@@ -603,7 +603,7 @@ def test_clearing_takes_the_timeline_away(qtbot, tmp_path):
     assert w._timeline.isHidden()
 
 
-# --- dragging the shown generation out to a combine slot --------------------
+# --- dragging the shown generation out to a Combine drop zone --------------------
 
 @pytest.fixture
 def drags(monkeypatch):
@@ -685,7 +685,7 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
 def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
         qtbot, make_preview, tmp_path, drags):
     # The pane fits its item to its own size, which is far bigger than a drop
-    # slot; under the cursor it travels as a thumbnail like every other drag.
+    # drop zone; under the cursor it travels as a thumbnail like every other drag.
     w = make_preview()
     w.show()
     w.resize(600, 480)

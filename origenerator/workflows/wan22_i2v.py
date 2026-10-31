@@ -149,8 +149,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, defaults["cfg_low"], min_val=0.0, max_val=30.0, step=0.1, good=(3, 4)),
             wan_expert_shift_param(defaults),
             *wan_expert_model_params(defaults),
-            # The speech slot takes only the speech model: an expert in it would
-            # render deaf, and the expert slots never offer it.
+            # The speaking model's place takes only the speech model: an expert there
+            # would render deaf, and the experts' places never offer it.
             model_picker("unet_s2v", "Speaking Model", defaults["unet_s2v"], "diffusion_models",
                          accepts=(WAN_S2V,)),
             *wan_expert_lora_params(defaults),

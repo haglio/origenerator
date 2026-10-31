@@ -1,4 +1,4 @@
-"""What Combine's Recent dropdown lists: the videos each lane's slot has been given.
+"""What Combine's Recent dropdown lists: the videos each lane's drop zone has been given.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """

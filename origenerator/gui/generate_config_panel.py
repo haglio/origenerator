@@ -61,7 +61,7 @@ from origenerator.gui import icons
 from origenerator.gui.action_picker import ActionPicker
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
-from origenerator.gui.drop_slot import DropSlot, DropZone
+from origenerator.gui.drop_zone import DropZone, DropZones
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
 from origenerator.gui.flow_layout import FlowLayout
@@ -124,7 +124,7 @@ _RANDOM_SEED_TIP = (
 # One thing in the tab is wider than a tiling-narrow window can give the info pane
 # — an image's list of versions, a thumbnail beside a file's facts and buttons — and
 # a floor that insisted on it would take the whole window out of the monitor-third
-# slot it has to fit (see tests/test_core.py). Past this the settings scroll
+# place it has to fit (see tests/test_core.py). Past this the settings scroll
 # sideways after all, which is the smaller of the two losses.
 _FLOOR_CAP = 330
 
@@ -201,7 +201,7 @@ def _pick_installed_ones_first(names: list[str]) -> str:
     return f"{shown} aren't installed anymore — pick installed ones first"
 
 
-class GenerateConfigPanel(DropZone):
+class GenerateConfigPanel(DropZones):
     """One generation configuration: pick a workflow and set its params.
 
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
@@ -601,7 +601,7 @@ class GenerateConfigPanel(DropZone):
         the wrapper this sits in: an explicit minimum *replaces* this hint rather
         than joining it, so one would pin the floor at its own number and put the
         scroll bar back. Capped at ``_FLOOR_CAP``, where holding the floor would
-        cost the window its tiling slot.
+        cost the window its tiling place.
         """
         hint = super().minimumSizeHint()
         hint.setWidth(min(self._contents_floor(), _FLOOR_CAP))
@@ -1288,8 +1288,8 @@ class GenerateConfigPanel(DropZone):
         for zone in self.reaches():
             zone.reread_name()
 
-    def reaches(self) -> tuple[DropSlot, ...]:
-        return () if self._param_form is None else self._param_form.drop_slots()
+    def reaches(self) -> tuple[DropZone, ...]:
+        return () if self._param_form is None else self._param_form.drop_zones()
 
     def tab_icon(self) -> QIcon:
         """The mark beside this tab's name: the displayed item's own thumbnail,

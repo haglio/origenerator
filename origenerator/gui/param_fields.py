@@ -14,7 +14,7 @@ from PyQt6.QtCore import QSignalBlocker, Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 
-from origenerator.gui.drop_slot import DropSlot, placeholder_for
+from origenerator.gui.drop_zone import DropZone, placeholder_for
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.param_help import option_help
@@ -117,7 +117,7 @@ class _Drop(FieldKind):
         self.browse_filter = FILE_FILTERS[kind]
 
     def make(self, pd):
-        zone = DropSlot(
+        zone = DropZone(
             self._kind, lambda prompt_id: self._items.lends(prompt_id, self._kind),
             self._items.preview, placeholder_for(self._kind),
             named=self._items.named, name_of=self._items.name_of,

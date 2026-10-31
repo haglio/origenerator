@@ -12,7 +12,7 @@ from PyQt6.QtGui import QColor, QImage
 
 from origenerator.gallery.enhance import EnhanceLevel
 from origenerator.gui.animated_strip import AnimatedVideoStrip
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.enhance_versions import _LevelRow
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
@@ -27,7 +27,7 @@ def _wide_thumbnail(tmp_path) -> str:
 
 
 def _as_the_drop_box_draws_it(qtbot, path) -> QSize:
-    box = DropSlot(MediaType.IMAGE, lambda pid: pid, lambda pid: (path, None), "Drop an image")
+    box = DropZone(MediaType.IMAGE, lambda pid: pid, lambda pid: (path, None), "Drop an image")
     qtbot.addWidget(box)
     box.set_item("img")
     return box._label.pixmap().size()

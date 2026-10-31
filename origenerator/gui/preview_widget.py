@@ -541,7 +541,7 @@ class PreviewWidget(QWidget):
             self.drag_out.note_press(event)
 
     def mouseMoveEvent(self, event) -> None:
-        # Drag the shown generation out to a combine slot, but only once the press
+        # Drag the shown generation out to a Combine drop zone, but only once the press
         # has travelled far enough to read as a drag rather than a click — so a
         # plain click still just opens fullscreen on the following double-click.
         if self._generation is None or not self.drag_out.should_start(event):
@@ -550,7 +550,7 @@ class PreviewWidget(QWidget):
 
     def _start_drag(self, prompt_id: str) -> None:
         """Carry the shown generation out under the shared drag type, so a combine
-        slot can read its prompt_id — the same payload a gallery thumbnail drags."""
+        drop zone can read its prompt_id — the same payload a gallery thumbnail drags."""
         self.drag_out.start(generation_mime(prompt_id),
                             self._drag_thumbnail())  # what is shown trails the cursor
 

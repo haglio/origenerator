@@ -2,7 +2,7 @@
 
 The fifth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is the whole act -- the panel with its two drop
-slots, what a dropped item lends each and how it shows there, the lane and
+drop zones, what a dropped item lends each and how it shows there, the lane and
 the act picked beside them, and every way settings are found and launched: the
 dropped video's own, the settings assigned for an act, the act's most-used past
 video, or the lane's own workflow as it starts.
@@ -68,7 +68,7 @@ class CombineHost(Protocol):
         """Which image made each file the gallery holds."""
 
     def animated_preview(self, row: dict) -> str | None:
-        """A looping preview of a video row, for a slot and for a prepared tab."""
+        """A looping preview of a video row, for a drop zone and for a prepared tab."""
 
     def folder_key_of(self, row: dict) -> str:
         """The settings-folder key a stored row lands in."""
@@ -82,7 +82,7 @@ class CombineHost(Protocol):
         the Latest collection its tile will appear on."""
 
     def follow_link(self, prompt_id: str) -> None:
-        """Go to a generation a slot is holding."""
+        """Go to a generation a drop zone is holding."""
 
     def tell(self, title: str, message: str) -> None:
         """Say something that needs acknowledging, where nobody is watching a
@@ -117,7 +117,7 @@ class CombineController(QObject):
         # Combine: drop an image + an i2v video, Generate re-runs that video's
         # settings on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
-            self._image_lent_by, self._video_lent_by, self._slot_preview,
+            self._image_lent_by, self._video_lent_by, self._zone_preview,
             self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
             browse_image=self._browse_image, leads_to=self._item_held)
         self.panel.video_used.connect(self._db.record_combine_video_use)
@@ -133,8 +133,8 @@ class CombineController(QObject):
         self.panel.intent_changed.connect(self._on_intent_changed)
         # An image dropped in narrows the acts too, so the list is re-asked
         # for the moment one lands rather than only when the lane changes.
-        self.panel.image_slot.changed.connect(self.image_dropped)
-        self.panel.video_slot.changed.connect(self.reconcile_generating)
+        self.panel.image_zone.changed.connect(self.image_dropped)
+        self.panel.video_zone.changed.connect(self.reconcile_generating)
         if client is None:
             self.panel.hide()
 
@@ -149,10 +149,10 @@ class CombineController(QObject):
         if not show_or_say("Checking animations", built, parent=self.panel):
             self._animation_settings = built
 
-    # --- what the slots take, and what the session keeps ---------------------
+    # --- what the drop zones take, and what the session keeps ---------------------
 
     def _accepts_image(self, image_id: str) -> bool:
-        """Whether the image slot can hold this: a generation that is an image
+        """Whether the image drop zone can hold this: a generation that is an image
         with a file to seed an i2v from (a video can't be a start frame),
         or an image file from outside the gallery."""
         return self._image_reference(image_id) is not None
@@ -182,7 +182,7 @@ class CombineController(QObject):
     def _browse_image(self) -> None:
         path = pick_a_file(self.panel, "Image", FILE_FILTERS[MediaType.IMAGE])
         if path:
-            self.panel.image_slot.set_item(path)
+            self.panel.image_zone.set_item(path)
 
     def _image_lent_by(self, prompt_id: str) -> str | None:
         lent = gallery.image_lent_by(prompt_id, self._db.get_generation,
@@ -193,7 +193,7 @@ class CombineController(QObject):
         """Whether ``row`` is a video whose i2v settings the app can rebuild — so its
         settings can be re-run on a new image. (``is_image_conditioned`` already
         implies the workflow is registered.) The shared gate under both the video
-        drop slot and the category dropdown's candidate pool."""
+        drop zone and the category dropdown's candidate pool."""
         return bool(
             row and gallery.media_type_of_row(row) == MediaType.VIDEO
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
@@ -205,8 +205,8 @@ class CombineController(QObject):
     def _video_lent_by(self, prompt_id: str) -> str | None:
         return prompt_id if self._accepts_video(prompt_id) else None
 
-    def _slot_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
-        """A dropped item's (thumbnail, looping-preview) paths for its slot: a video
+    def _zone_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
+        """A dropped item's (thumbnail, looping-preview) paths for its drop zone: a video
         loops, an image shows its still. Either may be ``None`` when absent."""
         row = self._db.get_generation(prompt_id)
         if row is None:
@@ -222,7 +222,7 @@ class CombineController(QObject):
 
     def selection(self) -> dict:
         return {
-            "image": self.panel.image_slot.current_id(),
+            "image": self.panel.image_zone.current_id(),
             "videos": self.panel.dropped_videos(),
             "intent": self.panel.selected_intent(),
             "category": self.panel.selected_category(),
@@ -230,13 +230,13 @@ class CombineController(QObject):
 
     def restore(self, saved) -> None:
         """Put the combine panel back the way a session left it, skipping an item
-        that has since been deleted or no longer fits its slot, and an act the
+        that has since been deleted or no longer fits its drop zone, and an act the
         lane can no longer answer.
 
         The lane goes in before the act: it decides which acts are answerable,
         and ``set_category`` refuses one that is grayed out under it.
 
-        A list of two is what sessions before this wrote — the slots alone — and
+        A list of two is what sessions before this wrote — the drop zones alone — and
         is still read, so an existing ``ui_state.json`` restores what it has.
         """
         match saved:
@@ -246,7 +246,7 @@ class CombineController(QObject):
             return
         image_id = saved.get("image")
         if image_id and self._accepts_image(image_id):
-            self.panel.image_slot.set_item(image_id)
+            self.panel.image_zone.set_item(image_id)
         self.panel.set_intent(saved.get("intent") or act_settings.VIDEO)
         videos = saved.get("videos")
         if not isinstance(videos, dict):
@@ -264,25 +264,25 @@ class CombineController(QObject):
 
     def offer_the_acts(self, rows: list[dict]) -> None:
         """Gray out the acts this press could not answer: those with no video to
-        mine settings from, and -- once an image is in the slot -- those
+        mine settings from, and -- once an image is in the drop zone -- those
         :mod:`origenerator.animation_paths` says it cannot start from. An image
         nobody has sorted yet narrows nothing."""
         lane = self.panel.selected_intent()
         offered = act_settings.available_categories(
             self.rebuildable_videos(rows), lane)
-        state = self._state_of(self.panel.image_slot.current_id())
+        state = self._state_of(self.panel.image_zone.current_id())
         if state:
             offered &= set(animation_paths.acts_for(state, lane))
         self.panel.set_available_categories(offered)
 
     def _state_of(self, image_id: str | None) -> str:
-        """What the image in the slot was sorted as showing, ``""`` for an
-        empty slot or an image nobody has sorted yet."""
+        """What the image in the drop zone was sorted as showing, ``""`` for an
+        empty drop zone or an image nobody has sorted yet."""
         row = self._db.get_generation(image_id) if image_id else None
         return (row or {}).get("image_state") or ""
 
     def image_dropped(self) -> None:
-        """The image in the slot changed: re-ask which acts it can start from."""
+        """The image in the drop zone changed: re-ask which acts it can start from."""
         self.offer_the_acts(self._db.list_generations())
         self.reconcile_generating()
 
@@ -292,8 +292,8 @@ class CombineController(QObject):
         self.reconcile_generating()
 
     def reconcile_generating(self) -> None:
-        image_id = self.panel.image_slot.current_id()
-        video_id = self.panel.video_slot.current_id()
+        image_id = self.panel.image_zone.current_id()
+        video_id = self.panel.video_zone.current_id()
         built = (self._combined_params(image_id, video_id, self.panel.selected_intent())
                  if image_id and video_id else None)
         self.panel.note_folder_generating(

@@ -39,7 +39,7 @@ _RECENT_WINDOW = 25  # rows arrive newest-first; this many count as "recent"
 # video made), so video bases get a fixed share of proposals rather than a
 # multiplier the image count would swamp.
 _VIDEO_SHARE = 0.8
-# LoRA dims (the file slots and their strengths) are the dimensions the user
+# LoRA dims (the file dropdowns and their strengths) are the dimensions the user
 # most wants explored, so they're drawn this much more often than the rest.
 _LORA_DIM_WEIGHT = 4.0
 
@@ -163,7 +163,7 @@ class ExperimentPolicy:
 
     def _weighted_dim_order(self, dims):
         """The dims in draw order for this proposal: a weighted shuffle in which
-        a LoRA dim (the file slot or its strength) outdraws any other dimension
+        a LoRA dim (the file dropdown or its strength) outdraws any other dimension
         ``_LORA_DIM_WEIGHT``-fold — LoRAs are what the user wants explored."""
         remaining = list(dims)
         order = []

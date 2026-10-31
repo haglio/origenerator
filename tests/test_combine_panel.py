@@ -1,4 +1,4 @@
-"""CombinePanel: two drop slots + a Generate button for the image+video combine."""
+"""CombinePanel: two drop zones + a Generate button for the image+video combine."""
 from __future__ import annotations
 
 import pytest
@@ -21,7 +21,7 @@ TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
 
 class _Uses:
-    """What the controller keeps of the videos the panel says went into its slot."""
+    """What the controller keeps of the videos the panel says went into its drop zone."""
 
     def __init__(self):
         self.said: list[tuple[str, str]] = []
@@ -35,9 +35,9 @@ class _Uses:
 
 
 def _panel(qtbot, start_images=None, *, fitting=None, preview=None, uses=None):
-    """Images are ``img*`` and videos ``vid*``; a video lends the image slot the
+    """Images are ``img*`` and videos ``vid*``; a video lends the image drop zone the
     image ``start_images`` names for it, and nothing when it names none.
-    ``fitting`` narrows the videos the video slot takes to the ones it holds."""
+    ``fitting`` narrows the videos the video drop zone takes to the ones it holds."""
     start_images = start_images or {}
     uses = uses if uses is not None else _Uses()
     panel = CombinePanel(
@@ -69,8 +69,8 @@ def _let_go_over(zone, pid):
     return event
 
 
-def _under_the_drag(slot) -> bool:
-    return slot._label.property("dropTarget")
+def _under_the_drag(zone) -> bool:
+    return zone._label.property("dropTarget")
 
 
 def _pick_act(panel, act):
@@ -89,7 +89,7 @@ def _pick_lane(panel, intent):
 
 
 def test_the_two_edit_buttons_say_which_settings_each_one_edits(qtbot):
-    """His pair: one for the combination in the slots, one for the settings every
+    """His pair: one for the combination in the drop zones, one for the settings every
     animation of an act runs."""
     panel = _panel(qtbot)
 
@@ -97,7 +97,7 @@ def test_the_two_edit_buttons_say_which_settings_each_one_edits(qtbot):
     assert panel._defaults_btn.text() == "Edit default…"
 
 
-def test_the_animation_settings_are_editable_with_nothing_in_the_slots(qtbot):
+def test_the_animation_settings_are_editable_with_nothing_in_the_drop_zones(qtbot):
     """What it opens is about the 93 animations, not about a dropped image, so
     it is not gated on one the way Generate and "Edit individual…" are."""
     panel = _panel(qtbot)
@@ -145,23 +145,23 @@ def test_an_act_both_lanes_carry_stays_picked_across_the_switch(qtbot):
     assert panel.selected_category() == "alpha"
 
 
-def test_only_the_video_slot_is_drained_of_color(qtbot):
+def test_only_the_video_drop_zone_is_drained_of_color(qtbot):
     # The video is here for its settings — never for what it looks like — while
     # the image is the very thing being animated.
     panel = _panel(qtbot)
 
-    assert panel.video_slot._grayscale
-    assert not panel.image_slot._grayscale
+    assert panel.video_zone._grayscale
+    assert not panel.image_zone._grayscale
 
 
-def test_generate_is_disabled_until_both_slots_are_filled(qtbot):
+def test_generate_is_disabled_until_both_drop_zones_are_filled(qtbot):
     panel = _panel(qtbot)
     assert not panel._generate_btn.isEnabled()
 
-    panel.image_slot.set_item("img1")
-    assert not panel._generate_btn.isEnabled()  # the video slot is still empty
+    panel.image_zone.set_item("img1")
+    assert not panel._generate_btn.isEnabled()  # the video drop zone is still empty
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     assert panel._generate_btn.isEnabled()       # both filled: ready
 
 
@@ -170,7 +170,7 @@ def test_grayed_generate_and_edit_say_what_they_still_need(qtbot):
     needs_image = "Nothing to start from — drop an image first"
     assert (panel._generate_btn.toolTip(), panel._open_btn.toolTip()) == (needs_image, needs_image)
 
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
 
     needs_act_or_video = "Pick an act or drop a video first"
     assert (panel._generate_btn.toolTip(), panel._open_btn.toolTip()) == (needs_act_or_video, needs_act_or_video)
@@ -178,9 +178,9 @@ def test_grayed_generate_and_edit_say_what_they_still_need(qtbot):
 
 def test_once_ready_generate_drops_its_reason_and_edit_says_what_it_does(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     assert panel._generate_btn.toolTip() == ""
     assert panel._open_btn.toolTip() == (
@@ -189,8 +189,8 @@ def test_once_ready_generate_drops_its_reason_and_edit_says_what_it_does(qtbot):
 
 def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
     got = []
     panel.combine_requested.connect(got.append)
 
@@ -206,10 +206,10 @@ def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
     panel = _panel(qtbot)
     assert not panel._open_btn.isEnabled()
 
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
     assert not panel._open_btn.isEnabled()  # image alone, no settings yet
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     assert panel._open_btn.isEnabled()       # both filled: ready to open
 
 
@@ -217,36 +217,36 @@ def test_generate_says_it_draws_a_random_seed_for_a_video_on_its_own_start_image
     # The press gives the video's settings fresh seeds, so it makes a new
     # variation rather than the same video again, and the button says so.
     panel = _panel(qtbot, start_images={"vid1": "img1"})
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     assert panel._generate_btn.text() == "Generate with Random seed"
 
 
 def test_generate_stays_plain_for_a_video_on_another_image(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
-    panel.image_slot.set_item("img2")
+    panel.image_zone.set_item("img2")
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     assert panel._generate_btn.text() == "Generate"
 
 
 def test_generate_goes_back_to_plain_once_the_image_changes(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
 
-    panel.image_slot.set_item("img2")
+    panel.image_zone.set_item("img2")
 
     assert panel._generate_btn.text() == "Generate"
 
 
 def test_generate_grays_while_the_pair_dropped_in_is_already_being_made(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
 
     panel.note_folder_generating(True)
 
@@ -257,8 +257,8 @@ def test_generate_grays_while_the_pair_dropped_in_is_already_being_made(qtbot):
 
 def test_generate_comes_back_once_that_one_is_made(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
     panel.note_folder_generating(True)
 
     panel.note_folder_generating(False)
@@ -274,8 +274,8 @@ def test_generate_is_blue_while_it_can_run_and_gray_while_it_cannot(qtbot):
         panel.show()
     cannot_run = ground(panel._generate_btn)
 
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
 
     assert ground(panel._generate_btn) == BLUE.name()
     assert cannot_run == BG_SECONDARY.name()
@@ -284,8 +284,8 @@ def test_generate_is_blue_while_it_can_run_and_gray_while_it_cannot(qtbot):
 @pytest.mark.parametrize("name", ["_generate_btn", "_open_btn"], ids=["Generate", "Edit"])
 def test_a_ready_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer, name):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
     panel.setStyleSheet(build_stylesheet())
     with qtbot.waitExposed(panel):
         panel.show()
@@ -299,8 +299,8 @@ def test_a_ready_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer, 
 
 def test_clicking_open_emits_the_dropped_video_for_the_generator(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
+    panel.image_zone.set_item("img1")
+    panel.video_zone.set_item("vid1")
     opened = []
     panel.combine_requested.connect(opened.append)
 
@@ -313,7 +313,7 @@ def test_clicking_open_emits_the_dropped_video_for_the_generator(qtbot):
 
 def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
     _pick_act(panel, "delta")
     opened = []
     panel.combine_requested.connect(opened.append)
@@ -324,46 +324,46 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
                                      intent=act_settings.VIDEO, edit_first=True)]
 
 
-def test_a_drag_under_way_lights_only_the_slot_it_fits(qtbot):
-    panel = _panel(qtbot)  # image slot accepts img*, video slot accepts vid*
+def test_a_drag_under_way_lights_only_the_drop_zone_it_fits(qtbot):
+    panel = _panel(qtbot)  # image drop zone accepts img*, video drop zone accepts vid*
     image, video = generation_mime("img7"), generation_mime("vid7")
 
     under_way.started.emit(image, None)
-    assert panel.image_slot._label.property("dragActive") is True
-    assert panel.video_slot._label.property("dragActive") is False
+    assert panel.image_zone._label.property("dragActive") is True
+    assert panel.video_zone._label.property("dragActive") is False
     under_way.ended.emit()
 
-    under_way.started.emit(video, None)  # a video now: the other slot lights instead
-    assert panel.image_slot._label.property("dragActive") is False
-    assert panel.video_slot._label.property("dragActive") is True
+    under_way.started.emit(video, None)  # a video now: the other drop zone lights instead
+    assert panel.image_zone._label.property("dragActive") is False
+    assert panel.video_zone._label.property("dragActive") is True
 
     under_way.ended.emit()
-    assert panel.image_slot._label.property("dragActive") is False
-    assert panel.video_slot._label.property("dragActive") is False
+    assert panel.image_zone._label.property("dragActive") is False
+    assert panel.video_zone._label.property("dragActive") is False
 
 
-def test_a_video_let_go_between_the_slots_lands_in_both(qtbot):
+def test_a_video_let_go_between_the_drop_zones_lands_in_both(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
 
     _let_go_over(panel._between, "vid1")
 
-    assert panel.image_slot.current_id() == "img1"  # the image the video was made from
-    assert panel.video_slot.current_id() == "vid1"
+    assert panel.image_zone.current_id() == "img1"  # the image the video was made from
+    assert panel.video_zone.current_id() == "vid1"
 
 
-def test_a_video_over_the_room_between_the_slots_lights_both(qtbot):
+def test_a_video_over_the_room_between_the_drop_zones_lights_both(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
 
     assert _drag_over(panel._between, "vid1").isAccepted()
-    assert _under_the_drag(panel.image_slot)
-    assert _under_the_drag(panel.video_slot)
+    assert _under_the_drag(panel.image_zone)
+    assert _under_the_drag(panel.video_zone)
 
     panel._between.dragLeaveEvent(QDragLeaveEvent())
-    assert not _under_the_drag(panel.image_slot)
-    assert not _under_the_drag(panel.video_slot)
+    assert not _under_the_drag(panel.image_zone)
+    assert not _under_the_drag(panel.video_zone)
 
 
-def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
+def test_both_drop_zones_stay_lit_while_the_drag_moves_about_between_them(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
     _drag_over(panel._between, "vid1")
     mime = generation_mime("vid1")
@@ -373,68 +373,68 @@ def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
     panel._between.dragMoveEvent(event)
 
     assert event.isAccepted()
-    assert _under_the_drag(panel.image_slot)
-    assert _under_the_drag(panel.video_slot)
+    assert _under_the_drag(panel.image_zone)
+    assert _under_the_drag(panel.video_zone)
 
 
-def test_letting_go_between_the_slots_puts_both_out(qtbot):
+def test_letting_go_between_the_drop_zones_puts_both_out(qtbot):
     panel = _panel(qtbot, start_images={"vid1": "img1"})
     _drag_over(panel._between, "vid1")
 
     _let_go_over(panel._between, "vid1")
 
-    assert not _under_the_drag(panel.image_slot)
-    assert not _under_the_drag(panel.video_slot)
+    assert not _under_the_drag(panel.image_zone)
+    assert not _under_the_drag(panel.video_zone)
 
 
-def test_between_the_slots_a_video_lands_only_where_it_lends_something(qtbot):
+def test_between_the_drop_zones_a_video_lands_only_where_it_lends_something(qtbot):
     panel = _panel(qtbot)  # the gallery holds no image vid7 was made from
 
     _drag_over(panel._between, "vid7")
-    assert not _under_the_drag(panel.image_slot)
-    assert _under_the_drag(panel.video_slot)
+    assert not _under_the_drag(panel.image_zone)
+    assert _under_the_drag(panel.video_zone)
 
     _let_go_over(panel._between, "vid7")
-    assert panel.image_slot.current_id() is None
-    assert panel.video_slot.current_id() == "vid7"
+    assert panel.image_zone.current_id() is None
+    assert panel.video_zone.current_id() == "vid7"
 
 
-def test_an_image_let_go_between_the_slots_lands_in_the_image_slot(qtbot):
+def test_an_image_let_go_between_the_drop_zones_lands_in_the_image_drop_zone(qtbot):
     panel = _panel(qtbot)
 
     _let_go_over(panel._between, "img1")
 
-    assert panel.image_slot.current_id() == "img1"
-    assert panel.video_slot.current_id() is None
+    assert panel.image_zone.current_id() == "img1"
+    assert panel.video_zone.current_id() is None
 
 
-def test_what_lends_neither_slot_anything_cannot_be_let_go_between_them(qtbot):
+def test_what_lends_neither_drop_zone_anything_cannot_be_let_go_between_them(qtbot):
     panel = _panel(qtbot)
 
     assert not _drag_over(panel._between, "elsewhere").isAccepted()
     assert not _let_go_over(panel._between, "elsewhere").isAccepted()
 
 
-def test_with_an_act_picked_the_room_between_reaches_only_the_image_slot(qtbot):
-    # The video slot is hidden under an act, so nothing shows it as a target.
+def test_with_an_act_picked_the_room_between_reaches_only_the_image_drop_zone(qtbot):
+    # The video drop zone is hidden under an act, so nothing shows it as a target.
     panel = _panel(qtbot, start_images={"vid1": "img1"})
     _pick_act(panel, "alpha")
 
     _let_go_over(panel._between, "vid1")
 
-    assert panel.image_slot.current_id() == "img1"
-    assert panel.video_slot.current_id() is None
+    assert panel.image_zone.current_id() == "img1"
+    assert panel.video_zone.current_id() is None
     assert panel.selected_category() == "alpha"
 
 
-def test_the_room_between_the_slots_is_the_whole_gap_that_parts_them(qtbot):
+def test_the_room_between_the_drop_zones_is_the_whole_gap_that_parts_them(qtbot):
     panel = _panel(qtbot)
     panel.setStyleSheet(build_stylesheet())
     with qtbot.waitExposed(panel):
         panel.show()
 
     between = panel._between.geometry()
-    assert between.top() == panel.image_slot.geometry().bottom() + 1
+    assert between.top() == panel.image_zone.geometry().bottom() + 1
     assert between.bottom() + 1 == panel._video_part.geometry().top()
     # As far apart as a group's gap set them in this column before it took drops.
     assert between.height() == BUTTON_GAP + BUTTON_GROUP_GAP
@@ -482,13 +482,13 @@ def test_a_grayed_act_explains_itself(qtbot):
     assert not panel._category.itemData(panel._category.findText("beta"), TOOLTIP)
 
 
-def test_dropdown_sits_beside_the_video_slot_in_one_part(qtbot):
+def test_dropdown_sits_beside_the_video_drop_zone_in_one_part(qtbot):
     panel = _panel(qtbot)
     # The dropdown configures the *video* settings, so it shares one container with the
-    # video slot — laid out side by side, not stacked, and not a peer of the image.
-    assert panel._action_part.parent() is panel.video_slot.parent()
-    assert panel.image_slot.parent() is not panel.video_slot.parent()
-    assert isinstance(panel.video_slot.parent().layout(), QHBoxLayout)
+    # video drop zone — laid out side by side, not stacked, and not a peer of the image.
+    assert panel._action_part.parent() is panel.video_zone.parent()
+    assert panel.image_zone.parent() is not panel.video_zone.parent()
+    assert isinstance(panel.video_zone.parent().layout(), QHBoxLayout)
 
 
 def test_the_word_action_sits_under_the_dropdown_it_names(qtbot):
@@ -506,7 +506,7 @@ def test_the_word_action_sits_under_the_dropdown_it_names(qtbot):
 
 def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
     assert not panel._generate_btn.isEnabled()  # image alone, no settings chosen yet
 
     _pick_act(panel, "alpha")
@@ -518,42 +518,42 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
 
 def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     panel = _panel(qtbot)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     height = panel._video_part.sizeHint().height()
 
     _pick_act(panel, "alpha")
 
-    assert panel.video_slot.current_id() is None  # the act supersedes it, so the video is dropped
+    assert panel.video_zone.current_id() is None  # the act supersedes it, so the video is dropped
     assert panel._video_part.sizeHint().height() == height  # hidden, but its room stays put
 
 
 def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
     panel = _panel(qtbot)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     _pick_act(panel, "alpha")
 
     _pick_act(panel, "")
 
-    assert panel.video_slot.current_id() == "vid1"
+    assert panel.video_zone.current_id() == "vid1"
 
 
-def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtbot):
+def test_a_remembered_video_that_no_longer_fits_its_drop_zone_is_not_brought_back(qtbot):
     fitting = {"vid1"}
     panel = _panel(qtbot, fitting=fitting)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     _pick_act(panel, "alpha")
     fitting.clear()  # trashed while the act was picked
 
     _pick_act(panel, "")
 
-    assert panel.video_slot.current_id() is None
+    assert panel.video_zone.current_id() is None
 
 
-def test_a_trashed_video_leaves_the_slot_empty_rather_than_bringing_back_an_older_one(qtbot):
+def test_a_trashed_video_leaves_the_drop_zone_empty_rather_than_bringing_back_an_older_one(qtbot):
     fitting = {"vid1", "vid2"}
     panel = _panel(qtbot, fitting=fitting)
-    panel.video_slot.set_item("vid1")
-    panel.video_slot.set_item("vid2")
+    panel.video_zone.set_item("vid1")
+    panel.video_zone.set_item("vid2")
     _pick_act(panel, "alpha")
     fitting.discard("vid2")  # trashed while the act was picked
 
@@ -561,22 +561,22 @@ def test_a_trashed_video_leaves_the_slot_empty_rather_than_bringing_back_an_olde
     _pick_lane(panel, act_settings.GENAU)
     _pick_lane(panel, act_settings.VIDEO)
 
-    assert panel.video_slot.current_id() is None
+    assert panel.video_zone.current_id() is None
     assert _listed_under_recent(panel) == ["vid1"]
 
 
 def test_each_lane_keeps_its_own_dropped_video(qtbot):
     panel = _panel(qtbot)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     _pick_lane(panel, act_settings.GENAU)
-    assert panel.video_slot.current_id() is None
-    panel.video_slot.set_item("vid2")
+    assert panel.video_zone.current_id() is None
+    panel.video_zone.set_item("vid2")
 
     _pick_lane(panel, act_settings.VIDEO)
-    assert panel.video_slot.current_id() == "vid1"
+    assert panel.video_zone.current_id() == "vid1"
 
     _pick_lane(panel, act_settings.GENAU)
-    assert panel.video_slot.current_id() == "vid2"
+    assert panel.video_zone.current_id() == "vid2"
 
 
 def _listed_under_recent(panel):
@@ -585,10 +585,10 @@ def _listed_under_recent(panel):
             for row in range(panel._recent_videos.count())]
 
 
-def test_a_video_put_in_the_slot_is_listed_under_recent(qtbot):
+def test_a_video_put_in_the_drop_zone_is_listed_under_recent(qtbot):
     panel = _panel(qtbot)
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     assert _listed_under_recent(panel) == ["vid1"]
 
@@ -597,16 +597,16 @@ def test_recent_lists_the_newest_first_and_each_video_once(qtbot):
     panel = _panel(qtbot)
 
     for video in ("vid1", "vid2", "vid1", "vid3"):
-        panel.video_slot.set_item(video)
+        panel.video_zone.set_item(video)
 
     assert _listed_under_recent(panel) == ["vid3", "vid1", "vid2"]
 
 
 def test_each_lane_lists_the_videos_it_had(qtbot):
     panel = _panel(qtbot)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     _pick_lane(panel, act_settings.GENAU)
-    panel.video_slot.set_item("vid2")
+    panel.video_zone.set_item("vid2")
 
     assert _listed_under_recent(panel) == ["vid2"]
     _pick_lane(panel, act_settings.VIDEO)
@@ -617,25 +617,25 @@ def test_recent_keeps_every_video_the_lane_has_had(qtbot):
     panel = _panel(qtbot)
 
     for n in range(40):
-        panel.video_slot.set_item(f"vid{n}")
+        panel.video_zone.set_item(f"vid{n}")
 
     assert _listed_under_recent(panel) == [f"vid{n}" for n in range(39, -1, -1)]
 
 
-def test_a_video_that_no_longer_fits_the_slot_is_not_listed(qtbot):
+def test_a_video_that_no_longer_fits_the_drop_zone_is_not_listed(qtbot):
     fitting = {"vid1", "vid2"}
     panel = _panel(qtbot, fitting=fitting)
-    panel.video_slot.set_item("vid1")
-    panel.video_slot.set_item("vid2")
+    panel.video_zone.set_item("vid1")
+    panel.video_zone.set_item("vid2")
     fitting.discard("vid1")  # trashed since
 
     assert _listed_under_recent(panel) == ["vid2"]
 
 
-def test_picking_a_recent_video_puts_it_in_the_slot_and_lists_it_first(qtbot):
+def test_picking_a_recent_video_puts_it_in_the_drop_zone_and_lists_it_first(qtbot):
     panel = _panel(qtbot)
-    panel.video_slot.set_item("vid1")
-    panel.video_slot.set_item("vid2")
+    panel.video_zone.set_item("vid1")
+    panel.video_zone.set_item("vid2")
     dropdown = panel._recent_videos
     dropdown.showPopup()
     view = dropdown.view()
@@ -643,11 +643,11 @@ def test_picking_a_recent_video_puts_it_in_the_slot_and_lists_it_first(qtbot):
     qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
                      pos=view.visualRect(dropdown.model().index(1, 0)).center())
 
-    assert panel.video_slot.current_id() == "vid1"
+    assert panel.video_zone.current_id() == "vid1"
     assert _listed_under_recent(panel) == ["vid1", "vid2"]
 
 
-def test_recent_sits_under_the_action_dropdown_left_of_the_video_slot(qtbot):
+def test_recent_sits_under_the_action_dropdown_left_of_the_video_drop_zone(qtbot):
     panel = _panel(qtbot)
     column = panel._action_part.layout()
     order = [column.itemAt(i).widget() for i in range(column.count())]
@@ -690,21 +690,21 @@ def test_recent_lists_what_the_lane_was_given_before_this_session(qtbot):
     assert _listed_under_recent(panel) == ["vid3"]
 
 
-def test_recent_lists_the_video_in_the_slot_first_whatever_came_since(qtbot):
+def test_recent_lists_the_video_in_the_drop_zone_first_whatever_came_since(qtbot):
     uses = _Uses()
     panel = _panel(qtbot, uses=uses)
-    panel.video_slot.set_item("vid1")
-    uses.record(act_settings.VIDEO, "vid2")  # given the slot in another copy of the app
+    panel.video_zone.set_item("vid1")
+    uses.record(act_settings.VIDEO, "vid2")  # given the drop zone in another copy of the app
 
     assert _listed_under_recent(panel) == ["vid1", "vid2"]
 
 
-def test_a_video_put_in_the_slot_is_said_with_the_lane_it_went_in_under(qtbot):
+def test_a_video_put_in_the_drop_zone_is_said_with_the_lane_it_went_in_under(qtbot):
     uses = _Uses()
     panel = _panel(qtbot, uses=uses)
     _pick_lane(panel, act_settings.GENAU)
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     assert uses.said == [(act_settings.GENAU, "vid1")]
 
@@ -712,7 +712,7 @@ def test_a_video_put_in_the_slot_is_said_with_the_lane_it_went_in_under(qtbot):
 def test_a_lanes_video_shown_again_is_not_said_again(qtbot):
     uses = _Uses()
     panel = _panel(qtbot, uses=uses)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
     _pick_lane(panel, act_settings.GENAU)
     _pick_lane(panel, act_settings.VIDEO)
     _pick_act(panel, "alpha")
@@ -727,7 +727,7 @@ def test_recent_reads_its_videos_only_when_it_opens(qtbot):
     panel = _panel(qtbot, preview=lambda pid: asked.append(pid) or (None, None))
 
     for n in range(5):
-        panel.video_slot.set_item(f"vid{n}")
+        panel.video_zone.set_item(f"vid{n}")
     _pick_lane(panel, act_settings.GENAU)
 
     assert asked == [f"vid{n}" for n in range(5)]
@@ -735,7 +735,7 @@ def test_recent_reads_its_videos_only_when_it_opens(qtbot):
 
 def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
     panel = _panel(qtbot)
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     _pick_lane(panel, act_settings.GENAU)
 
@@ -747,26 +747,26 @@ def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     panel = _panel(qtbot)
     _pick_act(panel, "delta")
 
-    panel.video_slot.set_item("vid1")
+    panel.video_zone.set_item("vid1")
 
     assert panel.selected_category() == ""          # a dropped video wipes the act back to "(custom)"
-    assert panel.video_slot.current_id() == "vid1"  # ...and the video is what's kept
+    assert panel.video_zone.current_id() == "vid1"  # ...and the video is what's kept
 
 
-def test_the_video_slot_shows_only_while_custom_is_picked(qtbot):
+def test_the_video_drop_zone_shows_only_while_custom_is_picked(qtbot):
     panel = _panel(qtbot)
-    assert not panel.video_slot.isHidden()
+    assert not panel.video_zone.isHidden()
 
     _pick_act(panel, "gamma")
-    assert panel.video_slot.isHidden()
+    assert panel.video_zone.isHidden()
 
     _pick_act(panel, "")
-    assert not panel.video_slot.isHidden()
+    assert not panel.video_zone.isHidden()
 
 
 def test_generate_emits_the_picked_act(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
     _pick_act(panel, "delta")
     cats = []
     panel.combine_requested.connect(cats.append)
@@ -807,7 +807,7 @@ def test_the_radio_sits_below_the_dropdown_it_changes(qtbot):
 
 def test_generate_carries_the_chosen_lane(qtbot):
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
     _pick_act(panel, "alpha")  # one both lanes have a row for, so the pick stands
     _pick_lane(panel, act_settings.GENAU)
     cats = []
@@ -855,7 +855,7 @@ def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
     # Otherwise Generate stays lit on a pick the lane has no settings for, and the
     # click can only end in "no past video yet".
     panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
+    panel.image_zone.set_item("img1")
     _pick_act(panel, "gamma")
     assert panel._generate_btn.isEnabled()
 
@@ -931,16 +931,16 @@ def test_both_zones_paste_a_name_and_only_the_image_zone_browses(qtbot):
         named={"AB12CD34 001": "img1"}.get, name_of={"img1": "AB12CD34 001"}.get,
         browse_image=lambda: browsed.append("asked"))
     qtbot.addWidget(panel)
-    image_actions = {action.text(): action for action in panel.image_slot.menu().actions()}
+    image_actions = {action.text(): action for action in panel.image_zone.menu().actions()}
     assert list(image_actions) == ["Paste Origenerator name", "Browse..."]
-    assert [action.text() for action in panel.video_slot.menu().actions()] == [
+    assert [action.text() for action in panel.video_zone.menu().actions()] == [
         "Paste Origenerator name"]
 
     image_actions["Browse..."].trigger()
     QApplication.clipboard().setText("AB12CD34 001")
-    {action.text(): action for action in panel.image_slot.menu().actions()}[
+    {action.text(): action for action in panel.image_zone.menu().actions()}[
         "Paste Origenerator name"].trigger()
 
     assert browsed == ["asked"]
-    assert panel.image_slot.current_id() == "img1"
-    assert panel.image_slot.toolTip() == "AB12CD34 001"
+    assert panel.image_zone.current_id() == "img1"
+    assert panel.image_zone.toolTip() == "AB12CD34 001"

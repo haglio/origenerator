@@ -263,11 +263,11 @@ class RunningPreview(OpensAFolder, QWidget):
 
     def show_foreign(self, text: str):
         """Say what the shared server is holding us up with — under our own job's
-        bar while it is held up by that work, or in the bar's own slot while
+        bar while it is held up by that work, or in the bar's own place while
         nothing of ours is in flight at all.
 
         Hidden with nothing to say, so a job of ours actually being made keeps the
-        slot for its bar alone; an empty half keeps it up regardless, holding the
+        place for its bar alone; an empty half keeps it up regardless, holding the
         space its bar has stood down from.
         """
         self._caption.setText(text)
@@ -847,11 +847,11 @@ class JobQueueView(QWidget):
         if key is None:
             return
         keys = [item.key for item in self._items]
-        slot = self._drop_index(event.position().toPoint())
-        # The slot was read with the dragged row still in place, so a drop below
-        # it names a slot one further along than it will end up in.
+        place = self._drop_index(event.position().toPoint())
+        # The place was read with the dragged row still in place, so a drop below
+        # it names a place one further along than it will end up in.
         rest = [other for other in keys if other != key]
-        landing = slot - 1 if slot > keys.index(key) else slot
+        landing = place - 1 if place > keys.index(key) else place
         if rest[:landing] + [key] + rest[landing:] != keys:
             self.move_requested.emit(key, rest[landing] if landing < len(rest) else None)
         event.acceptProposedAction()
@@ -862,7 +862,7 @@ class JobQueueView(QWidget):
             self._rules.update()
 
     def _drop_index(self, point) -> int:
-        """Which slot a drop at ``point`` (in this widget's coordinates) lands in:
+        """Which place a drop at ``point`` (in this widget's coordinates) lands in:
         above the row whose top half it fell on, else at the end of the line. Never
         in front of a row that holds its place."""
         for index, row in enumerate(self.rows()):

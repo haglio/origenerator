@@ -120,7 +120,7 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     """Return the first already-completed generation ``snapshot`` would reproduce.
 
     Re-running a config whose seed isn't randomized re-creates a byte-identical
-    output, so this lets the caller warn before wasting a slot. A row counts only
+    output, so this lets the caller warn before wasting a run. A row counts only
     when it is a reproducible generation of ours whose full parameters match:
 
     * ``completed`` -- a failed or canceled attempt is a legitimate retry.

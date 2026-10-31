@@ -20,8 +20,8 @@ FLUX = "flux"
 QWEN = "qwen"
 WAN = "wan"
 # WAN 2.2's speech-to-video model: the WAN layout plus the audio injector that
-# lets it lip-sync, and a family of its own because it is one -- an i2v slot
-# that took it would run without the audio it needs, and the speech slot must
+# lets it lip-sync, and a family of its own because it is one -- an i2v dropdown
+# that took it would run without the audio it needs, and the speech dropdown must
 # not offer the i2v experts, which have no ear.
 WAN_S2V = "wan_s2v"
 # WAN 2.2 Animate: WAN with the pose embedding that follows a video's person.
@@ -171,7 +171,7 @@ def _expert_from_name(name: str) -> str | None:
     """Which WAN 2.2 expert the filename claims, or ``None`` when it says nothing.
 
     A name carrying both markers claims nothing usable, so it reads as unmarked
-    and stays offered in either slot.
+    and stays offered in either dropdown.
     """
     found = {
         match.group(0).lower().strip("-_. ")

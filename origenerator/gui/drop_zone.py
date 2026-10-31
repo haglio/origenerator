@@ -1,15 +1,15 @@
-"""Drop targets for a dragged gallery generation: slots holding what it lends them.
+"""Drop targets for a dragged gallery generation: drop zones holding what it lends them.
 
-The gallery's combine panel pairs two slots — an image slot and a video slot — with
-a zone between them that drops into both. A slot holds whatever its ``lent_by``
+The gallery's combine panel pairs two drop zones — one for an image and one for a
+video — with a span between them that drops into both. A drop zone holds whatever its ``lent_by``
 says a dropped generation lends it and turns away one that lends it nothing; it
 previews what it holds — a video loops, an image shows its still — names
 it underneath, and wears an item type icon of its own kind. What it holds means
 nothing to it; its owner supplies ``lent_by``, the preview and the name.
 
-A slot whose item is held only for its settings is built ``grayscale``, and draws
+A drop zone whose item is held only for its settings is built ``grayscale``, and draws
 whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
-video slot's whole purpose being the video's settings rather than the video.
+video drop zone's whole purpose being the video's settings rather than the video.
 """
 from __future__ import annotations
 
@@ -42,37 +42,37 @@ def placeholder_for(kind: str) -> str:
     return DROP_A_VIDEO if kind == "video" else DROP_AN_IMAGE
 
 
-class DropZone(QWidget):
-    """Where a dragged generation can be let go: into every slot this zone reaches
-    that is showing and is lent something by it, each lit while the drag is here."""
+class DropZones(QWidget):
+    """Where a dragged generation can be let go: into every drop zone this span
+    reaches that is showing and is lent something by it, each lit while the drag is here."""
 
-    def __init__(self, slots=(), parent=None):
+    def __init__(self, zones=(), parent=None):
         super().__init__(parent)
-        self._slots = tuple(slots)
+        self._zones = tuple(zones)
         self.setAcceptDrops(True)
 
-    def reaches(self) -> tuple[DropSlot, ...]:
-        return tuple(slot for slot in self._slots if not slot.isHidden())
+    def reaches(self) -> tuple[DropZone, ...]:
+        return tuple(zone for zone in self._zones if not zone.isHidden())
 
-    def _landing(self, mime) -> dict[DropSlot, str]:
+    def _landing(self, mime) -> dict[DropZone, str]:
         dropped = dragged_generation(mime)
         if dropped is None:
             return {}
-        lent = {slot: slot.lent_by(dropped) for slot in self.reaches()}
-        return {slot: held for slot, held in lent.items() if held is not None}
+        lent = {zone: zone.lent_by(dropped) for zone in self.reaches()}
+        return {zone: held for zone, held in lent.items() if held is not None}
 
     def _aim(self, event):
         landing = self._landing(event.mimeData())
-        for slot in self.reaches():
-            slot.set_targeted(slot in landing)
+        for zone in self.reaches():
+            zone.set_targeted(zone in landing)
         if landing:
             event.acceptProposedAction()
         else:
             event.ignore()
 
     def _put_out(self):
-        for slot in self.reaches():
-            slot.set_targeted(False)
+        for zone in self.reaches():
+            zone.set_targeted(False)
 
     def dragEnterEvent(self, event):
         self._aim(event)
@@ -86,15 +86,15 @@ class DropZone(QWidget):
     def dropEvent(self, event):
         self._put_out()
         landing = self._landing(event.mimeData())
-        for slot, held in landing.items():
-            slot.set_item(held)
+        for zone, held in landing.items():
+            zone.set_item(held)
         if landing:
             event.acceptProposedAction()
         else:
             event.ignore()
 
 
-class DropSlot(DropZone):
+class DropZone(DropZones):
     """A labeled drop zone that holds one accepted generation's prompt_id."""
 
     changed = pyqtSignal()  # the held item changed (dropped or cleared)
@@ -119,7 +119,7 @@ class DropSlot(DropZone):
         self._placeholder = placeholder
         self._named = named        # an Origenerator name -> the prompt_id wearing it
         self._name_of = name_of    # what is held -> the name its tooltip says
-        self._browse = browse      # picks a file into the slot; None where only items go
+        self._browse = browse      # picks a file into the drop zone; None where only items go
         self._leads_to = leads_to
         self._go_to_tip = f"Click to go to this {kind}"
         # Whether what lands here is held for its settings rather than shown as a
@@ -135,7 +135,7 @@ class DropSlot(DropZone):
         # Style the child label, not the bare QWidget: a plain QWidget subclass
         # paints no stylesheet border without WA_StyledBackground.
         self._label = QLabel(placeholder)
-        self._label.setObjectName("dropSlot")
+        self._label.setObjectName("dropZone")
         self._label.setProperty(LIT, False)
         self._label.setProperty(AIMED, False)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -147,7 +147,7 @@ class DropSlot(DropZone):
         self._caption.setWordWrap(True)
         tile_shape.style_caption(self._caption)
         layout.addWidget(self._caption)
-        # An item type icon naming this slot's kind, shown only once something's dropped.
+        # An item type icon naming this drop zone's kind, shown only once something's dropped.
         self._item_type_icon = ItemTypeIcon(kind, self)
         self._render()
         under_way.started.connect(self._light_for)
@@ -165,7 +165,7 @@ class DropSlot(DropZone):
         self.changed.emit()
 
     def clear(self):
-        """Empty the slot back to its placeholder; a no-op when already empty."""
+        """Empty the drop zone back to its placeholder; a no-op when already empty."""
         if self._current_id is None:
             return
         self._current_id = None
@@ -221,7 +221,7 @@ class DropSlot(DropZone):
 
     # --- drag & drop ------------------------------------------------------
 
-    def reaches(self) -> tuple[DropSlot, ...]:
+    def reaches(self) -> tuple[DropZone, ...]:
         return (self,)
 
     def lent_by(self, prompt_id: str) -> str | None:

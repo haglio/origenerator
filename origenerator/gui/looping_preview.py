@@ -1,7 +1,7 @@
 """Play a looping WebP preview inside a QLabel via ``QMovie``.
 
 Video thumbnails across the gallery — the grid tiles, the Latest collection, the
-"Animated in" strip and a combine slot — all show a short looping WebP rather
+"Animated in" strip and a Combine drop zone — all show a short looping WebP rather
 than a static frame. ``QMovie`` plays them cheaply, with no video player per
 tile.
 

@@ -275,7 +275,7 @@ def queue_estimate_label(seconds: float | None) -> str:
     the median of that workflow's recent runs whatever length and resolution each
     was asked for, so "~2 min" claims exactly as much as it can back up. ``"~?"``
     when the workflow has never been timed — a first run has to happen before
-    anything can be said about the next one, and a made-up number in that slot is
+    anything can be said about the next one, and a made-up number in that place is
     worse than an admitted blank.
     """
     if seconds is None:

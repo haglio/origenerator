@@ -402,13 +402,13 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
         font-weight: bold;
     }}
-    QLabel#dropSlot {{
+    QLabel#dropZone {{
         border: 1px dashed {_h(BORDER_PANEL)};
         border-radius: {drop_style.RADIUS}px;
         color: {_h(TEXT_MUTED)};
         padding: {MARGIN_STANDARD}px;
     }}
-    QLabel#dropSlot[{drop_style.LIT}="true"], QLabel#dropSlot[{drop_style.AIMED}="true"] {{
+    QLabel#dropZone[{drop_style.LIT}="true"], QLabel#dropZone[{drop_style.AIMED}="true"] {{
         border: 1px solid {_h(drop_style.EDGE)};
         color: {_h(TEXT_PRIMARY)};
     }}

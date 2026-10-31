@@ -128,14 +128,14 @@ _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
 _FRAME = MAP_THUMB_H
 _PLUS_W = 10            # the operator between a start frame and its source video
 _PAREN_W = 5            # the marks around a source video whose prompt was edited
-_MARK_H = 8             # the slot the "…" takes when the line runs on past the rows
+_MARK_H = 8             # the room the "…" takes when the line runs on past the rows
 _MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on the satellite's map
 _DROP_W = 2             # the mark showing where a dragged row would land
 _SHIELD_MARK = CTRL_BTN - 2 * BUTTON_ICON_INSET  # a row's shield's own size
 _MARK_TO_WORD = 3       # between Shield All's shield and its word
 _HEIGHT = _FRAME + BLOCK_GAP + 2 * _MARK_H + ROWS * _ROW_H
 
-_SLOT_ALPHA = 110       # a cell with nothing in it reads as a slot, not a thumbnail
+_EMPTY_CELL_ALPHA = 110  # a cell with nothing in it reads as an empty cell, not a thumbnail
 
 
 @cache
@@ -346,7 +346,7 @@ class QueueSection:
             image.alpha_composite(live, (x, y + (_FRAME - live.height) // 2))
             return live.width
         return _paint_source(image, draw, x, y, _FRAME, self.leader.source,
-                             self.leader.prompt_edited) or _slot(draw, x, y, _FRAME)
+                             self.leader.prompt_edited) or _empty_cell(draw, x, y, _FRAME)
 
     def _paint_rows(self, image, draw, x, y, width, pointer, targets) -> None:
         for index, line in enumerate(self.drawn):
@@ -389,8 +389,8 @@ class QueueSection:
     def _paint_drop(self, draw, x, y, width) -> None:
         if self.drop_at is None:
             return
-        slot = min(max(self.drop_at - self.first, 0), len(self.drawn))
-        top = y + slot * _ROW_H - _DROP_W // 2
+        place = min(max(self.drop_at - self.first, 0), len(self.drawn))
+        top = y + place * _ROW_H - _DROP_W // 2
         draw.rectangle([x, top, x + width - 1, top + _DROP_W - 1], fill=(*BLUE, 255))
 
     def _paint_mark(self, image, x, y, width, more: bool) -> None:
@@ -435,11 +435,11 @@ def _fraction(progress) -> float | None:
     return min(1.0, max(0.0, progress[0] / progress[1]))
 
 
-def _slot(draw, x, y, side) -> int:
+def _empty_cell(draw, x, y, side) -> int:
     """A cell with nothing in it: a faint square, so a row with no thumbnail reads
     as a job whose thumbnail has not arrived rather than as one that failed to draw."""
     draw.rectangle([x, y, x + side - 1, y + side - 1],
-                   fill=(*BORDER_SUBTLE, _SLOT_ALPHA))
+                   fill=(*BORDER_SUBTLE, _EMPTY_CELL_ALPHA))
     return side
 
 
@@ -536,7 +536,7 @@ def _paint_thumbnails(image, draw, x, y, line: JobLine) -> None:
         cell_x = x + index * (_CELL + _CELL_GAP)
         drawn = _cell(line.folder[index], _CELL) if index < len(line.folder) else None
         if drawn is None:
-            _slot(draw, cell_x, y, _CELL)
+            _empty_cell(draw, cell_x, y, _CELL)
         else:
             image.alpha_composite(drawn, (cell_x, y))
 
@@ -804,13 +804,13 @@ class QueuePointer:
         return next((item for item in self._host.hud_queue[0] if item.key == key), None)
 
     def _drop_index(self, py: int) -> int:
-        """Which slot in the line a drop at ``py`` lands in: above the row whose
+        """Which place in the line a drop at ``py`` lands in: above the row whose
         upper half it fell on, else at the end of what is drawn, and never in
         front of a row that holds its place."""
         rows = self._rows()
-        slot = next((index for index, (rect, _key) in enumerate(rows)
+        place = next((index for index, (rect, _key) in enumerate(rows)
                      if py < rect[1] + rect[3] / 2), len(rows))
-        return max(first_movable(self._host.hud_queue[0]), self.first + slot)
+        return max(first_movable(self._host.hud_queue[0]), self.first + place)
 
     def _drag_to(self, key: str, target: int) -> None:
         """Ask for *key*'s row to go where it was let go, at *target*.
@@ -822,7 +822,7 @@ class QueuePointer:
         keys = [item.key for item in items]
         if key not in keys:
             return
-        # The slot was read with the dragged row still in place, so a drop below
+        # The place was read with the dragged row still in place, so a drop below
         # it names one further along than it will end up in.
         rest = [other for other in keys if other != key]
         landing = target - 1 if target > keys.index(key) else target

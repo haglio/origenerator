@@ -656,19 +656,19 @@ def test_changing_a_setting_other_than_the_prompt_leaves_the_clip_out_of_parenth
     assert panel._preview._combination.open_paren_label.isHidden()
 
 
-@pytest.mark.parametrize(("slot_name", "prompt_id"), [("image_slot", "img"),
-                                                      ("video_slot", "vid")])
-def test_clicking_a_combine_slot_goes_to_what_it_holds(qtbot, tmp_path, slot_name, prompt_id):
+@pytest.mark.parametrize(("zone_name", "prompt_id"), [("image_zone", "img"),
+                                                      ("video_zone", "vid")])
+def test_clicking_a_combine_drop_zone_goes_to_what_it_holds(qtbot, tmp_path, zone_name, prompt_id):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     slot = getattr(view._combine.panel, slot_name)
-    slot.set_item(prompt_id)
+    zone.set_item(prompt_id)
 
-    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
 
     assert view.selected_prompt_ids() == [prompt_id]
-    assert slot.current_id() == prompt_id
+    assert zone.current_id() == prompt_id
 
 
 def test_combines_drop_zones_name_what_was_dropped_on_them(qtbot, tmp_path):
@@ -720,11 +720,11 @@ def test_an_image_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp
     view.refresh()
     view.follow_link("img")
     slot = view._combine.panel.image_slot
-    slot.set_item(str(tmp_path / "scene one.png"))
+    zone.set_item(str(tmp_path / "scene one.png"))
 
-    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
 
-    assert slot.cursor().shape() == Qt.CursorShape.ArrowCursor
+    assert zone.cursor().shape() == Qt.CursorShape.ArrowCursor
     assert view.selected_prompt_ids() == ["img"]
 
 
@@ -948,7 +948,7 @@ def test_restore_combine_selection_reads_the_two_item_list_older_sessions_wrote(
 def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
 
-    # image slot given a deleted id; video slot given an image (wrong kind)
+    # image drop zone given a deleted id; video drop zone given an image (wrong kind)
     view.restore_combine_selection({"image": "ghost", "video": "img"})
 
     assert view._combine.panel.image_slot.current_id() is None   # "ghost" no longer exists
@@ -967,13 +967,13 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
     }
 
 
-def _lit_while_dragging(monkeypatch, drag_out, mime, slots) -> dict:
-    """Carry ``mime`` out through ``drag_out`` and say which of ``slots`` were lit
+def _lit_while_dragging(monkeypatch, drag_out, mime, zones) -> dict:
+    """Carry ``mime`` out through ``drag_out`` and say which of ``zones`` were lit
     while it was under way, before it reached any of them."""
     lit = {}
 
     def drag_loop(_drag, _action):
-        lit.update({name: slot._label.property("dragActive") for name, slot in slots.items()})
+        lit.update({name: zone._label.property("dragActive") for name, zone in zones.items()})
 
     monkeypatch.setattr(QDrag, "exec", drag_loop)
     drag_out.start(mime, QPixmap())
@@ -1035,10 +1035,10 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, 
     mime = generation_mime("vid")
 
     lit = _lit_while_dragging(monkeypatch, preview.drag_out, mime,
-                              {"video": combine.video_slot, "image": combine.image_slot})
+                              {"video": combine.video_zone, "image": combine.image_zone})
 
     assert lit == {"video": True, "image": False}
-    assert combine.video_slot._label.property("dragActive") is False
+    assert combine.video_zone._label.property("dragActive") is False
 
 
 def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
@@ -1054,7 +1054,7 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         # moves, so the redraw is the kind that takes the tile away under the drag.
         view._db.update_generation("vid", thumbnail_path="moved.jpg")
         view.refresh()
-        in_flight["slot lit"] = slot.property("dragActive")
+        in_flight["zone lit"] = zone.property("dragActive")
         in_flight["drag alive"] = not sip.isdeleted(drag)
 
     monkeypatch.setattr(QDrag, "exec", drag_loop_through_a_grid_redraw)
@@ -1064,5 +1064,5 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
     qtbot.mouseRelease(view, Qt.MouseButton.LeftButton)
 
     assert sip.isdeleted(tile)
-    assert in_flight == {"slot lit": True, "drag alive": True}
-    assert slot.property("dragActive") is False
+    assert in_flight == {"zone lit": True, "drag alive": True}
+    assert zone.property("dragActive") is False

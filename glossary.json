@@ -402,14 +402,14 @@
       ],
       "his_word": "drop zone (2026-10-21, 2026-10-24, 2026-10-25); drop area (2026-10-13)",
       "code_today": [
-        "drop slot",
-        "slot",
-        "drop zone",
-        "zone"
+        "drop zone"
       ],
       "code_word": "drop zone",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "drop slot"
+      ]
     },
     {
       "id": "tile",
@@ -626,11 +626,24 @@
       "screen": null,
       "his_word": "empty cell (2026-10-30)",
       "code_today": [
-        "slot"
+        "empty cell"
       ],
       "code_word": "empty cell",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "slot"
+      ],
+      "keep": [
+        "pyqtSlot",
+        "[node_id, slot]",
+        "[source_node_id, slot]",
+        "osr2_slot",
+        "holding that slot",
+        "a slot nobody listens on",
+        "the broker's slot",
+        "holding its slot"
+      ]
     },
     {
       "id": "osr2_console",

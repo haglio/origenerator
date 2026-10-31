@@ -65,8 +65,8 @@ class FakePanel:
         self.name_of = name_of
         self.browse_image = browse_image
         self.leads_to = leads_to
-        self.image_slot = self._Slot()
-        self.video_slot = self._Slot()
+        self.image_zone = self._Slot()
+        self.video_zone = self._Slot()
         self.intent = act_settings.VIDEO
         self.category = ""
         self.dropped = {}
@@ -97,7 +97,7 @@ class FakePanel:
     def set_dropped_videos(self, videos):
         self.dropped = dict(videos)
         if not self.category:
-            self.video_slot.set_item(self.dropped.get(self.intent))
+            self.video_zone.set_item(self.dropped.get(self.intent))
 
     def set_available_categories(self, categories):
         self.available = list(categories)
@@ -314,7 +314,7 @@ def combine(qtbot, monkeypatch, starting):
     yield build
 
 
-# --- what the slots take ----------------------------------------------------
+# --- what the drop zones take ----------------------------------------------------
 
 
 def test_the_image_slot_takes_an_image_with_a_file_to_seed_from(combine):
@@ -372,8 +372,8 @@ def _a_dropped_pair(combine, *, making=()):
     controller, _host = combine(FakeHost(rows=[image]),
                                 db=FakeDB([image, _video("clip")]),
                                 jobs=FakeReroll(making=making))
-    controller.panel.image_slot.set_item("img")
-    controller.panel.video_slot.set_item("clip")
+    controller.panel.image_zone.set_item("img")
+    controller.panel.video_zone.set_item("clip")
     return controller
 
 
@@ -409,8 +409,8 @@ def test_the_video_slot_takes_only_a_video_this_app_can_rebuild(combine):
 def test_a_dropped_item_shows_its_still_and_its_loop(combine):
     controller, _host = combine(db=FakeDB([_video("clip")]))
 
-    assert controller._slot_preview("clip") == ("clip-thumb.png", "clip.webp")
-    assert controller._slot_preview("gone") == (None, None)
+    assert controller._zone_preview("clip") == ("clip-thumb.png", "clip.webp")
+    assert controller._zone_preview("gone") == (None, None)
 
 
 def test_a_panel_with_no_server_behind_it_hides(combine):
@@ -426,7 +426,7 @@ def test_the_session_keeps_the_image_each_lanes_videos_the_lane_and_the_act(comb
     # None of the four is recoverable from the others: an act says nothing about
     # which lane answers it.
     controller, _host = combine()
-    controller.panel.image_slot.set_item("img")
+    controller.panel.image_zone.set_item("img")
     controller.panel.set_dropped_videos({act_settings.VIDEO: "clip"})
     controller.panel.set_intent(act_settings.GENAU)
     controller.panel.set_category("waving")
@@ -444,7 +444,7 @@ def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combin
                                    "elsewhere": "gone"}})
 
     assert controller.panel.dropped == {act_settings.VIDEO: "clip", act_settings.GENAU: "loop"}
-    assert controller.panel.video_slot.item == "loop"
+    assert controller.panel.video_zone.item == "loop"
 
 
 def test_a_video_put_in_the_slot_is_kept_in_the_library_under_its_lane(combine):
@@ -485,8 +485,8 @@ def test_a_restore_skips_an_item_that_no_longer_fits_its_slot(combine):
 
     controller.restore({"image": "img", "video": "gone"})
 
-    assert controller.panel.image_slot.item == "img"
-    assert controller.panel.video_slot.item is None
+    assert controller.panel.image_zone.item == "img"
+    assert controller.panel.video_zone.item is None
 
 
 def test_the_two_item_list_older_sessions_wrote_still_restores(combine):
@@ -494,8 +494,8 @@ def test_the_two_item_list_older_sessions_wrote_still_restores(combine):
 
     controller.restore(["img", "clip"])
 
-    assert controller.panel.image_slot.item == "img"
-    assert controller.panel.video_slot.item == "clip"
+    assert controller.panel.image_zone.item == "img"
+    assert controller.panel.video_zone.item == "clip"
 
 
 # --- the stand-in row -------------------------------------------------------
@@ -1086,7 +1086,7 @@ def test_the_acts_narrow_to_what_the_dropped_image_can_start_from(combine,
     controller, _host = combine(db=FakeDB([_image("img", state="state one"),
                                            _video("clip")]))
 
-    controller.panel.image_slot.set_item("img")
+    controller.panel.image_zone.set_item("img")
 
     assert sorted(controller.panel.available) == ["leaning", "waving"]
 
@@ -1105,7 +1105,7 @@ def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
                         lambda rows, intent: {"waving", "leaning"})
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
-    controller.panel.image_slot.set_item("img")
+    controller.panel.image_zone.set_item("img")
 
     assert sorted(controller.panel.available) == ["leaning", "waving"]
 
@@ -1192,8 +1192,8 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
 def test_an_image_browsed_from_outside_runs_the_settings_on_that_file(combine, tmp_path):
     photo = square(tmp_path, "red")
     controller, _host = combine(db=FakeDB([_video("clip")]))
-    controller.panel.image_slot.set_item(photo)
-    controller.panel.video_slot.set_item("clip")
+    controller.panel.image_zone.set_item(photo)
+    controller.panel.video_zone.set_item("clip")
 
     workflow, params, video_row, image_row = controller._combined_params(photo, "clip")
 
@@ -1202,7 +1202,7 @@ def test_an_image_browsed_from_outside_runs_the_settings_on_that_file(combine, t
     assert controller._accepts_image(photo) is True
     assert controller._accepts_image(str(tmp_path / "nowhere.png")) is False
     assert controller._state_of(photo) == ""
-    assert controller._slot_preview(photo) == (photo, None)
+    assert controller._zone_preview(photo) == (photo, None)
     assert controller.panel.name_of(photo) == "made-red.png"
 
 
@@ -1214,7 +1214,7 @@ def test_browsing_an_image_puts_the_file_in_the_image_zone(combine, monkeypatch,
 
     controller.panel.browse_image()
 
-    assert controller.panel.image_slot.current_id() == photo
+    assert controller.panel.image_zone.current_id() == photo
 
 
 def test_a_picked_act_runs_its_pinned_settings_on_a_browsed_image(combine, tmp_path, monkeypatch):

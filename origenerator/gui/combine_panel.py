@@ -1,10 +1,10 @@
 """The gallery's image + video combine panel, sitting under the TOC folder tree.
 
-Drop an image into the top slot, then supply *settings* either by picking an act
+Drop an image into the top drop zone, then supply *settings* either by picking an act
 from the Action list, which sends the app looking for a fitting past video, or by
 dropping a specific i2v video (shown in gray: it is here for its settings). The two
-are mutually exclusive. A video dropped into the top slot lends it only the image
-it was made from, and one let go between the slots lends each what it can. Generate
+are mutually exclusive. A video dropped into the top drop zone lends it only the image
+it was made from, and one let go between the drop zones lends each what it can. Generate
 re-runs the chosen settings on the dropped image; “Edit individual…” hands them to a
 generate tab first.
 
@@ -16,7 +16,7 @@ are no kind of cycle at all are not offered there.
 
 The panel is pure UI, reporting what was asked for as one :class:`CombineRequest` on
 :attr:`combine_requested`; its controller
-(:mod:`origenerator.gui.combine_controller`) owns the database, what each slot is
+(:mod:`origenerator.gui.combine_controller`) owns the database, what each drop zone is
 lent, the routing and both the generation and the generator tab.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ from origenerator import animation_paths
 from origenerator.act_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.content import genau_flick_word
 from origenerator.gui.action_picker import ACTION_LABEL
-from origenerator.gui.drop_slot import DROP_A_VIDEO, DROP_AN_IMAGE, DropSlot, DropZone
+from origenerator.gui.drop_zone import DROP_A_VIDEO, DROP_AN_IMAGE, DropZone, DropZones
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.generate_button import (
     DEFAULT_CAPTION,
@@ -92,13 +92,13 @@ class CombineRequest:
 
 
 class CombinePanel(QWidget):
-    """Image slot + settings (dropped video or picked act) + an intent + Generate."""
+    """Image drop zone + settings (dropped video or picked act) + an intent + Generate."""
 
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
     intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
-    item_activated = pyqtSignal(str)  # a slot's image or video was clicked (prompt_id)
-    video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the slot by hand
+    item_activated = pyqtSignal(str)  # a drop zone's image or video was clicked (prompt_id)
+    video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the drop zone by hand
 
     def __init__(
         self,
@@ -116,27 +116,27 @@ class CombinePanel(QWidget):
         super().__init__(parent)
         self._preview = preview
         self._history = history
-        self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
+        self.image_zone = DropZone(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
                                    named=named, name_of=name_of, browse=browse_image,
                                    leads_to=leads_to)
-        # Gray, always: the video in this slot is never what gets made — only the
+        # Gray, always: the video in this drop zone is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
-        self.video_slot = DropSlot(MediaType.VIDEO, video_lent_by, preview, DROP_A_VIDEO,
+        self.video_zone = DropZone(MediaType.VIDEO, video_lent_by, preview, DROP_A_VIDEO,
                                    grayscale=True, named=named, name_of=name_of,
                                    leads_to=leads_to)
-        _keep_its_room_when_hidden(self.video_slot)
-        self._between = DropZone((self.image_slot, self.video_slot))
+        _keep_its_room_when_hidden(self.video_zone)
+        self._between = DropZones((self.image_zone, self.video_zone))
         self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)
-        self.image_slot.changed.connect(self._sync)
-        self.video_slot.changed.connect(self._on_video_changed)
-        self.image_slot.activated.connect(self.item_activated)
-        self.video_slot.activated.connect(self.item_activated)
+        self.image_zone.changed.connect(self._sync)
+        self.video_zone.changed.connect(self._on_video_changed)
+        self.image_zone.activated.connect(self.item_activated)
+        self.video_zone.activated.connect(self.item_activated)
         self._dropped: dict[str, str] = {}
         self._folder_generating = False
         self._recent_videos = RecentVideos(self._recent_rows,
                                            lambda video: self._preview(video)[1])
-        self._recent_videos.picked.connect(self.video_slot.set_item)
+        self._recent_videos.picked.connect(self.video_zone.set_item)
         _keep_its_room_when_hidden(self._recent_videos)
 
         # The video part's fast path: pick an act and the view finds a fitting past
@@ -173,7 +173,7 @@ class CombinePanel(QWidget):
         video_row.setContentsMargins(0, 0, 0, 0)
         video_row.setSpacing(BUTTON_GAP)  # the family's gap inside a group
         video_row.addWidget(self._action_part, 1)  # each takes half the part's width
-        video_row.addWidget(self.video_slot, 1)
+        video_row.addWidget(self.video_zone, 1)
 
         # What the result is for. Kino is the default because it is the long-
         # standing behavior of this panel and by far the more common ask; Genau is
@@ -226,7 +226,7 @@ class CombinePanel(QWidget):
         layout.addWidget(heading)
         parted = QVBoxLayout()
         parted.setSpacing(0)  # the room between them is the whole gap
-        parted.addWidget(self.image_slot)
+        parted.addWidget(self.image_zone)
         parted.addWidget(self._between)
         parted.addWidget(self._video_part)
         layout.addLayout(parted)
@@ -315,21 +315,21 @@ class CombinePanel(QWidget):
     # --- mutual exclusion: an act and a dropped video never coexist -------
 
     def _on_category_changed(self):
-        """A picked act supersedes a dropped video: clear the slot and hide it, its
+        """A picked act supersedes a dropped video: clear the drop zone and hide it, its
         room kept. Going back to "(custom)" shows it again, holding the video this
         lane last had dropped in it."""
         custom = not self.selected_category()
         if custom:
             self._show_dropped()
         else:
-            self.video_slot.clear()
-        self.video_slot.setVisible(custom)
+            self.video_zone.clear()
+        self.video_zone.setVisible(custom)
         self._recent_videos.setVisible(custom)
         self._sync()
 
     def _on_video_changed(self):
         """A dropped video supersedes a picked act: wipe the dropdown back to "(custom)"."""
-        video = self.video_slot.current_id()
+        video = self.video_zone.current_id()
         if video:
             lane = self.selected_intent()
             if video != self._dropped.get(lane):
@@ -339,20 +339,20 @@ class CombinePanel(QWidget):
         self._sync()
 
     def _recent_rows(self) -> list[RecentVideo]:
-        held = self.video_slot.current_id()
+        held = self.video_zone.current_id()
         listed = dict.fromkeys(video for video in (held, *self._history(self.selected_intent()))
                                if video)
         return [RecentVideo(video, self._preview(video)[0])
-                for video in listed if self.video_slot.accepts(video)]
+                for video in listed if self.video_zone.accepts(video)]
 
     def _show_dropped(self):
         lane = self.selected_intent()
         video = self._dropped.get(lane)
-        if video and self.video_slot.accepts(video):
-            self.video_slot.set_item(video)
+        if video and self.video_zone.accepts(video):
+            self.video_zone.set_item(video)
         else:
             self._dropped.pop(lane, None)
-            self.video_slot.clear()
+            self.video_zone.clear()
 
     def note_folder_generating(self, generating: bool) -> None:
         self._folder_generating = generating
@@ -362,8 +362,8 @@ class CombinePanel(QWidget):
         return dict(self._dropped)
 
     def reread_names(self) -> None:
-        self.image_slot.reread_name()
-        self.video_slot.reread_name()
+        self.image_zone.reread_name()
+        self.video_zone.reread_name()
 
     def set_dropped_videos(self, videos: dict[str, str]):
         self._dropped = dict(videos)
@@ -371,11 +371,11 @@ class CombinePanel(QWidget):
             self._show_dropped()
 
     def _sync(self):
-        image_id = self.image_slot.current_id()
-        video_id = self.video_slot.current_id()
+        image_id = self.image_zone.current_id()
+        video_id = self.video_zone.current_id()
         ready = bool(image_id) and bool(self.selected_category() or video_id)
         can_run = ready and not self._folder_generating
-        remakes_its_own = bool(video_id) and self.image_slot.lent_by(video_id) == image_id
+        remakes_its_own = bool(video_id) and self.image_zone.lent_by(video_id) == image_id
         self._generate_btn.setEnabled(can_run)
         self._generate_btn.set_caption(
             RANDOM_SEED_CAPTION if can_run and remakes_its_own else DEFAULT_CAPTION)
@@ -396,9 +396,9 @@ class CombinePanel(QWidget):
     def _dispatch(self, *, edit_first: bool):
         """Announce what was asked for: a picked act, else the dropped video, and
         nothing at all while either the image or the settings are missing."""
-        image_id = self.image_slot.current_id()
+        image_id = self.image_zone.current_id()
         category = self.selected_category()
-        video_id = "" if category else (self.video_slot.current_id() or "")
+        video_id = "" if category else (self.video_zone.current_id() or "")
         if not image_id or not (category or video_id):
             return
         self.combine_requested.emit(CombineRequest(

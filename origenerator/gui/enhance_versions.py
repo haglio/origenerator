@@ -24,7 +24,7 @@ generation — the image keeps its folder, its star and its other versions — a
 the delete is undoable. Never deleted here: the original, and the last version,
 since an image with no file left is a deleted generation, the gallery's own.
 
-An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
+An enhancement still in flight takes the ``+ Enhance`` row's own place at the head
 of the list, mirroring the run's streamed frames the way the in-flight tiles do
 everywhere else — the row becomes the thing it asked for, and the level being
 made appears where the level will be.
@@ -412,7 +412,7 @@ class _PendingRow(_Row):
 
 
 class _AddRow(_Row):
-    """The ``+ Enhance`` slot that leads the list.
+    """The ``+ Enhance`` row that leads the list.
 
     Live, it makes another version at whatever the Enhance panel currently says.
     Dimmed, the image already holds one made at exactly those settings, and
@@ -518,7 +518,7 @@ class EnhanceVersions(QWidget):
         duplicate, or ``None`` when they would make something new.
 
         ``pending`` is the :class:`RunningEnhancement` of one still running, and
-        it takes that same leading slot: the row becomes the thing it asked for
+        it takes that same leading place: the row becomes the thing it asked for
         rather than sitting beside it.
 
         ``created_fallback`` stands in on a level whose file is no longer on disk
@@ -551,7 +551,7 @@ class EnhanceVersions(QWidget):
         self._versions_listed = len(items)
         self._originals = {position for position, (level, _path) in enumerate(items)
                            if level.is_original}
-        # One leading slot, held by whichever of the two applies: the run in
+        # One leading place, held by whichever of the two applies: the run in
         # flight if there is one, else the row that would start it.
         if pending is not None:
             self._pending = _PendingRow()

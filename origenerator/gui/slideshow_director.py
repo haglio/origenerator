@@ -301,7 +301,7 @@ class SlideshowDirector:
         self._fun_time = fun_time
         # The fullscreen slideshow window while one is open — whether it was
         # started from the toolbar (a whole folder, shuffled) or by
-        # double-clicking an item (that folder in order). One slot, because
+        # double-clicking an item (that folder in order). One place, because
         # it is one view.
         self._slideshow = None
         self._standalone_side: str | None = None
@@ -327,7 +327,7 @@ class SlideshowDirector:
         self._asked_for: dict[str, partial] = {}
         # Inside Fun Time, what occupies each satellite region — a slideshow per
         # region, at most one each.  A slideshow is "open" while its window is
-        # visible; a closed one just goes stale in its slot until something
+        # visible; a closed one just goes stale in its place until something
         # replaces it.
         self._region_slideshows: dict[str, QWidget | None] = (
             dict.fromkeys(_ORIENTATIONS) if fun_time is not None else {}

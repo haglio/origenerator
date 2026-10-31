@@ -28,7 +28,7 @@ from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
@@ -373,7 +373,7 @@ class ParamForm(QWidget):
     def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
         """Insert one row (an input or a read-only value, then its ``extras``)
         into its section at the canonical position among the rows already there,
-        its label after the slot its warning mark shows in.
+        its label after the place its warning mark shows in.
 
         The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
         as well as its input: the label is what you are looking at when you
@@ -400,7 +400,7 @@ class ParamForm(QWidget):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
             return
         label.setToolTip(help_text or label.text())
-        if widget is not None and help_text and not isinstance(widget, DropSlot):
+        if widget is not None and help_text and not isinstance(widget, DropZone):
             if key in self._lora_keys:
                 help_text = with_training_date(help_text, self._read_field(self._defs[key]))
             widget.setToolTip(help_text)  # a zone's tooltip names what it holds
@@ -616,8 +616,8 @@ class ParamForm(QWidget):
         return scenes + [box for widget in self._widgets.values()
                          if isinstance(widget, PromptBoxes) for box in widget.boxes()]
 
-    def drop_slots(self) -> tuple[DropSlot, ...]:
-        return tuple(w for w in self._widgets.values() if isinstance(w, DropSlot))
+    def drop_zones(self) -> tuple[DropZone, ...]:
+        return tuple(w for w in self._widgets.values() if isinstance(w, DropZone))
 
     def _has_param(self, key: str) -> bool:
         return key in self._defs
@@ -872,7 +872,7 @@ class ParamForm(QWidget):
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
         widget = self._kind(pd).make(pd)
-        if isinstance(widget, DropSlot):
+        if isinstance(widget, DropZone):
             widget.activated.connect(self.item_activated)
         if isinstance(widget, PromptBoxes):
             widget.boxes_changed.connect(self.text_fields_changed)

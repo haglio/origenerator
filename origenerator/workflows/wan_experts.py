@@ -1,7 +1,7 @@
 """The WAN 2.2 expert pair, as the form rows that pick it.
 
 WAN 2.2 samples in two stages against two halves of one model — a high-noise
-expert and a low-noise one — and a slot must offer only its own half: a file
+expert and a low-noise one — and a dropdown must offer only its own half: a file
 whose name claims the other is the one pick that is certainly wrong there.
 That convention is what these rows encode, and it lives here rather than in
 each workflow because every workflow sampling in those two stages has to agree
@@ -11,7 +11,7 @@ changed in one place only.
 Two functions rather than one, because the order the rows come back in is the
 order the Generate form shows and the gallery info pane groups by: the models
 sit together and the LoRAs sit together, and one workflow has a third model
-picker to slot in between them.
+picker to fit in between them.
 """
 from __future__ import annotations
 

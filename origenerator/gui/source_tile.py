@@ -26,7 +26,7 @@ from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 from origenerator.media import MediaType
 
 # What the tile says and draws when a showing names neither: a video's start
-# frame, which is what this slot was built for and still shows most often.
+# frame, which is what this tile was built for and still shows most often.
 _DEFAULT_HEADING = "From source image"
 _DEFAULT_MEDIA_TYPE = MediaType.IMAGE
 

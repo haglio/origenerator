@@ -32,7 +32,7 @@ from origenerator.gui import (
     training_controls,
 )
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_form import (
@@ -2555,11 +2555,11 @@ class _Lends:
         return (None, None)
 
 
-def _let_go(slot, prompt_id):
+def _let_go(zone, prompt_id):
     mime = generation_mime(prompt_id)
     event = QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                        Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
-    slot.dropEvent(event)
+    zone.dropEvent(event)
 
 
 @pytest.mark.parametrize("kind", ["image", "video"])
@@ -2567,7 +2567,7 @@ def test_an_image_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qt
     form = ParamForm([ParamDef("source", "Source", kind, "")])
     qtbot.addWidget(form)
     zone = form._widgets["source"]
-    assert isinstance(zone, DropSlot)
+    assert isinstance(zone, DropZone)
     assert form.get_values()["source"] == ""
     assert "source" not in form._browse_buttons
     assert [action.text() for action in zone.menu().actions()] == ["Paste Origenerator name",

@@ -125,7 +125,7 @@ class Core(QMainWindow):
         # A small floor (not the old 1000x700) so a tiling window manager can snap
         # the window into a monitor third (~853px) or a portrait-monitor half
         # (~720px) — Qt maps this straight to the window's min track size. The
-        # gallery's own pane floors keep content readable at those slot sizes; only
+        # gallery's own pane floors keep content readable at those tiling sizes; only
         # a manual drag below that compresses it.
         self.setMinimumSize(600, 400)
         # The rect this window is pinned to once shown, or None standalone.

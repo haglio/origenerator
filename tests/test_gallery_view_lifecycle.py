@@ -14,7 +14,7 @@ from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.gallery_view import GalleryView
-from tests.test_gallery_view import FakeDB, _image
+from tests.gallery_view_support import FakeDB, _image
 
 
 def _gallery(qtbot, db=None):

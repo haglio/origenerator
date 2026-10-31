@@ -32,8 +32,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import answer
-from tests.slideshow_hud_support import funestra_of, open_both_sides
-from tests.test_gallery_view import (
+from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeDB,
     _enhanced_image,
@@ -47,6 +46,7 @@ from tests.test_gallery_view import (
     _seeded_db,
     _will_move_on,
 )
+from tests.slideshow_hud_support import funestra_of, open_both_sides
 from tests.test_slideshow_hud import _inflight
 
 

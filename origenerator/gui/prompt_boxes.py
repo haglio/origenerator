@@ -33,7 +33,7 @@ class Countdown(QLabel):
         if left is None or left > COUNTING_DOWN_FROM:
             self.hide()
             return
-        self.setText(f"{left} left")
+        self.setText(f"{left} left" if left >= 0 else f"{-left} over")
         self.setStyleSheet(f"color: {(AMBER if left >= 0 else RED).name()};")
         self.show()
 

@@ -31,10 +31,10 @@ def tabs(qtbot, tmp_path):
 
 
 def _pick_workflow(panel, key="sdxl_t2i"):
-    """Answer a fresh tab's workflow picker, so it has a param form to poke at."""
-    index = panel._workflow_combo.findData(key)
+    """Answer a fresh tab's workflow dropdown, so it has a param form to poke at."""
+    index = panel._workflow_dropdown.findData(key)
     assert index >= 0, f"{key} is not in the Workflow dropdown"
-    panel._workflow_combo.setCurrentIndex(index)
+    panel._workflow_dropdown.setCurrentIndex(index)
     return panel
 
 
@@ -366,7 +366,7 @@ def test_open_config_takes_over_the_blank_resting_tab(tabs):
     assert tabs.count() == 1
     panel = tabs.currentWidget()
     assert panel is resting
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._workflow_dropdown.currentData() == "wan22_i2v"
     assert panel._param_form.get_values()["positive_prompt"] == "a fox"
 
 
@@ -377,7 +377,7 @@ def test_open_config_adds_and_prefills_a_tab_beside_a_used_one(tabs):
 
     assert tabs.count() == 2
     panel = tabs.currentWidget()
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._workflow_dropdown.currentData() == "wan22_i2v"
     assert panel._param_form.get_values()["positive_prompt"] == "a fox"
 
 
@@ -945,7 +945,7 @@ def test_an_edited_tab_is_not_replaced_by_the_next_click(tabs):
 
 
 def test_changing_the_workflow_takes_the_italic_off(tabs):
-    # The picker is a field like any other, and on a form with nothing to carry
+    # The dropdown is a field like any other, and on a form with nothing to carry
     # over to the new workflow it is the only signal an edit happened at all.
     cat, _dog = _two_generations(tabs)
     tabs.load_selection(cat, [cat])
@@ -958,7 +958,7 @@ def test_changing_the_workflow_takes_the_italic_off(tabs):
 
 
 def test_opening_a_generation_does_not_count_as_editing_it(tabs):
-    # An open writes the picker and every field exactly as typing would. If that
+    # An open writes the dropdown and every field exactly as typing would. If that
     # counted, no tab would ever stay the preview one and every click would add
     # one more to the row — the pile-up the italic tab exists to prevent.
     cat, dog = _two_generations(tabs)
@@ -1125,9 +1125,9 @@ def test_restore_state_rebuilds_config_tabs(tabs):
     tabs.restore_state(state)
     panels = tabs.config_panels()
     assert len(panels) == 2  # every prior tab was replaced
-    assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
+    assert panels[0]._workflow_dropdown.currentData() == "wan22_i2v"
     assert panels[0]._param_form.get_values()["positive_prompt"] == "a fox"
-    assert panels[1]._workflow_combo.currentData() == "sdxl_t2i"
+    assert panels[1]._workflow_dropdown.currentData() == "sdxl_t2i"
     assert panels[1]._param_form.get_values()["seed"] == 99
     assert tabs.currentIndex() == 1
 
@@ -1138,7 +1138,7 @@ def test_restore_state_skips_unknown_workflows(tabs):
     ]})
     panels = tabs.config_panels()
     assert len(panels) == 1
-    assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
+    assert panels[0]._workflow_dropdown.currentData() == "wan22_i2v"
 
 
 def test_restore_state_keeps_the_initial_tab_when_nothing_restorable(tabs):
@@ -1155,7 +1155,7 @@ def test_restore_state_tolerates_malformed_blobs(tabs):
     tabs.restore_state({"tabs": ["not a dict", {"config": {"workflow_name": "wan22_i2v"}}]})
     panels = tabs.config_panels()
     assert len(panels) == 1  # only the one valid entry survived
-    assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
+    assert panels[0]._workflow_dropdown.currentData() == "wan22_i2v"
 
 
 def test_a_malformed_snapshot_parses_to_nothing():
@@ -1245,7 +1245,7 @@ def test_capture_restore_round_trips_config(tabs, qtbot):
     fresh.restore_state(captured)
 
     panels = fresh.config_panels()
-    assert [p._workflow_combo.currentData() for p in panels] == ["sdxl_t2i", "wan22_i2v"]
+    assert [p._workflow_dropdown.currentData() for p in panels] == ["sdxl_t2i", "wan22_i2v"]
     assert panels[1]._param_form.get_values()["seed"] == 7
     # A tab is named by what it shows, so its name comes back with its config.
     assert fresh.tabText(fresh.indexOf(panels[1])) == panels[1].title()

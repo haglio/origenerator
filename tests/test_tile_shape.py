@@ -14,12 +14,12 @@ def test_the_caption_is_set_in_the_familys_tiny_type(qtbot):
     assert (font.family(), font.pointSize()) == (FONT_UI, SIZE_TINY)
 
 
-def test_a_folders_count_and_breadcrumb_are_each_a_whole_line_of_the_caption(qtbot):
+def test_a_folders_count_and_folder_path_are_each_a_whole_line_of_the_caption(qtbot):
     width, height = tile_shape.tile_size()
     line = QFontMetrics(tile_shape.caption_font()).height()
 
     assert tile_shape.folder_tile_size() == (width, height + tile_shape.TILE_SPACING + line)
-    assert tile_shape.folder_tile_size(breadcrumb=True) == (
+    assert tile_shape.folder_tile_size(folder_path=True) == (
         width, height + 2 * (tile_shape.TILE_SPACING + line))
 
 

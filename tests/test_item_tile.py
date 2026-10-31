@@ -501,7 +501,7 @@ def test_an_enhancing_tile_says_so_over_the_thumbnail_and_on_a_bar(qtbot):
 
 def test_the_fix_being_applied_gets_the_band_under_the_run_s_own_reading(qtbot):
     # An enhance with detail fixes is several sampler passes, and this tile is
-    # where the user watches one. The bar is the whole enhancement; the band
+    # where the user watches one. The bar is the whole enhancement; the substep progress bar
     # along its foot is the fix in hand — which is the reading that restarts,
     # and used to be the only one there was.
     tw = ItemTile("p1", None, "label", enhancing=_run(

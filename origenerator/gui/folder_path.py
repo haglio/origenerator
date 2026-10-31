@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
-from shared_ui.folder_path import FolderPath
+from shared_ui import folder_path as shared_folder_path
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
 from shared_ui.type_scale import SIZE_BODY, in_pixels
 
@@ -12,13 +12,13 @@ from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.gallery_tree import PATH_SEPARATOR, PathStep
 
 
-class FolderPathHeader(QWidget):
+class FolderPath(QWidget):
     folder_chosen = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._keys: tuple[str | None, ...] = ()
-        self._path = FolderPath(PATH_SEPARATOR)
+        self._path = shared_folder_path.FolderPath(PATH_SEPARATOR)
         self._path.setWordWrap(True)
         self._path.setStyleSheet(
             f"font-size: {in_pixels(SIZE_BODY)}px; font-weight: bold; padding: {GAP_SMALL}px;")

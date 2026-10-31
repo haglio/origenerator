@@ -108,7 +108,7 @@ class InFlightItems:
             if tracked is not None:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
-                pass_progress = job.last_pass_progress  # the band along the bar's foot
+                pass_progress = job.last_pass_progress  # the substep progress bar along the foot
                 stage = job.last_stage                   # and what it is doing
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 starts_at = self._jobs.starts_at(pid)

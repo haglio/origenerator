@@ -1039,7 +1039,7 @@ def test_a_director_names_both_shapes_for_a_slideshow_of_both(slideshows):
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):
     """A slideshow on a Funestra opens on its side's whole library, which the browser
     is not listing — so versions read off the browser's rows named none of the
-    slides on screen, and every versions button on the band was drawn faded
+    slides on screen, and every versions button on the HUD was drawn faded
     however many enhancements that library held (2026-09-19)."""
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
@@ -1300,7 +1300,7 @@ def test_a_region_reset_re_points_what_feeds_it(slideshows):
 def test_a_set_handed_to_a_running_slideshow_brings_its_own_versions_with_it(slideshows):
     """Latest, Shuffle and a region reset each hand the slideshow a different set of
     its side's library.  A versions map still armed on the set the slideshow opened
-    with names none of the images now on screen, so the band's versions button
+    with names none of the images now on screen, so the HUD's versions button
     goes faded over a whole library of enhancements (2026-09-19)."""
     browser = FakeBrowser(collections={LATEST_LANDSCAPE: [_row("g9")],
                                        ALL_LANDSCAPE: [_row("g4")]})

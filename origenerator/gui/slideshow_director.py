@@ -591,7 +591,7 @@ class SlideshowDirector:
                                     else opening.enhanced_ids),
                       enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
-        # the shifted step keys and the band's versions button walk.
+        # the shifted step keys and the HUD's versions button walk.
         levels = self.versions_of(rows) if levels is None else levels
         actions = self._slideshow_actions(where)
         keep_the_slide = kwargs.get("start") is not None
@@ -906,7 +906,7 @@ class SlideshowDirector:
 
         A region slideshow is frameless (the region IS the window, like every
         managed Funestra) and topmost, since the Satellite Funestra it covers is
-        topmost itself; Fun Time restacks the band as its modes change.
+        topmost itself; Fun Time restacks the layer as its modes change.
 
         Either way it ends up wearing the Funestras' HUD (:meth:`_wear_the_hud`):
         the HUD is about the slideshow, and a slideshow is a slideshow wherever it is.

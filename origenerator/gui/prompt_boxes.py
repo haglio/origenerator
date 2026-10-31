@@ -38,9 +38,11 @@ class Countdown(QLabel):
         self.show()
 
 
-def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReading | None) -> None:
+def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReading | None,
+               *, in_use: bool = True) -> None:
     text = diff_text.live_text(field)
-    countdown.show_left(None if reading is None else reading.reads_well - reading.tokens(text))
+    countdown.show_left(None if reading is None or not in_use
+                        else reading.reads_well - reading.tokens(text))
     mark_past_the_limit(field, None if reading is None else reading.past_limit_at(text),
                         unread=reading is not None and reading.past_it == CUT_OFF)
 
@@ -137,6 +139,7 @@ class PromptBoxes(QWidget):
         self._in_use = (in_use, tip)
         for box in self._boxes:
             _mark_in_use(box, in_use, tip)
+        self._count_down()
 
     def _flows(self) -> bool:
         return self._reading is not None and self._reading.past_it == READ_IN_PIECES
@@ -266,13 +269,14 @@ class PromptBoxes(QWidget):
         self.textChanged.emit()
 
     def _count_down(self) -> None:
+        in_use = self._in_use is None or self._in_use[0]
         if self._cut_from is not None:
             for countdown, (_start, tokens) in zip(self._countdowns,
                                                    self._reading.pieces(self._cut_from)):
-                countdown.show_left(self._reading.reads_well - tokens)
+                countdown.show_left(self._reading.reads_well - tokens if in_use else None)
             return
         for box, countdown in zip(self._boxes, self._countdowns):
-            count_down(countdown, box, self._reading)
+            count_down(countdown, box, self._reading, in_use=in_use)
 
 
 def _put(box: QPlainTextEdit, text: str, share: str | None) -> None:

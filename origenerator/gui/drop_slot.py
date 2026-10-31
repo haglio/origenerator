@@ -21,6 +21,7 @@ from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
+from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui import grid_card
 from origenerator.gui.drags import under_way
@@ -130,6 +131,7 @@ class DropSlot(DropZone):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(GAP_SMALL)
         # Style the child label, not the bare QWidget: a plain QWidget subclass
         # paints no stylesheet border without WA_StyledBackground.
         self._label = QLabel(placeholder)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from funestra.video_families import normalized_text
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QWidget
-from shared_ui.spacing import BUTTON_GAP
+from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.gallery import media_type_of_row
 from origenerator.gui.eliding import ElidingLabel, open_the_list_in_full
@@ -40,7 +40,7 @@ class ActionPicker(QWidget):
         self._states, self._acts = tuple(states), tuple(acts)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(BUTTON_GAP)
+        row.setSpacing(GAP_MEDIUM)
         row.addWidget(ElidingLabel(ACTION_LABEL))
         self._combo = NoWheelComboBox()
         self._offer(self._states)

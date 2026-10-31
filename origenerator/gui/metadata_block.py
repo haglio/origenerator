@@ -133,15 +133,8 @@ def _build_section(section: MetaSection | None, go_to_folder: QAction | None = N
 
 
 def label_column_width(items: list[MetaItem]) -> int:
-    """Pixels wide enough for this group's longest label, so a group of long ones
-    (an enhancement level's facts) gets the room a short Basic block never wastes.
-    Applied as a minimum, not a cap, so an under-measured label grows to fit
-    rather than clipping."""
-    labels = [item.label for item in items if item.label]
-    if not labels:
-        return 0
     metrics = QFontMetrics(QApplication.font())
-    return max(metrics.horizontalAdvance(text) for text in labels) + 12
+    return max((metrics.horizontalAdvance(item.label) for item in items if item.label), default=0)
 
 
 def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:

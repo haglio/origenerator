@@ -137,7 +137,7 @@ class _ThumbnailRows(QStyledItemDelegate):
         self.initStyleOption(filled, index)
         thumbnails = index.data(THUMBNAILS_ROLE)
         places = _thumbnail_places(option.rect, _shapes(index), worded=bool(index.data()))
-        for thumbnail, place in zip(thumbnails, places):
+        for thumbnail, place in zip(thumbnails, places, strict=True):
             drawn = (self._drawn(thumbnail, index.row())
                      if place.intersects(painter.viewport()) else None)
             if drawn is not None:

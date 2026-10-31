@@ -89,7 +89,7 @@ def _qt_after_importing(module: str) -> bool:
          "content.LOCAL_CONTENT = content.EXAMPLE_CONTENT\n"
          f"import {module}\n"
          'print("PyQt6" in sys.modules)'],
-        cwd=REPO_ROOT, env=env, capture_output=True, text=True,
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr
     return result.stdout.strip() == "True"

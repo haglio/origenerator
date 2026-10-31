@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+from itertools import pairwise
 
 import pytest
 from app_support.osr2_hold import PARK, RESUME, RETRACT
@@ -194,7 +195,7 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
 
     ticker = _TickThread(tick, 0.025, now=now, sleep=sleep)
     ticker._run()  # the loop itself, on this thread, against a scripted clock
-    gaps = [b - a for a, b in zip(ticks, ticks[1:])]
+    gaps = [b - a for a, b in pairwise(ticks)]
     assert gaps and all(abs(g - 0.025) < 1e-9 for g in gaps)
 
 

@@ -120,6 +120,6 @@ class ContactSheet(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        for thumbnail, cell in zip(self._thumbnails, self.cells()):
+        for thumbnail, cell in zip(self._thumbnails, self.cells(), strict=True):
             if cell.width() > 0 and cell.height() > 0:
                 painter.drawPixmap(cell, _cover(thumbnail, cell))

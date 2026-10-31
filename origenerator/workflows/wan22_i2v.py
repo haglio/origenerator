@@ -367,7 +367,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             speech = self._speech_nodes(params, spoken)
             track, audio_ref = self.speech_track_nodes("speech_", [
                 (frames, [f"scene{index}_line", 0] if line is not None else None)
-                for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken))],
+                for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken, strict=True))],
                 audio_ref)
             speech.update(track)
         # The decode's frames are the clip's motion; the writer's are that motion

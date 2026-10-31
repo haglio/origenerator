@@ -222,7 +222,7 @@ def test_the_handler_windows_runs_answers_out_of_its_own_checkout(tmp_path):
         [sys.executable, str(app_link.CHECKOUT / app_link.HANDLER),
          app_link.LIVE_LAUNCHER, "https://example.test/"],
         cwd=tmp_path, capture_output=True, text=True, timeout=60,
-        env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"})
+        env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, check=False)
 
     assert handler.returncode == 2, handler.stderr
     assert handler.stdout == ""

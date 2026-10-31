@@ -47,7 +47,7 @@ def test_a_scene_with_a_line_renders_on_the_speech_model_hearing_that_line():
     assert [seg["inputs"]["length"] for seg in spoken] == [161, 161]
     assert [seg["inputs"]["length"] for seg in _nodes(payload, "WanImageToVideo")] == [81]
     files = [scene.file for scene in scene_speech(params) if scene is not None]
-    for seg, file in zip(spoken, files):
+    for seg, file in zip(spoken, files, strict=True):
         heard = payload[seg["inputs"]["audio_encoder_output"][0]]
         assert heard["class_type"] == "AudioEncoderEncode"
         encoder = payload[heard["inputs"]["audio_encoder"][0]]

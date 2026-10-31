@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta, tzinfo
-from itertools import accumulate
+from itertools import accumulate, pairwise
 
 from origenerator.gallery.moments import moment_of
 
@@ -24,7 +24,7 @@ def section_headings(rows, *, zone: tzinfo | None = None,
     starts = [index for index in range(len(placed))
               if index == 0 or placed[index - 1] - placed[index] >= BREAK_BETWEEN_SECTIONS]
     headings: list[str | None] = [None] * len(placed)
-    for start, end in zip(starts, [*starts[1:], len(placed)]):
+    for start, end in pairwise([*starts, len(placed)]):
         headings[start] = _heading(oldest=placed[end - 1], newest=placed[start], today=today)
     return headings
 

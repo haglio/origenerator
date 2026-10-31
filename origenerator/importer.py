@@ -431,7 +431,8 @@ def _probe_video(fpath: Path) -> dict:
         proc = subprocess.run(
             [ffprobe, "-v", "quiet", "-print_format", "json",
              "-show_format", "-show_streams", str(fpath)],
-            capture_output=True, text=True, timeout=30, **hidden_subprocess_kwargs(),
+            capture_output=True, text=True, timeout=30, check=False,
+            **hidden_subprocess_kwargs(),
         )
     except (OSError, subprocess.SubprocessError):
         return {}

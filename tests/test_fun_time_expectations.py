@@ -30,7 +30,7 @@ def relied_on() -> dict:
     except RuntimeError:
         pytest.skip("no fun_time checkout beside this one")
     shown = subprocess.run(["git", "show", f"origin/HEAD:{EXPECTATIONS}"], cwd=str(fun_time),
-                           capture_output=True, text=True, encoding="utf-8",
+                           capture_output=True, text=True, encoding="utf-8", check=False,
                            **hidden_subprocess_kwargs())
     if shown.returncode:
         pytest.fail(f"{fun_time}: {shown.stderr}")

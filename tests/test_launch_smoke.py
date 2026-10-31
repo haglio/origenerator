@@ -93,6 +93,7 @@ def _run_in_a_fresh_interpreter(statements: list[str]) -> subprocess.CompletedPr
         env=env,
         capture_output=True,
         text=True,
+        check=False,
     )
 
 

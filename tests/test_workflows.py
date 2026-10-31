@@ -220,7 +220,7 @@ def test_the_two_wan_expert_pair_workflows_offer_one_and_the_same_pair(installed
             for key in pair_keys
         ])
     assert shapes[0] == shapes[1]
-    assert "wan_high_noise.safetensors" in dict(zip(pair_keys, shapes[0]))["unet_high"][3]
+    assert "wan_high_noise.safetensors" in dict(zip(pair_keys, shapes[0], strict=True))["unet_high"][3]
 
 
 def test_workflows_expose_their_seed_param_keys():

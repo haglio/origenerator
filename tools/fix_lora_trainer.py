@@ -213,7 +213,8 @@ def run(job: dict) -> None:
     try:
         _take_the_card(job)
         cropping = subprocess.run([job["comfyui_python"], str(Path(__file__).resolve()), "crop",
-                                   job["job_file"]], creationflags=_IN_THE_BACKGROUND)
+                                   job["job_file"]], creationflags=_IN_THE_BACKGROUND,
+                                  check=False)
         if cropping.returncode != 0:
             if _said_why(job):
                 raise Stopped()

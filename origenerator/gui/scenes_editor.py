@@ -279,14 +279,14 @@ class ScenesEditor(QWidget):
     def set_scene_frames(self, frames) -> None:
         """Each scene's length; a list short of the scenes leaves the rest as
         they are, and one past them is cut to fit."""
-        for scene, count in zip(self._scenes, list(frames or [])):
+        for scene, count in zip(self._scenes, list(frames or []), strict=False):
             scene.set_frames(int(count))
 
     def lines(self) -> list[str]:
         return [diff_text.live_text(field) for field in self.fields("scene_lines")]
 
     def set_lines(self, lines) -> None:
-        for field, text in zip(self.fields("scene_lines"), list(lines or [])):
+        for field, text in zip(self.fields("scene_lines"), list(lines or []), strict=False):
             tracked_prompt.write(field, str(text))
 
     def total_frames(self) -> int:

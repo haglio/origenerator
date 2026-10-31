@@ -22,6 +22,7 @@ import logging
 import math
 import threading
 import time
+from itertools import pairwise
 
 from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, pyqtSignal
 
@@ -329,7 +330,7 @@ class JobQueue(QObject):
         lined_up = [job for job in jobs if job is not None]
         if lined_up:
             self._enqueue(lined_up[0])
-            for ahead, job in zip(lined_up, lined_up[1:]):
+            for ahead, job in pairwise(lined_up):
                 self._waiting.insert(self._waiting.index(ahead) + 1, job)
             self._admit(lined_up[-1])
         return [job.prompt_id if job is not None and self._key_of(job) == key else None

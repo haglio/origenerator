@@ -178,7 +178,7 @@ def cache(job: dict, wait_for_idle=None) -> None:
         [sys.executable, _musubi(job, "krea2_cache_text_encoder_outputs.py"), "--dataset_config",
          settings, "--text_encoder", job["text_encoder"], "--batch_size", "1", "--skip_existing"],
     ):
-        if subprocess.run(command, creationflags=_IN_THE_BACKGROUND).returncode != 0:
+        if subprocess.run(command, creationflags=_IN_THE_BACKGROUND, check=False).returncode != 0:
             raise Stopped("Preparing the pictures for the training failed. Nothing about your "
                           f"pictures caused it; an agent can read why in {job['log']}.")
 
@@ -220,7 +220,7 @@ class Machine:
         try:
             said = subprocess.run(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
                                   capture_output=True, text=True, timeout=30,
-                                  creationflags=_NO_WINDOW).stdout
+                                  creationflags=_NO_WINDOW, check=False).stdout
             return int(said.strip().splitlines()[0])
         except Exception:
             return None
@@ -321,7 +321,7 @@ class _Progress(threading.Thread):
 
 def _end(process) -> None:
     subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True,
-                   creationflags=_NO_WINDOW)
+                   creationflags=_NO_WINDOW, check=False)
 
 
 def train(job: dict, machine, popen=subprocess.Popen, kill=_end) -> None:
@@ -408,7 +408,8 @@ def run(job: dict) -> None:
     try:
         prepare(job)
         describing = subprocess.run([sys.executable, str(Path(__file__).resolve()), "describe",
-                                     job["job_file"]], creationflags=_IN_THE_BACKGROUND)
+                                     job["job_file"]], creationflags=_IN_THE_BACKGROUND,
+                                    check=False)
         if describing.returncode != 0:
             if _said_why(job):
                 raise Stopped()

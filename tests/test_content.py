@@ -59,7 +59,7 @@ def _run_in_a_fresh_interpreter(*statements) -> subprocess.CompletedProcess:
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
     return subprocess.run(
         [sys.executable, "-c", "\n".join(statements)],
-        cwd=REPO_ROOT, env=env, capture_output=True, text=True,
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False,
     )
 
 

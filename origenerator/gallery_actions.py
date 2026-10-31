@@ -228,7 +228,7 @@ class GalleryActions:
         by_row = self._files_by_row(rows, names)
         if self._environment.release_files is not None:
             self._environment.release_files([path for files in by_row for path in files])
-        return [(row, self._trash.store(files)) for row, files in zip(rows, by_row)]
+        return [(row, self._trash.store(files)) for row, files in zip(rows, by_row, strict=True)]
 
     def _files_by_row(self, rows: list[dict],
                       names: set[str] | None = None) -> list[list[Path]]:

@@ -39,6 +39,6 @@ def sounds_like(word: str, targets: tuple) -> bool:
     return any(
         word == target
         or (len(word) == len(target)
-            and sum(a != b for a, b in zip(word, target)) == 1)
+            and sum(a != b for a, b in zip(word, target, strict=True)) == 1)
         for target in targets
     )

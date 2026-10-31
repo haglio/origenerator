@@ -18,6 +18,7 @@ share one.
 from __future__ import annotations
 
 import logging
+from itertools import pairwise
 from pathlib import Path
 
 from app_support.funscript import document, read_actions, write
@@ -166,5 +167,5 @@ def _is_synthesized(actions: list[dict]) -> bool:
         return False
     if any(a["pos"] != (0 if i % 2 == 0 else 100) for i, a in enumerate(actions)):
         return False
-    gaps = [b["at"] - a["at"] for a, b in zip(actions, actions[1:])]
+    gaps = [b["at"] - a["at"] for a, b in pairwise(actions)]
     return not gaps or max(gaps) - min(gaps) <= 1

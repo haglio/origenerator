@@ -376,7 +376,7 @@ def test_a_form_freed_while_its_prompt_waits_to_be_redrawn_leaves_the_app_runnin
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
                PYTHONPATH=str(Path(__file__).resolve().parent.parent))
     ran = subprocess.run([sys.executable, "-c", _FORMS_FREED_WHILE_A_REDRAW_WAITS],
-                         env=env, capture_output=True, text=True, timeout=120,
+                         env=env, capture_output=True, text=True, timeout=120, check=False,
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
     assert (ran.returncode, ran.stdout.strip()) == (0, "still running"), ran.stderr

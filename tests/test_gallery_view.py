@@ -1450,11 +1450,11 @@ def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert "rr1" in view._browser._inflight_cards
+    assert "rr1" in view._browser._inflight_tiles
 
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
 
-    assert "rr1" not in view._browser._inflight_cards
+    assert "rr1" not in view._browser._inflight_tiles
 
 
 def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
@@ -1610,7 +1610,7 @@ def _counted(monkeypatch, owner, name, calls):
 
 
 def test_a_rebuild_reads_the_library_and_the_requests_once(qtbot, monkeypatch):
-    # The in-flight cards were built three times over per rebuild, and each
+    # The in-flight tiles were built three times over per rebuild, and each
     # build read both tables again, with the listing already in hand.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)

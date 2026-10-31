@@ -2,7 +2,7 @@
 
 An enhancement is not a generation of its own: its result is an upgraded layer
 on an existing image. The standalone ``image_enhance`` workflow is machinery —
-its job runs under a transient row (so in-flight cards and restart reconnection
+its job runs under a transient row (so in-flight tiles and restart reconnection
 work), and the moment it completes :func:`fold_enhancement` moves its output
 onto the source row: the source keeps its folder, star and identity, its
 thumbnail and preview become the enhanced pixels, its pre-enhance file stays

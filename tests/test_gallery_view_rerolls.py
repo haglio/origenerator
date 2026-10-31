@@ -22,8 +22,8 @@ from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
-from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.item_tile import ItemTile
+from origenerator.gui.new_tile import NewTile
 from origenerator.orientation import base_of
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
@@ -37,11 +37,11 @@ from tests.gallery_view_support import (
     _generating_tile,
     _image,
     _image_workflow,
+    _new_tile,
     _on_screen,
     _open_leaf,
     _png_bytes,
     _reroll_client,
-    _reroll_tile,
     _row,
     _search_for,
     _seeded_db,
@@ -61,7 +61,7 @@ def test_leaf_shows_add_tile_when_client_present(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is not None
+    assert _new_tile(view) is not None
 
 
 def test_main_view_reflows_to_fill_extra_width(qtbot):
@@ -88,7 +88,7 @@ def test_add_tile_leads_the_folders_images(qtbot):
     _select_first_leaf(view)
     layout = view._scroll.widget().layout()
     kinds = [type(layout.itemAt(index).widget()) for index in range(layout.count())]
-    assert kinds.index(RerollTile) < kinds.index(ThumbnailWidget)
+    assert kinds.index(NewTile) < kinds.index(ItemTile)
 
 
 def test_leaf_has_no_add_tile_without_a_client(qtbot):
@@ -96,7 +96,7 @@ def test_leaf_has_no_add_tile_without_a_client(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _new_tile(view) is None
 
 
 def test_no_add_tile_for_unknown_workflow(qtbot):
@@ -105,7 +105,7 @@ def test_no_add_tile_for_unknown_workflow(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _new_tile(view) is None
 
 
 def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
@@ -114,7 +114,7 @@ def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _new_tile(view) is None
 
 
 def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
@@ -125,7 +125,7 @@ def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is not None
+    assert _new_tile(view) is not None
 
 
 def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
@@ -146,7 +146,7 @@ def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     job = view._live_jobs[key]
     assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
@@ -161,7 +161,7 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     assert key in view._live_jobs
     job = view._live_jobs[key]
@@ -170,7 +170,7 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
-def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_request_card(
+def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_request_tile(
         qtbot, tmp_path):
     # Reported: the press that started a run turned the + itself into the run,
     # with the run's Cancel where the + had been -- so on a slow app, a second
@@ -182,11 +182,11 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
     view.refresh()
     _select_first_leaf(view)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
-    assert not _reroll_tile(view).isEnabled()
+    assert not _new_tile(view).isEnabled()
     kinds = _tile_kinds_in_order(view)
-    assert kinds.index(FolderModifyTile) == kinds.index(RerollTile) + 1
+    assert kinds.index(FolderModifyTile) == kinds.index(NewTile) + 1
     assert kinds.index(GeneratingTile) == kinds.index(FolderModifyTile) + 1
 
 
@@ -205,7 +205,7 @@ def test_a_second_press_where_the_runs_cancel_was_starts_no_new_run(qtbot, tmp_p
     view = GalleryView(_seeded_db(tmp_path), client=client)
     _on_screen(qtbot, view, 1200, 800)
     key = _select_first_leaf(view)
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
     cancel = _generating_tile(view)._cancel
     spot = cancel.mapTo(view._scroll.widget(), cancel.rect().center())
 
@@ -233,9 +233,9 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
 # --- Modify (all seeds): same seeds, changed words --------------------------
 
 
-def _request_card(view):
-    cards = view._scroll.widget().findChildren(FolderModifyTile)
-    return cards[0] if cards else None
+def _request_tile(view):
+    tiles = view._scroll.widget().findChildren(FolderModifyTile)
+    return tiles[0] if tiles else None
 
 
 def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
@@ -266,14 +266,14 @@ def _rewritten(view, key, prompt="a dog on a couch"):
     view._on_modify_requested(key, "sdxl_t2i", params)
 
 
-def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
+def test_a_folder_offers_a_request_tile_beside_its_new_tile(qtbot, tmp_path):
     view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
 
-    assert _request_card(view) is not None
-    assert _reroll_tile(view) is not None  # the pair: new seed, and new words
+    assert _request_tile(view) is not None
+    assert _new_tile(view) is not None  # the pair: new seed, and new words
 
 
 def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
@@ -286,17 +286,17 @@ def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    assert _request_card(view) is None
+    assert _request_tile(view) is None
 
 
-def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot, tmp_path):
+def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_folder_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
 
-    _request_card(view).clicked.emit()
+    _request_tile(view).clicked.emit()
 
     panel = view._info_tabs.current_config_panel()
     assert panel._folder_modify.folder_key == key
@@ -393,7 +393,7 @@ def test_the_folders_live_tile_stands_the_image_it_was_asked_of_behind_the_wait(
 
 
 def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
-    # Every run is being made, so the folder shows every run — not one card the
+    # Every run is being made, so the folder shows every run — not one tile the
     # images then arrive through one at a time.
     view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
     qtbot.addWidget(view)
@@ -405,7 +405,7 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
     queued = [job.prompt_id for job in view._jobs.all_jobs]
     # The one in front -- the last asked for, since each image takes the
     # machine from the one before -- is the folder's generating tile; the rest
-    # each get their own card.
+    # each get their own tile.
     assert _generating_tile(view) is not None
     in_front = view._jobs.queue_order[0]
     assert set(view._browser._inflight_cards) == set(queued) - {in_front}
@@ -689,7 +689,7 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     _select_first_leaf(view)
     _folder_tab(view, db)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     panel = view._info_tabs.current_config_panel()
     job = next(iter(view._live_jobs.values()))
@@ -830,7 +830,7 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
     panel = _folder_tab(view, db)
     panel._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     assert view._live_jobs                       # the run started
     assert panel._cancel_btn.isHidden() is True    # but this tab isn't its home
@@ -849,7 +849,7 @@ def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
     parked = _folder_tab(view, db)
     parked._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     opened = view._info_tabs.current_config_panel()
     assert opened is not parked
@@ -869,7 +869,7 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
     parked = _folder_tab(view, db)
     parked._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     assert view._info_tabs._preview_panel is None
 

@@ -1,4 +1,4 @@
-"""The queue's view-model: every generation in flight, as a card.
+"""The queue's view-model: every generation in flight, as a tile.
 
 Not rendering, and it had grown into the pane's largest function by nearly three
 to one -- it joins the generations table, the requests table, the controller's
@@ -36,9 +36,9 @@ TRAINING_KEY = "fix training"
 
 
 class InFlightItems:
-    """The queue's cards, built from the tables and the controller under them.
+    """The queue's tiles, built from the tables and the controller under them.
 
-    ``on_cancel``, ``on_reveal`` and ``on_go_to_item`` are what a card's buttons
+    ``on_cancel``, ``on_reveal`` and ``on_go_to_item`` are what a tile's buttons
     do -- the pane passes its own signals -- so nothing here needs to be a widget.
     """
 
@@ -59,15 +59,15 @@ class InFlightItems:
         self._on_shield = on_shield
 
     def build(self, rows=None, requests=None) -> list[InFlightItem]:
-        """Every queued/running generation as a card model, in the order the queue
+        """Every queued/running generation as a tile model, in the order the queue
         will work through them.
 
         The database's running/pending rows are the source of truth for what's in
         flight — every generation is a gallery re-roll (a tab's Generate launches
-        one too) — so a card shows even when no live job object is tracking a row
+        one too) — so a tile shows even when no live job object is tracking a row
         (after a restart that hasn't re-adopted it, say). A re-roll tracked this
         session grafts on its live frame, progress, cancel and start time from its
-        :class:`GenerationJob`; an untracked running row shows a plain card.
+        :class:`GenerationJob`; an untracked running row shows a plain tile.
 
         The queue's own line orders them (:attr:`JobQueue.queue_order`):
         nothing a row records says whether an image jumped ahead of a video, or
@@ -75,7 +75,7 @@ class InFlightItems:
         hasn't re-adopted — sorts to the back rather than jumping the queue on
         screen.
 
-        The Job Queue's rows carry more than the collection's cards do — a price, a kind, a
+        The Job Queue's rows carry more than the collection's tiles do — a price, a kind, a
         thumbnail of what the job is made from or of the folder it will land in —
         and all of it is read off the row and the tree already in hand, so a poll
         costs one listing whatever the queue is showing. ``rows``/``requests``

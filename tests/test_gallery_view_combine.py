@@ -32,7 +32,7 @@ from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.drags import under_way
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.item_tile import ItemTile
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
@@ -626,7 +626,7 @@ def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_source_video
     view = _combine_view_with_a_looping_video(qtbot, tmp_path)
 
     view._combine._generate_combination("img", "vid", intent=act_settings.GENAU)
-    view._select_reroll(next(iter(view._live_jobs)))  # its card in the collection, clicked
+    view._select_reroll(next(iter(view._live_jobs)))  # its tile in the collection, clicked
 
     assert _front_panel(view)._live_source.prompt_edited
 
@@ -984,7 +984,7 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path, m
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tw = ThumbnailWidget("vid", None, "v")  # a video tile, wired like a real one
+    tw = ItemTile("vid", None, "v")  # a video tile, wired like a real one
     qtbot.addWidget(tw)
     panel = view._combine.panel
     mime = generation_mime("vid")

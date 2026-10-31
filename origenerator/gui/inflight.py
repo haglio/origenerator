@@ -1,7 +1,7 @@
 """What every surface knows about a generation that is still in flight.
 
-Three widgets show queued and running work — the Latest collection's cards
-(:mod:`origenerator.gui.inflight_card`), the Job Queue
+Three widgets show queued and running work — the Latest collection's tiles
+(:mod:`origenerator.gui.inflight_tile`), the Job Queue
 (:mod:`origenerator.gui.job_queue_view`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
@@ -10,7 +10,7 @@ builds per job, carrying what to draw, how to stop it, and how to go to it.
 How the run itself is going — what it is doing, its latest frame, how far along
 it is, how long it has left — is :class:`RunReading`, which an item carries and
 which is also all the tile of an image being enhanced is handed
-(:mod:`origenerator.gui.thumbnail_widget`): that tile has a thumbnail, a name and
+(:mod:`origenerator.gui.item_tile`): that tile has a thumbnail, a name and
 a click of its own already.
 
 :func:`queue_wait_text` is here for the same reason: how a wait reads is one
@@ -282,7 +282,7 @@ def stop_auto_generate_text() -> str:
     A button carries one act, so while Auto-Generate is on its Cancel only
     throws the seed away, and there is nowhere left on that surface to ask for
     a stop: the only one was the Auto switch, which is in the header rather
-    than on the card you are looking at. A menu has room for both, and this is
+    than on the tile you are looking at. A menu has room for both, and this is
     the other one.
 
     It says Auto-Generate goes off rather than reading "Cancel", because switching a

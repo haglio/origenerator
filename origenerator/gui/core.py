@@ -135,7 +135,7 @@ class Core(QMainWindow):
 
         # One unified view: the gallery, whose info pane now holds the editable
         # config tabs that used to be a separate Generate tab. A clicked
-        # thumbnail, the re-roll "+", and the combine panel all feed it.
+        # thumbnail, the New tile, and the combine panel all feed it.
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
                                          prompt_heights=PROMPT_HEIGHTS)
         self.setCentralWidget(self._gallery_view)

@@ -5,12 +5,12 @@ from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.browser_pane import BrowserScrollArea
-from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.new_tile import NewTile
 from origenerator.gui.stylesheet import build_stylesheet
 
 
 def test_the_tile_offers_a_new_random_seed(qtbot):
-    tile = RerollTile()
+    tile = NewTile()
     qtbot.addWidget(tile)
     assert tile._glyph.mark == "plus"
     assert tile._caption.text() == "New (random seed)"
@@ -18,7 +18,7 @@ def test_the_tile_offers_a_new_random_seed(qtbot):
 
 
 def test_a_click_asks_for_a_new_seed(qtbot):
-    tile = RerollTile()
+    tile = NewTile()
     qtbot.addWidget(tile)
     clicks = []
     tile.add_requested.connect(lambda: clicks.append(True))
@@ -27,7 +27,7 @@ def test_a_click_asks_for_a_new_seed(qtbot):
 
 
 def test_a_folder_already_making_one_grays_its_plus_out_and_says_why(qtbot):
-    tile = RerollTile(making_one=True)
+    tile = NewTile(making_one=True)
     qtbot.addWidget(tile)
 
     assert not tile.isEnabled()
@@ -35,7 +35,7 @@ def test_a_folder_already_making_one_grays_its_plus_out_and_says_why(qtbot):
 
 
 def test_a_grayed_plus_starts_nothing_on_a_click(qtbot):
-    tile = RerollTile(making_one=True)
+    tile = NewTile(making_one=True)
     qtbot.addWidget(tile)
     clicks = []
     tile.add_requested.connect(lambda: clicks.append(True))
@@ -50,7 +50,7 @@ def test_a_press_on_a_grayed_plus_does_not_put_the_picked_items_down(qtbot):
     # items, and answers it by putting the picked ones down.
     pane = BrowserScrollArea()
     qtbot.addWidget(pane)
-    tile = RerollTile(making_one=True)
+    tile = NewTile(making_one=True)
     pane.setWidget(tile)
     let_go = []
     pane.background_clicked.connect(lambda: let_go.append(True))
@@ -71,7 +71,7 @@ def test_a_grayed_plus_is_painted_darker_than_a_live_one(qtbot):
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
     try:
-        live, grayed = RerollTile(), RerollTile(making_one=True)
+        live, grayed = NewTile(), NewTile(making_one=True)
         for tile in (live, grayed):
             qtbot.addWidget(tile)
             tile.ensurePolished()

@@ -1072,8 +1072,8 @@ def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
 
 def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_path):
     # A tab's Generate launches a re-roll of its settings folder; that in-flight
-    # generation shows as a card on Latest, and clicking the card opens the folder
-    # it runs in (where its live tile shows), just like any re-roll's card.
+    # generation shows as a tile on Latest, and clicking the tile opens the folder
+    # it runs in (where its live tile shows), just like any re-roll's tile.
     win = _window(qtbot, tmp_path)
     gv = win._gallery_view
     tabs = gv._info_tabs
@@ -1087,16 +1087,16 @@ def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_pat
     pid = gv._live_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert pid in gv._browser._inflight_cards   # the running generation shows as a card
+    assert pid in gv._browser._inflight_tiles   # the running generation shows as a tile
 
-    gv._browser._on_inflight_clicked(pid)       # click that card
+    gv._browser._on_inflight_clicked(pid)       # click that tile
     assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
 def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
     # The reported bug: a generation left running by a prior session (here an i2v
     # video), with the gallery restored onto Latest. It must show as an in-flight
-    # card — the collection reads the database's running rows, so a card appears whether
+    # tile — the collection reads the database's running rows, so a tile appears whether
     # or not the re-roll controller has re-adopted the job this instant.
     db = Database(tmp_path / "t.db")
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
@@ -1117,7 +1117,7 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
     gv = win._gallery_view
     gv.refresh()
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert "vid_run" in gv._browser._inflight_cards
+    assert "vid_run" in gv._browser._inflight_tiles
 
 
 def _seed_combine_db(tmp_path, videos=("vid",)):

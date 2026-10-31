@@ -2225,7 +2225,7 @@ def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
 
 
 def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame():
-    # 481 frames as one window is 31 GB of activations on a 16 GB card, and
+    # 481 frames as one window is 31 GB of activations on a 16 GB tile, and
     # windows blended over each other crossfade and drift. So a long video is
     # rendered as videos of the longest length one window takes, each started
     # from the last frame the one before it decoded: no blend, one scene.
@@ -2605,7 +2605,7 @@ def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
-def test_a_workflow_name_uses_no_model_card_shorthand_but_t2i_i2v_and_t2v(name):
+def test_a_workflow_name_uses_no_model_tile_shorthand_but_t2i_i2v_and_t2v(name):
     assert not re.search(r"\b(FLF2V|ATI|I2I|S2V)\b", WORKFLOW_REGISTRY[name].display_name)
 
 

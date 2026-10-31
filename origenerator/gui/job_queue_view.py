@@ -222,7 +222,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # it has — written across the bar those numbers measure, so the reading and
         # the thing read are one object rather than a line of text with a separate
         # stripe under it. The same line, in the same words, as the browser pane's
-        # in-flight cards carry.
+        # in-flight tiles carry.
         self._progress = ProgressCaption()
         self._progress.setFixedHeight(BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)

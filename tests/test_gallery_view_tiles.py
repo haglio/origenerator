@@ -781,8 +781,8 @@ def test_a_version_dragged_onto_the_enhance_panel_grays_the_enhance_that_would_r
     _dropped_on(view._enhance.panel, mime)
 
     assert not view._bank.enhance.isEnabled()
-    (card,) = versions._host.findChildren(_AddRow)
-    assert "already has a version" in card.toolTip()
+    (tile,) = versions._host.findChildren(_AddRow)
+    assert "already has a version" in tile.toolTip()
 
 
 # --- the controls a tile wears in its own corners -----------------------------

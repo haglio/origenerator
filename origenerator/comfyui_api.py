@@ -300,7 +300,7 @@ class ComfyUIApi:
 
         ComfyUI keeps the last run's models resident between prompts, which is
         right when the next prompt is its own and wrong when another program
-        needs the card first -- the voice that speaks a story's lines, run
+        needs the graphics card first -- the voice that speaks a story's lines, run
         before the video that lip-syncs to them is submitted. ComfyUI takes the
         request as a flag it acts on before its next prompt, so the call returns
         at once.

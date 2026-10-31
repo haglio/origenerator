@@ -1,4 +1,4 @@
-"""The scenes of a story, one card each: what it shows, what it keeps out,
+"""The scenes of a story, one tile each: what it shows, what it keeps out,
 what she says, and how long it runs.
 
 A video longer than one segment is rendered as segments chained from each
@@ -15,9 +15,9 @@ per scene.
 The lines are spoken: a scene with one renders on the speech model, her lips
 on the words, in the voice the Audio section sets (see
 :mod:`origenerator.speech`). A workflow that cannot speak -- the loop -- has no
-lines param, and its cards carry no lines field.
+lines param, and its tiles carry no lines field.
 
-A scene is one thing or the other, and the card says which. The speech model
+A scene is one thing or the other, and the tile says which. The speech model
 renders a talking performance and nothing else: measured on his own settings, a
 speaking scene moves under half as much as the same scene on the experts, with
 the movement at the head, and driving it with the scene rendered properly
@@ -141,7 +141,7 @@ class _Scene(QFrame):
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
             # Every path that fills a line -- typing, loading settings, a voice
-            # edit -- ends in textChanged, so the card follows all of them.
+            # edit -- ends in textChanged, so the tile follows all of them.
             self.fields["scene_lines"].textChanged.connect(self.reflect_use)
         self.reflect_use()
         self.length.editTextChanged.connect(self.changed)
@@ -186,7 +186,7 @@ class _Scene(QFrame):
 
 
 class ScenesEditor(QWidget):
-    """One card per scene, and a button for the next one."""
+    """One tile per scene, and a button for the next one."""
 
     changed = pyqtSignal()
 
@@ -196,7 +196,7 @@ class ScenesEditor(QWidget):
         super().__init__(parent)
         self._pd = frames_def
         self._prepare_length = prepare_length
-        # Whether the workflow speaks: a card of one that cannot has no lines field.
+        # Whether the workflow speaks: a tile of one that cannot has no lines field.
         self._lines = lines
         self._shut_down = shut_down
         self._scenes: list[_Scene] = []
@@ -204,9 +204,9 @@ class ScenesEditor(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_MEDIUM)
-        self._cards = QVBoxLayout()
-        self._cards.setSpacing(GAP_MEDIUM)
-        column.addLayout(self._cards)
+        self._scene_column = QVBoxLayout()
+        self._scene_column.setSpacing(GAP_MEDIUM)
+        column.addLayout(self._scene_column)
         self._add = QPushButton("Add scene")
         self._add.setToolTip("Another scene, run after this one from its last frame")
         self._add.clicked.connect(self.add_scene)
@@ -228,7 +228,7 @@ class ScenesEditor(QWidget):
         scene.changed.connect(self.changed)
         scene.remove_requested.connect(self.remove_scene)
         self._scenes.append(scene)
-        self._cards.addWidget(scene)
+        self._scene_column.addWidget(scene)
         self._renumber()
         self.changed.emit()
 
@@ -242,12 +242,12 @@ class ScenesEditor(QWidget):
             scene.show_readings(self._readings)
 
     def remove_scene(self, which) -> None:
-        """Take a scene out, by index or by card; the last one stays."""
+        """Take a scene out, by index or by tile; the last one stays."""
         scene = self._scenes[which] if isinstance(which, int) else which
         if len(self._scenes) == 1 or scene not in self._scenes:
             return
         self._scenes.remove(scene)
-        self._cards.removeWidget(scene)
+        self._scene_column.removeWidget(scene)
         scene.setParent(None)
         scene.deleteLater()
         self._renumber()
@@ -276,7 +276,7 @@ class ScenesEditor(QWidget):
         return [scene.fields[key] for scene in self._scenes if key in scene.fields]
 
     def text_fields(self) -> list[PromptField]:
-        """Every field on every card, in reading order: what a find searches."""
+        """Every field on every tile, in reading order: what a find searches."""
         return [field for scene in self._scenes for field in scene.fields.values()]
 
     def fields_beside_their_texts(self, stored: dict) -> list[tuple[PromptField, str | None]]:
@@ -294,7 +294,7 @@ class ScenesEditor(QWidget):
         the story, so the count of scenes follows it; a negative with fewer
         texts than scenes carries its last text on through the rest, which is
         what the graph keeps out of them (WorkflowTemplate.scene_prompt_nodes),
-        so what the cards show is what renders."""
+        so what the tiles show is what renders."""
         texts = scene_prompts(str(text))
         if key == "positive_prompt":
             self._resize_to(len(texts))

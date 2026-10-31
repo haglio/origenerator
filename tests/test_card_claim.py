@@ -6,7 +6,7 @@ from pathlib import Path
 from tools import card_claim
 
 
-def test_a_free_card_is_taken_with_who_holds_it_and_since_when(tmp_path):
+def test_a_free_tile_is_taken_with_who_holds_it_and_since_when(tmp_path):
     claim = tmp_path / "claim.json"
 
     assert card_claim.take("Example Look 1.1 training", 4242, claim)
@@ -17,7 +17,7 @@ def test_a_free_card_is_taken_with_who_holds_it_and_since_when(tmp_path):
     assert written["since"] > 0
 
 
-def test_a_card_a_live_program_holds_is_not_taken_and_reads_as_held_by_another(
+def test_a_tile_a_live_program_holds_is_not_taken_and_reads_as_held_by_another(
         tmp_path, another_program):
     claim = tmp_path / "claim.json"
     assert card_claim.take("hand training", another_program.pid, claim)

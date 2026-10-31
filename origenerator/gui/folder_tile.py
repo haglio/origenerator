@@ -17,17 +17,17 @@ from shared_ui.icons import icon_then_text
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
-from origenerator.gui import grid_card, palette
+from origenerator.gui import palette, tile_shape
 
-# The collage's four cells fill the card's thumbnail area, a gap apart.
+# The four thumbnails fill the tile's thumbnail area, a gap apart.
 _CELL_GAP = HAIRLINE
-_CELL_SIZE = ((grid_card.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
-              (grid_card.THUMBNAIL_SIZE[1] - _CELL_GAP) // 2)
-_INNER_WIDTH = grid_card.CARD_WIDTH - 2 * grid_card.CARD_MARGIN
+_CELL_SIZE = ((tile_shape.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
+              (tile_shape.THUMBNAIL_SIZE[1] - _CELL_GAP) // 2)
+_INNER_WIDTH = tile_shape.TILE_WIDTH - 2 * tile_shape.TILE_MARGIN
 
 
 class FolderTile(QFrame):
-    """A folder shown in the main view: a thumbnail collage plus name + count.
+    """A folder shown in the main view: up to four thumbnails plus name + count.
 
     Clicking drills into the folder; right-clicking asks for a context menu.
     Both signals carry the folder's stable key so the view can act on it.
@@ -47,20 +47,20 @@ class FolderTile(QFrame):
         self._selected = False
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # The same card the generations beside it in the flow stand in, plus the
+        # The same tile the generations beside it in the flow stand in, plus the
         # breadcrumb line the Favorites collection's tiles carry.
-        self.setFixedSize(*grid_card.folder_card_size(breadcrumb=bool(context)))
-        self.setStyleSheet(grid_card.idle_css("folderTile"))
+        self.setFixedSize(*tile_shape.folder_tile_size(breadcrumb=bool(context)))
+        self.setStyleSheet(tile_shape.idle_css("folderTile"))
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self._key, self.mapToGlobal(pos))
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
-        layout.setSpacing(grid_card.CARD_SPACING)
-        self._collage = self._build_collage(preview_paths)
-        layout.addWidget(self._collage)
+        layout.setContentsMargins(*(tile_shape.TILE_MARGIN,) * 4)
+        layout.setSpacing(tile_shape.TILE_SPACING)
+        self._thumbnails = self._build_thumbnails(preview_paths)
+        layout.addWidget(self._thumbnails)
 
         if context:
             # Where this folder lives, so a favorited folder is tellable apart from a
@@ -68,8 +68,8 @@ class FolderTile(QFrame):
             # folder's own parent — visible; the whole path sits in the tooltip.
             crumb = QLabel()
             crumb.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
-            crumb.setFont(grid_card.caption_font())
-            crumb.setFixedHeight(grid_card.line_height())
+            crumb.setFont(tile_shape.caption_font())
+            crumb.setFixedHeight(tile_shape.line_height())
             crumb.setText(crumb.fontMetrics().elidedText(
                 context, Qt.TextElideMode.ElideLeft, _INNER_WIDTH))
             crumb.setToolTip(context)
@@ -85,18 +85,18 @@ class FolderTile(QFrame):
         caption.setTextFormat(Qt.TextFormat.RichText)
         caption.setText(self._captioned(favorite))
         caption.setWordWrap(True)
-        grid_card.style_caption(caption)  # the grid's shared caption size
+        tile_shape.style_caption(caption)  # the grid's shared caption size
         # A settings folder is named by a code, so what it holds — the prompt and
         # the settings that set it apart — is read on hover rather than under the
-        # collage, where it would take more of the tile than the thumbnails do.
+        # thumbnails, where it would take more of the tile than the thumbnails do.
         caption.setToolTip(text)
         caption_row.addWidget(caption, 1)
         layout.addLayout(caption_row)
 
         count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
         count_label.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
-        count_label.setFont(grid_card.caption_font())
-        count_label.setFixedHeight(grid_card.line_height())
+        count_label.setFont(tile_shape.caption_font())
+        count_label.setFixedHeight(tile_shape.line_height())
         layout.addWidget(count_label)
 
     @property
@@ -110,14 +110,14 @@ class FolderTile(QFrame):
         if selected == self._selected:
             return
         self._selected = selected
-        self.setStyleSheet(grid_card.selected_css("folderTile") if selected
-                           else grid_card.idle_css("folderTile"))
+        self.setStyleSheet(tile_shape.selected_css("folderTile") if selected
+                           else tile_shape.idle_css("folderTile"))
 
     def _captioned(self, favorite: bool) -> str:
         if not favorite:
             return html.escape(self._text, quote=False)
         return icon_then_text("star", self._text, color=TEXT_PRIMARY,
-                              size=grid_card.line_height())
+                              size=tile_shape.line_height())
 
     def _badge(self, icon, name: str) -> QLabel:
         badge = QLabel()
@@ -127,10 +127,10 @@ class FolderTile(QFrame):
         return badge
 
     @staticmethod
-    def _build_collage(preview_paths) -> QWidget:
-        collage = QWidget()
-        collage.setFixedSize(grid_card.thumbnail_size())
-        grid = QGridLayout(collage)
+    def _build_thumbnails(preview_paths) -> QWidget:
+        thumbnails = QWidget()
+        thumbnails.setFixedSize(tile_shape.thumbnail_size())
+        grid = QGridLayout(thumbnails)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(_CELL_GAP)
         previews = list(preview_paths)[:4]
@@ -140,9 +140,9 @@ class FolderTile(QFrame):
             placeholder.setStyleSheet(
                 f"color: {as_hex(TEXT_MUTED)}; background: {palette.EMPTY_PLATE};"
                 f" border-radius: {BUTTON_RADIUS}px;")
-            placeholder.setFixedSize(grid_card.thumbnail_size())
+            placeholder.setFixedSize(tile_shape.thumbnail_size())
             grid.addWidget(placeholder, 0, 0)
-            return collage
+            return thumbnails
         for idx in range(4):
             cell = QLabel()
             cell.setFixedSize(*_CELL_SIZE)
@@ -158,7 +158,7 @@ class FolderTile(QFrame):
                         Qt.TransformationMode.SmoothTransformation,
                     ))
             grid.addWidget(cell, idx // 2, idx % 2)
-        return collage
+        return thumbnails
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

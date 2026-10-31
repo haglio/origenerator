@@ -23,7 +23,7 @@ _THE_BRACKETS_ROUND_A_COMBINATION = ("origenerator/gui/combination.py: text size
 # Artwork: the app icon's corner on its 256px canvas, which shared_ui.app_icon's spec checks.
 _THE_APP_ICONS_CORNER = "origenerator/icon_design.py: spacing CORNER_RADIUS = 5"
 # Not drawn: the mark WAN's text reader puts where each word starts, as its own vocabulary spells it.
-_UMT5S_WORD_START = "origenerator/prompt_tokens.py: glyph ▁ (U+2581 LOWER ONE EIGHTH BLOCK)"
+_UMT5S_WORD_START = "origenerator/prompt_tokens.py: symbol ▁ (U+2581 LOWER ONE EIGHTH BLOCK)"
 
 
 def test_everything_origenerator_draws_with_comes_from_shared_ui():

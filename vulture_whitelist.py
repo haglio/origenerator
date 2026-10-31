@@ -19,9 +19,9 @@ belong.
 from __future__ import annotations
 
 # --- Qt event handlers and layout hooks -- called by the C++ event loop, never from here ---
-_.dragEnterEvent  # origenerator/gui/drop_slot.py:64, origenerator/gui/folder_tree.py:304, origenerator/gui/job_queue_view.py:743
-_.dropEvent  # origenerator/gui/drop_slot.py:73, origenerator/gui/folder_tree.py:329, origenerator/gui/job_queue_view.py:757
-_.contextMenuEvent  # origenerator/gui/drop_slot.py:238
+_.dragEnterEvent  # origenerator/gui/drop_zone.py:64, origenerator/gui/folder_tree.py:304, origenerator/gui/job_queue_view.py:743
+_.dropEvent  # origenerator/gui/drop_zone.py:73, origenerator/gui/folder_tree.py:329, origenerator/gui/job_queue_view.py:757
+_.contextMenuEvent  # origenerator/gui/drop_zone.py:238
 _.takeAt  # origenerator/gui/flow_layout.py:46
 _.expandingDirections  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # origenerator/gui/flow_layout.py:54

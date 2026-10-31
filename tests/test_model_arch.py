@@ -19,6 +19,13 @@ from origenerator.workflows.model_arch import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _each_test_is_a_launch_of_its_own():
+    model_arch._remembered.cache_clear()
+    yield
+    model_arch._remembered.cache_clear()
+
+
 def _write(path, tensor_names):
     header = json.dumps(
         {name: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for name in tensor_names}
@@ -117,12 +124,12 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
     # of them -- a third of a second, every launch, for files unchanged since the
     # last one.
     monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
-    monkeypatch.setattr(model_arch, "_described", None)
+    model_arch._remembered.cache_clear()
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
     assert model_arch.describe(path).arch == SDXL
     reads = []
     monkeypatch.setattr(model_arch, "_tensor_names", lambda p: reads.append(p))
-    monkeypatch.setattr(model_arch, "_described", None)  # the next launch
+    model_arch._remembered.cache_clear()  # the next launch
 
     assert model_arch.describe(path).arch == SDXL
     assert reads == []
@@ -133,7 +140,7 @@ def test_a_header_remembered_by_an_older_reader_is_read_again(tmp_path, monkeypa
     # launch whose reader has changed reads every header again: the fix LoRAs
     # stayed unrecognized in every picker after the reader learned their shape.
     monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
-    monkeypatch.setattr(model_arch, "_described", None)
+    model_arch._remembered.cache_clear()
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
     stat = path.stat()
     remembered = {"path": str(path), "size": stat.st_size, "mtime_ns": stat.st_mtime_ns,
@@ -143,7 +150,7 @@ def test_a_header_remembered_by_an_older_reader_is_read_again(tmp_path, monkeypa
     assert model_arch.describe(path).arch == SDXL
 
     # ...and what the readers before this one left on disk, a bare list, is older still.
-    monkeypatch.setattr(model_arch, "_described", None)
+    model_arch._remembered.cache_clear()
     (tmp_path / "headers.json").write_text(json.dumps([remembered]))
 
     assert model_arch.describe(path).arch == SDXL

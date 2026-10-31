@@ -113,7 +113,7 @@ def created_item(file: dict, fallback: str = "", *,
     gone from disk."""
     full = gallery.output_file_path(file, _places(places))
     try:
-        stamp = datetime.fromtimestamp(full.stat().st_mtime)
+        stamp = datetime.fromtimestamp(full.stat().st_mtime).astimezone()
     except OSError:
         return MetaItem("Created", str(fallback))
     return MetaItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))

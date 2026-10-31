@@ -81,7 +81,7 @@ class SeedComboBox(ThumbnailDropdown):
 
     def _rows_of(self, uses: list[SeedUse]):
         most_in_a_row = max(1, _TALLEST_ROW_A_LIST_LAYS_OUT // self._thumbnail_row_height())
-        for seed, stretch in groupby(uses, key=attrgetter("seed")):
-            stretch = tuple(stretch)
+        for seed, grouped in groupby(uses, key=attrgetter("seed")):
+            stretch = tuple(grouped)
             for start in range(0, len(stretch), most_in_a_row):
                 yield str(seed), stretch[start:start + most_in_a_row]

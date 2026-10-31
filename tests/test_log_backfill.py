@@ -10,13 +10,13 @@ from origenerator.log_backfill import (
 
 
 def _local_epoch(y, mo, d, h, mi, s, us=0):
-    return datetime(y, mo, d, h, mi, s, us).timestamp()
+    return datetime(y, mo, d, h, mi, s, us).astimezone().timestamp()
 
 
 def _utc_iso_for_local(y, mo, d, h, mi, s, us=0):
     """The completed_at an importer would store for a file written at this
     local wall-clock time (mtime -> UTC isoformat)."""
-    epoch = datetime(y, mo, d, h, mi, s, us).timestamp()
+    epoch = datetime(y, mo, d, h, mi, s, us).astimezone().timestamp()
     return datetime.fromtimestamp(epoch, tz=UTC).isoformat()
 
 

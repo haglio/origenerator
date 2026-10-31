@@ -9,6 +9,7 @@ import json
 import re
 import struct
 from dataclasses import asdict, dataclass
+from functools import cache
 from pathlib import Path
 
 from origenerator import config
@@ -93,7 +94,6 @@ class ModelFile:
 # file of gigabytes opened, and a file unchanged in size and time reads the same.
 _HEADERS_PATH = config.STATE_DIR / "model_headers.json"
 _READER_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
-_described: dict[tuple[str, int, int], ModelFile] | None = None
 
 
 def describe(path: Path) -> ModelFile:
@@ -110,11 +110,9 @@ def describe(path: Path) -> ModelFile:
     return remembered[key]
 
 
+@cache
 def _remembered() -> dict[tuple[str, int, int], ModelFile]:
-    global _described
-    if _described is None:
-        _described = _read_remembered(_HEADERS_PATH)
-    return _described
+    return _read_remembered(_HEADERS_PATH)
 
 
 def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
@@ -185,11 +183,8 @@ def _components(keys: list[str]) -> set[str]:
     these by prefix as well as by equality.
     """
     out = set()
-    for key in keys:
-        for wrapper in _WRAPPERS:
-            if key.startswith(wrapper):
-                key = key[len(wrapper):]
-                break
+    for name in keys:
+        key = next((name[len(wrapper):] for wrapper in _WRAPPERS if name.startswith(wrapper)), name)
         out.add(key.split(".")[0])
     return out
 

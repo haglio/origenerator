@@ -136,8 +136,9 @@ class FlowLayout(QLayout):
             x = area.x()
             if self._align_right:
                 x += max(0, area.width() - _span_of(placed, spacing))
-            for run, start in ((leading, x),
+            for run, run_x in ((leading, x),
                                (trailing, area.x() + max(0, area.width() - _span_of(trailing, spacing)))):
+                start = run_x
                 for item, hint in run:
                     if place:
                         item.setGeometry(QRect(QPoint(start, y), hint))

@@ -37,6 +37,9 @@ IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
 
 
+_A_CLIENT = object()
+
+
 class FakePanel:
     """The combine panel reduced to what the controller drives."""
 
@@ -294,7 +297,7 @@ def combine(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "CombinePanel", FakePanel)
     built = []
 
-    def build(host=None, *, db=None, jobs=None, client=object(), slideshows=None,
+    def build(host=None, *, db=None, jobs=None, client=_A_CLIENT, slideshows=None,
               tabs=None, inbox=None):
         host = host or FakeHost()
         parent = QWidget()

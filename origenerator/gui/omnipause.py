@@ -19,16 +19,20 @@ import weakref
 
 from PyQt6.QtGui import QMovie
 
+
+class _TheRoom:
+    frozen = False
+
+
 # Weak, because everything here is parented to the widget that shows it: PyQt
 # keeps a parented wrapper alive as long as its parent, so an entry lives
 # exactly as long as the thing it stands for and a rebuilt strip leaves nothing.
-_frozen = False
 _held: weakref.WeakSet = weakref.WeakSet()
 
 
 def frozen() -> bool:
     """Whether the room is stopped."""
-    return _frozen
+    return _TheRoom.frozen
 
 
 def holds(thing) -> None:
@@ -37,13 +41,12 @@ def holds(thing) -> None:
     A ``QMovie`` is Qt's and answers ``setPaused``; ours answer ``set_frozen``.
     """
     _held.add(thing)
-    _tell(thing, _frozen)
+    _tell(thing, _TheRoom.frozen)
 
 
 def freeze(on: bool) -> None:
     """Stop the room, or let it go again."""
-    global _frozen
-    _frozen = on
+    _TheRoom.frozen = on
     for thing in list(_held):
         try:
             _tell(thing, on)

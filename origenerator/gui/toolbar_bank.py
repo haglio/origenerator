@@ -236,7 +236,7 @@ class ToolbarBank(QWidget):
         # two rows all but touching.
         layout = FlowLayout(self)
         self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
-        for buttons in (
+        for listed in (
             (self.back, self.forward),               # where you are
             (self.undo, self.redo),                  # what you did
             (self.group,),                           # …to the picked folders
@@ -244,7 +244,7 @@ class ToolbarBank(QWidget):
             (self.slideshow, self.auto, self.radio),  # what the app is doing
             (self.mic,),                             # what it hears with
         ):
-            buttons = tuple(b for b in buttons if b is not None)
+            buttons = tuple(b for b in listed if b is not None)
             gap = _group_gap()
             layout.addWidget(gap)
             for button in buttons:

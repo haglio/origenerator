@@ -206,7 +206,11 @@ def _said_why(job: dict) -> bool:
 def _take_the_card(job: dict) -> None:
     while not card_claim.take(f"{job['part'].capitalize()} fix training", os.getpid()):
         _status(job, state="waiting")
-        time.sleep(20)
+        _wait_for_the_card()
+
+
+def _wait_for_the_card() -> None:
+    time.sleep(20)
 
 
 def run(job: dict) -> None:

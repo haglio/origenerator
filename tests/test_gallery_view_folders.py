@@ -118,7 +118,7 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
 
     view._group_selection()
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["name"] == "Favorites"
     assert record["folders"] == [cat, dog]
     # ...and the view has landed on it, showing what it gathered.
@@ -128,14 +128,14 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
 
 def test_grouping_picked_folders_takes_a_custom_folder_among_them(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
-    mine = gallery.custom_folder_key(_make_folder(view, "Mine", [dog]))
+    mine = gallery.custom_collection_key(_make_folder(view, "Mine", [dog]))
     _pick(view, mine, cat)
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Both", True)))
 
     view._group_selection()
 
-    record = next(r for r in view._db.list_custom_folders() if r["name"] == "Both")
+    record = next(r for r in view._db.list_custom_collections() if r["name"] == "Both")
     assert sorted(record["folders"]) == sorted([mine, cat])
 
 
@@ -147,7 +147,7 @@ def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
 
     view._group_selection()
 
-    assert view._db.list_custom_folders() == []
+    assert view._db.list_custom_collections() == []
 
 
 def test_a_folder_of_your_own_is_drawn_only_on_the_side_it_was_made_on(qtbot):
@@ -175,7 +175,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
 def test_a_custom_folder_shows_the_items_it_holds_ahead_of_its_folders(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Mine", [dog])
-    view._db.add_items_to_custom_folder(folder_id, ["i1"])
+    view._db.add_items_to_custom_collection(folder_id, ["i1"])
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
@@ -206,9 +206,9 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat])
 
-    view._on_dropped(gallery.custom_folder_key(folder_id), [dog])
+    view._on_dropped(gallery.custom_collection_key(folder_id), [dog])
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat, dog]
     assert view._gallery_pane._listed_folders == [cat, dog]  # landed on it
 
@@ -236,9 +236,9 @@ def test_an_item_dropped_on_a_custom_folders_row_goes_in_and_the_folder_opens(qt
 
     assert _drop_on(_top_level(view._tree)["Mine"], mime)
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["items"] == ["i1"]
-    assert view.current_group().key == gallery.custom_folder_key(folder_id)
+    assert view.current_group().key == gallery.custom_collection_key(folder_id)
 
 
 def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
@@ -250,7 +250,7 @@ def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
     mime = generation_mime("t1")
 
     assert not _drop_on(_top_level(view._tree)["Mine"], mime)
-    assert view._db.list_custom_folders()[0]["items"] == []
+    assert view._db.list_custom_collections()[0]["items"] == []
 
 
 def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
@@ -262,7 +262,7 @@ def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
     mime = generation_mime("not-in-any-folder")
 
     assert not _drop_on(_top_level(view._tree)["Mine"], mime)
-    assert view._db.list_custom_folders()[0]["items"] == []
+    assert view._db.list_custom_collections()[0]["items"] == []
 
 
 def _drop_in_the_middle_pane(view, mime, source=None) -> bool:
@@ -291,7 +291,7 @@ def test_an_item_dropped_into_an_open_custom_folder_goes_in(qtbot):
 
     assert _drop_in_the_middle_pane(view, mime)
 
-    assert view._db.list_custom_folders()[0]["items"] == ["i1"]
+    assert view._db.list_custom_collections()[0]["items"] == ["i1"]
     assert view._gallery_pane.listed_prompt_ids() == ["i1"]  # drawn again with it
 
 
@@ -310,7 +310,7 @@ def test_a_folder_dragged_from_the_toc_into_an_open_custom_folder_goes_in(qtbot)
 
     assert _drop_in_the_middle_pane(view, mime, source=_side(view._tree))
 
-    assert view._db.list_custom_folders()[0]["folders"] == [dog, cat]
+    assert view._db.list_custom_collections()[0]["folders"] == [dog, cat]
 
 
 def test_an_open_custom_folder_refuses_a_folder_from_the_other_shapes_list(qtbot):
@@ -321,12 +321,12 @@ def test_an_open_custom_folder_refuses_a_folder_from_the_other_shapes_list(qtbot
 
     assert not _drop_in_the_middle_pane(view, mime, source=_side(view._tree, PORTRAIT))
 
-    assert view._db.list_custom_folders()[0]["folders"] == [dog]
+    assert view._db.list_custom_collections()[0]["folders"] == [dog]
 
 
 def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
-    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [dog]))
+    inner = gallery.custom_collection_key(_make_folder(view, "Inner", [dog]))
     _make_folder(view, "Outer", [cat])
     with qtbot.waitExposed(view):
         view.show()
@@ -334,7 +334,7 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
 
     assert _drop_on(_top_level(view._tree)["Outer"], mime)
 
-    outer = next(r for r in view._db.list_custom_folders() if r["name"] == "Outer")
+    outer = next(r for r in view._db.list_custom_collections() if r["name"] == "Outer")
     assert outer["folders"] == [cat, inner]
     assert _shown(_top_level(view._tree)["Outer"]) == "(2) Outer"
     assert view._gallery_pane._listed_folders == [cat, inner]  # landed on it
@@ -343,8 +343,8 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
 
 def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
-    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
-    outer = gallery.custom_folder_key(_make_folder(view, "Outer", [inner]))
+    inner = gallery.custom_collection_key(_make_folder(view, "Inner", [cat]))
+    outer = gallery.custom_collection_key(_make_folder(view, "Outer", [inner]))
     with qtbot.waitExposed(view):
         view.show()
     mime = _folder_drag(view, outer)
@@ -354,14 +354,14 @@ def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
 
     assert not _drop_on(inner_row, mime)
 
-    inner_record = next(r for r in view._db.list_custom_folders() if r["name"] == "Inner")
+    inner_record = next(r for r in view._db.list_custom_collections() if r["name"] == "Inner")
     assert inner_record["folders"] == [cat]
 
 
 def test_a_custom_folder_dragged_onto_favorites_is_refused(qtbot):
-    # Favorites stars what lands on it, and a custom folder takes no star.
+    # Favorites stars what lands on it, and a custom collection takes no star.
     view, cat, _dog = _two_leaf_view(qtbot)
-    mine = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
+    mine = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
     with qtbot.waitExposed(view):
         view.show()
     mime = _folder_drag(view, mine)
@@ -432,7 +432,7 @@ def test_dropping_a_favorite_folder_onto_favorites_leaves_it_a_favorite(qtbot):
 
 def test_a_folder_the_user_made_dropped_onto_favorites_takes_no_favorite(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
-    made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
+    made = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
 
     view._on_dropped(FAVORITES_KEY, [made])
 
@@ -457,20 +457,20 @@ def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [])
 
-    view._on_dropped(gallery.custom_folder_key(folder_id), [cat])
+    view._on_dropped(gallery.custom_collection_key(folder_id), [cat])
 
-    (held,) = view._db.folders_in_custom_folders()
+    (held,) = view._db.folders_in_custom_collections()
     assert (held["level"], held["ref_prompt_id"]) == ("settings", "i1")
 
 
 def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat, dog])
-    group = view.group_for_key(gallery.custom_folder_key(folder_id))
+    group = view.group_for_key(gallery.custom_collection_key(folder_id))
 
-    view._remove_from_custom_folder(group, [dog])
+    view._remove_from_custom_collection(group, [dog])
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # the folder itself survives
 
@@ -480,9 +480,9 @@ def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
     folder_id = _make_folder(view, "Keepers", [cat, dog])
     view._confirm = lambda text: True
 
-    view._remove_custom_folder(view.group_for_key(gallery.custom_folder_key(folder_id)))
+    view._remove_custom_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
 
-    assert view._db.list_custom_folders() == []
+    assert view._db.list_custom_collections() == []
     assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
     assert "Keepers" not in _top_level(view._tree)
 
@@ -490,12 +490,12 @@ def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
 def test_removing_a_folder_of_your_own_says_the_items_it_holds_are_kept(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat])
-    view._db.add_items_to_custom_folder(folder_id, ["i2"])
+    view._db.add_items_to_custom_collection(folder_id, ["i2"])
     view.refresh()
     asked = []
     view._confirm = lambda text: asked.append(text) and False
 
-    view._remove_custom_folder(view.group_for_key(gallery.custom_folder_key(folder_id)))
+    view._remove_custom_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
 
     assert asked == ["Remove the folder “Keepers”?\n\n"
                      "The 1 folder and 1 item it holds are kept."]
@@ -521,7 +521,7 @@ def test_an_empty_folder_of_your_own_says_items_can_be_dragged_onto_it(qtbot):
 
 
 def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
-    # Delete trashes a folder's generations; a custom folder holds none of its own,
+    # Delete trashes a folder's generations; a custom collection holds none of its own,
     # so that path must never accept one.
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat])
@@ -531,7 +531,7 @@ def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
     view._delete_selection()
 
     assert view._db.get_generation("i1") is not None
-    assert view._db.list_custom_folders()[0]["id"] == folder_id
+    assert view._db.list_custom_collections()[0]["id"] == folder_id
 
 
 def test_a_custom_folder_survives_a_rebuild_and_follows_its_items(qtbot):
@@ -600,12 +600,12 @@ def test_a_folder_under_a_folder_of_your_own_in_the_list_can_be_taken_out_of_it(
 
     _tree_menu(view, under_mine.data(0, TREE_KEY_ROLE))
 
-    assert view._db.list_custom_folders()[0]["folders"] == []
+    assert view._db.list_custom_collections()[0]["folders"] == []
 
 
 def test_a_folder_of_your_own_put_inside_another_leaves_the_top_of_the_list(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
-    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+    inner = gallery.custom_collection_key(_make_folder(view, "Inner", [cat]))
 
     _make_folder(view, "Outer", [inner])
 
@@ -618,16 +618,16 @@ def test_standing_on_a_folder_of_your_own_as_it_goes_inside_another_stays_on_it(
     inner_id = _make_folder(view, "Inner", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Inner"])
 
-    _make_folder(view, "Outer", [gallery.custom_folder_key(inner_id)])
+    _make_folder(view, "Outer", [gallery.custom_collection_key(inner_id)])
 
     here = view._tree.currentItem()
-    assert (_key(here), here.parent()) == (gallery.custom_folder_key(inner_id),
+    assert (_key(here), here.parent()) == (gallery.custom_collection_key(inner_id),
                                            _top_level(view._tree)["Outer"])
 
 
 def test_an_item_dropped_on_a_folder_of_your_own_inside_another_opens_it_there(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
-    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+    inner = gallery.custom_collection_key(_make_folder(view, "Inner", [cat]))
     _make_folder(view, "Outer", [inner])
     with qtbot.waitExposed(view):
         view.show()
@@ -644,14 +644,14 @@ def test_an_item_dropped_on_a_folder_of_your_own_inside_another_opens_it_there(q
 
 def test_a_custom_folder_inside_another_can_be_taken_back_out_of_it(qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
-    inner = gallery.custom_folder_key(_make_folder(view, "Inner", [cat]))
+    inner = gallery.custom_collection_key(_make_folder(view, "Inner", [cat]))
     _make_folder(view, "Outer", [inner])
     view._tree.setCurrentItem(_top_level(view._tree)["Outer"])  # standing inside it
     _answer_menu(monkeypatch, "Remove from “Outer”")
 
     _square_menu(view, inner)
 
-    outer = next(r for r in view._db.list_custom_folders() if r["name"] == "Outer")
+    outer = next(r for r in view._db.list_custom_collections() if r["name"] == "Outer")
     assert outer["folders"] == []
     assert "Inner" in _top_level(view._tree)  # taken out of it, not removed
 
@@ -729,11 +729,11 @@ def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
 def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _make_folder(view, "Keepers", [cat])
-    _answer_menu(monkeypatch, "Keepers")  # under "Add to folder"
+    _answer_menu(monkeypatch, "Keepers")  # under "Add to collection"
 
     _tree_menu(view, dog)
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat, dog]
 
 
@@ -746,7 +746,7 @@ def test_a_folders_menu_offers_only_the_folders_of_your_own_on_its_side(qtbot, m
 
     _tree_menu(view, dog)
 
-    assert "Add to folder" not in labels
+    assert "Add to collection" not in labels
 
 
 def test_a_folder_squares_menu_offers_the_folders_of_your_own_on_the_side_browsed(
@@ -759,7 +759,7 @@ def test_a_folder_squares_menu_offers_the_folders_of_your_own_on_the_side_browse
 
     _square_menu(view, dog)
 
-    assert "Add to folder" in labels
+    assert "Add to collection" in labels
 
 
 def test_a_folder_already_in_a_folder_of_your_own_is_not_offered_it_again(
@@ -771,7 +771,7 @@ def test_a_folder_already_in_a_folder_of_your_own_is_not_offered_it_again(
 
     _tree_menu(view, cat)
 
-    assert "Add to folder" not in labels
+    assert "Add to collection" not in labels
 
 
 def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monkeypatch):
@@ -782,7 +782,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
 
     _square_menu(view, dog)
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["id"] == folder_id
     assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
@@ -791,14 +791,14 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
 def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat])
-    view._db.add_items_to_custom_folder(folder_id, ["i2"])
+    view._db.add_items_to_custom_collection(folder_id, ["i2"])
     view.refresh()
     view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])  # standing inside it
     _answer_menu(monkeypatch, "Remove from “Keepers”")
 
     view.generation_menu(["i2"], QPoint(0, 0))
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["items"] == []
     assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # taken out of it, not deleted
@@ -826,11 +826,11 @@ def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
     labels = []
     _menu_labels(monkeypatch, labels)
 
-    _tree_menu(view, gallery.custom_folder_key(folder_id))
+    _tree_menu(view, gallery.custom_collection_key(folder_id))
 
     # No star (a favorite of a favorite collection gathers nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
-    assert labels == ["Copy name", "", "Remove folder…", "", "Collapse all", "Expand all"]
+    assert labels == ["Copy name", "", "Remove collection…", "", "Collapse all", "Expand all"]
 
 
 def test_copy_name_on_a_folder_of_your_own_copies_the_name_you_gave_it(
@@ -840,7 +840,7 @@ def test_copy_name_on_a_folder_of_your_own_copies_the_name_you_gave_it(
     QApplication.clipboard().clear()
     _answer_menu(monkeypatch, "Copy name")
 
-    _tree_menu(view, gallery.custom_folder_key(folder_id))
+    _tree_menu(view, gallery.custom_collection_key(folder_id))
 
     assert QApplication.clipboard().text() == "Keepers"
 
@@ -850,24 +850,24 @@ def test_removing_a_folder_of_your_own_from_its_menu_keeps_what_it_gathered(
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat, dog])
     view._confirm = lambda text: True
-    _answer_menu(monkeypatch, "Remove folder…")
+    _answer_menu(monkeypatch, "Remove collection…")
 
-    _tree_menu(view, gallery.custom_folder_key(folder_id))
+    _tree_menu(view, gallery.custom_collection_key(folder_id))
 
-    assert view._db.list_custom_folders() == []
+    assert view._db.list_custom_collections() == []
     assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
 
 
 def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
         qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
-    _answer_menu(monkeypatch, "New folder…")
+    _answer_menu(monkeypatch, "New collection…")
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
     _tree_menu(view)  # no row under the cursor
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["name"] == "Keepers"
     assert record["folders"] == []
     assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
@@ -890,19 +890,19 @@ def test_grouping_picked_folders_makes_a_folder_on_their_side(qtbot, monkeypatch
 
     view._group_selection()
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["side"] == PORTRAIT
 
 
 def test_a_folder_started_below_the_last_row_belongs_to_that_half(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
-    _answer_menu(monkeypatch, "New folder…")
+    _answer_menu(monkeypatch, "New collection…")
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
     _tree_menu(view, side=PORTRAIT)
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["side"] == PORTRAIT
     assert _top_level(view._tree, PORTRAIT)["Keepers"] is view._tree.currentItem()
 
@@ -910,13 +910,13 @@ def test_a_folder_started_below_the_last_row_belongs_to_that_half(qtbot, monkeyp
 def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
-    _answer_menu(monkeypatch, "Group 2 folders into a new folder…")
+    _answer_menu(monkeypatch, "Group 2 folders into a new collection…")
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
     _tree_menu(view, cat)
 
-    (record,) = view._db.list_custom_folders()
+    (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat, dog]  # both, not the one under the cursor
 
 
@@ -1034,7 +1034,7 @@ def test_the_picked_folders_menu_offers_collapse_all_and_expand_all_last(
 
     _tree_menu(view, second)
 
-    assert labels == ["Copy 2 names", "", "Group 2 folders into a new folder…", "",
+    assert labels == ["Copy 2 names", "", "Group 2 folders into a new collection…", "",
                       "Delete 2 folders…", "", "Collapse all", "Expand all"]
 
 
@@ -1046,7 +1046,7 @@ def test_the_picked_folders_menu_offers_to_delete_them(qtbot, monkeypatch):
 
     _tree_menu(view, dog)
 
-    assert labels == ["Copy 2 names", "", "Group 2 folders into a new folder…", "",
+    assert labels == ["Copy 2 names", "", "Group 2 folders into a new collection…", "",
                       "Delete 2 folders…"]
 
 

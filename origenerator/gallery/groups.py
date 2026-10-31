@@ -6,7 +6,7 @@ and children. The walkers (:func:`child_groups`, :func:`rows_under`) and the
 tier/level classifiers (:func:`folder_level`, :func:`group_level`) work off those
 types alone, so they live with the definitions rather than with the tree builder.
 
-:class:`CustomGroup` sits alongside them as the one folder the *user* composes:
+:class:`CustomCollection` sits alongside them as the one folder the *user* composes:
 it holds whichever folders they gathered into it rather than a slice of the
 hierarchy. It answers the same walkers, so everything built on them — the
 folder path, the folder tiles, the slideshow's row list — treats it like any
@@ -102,13 +102,13 @@ class AllGroup:
 
 
 @dataclass
-class CustomGroup:
+class CustomCollection:
     """A folder the user composed: the folders they gathered into it and the
     items they put in it on their own, each in the order they were added.
 
     Unlike every tier above, what it gathers can sit at any depth and in any
     branch — it is a grouping, not a projection — so nothing nests beneath it in
-    the tree. ``folder_id`` is the saved custom folder it renders (``None`` for
+    the tree. ``folder_id`` is the saved custom collection it renders (``None`` for
     the throwaway one a live multi-selection makes)."""
 
     key: str
@@ -123,7 +123,7 @@ class CustomGroup:
 def folder_level(group) -> str | None:
     """Which hierarchy level a folder sits at: ``"workflow"``, ``"model"``,
     ``"lora"`` or ``"source_image"`` — ``None`` for the All row, Images and
-    Videos, the settings leaves and a custom folder.
+    Videos, the settings leaves and a custom collection.
 
     Powers the TOC initial the gallery draws on tree rows and Gallery pane tiles, so
     a folder's place in the hierarchy reads at a glance rather than by counting
@@ -142,13 +142,13 @@ def child_groups(group) -> list:
 def rows_under(group) -> list[dict]:
     """Every generation beneath a folder, at any depth.
 
-    A custom folder can gather two folders where one contains the other, so its
+    A custom collection can gather two folders where one contains the other, so its
     walk drops repeats — a generation counted twice would be played twice by the
     slideshow and counted twice on its tile."""
     if isinstance(group, SettingsGroup):
         return list(group.rows)
     rows = [row for child in child_groups(group) for row in rows_under(child)]
-    if not isinstance(group, CustomGroup):
+    if not isinstance(group, CustomCollection):
         return rows  # the hierarchy proper never nests a folder under two parents
     seen, unique = set(), []
     for row in [*group.rows, *rows]:

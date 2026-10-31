@@ -246,7 +246,7 @@ def all_icon() -> QIcon:
     return qt_icon("database", size=_SIZE)
 
 
-def custom_folder_icon() -> QIcon:
+def custom_collection_icon() -> QIcon:
     """A folder — the mark on a folder the user composed, and the Gallery pane button
     that composes one out of the picked folders."""
     return qt_icon("folder", size=_SIZE)

@@ -88,6 +88,19 @@ class PromptBoxes(QWidget):
         self._show_stored(value)
         self.textChanged.emit()
 
+    def shown_value(self) -> str:
+        return BOX_BREAK.join(self._texts)
+
+    def edit(self, value: str) -> None:
+        self._history.took(self.value())
+        self._burst.stop()
+        self._reflow.stop()
+        self._flow_from = None
+        self._as_stored, self._cut = None, False
+        self._show(prompt_boxes(value) if self._reading is None
+                   else self._reading.boxes_of(value))
+        self.textChanged.emit()
+
     def set_reading(self, reading: PromptReading | None) -> None:
         if reading != self._reading:
             self._reading = reading

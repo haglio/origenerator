@@ -406,3 +406,29 @@ def test_undoing_the_first_edit_reads_back_as_it_was_stored(qtbot, made_before_t
                    Qt.KeyboardModifier.ControlModifier)
 
     assert made_before_the_boxes.value() == _CUT_IN_HALF
+
+
+def test_a_prompt_written_for_him_flows_into_boxes_of_whole_words(qtbot, typed_into):
+    typed_into.set_value("a b")
+
+    typed_into.edit("x y a b c")
+
+    assert _texts(typed_into) == ["x y a", "b c"]
+    assert typed_into.value() == f"x y a{BOX_BREAK}b c"
+
+
+def test_a_prompt_written_for_him_is_one_step_of_undo(qtbot, typed_into):
+    typed_into.set_value("a b")
+    typed_into.edit("x y a b c")
+
+    qtbot.keyClick(typed_into.boxes()[0], Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert typed_into.value() == "a b"
+
+
+def test_a_prompt_written_for_him_into_a_prompt_read_whole_stays_one_box(typed_into):
+    typed_into.set_reading(word_reading(3, READ_WHOLE))
+
+    typed_into.edit("x y a b c")
+
+    assert _texts(typed_into) == ["x y a b c"]

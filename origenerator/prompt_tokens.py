@@ -12,7 +12,7 @@ from typing import NamedTuple
 from tokenizers import Regex, Tokenizer, models, normalizers, pre_tokenizers
 
 from origenerator import config
-from origenerator.box_breaks import flowed
+from origenerator.box_breaks import BOX_BREAK, flowed, prompt_boxes, unboxed
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.prompt_readers import CLIP, QWEN3VL, SOUND_PROMPT_KEYS, T5, UMT5
 
@@ -77,6 +77,11 @@ class PromptReading:
              ) -> tuple[list[str], tuple[int, int] | None]:
         return flowed(texts, self.tokens, limit=self.reads_well, start=start, caret=caret)
 
+    def boxes_of(self, text: str) -> list[str]:
+        if self.past_it != READ_IN_PIECES:
+            return [unboxed(text)]
+        return self.flow(prompt_boxes(text))[0]
+
     def stops_at(self, text: str) -> int | None:
         if self.past_it != CUT_OFF:
             return None
@@ -105,6 +110,11 @@ def prompt_reading(workflow_name: str, params: dict, key: str) -> PromptReading 
         return None
     reader, tokenizer = found
     return PromptReading(reader.reads_well, reader.past_it, reader.weighted, tokenizer)
+
+
+def boxed_as_typed(workflow_name: str, params: dict, key: str, text: str) -> str:
+    reading = prompt_reading(workflow_name, params, key)
+    return text if reading is None else BOX_BREAK.join(reading.boxes_of(text))
 
 
 def prompt_readings(workflow_name: str, params: dict) -> dict[str, PromptReading | None]:

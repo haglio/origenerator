@@ -82,6 +82,7 @@ from origenerator import (
     search,
 )
 from origenerator.animate_command import AnimateRequest
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -16604,6 +16605,19 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
     assert job.params["seed"] == 7
     assert job.params["positive_prompt"] == "a woman, soft light"
     assert job.params["negative_prompt"] == "blurry"
+
+
+def test_a_request_rewritten_past_a_boxs_end_queues_in_boxes_of_whole_words(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=f"a hat, {cats[0]}")
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    assert job.params["positive_prompt"] == f"{cats[1]}{BOX_BREAK}{cats[2]}"
 
 
 def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):

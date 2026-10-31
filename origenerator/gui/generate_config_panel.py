@@ -1766,7 +1766,7 @@ class GenerateConfigPanel(DropZone):
         if revision is None:
             field.failed()
             return
-        self._param_form.set_prompts(revision.positive, revision.negative)
+        self._param_form.set_prompts(revision.positive, revision.negative, typed=True)
         field.done()
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:

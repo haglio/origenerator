@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from functools import partial
 
 from PyQt6.QtCore import QSignalBlocker, Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
@@ -19,6 +20,7 @@ from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoW
 from origenerator.gui.param_help import option_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_boxes import PromptBoxes
+from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.seed_combo import SeedComboBox
 from origenerator.media import MediaType
 from origenerator.model_titles import option_title
@@ -146,7 +148,7 @@ class _Prompt(FieldKind):
         self._heights = heights
 
     def make(self, pd):
-        widget = PromptBoxes(pd.key, heights=self._heights)
+        widget = PromptBoxes(partial(PromptField, pd.key, heights=self._heights))
         widget.set_value(str(pd.default))
         return widget
 

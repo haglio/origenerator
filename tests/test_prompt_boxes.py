@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCursor
@@ -13,11 +15,15 @@ from origenerator.box_breaks import BOX_BREAK
 from origenerator.gui import diff_text
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
-from origenerator.gui.prompt_field import PromptHeights
+from origenerator.gui.prompt_field import PromptField, PromptHeights
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, story_of
 from tests.text_readers import clip_reader, word_reading
+
+
+def _prompt_fields(key: str, heights: PromptHeights | None = None) -> PromptBoxes:
+    return PromptBoxes(partial(PromptField, key, heights=heights))
 
 
 def _words(count: int) -> str:
@@ -52,7 +58,7 @@ def _marks(field) -> list[tuple[str, str]]:
 
 @pytest.fixture
 def prompt(qtbot):
-    widget = PromptBoxes("positive_prompt")
+    widget = _prompt_fields("positive_prompt")
     qtbot.addWidget(widget)
     widget.set_reading(word_reading(75, READ_IN_PIECES))
     return widget
@@ -92,7 +98,7 @@ def test_a_prompt_read_whole_counts_down_to_what_its_reader_reads_well_and_on_be
 
 
 def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it(qtbot):
-    sound = PromptBoxes("audio_prompt")
+    sound = _prompt_fields("audio_prompt")
     qtbot.addWidget(sound)
     sound.set_reading(word_reading(76, CUT_OFF))
 
@@ -144,7 +150,7 @@ def test_each_scene_counts_down_its_own_prompts(qtbot):
 
 @pytest.fixture
 def typed_into(qtbot):
-    widget = PromptBoxes("positive_prompt")
+    widget = _prompt_fields("positive_prompt")
     qtbot.addWidget(widget)
     widget.set_reading(word_reading(3, READ_IN_PIECES))
     with qtbot.waitExposed(widget):
@@ -315,7 +321,7 @@ def test_untracking_takes_every_boxs_marks_off(qtbot, typed_into):
 def test_every_box_shares_the_prompts_dragged_height_a_small_gap_apart(qtbot):
     heights = PromptHeights()
     heights.set_height("positive_prompt", 180)
-    widget = PromptBoxes("positive_prompt", heights=heights)
+    widget = _prompt_fields("positive_prompt", heights)
     qtbot.addWidget(widget)
     widget.set_value(f"a{BOX_BREAK}b")
     widget.resize(400, 600)
@@ -368,7 +374,7 @@ def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):
 def made_before_the_boxes(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
     clip_reader(tmp_path / "ComfyUI")
-    widget = PromptBoxes("positive_prompt")
+    widget = _prompt_fields("positive_prompt")
     qtbot.addWidget(widget)
     widget.set_reading(prompt_reading("sdxl_t2i", {}, "positive_prompt"))
     with qtbot.waitExposed(widget):

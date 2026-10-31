@@ -2,12 +2,12 @@
 
 Under a config tab's form: the item's thumbnail with its name centered beneath,
 styled like the gallery's other thumbnail tiles — a thin border and a media-type
-badge in the corner. Clicking anywhere emits ``activated`` with the item's
+item type icon in the corner. Clicking anywhere emits ``activated`` with the item's
 prompt_id, so the gallery navigates to it.
 
 A video's start frame is what it shows most often. The other relations borrow
 it — the item a spoken request revised, the video a cycle was cut out of, the
-video whose settings Combine ran — which is why its heading, its badge and
+video whose settings Combine ran — which is why its heading, its item type icon and
 whether its thumbnail is drained of color are set with each showing.
 """
 from __future__ import annotations
@@ -20,8 +20,8 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
 from origenerator.gui import tile_shape
 from origenerator.gui.grayscale import grayscale_pixmap
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.link_heading import link_heading
-from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 from origenerator.media import MediaType
 
@@ -59,9 +59,9 @@ class SourceTile(QWidget):
             f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: {BUTTON_RADIUS}px;"
         )
         column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignHCenter)
-        # A photo (or play) badge in the thumbnail's top-left corner, like the
+        # A photo (or play) item type icon in the thumbnail's top-left corner, like the
         # gallery tiles.
-        self._badge = MediaBadge(_DEFAULT_MEDIA_TYPE, self._thumb)
+        self._item_type_icon = ItemTypeIcon(_DEFAULT_MEDIA_TYPE, self._thumb)
 
         self._name = QLabel()
         self._name.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
@@ -77,13 +77,13 @@ class SourceTile(QWidget):
         isn't the usual one — "requested from" for what a request revised,
         "trimmed from" for the video a single cycle was cut out of, "from source
         video" for the video whose settings Combine ran. The last two are
-        videos, so ``media_type`` moves the badge with them, and ``gray`` drains
+        videos, so ``media_type`` moves the item type icon with them, and ``gray`` drains
         the one shown only for its settings. All three are per-showing, because
         the next row put in this tile may be a different relation to a
         different kind of thing."""
         self._prompt_id = prompt_id
         self._heading.setText(heading or _DEFAULT_HEADING)
-        self._badge.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
+        self._item_type_icon.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
         self._name.setText(name)
         thumb = self._scaled_thumb(thumbnail_path)
         self._thumb.setPixmap(grayscale_pixmap(thumb) if gray else thumb)

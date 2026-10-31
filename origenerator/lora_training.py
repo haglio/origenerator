@@ -11,7 +11,7 @@ from app_support.win32 import process_started
 
 from origenerator import timing
 from origenerator.gallery import JobKind
-from origenerator.run_notice import RunOutcome
+from origenerator.run_toast import RunOutcome
 
 TRAINERS = Path(__file__).resolve().parents[1] / "tools"
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)

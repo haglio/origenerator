@@ -1,4 +1,4 @@
-"""Where a click on a notification reaches the running app.
+"""Where a click on a toast reaches the running app.
 
 Both ends meet here: what the handler Windows runs writes
 (:func:`origenerator.app_link.hand_over`) and what the app hears. The write is
@@ -24,7 +24,7 @@ def _click(channel: str, generation: str) -> threading.Thread:
     return handler
 
 
-def test_a_click_on_a_notice_reaches_the_running_app(qtbot, tmp_path):
+def test_a_click_on_a_toast_reaches_the_running_app(qtbot, tmp_path):
     asked = []
     listener = LinkListener(checkout=tmp_path, environ={})
     listener.answer_with(asked.append)
@@ -98,7 +98,7 @@ def test_a_launch_carrying_anything_but_a_generation_opens_on_nothing(qtbot, tmp
 
 def test_a_channel_that_cannot_be_opened_says_so(qtbot, tmp_path, caplog, monkeypatch):
     # Nothing on screen says whether clicks can be answered, so an app that
-    # could not open its channel would look exactly like one whose notices
+    # could not open its channel would look exactly like one whose toasts
     # nobody has clicked.
     monkeypatch.setattr(QLocalServer, "listen", lambda *_a: False)
 

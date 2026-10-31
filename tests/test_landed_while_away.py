@@ -74,7 +74,7 @@ def test_a_run_that_lands_while_the_app_is_closed_is_announced(tmp_path):
 
     said = _watch(db, _Api({"vid": _landed()}), tmp_path)
 
-    assert [notice.title for notice in said] == ["Video ready"]
+    assert [toast.title for toast in said] == ["Video ready"]
     assert db.get_generation("vid")["status"] == "completed"
 
 
@@ -108,7 +108,7 @@ def test_a_run_still_going_is_waited_out(tmp_path):
     said = _watch(db, api, tmp_path, sleep=nap)
 
     assert naps          # it waited rather than asking once and giving up
-    assert [notice.title for notice in said] == ["Video ready"]
+    assert [toast.title for toast in said] == ["Video ready"]
 
 
 def test_a_run_comfyui_ended_with_nothing_saved_is_not_written_down_as_finished(tmp_path):
@@ -268,7 +268,7 @@ def test_a_training_that_ends_while_the_app_is_closed_is_announced(tmp_path, mon
 
     said = _watch(Database(tmp_path / "t.db"), _Api({}), tmp_path, sleep=nap, trainings=[job])
 
-    assert [(notice.title, notice.body) for notice in said] == [("LoRA ready", "Hands fix 1.0 · 49:12")]
+    assert [(toast.title, toast.body) for toast in said] == [("LoRA ready", "Hands fix 1.0 · 49:12")]
 
 
 def test_a_training_still_going_is_waited_out_and_its_failure_announced(tmp_path, monkeypatch):
@@ -277,7 +277,7 @@ def test_a_training_still_going_is_waited_out_and_its_failure_announced(tmp_path
 
     said = _watch(Database(tmp_path / "t.db"), _Api({}), tmp_path, sleep=nap, trainings=[job])
 
-    assert [notice.title for notice in said] == ["Training failed"]
+    assert [toast.title for toast in said] == ["Training failed"]
 
 
 def test_quitting_while_a_training_runs_hands_it_to_a_process_of_its_own(tmp_path, monkeypatch):

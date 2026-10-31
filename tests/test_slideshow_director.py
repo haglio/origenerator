@@ -33,7 +33,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.sides import BOTH
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
-from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
+from origenerator.gui.message import FAVORITE, INFO, WARNING
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -193,11 +193,11 @@ class FakeSlideshow:
     def add_levels(self, levels):
         self.levels_added.append(levels)
 
-    def note_voice_command(self, message, *, kind=NOTICE):
+    def note_voice_command(self, message, *, kind=INFO):
         self.said.append(message)
         self.said_kinds.append(kind)
 
-    def note_voice_run(self, prompt_id, message, *, kind=NOTICE):
+    def note_voice_run(self, prompt_id, message, *, kind=INFO):
         self.runs_said.append((prompt_id, message))
 
     def set_paused(self, paused):
@@ -1807,7 +1807,7 @@ def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
     assert made[0].steps == [1, -1]
     assert made[0].done == []  # a step is from the slide on screen
     assert made[0].said == ["next", "back"]
-    assert made[0].said_kinds == [NOTICE, NOTICE]
+    assert made[0].said_kinds == [INFO, INFO]
 
 
 def test_a_lock_said_over_a_slide_since_left_puts_that_slide_back_and_locks_it(slideshows):

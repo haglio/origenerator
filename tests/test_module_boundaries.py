@@ -32,14 +32,14 @@ QT_FREE = (
     # makes, so the splash is already up before the slow ones run. Importing it
     # costs nothing, which is what tests/test_launch_smoke.py replays off its AST.
     "origenerator.app",
-    # What a click on a notification runs: a fresh process every time, whose
+    # What a click on a toast runs: a fresh process every time, whose
     # whole job is over before the app it starts has drawn anything.
     "origenerator.app_link",
     "origenerator.windows_toast",
-    # What a closing copy starts to wait out its runs in flight, the notice it
+    # What a closing copy starts to wait out its runs in flight, the toast it
     # raises when one lands, and the one-copy rule it asks whether the app is back.
     "origenerator.landed_while_away",
-    "origenerator.notice_toast",
+    "origenerator.toast_raising",
     "origenerator.single_instance",
     "origenerator.comfyui_api",
     "origenerator.completion",
@@ -56,7 +56,7 @@ QT_FREE = (
     "origenerator.config",
     "origenerator.undo_stack",
     "origenerator.gallery_actions",
-    "origenerator.run_notice",
+    "origenerator.run_toast",
     # Out of the widget package with the rest of the app's machinery, and
     # needing no Qt once there: the orientation key scheme, the spin-arrow
     # PNGs, the slideshow's press vocabulary and the console press grammar.

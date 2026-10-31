@@ -25,7 +25,7 @@ from origenerator.gallery.sides import SEPARATE, TOGETHER
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.pane_arrangement import TOC_OPENING_WIDTH
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_hud import slideshow_hud_model
@@ -931,7 +931,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
         view, "fix_parts",
         lambda prompt_id, parts: (prompt_id,
                                   "fixing " + " ".join(p.name for p in parts),
-                                  NOTICE))
+                                  INFO))
     for slideshow in (portrait, landscape):
         monkeypatch.setattr(slideshow, "note_voice_run",
                             lambda pid, msg, *, kind, s=slideshow: fixed.append((s, pid, msg)))

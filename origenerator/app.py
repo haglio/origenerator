@@ -679,7 +679,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
 class Boot:
     """The launch's steps between the overlay checks and the window -- the claim on
     the library, the loading screen, the offer to Fun Time, the crash log and the
-    listener for clicked notices -- each taken once and undone by a cancel or a
+    listener for clicked toasts -- each taken once and undone by a cancel or a
     close. MAINTENANCE is what runs over the library in between."""
 
     app: object
@@ -692,7 +692,7 @@ class Boot:
     loading: object = None
     claim: object = None
     crash_log: object = None
-    clicked_notices: object = None
+    clicked_toasts: object = None
     watch: object = None
     freeze_watch: object = None
 
@@ -742,13 +742,13 @@ class Boot:
     def arm_the_crash_log(self) -> None:
         self.crash_log = _arm_the_crash_log(self.state_dir, self.logger)
 
-    def listen_for_clicked_notices(self, checkout: Path) -> None:
+    def listen_for_clicked_toasts(self, checkout: Path) -> None:
         """From here rather than from the window: a launch takes a minute, and a
-        notice clicked during one would otherwise find nobody listening and start
+        toast clicked during one would otherwise find nobody listening and start
         a second copy (origenerator.app_link)."""
         from origenerator.gui.link_listener import LinkListener
 
-        self.clicked_notices = LinkListener(checkout=checkout, parent=self.app)
+        self.clicked_toasts = LinkListener(checkout=checkout, parent=self.app)
 
     def show(self, window) -> None:
         """The window up, the loading screen down, then the window in front, since
@@ -764,7 +764,7 @@ class Boot:
         if still_offered:
             from shared_ui.foreground import bring_to_front
             bring_to_front(window)
-        self.clicked_notices.answer_with(window.go_to_generation)
+        self.clicked_toasts.answer_with(window.go_to_generation)
 
     def run(self) -> int:
         from origenerator.freeze_watch import watch_the_window
@@ -881,7 +881,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         return refused
     boot.offer_to_fun_time()
     boot.arm_the_crash_log()
-    boot.listen_for_clicked_notices(PRODUCTION_CHECKOUT)
+    boot.listen_for_clicked_toasts(PRODUCTION_CHECKOUT)
 
     from origenerator.app_state import AppState
     app_state = AppState(UI_STATE_PATH)

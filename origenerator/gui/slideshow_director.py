@@ -63,7 +63,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.level_stepper import Version
-from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -1524,14 +1524,14 @@ class SlideshowDirector:
         for slideshow in self.surfaces():
             slideshow.shown.set_queue(items, foreign_total)
 
-    def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
-        """Put a spoken line in the slideshow's own notice, if a slideshow is up."""
+    def note_voice_command(self, message: str, *, kind: str = INFO) -> None:
+        """Put a spoken line in the slideshow's own message, if a slideshow is up."""
         if self._slideshow is not None:
             self._slideshow.note_voice_command(message, kind=kind)
 
     def note_voice_run(self, prompt_id: str | None, message: str, *,
-                       kind: str = NOTICE) -> None:
-        """Put a line about a launched run in the slideshow's own notice."""
+                       kind: str = INFO) -> None:
+        """Put a line about a launched run in the slideshow's own message."""
         if self._slideshow is not None:
             self._slideshow.note_voice_run(prompt_id, message, kind=kind)
 
@@ -1543,9 +1543,9 @@ class SlideshowDirector:
 
     # --- the spoken words about a slideshow --------------------------------------
 
-    def answer(self, message: str, *, kind: str = NOTICE) -> None:
+    def answer(self, message: str, *, kind: str = INFO) -> None:
         """Say what a spoken command did, where the speaker is looking — the
-        slideshow's own notice while one is up, since the window under it is covered
+        slideshow's own message while one is up, since the window under it is covered
         by the very thing being talked to, and the gallery's caption otherwise."""
         slideshow = self._slideshow
         if slideshow is not None:
@@ -1668,7 +1668,7 @@ class SlideshowDirector:
         slideshow = self._slideshow
         if command in _ABOUT_THE_SLIDE_SAID_OVER:
             slideshow.back_to_what_was_said_over(said_at)
-        kind = NOTICE
+        kind = INFO
         if command is AppCommand.BACK:
             slideshow.slideshow_step(-1)
             said = "back"
@@ -1682,10 +1682,10 @@ class SlideshowDirector:
             said, kind = (("favorited", FAVORITE) if slideshow.favorite()
                           else ("nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:
-            said, kind = (("locked this one", NOTICE) if slideshow.set_locked(True)
+            said, kind = (("locked this one", INFO) if slideshow.set_locked(True)
                           else ("already locked", WARNING))
         else:  # UNLOCK
-            said, kind = (("let go", NOTICE) if slideshow.set_locked(False)
+            said, kind = (("let go", INFO) if slideshow.set_locked(False)
                           else ("nothing was locked", WARNING))
         self.answer(said, kind=kind)
 

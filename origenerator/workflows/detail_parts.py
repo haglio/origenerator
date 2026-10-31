@@ -37,7 +37,7 @@ FIX_MAX = 1.0
 
 @dataclass(frozen=True)
 class DetailPart:
-    """One part a targeted fix can be asked for: ``name`` is what the level's
+    """One part a targeted fix can be asked for: ``name`` is what the version's
     caption and the on-screen answer call it, ``spoken`` every word a command
     may use for it, and ``matches`` the lowercase filename fragments that
     recognize an installed detector as finding it."""
@@ -218,7 +218,7 @@ def detector_part_label(filename: str) -> str:
 
 
 def name_parts(parts) -> str:
-    """The parts of one fix as the words that caption its level: "hands & teeth"."""
+    """The parts of one fix as the words that caption its version: "hands & teeth"."""
     return " & ".join(part.name for part in parts)
 
 

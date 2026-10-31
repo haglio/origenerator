@@ -38,6 +38,6 @@ EMPTY_PLATE = as_hex(BG_SECONDARY)
 # whose generation is on the GPU.
 IN_FLIGHT_BORDER = as_hex(BLUE)
 
-# The lit edge an enhancement level wears while the row that would duplicate it
+# The lit edge a version wears while the row that would duplicate it
 # is hovered.
 MATCH_BORDER = as_hex(TEXT_PRIMARY)

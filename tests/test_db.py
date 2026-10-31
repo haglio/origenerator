@@ -175,7 +175,7 @@ def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
 
 
 def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
-    """Callers build the field dict conditionally -- an enhance level removed
+    """Callers build the field dict conditionally -- an version removed
     from a row that had none yields ``{}`` -- so an empty update is a normal
     outcome rather than a mistake."""
     db = Database(tmp_path / "test.db")

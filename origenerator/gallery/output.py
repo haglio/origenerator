@@ -231,7 +231,7 @@ def output_disk_files(row: dict, places: OutputPlaces,
 
     ``names`` narrows it to the given filenames (and their sidecars), for a
     delete that takes some of a row's files rather than the row: binning one
-    enhancement level leaves the generation and its other versions alone.
+    version leaves the generation and its other versions alone.
     """
     paths: list[Path] = []
     for f in row_output_files(row):

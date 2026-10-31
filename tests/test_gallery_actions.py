@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from origenerator.db import Database
-from origenerator.gallery import enhance_levels, is_enhanced_row
+from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
@@ -437,7 +437,7 @@ def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
     seen = []
     actions, db, output_dir = _actions(tmp_path, cancel_enhancements=seen.extend)
 
-    actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["enhanced.png"])
+    actions.delete_enhance_versions(_enhanced_row(db, output_dir), ["enhanced.png"])
 
     assert seen == []
 
@@ -518,7 +518,7 @@ def test_deleting_a_version_keeps_the_generation(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _enhanced_row(db, output_dir)
 
-    assert actions.delete_enhance_levels(row, ["enhanced.png"]) is True
+    assert actions.delete_enhance_versions(row, ["enhanced.png"]) is True
 
     updated = db.get_generation("p1")
     assert updated is not None
@@ -534,13 +534,13 @@ def test_deleting_the_last_enhancement_leaves_a_plain_image(tmp_path):
     # remaining file would read as an enhancement of itself.
 
     actions, db, output_dir = _actions(tmp_path)
-    actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["enhanced.png"])
+    actions.delete_enhance_versions(_enhanced_row(db, output_dir), ["enhanced.png"])
 
     updated = db.get_generation("p1")
     assert updated["original_files"] is None
     assert updated["enhance_history"] is None
     assert not is_enhanced_row(updated)   # and the yellow plus is gone with it
-    assert enhance_levels(updated) == []
+    assert enhancement_versions(updated) == []
 
 
 def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
@@ -548,10 +548,10 @@ def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
     # what is left is still an enhancement, and still says what made it.
 
     actions, db, output_dir = _actions(tmp_path)
-    actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["base.png"])
+    actions.delete_enhance_versions(_enhanced_row(db, output_dir), ["base.png"])
 
     updated = db.get_generation("p1")
-    (level,) = enhance_levels(updated)
+    (level,) = enhancement_versions(updated)
     assert level.label == "Enhancement 1/1"
     assert level.params == {"enhance_scale": 2.0}
 
@@ -562,7 +562,7 @@ def test_deleting_every_version_is_refused(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _enhanced_row(db, output_dir)
 
-    assert actions.delete_enhance_levels(row, ["enhanced.png", "base.png"]) is False
+    assert actions.delete_enhance_versions(row, ["enhanced.png", "base.png"]) is False
 
     assert db.get_generation("p1")["output_files"] == row["output_files"]
     assert (output_dir / "image" / "enhanced.png").exists()
@@ -572,7 +572,7 @@ def test_deleting_every_version_is_refused(tmp_path):
 def test_undoing_a_version_delete_puts_it_back(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _enhanced_row(db, output_dir)
-    actions.delete_enhance_levels(row, ["enhanced.png"])
+    actions.delete_enhance_versions(row, ["enhanced.png"])
 
     actions.undo()
 
@@ -595,7 +595,7 @@ def test_undoing_a_version_delete_after_a_newer_image_took_its_name_lists_its_ne
         original_files=json.dumps([{"filename": "alpha_t2i_00004_.png", "subfolder": "image"}]),
         enhance_history=json.dumps([{"filename": "alpha_t2i_00005_.png", "params": {}}]),
     )
-    actions.delete_enhance_levels(db.get_generation("p1"), ["alpha_t2i_00005_.png"])
+    actions.delete_enhance_versions(db.get_generation("p1"), ["alpha_t2i_00005_.png"])
     (output_dir / "image" / "alpha_t2i_00005_.png").write_bytes(b"newer")
 
     actions.undo()
@@ -622,7 +622,7 @@ def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):
         original_files=json.dumps([{"filename": "base.png", "subfolder": "image"}]),
     )
 
-    actions.delete_enhance_levels(db.get_generation("p1"), ["enhanced.png"])
+    actions.delete_enhance_versions(db.get_generation("p1"), ["enhanced.png"])
 
     assert (tmp_path / "thumbs" / "p1.jpg").exists()
     assert row["thumbnail_path"] == str(tmp_path / "thumbs" / "p1.jpg")

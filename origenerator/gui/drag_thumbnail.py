@@ -9,7 +9,7 @@ threshold wrong and one reason a plain click somewhere could start a drag.
 shows, and its own reason to refuse.
 
 Every drag in this app should carry one — a gallery tile onto a Combine drop zone,
-the Generate pane preview onto the same drop zone, an enhancement level onto the Enhance
+the Generate pane preview onto the same drop zone, an version onto the Enhance
 pane — so what is in flight is never in doubt. What each source is showing
 lives somewhere different, though: a still sits in a label's pixmap, a looping
 WebP in a ``QMovie``, a playing video on the player's own surface with no pixmap

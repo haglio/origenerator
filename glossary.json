@@ -1046,20 +1046,27 @@
       "ruled": "2026-10-30, his words on the glossary's list"
     },
     {
-      "id": "enhancement_level",
+      "id": "version",
       "thing": "one version of an image: the original, then each enhancement made of it",
       "screen": [
-        "Enhancement levels",
+        "Enhancements",
         "Other versions of this one"
       ],
       "his_word": "versions (2026-10-30)",
       "code_today": [
-        "level",
         "version"
       ],
       "code_word": "version",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list; the section's title becomes \"Enhancements\""
+      "ruled": "2026-10-30, his words on the glossary's list; the section's title is \"Enhancements\", and the TOC's levels (workflow, model, LoRA) are another thing and keep their word",
+      "retired": [
+        "enhance level",
+        "enhancement level",
+        "level stepper"
+      ],
+      "keep": [
+        "enhancement_levels_folded"
+      ]
     },
     {
       "id": "basic",

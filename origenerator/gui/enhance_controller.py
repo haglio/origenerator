@@ -83,7 +83,7 @@ def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.
 
 
 def _made_or_on_its_way(jobs, row: dict, params: dict) -> bool:
-    if gallery.level_matching_params(row, params) is not None:
+    if gallery.version_matching_params(row, params) is not None:
         return True
     image = frame_name(params.get("input_image"))
     return any(job.workflow.name == gallery.ENHANCE_WORKFLOW
@@ -324,7 +324,7 @@ class EnhanceController:
         And an image that already holds a version made at exactly the settings
         on the pane: running it again would spend a generation arriving at the
         image that is already there. Judged against what the run would *use*
-        (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
+        (:func:`~origenerator.gallery.enhance.version_matching_settings`), so a
         source-matched model resolves to this image's own checkpoint before the
         comparison rather than the pane's raw value. Change any setting and the
         button comes back, which is what makes it read as "you have this one"
@@ -336,7 +336,7 @@ class EnhanceController:
 
     def would_enhance(self, row: dict) -> bool:
         return (gallery.is_enhanceable_row(row)
-                and gallery.level_matching_settings(row, self._settings) is None)
+                and gallery.version_matching_settings(row, self._settings) is None)
 
     def _selection_is_all_video(self) -> bool:
         """Whether every picked thumbnail is a video — which is why Enhance is
@@ -368,7 +368,7 @@ class EnhanceController:
     def enhance_items(self, prompt_ids: list[str]) -> None:
         """Queue a standalone enhance for each picked generation (the thumbnail
         context menu's action) — a deliberate pick, so already-enhanced images
-        are re-enhanced rather than skipped, landing as a further level beside
+        are re-enhanced rather than skipped, landing as a further version beside
         the ones already there."""
         rows = [self._db.get_generation(pid) for pid in prompt_ids]
         self._enqueue([r for r in rows if r is not None])
@@ -481,7 +481,7 @@ class EnhanceController:
         if params is None:
             folders = " or ".join(sorted({detector_folder(part) for part in parts}))
             return None, f"no {asked} detector installed (ComfyUI {folders})", WARNING
-        if gallery.level_matching_params(row, params) is not None:
+        if gallery.version_matching_params(row, params) is not None:
             return None, f"{asked} already fixed as hard as a fix goes", WARNING
         fixing = name_parts(
             [part for part in parts if part.name in params["enhance_detail_fixes"]])
@@ -512,7 +512,7 @@ class EnhanceController:
         The same ask as a spoken "enhance" over the same image, so the same
         decision makes it (:meth:`enhance_it`); a lock has no corner line to
         fill, so its answer is dropped. The decision is on this side rather than
-        in the slideshow because it is this side that holds the levels — and a
+        in the slideshow because it is this side that holds the versions — and a
         video has none to receive."""
         if self.enhance_it(prompt_id)[0] is not None:
             return True
@@ -678,7 +678,7 @@ class EnhanceController:
         ``row``'s own image, or ``None`` — the version list's live row.
 
         The settings ride along so the live row can name what is being made the
-        way a finished level names what made it: the pane may have moved on
+        way a finished version names what made it: the pane may have moved on
         since the run was launched, so the job's own params are the only honest
         answer. Everything else about which job it is, and why a queued one shows
         no frame, is :meth:`_job_for`'s and :meth:`_as_run`'s.

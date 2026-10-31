@@ -289,7 +289,7 @@ def enhance(monkeypatch):
 
 def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
-    monkeypatch.setattr(module.gallery, "level_matching_settings",
+    monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: None)
     controller, _host = enhance(
         FakeHost(picked=["i1", "i2"]),
@@ -322,7 +322,7 @@ def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
     # as "you have this one" rather than as "no".
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "image")
-    monkeypatch.setattr(module.gallery, "level_matching_settings",
+    monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: {"file": "one-enhanced.png"})
     controller, _host = enhance(
         FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]), gallery_pane=FakeGalleryPane(["i1"]))
@@ -447,7 +447,7 @@ def test_an_image_already_holding_an_enhancement_at_these_settings_is_not_enhanc
     params = {"input_image": "one.png"}
     monkeypatch.setattr(module.gallery, "enhance_params_for", lambda row, settings: params)
     asked = []
-    monkeypatch.setattr(module.gallery, "level_matching_params",
+    monkeypatch.setattr(module.gallery, "version_matching_params",
                         lambda row, wanted: asked.append((row["prompt_id"], wanted)) or 0)
     jobs = FakeReroll()
     controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
@@ -492,7 +492,7 @@ def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
 def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance,
                                                                          monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
-    monkeypatch.setattr(module.gallery, "level_matching_settings",
+    monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: None)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
@@ -767,7 +767,7 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
                         lambda row, parts, settings: {
                             "input_image": "one.png",
                             "enhance_detail_fixes": {"hands": 1}})
-    monkeypatch.setattr(module.gallery, "level_matching_params",
+    monkeypatch.setattr(module.gallery, "version_matching_params",
                         lambda row, params: None)
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
     monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda p: "fix")
@@ -790,7 +790,7 @@ def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "fix_params_for",
                         lambda row, parts, settings: {"enhance_detail_fixes": {"hands": 1.0}})
-    monkeypatch.setattr(module.gallery, "level_matching_params", lambda row, params: 0)
+    monkeypatch.setattr(module.gallery, "version_matching_params", lambda row, params: 0)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
     assert controller.fix_parts("i1", [DetailPart("hands", ("hands",), ("hands",))]) == (

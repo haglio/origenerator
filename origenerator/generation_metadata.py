@@ -11,10 +11,10 @@ the output file, its timestamp and the workflow version, shown as a compact
 
 An image's files are not one of those things any more: each is a version of the
 image, made by its own enhancement at its own settings and at its own moment, so
-each is listed down in the version list beside the level that produced it —
+each is listed down in the version list beside the version that produced it —
 where the settings that made it already are — rather than pooled in one block at
-the top under a label naming a level you then have to go and find. What stays
-here is what no level claims: a video's file, and the siblings of a batch (which
+the top under a label naming a version you then have to go and find. What stays
+here is what no version claims: a video's file, and the siblings of a batch (which
 are separate results of one run, not versions of each other).
 
 Kept Qt-free so the section/item model is unit-testable directly;
@@ -94,7 +94,7 @@ def file_item(file: dict, label: str = "File", *,
     ``held_days`` is set only for a deleted item, and puts how long it has been
     in the trash in front of the path.
 
-    Shared with the version list, which puts this exact row beside the level it
+    Shared with the version list, which puts this exact row beside the version it
     belongs to — the same file information, wherever the file is listed."""
     filename = file.get("filename") or ""
     full = gallery.output_file_path(file, _places(places))
@@ -121,8 +121,8 @@ def created_item(file: dict, fallback: str = "", *,
 
 def basic_section(row: dict, upscale: Path | None = None, *,
                   name: str = "") -> MetaSection | None:
-    listed = {level.file.get("filename")
-              for level in gallery.displayed_levels(row, upscale)}
+    listed = {version.file.get("filename")
+              for version in gallery.displayed_versions(row, upscale)}
     files = [f for f in gallery.row_output_files(row)
              if f.get("filename") and f.get("filename") not in listed]
     items = [MetaItem("Name", name, copy=name)] if name else []

@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS generations (
     original_files  TEXT,
     -- One entry per enhancement folded into this row, newest first: the file it
     -- produced and the settings that produced it. What lets the Generate pane list
-    -- every level an image has received rather than just "enhanced".
+    -- every version an image has received rather than just "enhanced".
     enhance_history TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,

@@ -439,11 +439,11 @@ class SlideshowSet:
             return False
         return self.start_loop(SEED, [*self.loop_pool(SEED), *additions])
 
-    def state(self, *, locked: bool, level_index: int) -> SlideshowState:
+    def state(self, *, locked: bool, version_index: int) -> SlideshowState:
         loop = self.loop or Loop("", ())
         return SlideshowState(order=tuple(self.playlist.order_ids()),
                               current=self.current_prompt_id(), locked=locked,
-                              level_index=level_index, loop=loop.axis,
+                              version_index=version_index, loop=loop.axis,
                               loop_pool=tuple(slide.prompt_id for slide in loop.pool))
 
     def resume(self, state: SlideshowState, *, lead: bool = True) -> bool:
@@ -621,12 +621,12 @@ def narrow_to_the_act_on_screen(slideshow_set: SlideshowSet) -> tuple[str, bool]
     if not act:
         return NO_ACT_ON_SCREEN, False
     return narrow_to_acts(slideshow_set, act)
-def item_note(slideshow_set: SlideshowSet, *, levels, level_index: int) -> str:
+def item_note(slideshow_set: SlideshowSet, *, versions, version_index: int) -> str:
     if slideshow_set.playlist.current_is_live():
         return GENERATING
     parts = []
-    if len(levels) > 1:
-        parts.append(levels[level_index][2])
+    if len(versions) > 1:
+        parts.append(versions[version_index][2])
     enhancement = slideshow_set.enhancement_of(slideshow_set.current_prompt_id())
     if enhancement:
         parts.append(_ENHANCEMENT_WORDS[enhancement])

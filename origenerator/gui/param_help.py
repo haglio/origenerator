@@ -239,7 +239,7 @@ PARAM_HELP: dict[str, str] = {
     "enhance_fix_prompts": (
         "The prompts a fix redraws its part toward and away from, put ahead of the "
         "image's own, and the LoRA it redraws through. A fix run with different "
-        "ones makes a different enhancement level."
+        "ones makes a different version."
     ),
 
     # --- structure transfer ---

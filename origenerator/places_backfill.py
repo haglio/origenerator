@@ -30,19 +30,19 @@ def queue_finding_for_the_absence(db, client) -> int:
 def queue_finding(rows: list[dict], client, record: Path, limit: int = RUNS_PER_ABSENCE) -> int:
     waiting = _read(record)
     asked = {(one["row"], one["file"]) for one in waiting.values()}
-    to_ask = ((row, level) for row, level in images_to_look_over(rows)
-              if (row["prompt_id"], level.file["filename"]) not in asked
-              and file_named_by(_reference_to(level), client.folders) is not None)
+    to_ask = ((row, version) for row, version in images_to_look_over(rows)
+              if (row["prompt_id"], version.file["filename"]) not in asked
+              and file_named_by(_reference_to(version), client.folders) is not None)
     batch = {str(uuid.uuid4()): image for image in islice(to_ask, limit)}
     _write(record, waiting | {prompt_id: _noted(*image) for prompt_id, image in batch.items()})
     queued = 0
-    for prompt_id, (row, level) in batch.items():
+    for prompt_id, (row, version) in batch.items():
         try:
-            client.submit_job(finding_graph(level), prompt_id)
+            client.submit_job(finding_graph(version), prompt_id)
         except Exception as e:
             logger.warning("ComfyUI took no more images to look over: %s", e)
             break
-        waiting[prompt_id] = _noted(row, level)
+        waiting[prompt_id] = _noted(row, version)
         queued += 1
     _write(record, waiting)
     if queued:
@@ -50,8 +50,8 @@ def queue_finding(rows: list[dict], client, record: Path, limit: int = RUNS_PER_
     return queued
 
 
-def _noted(row: dict, level: gallery.EnhanceLevel) -> dict:
-    return {"row": row["prompt_id"], "file": level.file["filename"]}
+def _noted(row: dict, version: gallery.EnhanceVersion) -> dict:
+    return {"row": row["prompt_id"], "file": version.file["filename"]}
 
 
 def fold_found_places(db, client, record: Path) -> int:
@@ -100,19 +100,19 @@ def _write(record: Path, waiting: dict) -> None:
     partial.replace(record)
 
 
-def finding_graph(level: gallery.EnhanceLevel) -> dict:
-    graph = {_IMAGE: {"class_type": "LoadImage", "inputs": {"image": _reference_to(level)}}}
-    for index, fix in enumerate(detail_fix_passes(level.params)):
+def finding_graph(version: gallery.EnhanceVersion) -> dict:
+    graph = {_IMAGE: {"class_type": "LoadImage", "inputs": {"image": _reference_to(version)}}}
+    for index, fix in enumerate(detail_fix_passes(version.params)):
         graph.update(finding_nodes(index, fix, [_IMAGE, 0], [_IMAGE, 0])[0])
     return graph
 
 
-def _reference_to(level: gallery.EnhanceLevel) -> str | None:
-    return gallery.output_file_reference([level.file])
+def _reference_to(version: gallery.EnhanceVersion) -> str | None:
+    return gallery.output_file_reference([version.file])
 
 
-def images_to_look_over(rows: list[dict]) -> list[tuple[dict, gallery.EnhanceLevel]]:
-    return [(row, level) for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE
-            for level in gallery.enhance_levels(row)
-            if not level.is_original and not points_of_interest.kept_the_current_way(level.file)
-            and detail_fix_passes(level.params)]
+def images_to_look_over(rows: list[dict]) -> list[tuple[dict, gallery.EnhanceVersion]]:
+    return [(row, version) for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE
+            for version in gallery.enhancement_versions(row)
+            if not version.is_original and not points_of_interest.kept_the_current_way(version.file)
+            and detail_fix_passes(version.params)]

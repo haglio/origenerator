@@ -64,7 +64,7 @@ class MetadataBlock(QWidget):
     def show_row(self, row: dict, upscale=None, name: str = "") -> bool:
         """Render this row's section, reporting whether it has anything in it.
 
-        An image's files are all versions, listed with the level that made each
+        An image's files are all versions, listed with the enhancement that made each
         — and so are a video's once Evolver has upscaled it — so what is left
         here can be as little as the way to the folder, or nothing at all."""
         self._shown = (row, upscale, name)
@@ -142,7 +142,7 @@ def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
     ``None`` unless the item declares copyable text or a path to reveal.
 
     Public as cells rather than only as a finished row because the version list
-    lays these into a grid of its own: a level's File line carries the same
+    lays these into a grid of its own: a version's File line carries the same
     copy and Show-in-Explorer buttons as one in a metadata block because it is
     built from the same widgets, and a grid puts nothing between them and the
     row, which is one thing to click.

@@ -988,7 +988,7 @@ class GalleryView(QWidget):
         # folder button and the context menu use, and its Delete goes through
         # the same undo stack as every other delete in the gallery.
         tab.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
-        tab.levels_delete_requested.connect(self.delete_enhance_levels)
+        tab.versions_delete_requested.connect(self.delete_enhance_versions)
         tab.set_enhance_settings(self._enhance.settings)
         tab.set_fullscreen_factory(self._slideshows.open_on_preview)
         tab.cancel_requested.connect(lambda p=tab: self._cancel_tab_reroll(p))
@@ -2941,7 +2941,7 @@ class GalleryView(QWidget):
         self.refresh()  # the queue marks the job as a request the moment it is spoken
         return "Request submitted", INFO
 
-    def delete_enhance_levels(self, prompt_id: str, filenames: list):
+    def delete_enhance_versions(self, prompt_id: str, filenames: list):
         """Trash some of one image's versions, from the Generate pane's version list.
 
         Undoable like every other delete here, and only ever a delete of files:
@@ -2950,7 +2950,7 @@ class GalleryView(QWidget):
         version means a new thumbnail and, once the last enhancement goes, no more
         yellow plus."""
         row = self._db.get_generation(prompt_id)
-        if row is None or not self._actions.delete_enhance_levels(row, filenames):
+        if row is None or not self._actions.delete_enhance_versions(row, filenames):
             return
         self._re_aim()
         self.refresh()
@@ -3368,7 +3368,7 @@ class GalleryView(QWidget):
         self._slideshows.note_finished(finished_row)  # a slideshow of its folder gains it
         self._show_reroll_result_in_tab(finished_row, launcher)
         if folded:
-            # The image itself changed — it now holds a level it did not a
+            # The image itself changed — it now holds a version it did not a
             # moment ago — and a tab holds the row it was handed, not a live
             # view of the database. Without this the new version reaches the
             # list only when the tab is next opened, which is a tab away and
@@ -3387,7 +3387,7 @@ class GalleryView(QWidget):
         self._auto.note_finished(key)  # if auto-generating in this folder, launch the next
         self._enhance.enhance_when_wanted(finished_row)  # while the Auto switch is on
         self._re_aim()  # a landed enhance may retire the button
-        self._enhance.reconcile()  # the live tile gives way to the level
+        self._enhance.reconcile()  # the live tile gives way to the version
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
         """After a re-roll finishes, load its result into the tab that launched it

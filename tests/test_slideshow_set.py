@@ -235,24 +235,24 @@ _TWO_VERSIONS = [("one_enhanced.png", "image", "Enhancement 1/1"), ("one.png", "
 def test_the_note_on_an_image_filed_once_with_nothing_in_flight_says_nothing():
     slideshow_set, _dealt = _set()
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == ""
+    assert item_note(slideshow_set, versions=[], version_index=0) == ""
 
 
 def test_the_note_names_the_version_on_screen_by_its_name_alone():
     slideshow_set, _dealt = _set()
 
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=0) == "Enhancement 1/1"
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=1) == "Original"
+    assert item_note(slideshow_set, versions=_TWO_VERSIONS, version_index=0) == "Enhancement 1/1"
+    assert item_note(slideshow_set, versions=_TWO_VERSIONS, version_index=1) == "Original"
 
 
 def test_the_note_says_whether_a_better_version_is_being_made_or_waiting():
     slideshow_set, _dealt = _set()
 
     slideshow_set.note_enhancing({"id-1": "queued"})
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancement queued"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancement queued"
     slideshow_set.note_enhancing({"id-1": "running"})
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancing…"
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=0) == (
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancing…"
+    assert item_note(slideshow_set, versions=_TWO_VERSIONS, version_index=0) == (
         "Enhancement 1/1 · Enhancing…")
 
 
@@ -261,9 +261,9 @@ def test_an_enhancement_this_slideshow_asked_for_waits_until_the_gallery_says_ot
 
     slideshow_set.note_enhancement_asked("id-1")
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancement queued"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancement queued"
     slideshow_set.note_enhancing({"id-1": "running"})
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancing…"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancing…"
 
 
 def test_an_enhancement_that_landed_leaves_nothing_in_flight_to_say():
@@ -273,7 +273,7 @@ def test_an_enhancement_that_landed_leaves_nothing_in_flight_to_say():
 
     slideshow_set.note_enhancement_landed("id-1")
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == ""
+    assert item_note(slideshow_set, versions=[], version_index=0) == ""
 
 
 def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated():
@@ -281,7 +281,7 @@ def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated
     slideshow_set.playlist.add(Slide(b"frame", LIVE, "id-run"))
     slideshow_set.lead_with_what_is_being_made()
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Generating…"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Generating…"
 
 
 # --- the map around the slide on screen, and the loops along it -------------
@@ -702,7 +702,7 @@ def test_a_loop_is_left_naming_what_it_plays_with_the_slide_it_began_on_first():
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.advance()
 
-    left = slideshow_set.state(locked=False, level_index=0)
+    left = slideshow_set.state(locked=False, version_index=0)
 
     assert (left.loop, left.loop_pool) == ("seed", ("id-1", "id-1b", "id-1c"))
     assert left.current == "id-1b"
@@ -716,7 +716,7 @@ def test_a_loop_picked_back_up_plays_its_own_slides_from_the_one_it_was_left_on(
         closed.playlist.advance()
 
     reopened, _dealt = _mapped(slides=slides_named(*closed.playlist.items))
-    assert reopened.resume(closed.state(locked=False, level_index=0)) is True
+    assert reopened.resume(closed.state(locked=False, version_index=0)) is True
 
     assert reopened.current_prompt_id() == "id-far"
     assert reopened.map() == closed.map()

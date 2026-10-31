@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 #: The row columns holding a list of output-file records. ``enhance_history``
 #: is not among them: it names its files by name alone, so a move cannot
-#: invalidate it -- and the levels it describes are resolved through
+#: invalidate it -- and the versions it describes are resolved through
 #: ``output_files``/``original_files`` anyway.
 FILE_LISTS = ("output_files", "original_files")
 

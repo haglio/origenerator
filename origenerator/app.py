@@ -312,10 +312,10 @@ def _scrap(library: Library, rows: list[dict]) -> int:
 
 
 def _disown_foreign_runs(library: Library):
-    """And take off the run ids a preview's own database left on the levels it
+    """And take off the run ids a preview's own database left on the versions it
     made back when it kept one: numbers from a counter that ran ahead of this
     table's, which seat those images above everything this app has made since.
-    After the fold, which is what writes a level's run id in the first place."""
+    After the fold, which is what writes a version's run id in the first place."""
     from origenerator.gallery import disown_foreign_runs
 
     return disown_foreign_runs(library.db)

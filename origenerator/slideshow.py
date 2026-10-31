@@ -99,7 +99,7 @@ class SlideshowState:
     order: tuple = ()
     current: str | None = None
     locked: bool = False
-    level_index: int = 0
+    version_index: int = 0
     loop: str = ""
     loop_pool: tuple = ()
     location: str | None = None
@@ -111,12 +111,12 @@ class SlideshowState:
     def restored(cls, saved) -> SlideshowState:
         if not isinstance(saved, dict):
             return cls()
-        level, loop = saved.get("level_index"), saved.get("loop")
+        version, loop = saved.get("version_index"), saved.get("loop")
         return cls(
             order=_ids_in(saved.get("order")),
             current=_text_in(saved.get("current")),
             locked=saved.get("locked") is True,
-            level_index=level if type(level) is int and level > 0 else 0,
+            version_index=version if type(version) is int and version > 0 else 0,
             loop=loop if isinstance(loop, str) else "",
             loop_pool=_ids_in(saved.get("loop_pool")),
             location=_text_in(saved.get("location")),

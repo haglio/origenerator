@@ -199,7 +199,7 @@ def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(mak
     assert not related._source_video_tile.isHidden()
     assert related._source_video_tile._prompt_id == "vid0"
     assert related._source_video_tile._heading.text() == "From source video"
-    assert related._source_video_tile._badge.media_type == "video"
+    assert related._source_video_tile._item_type_icon.media_type == "video"
     assert related._source_video_tile._name.text() == "77B2E1A0 012"
 
 
@@ -465,7 +465,7 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
     assert related._source_tile._prompt_id == "vid1"
     assert related._source_tile._heading.text() == "Trimmed from"
     # The first source that is a video, so the badge has to follow what it shows.
-    assert related._source_tile._badge.media_type == "video"
+    assert related._source_tile._item_type_icon.media_type == "video"
 
 
 def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
@@ -498,7 +498,7 @@ def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
     related.show_row(_trim_row(trimmed_from="deleted"), [_image_row()])
 
     assert related._source_tile._prompt_id == "img1"
-    assert related._source_tile._badge.media_type == "image"
+    assert related._source_tile._item_type_icon.media_type == "image"
 
 
 def test_a_cut_whose_video_is_in_the_trash_still_points_back_at_the_video(make_related):

@@ -138,7 +138,7 @@ def test_the_work_left_tries_experiments_from_the_policy_handed_in_only_while_th
     assert jobs.job_for(gallery.settings_folder_key(tried, {})).prompt_id == tried["prompt_id"]
 
 
-def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_card(
+def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_tile(
         monkeypatch, tmp_path, capsys):
     for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
                        ("UI_STATE_PATH", tmp_path / "ui_state.json"),
@@ -242,7 +242,7 @@ def test_a_training_evolver_started_is_announced_once_when_it_ends_unless_alread
         ("LoRA ready", "Hands fix 1.0")]
 
 
-def test_the_command_evolver_runs_holds_the_card_while_a_look_lora_trains(monkeypatch, tmp_path, capsys):
+def test_the_command_evolver_runs_holds_the_tile_while_a_look_lora_trains(monkeypatch, tmp_path, capsys):
     for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
                        ("UI_STATE_PATH", tmp_path / "ui_state.json"),
                        ("FIX_TRAINING_DIR", tmp_path / "fix training")):

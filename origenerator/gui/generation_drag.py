@@ -4,7 +4,7 @@ Shared by every drag source — the gallery's browser thumbnails and the generat
 tab's preview — and by what reads it, the combine drop slots and the folders of
 your own in the TOC, so any of them can be dragged onto any of those with the same
 contract. Kept in its own module so a plain media widget doesn't have to depend on
-the thumbnail widget just for the type.
+the item tile just for the type.
 """
 from __future__ import annotations
 

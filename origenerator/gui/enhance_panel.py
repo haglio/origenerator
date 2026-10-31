@@ -5,13 +5,13 @@ lands in — it is a finish applied to an image afterward — so it is deliberat
 not on the Generate form beside Seed, Dimensions and Output. It lives here
 instead, beside Genau's console, and it is app-wide: whatever is set here is
 what Enhance All runs with, what a single image's Enhance action runs with, and
-— with the tick on — what every image the app newly generates receives as it
+— with the checkbox on — what every image the app newly generates receives as it
 lands. It follows you rather than the folder, so it shows in the collections
 (Latest, Favorites, Experiments) exactly as it does on a settings folder.
 
 Editing writes straight back through ``on_change`` — there is no Apply button —
 and the settings persist with the rest of the session state. Auto-enhance is a
-bare switch on the title row rather than a labeled tick among the settings: it
+bare switch on the title row rather than a labeled checkbox among the settings: it
 is the panel's power, not one of its settings.
 
 An enhancement level dragged in from the info pane's version strip is absorbed:
@@ -19,9 +19,9 @@ the settings that made that version become the ones on the panel, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 
 Each part the detail pass can redraw is a tick and a denoise to run it
-at: the tick is whether that part is fixed at all, so an unticked part grays its
+at: the checkbox is whether that part is fixed at all, so an unchecked part grays its
 own name and number rather than making zero mean off. A part whose detector
-isn't installed in ComfyUI can't be ticked at all, and says why — the
+isn't installed in ComfyUI can't be checked at all, and says why — the
 alternative being a run that fails on submit.
 """
 from __future__ import annotations
@@ -74,8 +74,8 @@ from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.no_wheel import (
-    NoWheelComboBox,
     NoWheelDoubleSpinBox,
+    NoWheelDropdown,
     NoWheelSpinBox,
 )
 from origenerator.gui.panes import border_as_a_set
@@ -124,7 +124,7 @@ _FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
 # pixels less the last digit of 4.00 was cut.
 _NUMBER_FIELD_CHROME = 50
 # Disabling a widget is not the same as it looking disabled: the app's sheet
-# colors every label, picker and spinner outright and names no disabled state,
+# colors every label, dropdown and spinner outright and names no disabled state,
 # so a panel switched off went on reading exactly as live as before. These mute
 # this panel's own fields — set on the panel, so nothing outside it is touched.
 # (The auto switch is the exception: it paints itself, and dims itself.)
@@ -168,14 +168,14 @@ _ENHANCE_BUTTON_CSS = f"""
 
 def _read(widget):
     """What one field reads as, in the type its param is stored as."""
-    if isinstance(widget, NoWheelComboBox):
+    if isinstance(widget, NoWheelDropdown):
         return widget.currentData()
     return widget.value()
 
 
 def _fill(widget, value) -> None:
     """Put a stored value into one field, coercing what JSON handed back."""
-    if isinstance(widget, NoWheelComboBox):
+    if isinstance(widget, NoWheelDropdown):
         choose_option(widget, str(value))
     elif isinstance(widget, NoWheelSpinBox):
         widget.setValue(int(value))
@@ -202,16 +202,16 @@ def _narrowest(widget: QWidget) -> int:
 
 class _FieldGrid(QGridLayout):
     """Fields beside one column of captions, its warning marks in a column left of
-    it: a picker to a line, and the numbers sharing a line while each keeps its
+    it: a dropdown to a line, and the numbers sharing a line while each keeps its
     width, a line each when they cannot.
 
     A layout rather than a widget, because Qt asks a widget's layout for its
     height at a width and never the widget itself."""
 
-    def __init__(self, pickers: list[tuple[QLabel, QWidget]],
+    def __init__(self, dropdowns: list[tuple[QLabel, QWidget]],
                  numbers: list[tuple[QLabel, QWidget]], marks: dict[QLabel, WarningMark]):
         super().__init__()
-        self._pickers = pickers
+        self._dropdowns = dropdowns
         self._numbers = numbers
         self._marks = marks
         self.setContentsMargins(0, 0, 0, 0)
@@ -223,7 +223,7 @@ class _FieldGrid(QGridLayout):
         return True
 
     def heightForWidth(self, width: int) -> int:
-        lines = [[pair] for pair in self._pickers]
+        lines = [[pair] for pair in self._dropdowns]
         if width < self._one_line_width():
             lines += [[pair] for pair in self._numbers]
         else:
@@ -237,7 +237,7 @@ class _FieldGrid(QGridLayout):
         return QSize(width, self.heightForWidth(width))
 
     def minimumSize(self) -> QSize:
-        pairs = self._pickers + self._numbers
+        pairs = self._dropdowns + self._numbers
         narrowest = (self._mark_column()
                      + max(label.sizeHint().width() for label, _field in pairs)
                      + self.horizontalSpacing()
@@ -254,7 +254,7 @@ class _FieldGrid(QGridLayout):
 
     def _one_line_width(self) -> int:
         captions = max(label.sizeHint().width()
-                       for label, _field in self._pickers + self._numbers[:1])
+                       for label, _field in self._dropdowns + self._numbers[:1])
         return (self._mark_column() + captions
                 + sum(label.sizeHint().width() for label, _field in self._numbers[1:])
                 + sum(_narrowest(field) for _label, field in self._numbers)
@@ -266,12 +266,12 @@ class _FieldGrid(QGridLayout):
         for column in range(self.columnCount()):
             self.setColumnStretch(column, 0)
         span = 1 if stacked else 2 * len(self._numbers) - 1
-        for row, (label, field) in enumerate(self._pickers):
+        for row, (label, field) in enumerate(self._dropdowns):
             if label in self._marks:
                 self.addWidget(self._marks[label], row, 0)
             self.addWidget(label, row, 1)
             self.addWidget(field, row, 2, 1, span)
-        below = len(self._pickers)
+        below = len(self._dropdowns)
         for index, (label, field) in enumerate(self._numbers):
             row, column = (below + index, 1) if stacked else (below, 1 + 2 * index)
             self.addWidget(label, row, column)
@@ -316,7 +316,7 @@ class _SettingsScroll(QScrollArea):
 
 
 class EnhancePanel(QWidget):
-    """The Enhance subpanel: an auto tick over the settings an enhancement runs at.
+    """The Enhance subpanel: an Auto checkbox over the settings an enhancement runs at.
 
     ``show_settings`` loads a stored configuration (or the defaults, before
     anything has been set); every edit calls back with the new
@@ -366,7 +366,7 @@ class EnhancePanel(QWidget):
         settings_column = QVBoxLayout(settings)
         settings_column.setContentsMargins(0, 0, 0, 0)
         settings_column.setSpacing(GAP_SMALL)
-        self._model = NoWheelComboBox()
+        self._model = NoWheelDropdown()
         # The default leaves the refining model to whatever made the image, which
         # is what keeps an enhanced image in its own style; picking a checkpoint
         # here overrides that for every enhance this folder runs.
@@ -381,7 +381,7 @@ class EnhancePanel(QWidget):
         self._model_warning = WarningMark()
         self._model_warning.pressed.connect(self._use_the_model_a_fixs_lora_was_trained_on)
 
-        self._upscaler = NoWheelComboBox()
+        self._upscaler = NoWheelDropdown()
         offer_options(self._upscaler, self._options("upscale_model"))
         self._upscaler.currentIndexChanged.connect(self._emit)
         self._upscaler.setToolTip(param_help("upscale_model"))
@@ -392,7 +392,7 @@ class EnhancePanel(QWidget):
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
         model_caption = self._labeled("Model", self._model)
         settings_column.addLayout(_FieldGrid(
-            pickers=[(model_caption, self._model),
+            dropdowns=[(model_caption, self._model),
                      (self._labeled("Upscaler", self._upscaler), self._upscaler)],
             numbers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Scale", self._scale), ("Steps", self._steps),
@@ -416,17 +416,17 @@ class EnhancePanel(QWidget):
         self._enhance_button.setObjectName("enhanceButton")
         self._enhance_button.clicked.connect(self.enhance_requested)
         self._presets: list[Preset] = []
-        self._preset_picker = NoWheelComboBox()
-        self._preset_picker.floor_chars = 2
-        self._preset_picker.setPlaceholderText("(custom)")
-        self._preset_picker.setToolTip("Pick a preset to use its settings")
-        self._preset_picker.activated.connect(
+        self._preset_dropdown = NoWheelDropdown()
+        self._preset_dropdown.floor_chars = 2
+        self._preset_dropdown.setPlaceholderText("(custom)")
+        self._preset_dropdown.setToolTip("Pick a preset to use its settings")
+        self._preset_dropdown.activated.connect(
             lambda index: self._take_settings(self._presets[index].params))
         self._preset_button = QPushButton("Save…")
         self._preset_button.clicked.connect(self._name_the_settings)
         action_row = QHBoxLayout()
         action_row.setContentsMargins(0, 0, 0, 0)
-        action_row.addWidget(self._preset_picker, 1)
+        action_row.addWidget(self._preset_dropdown, 1)
         action_row.addWidget(self._preset_button)
         action_row.addWidget(self._enhance_button)
         column.addLayout(action_row)
@@ -436,9 +436,9 @@ class EnhancePanel(QWidget):
         """Every fixable part on one line: a tick over its name and the
         denoise it runs at.
 
-        The tick is what turns a part's fix on, so the number underneath is free
+        The checkbox is what turns a part's fix on, so the number underneath is free
         to sit at the denoise it would run at whether or not it is running —
-        tick a part and it fixes at that, untick it and the number is still
+        check a part and it fixes at that, uncheck it and the number is still
         there for next time, grayed along with the name so the line reads at a
         glance as which parts are on.
 
@@ -452,11 +452,11 @@ class EnhancePanel(QWidget):
         Flowed rather than fixed, so a pane too narrow for the line wraps the
         last parts onto a second one instead of cutting them off — and so the
         line never widens the window, which tiles into a third of a monitor.
-        Each part's tick, name and number travel together, so a wrap can't
+        Each part's checkbox, name and number travel together, so a wrap can't
         separate them.
 
         Every part the app knows is here, installed detector or not: one with
-        nothing to find it can't be ticked, and says which file to add — which
+        nothing to find it can't be checked, and says which file to add — which
         tells you more than an absent field (nothing at all to see) and far
         more than a live one that would be rejected on submit.
         """
@@ -479,7 +479,7 @@ class EnhancePanel(QWidget):
         return host
 
     def _fix_field(self, part) -> QWidget:
-        """One part's column: its tick, over its name and its denoise."""
+        """One part's column: its checkbox, over its name and its denoise."""
         check = TickControl("")
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
@@ -559,7 +559,7 @@ class EnhancePanel(QWidget):
         self._emit()
 
     def _show_fix_on(self, name: str) -> None:
-        """Gray one part's name and number unless it is ticked."""
+        """Gray one part's name and number unless it is checked."""
         check = self._fix_checks[name]
         widget = self._fixes[name]
         on = check.isChecked() and check.isEnabled()
@@ -584,9 +584,9 @@ class EnhancePanel(QWidget):
         widget.setMaximum(pd.max_val if pd is not None else 1.0)
         widget.setSingleStep(pd.step if pd is not None and pd.step else 0.05)
         widget.setDecimals(2)
-        # The denoise a fix runs at unless it is given another: the tick beside
+        # The denoise a fix runs at unless it is given another: the checkbox beside
         # it is what says whether this part is fixed, so the number never has to
-        # mean off, and a part ticked on runs at something sensible untouched.
+        # mean off, and a part checked on runs at something sensible untouched.
         widget.setValue(DEFAULT_FIX_DENOISE)
         # No steppers: seven pairs of arrows cost more width than the numbers
         # beside them, and a denoise is typed or nudged with the arrow keys.
@@ -600,13 +600,13 @@ class EnhancePanel(QWidget):
 
     def show_presets(self, presets: list[Preset]) -> None:
         self._presets = list(presets)
-        self._preset_picker.clear()
-        self._preset_picker.addItems([preset.name for preset in presets])
-        open_the_list_in_full(self._preset_picker)
+        self._preset_dropdown.clear()
+        self._preset_dropdown.addItems([preset.name for preset in presets])
+        open_the_list_in_full(self._preset_dropdown)
         self._show_the_preset_held()
 
     def _name_the_settings(self) -> None:
-        held = self._preset_picker.currentIndex()
+        held = self._preset_dropdown.currentIndex()
         title, given = (("Save Preset", "") if held < 0
                         else ("Rename Preset", self._presets[held].name))
         name, ok = QInputDialog.getText(self, title, "Preset name:", text=given)
@@ -619,7 +619,7 @@ class EnhancePanel(QWidget):
 
     def _show_the_preset_held(self) -> None:
         held = enhance_presets.matching(self._presets, self.settings().params)
-        self._preset_picker.setCurrentIndex(-1 if held is None else held)
+        self._preset_dropdown.setCurrentIndex(-1 if held is None else held)
         text, tip = (("Save…", "Save these settings as a preset") if held is None
                      else ("Rename…", "Rename this preset"))
         self._preset_button.setText(text)
@@ -667,7 +667,7 @@ class EnhancePanel(QWidget):
         return label
 
     def _options(self, key: str) -> list:
-        """The installed files a picker offers, from the enhancer's own ParamDef."""
+        """The installed files a dropdown offers, from the enhancer's own ParamDef."""
         pd = self._defs.get(key)
         return list(pd.options or []) if pd is not None else []
 
@@ -757,7 +757,7 @@ class EnhancePanel(QWidget):
             widget = self._widgets.get(key)
             if widget is not None:
                 params[key] = _read(widget)
-        # Only the parts ticked on: an unticked part is one this enhancement
+        # Only the parts checked on: an unchecked part is one this enhancement
         # doesn't touch, and carrying its number anyway would make two settings
         # that fix the same parts compare as different.
         params["enhance_detail_fixes"] = {
@@ -823,7 +823,7 @@ class FixPromptsDialog(QDialog):
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        self.lora = NoWheelComboBox()
+        self.lora = NoWheelDropdown()
         offer_options(self.lora, loras)
         choose_option(self.lora, current["lora"] or NO_LORA)
         self.lora.currentIndexChanged.connect(self._explain_lora)

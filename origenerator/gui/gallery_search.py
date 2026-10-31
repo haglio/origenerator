@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from origenerator import gallery, search
 from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
 
@@ -136,21 +136,21 @@ class GallerySearchController(QObject):
         self._count.setObjectName("estimateLabel")
         # No-wheel: it rides directly over the scrolling results, and a wheel
         # notch that lands on it must scroll them rather than re-sort them.
-        self._sort_combo = NoWheelComboBox()
+        self._sort_dropdown = NoWheelDropdown()
         for label, mode in _SORTS:
-            self._sort_combo.addItem(label, mode)
-        self._sort_combo.setToolTip(
+            self._sort_dropdown.addItem(label, mode)
+        self._sort_dropdown.setToolTip(
             "Order the results: newest first, or banded under a heading per "
             "model + LoRA combination — click a heading to fold its band away"
         )
-        self._sort_combo.currentIndexChanged.connect(self._on_sort_changed)
+        self._sort_dropdown.currentIndexChanged.connect(self._on_sort_changed)
         self.bar = QWidget()
         row = QHBoxLayout(self.bar)
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self._count)
         row.addStretch(1)
         row.addWidget(QLabel("Sort:"))
-        row.addWidget(self._sort_combo)
+        row.addWidget(self._sort_dropdown)
         self.bar.hide()  # shown only while a search is running
 
     # --- what the gallery asks of a search -----------------------------------
@@ -172,9 +172,9 @@ class GallerySearchController(QObject):
     def set_sort(self, mode: str | None) -> None:
         """Restore the remembered results order (ignoring anything unrecognized,
         so a state file from a version that offered a different one still opens)."""
-        index = self._sort_combo.findData(search.saved_sort(mode))
+        index = self._sort_dropdown.findData(search.saved_sort(mode))
         if index >= 0:
-            self._sort_combo.setCurrentIndex(index)  # its signal sets the mode
+            self._sort_dropdown.setCurrentIndex(index)  # its signal sets the mode
 
     def focus_field(self) -> None:
         """Put the caret in the field with whatever it holds selected — where a
@@ -317,7 +317,7 @@ class GallerySearchController(QObject):
 
     def _on_sort_changed(self, _index=0) -> None:
         """Re-lay the results in the newly picked order (a no-op off a search)."""
-        self._sort = self._sort_combo.currentData() or search.SORT_RECENT
+        self._sort = self._sort_dropdown.currentData() or search.SORT_RECENT
         if self._query:
             self.run()
 

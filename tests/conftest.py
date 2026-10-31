@@ -120,7 +120,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 # One recognizable tensor name per architecture, matching the signatures in
 # origenerator.workflows.model_arch. Fabricated, not lifted from a real file —
-# a header is all the pickers read, so a stand-in needs nothing else.
+# a header is all the dropdowns read, so a stand-in needs nothing else.
 ARCH_TENSOR_NAMES = {
     "sdxl": ["conditioner.embedders.0.transformer.x", "model.diffusion_model.input_blocks.0.y"],
     "sd15": ["cond_stage_model.transformer.x", "model.diffusion_model.input_blocks.0.y"],
@@ -151,7 +151,7 @@ class ModelTree:
 
         With *arch*, the file gets a real safetensors header naming that
         architecture's tensors — plus the LoRA suffixes when *lora* — which is
-        what the pickers classify it by, and *metadata* goes into that header
+        what the dropdowns classify it by, and *metadata* goes into that header
         as the trainer's own notes would. With *body*, the raw bytes are
         written instead, for the unreadable-file cases.
         """

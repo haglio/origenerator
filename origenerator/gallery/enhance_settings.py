@@ -36,7 +36,7 @@ ENHANCE_SETTING_KEYS = (
 # What a folder's settings leave to the source image rather than pinning: the
 # refining checkpoint, which by default is whichever one made the image, so an
 # enhanced image stays in its own style. The subpanel offers this as an option
-# on its model picker; picking a real checkpoint pins it instead.
+# on its model dropdown; picking a real checkpoint pins it instead.
 MATCH_SOURCE_MODEL = "(match the source image)"
 
 
@@ -55,7 +55,7 @@ def level_settings(params: dict) -> dict:
 
     :data:`ENHANCE_SETTING_KEYS` filtered off ``params``, with the detail pass
     read through :func:`~origenerator.workflows.detail_parts.detail_fixes_of` —
-    so a level recorded under the old tick-and-two-detectors shape comes back as
+    so a level recorded under the old checkbox-and-two-detectors shape comes back as
     the parts it fixed, and captions, re-runs and duplicate checks all see one
     thing. A level that recorded no pass keeps none rather than an empty dict:
     an enhancement whose settings are unknown must stay indistinguishable from one
@@ -96,7 +96,7 @@ class EnhanceSettings:
     @classmethod
     def parse(cls, raw: str | None) -> EnhanceSettings:
         """Read back what :meth:`to_json` wrote, tolerating bad or absent data —
-        an unconfigured folder is simply the defaults, tick off.
+        an unconfigured folder is simply the defaults, the checkbox off.
 
         A folder configured before the detail pass became a number per part is
         read as what it asked for (:func:`~origenerator.workflows.detail_parts.

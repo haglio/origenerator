@@ -2948,7 +2948,7 @@ class GalleryView(QWidget):
         the generation keeps its row, its folder, its star and its other
         versions. The rebuild after is what redraws the tile — a trashed top
         version means a new thumbnail and, once the last enhancement goes, no more
-        green badge."""
+        yellow plus."""
         row = self._db.get_generation(prompt_id)
         if row is None or not self._actions.delete_enhance_levels(row, filenames):
             return
@@ -3348,7 +3348,7 @@ class GalleryView(QWidget):
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             # A standalone enhance is an upgrade, not a generation: fold its
             # output onto the image it enhanced — same row, same folder, same
-            # star, now wearing the enhanced pixels and badge — and let the
+            # star, now wearing the enhanced pixels and plus — and let the
             # upgraded image be what the front tab shows.
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:

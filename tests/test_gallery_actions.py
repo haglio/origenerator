@@ -539,7 +539,7 @@ def test_deleting_the_last_enhancement_leaves_a_plain_image(tmp_path):
     updated = db.get_generation("p1")
     assert updated["original_files"] is None
     assert updated["enhance_history"] is None
-    assert not is_enhanced_row(updated)   # and the green badge is gone with it
+    assert not is_enhanced_row(updated)   # and the yellow plus is gone with it
     assert enhance_levels(updated) == []
 
 

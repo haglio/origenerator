@@ -84,10 +84,10 @@ def _children(row) -> Iterator[QTreeWidgetItem]:
     return (row.child(i) for i in range(row.childCount()))
 
 
-def _tooltip_of(group, badge) -> str:
-    if badge is None or isinstance(group, gallery.SettingsGroup) or badge[1] == group.label:
+def _tooltip_of(group, kind_icon) -> str:
+    if kind_icon is None or isinstance(group, gallery.SettingsGroup) or kind_icon[1] == group.label:
         return group.label
-    return f"{group.label} · {badge[1]}"
+    return f"{group.label} · {kind_icon[1]}"
 
 
 def _inside(group, inside: tuple) -> tuple:
@@ -259,10 +259,10 @@ class GalleryTree:
         item = QTreeWidgetItem([group.label])
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
-        badge = icons.folder_badge(group)
-        if badge is not None:
-            item.setIcon(0, badge[0])
-        item.setToolTip(0, _tooltip_of(group, badge))
+        kind_icon = icons.folder_kind_icon(group)
+        if kind_icon is not None:
+            item.setIcon(0, kind_icon[0])
+        item.setToolTip(0, _tooltip_of(group, kind_icon))
         self._register(item, oriented_key(group.key, side.side, inside), parent_item,
                        folder_key=group.key)
         if not isinstance(group, gallery.SettingsGroup):

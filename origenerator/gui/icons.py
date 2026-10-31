@@ -4,11 +4,11 @@ The marks themselves live in :mod:`shared_ui.icons` now.  They used to be drawn
 here, and Fun Time drew its own copies of the ones it shares -- which is how the
 two apps ended up with microphones of different shapes on one screen.  What
 stays here is what is genuinely this app's: which button wears which mark, what
-color it wears it in, and the grounds the badges sit on.
+color it wears it in, and the grounds the TOC initials and item type icons sit on.
 
 The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
-folder-level badges (:func:`level_badge_icon`) are TOC initials marking which
+TOC initials (:func:`toc_initial_icon`) mark which
 of workflow/model/LoRA a folder is; the item type icons
 (:func:`item_type_icon`) mark a Latest tile as an image or a video.
 
@@ -19,7 +19,7 @@ reads.
 The corner buttons (:func:`corner_star_icon`, :func:`corner_trash_icon`,
 :func:`corner_enhance_icon`) are the marks an item wears in its
 own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
-with the cursor on it -- because each is a badge and a button at once: the mark
+with the cursor on it -- because each is a sign and a button at once: the mark
 says which state the item is in, and pressing it is what changes that state.
 
 :func:`tab_close_icon` is the family's cross, so a button that closes tabs wears
@@ -64,7 +64,7 @@ from origenerator.media import MediaType
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 
-# Hierarchy level badges. Every gallery folder above a settings leaf sits at one
+# TOC initials. Every gallery folder above a settings leaf sits at one
 # of these levels, and a small TOC initial in the level's own color names
 # which, so a tree row or a browser tile is self-describing without the reader
 # counting indentation.
@@ -72,20 +72,20 @@ LEVEL_LABELS = {
     "workflow": "Workflow", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
 }
-_LEVEL_BADGES = {
+_TOC_INITIALS = {
     "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", YELLOW),
     "source_image": ("I", GREEN),
 }
 
 # The Latest collection mixes images and videos in one flow, so each tile wears a
-# small corner badge naming its kind. A white glyph on a translucent dark ground,
+# small item type icon naming its kind. A white glyph on a translucent dark ground,
 # so it reads over a thumbnail of any color.
 _ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
 _ITEM_TYPE_ICON_INK = WHITE
-_ITEM_TYPE_ICON_SIZE = 22  # the badge's on-screen size, in px
-_BADGE_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
+_ITEM_TYPE_ICON_SIZE = 22  # the icon's on-screen size, in px
+_TOC_INITIAL_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 
-# Every ground carries its mark at one size, whichever mark it is. A star badge and
+# Every ground carries its mark at one size, whichever mark it is. A corner star and
 # an item type icon can sit on the same tile, and the two only read as one system if
 # they are drawn to one scale — which they were not while each glyph was sized
 # for itself.
@@ -95,9 +95,9 @@ _GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
 # A favorited item's star, in the green Fun Time paints its favorite ★ with: one
 # color means "favorited" across both apps, so a star learned in one reads in
 # the other. Worn by every star that says something IS favorited — the tile's
-# corner badge and a favorited folder's row alike. The plus marking an enhanced
+# corner button and a favorited folder's row alike. The plus marking an enhanced
 # tile is yellow (YELLOW, this palette's yellow): green is spoken for and the two
-# badges can sit on one tile, and blue is genau's across this family.
+# corner buttons can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
 _REROLL_GLYPH = WHITE
 
@@ -193,7 +193,7 @@ def star_icon(*, filled: bool) -> QIcon:
     """A five-pointed star — solid when the folder is favorited, an outline when
     not, so the hover control shows the state it will toggle.
 
-    A favorited one is green (:data:`_STAR_GLYPH`), the color the corner badge and
+    A favorited one is green (:data:`_STAR_GLYPH`), the color the corner button and
     Fun Time's favorite ★ both wear; the outline stays the chrome's own gray,
     because it is an offer to favorite rather than a thing that is favorited. The
     button bank's Favorite wears the filled one, so the control and the mark it
@@ -238,7 +238,7 @@ def collection_icon(collection: str) -> QIcon:
     }[collection]()
 
 
-def collection_badge(collection: str) -> tuple[QIcon, str]:
+def collection_kind_icon(collection: str) -> tuple[QIcon, str]:
     return collection_icon(collection), COLLECTION_LABELS[collection]
 
 
@@ -302,7 +302,7 @@ def item_type_icon(media_type: str) -> QPixmap:
 
     A white glyph — a play triangle for a video, a framed photo for an image — on
     a translucent dark ground, so it reads over a thumbnail of any color. Cached and
-    pre-scaled to its on-screen size; the same two badges decorate every tile.
+    pre-scaled to its on-screen size; the same two icons decorate every tile.
     """
     glyph = "play" if media_type == MediaType.VIDEO else "photo"
     return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, glyph, _ITEM_TYPE_ICON_INK))
@@ -312,7 +312,7 @@ def item_type_icon(media_type: str) -> QPixmap:
 def media_type_icon(media_type: str) -> QIcon:
     """The same play/photo mark as :func:`item_type_icon`, bare.
 
-    The badge sits over a thumbnail, so it needs its dark ground to read against
+    The item type icon sits over a thumbnail, so it needs its dark ground to read against
     any thumbnail; this one sits in a row of text — a config tab's label, where it
     stands in for the thumbnail a tab has no result to show yet, or the row of a
     folder of images or videos — so the ground would be a black square among words.
@@ -369,7 +369,7 @@ def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
     favorite ★ with, so one color means one thing across both apps — and a
     hollow outline while it is not. The mark is therefore the state and the
     button at once, which is why a favorited item keeps it up with nothing
-    hovering: there is no separate badge left to disagree with it.
+    hovering: there is no separate sign left to disagree with it.
     """
     return _corner_icon("star" if favorite else "star_outline",
                         _STAR_GLYPH if favorite else _CORNER_REST, armed)
@@ -392,7 +392,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     :data:`ENHANCE_OPEN` is a hollow plus — nothing has been made of this image
     and pressing would make the first. :data:`ENHANCE_HELD` is the solid yellow
     one: it already holds exactly the version the Enhance settings describe, so
-    there is nothing here to press and the mark is a badge alone.
+    there is nothing here to press and the mark is a sign alone.
 
     :data:`ENHANCE_MORE` is both at once, which is the state that needs saying:
     the image holds an enhancement AND the settings on the panel would make a
@@ -421,7 +421,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
 
 def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
     """One corner button's mark, at rest or armed — bare line art, since the
-    button paints the translucent ground under it that the badges draw into
+    button paints the translucent ground under it that the corner buttons draw into
     themselves."""
     color = (arm_color or _CORNER_ARMED) if armed else ink
     return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
@@ -494,10 +494,10 @@ def tab_close_icon() -> QIcon:
     return qt_icon("cross", size=_SIZE)
 
 
-def folder_badge(group) -> tuple[QIcon, str] | None:
+def folder_kind_icon(group) -> tuple[QIcon, str] | None:
     level = folder_level(group)
     if level is not None:
-        return level_badge_icon(level), LEVEL_LABELS[level]
+        return toc_initial_icon(level), LEVEL_LABELS[level]
     if isinstance(group, (MediaGroup, SettingsGroup)):
         media = media_type_of_row(rows_under(group)[0])
         return media_type_icon(media), MEDIA_LABELS[media]
@@ -505,7 +505,7 @@ def folder_badge(group) -> tuple[QIcon, str] | None:
 
 
 @cache
-def level_badge_icon(level: str) -> QIcon:
+def toc_initial_icon(level: str) -> QIcon:
     """The TOC initial marking a folder's place in the hierarchy (see LEVEL_LABELS).
 
     Its level's letter, in that level's own color.
@@ -514,8 +514,8 @@ def level_badge_icon(level: str) -> QIcon:
     rendered once and shared rather than re-drawn per folder.
     """
     icon = QIcon()
-    letter, color = _LEVEL_BADGES[level]
-    icon.addPixmap(_render_badge(letter, color))
+    letter, color = _TOC_INITIALS[level]
+    icon.addPixmap(_render_toc_initial(letter, color))
     return icon
 
 
@@ -539,13 +539,13 @@ def _ground_pixmap(color, draw) -> QPixmap:
     return pixmap
 
 
-def _render_badge(letter: str, color) -> QPixmap:
+def _render_toc_initial(letter: str, color) -> QPixmap:
     """A ground with ``letter`` centered in readable contrast — dark on a light
     ground, light on a saturated one."""
     def draw(painter: QPainter):
         font = QFont(FONT_UI)
         font.setBold(True)
-        font.setPixelSize(_BADGE_LETTER)
+        font.setPixelSize(_TOC_INITIAL_LETTER)
         painter.setFont(font)
         painter.setPen(_readable_on(color))
         painter.drawText(QRectF(0, 0, _SIZE, _SIZE),

@@ -684,7 +684,7 @@ def test_an_unenhanced_image_shows_no_version_strip(qtbot):
 
 def test_a_lone_enhancement_is_still_worth_showing(qtbot):
     # An image the inline tail finished kept no original, so it has exactly one
-    # level. The badge says it was enhanced; this is where you see how.
+    # level. The yellow plus says it was enhanced; this is where you see how.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items([

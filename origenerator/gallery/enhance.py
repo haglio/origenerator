@@ -15,7 +15,7 @@ stays listed and reachable.
 What an enhancement is configured with is a property of the FOLDER, not of any
 one image: :class:`EnhanceSettings` is what the gallery's Enhance subpanel edits
 and stores per settings folder, and :func:`enhance_params_for` is where it meets
-a particular row. The thumbnail badge, the folder's Enhance All button, and the
+a particular row. The tile's yellow plus, the folder's Enhance All button, and the
 selection's Enhance action all decide off the helpers here, so "enhanced" means
 one thing everywhere: the row went through the upscale + low-denoise re-sample
 tail — inline (its workflow's ``enhance`` toggle) or folded in from a standalone
@@ -125,7 +125,7 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     """The enhancement(s) this image has received, newest first, with its
     pre-enhance original last when it kept one. ``[]`` for an unenhanced image.
 
-    Every image the green badge marks lists here, because the badge and this
+    Every image the yellow plus marks lists here, because the plus and this
     answer the same question — what enhancement did this receive? Two shapes:
 
     * it kept an original (:func:`original_files_of`), so whatever sits ahead of
@@ -201,7 +201,7 @@ def enhanced_version_of(image_ref: str | None, image: dict) -> str | None:
 
 def is_enhanced_row(row: dict) -> bool:
     """Whether this generation carries enhanced pixels — what the green
-    thumbnail badge marks. A folded-in standalone enhance (``original_files``
+    tile's yellow plus marks. A folded-in standalone enhance (``original_files``
     set) counts, as does an inline run that kept its base render beside the
     enhanced one; a recorded ``enhance_history`` counts on its own, which is the
     row whose original has since been deleted; an explicit ``enhance`` param is

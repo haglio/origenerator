@@ -38,10 +38,10 @@ class FolderTile(QFrame):
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
-    _BADGE = BUTTON_ICON  # on-tile size of the TOC initial
+    _KIND_ICON = BUTTON_ICON  # on-tile size of the TOC initial or image-or-video icon
 
     def __init__(self, key, text, preview_paths, count, favorite=False,
-                 context="", badge=None, parent=None):
+                 context="", kind_icon=None, parent=None):
         super().__init__(parent)
         self._key = key
         self._selected = False
@@ -78,8 +78,8 @@ class FolderTile(QFrame):
         caption_row = QHBoxLayout()
         caption_row.setContentsMargins(0, 0, 0, 0)
         caption_row.setSpacing(GAP_SMALL)
-        if badge is not None:
-            caption_row.addWidget(self._badge(*badge), 0, Qt.AlignmentFlag.AlignTop)
+        if kind_icon is not None:
+            caption_row.addWidget(self._kind_icon_label(*kind_icon), 0, Qt.AlignmentFlag.AlignTop)
         self._text = text
         self._caption = caption = QLabel()
         caption.setTextFormat(Qt.TextFormat.RichText)
@@ -119,12 +119,12 @@ class FolderTile(QFrame):
         return icon_then_text("star", self._text, color=TEXT_PRIMARY,
                               size=tile_shape.line_height())
 
-    def _badge(self, icon, name: str) -> QLabel:
-        badge = QLabel()
-        badge.setFixedSize(self._BADGE, self._BADGE)
-        badge.setPixmap(icon.pixmap(QSize(self._BADGE, self._BADGE)))
-        badge.setToolTip(name)
-        return badge
+    def _kind_icon_label(self, icon, name: str) -> QLabel:
+        label = QLabel()
+        label.setFixedSize(self._KIND_ICON, self._KIND_ICON)
+        label.setPixmap(icon.pixmap(QSize(self._KIND_ICON, self._KIND_ICON)))
+        label.setToolTip(name)
+        return label
 
     @staticmethod
     def _build_thumbnails(preview_paths) -> QWidget:

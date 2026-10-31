@@ -195,7 +195,7 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     assert not _at(workflow, 0).data(0, RECENT_ROLE)    # and nothing the model left out
 
 
-def test_tree_rows_carry_a_folder_level_badge(qtbot):
+def test_tree_rows_carry_a_toc_initial(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()

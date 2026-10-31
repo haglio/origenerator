@@ -464,7 +464,7 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
     assert not related._source_tile.isHidden()
     assert related._source_tile._prompt_id == "vid1"
     assert related._source_tile._heading.text() == "Trimmed from"
-    # The first source that is a video, so the badge has to follow what it shows.
+    # The first source that is a video, so the item type icon has to follow what it shows.
     assert related._source_tile._item_type_icon.media_type == "video"
 
 

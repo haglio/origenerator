@@ -188,7 +188,7 @@ def test_an_unenhanced_image_has_no_levels():
 
 
 def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
-    # Every image the green badge marks lists here — including the ones the
+    # Every image the yellow plus marks lists here — including the ones the
     # inline tail finished, which kept no original. There is one file and no
     # "before", so the list is that single enhancement, named by the settings the
     # tail ran at so it can still be dragged onto the panel and reused.
@@ -401,7 +401,7 @@ def test_removing_the_original_keeps_every_enhancement_named(tmp_path):
     levels = enhance_levels(after)
     assert [lvl.label for lvl in levels] == ["Enhancement 2/2", "Enhancement 1/2"]
     assert levels[0].params == {"enhance_scale": 3.0}
-    assert gallery.is_enhanced_row(after)   # still an enhanced image, badge and all
+    assert gallery.is_enhanced_row(after)   # still an enhanced image, plus and all
 
 
 def test_removing_an_inline_tails_enhancement_untags_its_base_render():

@@ -769,7 +769,7 @@ def _tree_with_a_collection(qtbot, which=LATEST_KEY):
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")
     folder = _folder_row("Workflow", "wf")
-    folder.setIcon(0, icons.level_badge_icon("workflow"))
+    folder.setIcon(0, icons.toc_initial_icon("workflow"))
     collection = QTreeWidgetItem([COLLECTION_LABELS[which]])
     collection.setIcon(0, icons.collection_icon(which))
     folder.addChild(collection)

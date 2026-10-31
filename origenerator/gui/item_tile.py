@@ -276,7 +276,7 @@ class ItemTile(QWidget):
         if run is None:
             self._enhancing_tick.stop()
             return
-        self._enhancing_bar.raise_()  # over the scrim just raised, and the badge
+        self._enhancing_bar.raise_()  # over the scrim just raised, and the item type icon
         self._render_enhancing_timing()
         # Only a run ComfyUI has actually started has a clock to advance; ticking
         # a queued one would redraw a line that cannot change.

@@ -66,14 +66,14 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
 
 
 def test_item_type_icon_shows_only_when_the_item_names_a_type(qtbot):
-    # An in-flight tile in the Latest collection wears the same image/video badge as a
+    # An in-flight tile in the Latest collection wears the same item type icon as a
     # finished tile, so a queued video reads as a video before its first frame.
-    plain = InFlightTile(_item())                    # no type known → no badge
+    plain = InFlightTile(_item())                    # no type known → no item type icon
     qtbot.addWidget(plain)
     assert plain.findChildren(ItemTypeIcon) == []
-    badged = InFlightTile(_item(media_type="video"))
-    qtbot.addWidget(badged)
-    assert len(badged.findChildren(ItemTypeIcon)) == 1
+    typed = InFlightTile(_item(media_type="video"))
+    qtbot.addWidget(typed)
+    assert len(typed.findChildren(ItemTypeIcon)) == 1
 
 
 def test_clicking_the_tile_emits_its_key(qtbot):

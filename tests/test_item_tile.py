@@ -195,10 +195,10 @@ def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     plain = ItemTile("p1", None, "label")
     qtbot.addWidget(plain)
     assert plain.findChildren(ItemTypeIcon) == []
-    # ...but a Latest tile, which mixes kinds, is told its type and shows a badge.
-    badged = ItemTile("p2", None, "label", media_type=MediaType.VIDEO)
-    qtbot.addWidget(badged)
-    assert len(badged.findChildren(ItemTypeIcon)) == 1
+    # ...but a Latest tile, which mixes kinds, is told its type and shows an item type icon.
+    typed = ItemTile("p2", None, "label", media_type=MediaType.VIDEO)
+    qtbot.addWidget(typed)
+    assert len(typed.findChildren(ItemTypeIcon)) == 1
 
 
 def test_no_corner_actions_by_default(qtbot):
@@ -358,11 +358,11 @@ def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
     assert trash.top() > area.center().y()
     assert plus.left() > area.center().x()
     assert plus.top() > area.center().y()
-    (badge,) = tw.findChildren(ItemTypeIcon)
+    (icon,) = tw.findChildren(ItemTypeIcon)
     assert icon.x() < tw.width() // 2
     assert icon.y() < tw.height() // 2
     for corner in (star, trash, plus):
-        assert badge.geometry().intersected(corner).isEmpty()
+        assert icon.geometry().intersected(corner).isEmpty()
 
 
 def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):

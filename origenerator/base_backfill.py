@@ -71,7 +71,7 @@ TARGET_KEY = "_base_render_of"
 def rows_missing_their_base(rows: list[dict]) -> list[dict]:
     """Enhanced images that kept no original and whose settings can be rebuilt.
 
-    The badge says an enhancement happened; the absence of an original says the
+    The yellow plus says an enhancement happened; the absence of an original says the
     tail baked it in. Those two together are exactly the rows this can help. A
     row whose workflow isn't registered (an import) is passed over: there are no
     settings to re-run, and guessing them would produce a "base" that is not this

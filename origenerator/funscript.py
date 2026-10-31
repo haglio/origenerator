@@ -1,6 +1,6 @@
 """Synthesize the funscript that rides alongside a generated video, and find it.
 
-What a ``.funscript`` document is -- its keys, the metadata block an outside
+What a ``.funscript`` document is -- its keys, the metadata an outside
 player reads, what a document listing no actions answers -- belongs to every app
 in this family that reads or writes one and lives in
 :mod:`app_support.funscript`. Origenerator's videos carry no explicit

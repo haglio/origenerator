@@ -6,10 +6,10 @@ import pytest
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
-import origenerator.gui.metadata_block as mb
+import origenerator.gui.basic_section as basic_section_module
 from origenerator import config
+from origenerator.gui.basic_section import BasicSection
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from tests import gestures
@@ -35,7 +35,7 @@ def _row(**overrides):
 
 @pytest.fixture
 def block(qtbot):
-    b = MetadataBlock()
+    b = BasicSection()
     qtbot.addWidget(b)
     return b
 
@@ -73,7 +73,7 @@ def test_the_way_to_the_folder_leads_the_block(qtbot):
     # those names a file of its own, and every one of them is in that folder.
     action = QAction("Go to folder")
     action.setVisible(False)          # nowhere to go until the gallery says so
-    b = MetadataBlock(go_to_folder=action)
+    b = BasicSection(go_to_folder=action)
     qtbot.addWidget(b)
 
     assert b.show_row(_row()) is True             # the file and the date are reason enough
@@ -152,7 +152,7 @@ def test_file_row_reveals_the_output_file_in_explorer(block, monkeypatch, tmp_pa
     monkeypatch.setattr(config, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     (tmp_path / "out.mp4").write_bytes(b"x")                 # ...at a real file
     revealed = []
-    monkeypatch.setattr(mb, "show_in_explorer", lambda p: revealed.append(p))
+    monkeypatch.setattr(basic_section_module, "show_in_explorer", lambda p: revealed.append(p))
 
     block.show_row(_row(output_files=json.dumps(
         [{"filename": "out.mp4", "subfolder": ""}])))

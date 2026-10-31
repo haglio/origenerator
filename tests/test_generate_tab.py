@@ -473,7 +473,7 @@ def test_info_and_form_share_one_scroll(tab):
     # The read-only info and the editable form live in one scroll, so they move
     # together — not the form walled into its own cramped scroll while the info sits in
     # a separate static footer.
-    for widget in (tab._metadata_block, tab._related._source_tile,
+    for widget in (tab._basic_section, tab._related._source_tile,
                    tab._related._animations, tab._param_form):
         assert _is_descendant(widget, tab._scroll)
 
@@ -481,7 +481,7 @@ def test_info_and_form_share_one_scroll(tab):
 def test_file_info_above_form_related_media_below(tab):
     body = tab._scroll.widget().layout()
     form_at = body.indexOf(tab._form_host)
-    assert body.indexOf(tab._metadata_block) < form_at
+    assert body.indexOf(tab._basic_section) < form_at
     assert body.indexOf(tab._related) > form_at
     links = tab._related.layout()
     sections = tab._related._sections()
@@ -1596,9 +1596,9 @@ def saved_panel(qtbot, tmp_path, installed_models):
 
 
 def _metadata_texts(tab):
-    """Every label in the tab's metadata block, minus the wrapping zero-widths."""
+    """Every label in the tab's Basic section, minus the wrapping zero-widths."""
     return [lbl.text().replace("\u200b", "")
-            for lbl in tab._metadata_block.findChildren(QLabel)]
+            for lbl in tab._basic_section.findChildren(QLabel)]
 
 
 def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
@@ -1618,7 +1618,7 @@ def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
 def test_a_fresh_tab_shows_no_footer(saved_panel):
     tab, _db = saved_panel
     assert tab._displayed_row is None
-    assert tab._metadata_block.isHidden()
+    assert tab._basic_section.isHidden()
     assert tab._versions.isHidden()
     assert tab._related._animations.isHidden()
     assert tab._related._source_tile.isHidden()
@@ -1726,7 +1726,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video(saved_panel, 
     rows = _version_rows(tab)
     assert [row._title.text() for row in rows] == ["Evolved", "Original"]
     assert upscale.name in _row_texts(rows[0])
-    assert tab._metadata_block.isHidden()   # its file is listed with its versions
+    assert tab._basic_section.isHidden()   # its file is listed with its versions
 
 
 def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkeypatch,
@@ -1769,7 +1769,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
 
 def test_each_level_carries_its_own_file_row(saved_panel):
     # The file information is per enhancement, so it sits with the level that
-    # made it — the same File row a metadata block renders, copy button and all,
+    # made it — the same File row a Basic section renders, copy button and all,
     # with the version's trash can beside it, rather than a pooled block at the
     # top labeled with a level's name.
 
@@ -1801,8 +1801,8 @@ def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
 
     tab.show_saved_generation(image, [image])
 
-    assert not tab._metadata_block.isHidden()
-    assert [b.objectName() for b in tab._metadata_block.findChildren(QPushButton)
+    assert not tab._basic_section.isHidden()
+    assert [b.objectName() for b in tab._basic_section.findChildren(QPushButton)
             if b.objectName() != "foldingSectionHeader"] == ["goToFolderButton"]
     for row in _version_rows(tab):
         assert "goToFolderButton" not in [b.objectName()
@@ -2026,7 +2026,7 @@ def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
 
     tab.show_saved_generation(video, [])
 
-    assert not tab._metadata_block.isHidden()
+    assert not tab._basic_section.isHidden()
     texts = _metadata_texts(tab)
     assert "video/vid1.mp4" in texts         # the filename — the reported regression
     assert "completed" not in texts         # Details (status/source) dropped as not useful
@@ -2046,7 +2046,7 @@ def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
     monkeypatch.setattr(tab, "_recent_matching_row", lambda: None)
     tab.show_recent_preview()
 
-    assert tab._metadata_block.isHidden()
+    assert tab._basic_section.isHidden()
     assert tab._versions.isHidden()
     assert tab._related._source_tile.isHidden()
     assert tab._lane_button.isHidden()
@@ -2458,7 +2458,7 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     def span(widget):
         return corner(widget).x(), corner(widget).x() + widget.width()
 
-    name = panel._metadata_block.findChild(CollapsibleSection)
+    name = tab._basic_section.findChild(CollapsibleSection)
     spans = {section.title(): span(section) for section in body.findChildren(CollapsibleSection)
              if section.isVisibleTo(body)}
 

@@ -18,7 +18,7 @@ here is what no version claims: a video's file, and the siblings of a batch (whi
 are separate results of one run, not versions of each other).
 
 Kept Qt-free so the section/item model is unit-testable directly;
-``gui/metadata_block.py`` does the rendering.
+``gui/basic_section.py`` does the rendering.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 @dataclass
-class MetaItem:
+class BasicItem:
     """One line in a section, rendered as ``label: value``.
 
     ``copy`` drives a copy-to-clipboard button: ``None`` shows no button, a
@@ -53,9 +53,9 @@ BASIC_TITLE = "Basic"   # the block draws it for a row whose facts come to nothi
 
 
 @dataclass
-class MetaSection:
+class BasicFacts:
     title: str
-    items: list[MetaItem]
+    items: list[BasicItem]
 
 
 def _output_path(file: dict) -> str:
@@ -85,7 +85,7 @@ def _places(given: OutputPlaces | None) -> OutputPlaces:
 
 
 def file_item(file: dict, label: str = "File", *,
-              held_days: int | None = None, places: OutputPlaces | None = None) -> MetaItem:
+              held_days: int | None = None, places: OutputPlaces | None = None) -> BasicItem:
     """One output file as a row: its path, a copy of just its filename (dropping
     the image/ or video/ subfolder the displayed path carries), and a reveal of
     its absolute location — in the library, or wherever the Trash has
@@ -98,12 +98,12 @@ def file_item(file: dict, label: str = "File", *,
     belongs to — the same file information, wherever the file is listed."""
     filename = file.get("filename") or ""
     full = gallery.output_file_path(file, _places(places))
-    return MetaItem(label, _held_prefix(held_days) + _output_path(file),
+    return BasicItem(label, _held_prefix(held_days) + _output_path(file),
                     copy=filename, reveal=str(full))
 
 
 def created_item(file: dict, fallback: str = "", *,
-                 places: OutputPlaces | None = None) -> MetaItem:
+                 places: OutputPlaces | None = None) -> BasicItem:
     """When one output file was written, from the file itself.
 
     Per file rather than per row, because an image's versions were made at
@@ -115,28 +115,28 @@ def created_item(file: dict, fallback: str = "", *,
     try:
         stamp = datetime.fromtimestamp(full.stat().st_mtime).astimezone()
     except OSError:
-        return MetaItem("Created", str(fallback))
-    return MetaItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
+        return BasicItem("Created", str(fallback))
+    return BasicItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def basic_section(row: dict, upscale: Path | None = None, *,
-                  name: str = "") -> MetaSection | None:
+def basic_facts(row: dict, upscale: Path | None = None, *,
+                  name: str = "") -> BasicFacts | None:
     listed = {version.file.get("filename")
               for version in gallery.displayed_versions(row, upscale)}
     files = [f for f in gallery.row_output_files(row)
              if f.get("filename") and f.get("filename") not in listed]
-    items = [MetaItem("Name", name, copy=name)] if name else []
+    items = [BasicItem("Name", name, copy=name)] if name else []
     if files:
         held = row.get("days_in_trash")
         items += [file_item(f, held_days=held) for f in files]
-        items.append(MetaItem("Created", str(row.get("created_at", ""))))
+        items.append(BasicItem("Created", str(row.get("created_at", ""))))
     if row.get("provenance") and row.get("workflow_name") in WORKFLOW_REGISTRY:
         items.append(_version_line(json.loads(row["provenance"])))
-    return MetaSection(BASIC_TITLE, items) if items else None
+    return BasicFacts(BASIC_TITLE, items) if items else None
 
 
-def _version_line(block: dict) -> MetaItem:
-    return MetaItem("Workflow version", _version_text(block))
+def _version_line(block: dict) -> BasicItem:
+    return BasicItem("Workflow version", _version_text(block))
 
 
 def _version_text(block: dict) -> str:

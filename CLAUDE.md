@@ -97,10 +97,10 @@ for one thing cost four. So:
   `HOLD_PICTURE`, a verb every running Funestra speaks, and app_support's
   loading screen's `pictures.json`.
 - **Where the screen names nothing, the code takes the user's word.** The
-  list of folders down the left of the gallery is the **TOC** (table of
-  contents), and the marks that open and shut its folders are its
-  **carets**: no label names either, and those are the words the user and
-  the app's designers use. So the code says `toc` and `caret`, an agent
+  list of folders down the left of the gallery is the **TOC** (tree of
+  contents, his word since 2026-10-30; table of contents before that), and
+  the marks that open and shut its folders are its **carets**: no label
+  names either, and those are the words the user and the app's designers use. So the code says `toc` and `caret`, an agent
   writing to the user says TOC and caret, and other names for the same two
   things -- tree, folder list, folder tree, arrow, chevron -- take nothing
   new. The back and forward buttons' chevrons and the text cursor's caret

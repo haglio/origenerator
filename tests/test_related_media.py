@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
+from PyQt6.QtWidgets import QApplication
 
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.animated_strip import _VideoTile
@@ -177,6 +178,7 @@ def _animated(related):
 def _drawn_links(related, row, image_rows):
     """(made from, made into) for each link the pane draws on *row*."""
     related.show_row(row, image_rows)
+    QApplication.processEvents()
     shown = row["prompt_id"]
     drawn = {(tile._prompt_id, shown) for tile in (related._source_tile,
                                                    related._source_video_tile)

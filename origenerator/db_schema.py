@@ -345,7 +345,7 @@ def as_stored(row: dict) -> dict:
 def create(conn) -> None:
     """Make every table and index this app needs, if they are not there already."""
     rename_tables(conn)
-    conn.executescript(SCHEMA)
+    conn.executescript(f"BEGIN;\n{SCHEMA}\nCOMMIT;")
     migrate(conn)
 
 

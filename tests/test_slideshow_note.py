@@ -15,8 +15,8 @@ from origenerator.gui import voice_router
 from origenerator.gui.notice_overlay import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView
 from tests.funestra_fakes import FakeEngine
+from tests.gallery_view_support import _requesting_view
 from tests.marked_words import words
-from tests.test_gallery_view import _requesting_view
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
 

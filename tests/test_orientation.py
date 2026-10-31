@@ -50,8 +50,8 @@ from origenerator.orientation import (
     side_of,
     split_key,
 )
+from tests.gallery_view_support import FakeDB, _image, _row, _side_rows
 from tests.test_folder_tree import _shown
-from tests.test_gallery_view import FakeDB, _image, _row, _side_rows
 from tests.test_icons import (
     _ink_bounds,  # the mark is measured the way the icons' own tests measure one
 )

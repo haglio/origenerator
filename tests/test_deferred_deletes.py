@@ -6,7 +6,7 @@ asserts — so those deletions pile up all run, and the first test that *does*
 pump the loop pays for every test before it.
 
 That is what made
-``test_gallery_view.py::test_a_finished_request_queues_the_revision_with_the_same_seed``
+``test_gallery_view_voice.py::test_a_finished_request_queues_the_revision_with_the_same_seed``
 the one flake this suite has been seen to have: it waits up to three seconds for
 an answer that crosses back from a pool thread, and 1.4 s of that budget went on
 delivering the 44,659 DeferredDelete events its neighbours had left over

@@ -3,6 +3,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 from shared_ui.colors import AMBER, RED
+from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.box_breaks import (
@@ -23,6 +24,7 @@ COUNTING_DOWN_FROM = 15
 class Countdown(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setFont(make_font(size=SIZE_BODY))
         self.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.hide()
 

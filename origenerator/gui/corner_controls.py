@@ -2,14 +2,14 @@
 
 A thumbnail in the browser pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
-bookmark it (top right), bin it (lower left), enhance it (lower right). Learn
+favorite it (top right), bin it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
 Top-LEFT is not one of them: the media-type badge has always lived there, and a
 control that landed on it would be a control that moves depending on which collection
 you happened to open.
 
 Each mark is the state and the button at once. A filled green star IS the
-bookmark, and pressing it is what takes the bookmark away; the yellow plus IS
+favorite, and pressing it is what takes the favorite away; the yellow plus IS
 the enhancement the image holds. That is why the badges these replaced are gone
 rather than sitting beside them: an item can no longer carry a badge saying
 one thing next to a control doing another, because there is only the one mark.

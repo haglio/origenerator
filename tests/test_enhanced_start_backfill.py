@@ -85,7 +85,7 @@ def _backfilled(db):
             for video, image in videos_to_backfill(db.list_generations())]
 
 
-def test_a_starred_video_from_an_image_never_enhanced_is_backfilled(tmp_path):
+def test_a_favorite_video_from_an_image_never_enhanced_is_backfilled(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     _video(db, "video", made_from="image", starred=True)
@@ -192,7 +192,7 @@ def test_a_sent_video_sharing_its_name_with_another_is_left_alone(tmp_path):
     assert _backfilled(db) == []
 
 
-def test_a_video_only_starred_is_backfilled_whatever_shares_its_name(tmp_path):
+def test_a_favorite_video_alone_is_backfilled_whatever_shares_its_name(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     _video(db, "video", made_from="image", starred=True)

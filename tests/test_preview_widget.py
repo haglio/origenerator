@@ -1046,7 +1046,7 @@ def test_a_new_item_takes_the_last_one_s_corners_away(make_preview, tmp_path):
 
 def test_a_running_generation_has_no_corners_to_press(make_preview):
     # Live frames are a part-drawn file that does not exist yet: nothing to
-    # bookmark, bin or enhance.
+    # favorite, bin or enhance.
     w = make_preview()
     w.set_actions("p1", favorite=False, enhance=None)
 

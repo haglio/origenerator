@@ -72,8 +72,8 @@ def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favor
     video, row = _another_sources_video(promise)
     places = _journaling_into(tmp_path, beside=video)
 
-    outside_videos.journal_stars(places, [row], True)
-    outside_videos.journal_stars(places, [row], False)
+    outside_videos.journal_favorites(places, [row], True)
+    outside_videos.journal_favorites(places, [row], False)
 
     lines = _journaled(places)
     assert all(set(line) == set(journals["fields"]) for line in lines)

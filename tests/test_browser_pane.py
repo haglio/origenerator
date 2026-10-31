@@ -696,7 +696,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot):
     assert list(pane._inflight_cards) == ["a2"]
 
 
-def test_a_folders_favorites_are_its_starred_items_and_the_favorite_folders_below_it(qtbot):
+def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_below_it(qtbot):
     rows = [_made_with("a1", "alpha.safetensors", starred=1),
             _made_with("a2", "alpha.safetensors", prompt="scene two"),
             _made_with("b1", "beta.safetensors", starred=1)]

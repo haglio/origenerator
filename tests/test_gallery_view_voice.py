@@ -1252,7 +1252,7 @@ def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_pa
     assert surface.steps == [1, 1, -1, -1]
 
 
-def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path):
+def test_a_spoken_favorite_over_a_slideshow_favorites_the_slide(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface

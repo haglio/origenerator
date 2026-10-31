@@ -5,14 +5,14 @@ import json
 import pytest
 from PIL import Image
 
-from origenerator import bookmark_reconcile, gallery
-from origenerator.bookmark_reconcile import (
-    reconcile_bookmarks,
+from origenerator import favorite_reconcile, gallery
+from origenerator.db import Database
+from origenerator.favorite_reconcile import (
     reconcile_custom_folders,
+    reconcile_favorites,
     reconcile_folder_meta,
     stamp_custom_folder_sides,
 )
-from origenerator.db import Database
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
 from origenerator.library_filing import saving_into_its_run_folder
@@ -155,7 +155,7 @@ def test_no_in_flight_rows_is_a_noop(tmp_path):
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
 
 
-# --- folder-bookmark reconciliation -----------------------------------------
+# --- folder-favorite reconciliation -----------------------------------------
 
 def _add_completed(db, pid, *, params, filename, workflow="sdxl_t2i"):
     db.insert_generation(prompt_id=pid, workflow_name=workflow, workflow_version="v",
@@ -184,23 +184,23 @@ def test_reconcile_repoints_a_favorite_orphaned_by_the_settings_formula_change(t
     assert summary["repointed"] == 1
 
 
-def test_a_launch_whose_bookmarks_all_still_match_works_out_no_old_keys(tmp_path, monkeypatch):
+def test_a_launch_whose_favorites_all_still_match_works_out_no_old_keys(tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a quay", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
     db.set_folder_favorite(gallery.settings_folder_key(row), True)
     worked_out = []
     real = gallery.legacy_settings_folder_key
-    monkeypatch.setattr(bookmark_reconcile.gallery, "legacy_settings_folder_key",
+    monkeypatch.setattr(favorite_reconcile.gallery, "legacy_settings_folder_key",
                         lambda folder_row: worked_out.append(folder_row["prompt_id"])
                         or real(folder_row))
 
-    reconcile_bookmarks(db)
+    reconcile_favorites(db)
 
     assert worked_out == []
 
 
-def test_reconcile_backfills_identity_onto_a_matching_bookmark(tmp_path):
+def test_reconcile_backfills_identity_onto_a_matching_favorite(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -220,7 +220,7 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
     key = gallery.settings_folder_key(row)
-    # A bookmark already carrying identity, as a prior reconcile would leave it.
+    # A favorite already carrying identity, as a prior reconcile would leave it.
     db.upsert_folder_meta(key, custom_name=None, favorite=True,
                           level="settings", ref_prompt_id="p1")
 
@@ -245,7 +245,7 @@ def test_reconcile_repoints_an_i2v_favorite_across_the_frame_config_change(tmp_p
     # A star made before an i2v's start-frame config was folded into its settings
     # key dangles once the formula changes. With no stored identity it is recovered
     # through the pre-frame-config legacy formula and moved onto the live folder —
-    # so the user's bookmark survives this fix.
+    # so the user's favorite survives this fix.
     db = Database(tmp_path / "t.db")
     _add_completed(db, "img", params={"positive_prompt": "a face", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_img.png")
@@ -298,7 +298,7 @@ def test_reconcile_repoints_a_favorite_across_the_version_fold(tmp_path):
     # A star made before the workflow generation was folded into the settings
     # key dangles once the formula changes. With no stored identity it is
     # recovered through the pre-version legacy formula and moved onto the live
-    # folder — so a bookmark made just before this fix survives it.
+    # folder — so a favorite made just before this fix survives it.
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -349,7 +349,7 @@ def test_reconcile_repoints_both_favorites_across_the_enhancement_merge(tmp_path
     assert summary["repointed"] == 2
 
 
-def test_reconcile_leaves_a_truly_orphaned_bookmark_untouched(tmp_path):
+def test_reconcile_leaves_a_truly_orphaned_favorite_untouched(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
@@ -392,7 +392,7 @@ def test_reconcile_merges_when_the_target_folder_is_already_bookmarked(tmp_path)
     assert legacy_key not in db.folder_meta_map()
 
 
-def test_reconcile_with_no_bookmarks_is_a_noop(tmp_path):
+def test_reconcile_with_no_favorites_is_a_noop(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
@@ -509,7 +509,7 @@ def test_a_folder_saved_before_folders_had_a_side_is_put_where_most_of_what_it_g
                                       for row in rows})
     empty = db.create_custom_folder("Later")
 
-    reconcile_bookmarks(db)
+    reconcile_favorites(db)
 
     assert {record["id"]: record["side"] for record in db.list_custom_folders()} == {
         gathering: PORTRAIT, empty: LANDSCAPE}
@@ -521,7 +521,7 @@ def test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_a
     assert gallery.legacy_settings_folder_key(tall) != gallery.settings_folder_key(tall)
     _folder_holding(db, (gallery.legacy_settings_folder_key(tall), None, None))
 
-    reconcile_bookmarks(db)
+    reconcile_favorites(db)
 
     assert db.list_custom_folders()[0]["side"] == PORTRAIT
 
@@ -532,7 +532,7 @@ def test_a_folder_that_has_a_side_keeps_it_whatever_it_gathers(tmp_path):
     folder_id = db.create_custom_folder("Mine", side=LANDSCAPE)
     db.add_folders_to_custom_folder(folder_id, [(gallery.settings_folder_key(tall), None, None)])
 
-    reconcile_bookmarks(db)
+    reconcile_favorites(db)
 
     assert db.list_custom_folders()[0]["side"] == LANDSCAPE
 
@@ -540,7 +540,7 @@ def test_a_folder_that_has_a_side_keeps_it_whatever_it_gathers(tmp_path):
 # --- one reading of the tree, for both passes ---------------------------------
 
 
-def _a_library_with_both_kinds_of_bookmark(tmp_path):
+def _a_library_with_both_kinds_of_favorite(tmp_path):
     """One generation, its settings folder favorited under a legacy key, and a
     hand-composed folder holding that same legacy key."""
     db = Database(tmp_path / "t.db")
@@ -557,13 +557,13 @@ def test_reconciling_both_reads_the_gallery_tree_once(tmp_path, monkeypatch):
     """The passes ask the same question of the same tree, and building it
     reads every row in the database — so the boot paid for two full builds back
     to back. One index now serves them all."""
-    db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    db, _row, _legacy = _a_library_with_both_kinds_of_favorite(tmp_path)
     builds = []
     build = gallery.build_gallery_tree
-    monkeypatch.setattr(bookmark_reconcile.gallery, "build_gallery_tree",
+    monkeypatch.setattr(favorite_reconcile.gallery, "build_gallery_tree",
                         lambda rows, meta: (builds.append(len(rows)), build(rows, meta))[1])
 
-    bookmark_reconcile.reconcile_bookmarks(db)
+    favorite_reconcile.reconcile_favorites(db)
 
     assert len(builds) == 1
 
@@ -571,10 +571,10 @@ def test_reconciling_both_reads_the_gallery_tree_once(tmp_path, monkeypatch):
 def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_path):
     """The control on sharing the index: a shared reading must not change any
     answer. Same library, both ways round."""
-    shared_db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
-    apart_db, _, _ = _a_library_with_both_kinds_of_bookmark(tmp_path / "apart")
+    shared_db, _row, _legacy = _a_library_with_both_kinds_of_favorite(tmp_path)
+    apart_db, _, _ = _a_library_with_both_kinds_of_favorite(tmp_path / "apart")
 
-    together = bookmark_reconcile.reconcile_bookmarks(shared_db)
+    together = favorite_reconcile.reconcile_favorites(shared_db)
     apart = {"folder_meta": reconcile_folder_meta(apart_db),
              "custom_folders": reconcile_custom_folders(apart_db),
              "custom_folder_sides": stamp_custom_folder_sides(apart_db)}
@@ -584,14 +584,14 @@ def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_p
     assert shared_db.list_custom_folders() == apart_db.list_custom_folders()
 
 
-def test_neither_bookmark_pass_touches_a_generation(tmp_path):
+def test_neither_favorite_pass_touches_a_generation(tmp_path):
     """What makes one index safe for both: the second pass reconciles against
     the tree the first left, and the tree is built out of `generations`. Both
-    write only to the bookmark tables."""
-    db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    write only to the favorite tables."""
+    db, _row, _legacy = _a_library_with_both_kinds_of_favorite(tmp_path)
     before = db.list_generations()
 
-    reconcile_bookmarks(db)
+    reconcile_favorites(db)
 
     assert db.list_generations() == before
 
@@ -600,13 +600,13 @@ def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path,
     """The order the boot ran them in, kept now that one call runs both. A
     custom folder gathers the same keys a star sits on, so the star's move is
     the one that has to be settled first."""
-    db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    db, _row, _legacy = _a_library_with_both_kinds_of_favorite(tmp_path)
     ran = []
     for name in ("reconcile_folder_meta", "reconcile_custom_folders"):
         monkeypatch.setattr(bookmark_reconcile, name,
                             _recording(ran, name, getattr(bookmark_reconcile, name)))
 
-    bookmark_reconcile.reconcile_bookmarks(db)
+    favorite_reconcile.reconcile_favorites(db)
 
     assert ran == ["reconcile_folder_meta", "reconcile_custom_folders"]
 
@@ -617,10 +617,10 @@ def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a harbor"}, filename="a.png")
     builds = []
-    monkeypatch.setattr(bookmark_reconcile.gallery, "build_gallery_tree",
+    monkeypatch.setattr(favorite_reconcile.gallery, "build_gallery_tree",
                         lambda rows, meta: builds.append(len(rows)) or [])
 
-    summaries = bookmark_reconcile.reconcile_bookmarks(db)
+    summaries = favorite_reconcile.reconcile_favorites(db)
 
     assert builds == []
     assert summaries == {"folder_meta": {"refreshed": 0, "repointed": 0, "orphaned": 0},

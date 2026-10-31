@@ -1,7 +1,7 @@
-"""Heal the gallery bookmarks a folder-key formula change detached.
+"""Heal the gallery favorites a folder-key formula change detached.
 
 A gallery folder has no id: its key is derived from the settings its generations
-share, so a change to that formula silently detaches every bookmark keyed by the
+share, so a change to that formula silently detaches every favorite keyed by the
 old one — a star, a name the user typed, a folder they gathered by hand. Both
 tables that hold such a key are reconciled at startup, and both the same way,
 for each stored key:
@@ -9,9 +9,9 @@ for each stored key:
   - **still matches a folder** → refresh its stored ``(level, ref)`` so a future
     formula change can re-derive it from a generation under it;
   - **dangles, stored ref still exists** → recompute the key at the stored tier
-    and move the bookmark onto it (robust to *any* formula change);
+    and move the favorite onto it (robust to *any* formula change);
   - **dangles, no usable identity** → try the legacy key formulas, which
-    recovers bookmarks predating stored identity;
+    recovers favorites predating stored identity;
   - **still nothing** → leave it alone. Its generations are gone, and a user's
     star, name or grouping is never dropped.
 
@@ -43,7 +43,7 @@ class Folders:
     """One reading of the gallery tree, indexed the ways a reconcile needs it.
 
     Built once and used by every pass. Safe to share because none writes to
-    `generations` — each writes only to the bookmark tables — so the tree a
+    `generations` — each writes only to the favorite tables — so the tree a
     later pass reads is the tree the first did. tests/test_reconcile.py
     asserts that, since sharing it is what makes the assumption load-bearing.
     """
@@ -59,7 +59,7 @@ class Folders:
     @cached_property
     def legacy_keys(self) -> dict:
         """A folder's keys under older formulas → its key today, worked out
-        only once a bookmark has lost its folder."""
+        only once a favorite has lost its folder."""
         return _legacy_keys(self.tree, self.image_index)
 
 
@@ -75,7 +75,7 @@ def index_folders(db) -> Folders:
     return Folders(current, rows_by_id, image_index, tree)
 
 
-def reconcile_bookmarks(db) -> dict:
+def reconcile_favorites(db) -> dict:
     if not db.folder_meta_full() and not db.folders_in_custom_folders():
         return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING),
                 "custom_folder_sides": 0}
@@ -106,10 +106,10 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
         held["level"], held["ref_prompt_id"] = level, ref
 
     def repoint(row, target, identity):
-        _move_bookmark(db, row, target, identity, meta_by_key)
+        _move_favorite(db, row, target, identity, meta_by_key)
 
     summary = _reconcile_keys(meta, folders, refresh, repoint)
-    logger.info("Reconciled folder bookmarks: %(refreshed)d refreshed, "
+    logger.info("Reconciled folder favorites: %(refreshed)d refreshed, "
                 "%(repointed)d re-pointed, %(orphaned)d orphaned", summary)
     return summary
 
@@ -213,11 +213,11 @@ def _legacy_keys(tree, image_index) -> dict:
 
 
 def _repoint_target(row, folders: Folders):
-    """The current key a dangling bookmark should move to, or ``None``.
+    """The current key a dangling favorite should move to, or ``None``.
 
-    Prefers recomputing from the bookmark's stored identity — a row under it at its
+    Prefers recomputing from the favorite's stored identity — a row under it at its
     tier, robust to any formula change — and falls back to a legacy key
-    formula for bookmarks that predate stored identity."""
+    formula for favorites that predate stored identity."""
     ref, level = row["ref_prompt_id"], row["level"]
     if ref and level and ref in folders.rows_by_id:
         candidate = gallery.folder_key_at_level(
@@ -227,8 +227,8 @@ def _repoint_target(row, folders: Folders):
     return folders.legacy_keys.get(row["folder_key"])
 
 
-def _move_bookmark(db, row, target, identity, meta_by_key):
-    """Move a bookmark's star/name onto ``target`` (merging into any bookmark
+def _move_favorite(db, row, target, identity, meta_by_key):
+    """Move a favorite's star/name onto ``target`` (merging into any favorite
     already there — a name and a star both survive), then drop its stale key."""
     level, ref = identity
     existing = meta_by_key.get(target)

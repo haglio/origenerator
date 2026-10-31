@@ -827,7 +827,7 @@ def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
 
     _tree_menu(view, gallery.custom_folder_key(folder_id))
 
-    # No star (a bookmark of a bookmark collection gathers nothing) and no delete —
+    # No star (a favorite of a favorite collection gathers nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
     assert labels == ["Copy name", "", "Remove folder…", "", "Collapse all", "Expand all"]
 

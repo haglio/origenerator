@@ -363,8 +363,8 @@ _ENHANCE_SHADOW = 5.0
 
 @cache
 def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
-    """The star in an item's top-left corner: bookmark it, or take the
-    bookmark away.
+    """The star in an item's top-left corner: favorite it, or take the
+    favorite away.
 
     Filled and green once it is bookmarked — the green Fun Time paints its
     favorite ★ with, so one color means one thing across both apps — and a

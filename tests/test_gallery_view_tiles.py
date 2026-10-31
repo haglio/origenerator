@@ -428,7 +428,7 @@ def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, mon
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-def test_right_click_favorite_on_the_recents_collection_bookmarks_the_item(qtbot, monkeypatch):
+def test_right_click_favorite_on_the_latest_collection_favorites_the_item(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -788,7 +788,7 @@ def test_a_version_dragged_onto_the_enhance_panel_grays_the_enhance_that_would_r
 # --- the controls a tile wears in its own corners -----------------------------
 
 
-def test_a_star_pressed_on_one_tile_bookmarks_it_at_once_and_leaves_the_rest(qtbot):
+def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -802,7 +802,7 @@ def test_a_star_pressed_on_one_tile_bookmarks_it_at_once_and_leaves_the_rest(qtb
     assert not db.get_generation("i1").get("starred")
 
 
-def test_a_favorite_tiles_favorite_corner_takes_the_bookmark_away(qtbot):
+def test_a_favorite_tiles_favorite_corner_takes_the_favorite_away(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
@@ -1083,7 +1083,7 @@ def test_a_favorite_row_renders_a_favorite_tile(qtbot):
     assert view._browser._thumb_widgets["i2"]._favorite is True
 
 
-def test_right_click_favorite_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
+def test_right_click_favorite_favorites_the_picked_thumbnail(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     db = FakeDB(rows)
     view = GalleryView(db, actions=FakeActions())

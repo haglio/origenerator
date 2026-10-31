@@ -44,7 +44,7 @@ QT_FREE = (
     "origenerator.comfyui_api",
     "origenerator.completion",
     "origenerator.inflight",
-    "origenerator.bookmark_reconcile",
+    "origenerator.favorite_reconcile",
     "origenerator.base_backfill",
     "origenerator.export_lane",
     "origenerator.enhanced_start_backfill",

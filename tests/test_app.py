@@ -1044,7 +1044,7 @@ def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
 # The tests above hand main a MagicMock database, whose every query answers with
 # an empty iterable — so the boot phases their patch chain does not name run over
 # nothing at all and are asserted by nothing. Four separate mutations to main
-# survived them: the folder-bookmark reconcile deleted, and the duration
+# survived them: the folder-favorite reconcile deleted, and the duration
 # backfill's result thrown away. These boot the same main over a real database
 # under tmp_path and read each phase's effect off it afterwards.
 
@@ -1135,7 +1135,7 @@ def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library)
         qapp.setPalette(prior)  # every later test renders in the chrome it expected
 
 
-def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
+def test_the_launch_heals_a_favorite_whose_folder_key_drifted(qapp, library):
     # The reconcile is why a star survives a change to the key formula. Deleting
     # both its calls left the boot tests green, and the star would simply be gone
     # from the folder the user put it on.
@@ -1247,7 +1247,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
     ("origenerator.provenance", "stamp_unstamped"),
-    ("origenerator.bookmark_reconcile", "reconcile_bookmarks"),
+    ("origenerator.favorite_reconcile", "reconcile_favorites"),
 )
 
 
@@ -1323,7 +1323,7 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
 
     assert "import_comfyui_output" not in ran
     # ...and everything after it still ran, up to and including the window.
-    assert ran[-1] == "reconcile_bookmarks"
+    assert ran[-1] == "reconcile_favorites"
     window.show.assert_called_once()
 
 

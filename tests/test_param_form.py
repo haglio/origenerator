@@ -21,6 +21,7 @@ from shared_ui.spacing import BUTTON_ICON
 from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gui import (
     diff_text,
@@ -48,7 +49,7 @@ from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.lora_training import TrainingOffer
-from origenerator.prompt_tokens import CUT_OFF
+from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
 from origenerator.seed_history import SeedHistory, SeedUse
 from origenerator.setting_advice import Advice, MissingTriggerWords, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
@@ -2339,6 +2340,31 @@ def test_a_missing_trigger_word_warns_beside_the_prompt_and_beside_its_lora(qtbo
     marks = [form._warning_marks[key] for key in ("positive_prompt", "lora")]
     assert [(mark.isHidden(), mark.toolTip()) for mark in marks] == [
         (False, _TRIGGER_WORD_SAID)] * 2
+
+
+def test_a_trigger_word_clicked_in_goes_at_the_start_of_the_first_box_and_flows_on(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
+    form.show_readings({"positive_prompt": word_reading(3, READ_IN_PIECES)})
+    form.set_values({"positive_prompt": f"a b c{BOX_BREAK}d"})
+    form.set_warnings(_TRIGGER_WORD)
+
+    qtbot.mouseClick(form._warning_marks["positive_prompt"], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == (
+        f"exmplstyle, a{BOX_BREAK}b c d")
+
+
+def test_a_requests_rewrite_flows_into_boxes_of_whole_words(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+    form.show_readings({"positive_prompt": word_reading(3, READ_IN_PIECES),
+                        "negative_prompt": word_reading(3, READ_IN_PIECES)})
+
+    form.set_prompts("a b c d", "e f g h", typed=True)
+
+    values = form.get_values()
+    assert (values["positive_prompt"], values["negative_prompt"]) == (
+        f"a b c{BOX_BREAK}d", f"e f g{BOX_BREAK}h")
 
 
 @pytest.mark.parametrize("beside", ["positive_prompt", "lora"])

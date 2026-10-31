@@ -344,13 +344,17 @@ class ParamForm(QWidget):
     def request_field(self) -> RequestField | None:
         return self._request_field
 
-    def set_prompts(self, positive: str, negative: str) -> None:
+    def set_prompts(self, positive: str, negative: str, *, typed: bool = False) -> None:
         """Write a prompt pair into its fields, as typing it in would."""
         for pd in self._param_defs:
-            if pd.key == "positive_prompt":
-                self._write_field(pd, positive)
-            elif pd.key == "negative_prompt":
-                self._write_field(pd, negative)
+            if pd.key not in ("positive_prompt", "negative_prompt"):
+                continue
+            said = positive if pd.key == "positive_prompt" else negative
+            widget = self._widgets[pd.key]
+            if typed and isinstance(widget, PromptBoxes):
+                widget.edit(said)
+            else:
+                self._write_field(pd, said)
 
     def _announce_every_edit(self):
         for pd in self._param_defs:
@@ -508,6 +512,10 @@ class ParamForm(QWidget):
 
     def _take_advice(self, key: str, found: Advice | MissingTriggerWords) -> None:
         written = found.writes or key
+        widget = self._widgets.get(written)
+        if isinstance(widget, PromptBoxes):
+            widget.edit(found.fixed(widget.shown_value()))
+            return
         fixed = found.fixed(self._read_field(self._defs[written]))
         if written == "frame_count" and self._scenes is not None:
             self._scenes.set_total_frames(fixed)

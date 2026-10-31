@@ -33,6 +33,7 @@ import origenerator.workflows.model_pickers as model_pickers_module
 from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
 from origenerator import export_lane as export_lane_module
 from origenerator.act_settings import CATEGORIES
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -73,7 +74,7 @@ from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
-from tests.text_readers import clap_reader
+from tests.text_readers import clap_reader, clip_reader
 from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
 
 
@@ -3200,6 +3201,21 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display(saved_panel, qtbot,
         ("a woman on a couch", "two women")]
     assert field._status.isHidden()
     assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_a_requests_rewrite_of_the_image_on_display_lands_in_boxes_of_whole_words(
+        saved_panel, qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
+    _rewriting(monkeypatch, answer=(cats[0], "blurry"))
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    panel.show_saved_generation(image, [image])
+
+    _ask(panel, qtbot, "eighty cats")
+
+    qtbot.waitUntil(lambda: _positive(panel) == f"{cats[1]}{BOX_BREAK}{cats[2]}", timeout=5000)
 
 
 def test_new_words_for_a_requested_image_redo_the_request_on_what_it_was_asked_of(

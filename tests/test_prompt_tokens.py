@@ -8,10 +8,12 @@ import pytest
 from tokenizers import pre_tokenizers
 
 from origenerator import config
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.prompt_tokens import (
     CUT_OFF,
     READ_IN_PIECES,
     READ_WHOLE,
+    boxed_as_typed,
     prompt_reading,
     prompt_readings,
 )
@@ -200,3 +202,21 @@ def test_every_prompt_comfyui_reads_names_its_text_reader(name):
     assert not workflow.generates_here or prompts - set(SOUND_PROMPT_KEYS) <= {
         "positive_prompt", "negative_prompt"}
     assert not workflow.generates_here or workflow.text_reader is not None
+
+
+def test_a_new_sdxl_prompt_is_flowed_into_boxes_of_whole_words(comfyui):
+    clip_reader(comfyui)
+
+    assert boxed_as_typed("sdxl_t2i", {}, "positive_prompt", f"{_cats(74)} dog cat") == (
+        f"{_cats(74)}{BOX_BREAK}dog cat")
+
+
+def test_a_prompt_read_whole_is_never_flowed_into_boxes(comfyui):
+    word_reader(comfyui / "comfy" / "text_encoders" / "t5_tokenizer" / "tokenizer.json")
+    text = " ".join(["alpha"] * 600)
+
+    assert boxed_as_typed("flux_t2i_upscaled", {}, "positive_prompt", text) == text
+
+
+def test_a_new_prompt_whose_reader_is_not_installed_is_left_as_it_is(comfyui):
+    assert boxed_as_typed("sdxl_t2i", {}, "positive_prompt", _cats(80)) == _cats(80)

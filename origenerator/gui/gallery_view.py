@@ -169,6 +169,7 @@ from origenerator.orientation import (
 )
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
+from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.radio import OrigeneratorRadio
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
@@ -2918,9 +2919,10 @@ class GalleryView(QWidget):
         *the same seed* — "the same image but without X" means the image, so
         the one thing deliberately not re-rolled is the seed that draws it.
         """
-        params = {**params, "positive_prompt": revision.positive,
-                  "negative_prompt": revision.negative}
-        key = self.folder_key_for(row.get("workflow_name") or "", params)
+        name = row.get("workflow_name") or ""
+        params = {**params, **{key: boxed_as_typed(name, params, key, said) for key, said in (
+            ("positive_prompt", revision.positive), ("negative_prompt", revision.negative))}}
+        key = self.folder_key_for(name, params)
         if not self._jobs.start_prepared(key, workflow, params):
             return "couldn't queue the request — see the log", ERROR
         job = self._jobs.newest_job_for(key)

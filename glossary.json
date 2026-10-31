@@ -331,13 +331,23 @@
       "screen": null,
       "his_word": "Gallery pane (2026-10-10, 2026-10-18); middle pane (2026-09-28); the gallery (2026-10-20)",
       "code_today": [
-        "browser pane",
-        "browser",
+        "gallery pane",
         "pane"
       ],
       "code_word": "gallery pane",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "browser pane",
+        "browser"
+      ],
+      "keep": [
+        "Random Favs Browser",
+        "web browser",
+        "web-browser",
+        "browser_and_enhance",
+        "Origenerator over the browser"
+      ]
     },
     {
       "id": "generate_tab",
@@ -821,20 +831,26 @@
       ]
     },
     {
-      "id": "toolbar",
+      "id": "gallery_pane_buttons",
       "thing": "the row of buttons over the Gallery pane: Back, Forward, Undo, Redo, the slideshow, Auto-generate, Favorite, Enhance, Delete, Radio and Listen",
       "screen": [
         "Listen: bare words for the collections and this bank"
       ],
       "his_word": "Gallery pane buttons (2026-10-30)",
       "code_today": [
-        "toolbar bank",
-        "bank",
-        "toolbar"
+        "gallery pane buttons"
       ],
       "code_word": "gallery pane buttons",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "toolbar bank",
+        "toolbar",
+        "bank"
+      ],
+      "keep": [
+        "and this bank"
+      ]
     },
     {
       "id": "latest",

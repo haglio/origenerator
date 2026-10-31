@@ -67,8 +67,8 @@ REMEMBERED = {
     "enhance_settings": lambda view: _within(view._enhance.panel),
     "search_sort": lambda view: [view._search._sort_dropdown],
     "gallery_combine": lambda view: _within(view._combine.panel),
-    "audio_enabled": lambda view: [view._bank.radio],
-    "mic_enabled": lambda view: [view._bank.mic],
+    "audio_enabled": lambda view: [view._buttons.radio],
+    "mic_enabled": lambda view: [view._buttons.mic],
 }
 
 NO_SETTING = {
@@ -77,7 +77,7 @@ NO_SETTING = {
     "what one item shows, which the library keeps with the item": lambda view: [
         widget for panel in _tabs(view) for widget in _within(panel._action)],
     ("Auto-Generate, which a restart leaves off, since one that came back on by itself"
-     " could run unnoticed"): lambda view: [view._bank.auto],
+     " could run unnoticed"): lambda view: [view._buttons.auto],
 }
 
 CONSOLE_PRESSES_REMEMBERED_AS = {

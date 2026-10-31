@@ -239,7 +239,7 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
     assert video.pixmap(size).toImage() != image.pixmap(size).toImage()
 
 
-def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
+def test_gallery_pane_button_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
               icons.delete_icon, icons.latest_icon, icons.radio_icon,
               icons.auto_generate_icon, icons.slideshow_icon, icons.enhance_icon,
@@ -340,7 +340,7 @@ def test_experiment_icons_render_and_verdicts_differ(qtbot):
     assert keep.pixmap(size).toImage() != reject.pixmap(size).toImage()
 
 
-def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
+def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
     # The reason the glyphs left this module: a drawing kept here is a drawing
     # that can drift from Fun Time's copy of it, and the two apps' microphones
     # had already drifted into different shapes on one screen. So every button's
@@ -373,7 +373,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
 
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
     # The white line art on a thumbnail's hover buttons is the same family mark
-    # the toolbar wears, in the white these read in over an image -- not a
+    # the Gallery pane buttons wears, in the white these read in over an image -- not a
     # second set of drawings kept for the tiles.
     white = QColor(255, 255, 255)
     for icon, name in ((icons.experiment_verdict_icon("up"), "check"),

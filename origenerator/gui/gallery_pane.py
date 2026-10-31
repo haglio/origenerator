@@ -1,4 +1,4 @@
-"""The gallery's browser pane — the middle column showing a folder's contents.
+"""The Gallery pane — the middle column showing a folder's contents.
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
 settings leaf's thumbnail grid (with its re-roll tile), or the Latest / Favorites /
@@ -99,19 +99,19 @@ _SECTION_SPACING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
 
 
-def play_once_made(pane: BrowserPane, prompt_id: str, movie_path: str) -> None:
+def play_once_made(pane: GalleryPane, prompt_id: str, movie_path: str) -> None:
     tile = pane._thumb_widgets.get(prompt_id)
     if tile is not None:
         tile.play_moving_preview(movie_path)
 
 
-class BrowserScrollArea(QScrollArea):
+class GalleryPaneScrollArea(QScrollArea):
     """The middle pane's scroll area, which says when a click landed on nothing.
 
     Every tile in here answers its own press and keeps it, so a press that
     arrives at this widget travelled the whole pane without meeting one: the
     background between the tiles, or the room under the last row. That is the
-    gesture every file browser answers by putting the selection down, and this
+    gesture every file manager answers by putting the selection down, and this
     pane needs it for more than tidiness — Favorite, Enhance and Delete all aim at
     the picked thumbnails when there are any and at the folder on screen when
     there are none, so "Enhance every image in this folder" is out of reach
@@ -380,7 +380,7 @@ class PaneCollection:
     render: Callable[[], None]
 
 
-class BrowserPane(QObject):
+class GalleryPane(QObject):
     """Fills the middle scroll area (folder tiles / thumbnail grid / collections) and
     owns the thumbnail multi-selection and in-flight tiles. Held by the GalleryView,
     which connects the signals below to its own handlers — a gesture on a tile is
@@ -860,7 +860,7 @@ class BrowserPane(QObject):
                                     top - _REACH, top + seen.height() + _REACH)
 
     def _scroll_bar(self):
-        """The browser pane's vertical scroll bar: what a pane grows off, and what a
+        """The Gallery pane's vertical scroll bar: what a pane grows off, and what a
         redraw puts back where the user was reading."""
         return self._scroll.verticalScrollBar()
 
@@ -1228,7 +1228,7 @@ class BrowserPane(QObject):
 
         Named rather than "what is showing" because a hosted slideshow outlives the
         selection that opened it: inside Fun Time the slideshows run on the satellite
-        regions while the browser goes on being used elsewhere, so keeping a
+        regions while the Gallery pane goes on being used elsewhere, so keeping a
         running slideshow fed — and answering a spoken "landscape favorites" — both
         need a collection's rows asked for by name.
         """
@@ -1358,7 +1358,7 @@ class BrowserPane(QObject):
         """Update the multi-select set the way the held modifiers dictate.
 
         Ctrl toggles one tile; Shift extends a contiguous run from the anchor;
-        a plain click resets to just this tile. Mirrors a typical file browser.
+        a plain click resets to just this tile. Mirrors a typical file manager.
         """
         self._selection.apply(
             prompt_id,

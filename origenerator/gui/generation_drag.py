@@ -1,6 +1,6 @@
 """The drag payload that names a generation by prompt_id.
 
-Shared by every drag source — the gallery's browser thumbnails and the generate
+Shared by every drag source — the Gallery pane's thumbnails and the generate
 tab's preview — and by what reads it, the Combine drop zones and the folders of
 your own in the TOC, so any of them can be dragged onto any of those with the same
 contract. Kept in its own module so a plain media widget doesn't have to depend on

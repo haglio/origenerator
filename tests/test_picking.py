@@ -1,6 +1,6 @@
 """Which entries are picked, with no pane and no Qt around it.
 
-The rule is a file browser's, and it used to be three fields and fourteen lines
+The rule is a file manager's, and it used to be three fields and fourteen lines
 among the pane's widgets: the only way to ask what a Shift-click would pick was to
 build a pane, draw tiles into it and read the highlights back off them.
 

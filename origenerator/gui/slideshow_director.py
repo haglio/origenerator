@@ -159,7 +159,7 @@ class SlideshowHost(Protocol):
         """Condemn it, as a slideshow's Up key does."""
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True) -> None:
-        """Bookmark it, as a slideshow's Down key does — or take the bookmark back,
+        """Favorite it, as a slideshow's Down key does — or take the favorite back,
         as its Up key does over a favorite."""
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
@@ -1578,7 +1578,7 @@ class SlideshowDirector:
 
     def run_on_slide(self, command: AppCommand, said_at: float | None = None) -> None:
         """A word about the slide filling the screen: step off it either way,
-        take it away, lock it, or bookmark it.
+        take it away, lock it, or favorite it.
 
         The words are Fun Time's, and so is what they do — "weird" condemns what
         was on screen when it was said, a lock holds it — because the two rooms are

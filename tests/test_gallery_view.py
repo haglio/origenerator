@@ -2032,7 +2032,7 @@ def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_i
 
 
 def test_a_folder_the_user_made_takes_no_favorite(qtbot):
-    # A bookmark of a bookmark collection gathers nothing, so its menu offers no
+    # A favorite of a favorite collection gathers nothing, so its menu offers no
     # Favorite — and the star its row shows on hover must not leave one either.
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
@@ -2080,7 +2080,7 @@ def _long_list_view(qtbot):
 def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
     # The gallery was read back and redrawn whole for one star — seconds of it on a
     # real library — and the redraw scrolled the list to the folder that was open,
-    # taking the row just starred out from under the mouse.
+    # taking the row just favorited out from under the mouse.
     view, folders = _long_list_view(qtbot)
     half = _side(view._tree)
     view._tree.setCurrentItem(folders[0])   # the folder that is open, up at the top
@@ -3587,7 +3587,7 @@ def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, mon
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-def test_right_click_favorite_on_the_latest_collection_bookmarks_the_item(qtbot, monkeypatch):
+def test_right_click_favorite_on_the_latest_collection_favorites_the_item(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -4665,7 +4665,7 @@ def test_a_version_dragged_onto_the_enhance_panel_grays_the_enhance_that_would_r
 
 # --- the controls a tile wears in its own corners -----------------------------
 
-def test_a_star_pressed_on_one_tile_bookmarks_it_at_once_and_leaves_the_rest(qtbot):
+def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -4679,7 +4679,7 @@ def test_a_star_pressed_on_one_tile_bookmarks_it_at_once_and_leaves_the_rest(qtb
     assert not db.get_generation("i1").get("starred")
 
 
-def test_a_favorite_tiles_favorite_corner_takes_the_bookmark_away(qtbot):
+def test_a_favorite_tiles_favorite_corner_takes_the_favorite_away(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
@@ -6327,7 +6327,7 @@ def test_a_favorite_row_renders_a_favorite_tile(qtbot):
     assert view._browser._thumb_widgets["i2"]._favorite is True
 
 
-def test_right_click_favorite_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
+def test_right_click_favorite_favorites_the_picked_thumbnail(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     db = FakeDB(rows)
     view = GalleryView(db, actions=FakeActions())
@@ -14011,7 +14011,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
     order = view._browser.listed_prompt_ids()
     # Each entry carries its generation's id, so the slideshow's Up and Down can name
-    # what to trash and what to bookmark, and its stored thumbnail, which is the
+    # what to trash and what to favorite, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
     assert slideshow._set.playlist._items == [(f"{pid}.png", "image", pid, None)
                                           for pid in order]
@@ -15536,7 +15536,7 @@ def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
 
     _tree_menu(view, gallery.custom_folder_key(folder_id))
 
-    # No star (a bookmark of a bookmark collection gathers nothing) and no delete —
+    # No star (a favorite of a favorite collection gathers nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
     assert labels == ["Copy name", "", "Remove folder…", "", "Collapse all", "Expand all"]
 
@@ -17264,7 +17264,7 @@ def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_pa
     assert surface.steps == [1, 1, -1, -1]
 
 
-def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path):
+def test_a_spoken_favorite_over_a_slideshow_favorites_the_slide(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface
@@ -17464,7 +17464,7 @@ def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
     assert db.get_generation("e1")["experiment_verdict"] == "up"
 
 
-def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
+def test_a_tiles_star_corner_favorites_that_tile(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)

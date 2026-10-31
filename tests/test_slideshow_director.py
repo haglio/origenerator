@@ -2262,7 +2262,7 @@ def test_a_seed_landing_while_latest_plays_reaches_it_as_its_runs_newest(slidesh
 def test_a_slideshow_of_favorites_plays_the_sides_whole_library_with_the_filter_on(slideshows):
     """Favorites is the Shuffle playlist with the favorites switch held down,
     so the switch can be let go to widen and the order pair still means the
-    library rather than the bookmarks."""
+    library rather than the favorites."""
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a blue car", seed=2)]
     browser = FakeBrowser(collections={oriented_key(FAVORITES_KEY, PORTRAIT): [rows[0]],
                                        ALL_PORTRAIT: rows})

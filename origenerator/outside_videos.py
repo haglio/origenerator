@@ -141,10 +141,10 @@ def _journals_folder() -> Path | None:
 def tell_fun_time(rows: list[dict], favorite: bool) -> None:
     places = places_here()
     if places is not None:
-        journal_stars(places, rows, favorite)
+        journal_favorites(places, rows, favorite)
 
 
-def journal_stars(places: Places, rows: list[dict], favorite: bool, *, now=time.time) -> None:
+def journal_favorites(places: Places, rows: list[dict], favorite: bool, *, now=time.time) -> None:
     _journal(places, rows, {"event": "favorite" if favorite else "unfavorite"}, now)
 
 
@@ -232,7 +232,7 @@ def _frames_by_file(rows: list[dict]) -> dict[str, dict]:
 def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
                          kinds: dict[str, set[VideoKind]]) -> dict[tuple, dict]:
     said = _said_here(places.journal)
-    told_here, acted_here = _starred_here(said), _acted_here(said)
+    told_here, acted_here = _favorited_here(said), _acted_here(said)
     frames = _frames_by_file(rows)
     made_here_from_frames = [row for row in rows if made_here(row) and _input_image(row)]
     images: dict[tuple, dict] = {}
@@ -265,7 +265,7 @@ def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
         for row, fields in updates:
             if _differs(row, fields):
                 rewritten[row["prompt_id"]] = {"prompt_id": row["prompt_id"], **fields}
-        _take_the_star(db, video_row, record, told_here.get(place, 0), written)
+        _take_the_favorite(db, video_row, record, told_here.get(place, 0), written)
     db.set_recorded_fields(list(rewritten.values()))
     db.forget_item_numbers(_numbered_in_another_folder(db))
     return images
@@ -317,7 +317,7 @@ def _differs(row: dict, fields: dict) -> bool:
                else row.get(key) != value for key, value in fields.items())
 
 
-def _take_the_star(db, video_row: dict, record: Record, told_at: float,
+def _take_the_favorite(db, video_row: dict, record: Record, told_at: float,
                    written: float | None) -> None:
     if written is None or told_at >= written:
         return
@@ -355,7 +355,7 @@ def _said_here(journal: Path | None) -> list[dict]:
     return said
 
 
-def _starred_here(said: list[dict]) -> dict[str, float]:
+def _favorited_here(said: list[dict]) -> dict[str, float]:
     told: dict[str, float] = {}
     for event in said:
         if event.get("event") in ("favorite", "unfavorite"):

@@ -1075,7 +1075,7 @@ def test_videos_made_without_a_start_frame_share_a_folder_named_in_the_forms_wor
 
 
 def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index():
-    # A source-image bookmark's key is recomputed from a row under it; it depends on
+    # A source-image favorite's key is recomputed from a row under it; it depends on
     # the start frame's config, so folder_key_at_level must resolve it through the
     # image index — matching the tree, not the bare filename.
     face = _img("face", "a face", 30, 1)
@@ -1160,7 +1160,7 @@ def test_copies_given_one_name_each_wear_it_as_given():
 
 
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
-    # The reconcile recomputes a settings bookmark's key from a row under it; for an
+    # The reconcile recomputes a settings favorite's key from a row under it; for an
     # i2v that key depends on the start frame's config, so folder_key_at_level must
     # resolve it through the image index — matching the tree, not the bare filename.
     face = _img("face", "a face", 30, 1)
@@ -1225,7 +1225,7 @@ def test_group_level_names_each_tier():
 
 
 def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
-    # A bookmark stores its tier + a row under it; recomputing the key from that row
+    # A favorite stores its tier + a row under it; recomputing the key from that row
     # must reproduce the folder's key at every tier, so the star can follow it.
     rows = [_i2v("v1", "styleA")]
     (media,) = build_gallery_tree(rows)
@@ -1684,7 +1684,7 @@ def test_favorite_generations_collects_favorite_items_newest_first():
 
 
 def test_favorite_generations_includes_imported_files():
-    # A bookmark is a bookmark: an imported image the user favorited belongs on the
+    # A favorite is a favorite: an imported image the user favorited belongs on the
     # Favorites collection.
     imported = _row(prompt_id="imp", source="imported", starred=1,
                     output_files=json.dumps([{"filename": "imp.png"}]))

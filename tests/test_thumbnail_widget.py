@@ -368,7 +368,7 @@ def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):
 
 def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
     # The Trash collection's tiles: their item is already deleted, so there is nothing
-    # to bookmark, bin or enhance, and their own two acts take the corners.
+    # to favorite, bin or enhance, and their own two acts take the corners.
     tw = ThumbnailWidget("p1", None, "label", controls=False,
                          corner_actions=_corner_actions())
     qtbot.addWidget(tw)

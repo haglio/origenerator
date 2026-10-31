@@ -387,7 +387,7 @@ class GenerateConfigPanel(DropZone):
         newest matching result otherwise."""
         self._preview = PreviewWidget(show_timeline=True)
         # Its corners and its right-click go to the gallery, which owns the
-        # bookmark, the bin and the enhance queue — the same route the browser
+        # favorite, the bin and the enhance queue — the same route the browser
         # pane's thumbnails take, so an act means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)

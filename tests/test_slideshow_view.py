@@ -1279,7 +1279,7 @@ def test_favoriting_the_slide_on_screen_without_locking_it(qtbot):
 
 def test_favoriting_says_no_when_there_is_nothing_to_favorite(qtbot):
     # A slideshow whose items carry no generation id — or a live one with no row of
-    # its own yet — has nothing to bookmark, and says so rather than seeming to.
+    # its own yet — has nothing to favorite, and says so rather than seeming to.
     assert _view(qtbot).slideshow.favorite() is False
 
 

@@ -160,7 +160,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     pane 77 -> 83: every folder of folders has its own five collections, so a collection's
     rows are asked for a folder as well as a side -- a side's placement of its
     rows, a folder's share of a list, the open collection's rows, a folder's own cards
-    in flight, its starred images, the counts every folder's collections wear and
+    in flight, its favorited images, the counts every folder's collections wear and
     the square each of them shows among the folder's own are seven methods, and
     the lister of Latest's rows they replace went. 267 -> 266: a combination
     draws fresh seeds, so it never repeats a run and the question the gallery

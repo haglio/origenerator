@@ -483,8 +483,8 @@ class FunestraSlideshow(QObject):
         self.slideshow_cull()
 
     def favorite(self) -> bool:
-        """Bookmark the item on screen; ``False`` when there is nothing to
-        bookmark."""
+        """Favorite the item on screen; ``False`` when there is nothing to
+        favorite."""
         prompt_id = self._set.current_prompt_id()
         if self._actions.favorite is None or prompt_id is None:
             return False

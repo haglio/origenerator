@@ -91,8 +91,8 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the star is drawn from the folder rather than written before its name
 # (test_favoriting_a_folder_persists_without_reordering and
 # test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere), and the
-# pane's that each side's Favorites collects its own side's bookmarks
-# (test_favorites_collects_the_bookmarks_of_its_own_side).
+# pane's that each side's Favorites collects its own side's favorites
+# (test_favorites_collects_the_favorites_of_its_own_side).
 #
 # 19316 when a tab's preview stopped asking the slideshow it opened a window's
 # question: its two notes on what builds that slideshow, one of them calling it a
@@ -157,7 +157,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands,
 # test_a_folders_latest_lists_what_that_folder_made_under_its_path,
 # test_a_folders_collection_scopes_the_search_and_names_its_path and
-# test_a_folders_favorites_are_its_starred_items_and_the_favorite_folders_below_it.
+# test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_below_it.
 #
 # 19161 when a collection row's mark moved under its folder's own mark and a folder of
 # your own lost the star it could not use: the list's note on where it draws a
@@ -170,7 +170,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_choosing_one_kind_leaves_every_sides_folders_standing.
 #
 # 19155 when a folder of your own saved before folders had a side was given one
-# at startup: the note on the order the bookmark passes run in is
+# at startup: the note on the order the favorite passes run in is
 # test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_are.
 #
 # 19126 when a window that stops answering began writing down where it is stuck:

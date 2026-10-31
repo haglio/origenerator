@@ -105,7 +105,7 @@ def test_a_tally_counts_a_row_once_in_every_folder_holding_it():
     assert tally[models["beta"].key] == 1
 
 
-def test_a_folder_favors_its_starred_rows_and_the_rows_of_favorite_folders_below_it():
+def test_a_folder_favors_its_favorite_rows_and_the_rows_of_favorite_folders_below_it():
     rows = [_image("p1", "alpha.safetensors", starred=1),
             _image("p2", "beta.safetensors"), _image("p3", "beta.safetensors", steps=40)]
     library = _library(rows)

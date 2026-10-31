@@ -477,8 +477,8 @@ is the two hooks that call the guard, below.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of
-  not running that ends in a zero exit code. `install.py` points
-  `core.hooksPath` here, which is the one step that arms a clone.
+  not running that ends in a zero exit code. `python -m app_support.githooks`
+  points `core.hooksPath` here, which is the one step that arms a clone.
 
 A new command here gets a line in this list and a test, or it is invisible by
 the time anyone needs it.

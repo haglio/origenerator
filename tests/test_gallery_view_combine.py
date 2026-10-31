@@ -924,7 +924,7 @@ def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot,
 def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
     # The lane decides which acts are answerable, and what could be answered when
     # the session closed may not be now — a video binned, or the lane itself
-    # changed. A greyed act must not come back selected: the buttons would be
+    # changed. A grayed act must not come back selected: the buttons would be
     # live on a pick that can only report "no past video yet".
     view = _combine_view(qtbot, tmp_path)
 

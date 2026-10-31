@@ -168,7 +168,7 @@ def test_reveal_button_is_disabled_when_the_output_is_gone(block, monkeypatch, t
         [{"filename": "gone.mp4", "subfolder": ""}])))
     btns = _reveal_btns(block)
     assert len(btns) == 1
-    assert btns[0].isEnabled() is False   # greyed out rather than opening the wrong place
+    assert btns[0].isEnabled() is False   # grayed out rather than opening the wrong place
 
 
 def test_show_row_replaces_the_previous_render(block):

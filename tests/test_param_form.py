@@ -1573,7 +1573,7 @@ def _preset_states(combo) -> dict:
     return {combo.itemText(i): model.item(i).isEnabled() for i in range(combo.count())}
 
 
-def test_a_duration_this_model_cannot_render_is_offered_greyed_out(qtbot):
+def test_a_duration_this_model_cannot_render_is_offered_grayed_out(qtbot):
     # The same lengths are offered on every video form, and the models stop at
     # different places. Picking one past the end doesn't fail, it quietly
     # becomes the longest clip the model does render — so the list says which

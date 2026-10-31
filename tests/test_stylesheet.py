@@ -51,7 +51,7 @@ def test_a_tabs_close_mark_is_styled_flat_not_as_a_button():
 
 def test_stylesheet_greys_disabled_buttons():
     # Without an explicit :disabled rule a styled QPushButton ignores Qt's
-    # disabled palette and never looks greyed out. The rule has to say something
+    # disabled palette and never looks grayed out. The rule has to say something
     # different from the enabled one to be worth having, so it is the colour that
     # is asserted, not the presence of the selector: painting a disabled button in
     # the ordinary text colour leaves it looking perfectly pressable.

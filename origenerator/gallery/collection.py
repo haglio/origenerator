@@ -27,7 +27,7 @@ ENHANCED_KEY = "__enhanced__"   # synthetic node: every enhanced image under its
 ENHANCED_LABEL = "Enhanced"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"
-TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
+TRASH_KEY = "__trash__"   # synthetic node: deleted items still held in the Trash
 TRASH_LABEL = "Trash"
 
 COLLECTIONS = (LATEST_KEY, FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)

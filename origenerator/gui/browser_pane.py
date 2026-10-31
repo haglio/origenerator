@@ -463,7 +463,7 @@ class BrowserPane(QObject):
         self._listed = _Listing()
         self._enhanced_rows = _Listing()    # every enhanced image, newest first
         self._experiment_rows = _Listing()  # unreviewed experiments, newest first
-        self._trash_rows = _Listing()       # held deletions, newest first
+        self._trash_rows = _Listing()       # trashed items, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
         self._collection_side: str | None = None
@@ -1071,10 +1071,10 @@ class BrowserPane(QObject):
                 "models. Results collect here; your keep/reject verdicts steer "
                 "what gets tried next.")
 
-    # --- the Trash collection: deleted items, still recoverable --------------
+    # --- the Trash collection: deleted items, still in the Trash --------------
 
     def _render_trash(self):
-        """The Trash collection: every deleted item the recovery bin is still
+        """The Trash collection: every deleted item the Trash is still
         holding, newest first, each tile wearing restore / delete-permanently
         hover controls and captioned with how long it has left. A restored item
         returns to its own folder, files and all; a purged one is gone for good,
@@ -1082,9 +1082,9 @@ class BrowserPane(QObject):
         automatic."""
         container, flow = self._new_tile_pane()
         actions = [
-            CornerAction("restore", icons.recovery_action_icon("restore"),
+            CornerAction("restore", icons.trash_action_icon("restore"),
                          "Restore — put it and its files back where they were"),
-            CornerAction("purge", icons.recovery_action_icon("purge"),
+            CornerAction("purge", icons.trash_action_icon("purge"),
                          "Delete permanently — remove it and its files for good"),
         ]
         rows = self._open_collection_rows(TRASH_KEY)
@@ -1100,10 +1100,10 @@ class BrowserPane(QObject):
         """One deleted item's tile — a collection tile like any other, wired to
         everything a deleted item can still do.
 
-        Its files are all in the trash rather than gone, and the bin kept its row
+        Its files are all in the trash rather than gone, and the Trash kept its row
         whole, so it previews on a click, loops if it's a video, opens full size,
         plays in the collection's slideshow and fills a config tab with the settings
-        that made it — the whole point of a bin being that you can look before you
+        that made it — the whole point of a Trash being that you can look before you
         decide. Double-clicking opens it as a Generate tab (the gesture a folder's
         tiles carry) rather than jumping to its folder, which is the one thing a
         deleted item hasn't got.
@@ -1185,9 +1185,9 @@ class BrowserPane(QObject):
 
         The slideshow plays these, so they have to match the tiles: Latest is its
         listed items, Favorites is its favorited items plus everything under each
-        bookmarked folder, since a folder tile there stands for its whole folder,
+        favorited folder, since a folder tile there stands for its whole folder,
         Enhanced is its enhanced images, Experiments is its unreviewed queue, and
-        Trash is what the bin is holding — deleted is not unwatchable, and items you
+        Trash is what is held there — deleted is not unwatchable, and items you
         are deciding whether to keep are ones to sit and look through.
         A favorited item inside a favorited folder is one item, so repeats drop out.
         A running search gathers too — its hits are gathered exactly as a
@@ -1448,7 +1448,7 @@ class BrowserPane(QObject):
         self.menu_requested.emit(self.selected_prompt_ids(), global_pos)
 
     def _on_tile_control(self, prompt_id: str, action: str):
-        """A tile's corner control was pressed: favorite, bin or enhance THIS one.
+        """A tile's corner control was pressed: favorite, trash or enhance THIS one.
 
         One item, never the selection — the control is drawn on a particular
         thumbnail, in that thumbnail's own corner, so it has already said which item

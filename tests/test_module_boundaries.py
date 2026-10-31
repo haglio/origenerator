@@ -50,7 +50,7 @@ QT_FREE = (
     "origenerator.enhanced_start_backfill",
     "origenerator.importer",
     "origenerator.db",
-    "origenerator.recovery",
+    "origenerator.trash_collection",
     "origenerator.branch_session",
     "origenerator.content",
     "origenerator.config",

@@ -141,7 +141,7 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     dragging onto the Enhance panel even when it stands alone.
 
     A third shape appears once levels can be deleted (:func:`remove_enhance_levels`):
-    the original binned out from under two or more enhancements. There is no
+    the original trashed out from under two or more enhancements. There is no
     "before" left to count back from, so the files the history names are the
     levels — which is also why the history entry, not the file's position, is
     what identifies one.

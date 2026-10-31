@@ -71,7 +71,7 @@ CONTROL_FACES = {
 _NO_OTHER_VERSION = " (none for this one)"
 
 # What each one is, in this app's words rather than a Funestra's: these act on the
-# generations this app made, so the bin is the toolbar's Delete and the lock is
+# generations this app made, so the Trash is the toolbar's Delete and the lock is
 # the whole of what locking a slide means here.
 CONTROL_TOOLTIPS = {
     "prev": "Previous slide",

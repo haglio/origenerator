@@ -542,20 +542,20 @@ def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtb
     panel = _panel(qtbot, fitting=fitting)
     panel.video_slot.set_item("vid1")
     _pick_act(panel, "alpha")
-    fitting.clear()  # binned while the act was picked
+    fitting.clear()  # trashed while the act was picked
 
     _pick_act(panel, "")
 
     assert panel.video_slot.current_id() is None
 
 
-def test_a_binned_video_leaves_the_slot_empty_rather_than_bringing_back_an_older_one(qtbot):
+def test_a_trashed_video_leaves_the_slot_empty_rather_than_bringing_back_an_older_one(qtbot):
     fitting = {"vid1", "vid2"}
     panel = _panel(qtbot, fitting=fitting)
     panel.video_slot.set_item("vid1")
     panel.video_slot.set_item("vid2")
     _pick_act(panel, "alpha")
-    fitting.discard("vid2")  # binned while the act was picked
+    fitting.discard("vid2")  # trashed while the act was picked
 
     _pick_act(panel, "")
     _pick_lane(panel, act_settings.GENAU)
@@ -627,7 +627,7 @@ def test_a_video_that_no_longer_fits_the_slot_is_not_listed(qtbot):
     panel = _panel(qtbot, fitting=fitting)
     panel.video_slot.set_item("vid1")
     panel.video_slot.set_item("vid2")
-    fitting.discard("vid1")  # binned since
+    fitting.discard("vid1")  # trashed since
 
     assert _listed_under_recent(panel) == ["vid2"]
 

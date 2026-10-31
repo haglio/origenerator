@@ -537,7 +537,7 @@ def test_closing_a_slideshow_twice_hands_over_once(qtbot):
 
 
 def test_culling_the_last_slide_hands_nothing_over(qtbot):
-    # The slideshow empties and closes itself, and the item it ended on is in the bin —
+    # The slideshow empties and closes itself, and the item it ended on is in the Trash —
     # nowhere to land.
     deleted = []
     view = SlideshowView([("a.png", "image", "id-a")], engine=FakeEngine(),
@@ -1284,7 +1284,7 @@ def test_favoriting_the_slide_on_screen_without_locking_it(qtbot):
     assert view.slideshow.favorite() is True
 
     assert favorite == ["gen-a"]
-    assert not view.slideshow.locked  # bookmarked, still moving on
+    assert not view.slideshow.locked  # favorited, still moving on
 
 
 def test_favoriting_says_no_when_there_is_nothing_to_favorite(qtbot):

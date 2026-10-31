@@ -524,7 +524,7 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
 
 
 def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
-    """The recovery bin asks every surface to let go of the files it moves; the
+    """The Trash asks every surface to let go of the files it moves; the
     Funestra is already letting go of this one, so asking again would move it on
     past the item after it as well."""
     released = []

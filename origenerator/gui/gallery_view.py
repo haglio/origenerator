@@ -25,8 +25,8 @@ from shared_ui.tick_control import TickControl
 from origenerator import (
     gallery,
     outside_videos,
-    recovery,
     timing,
+    trash_collection,
 )
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
@@ -455,7 +455,7 @@ class GalleryView(QWidget):
         # are built before _build_ui, whose field drives them.
         self._search = GallerySearchController(
             self, parent=self, expander=search_expander)
-        # The held deletions the Trash collection lists, as gallery rows re-pointed at
+        # The trashed items the Trash collection lists, as gallery rows re-pointed at
         # their files in the trash — the rows under everything a deleted item can
         # still do (see :meth:`row_for`).
         self._held_rows: list[dict] = []
@@ -1589,7 +1589,7 @@ class GalleryView(QWidget):
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._combine.offer_the_acts(rows)
         self._listed_rows = rows
-        self._held_rows = recovery.bin_items(self._bin_records())
+        self._held_rows = trash_collection.trash_items(self._trash_records())
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`) — and kept as the
@@ -1615,7 +1615,7 @@ class GalleryView(QWidget):
         #
         # The trash's held rows are indexed alongside the gallery's own, because
         # standing in the Trash collection and searching it has to find something —
-        # a deleted row is out of ``list_generations`` and lives only in the bin.
+        # a deleted row is out of ``list_generations`` and lives only in the Trash.
         # They are reachable only from that collection: every other scope is a set of
         # ids drawn from the live tree (see :meth:`search_scope`).
         self._search.index.update(rows + held, gallery.folder_names_by_row(
@@ -2837,8 +2837,8 @@ class GalleryView(QWidget):
         folder on screen. It toggles, so the tip says which way it will go — a set
         already favorited all over unfavorites.
 
-        Dark where a star means nothing: a collection, or a deleted item in the bin,
-        which has no folder to be bookmarked in.
+        Dark where a star means nothing: a collection, or a deleted item in the Trash,
+        which has no folder to be favorited in.
         """
         pids = self.selected_prompt_ids() if self._browser.selected_ids else []
         if pids and not self._browser.showing_trash():
@@ -2855,7 +2855,7 @@ class GalleryView(QWidget):
         """Delete, aimed the same way: the picked thumbnails, else the folder or
         the picked folders on screen, with the tip saying which.
 
-        In the bin the button's one remaining meaning is "for good", and the tip
+        In the Trash the button's one remaining meaning is "for good", and the tip
         has to say so before it is clicked.
         """
         count = len(self._browser.selected_ids)
@@ -2942,11 +2942,11 @@ class GalleryView(QWidget):
         return "Request submitted", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
-        """Bin some of one image's versions, from the info pane's version list.
+        """Trash some of one image's versions, from the info pane's version list.
 
         Undoable like every other delete here, and only ever a delete of files:
         the generation keeps its row, its folder, its star and its other
-        versions. The rebuild after is what redraws the tile — a binned top
+        versions. The rebuild after is what redraws the tile — a trashed top
         version means a new thumbnail and, once the last enhancement goes, no more
         green badge."""
         row = self._db.get_generation(prompt_id)
@@ -3020,7 +3020,7 @@ class GalleryView(QWidget):
         collection plays as a slideshow, so Up there is the collection's own Reject, and
         that keeps the row whose params the policy learns to steer away from.
 
-        An item already in the bin has no row to delete, so Up does nothing over
+        An item already in the Trash has no row to delete, so Up does nothing over
         the Trash collection's slideshow. Deliberate: the only delete left there is the
         permanent one, and that is not a thing to do on a keystroke — it is asked
         for from the tile, and confirmed.
@@ -3750,9 +3750,9 @@ class GalleryView(QWidget):
 
     # --- the Trash collection: restoring a delete, or ending it --------------
 
-    def _bin_records(self) -> list[dict]:
-        """The held deletions the Trash collection offers."""
-        return self._db.list_deletions()
+    def _trash_records(self) -> list[dict]:
+        """The trashed items the Trash collection offers."""
+        return self._db.list_trashed()
 
     def _on_trash_action(self, prompt_id: str, action_id: str):
         """A Trash tile's hover control: restore this item, or end it now."""
@@ -4074,7 +4074,7 @@ class GalleryView(QWidget):
         deletion's.
 
         A deleted item's row is out of the ``generations`` table — that is what
-        deleting is — but the recovery bin kept it whole, and its files are all
+        deleting is — but the Trash kept it whole, and its files are all
         still there in the trash. So a Trash tile is a generation like any other
         to look at: it previews, it plays, it opens full size, it fills a config
         tab with the settings that made it. Only the actions that would change it

@@ -88,7 +88,7 @@ def file_item(file: dict, label: str = "File", *,
               held_days: int | None = None, places: OutputPlaces | None = None) -> MetaItem:
     """One output file as a row: its path, a copy of just its filename (dropping
     the image/ or video/ subfolder the displayed path carries), and a reveal of
-    its absolute location — in the library, or wherever the recovery bin has
+    its absolute location — in the library, or wherever the Trash has
     since moved it.
 
     ``held_days`` is set only for a deleted item, and puts how long it has been

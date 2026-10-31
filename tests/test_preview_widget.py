@@ -560,7 +560,7 @@ def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp
     # The timeline appears with the video, a layout pass later, and takes its rows
     # from the media area. A video whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
-    # shrinks; placed once, against the pane as it was, the bin chip stayed
+    # shrinks; placed once, against the pane as it was, the Trash chip stayed
     # straddling the video's lower edge and the timeline.
 
     player = MagicMock()
@@ -1253,7 +1253,7 @@ def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
                                                                  tmp_path):
     # The defect this closes (audit §3 bug 15, signed off 2026-08-31): the wall
     # kept the corners of whatever generation was there before it, so pressing
-    # trash binned an item the user was no longer looking at.
+    # trash trashed an item the user was no longer looking at.
     w = _pane_holding_everything(make_preview(), tmp_path)
     fired = []
     w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))

@@ -34,7 +34,6 @@ from tests.gallery_view_support import (
     FakeDB,
     _alls,
     _at,
-    _bin_db,
     _children_by_prompt,
     _collection,
     _i2v_video,
@@ -50,6 +49,7 @@ from tests.gallery_view_support import (
     _subs,
     _tab_with_prompts,
     _top_level,
+    _trash_db,
     _video_workflow,
 )
 from tests.text_readers import clip_reader
@@ -224,9 +224,9 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
-    # A deleted row is out of the gallery's own list and lives only in the bin,
-    # so a Trash search finds nothing at all unless the bin is indexed too.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    # A deleted row is out of the gallery's own list and lives only in the Trash,
+    # so a Trash search finds nothing at all unless the Trash is indexed too.
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -238,9 +238,9 @@ def test_the_trash_collection_searches_what_it_is_holding(qtbot):
 
 
 def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
-    # The bin shares the index so its collection can be searched; it must not leak
+    # The Trash shares the index so its collection can be searched; it must not leak
     # into a search of the gallery, where those items are gone.
-    view = GalleryView(_bin_db(rows=[_image("i1", "a dog", 50, 3)],
+    view = GalleryView(_trash_db(rows=[_image("i1", "a dog", 50, 3)],
                                held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()

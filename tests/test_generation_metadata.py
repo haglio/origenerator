@@ -86,7 +86,7 @@ def test_file_item_reveals_the_absolute_output_path():
 
 
 def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
-    # The bin re-points a deleted row's files at the trash; Show in Explorer has
+    # The Trash re-points a deleted row's files at the trash; Show in Explorer has
     # to follow them there, or it points at a folder the file left.
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video",
                                          "path": r"C:\state\trash\abc\0_clip.mp4"}]))
@@ -107,7 +107,7 @@ def test_one_day_in_the_trash_reads_as_one_day():
     assert file_item.value.startswith("(1 day in trash)")
 
 
-def test_an_item_binned_today_says_so_rather_than_counting_zero():
+def test_an_item_trashed_today_says_so_rather_than_counting_zero():
     file_item = basic_section(_row(days_in_trash=0)).items[0]
     assert file_item.value == "(deleted today) video/clip.mp4"
 
@@ -214,7 +214,7 @@ def test_a_files_row_can_be_pointed_at_a_different_output_folder(tmp_path):
     inside the function, so nothing in the signature said it touched the
     filesystem at all, and it could not be pointed at another library without
     monkeypatching a module. Its neighbours -- importer, completion, reconcile,
-    base_backfill, recovery -- all take the folder as an argument."""
+    base_backfill, trash_collection -- all take the folder as an argument."""
     item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"},
                      places=OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
 

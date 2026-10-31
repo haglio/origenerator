@@ -434,7 +434,7 @@ class FunestraSlideshow(QObject):
 
         The Funestra is told to drop a condemned item before the generation is:
         it is playing that very file, and Windows will not move a file a
-        process still has open — the recovery bin's own retries cover the
+        process still has open — the Trash's own retries cover the
         moment the Funestra takes to let go.
         """
         item = self._set.playlist.current()

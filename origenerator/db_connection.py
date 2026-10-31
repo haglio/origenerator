@@ -46,7 +46,7 @@ class SqliteFile:
 class Store:
     """A group of queries over one table of a :class:`SqliteFile`.
 
-    Whole on its own: ``DeletionStore(SqliteFile(path))`` is a working object, so
+    Whole on its own: ``TrashStore(SqliteFile(path))`` is a working object, so
     a unit that touches one table can be handed that table rather than the whole
     database. Making the file and its schema is not a store's job -- that is the
     whole database's, and :class:`origenerator.db.Database` does it once.

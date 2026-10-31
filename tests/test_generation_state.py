@@ -97,12 +97,12 @@ def test_a_row_of_a_kind_this_build_has_no_name_for_gets_no_generation_time(tmp_
 
 def test_a_row_of_a_kind_this_build_has_no_name_for_is_left_out_of_the_trash(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.record_deletion("ours", {"prompt_id": "ours", "source": "generated"}, {})
-    db.record_deletion("a-newer-builds",
+    db.record_trashed("ours", {"prompt_id": "ours", "source": "generated"}, {})
+    db.record_trashed("a-newer-builds",
                        {"prompt_id": "a-newer-builds", "source": "a-kind-from-a-newer-build"}, {})
 
-    assert [record["prompt_id"] for record in db.list_deletions()] == ["ours"]
-    assert db.get_deletion("a-newer-builds") is None
+    assert [record["prompt_id"] for record in db.list_trashed()] == ["ours"]
+    assert db.get_trashed("a-newer-builds") is None
 
 
 def test_a_cut_made_for_the_genau_lane_is_still_in_the_library(tmp_path):

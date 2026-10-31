@@ -2092,7 +2092,7 @@ def test_a_video_whose_start_image_is_in_the_trash_still_shows_its_source(saved_
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
-    db.record_deletion("img1", image, {"moves": [], "subdir": None})
+    db.record_trashed("img1", image, {"moves": [], "subdir": None})
     db.delete_generation("img1")
 
     panel.show_saved_generation(video, [])
@@ -3561,7 +3561,7 @@ def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
         saved_panel, tmp_path, monkeypatch):
     # Audit §3 bug 15, signed off and fixed 2026-08-31: the wall used to keep
     # the corners of whichever generation the tab had been showing, so trash
-    # there binned an image the user was not looking at.
+    # there trashed an image the user was not looking at.
     panel, db = saved_panel
     image = _image_row(db, "img1")
     monkeypatch.setattr(gcp_module, "resolve_preview",

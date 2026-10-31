@@ -14,7 +14,7 @@ from origenerator.gui.browser_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.corner_buttons import CORNER_INSET
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile
-from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
 from tests.heard_drags import HeardDrags
@@ -189,15 +189,15 @@ def test_right_click_requests_a_context_menu_for_this_thumbnail(qtbot):
     assert received == ["p1"]
 
 
-def test_media_badge_appears_only_when_a_type_is_given(qtbot):
+def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     # Inside a single-type folder the kind is obvious, so a bare tile wears none...
     plain = ItemTile("p1", None, "label")
     qtbot.addWidget(plain)
-    assert plain.findChildren(MediaBadge) == []
+    assert plain.findChildren(ItemTypeIcon) == []
     # ...but a Latest tile, which mixes kinds, is told its type and shows a badge.
     badged = ItemTile("p2", None, "label", media_type=MediaType.VIDEO)
     qtbot.addWidget(badged)
-    assert len(badged.findChildren(MediaBadge)) == 1
+    assert len(badged.findChildren(ItemTypeIcon)) == 1
 
 
 def test_no_corner_actions_by_default(qtbot):
@@ -340,7 +340,7 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
 
 
 def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
-    # Star top-right, trash lower-left, plus lower-right — and the media badge
+    # Star top-right, trash lower-left, plus lower-right — and the item type icon
     # keeps the top-left it has always had, so all four can coexist.
     tw = ItemTile("p1", None, "label", favorite=True,
                          enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE)
@@ -352,7 +352,7 @@ def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
     assert star.left() > area.center().x() and star.top() < area.center().y()
     assert trash.left() < area.center().x() and trash.top() > area.center().y()
     assert plus.left() > area.center().x() and plus.top() > area.center().y()
-    (badge,) = tw.findChildren(MediaBadge)
+    (badge,) = tw.findChildren(ItemTypeIcon)
     assert badge.x() < tw.width() // 2 and badge.y() < tw.height() // 2
     for corner in (star, trash, plus):
         assert badge.geometry().intersected(corner).isEmpty()

@@ -9,9 +9,8 @@ color it wears it in, and the grounds the badges sit on.
 The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
 folder-level badges (:func:`level_badge_icon`) are TOC initials marking which
-of workflow/model/LoRA a folder is; the media-type badges
-(:func:`media_type_badge`) are item type icons marking a Latest tile as an image
-or a video.
+of workflow/model/LoRA a folder is; the item type icons
+(:func:`item_type_icon`) mark a Latest tile as an image or a video.
 
 :func:`recent_mark_icon` is the dot at the start of the row of a folder lately
 worked in, drawn here because it is a color saying one thing, not a mark anyone
@@ -81,13 +80,13 @@ _LEVEL_BADGES = {
 # The Latest collection mixes images and videos in one flow, so each tile wears a
 # small corner badge naming its kind. A white glyph on a translucent dark ground,
 # so it reads over a thumbnail of any color.
-_BADGE_GROUND = QColor(*palette.BLACK, 160)
-_BADGE_GLYPH = WHITE
-_BADGE_DISPLAY = 22  # the badge's on-screen size, in px
+_ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
+_ITEM_TYPE_ICON_INK = WHITE
+_ITEM_TYPE_ICON_SIZE = 22  # the badge's on-screen size, in px
 _BADGE_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 
 # Every ground carries its mark at one size, whichever mark it is. A star badge and
-# a media badge can sit on the same tile, and the two only read as one system if
+# an item type icon can sit on the same tile, and the two only read as one system if
 # they are drawn to one scale — which they were not while each glyph was sized
 # for itself.
 _GLYPH_ON_GROUND = 44
@@ -298,20 +297,20 @@ def trash_action_icon(action: str) -> QIcon:
 
 
 @cache
-def media_type_badge(media_type: str) -> QPixmap:
-    """A small corner badge marking a Latest tile as an image or a video.
+def item_type_icon(media_type: str) -> QPixmap:
+    """A small item type icon marking a Latest tile as an image or a video.
 
     A white glyph — a play triangle for a video, a framed photo for an image — on
     a translucent dark ground, so it reads over a thumbnail of any color. Cached and
     pre-scaled to its on-screen size; the same two badges decorate every tile.
     """
     glyph = "play" if media_type == MediaType.VIDEO else "photo"
-    return _display_size(_render_on_ground(_BADGE_GROUND, glyph, _BADGE_GLYPH))
+    return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, glyph, _ITEM_TYPE_ICON_INK))
 
 
 @cache
 def media_type_icon(media_type: str) -> QIcon:
-    """The same play/photo mark as :func:`media_type_badge`, bare.
+    """The same play/photo mark as :func:`item_type_icon`, bare.
 
     The badge sits over a thumbnail, so it needs its dark ground to read against
     any thumbnail; this one sits in a row of text — a config tab's label, where it
@@ -460,7 +459,7 @@ def _same_when_dead(pixmap: QPixmap) -> QIcon:
     return icon
 
 
-def _display_size(pixmap: QPixmap, size: int = _BADGE_DISPLAY) -> QPixmap:
+def _display_size(pixmap: QPixmap, size: int = _ITEM_TYPE_ICON_SIZE) -> QPixmap:
     """A rendered ground scaled down to the size a tile shows it at."""
     return pixmap.scaled(
         size, size,

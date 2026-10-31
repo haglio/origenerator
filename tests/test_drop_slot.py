@@ -13,7 +13,7 @@ from origenerator.gui.drags import under_way
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.drop_style_seen import worn
 
@@ -319,9 +319,9 @@ def test_accepts_delegates_to_the_predicate(qtbot):
 
 
 @pytest.mark.parametrize("kind", ["image", "video"])
-def test_the_kind_badge_appears_only_once_filled(qtbot, kind):
+def test_the_item_type_icon_appears_only_once_filled(qtbot, kind):
     slot = _slot(qtbot, kind=kind)
-    badge = slot.findChild(MediaBadge)
+    badge = slot.findChild(ItemTypeIcon)
     assert badge.media_type == kind      # an item type icon, so you know what goes here
     assert badge.isHidden()              # nothing dropped yet (isHidden works offscreen)
 

@@ -883,7 +883,7 @@ class BrowserPane(QObject):
 
         return self._draw_tile(
             flow, row, _REVIEW_TILE if corner_buttons else _COLLECTION_TILE, wire,
-            media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
+            media_type=gallery.media_type_of_row(row),  # an item type icon: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
             enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
@@ -1124,7 +1124,7 @@ class BrowserPane(QObject):
         return self._draw_tile(
             flow, row, _TRASH_TILE, wire,
             caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
-            media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
+            media_type=gallery.media_type_of_row(row),  # an item type icon: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
             controls=False,       # its two acts are restore and purge, in the corners

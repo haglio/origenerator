@@ -152,7 +152,7 @@ class InFlightItems:
                     typical_seconds=self._typical_seconds(workflow_name, typical),
                 ),
                 reveal=reveal,
-                media_type=gallery.media_type_of_row(row),  # image/video corner badge
+                media_type=gallery.media_type_of_row(row),  # image/video item type icon
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,

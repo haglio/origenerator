@@ -130,7 +130,7 @@ from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.item_tile import ItemTile
-from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.notice_overlay import NOTICE, WARNING
@@ -3868,7 +3868,7 @@ def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_sh
     assert made_on and threading.main_thread() not in made_on
 
 
-def test_latest_tiles_are_badged_image_or_video(qtbot):
+def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
     # The collection mixes kinds, so each finished tile wears a corner badge naming its
     # own — an image thumbnail and a video thumbnail, told apart at a glance.
     rows = [
@@ -3880,15 +3880,15 @@ def test_latest_tiles_are_badged_image_or_video(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    def badge_type(pid):
-        badges = view._browser._thumb_widgets[pid].findChildren(MediaBadge)
+    def icon_type(pid):
+        badges = view._browser._thumb_widgets[pid].findChildren(ItemTypeIcon)
         return badges[0].media_type if badges else None
 
-    assert badge_type("i1") == "image"
-    assert badge_type("v1") == "video"
+    assert icon_type("i1") == "image"
+    assert icon_type("v1") == "video"
 
 
-def test_inflight_tile_is_badged_by_its_media_type(qtbot):
+def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
     # A running video row with no file yet still badges its in-flight tile a video,
     # inferred from the workflow — so the kind reads before the first frame lands.
     db = FakeDB([_image("i1", "a cat", 50, 1)])

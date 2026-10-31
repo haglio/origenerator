@@ -29,7 +29,7 @@ from shared_ui.spacing import BUTTON_RADIUS
 from origenerator.gui import palette, tile_shape
 from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import TICK_MS, InFlightItem, queue_wait_text
-from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
@@ -99,10 +99,10 @@ class InFlightTile(QWidget):
         self._place_overlays()  # once: the tile is a fixed size and never moves them
         self.update_item(item)
 
-        # The kind is fixed for a job, so the badge is placed once here (not in the
-        # in-place update_item). It matches the badge a finished tile will wear.
+        # The kind is fixed for a job, so the item type icon is placed once here (not in the
+        # in-place update_item). It matches the item type icon a finished tile will wear.
         if item.media_type:
-            MediaBadge(item.media_type, self)
+            ItemTypeIcon(item.media_type, self)
 
     @property
     def key(self) -> str:

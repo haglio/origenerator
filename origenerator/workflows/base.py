@@ -16,7 +16,7 @@ from origenerator.workflows.detail_parts import detail_fix_passes, fix_prompts
 from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 
-# ComfyUI's KSampler vocabulary, which the SDXL pair's pickers offer.
+# ComfyUI's KSampler vocabulary, which the SDXL pair's dropdowns offer.
 SAMPLER_OPTIONS = [
     "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2",
     "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
@@ -200,7 +200,7 @@ class ParamType(StrEnum):
     INT = "int"
     FLOAT = "float"
     SEED = "seed"
-    COMBO = "combo"
+    DROPDOWN = "dropdown"
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
@@ -216,7 +216,7 @@ class ParamDef:
     label: str
     type: ParamType
     default: Any
-    # A "combo" picks one of these; an "int"/"float" with them is an editable
+    # A "dropdown" picks one of these; an "int"/"float" with them is an editable
     # dropdown of common values that still takes any typed one.
     options: list | None = None
     min_val: float | None = None
@@ -249,9 +249,9 @@ class ParamDef:
 
 def sampler_params(defaults: dict) -> list[ParamDef]:
     return [
-        ParamDef("sampler_name", "Sampler", ParamType.COMBO, defaults["sampler_name"],
+        ParamDef("sampler_name", "Sampler", ParamType.DROPDOWN, defaults["sampler_name"],
                  options=SAMPLER_OPTIONS),
-        ParamDef("scheduler", "Step Spacing", ParamType.COMBO, defaults["scheduler"],
+        ParamDef("scheduler", "Step Spacing", ParamType.DROPDOWN, defaults["scheduler"],
                  options=SCHEDULER_OPTIONS),
     ]
 

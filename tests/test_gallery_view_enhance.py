@@ -365,7 +365,7 @@ def test_a_single_enhance_runs_at_the_same_settings_from_anywhere(qtbot, tmp_pat
 
 
 def test_auto_enhance_claims_a_newly_generated_image(qtbot, tmp_path):
-    # The tick's standing instruction: with it ticked the app turns out finished
+    # The checkbox's standing instruction: with it checked the app turns out finished
     # images without the user pressing Enhance All after every run.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())

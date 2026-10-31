@@ -256,9 +256,9 @@ def test_an_advice_says_the_value_it_advises_against_the_way_it_says_its_fix():
 
 
 _PICKERS = [
-    ParamDef("checkpoint", "Model", ParamType.COMBO, "installed_a.safetensors",
+    ParamDef("checkpoint", "Model", ParamType.DROPDOWN, "installed_a.safetensors",
              options=["installed_a.safetensors", "installed_b.safetensors"]),
-    ParamDef("lora_high", "LoRA", ParamType.COMBO, "None",
+    ParamDef("lora_high", "LoRA", ParamType.DROPDOWN, "None",
              options=["None", "installed_lora.safetensors"]),
     ParamDef("vae", "VAE", ParamType.STR, ""),
 ]
@@ -301,7 +301,7 @@ def test_a_missing_model_whose_default_is_gone_too_is_answered_with_the_first_in
 
 
 _LISTED_FROM_A_FOLDER = [
-    ParamDef("checkpoint", "Model", ParamType.COMBO, "installed_a.safetensors",
+    ParamDef("checkpoint", "Model", ParamType.DROPDOWN, "installed_a.safetensors",
              options=["installed_a.safetensors", "installed_b.safetensors"],
              folder="checkpoints"),
 ]
@@ -329,9 +329,9 @@ def test_a_model_installed_but_not_made_for_the_workflow_says_so_and_a_click_use
 
 
 _A_MODEL_AND_ITS_LORA = [
-    ParamDef("unet", "Model", ParamType.COMBO, "raw_model.safetensors",
+    ParamDef("unet", "Model", ParamType.DROPDOWN, "raw_model.safetensors",
              options=["raw_model.safetensors", "turbo_model.safetensors"]),
-    ParamDef("lora", "LoRA", ParamType.COMBO, "None", beside_model="unet",
+    ParamDef("lora", "LoRA", ParamType.DROPDOWN, "None", beside_model="unet",
              options=["None", "speed_up.safetensors", "a_look.safetensors"]),
 ]
 

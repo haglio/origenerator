@@ -22,6 +22,7 @@ from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
+from origenerator.media import MediaType
 from origenerator.voice.dictation import words_of
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -275,3 +276,11 @@ def source_file_of(asked_of: dict | None, params: dict, kind: str) -> str | None
     frame = resolve_input_image_path(start_frame_of(kind, params))
     return str(frame) if frame is not None else None
 
+
+def requested_of(row: dict, workflow, params: dict) -> dict:
+    kind = gallery.job_kind_label(workflow.name)
+    made = "A video" if workflow.output_type == MediaType.VIDEO else "An image"
+    return {"caption": f"{made} from a Request, still being started",
+            "media_type": workflow.output_type, "job_kind": kind, "requested": True,
+            "source_image": start_frame_of(kind, params),
+            "source_file": source_file_of(row, params, kind)}

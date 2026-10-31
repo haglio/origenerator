@@ -561,7 +561,8 @@ class GalleryView(QWidget):
         # caption is placed by _build_ui, and the bank it presses is bound to it
         # once _build_ui has built one.
         self._voice = VoiceRouter(self, parent=self, db=db, slideshows=self._slideshows,
-                                  client=client, motion=self._osr2_motion)
+                                  client=client, motion=self._osr2_motion,
+                                  starting=self._starting)
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
 
     def _intercept_the_rooms_keys(self, intercepting: bool):

@@ -16,7 +16,8 @@ import pytest
 from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.inflight_items import TRAINING_KEY, InFlightItems
+from origenerator.gui.inflight_items import TRAINING_KEY, InFlightItems, requested_of
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def _row(prompt_id, *, status="pending", workflow="sdxl_t2i", params=None, **extra):
@@ -330,6 +331,19 @@ def test_a_run_a_request_queued_is_marked_as_one(build):
 
     card = next(item for item in items if item.key == "g1")
     assert card.requested and not card.modified
+
+
+def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build):
+    asked_of = _row("asked-of", status="completed")
+    items = build([asked_of, _row("g1")], requests=[{
+        "prompt_id": "g1", "source_prompt_id": "asked-of", "heard": "Request, no hat, over."}])
+    card = next(item for item in items if item.key == "g1")
+
+    standing = requested_of(asked_of, WORKFLOW_REGISTRY["sdxl_t2i"], {})
+
+    drawn = ("media_type", "job_kind", "requested", "source_image", "source_file")
+    assert {name: standing[name] for name in drawn} == {
+        name: getattr(card, name) for name in drawn}
 
 
 def test_a_queued_run_with_no_thumbnail_shows_what_its_folder_already_holds(build):

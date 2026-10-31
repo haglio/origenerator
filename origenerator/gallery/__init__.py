@@ -16,7 +16,7 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.time_sections` — where a newest-first listing breaks between one sitting
   and the next, and what each section's heading says about when it was made.
 * :mod:`.tree` — nesting rows into the media -> workflow -> model -> LoRA ->
-  [source image] -> settings hierarchy, and the bookmark-key helpers around it.
+  [source image] -> settings hierarchy, and the favorite-key helpers around it.
 * :mod:`.enhance_settings` — what a folder's enhancement is configured with,
   and how one enhancement is described.
 * :mod:`.enhance_graph` — the same settings read back off a row's stored ComfyUI

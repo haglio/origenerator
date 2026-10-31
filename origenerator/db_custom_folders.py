@@ -6,8 +6,8 @@ origenerator.gallery.custom). A custom folder holds references, not copies -- wh
 it gathers outlives it.
 
 A gathered folder is stored by tree key, so it drifts when a key formula moves
-exactly as a `folder_meta` bookmark does, and carries the same identity columns for
-the same reason: `origenerator.bookmark_reconcile` re-points it from a generation
+exactly as a `folder_meta` favorite does, and carries the same identity columns for
+the same reason: `origenerator.favorite_reconcile` re-points it from a generation
 under it.
 """
 from __future__ import annotations

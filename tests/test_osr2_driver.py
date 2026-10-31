@@ -96,7 +96,7 @@ def test_it_says_whether_it_has_the_device(qapp):
 
 
 def test_the_line_it_draws_is_the_script_from_the_playhead_forward(qapp):
-    """What the console draws in the motion's place while a script has the
+    """What the OSR2 controls draw in the motion's place while a script has the
     device: where the script puts it now, and where it is about to."""
     driver = Osr2Driver(broker=FakeBroker())
     driver.start(FakePlayer(pos=0), ACTIONS)

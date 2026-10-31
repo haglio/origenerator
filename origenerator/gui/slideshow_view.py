@@ -29,12 +29,6 @@ from shared_ui.colors import BLACK
 
 from origenerator import osr2 as osr2_device
 from origenerator.config import FRAMES_BEING_MADE_DIR
-from origenerator.console_commands import side_press, spelled_for
-from origenerator.gui.console import (
-    REPAINT_MS,
-    post_device_action,
-    slideshow_device,
-)
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
@@ -42,6 +36,11 @@ from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.message import HEARD_MARK, INFO, Message
 from origenerator.gui.motion_hud import apply_motion_key
+from origenerator.gui.osr2_controls_state import (
+    REPAINT_MS,
+    osr2_controls_state,
+    post_device_action,
+)
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
     OPENS_IN,
@@ -49,6 +48,7 @@ from origenerator.gui.slideshow_hud import (
     slideshow_hud_model,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
+from origenerator.osr2_controls_commands import side_press, spelled_for
 from origenerator.slideshow_buttons import PRESSES_ON_THE_QUEUE, answer
 
 # How often the HUD is rebuilt: on its own beat, and faster while something
@@ -234,7 +234,7 @@ class SlideshowView(QWidget):
         if action in THE_SLIDESHOWS_OWN:
             answer(self.slideshow, action, path)
             return True
-        if self.press_console(verb):
+        if self.press_osr2_controls(verb):
             return True
         if action in _RATE_STEPS:
             self._pane.channel.send(_RATE_STEPS[action])
@@ -282,14 +282,14 @@ class SlideshowView(QWidget):
         if self._motion is None:
             return None
         control = self._actions.osr2_control
-        return slideshow_device(
+        return osr2_controls_state(
             self._motion, device=osr2_device.device_mode(),
             trouble=osr2_device.device_trouble(),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None,
             broker_running=osr2_device.broker_running())
 
-    def press_console(self, action: str) -> bool:
+    def press_osr2_controls(self, action: str) -> bool:
         """Take a press off the device rows of that HUD — the motion, the
         four control states, a level dragged on the readout."""
         if self._motion is None:

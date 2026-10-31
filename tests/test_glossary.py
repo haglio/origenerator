@@ -64,8 +64,14 @@ def streams():
     return list(_word_streams())
 
 
+def _words_of_phrase(phrase: str) -> list[str]:
+    """A phrase as the words an identifier saying it would be made of, so
+    "osr2 controls" is found in ``Osr2Controls`` and ``osr2_controls`` alike."""
+    return [w.lower() for token in phrase.split() for w in _words_of(token)]
+
+
 def _said_somewhere(phrase: str, streams) -> bool:
-    wanted = " " + " ".join(phrase.lower().split()) + " "
+    wanted = " " + " ".join(_words_of_phrase(phrase)) + " "
     return any(wanted in " " + " ".join(w.lower() for w in words) + " " for _, _, _, words, _ in streams)
 
 
@@ -92,7 +98,7 @@ def _mentions(retired: str, keep: list[str], streams) -> list[str]:
     """Where the code still says ``retired``, outside ``keep``: a word as a word of
     its own, plural or not; a phrase as those words one after another, in one
     identifier or across a line."""
-    wanted = retired.lower().split()
+    wanted = _words_of_phrase(retired)
     hits = []
     for where, number, tokens, _, line in streams:
         said = [(w.lower(), token) for token in tokens if not _kept(token, line, keep)

@@ -76,7 +76,7 @@ from origenerator import (
     running_ahead,
     toast_raising,
 )
-from origenerator.gui import job_queue, motion_panel, omnipause, toasts, voice_router
+from origenerator.gui import job_queue, omnipause, osr2_controls, toasts, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
@@ -394,19 +394,19 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "_TickThread", _NoTicker)
-    # And off the broker's serial stamps, which the console reads to say whether
+    # And off the broker's serial stamps, which the OSR2 controls read to say whether
     # the device is answering: those are live files whose freshness depends on
     # whether the OSR2 happens to be switched on right now, so a suite reading
     # them would pass or fail with the hardware. The stand-in says it is there —
-    # the console's own state before it could tell — and the tests about the
+    # the OSR2 controls' own state before they could tell — and the tests about the
     # device being off inject their own.
-    setattr(motion_panel.osr2, "device_mode",
-            lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
-    setattr(motion_panel.osr2, "device_trouble", lambda **_kw: None)
+    setattr(osr2_controls.osr2, "device_mode",
+            lambda **_kw: osr2_controls.osr2.osr2_device.Osr2Mode.CONTROLLED)
+    setattr(osr2_controls.osr2, "device_trouble", lambda **_kw: None)
     # The Broker's heartbeat is as live as those stamps, and a press on its
     # button would start or stop the machine's own Broker.
-    setattr(motion_panel.osr2, "broker_running", lambda **_kw: True)
-    setattr(motion_panel.osr2, "press_the_broker", lambda **_kw: None)
+    setattr(osr2_controls.osr2, "broker_running", lambda **_kw: True)
+    setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)
 
 
 @pytest.fixture(autouse=True)

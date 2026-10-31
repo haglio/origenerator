@@ -46,7 +46,7 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, SIDE_LABELS
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
-    corner_controls,
+    corner_buttons,
     icons,
     off_thread,
 )
@@ -206,7 +206,7 @@ def test_tree_rows_carry_a_folder_level_badge(qtbot):
     source = _at(lora, 0)
     settings = _at(source, 0)
 
-    # Each level carries a chip as its row icon — right of the caret, reading as
+    # Each level carries a ground as its row icon — right of the caret, reading as
     # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull()
     assert "Workflow" in workflow.toolTip(0)
@@ -265,10 +265,10 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # lives in the window's narrowest column, so every wasted pixel per level is
     # six wasted at the foot. Each step is one indentation and no more.
     #
-    # Measured at the left edge of each row's *name block* — its chip when it has
-    # one, its text when it does not — because the chip reads as the first
+    # Measured at the left edge of each row's *name block* — its ground when it has
+    # one, its text when it does not — because the ground reads as the first
     # character of the name. Qt lays the text out after the icon, so the text
-    # alone would step unevenly wherever a chipped row meets an unchipped one.
+    # alone would step unevenly wherever a initialed row meets an uninitialed one.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     _on_screen(qtbot, view, 1200, 800)
@@ -2683,7 +2683,7 @@ def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
 
-    view._browser._thumb_widgets["e1"].corner_action_triggered.emit("e1", "keep")
+    view._browser._thumb_widgets["e1"].corner_button_triggered.emit("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
 
@@ -2696,7 +2696,7 @@ def test_a_tiles_star_corner_favorites_that_tile(qtbot):
     _select_first_leaf(view)
 
     view._browser._thumb_widgets["i1"].control_triggered.emit(
-        "i1", corner_controls.STAR)
+        "i1", corner_buttons.STAR)
 
     assert db.get_generation("i1")["starred"]
 
@@ -2725,7 +2725,7 @@ def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
     leaf = view._leaf_by_id["vid"]
     view._tree.setCurrentItem(leaf)
 
-    view._browser._thumb_widgets["vid"].corner_action_triggered.emit("vid", "video")
+    view._browser._thumb_widgets["vid"].corner_button_triggered.emit("vid", "video")
 
     (job,) = [job for jobs in view._jobs.jobs_by_folder.values() for job in jobs]
     assert job.workflow.name == "wan22_i2v"

@@ -609,6 +609,8 @@ class QueueFoot:
         self._items: list = []
         self._foreign = 0
         self.pointer = QueuePointer(self)
+        if actions.queue_now is not None:
+            self.set(*actions.queue_now())
 
     def set(self, items, foreign: int = 0) -> None:
         self._items = list(items)

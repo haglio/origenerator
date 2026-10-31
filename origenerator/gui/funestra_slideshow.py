@@ -116,6 +116,7 @@ class FunestraSlideshow(QObject):
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
             self._showing = self._funestra_status().video
+        self._publish()
         self._hand_over(land=opened_on_a_slide)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)

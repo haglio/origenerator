@@ -624,6 +624,7 @@ class SlideshowDirector:
         the gallery says about the library the slideshow on *side* is mapped
         against — that side's own shape of it."""
         return SlideshowActions(
+            queue_now=self._host.queue_now,
             delete=self._host.trash_generation,
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
@@ -705,7 +706,6 @@ class SlideshowDirector:
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace_on(side), hud=hud,
                           levels=levels, say=self._host.say, **kwargs)
-        slideshow.shown.set_queue(*self._host.queue_now())
         self._region_slideshows[side] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
         # way a window one does.
@@ -739,7 +739,6 @@ class SlideshowDirector:
             view.slideshow.play(items, actions=actions, hud=hud, levels=levels, **kwargs)
         if built:
             self._present_surface(view, side)
-            view.set_queue(*self._host.queue_now())
         else:
             self._show_on_its_monitor(view, built=False)
         return view.slideshow

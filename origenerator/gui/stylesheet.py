@@ -376,7 +376,7 @@ def build_stylesheet() -> str:
     QPushButton#tileGroupHeading:hover {{
         color: {_h(BLUE)};
     }}
-    /* The picked row in the table of contents, marked by its ground alone.
+    /* The picked row in the tree of contents, marked by its ground alone.
        Left to the platform, a picked row also wears an accent bar down its left
        edge, which lands on the mark the row leads with and says nothing the
        blue ground has not said already. Naming the ground here is what takes a

@@ -73,6 +73,7 @@ from origenerator.nav_map import (
     one_per_stretch,
     surroundings,
 )
+from origenerator.one_look import looking_once
 from origenerator.orientation import (
     filter_rows,
     oriented_key,
@@ -467,6 +468,7 @@ class SlideshowDirector:
                 "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
                                 favorite_ids=self._favorite_prompt_ids())}
 
+    @looking_once
     def open_on_preview(self, media, generation):
         """A double-click on a tab's preview: open the folder of the generation
         it shows as a slideshow standing on that generation.
@@ -502,6 +504,7 @@ class SlideshowDirector:
         key = gallery.settings_folder_key(row, self._host.image_config_index())
         return oriented_key(key, row_orientation(row))
 
+    @looking_once
     def open(self, items, *, rows=(), folder_items=None, location=None,
              side=None, resume=None, filters=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
@@ -729,6 +732,7 @@ class SlideshowDirector:
         elif built or view.isMinimized():
             view.showFullScreen()
 
+    @looking_once
     def items_of(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
         order given — the slideshow's playlist. The thumbnail is what the view
@@ -745,6 +749,7 @@ class SlideshowDirector:
                  row.get("thumbnail_path"))
                 for row, (path, media_type) in _with_files(rows)]
 
+    @looking_once
     def versions_of(self, rows) -> dict:
         """Each of ``rows``' versions, newest first, keyed by the file its slide
         plays -- the axis Shift+Left/Right steps along. One with a single version

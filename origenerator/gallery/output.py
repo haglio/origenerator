@@ -21,6 +21,7 @@ from origenerator.file_refs import frame_name
 from origenerator.gallery.signatures import READINGS_KEPT, workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.one_look import is_file
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path, generate_animated_thumbnail
 
@@ -177,12 +178,12 @@ def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:
             continue
         full = output_file_path(f, places)
         rendered_as = media_type_from_filename(filename)
-        if rendered_as is not None and full.exists():
+        if rendered_as is not None and is_file(full):
             return full, rendered_as
         break
 
     thumb = row.get("thumbnail_path")
-    if thumb and Path(thumb).exists():
+    if thumb and is_file(thumb):
         return Path(thumb), MediaType.IMAGE
 
     return None

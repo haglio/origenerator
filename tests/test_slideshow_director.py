@@ -14,6 +14,7 @@ import json
 import os
 import re
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -668,6 +669,32 @@ def test_a_double_clicked_item_plays_the_rows_the_browser_listed_without_reading
 
     assert [item[2] for item in made[0].items] == ["a2", "a1"]
     assert asked == []
+
+
+def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_folder(
+        slideshows, monkeypatch, tmp_path):
+    # Asked after one at a time, the files of Latest's items held a double-click
+    # for a second; the folder they sit in is listed once instead.
+    for n in range(3):
+        (tmp_path / f"g{n}.png").write_bytes(b"x")
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    rows = [_row(f"g{n}", files=(f"g{n}.png",)) for n in range(3)]
+    director, _host, made = slideshows(FakeHost(rows=rows))
+    del director.items_of
+
+    def refused(asking):
+        def ask(path):
+            if tmp_path in path.parents:
+                pytest.fail(f"asked after {path.name} alone")
+            return asking(path)
+        return ask
+
+    with monkeypatch.context() as asked:
+        asked.setattr(Path, "exists", refused(Path.exists))
+        asked.setattr(Path, "is_file", refused(Path.is_file))
+        director.open_on_preview((str(tmp_path / "g1.png"), "image"), "g1")
+
+    assert [item[2] for item in made[0].items] == ["g0", "g1", "g2"]
 
 
 def test_a_double_clicked_item_s_slideshow_takes_the_shape_its_rows_say_opening_no_file(

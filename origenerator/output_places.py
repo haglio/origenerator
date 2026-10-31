@@ -5,6 +5,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from origenerator.one_look import entries_in
+
 IMAGES = "image"
 SCRIPTS = "funscript"
 AUDIO = "audio"
@@ -98,10 +100,8 @@ def _parts_within(folder: Path, home: Path) -> tuple[str, ...] | None:
 
 
 def folders_in(folder: Path) -> list[Path]:
-    if not folder.is_dir():
-        return []
-    return sorted(child for child in folder.iterdir()
-                  if child.is_dir() and not os.path.isjunction(child))
+    return sorted(Path(entry.path) for entry in entries_in(folder).values()
+                  if entry.is_dir() and not entry.is_junction())
 
 
 def _files_in(folder: Path) -> list[Path]:

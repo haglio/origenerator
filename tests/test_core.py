@@ -28,7 +28,7 @@ from origenerator.db import Database
 from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.collection import RECENTS_KEY, FolderCollection
+from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.sides import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, desktop_notices
@@ -746,7 +746,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)
+    assert view._tree.currentItem() is _collection(view, LATEST_KEY)
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
@@ -1070,9 +1070,9 @@ def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
     assert effective_min_width <= 704
 
 
-def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_path):
+def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_path):
     # A tab's Generate launches a re-roll of its settings folder; that in-flight
-    # generation shows as a card on Recents, and clicking the card opens the folder
+    # generation shows as a card on Latest, and clicking the card opens the folder
     # it runs in (where its live tile shows), just like any re-roll's card.
     win = _window(qtbot, tmp_path)
     gv = win._gallery_view
@@ -1086,16 +1086,16 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     (folder_key,) = list(gv._live_jobs)
     pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert pid in gv._browser._inflight_cards   # the running generation shows as a card
 
     gv._browser._on_inflight_clicked(pid)       # click that card
     assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
-def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
+def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
     # The reported bug: a generation left running by a prior session (here an i2v
-    # video), with the gallery restored onto Recents. It must show as an in-flight
+    # video), with the gallery restored onto Latest. It must show as an in-flight
     # card — the collection reads the database's running rows, so a card appears whether
     # or not the re-roll controller has re-adopted the job this instant.
     db = Database(tmp_path / "t.db")
@@ -1116,7 +1116,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
 
     gv = win._gallery_view
     gv.refresh()
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert "vid_run" in gv._browser._inflight_cards
 
 
@@ -1308,7 +1308,7 @@ def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot
     first = _window(qtbot, tmp_path, AppState(path))
     view = first._gallery_view
     view.refresh()
-    latest = oriented_key(FolderCollection(RECENTS_KEY, MediaType.VIDEO).key, SEPARATE[1])
+    latest = oriented_key(FolderCollection(LATEST_KEY, MediaType.VIDEO).key, SEPARATE[1])
     view._tree.setCurrentItem(view._tree_item_for(latest))
     first.close()
 

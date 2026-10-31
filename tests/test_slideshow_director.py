@@ -26,7 +26,7 @@ from origenerator import gallery
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     FolderCollection,
 )
 from origenerator.gallery.sides import BOTH
@@ -50,8 +50,8 @@ LANDSCAPE = "landscape"
 # narrowed to that region's shape.
 ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
-LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
-LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
+LATEST_PORTRAIT = oriented_key(LATEST_KEY, PORTRAIT)
+LATEST_LANDSCAPE = oriented_key(LATEST_KEY, LANDSCAPE)
 PORTRAIT_MONITOR = QRect(2560, 0, 1440, 2560)
 LANDSCAPE_MONITOR = QRect(0, 0, 2560, 1440)
 HIS_TWO_MONITORS = [SimpleNamespace(geometry=lambda: LANDSCAPE_MONITOR),
@@ -375,9 +375,9 @@ class FakeBrowser:
     Its gallery reads as new at every look unless a test gives it a *stamp*,
     since most tests here change its collections between looks."""
 
-    def __init__(self, collections=None, recents=False, searching=False, stamp=None):
+    def __init__(self, collections=None, latest=False, searching=False, stamp=None):
         self.collections = collections or {}
-        self.recents = recents
+        self.latest = latest
         self.searching = searching
         self.stamp = stamp
         self.collections_asked = 0
@@ -389,8 +389,8 @@ class FakeBrowser:
     def model_stamp(self):
         return object() if self.stamp is None else self.stamp
 
-    def showing_recents(self):
-        return self.recents
+    def showing_latest(self):
+        return self.latest
 
     def showing_search(self):
         return self.searching
@@ -1060,7 +1060,7 @@ def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
     enhance = _row("g8", workflow_name="enhance_image")
     host = FakeHost(rows=[_row("g1"), enhance])
     director, _host, made = slideshows(host, db=FakeDB([enhance]),
-                                       browser=FakeBrowser(recents=True))
+                                       browser=FakeBrowser(latest=True))
     enhance["workflow_name"] = gallery.ENHANCE_WORKFLOW
     director.open([("a.png", "image", "g1", None)])
 
@@ -1698,7 +1698,7 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slid
 
 def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
     class Spoken:
-        collection_key = RECENTS_KEY
+        collection_key = LATEST_KEY
         side = None
 
     director, host, made = slideshows(browser=FakeBrowser(collections={}))
@@ -2225,7 +2225,7 @@ def test_a_slideshow_of_latest_plays_one_of_each_run_of_a_folders_generations(sl
 
 
 def test_a_slideshow_of_a_folders_latest_plays_one_of_each_run_newest_first(slideshows):
-    location = oriented_key(FolderCollection(RECENTS_KEY, "workflow/a").key, PORTRAIT)
+    location = oriented_key(FolderCollection(LATEST_KEY, "workflow/a").key, PORTRAIT)
     director, _host, made = slideshows(FakeHost(location=location, rows=_a_sitting()))
 
     director.start()
@@ -2554,7 +2554,7 @@ def test_every_slideshow_that_is_up_hears_which_runs_are_still_being_made(slides
 
 
 def test_a_latest_slideshow_takes_a_new_run_after_the_browser_has_moved_on(slideshows):
-    browser = FakeBrowser(collections={LATEST_LANDSCAPE: [_row("g1")]}, recents=False)
+    browser = FakeBrowser(collections={LATEST_LANDSCAPE: [_row("g1")]}, latest=False)
     director, _host, made = slideshows(browser=browser, db=FakeDB([_row("g-run")]),
                                        fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location=LATEST_LANDSCAPE,
@@ -2566,7 +2566,7 @@ def test_a_latest_slideshow_takes_a_new_run_after_the_browser_has_moved_on(slide
 
 
 def test_a_slideshow_of_one_kinds_latest_takes_a_new_run_of_that_kind_alone(slideshows):
-    videos_latest = oriented_key(FolderCollection(RECENTS_KEY, "video").key, LANDSCAPE)
+    videos_latest = oriented_key(FolderCollection(LATEST_KEY, "video").key, LANDSCAPE)
     video_run = _row("v-run", workflow_name="wan22_i2v", files=("v-run.mp4",))
     browser = FakeBrowser(collections={videos_latest: [_row("v1", files=("v1.mp4",))]})
     director, _host, made = slideshows(browser=browser, db=FakeDB([video_run, _row("i-run")]),

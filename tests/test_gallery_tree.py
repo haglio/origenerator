@@ -69,7 +69,7 @@ def _gathered_tree(qtbot, rows, folders_of_your_own, folder_meta=None, recently_
     tree = GalleryTree(pane)
     tree.populate(
         [SideModel(LANDSCAPE, model, custom_folders=list(folders_of_your_own(model)),
-                   show_recents=True),
+                   show_latest=True),
          SideModel(PORTRAIT, [])],
         folder_meta=folder_meta, recently_worked=recently_worked)
     return pane, tree, model

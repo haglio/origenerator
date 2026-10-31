@@ -760,12 +760,18 @@
       ],
       "his_word": "Latest (2026-10-30); Recents (2026-08)",
       "code_today": [
-        "recents",
         "latest"
       ],
       "code_word": "latest",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "recents"
+      ],
+      "keep": [
+        "\"__recents__\"",
+        "\"recents\""
+      ]
     },
     {
       "id": "favorite",

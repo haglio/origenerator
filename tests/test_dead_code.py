@@ -311,7 +311,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the notes on what each kind's hover says, and that a workflow this build has
 # no template for adds no line, are test_each_kind_of_work_is_spelled_out_on_hover
 # and test_a_workflow_this_build_has_no_template_for_contributes_no_line, and the
-# Recents collection's note on asking the queue for its word for an enhance is the
+# Latest collection's note on asking the queue for its word for an enhance is the
 # name JobKind.ENHANCE.
 #
 # 18408 when the Slideshow moved onto a Funestra: the window the slideshow drew for

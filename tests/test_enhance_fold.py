@@ -157,7 +157,7 @@ def test_an_enhancement_folded_again_after_a_stop_between_its_saves_is_listed_on
 def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
     # The transient row is deleted here, and with it the only thing that said
     # when this enhancement happened. Its id rides onto the level instead, which
-    # is what lifts the image up the Recents collection to where the run belongs
+    # is what lifts the image up the Latest collection to where the run belongs
     # rather than leaving it where it was generated.
     db = Database(tmp_path / "t.db")
     _add_source(db)
@@ -336,7 +336,7 @@ def test_an_enhancement_whose_image_is_gone_is_one_to_scrap(tmp_path):
 
 
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
-    # The transient job row shows as an in-flight card on Recents, never as an
+    # The transient job row shows as an in-flight card on Latest, never as an
     # "Image Enhance" folder in the tree; a completed one that has not been
     # folded yet does.
     db = Database(tmp_path / "t.db")

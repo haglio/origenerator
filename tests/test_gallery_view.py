@@ -94,7 +94,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
@@ -1367,7 +1367,7 @@ def test_the_field_says_what_it_would_search(qtbot):
     assert leaf.text(0) in placeholder      # right down to the folder itself
     assert videos.text(0) in placeholder    # and every branch above it
 
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert view._search.field.placeholderText() == "Search Landscape  ›  All  ›  Latest…"
 
 
@@ -2238,7 +2238,7 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
-    # The Favorites collection sits just below Recents, above the media folders.
+    # The Favorites collection sits just below Latest, above the media folders.
     assert list(_alls(view._tree))[:2] == ["Latest", "Favorites"]
     # Selecting it lists a tile for each favorited folder, wherever it lives.
     collection = _alls(view._tree)["Favorites"]
@@ -2312,7 +2312,7 @@ def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
 
 def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
     # An experiment has a folder like anything else, so the collection's double-click
-    # is the same jump Recents and Favorites make — no verdict needed first.
+    # is the same jump Latest and Favorites make — no verdict needed first.
     experiment = _experiment_row("e1", steps=30)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
@@ -2834,7 +2834,7 @@ def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     view._navigation.go_back()
 
     assert view._tree.currentItem() is _collection(view, TRASH_KEY)
@@ -3107,13 +3107,13 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
         f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
 
-def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
+def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]  # newest first
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Recents leads its side, above Favorites and the media folders.
+    # Latest leads its side, above Favorites and the media folders.
     assert list(_alls(view._tree))[0] == "Latest"
     # Selecting it lists every recently generated item, newest first — not folders.
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -3121,7 +3121,7 @@ def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
     assert view._browser._listed_folders == []
 
 
-def test_recents_collection_lists_imported_files_too(qtbot):
+def test_latest_collection_lists_imported_files_too(qtbot):
     # A file ComfyUI wrote on its own arrives at the launch that finds it, and
     # Latest is where it is looked for then -- it used to sit in its workflow's
     # folder alone, with nothing to say why it was not the newest thing here.
@@ -3196,7 +3196,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     # Its details fill the info pane, but the collection stays put — no navigation, so
     # every recent item is still listed.
     assert view.selected_generation() == "i2"
-    assert view._browser.showing_recents()
+    assert view._browser.showing_latest()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
 
 
@@ -3210,7 +3210,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     # Double-clicking a recent tile is the whole jump — no button stands in for it.
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
-    assert view._browser.showing_recents() is False             # out of the collection...
+    assert view._browser.showing_latest() is False             # out of the collection...
     assert set(view.listed_prompt_ids()) == {"i2"}     # ...into the dog's own folder
     # The item lands selected — its tile picked and highlighted, not merely
     # previewed — as if we'd navigated in and clicked it.
@@ -3570,7 +3570,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
     assert button.toolTip() == "Go to the folder this item is in"
 
 
-def test_right_click_delete_on_the_recents_collection_removes_the_item(qtbot, monkeypatch):
+def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=actions)
@@ -3587,7 +3587,7 @@ def test_right_click_delete_on_the_recents_collection_removes_the_item(qtbot, mo
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-def test_right_click_favorite_on_the_recents_collection_bookmarks_the_item(qtbot, monkeypatch):
+def test_right_click_favorite_on_the_latest_collection_bookmarks_the_item(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -3599,11 +3599,11 @@ def test_right_click_favorite_on_the_recents_collection_bookmarks_the_item(qtbot
     _right_click(view, "i1")
 
     assert db.get_generation("i1")["starred"]                # persisted
-    assert view._browser.showing_recents()                           # still in the collection
+    assert view._browser.showing_latest()                           # still in the collection
     assert view._browser._thumb_widgets["i1"]._favorite is True    # the tile takes the star at once
 
 
-def test_right_click_enhance_on_the_recents_collection_queues_the_image(qtbot, tmp_path, monkeypatch):
+def test_right_click_enhance_on_the_latest_collection_queues_the_image(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -3617,7 +3617,7 @@ def test_right_click_enhance_on_the_recents_collection_queues_the_image(qtbot, t
     assert job.workflow.name == "image_enhance"
 
 
-def test_recents_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
+def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     pending = _row("wip", "sdxl_t2i", {"seed": 9}, "wip.png", status="running", output_files=None)
     view = GalleryView(FakeDB([pending]))
     qtbot.addWidget(view)
@@ -3627,7 +3627,7 @@ def test_recents_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     assert view.listed_prompt_ids() == []  # nothing to show: just the hint
 
 
-def test_recents_collection_stays_selected_across_a_refresh(qtbot):
+def test_latest_collection_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -3638,7 +3638,7 @@ def test_recents_collection_stays_selected_across_a_refresh(qtbot):
     assert view._tree.currentItem().text(0) == "Latest"
 
 
-def _many_recents(count):
+def _many_latest(count):
     """``count`` generated images, newest first, so the collection runs past one page."""
     return [_image(f"i{n}", "a cat", 50, n) for n in reversed(range(count))]
 
@@ -3662,10 +3662,10 @@ def _drawn(view):
     return list(view._browser._thumb_widgets)
 
 
-def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
+def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
     # The collection lists every generation ever made, so it draws a page of tiles at a
     # time rather than all 120 at once.
-    view = GalleryView(FakeDB(_many_recents(120)))
+    view = GalleryView(FakeDB(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -3681,8 +3681,8 @@ def _scroll_to_the_end(view):
     bar.setValue(bar.maximum())
 
 
-def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
-    view = GalleryView(FakeDB(_many_recents(120)))
+def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
+    view = GalleryView(FakeDB(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = len(_drawn(view))
@@ -3696,11 +3696,11 @@ def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
     assert _drawn(view) == [f"i{n}" for n in reversed(range(120))]
 
 
-def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
+def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
     # A generation landing rebuilds the gallery under the open collection. That must not
     # collapse it back to one page and throw away everything the user scrolled
     # down through — the new item just joins the top of what's already drawn.
-    db = FakeDB(_many_recents(120))
+    db = FakeDB(_many_latest(120))
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -3715,7 +3715,7 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
 
 def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB(_many_recents(120)))
+    view = GalleryView(FakeDB(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -3773,7 +3773,7 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 def test_another_latest_opens_on_its_first_page(qtbot):
     # Another Latest is a new listing, not a redraw of the one on screen, so it
     # starts at its newest item instead of holding the pages already scrolled.
-    view = GalleryView(FakeDB(_many_recents(120)))
+    view = GalleryView(FakeDB(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = _drawn(view)
@@ -3807,7 +3807,7 @@ def _write_looping_webp(path, size=(64, 48)):
     return path
 
 
-def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, monkeypatch):
+def test_latest_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, monkeypatch):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     rows = [
         _image("i1", "a cat", 50, 1),
@@ -3868,7 +3868,7 @@ def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_sh
     assert made_on and threading.main_thread() not in made_on
 
 
-def test_recents_tiles_are_badged_image_or_video(qtbot):
+def test_latest_tiles_are_badged_image_or_video(qtbot):
     # The collection mixes kinds, so each finished tile wears a corner badge naming its
     # own — an image thumbnail and a video thumbnail, told apart at a glance.
     rows = [
@@ -3901,7 +3901,7 @@ def test_inflight_card_is_badged_by_its_media_type(qtbot):
     assert items["rr1"].media_type == "video"
 
 
-def test_a_new_generation_appears_at_the_top_of_recents(qtbot):
+def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
     db = FakeDB([_image("old", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -4545,7 +4545,7 @@ def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))   # a collection is nobody's folder
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))   # a collection is nobody's folder
     assert not view._bank.favorite.isEnabled()
     assert view._bank.favorite.toolTip() == "Nothing here to favorite"
 
@@ -5089,7 +5089,7 @@ def test_history_spans_folder_navigation(qtbot):
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
 
-def test_back_returns_to_the_recents_collection_then_forward_reopens_the_folder(qtbot):
+def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -5097,19 +5097,19 @@ def test_back_returns_to_the_recents_collection_then_forward_reopens_the_folder(
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
-    assert view._browser.showing_recents() is False
+    assert view._browser.showing_latest() is False
     assert view._bank.back.isEnabled()                    # the collection is somewhere to go back to
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # Back returns to the Recents collection
+    assert view._browser.showing_latest()                       # Back returns to the Latest collection
 
     view._navigation.go_forward()
-    assert view._browser.showing_recents() is False              # Forward re-opens the folder
+    assert view._browser.showing_latest() is False              # Forward re-opens the folder
     assert view.selected_generation() == "i2"
 
 
 def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
-    # The reported bug: a folder was no history stop at all, so leaving Recents by
+    # The reported bug: a folder was no history stop at all, so leaving Latest by
     # clicking one in the tree recorded nothing and Back had nowhere to go from —
     # the collection was on the stack, but the cursor was still sitting on it.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
@@ -5121,12 +5121,12 @@ def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
     view._tree.setCurrentItem(
         _at(_image_workflow(view._tree), 0, 0, 0)
     )
-    assert view._browser.showing_recents() is False
+    assert view._browser.showing_latest() is False
     assert view._bank.back.isEnabled()
 
     view._navigation.go_back()
 
-    assert view._browser.showing_recents()
+    assert view._browser.showing_latest()
 
 
 def test_back_walks_folders_the_way_it_walks_generations(qtbot):
@@ -5184,7 +5184,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
     assert view._tree.currentItem() is _collection(view, FAVORITES_KEY)  # Back returns to Favorites
 
 
-def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
+def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -5192,10 +5192,10 @@ def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i2")         # select i2 in the collection
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
-    assert view._browser.showing_recents() is False
+    assert view._browser.showing_latest() is False
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # back in the collection...
+    assert view._browser.showing_latest()                       # back in the collection...
     assert view.selected_generation() == "i2"            # ...with i2 previewed again
     assert view._browser._thumb_widgets["i2"]._selected       # and its tile re-highlighted
 
@@ -5213,7 +5213,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
         _click_tile(view, pid)       # browse a few previews
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # still in the collection...
+    assert view._browser.showing_latest()                       # still in the collection...
     assert view.selected_generation() == "i2"            # ...on the one before
 
     view._navigation.go_back()
@@ -5305,7 +5305,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
 
     view._navigation.go_back()
 
-    assert view._browser.showing_recents()
+    assert view._browser.showing_latest()
     assert view.selected_generation() == "i1"
 
 
@@ -8060,7 +8060,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert "this folder" in view._bank.slideshow.toolTip()
 
     # The collections hold media too, so each plays as a folder does...
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Latest" in view._bank.slideshow.toolTip()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
@@ -8145,12 +8145,12 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
+def test_slideshow_plays_the_latest_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
 
     view._slideshows.start()
 
@@ -8178,7 +8178,7 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     newest, older = view.listed_prompt_ids()
     view._browser.apply_selection(older, _NO_MOD)
 
@@ -8199,7 +8199,7 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8222,7 +8222,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8246,7 +8246,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8274,7 +8274,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
                                     "sdxl_t2i_i2.png", favorite=1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8295,7 +8295,7 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8317,7 +8317,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8336,7 +8336,7 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
@@ -8423,7 +8423,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -8432,7 +8432,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
 
     assert view._slideshows.showing is None               # out of the slideshow...
-    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)  # ...still in the collection
+    assert view._tree.currentItem() is _collection(view, LATEST_KEY)  # ...still in the collection
     assert view._browser.selected_ids == {shown}     # with that image picked
     # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
@@ -8983,8 +8983,8 @@ def test_a_run_in_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_run_being_made_joins_a_recents_slideshow_too(qtbot, monkeypatch):
-    # Recents is a collection of results and a run has none yet, so it cannot answer
+def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
+    # Latest is a collection of results and a run has none yet, so it cannot answer
     # off its own list — but every generation this app makes lands there.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
@@ -10203,7 +10203,7 @@ def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypa
     assert db.get_generation("i1") is not None
 
 
-# --- Recents collection: in-flight cards for queued/running generations -------
+# --- Latest collection: in-flight cards for queued/running generations -------
 
 class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
@@ -10239,7 +10239,7 @@ class _FakeRerollJob:
         self.state = "canceled"
 
 
-def _open_recents(view):
+def _open_latest(view):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
 
@@ -10250,22 +10250,22 @@ def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
                 status="running", output_files="[]")
 
 
-def test_recents_shows_an_inflight_card_above_finished_items(qtbot):
+def test_latest_shows_an_inflight_card_above_finished_items(qtbot):
     # An in-flight generation (a running DB row, as a re-roll inserts) shows as a
-    # card on Recents; the finished item still lists below it, and the output-less
+    # card on Latest; the finished item still lists below it, and the output-less
     # running row is never counted among the finished thumbnails.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_running_row("gen1", prompt="a dog"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
 
     assert "gen1" in view._browser._inflight_cards
     assert view.listed_prompt_ids() == ["done"]          # cards aren't finished items
 
 
-def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
+def test_latest_shows_a_live_reroll_as_an_inflight_card(qtbot):
     # A gallery re-roll: a running DB row (as _launch_reroll inserts) plus a live
     # job that supplies the frame. The card shows and carries the job's frame.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
@@ -10277,7 +10277,7 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     view._jobs._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running", frame=_png_bytes()
     )]
-    _open_recents(view)
+    _open_latest(view)
 
     assert "rr1" in view._browser._inflight_cards
     assert not view._browser._inflight_cards["rr1"]._image.pixmap().isNull()  # the job's live frame
@@ -10316,7 +10316,7 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
     view.refresh()
     _key, job = _running_reroll(view)
     view.refresh()          # the launch's running row is in the DB now
-    _open_recents(view)
+    _open_latest(view)
     assert job.prompt_id in view._browser._inflight_cards
     labels = _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
 
@@ -10340,7 +10340,7 @@ def test_an_auto_generating_folders_card_offers_a_cancel_and_a_real_stop(
     view._toggle_auto(True)          # Auto-Generate launches the first variation
     (job,) = view._jobs.all_jobs
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     labels = _menu_offering(monkeypatch, "browser_pane")
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
@@ -10361,7 +10361,7 @@ def test_canceling_from_an_auto_generating_folders_card_ends_auto_generate_too(
     view._toggle_auto(True)
     (job,) = view._jobs.all_jobs
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     _menu_offering(monkeypatch, "browser_pane", pick="Cancel and stop")
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
@@ -10379,7 +10379,7 @@ def test_a_card_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     assert "gen1" in view._browser._inflight_cards      # the card is there...
     labels = _menu_offering(monkeypatch, "browser_pane")
 
@@ -10488,7 +10488,7 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     folder_key = _key(_at(_image_workflow(view._tree), 0, 0))
     view._jobs._jobs[folder_key] = [
         _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
-    _open_recents(view)
+    _open_latest(view)
     assert "rr1" in view._browser._inflight_cards
 
     # The re-roll finishes: its row becomes a completed generation, its job drops.
@@ -10510,7 +10510,7 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     folder_key = _key(_at(_image_workflow(view._tree), 0, 0))
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
     view._jobs._jobs[folder_key] = [job]
-    _open_recents(view)
+    _open_latest(view)
     card = view._browser._inflight_cards["rr1"]
 
     job.last_preview = _png_bytes()  # a live frame arrives on the tracked re-roll
@@ -10519,15 +10519,15 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     assert not card._image.pixmap().isNull()          # now showing the frame
 
 
-def test_recents_collection_appears_for_a_running_generation(qtbot):
-    # A generation is running (a running DB row, no output yet): the Recents collection
+def test_latest_collection_appears_for_a_running_generation(qtbot):
+    # A generation is running (a running DB row, no output yet): the Latest collection
     # appears and lists it as an in-flight card.
     view = GalleryView(FakeDB([_running_row("gen1")]))
     qtbot.addWidget(view)
     view.refresh()
 
     assert "Latest" in _alls(view._tree)
-    _open_recents(view)
+    _open_latest(view)
     assert "gen1" in view._browser._inflight_cards
 
 
@@ -10990,7 +10990,7 @@ def _finished_row_db(tmp_path):
 
 def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_path):
     # Real wiring, as the app builds it: a tab's Generate launches a re-roll, whose
-    # in-flight card must stay on Recents across navigating to a folder and back, and
+    # in-flight card must stay on Latest across navigating to a folder and back, and
     # across poll ticks.
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = lambda payload, prompt_id: prompt_id
@@ -11005,12 +11005,12 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     panel._on_generate()                          # emits generate_requested -> a re-roll
     (pid,) = [job.prompt_id for job in gv._live_jobs.values()]
 
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert pid in gv._browser._inflight_cards
 
     folder = _at(_image_workflow(gv._tree), 0, 0)
     gv._tree.setCurrentItem(folder)              # navigate away
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))    # and back
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))    # and back
     assert pid in gv._browser._inflight_cards, "card vanished after navigating away and back"
 
     gv._poll()
@@ -11030,11 +11030,11 @@ def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_pa
     gv._start_reroll(folder_key)
     rr_pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert rr_pid in gv._browser._inflight_cards
 
     gv._tree.setCurrentItem(gv._tree_item_for(folder_key))  # into the re-roll's folder
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))             # and back
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))             # and back
     assert rr_pid in gv._browser._inflight_cards, "re-roll card vanished after navigation"
 
     gv._poll()
@@ -11043,8 +11043,8 @@ def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_pa
 
 def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_path):
     # The user's real case: an i2v re-roll runs its image stage, then swaps to the
-    # video stage under the same folder key (a new prompt id). The Recents card
-    # must follow that handoff, on Recents and after navigating away and back.
+    # video stage under the same folder key (a new prompt id). The Latest card
+    # must follow that handoff, on Latest and after navigating away and back.
     db = _seeded_i2v_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -11054,7 +11054,7 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     _reroll_tile(view).add_requested.emit()
     img_job = view._live_jobs[key]
 
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert img_job.prompt_id in view._browser._inflight_cards
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image -> video
@@ -11065,11 +11065,11 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after handoff"
 
     view._tree.setCurrentItem(view._tree_item_for(key))   # away
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))        # and back
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))        # and back
     assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after navigation"
 
 
-def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
+def test_latest_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     # A re-roll left running in the DB but not tracked by a live job — e.g. a
     # restart that didn't re-adopt it into _live_jobs — must still show as
     # in-flight. The card reflects the database, the source of truth for what is
@@ -11083,7 +11083,7 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     gv = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(gv)
     gv.refresh()
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
 
     assert "rr_running" in gv._browser._inflight_cards
 
@@ -12806,7 +12806,7 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     _select_first_leaf(view)
     assert not view._enhance.panel.isHidden()
 
-    for item in (_image_workflow(view._tree), _collection(view, RECENTS_KEY),
+    for item in (_image_workflow(view._tree), _collection(view, LATEST_KEY),
                  _collection(view, FAVORITES_KEY), _collection(view, EXPERIMENTS_KEY),
                  _collection(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
@@ -12860,7 +12860,7 @@ def test_enhance_all_runs_at_the_panels_settings(qtbot, tmp_path):
 
 
 def test_a_single_enhance_runs_at_the_same_settings_from_anywhere(qtbot, tmp_path):
-    # An image picked out of the Recents collection enhances at exactly what the panel
+    # An image picked out of the Latest collection enhances at exactly what the panel
     # says, the same as one picked inside its own folder — there is one setting.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -13073,7 +13073,7 @@ def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeyp
     assert not any(label.startswith("Cancel") for label in labels[0])
 
 
-def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
+def test_a_running_enhance_gets_no_card_of_its_own_on_latest(qtbot, tmp_path):
     # An enhancement is a version of an image, not an item beside it — so the
     # collection shows the run on that image's own tile, under the scrim, and never as
     # a second card claiming something else is being made. The Job Queue's
@@ -13086,14 +13086,14 @@ def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     view.refresh()          # the launch's transient row is in the DB now
-    _open_recents(view)
+    _open_latest(view)
 
     assert job.prompt_id not in view._browser._inflight_cards
     assert view._browser._thumb_widgets["g0"]._enhancing is not None
     assert view._queue.keys() == [job.prompt_id]
 
 
-def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path):
+def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path):
     # With no card of its own, the run shows only on the tile of the image it is
     # upgrading — and that image can have been made a thousand tiles ago, where
     # nobody would find it. What is being done to an image is the newest thing
@@ -13103,7 +13103,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     assert view.listed_prompt_ids() == ["g2", "g1", "g0"]  # newest generated first
 
     view.enhance_items(["g0"])
@@ -13327,7 +13327,7 @@ def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
         ["Enhancement 1/1", "Original"]
 
 
-def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_path):
+def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_path):
     db = _combine_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -13336,12 +13336,12 @@ def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_p
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._browser.showing_recents()  # brand-new folder: watch it cook in the collection
+    assert view._browser.showing_latest()  # brand-new folder: watch it cook in the collection
     prompt_id = next(iter(view._live_jobs.values())).prompt_id
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)
 
-    assert not view._browser.showing_recents()  # the finished row gave its folder a node
+    assert not view._browser.showing_latest()  # the finished row gave its folder a node
     new_row = db.get_generation(prompt_id)
     image_rows = [r for r in db.list_generations() if gallery.media_type_of_row(r) == "image"]
     expected = gallery.settings_folder_key(new_row, gallery.build_image_config_index(image_rows))
@@ -13362,7 +13362,7 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     view._combine._generate_combination("img", "vid")
 
     expected = view._leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
-    assert not view._browser.showing_recents()
+    assert not view._browser.showing_latest()
     assert _selected_folder(view) == expected
     assert view._selected_reroll_key == expected  # watching the live combine tile
 
@@ -13608,7 +13608,7 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, 
 def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         qtbot, tmp_path, monkeypatch):
     view = _combine_view(qtbot, tmp_path)
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     tile = view._browser._thumb_widgets["vid"]
     slot = view._combine.panel.video_slot._label
     in_flight = {}
@@ -17209,7 +17209,7 @@ def _listening(qtbot, tmp_path, db=None):
 @pytest.mark.parametrize("said, key", [
     ("experiments", EXPERIMENTS_KEY),
     ("trash", TRASH_KEY),
-    ("recents", RECENTS_KEY),
+    ("recents", LATEST_KEY),
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])

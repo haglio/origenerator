@@ -24,7 +24,7 @@ from origenerator import orientation as orientation_module
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -72,9 +72,9 @@ def _shaped(row: dict, tmp_path: Path, width: int, height: int) -> dict:
 
 
 def test_keys_split_and_join():
-    assert oriented_key(RECENTS_KEY, "portrait") == "__recents__::portrait"
-    assert split_key("__recents__::portrait") == (RECENTS_KEY, "portrait")
-    assert split_key(RECENTS_KEY) == (RECENTS_KEY, None)
+    assert oriented_key(LATEST_KEY, "portrait") == "__recents__::portrait"
+    assert split_key("__recents__::portrait") == (LATEST_KEY, "portrait")
+    assert split_key(LATEST_KEY) == (LATEST_KEY, None)
     assert split_key(None) == (None, None)
     assert split_key("__recents__::sideways") == ("__recents__::sideways", None)
     assert base_of("image/sdxl_t2i/m0011::portrait") == "image/sdxl_t2i/m0011"
@@ -265,7 +265,7 @@ def test_every_sides_latest_leads_with_the_runs_in_flight_it_holds(qtbot, side):
     view = _view_of_runs(qtbot)
     _drawing(view, side)
 
-    view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, side)])
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(LATEST_KEY, side)])
 
     assert set(view._browser._inflight_cards) == {
         run for run, shape in _RUNS.items() if side_holds(side, shape)}
@@ -287,7 +287,7 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
     qtbot.addWidget(view)
     view.refresh()
     _drawing(view, opened_first)
-    view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, opened_first)])
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(LATEST_KEY, opened_first)])
     holding_the_folder = next(side for side in view._tree.sides
                               if side_holds(side, PORTRAIT))
     folder = gallery.settings_folder_key(finished, gallery.build_image_config_index([finished]))
@@ -650,14 +650,14 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, "portrait")])
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(LATEST_KEY, "portrait")])
 
     assert view._browser.listed_prompt_ids() == ["t1"]
     # The slideshow plays exactly the listing — a homogeneous set, so the
     # hosting session routes the whole slideshow to the portrait region.
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
     # And it is what history remembers, so Back returns to that side's collection.
-    assert view._current_collection_key() == oriented_key(RECENTS_KEY, "portrait")
+    assert view._current_collection_key() == oriented_key(LATEST_KEY, "portrait")
 
 
 def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
@@ -757,11 +757,11 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
         return stub
 
     view._slideshows.open = record
-    view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, "portrait")])
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(LATEST_KEY, "portrait")])
     view._slideshows.start()
 
     assert opened and opened[0]["side"] == "portrait"
-    assert opened[0]["location"] == oriented_key(RECENTS_KEY, "portrait")
+    assert opened[0]["location"] == oriented_key(LATEST_KEY, "portrait")
 
 
 def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):

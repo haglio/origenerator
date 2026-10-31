@@ -12,7 +12,7 @@ from shared_ui.icons import glyph_icon, glyph_pixmap
 from shared_ui.spacing import BUTTON_MARK
 
 import origenerator
-from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
 from origenerator.media import MediaType
@@ -67,7 +67,7 @@ def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
 
 
 def test_media_type_badges_render_for_image_and_video(qtbot):
-    # The Recents collection marks each tile image-or-video with a small corner badge;
+    # The Latest collection marks each tile image-or-video with a small corner badge;
     # both types must draw a non-blank pixmap so neither shows an empty square.
     image_badge = icons.media_type_badge(MediaType.IMAGE)
     video_badge = icons.media_type_badge(MediaType.VIDEO)
@@ -125,7 +125,7 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
 def test_a_collection_mark_is_drawn_once():
     """One redraw of the folder list asked for these 1,280 times -- every collection
     of every folder of folders, on every side -- and drew each one afresh."""
-    assert icons.collection_icon(RECENTS_KEY) is icons.collection_icon(RECENTS_KEY)
+    assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY)
 
 
 def _ink_at_the_edges(pixmap) -> bool:

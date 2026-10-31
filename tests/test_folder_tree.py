@@ -5,7 +5,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropE
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
-from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, RECENTS_KEY
+from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
 from origenerator.gallery.sides import LANDSCAPE
 from origenerator.gui import folder_tree, icons
 from origenerator.gui.drags import under_way
@@ -763,7 +763,7 @@ def _laid_out(tree, item, element) -> QRect:
     return tree.style().subElementRect(element, option, tree)
 
 
-def _tree_with_a_collection(qtbot, which=RECENTS_KEY):
+def _tree_with_a_collection(qtbot, which=LATEST_KEY):
     """A collection row under a workflow folder, under All, the way a side lays them out."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)

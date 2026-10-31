@@ -99,7 +99,7 @@ class HudFacts:
     """What this slideshow's own HUD says about the set it is playing.
 
     All of it is the Funestras' vocabulary, because the HUD is the Funestras'
-    HUD: ``order_label`` is how the set is ordered — "Latest" for Recents and
+    HUD: ``order_label`` is how the set is ordered — "Latest" for Latest and
     for a folder opened on one of its items, both of which play newest
     first, and "Shuffle" for everything else; ``favorite_ids`` is which of
     the items are favorites, so the star readout and the F-mode narrowing mean

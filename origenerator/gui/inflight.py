@@ -1,6 +1,6 @@
 """What every surface knows about a generation that is still in flight.
 
-Three widgets show queued and running work — the Recents collection's cards
+Three widgets show queued and running work — the Latest collection's cards
 (:mod:`origenerator.gui.inflight_card`), the Job Queue
 (:mod:`origenerator.gui.job_queue_view`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.

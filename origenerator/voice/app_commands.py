@@ -38,7 +38,7 @@ class AppCommand(Enum):
     """One thing a bare spoken word asks the app for."""
 
     # The collections that lead the tree, each reached by its own name.
-    RECENTS = "recents"
+    LATEST = "recents"
     FAVORITES = "favorites"
     EXPERIMENTS = "experiments"
     TRASH = "trash"
@@ -149,7 +149,7 @@ def _say(command: AppCommand | BarSetting, *phrases: str) -> None:
 # name is what the row says — and to a verb in front of it or the word "collection"
 # after it, for a speaker who would rather say a sentence.
 _COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
-    AppCommand.RECENTS: ("recents", "recent"),
+    AppCommand.LATEST: ("recents", "recent"),
     AppCommand.FAVORITES: ("favorites",),
     AppCommand.EXPERIMENTS: ("experiments", "experiment"),
     AppCommand.TRASH: ("trash",),

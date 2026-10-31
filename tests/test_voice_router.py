@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import gallery
 from origenerator.act_settings import GENAU, VIDEO
 from origenerator.animate_command import AnimateRequest
-from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
@@ -232,7 +232,7 @@ class FakeHost:
         self.queued = []
 
     def collection_label(self, key):
-        return "Latest" if key == RECENTS_KEY else key.strip("_").title()
+        return "Latest" if key == LATEST_KEY else key.strip("_").title()
 
     def stand_in_collection(self, key, side):
         self.stood_in.append((key, side))
@@ -422,16 +422,16 @@ def test_a_transcription_with_no_letters_in_it_says_nothing(router):
 def test_a_collection_name_stands_you_in_that_collection(router):
     voice, host, slideshows = router()
 
-    voice.on_command(AppCommand.RECENTS)
+    voice.on_command(AppCommand.LATEST)
 
-    assert host.stood_in == [(RECENTS_KEY, None)]
+    assert host.stood_in == [(LATEST_KEY, None)]
     assert slideshows.answers == ["Latest"]
 
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
     voice, _host, slideshows = router(FakeHost(collections=()))
 
-    voice.on_command(AppCommand.RECENTS)
+    voice.on_command(AppCommand.LATEST)
 
     assert slideshows.answers == ["no Latest collection yet"]
     assert slideshows.answer_kinds == [WARNING]
@@ -440,9 +440,9 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(rou
 def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
     voice, host, _slideshows = router()
 
-    voice.on_command(SurfaceCommand(AppCommand.RECENTS, "portrait"))
+    voice.on_command(SurfaceCommand(AppCommand.LATEST, "portrait"))
 
-    assert host.stood_in == [(RECENTS_KEY, "portrait")]
+    assert host.stood_in == [(LATEST_KEY, "portrait")]
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(router):
@@ -592,7 +592,7 @@ def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
 def test_a_collection_to_play_and_a_slideshow_command_go_to_the_slideshows(router):
     voice, _host, slideshows = router()
 
-    voice.on_command(CollectionCommand(RECENTS_KEY, "portrait"))
+    voice.on_command(CollectionCommand(LATEST_KEY, "portrait"))
     voice.on_command(SlideshowControl(SlideshowCommand.STOP, "landscape"))
 
     assert len(slideshows.collections_played) == 1
@@ -839,7 +839,7 @@ def test_a_microphone_that_fails_says_so_as_an_error(router):
 
 def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     voice, _host, slideshows = router()
-    voice.listener.bare = AppCommand.RECENTS
+    voice.listener.bare = AppCommand.LATEST
 
     assert voice.run_spoken_command("recents") is True
     assert slideshows.answers == ["Latest"]
@@ -847,7 +847,7 @@ def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
 
 def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
     voice, _host, slideshows = router()
-    voice.listener.bare = AppCommand.RECENTS
+    voice.listener.bare = AppCommand.LATEST
     voice.listener.dictated = Spoken("recents", listening=True)
 
     assert voice.run_spoken_command("portrait recents") is True

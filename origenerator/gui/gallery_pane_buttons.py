@@ -203,8 +203,8 @@ class GalleryPaneButtons(QWidget):
         # Turn the folders picked in the tree into a folder of their own. Shown
         # only while several are picked — that selection IS the folder, unsaved.
         self.group = _tool_button(
-            icons.custom_folder_icon(),
-            "Group the selected folders into a folder of your own", acts.group)
+            icons.custom_collection_icon(),
+            "Group the selected folders into a collection of your own", acts.group)
         self.group.hide()
         self.delete = _tool_button(icons.delete_icon(), "Delete", acts.delete)
         self.radio = None

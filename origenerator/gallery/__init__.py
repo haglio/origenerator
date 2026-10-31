@@ -41,9 +41,9 @@ from origenerator.gallery.combine import (
 )
 from origenerator.gallery.custom import (
     SELECTION_KEY,
-    build_custom_folders,
+    build_custom_collections,
+    custom_collection_key,
     custom_folder_id,
-    custom_folder_key,
     holds,
     outermost,
     selection_group,
@@ -89,7 +89,7 @@ from origenerator.gallery.enhance_settings import (
 )
 from origenerator.gallery.groups import (
     AllGroup,
-    CustomGroup,
+    CustomCollection,
     LoraGroup,
     MediaGroup,
     ModelGroup,
@@ -204,7 +204,7 @@ __all__ = [
     "MEDIA_LABELS",
     "SELECTION_KEY",
     "AllGroup",
-    "CustomGroup",
+    "CustomCollection",
     "EnhanceSettings",
     "EnhanceVersion",
     "JobKind",
@@ -216,7 +216,7 @@ __all__ = [
     "WorkflowGroup",
     "all_group",
     "animated_preview_if_made",
-    "build_custom_folders",
+    "build_custom_collections",
     "build_gallery_tree",
     "build_image_config_index",
     "child_groups",
@@ -224,8 +224,8 @@ __all__ = [
     "command_phrases",
     "config_folder_key",
     "config_folder_name",
+    "custom_collection_key",
     "custom_folder_id",
-    "custom_folder_key",
     "cycle_shaped",
     "default_enhance_params",
     "describe_enhance_params",

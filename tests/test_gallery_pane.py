@@ -297,7 +297,7 @@ def test_a_folder_of_your_own_draws_a_page_at_a_time_of_everything_it_lists(qtbo
     rows = _sixty()
     pane, scroll = _pane(qtbot, rows)
 
-    pane.show_custom_folder(gallery.CustomGroup(key="custom:1", label="mine", children=[],
+    pane.show_custom_collection(gallery.CustomCollection(key="custom:1", label="mine", children=[],
                                                 rows=rows, folder_id=1))
 
     assert len(_drawn(scroll)) == gallery_pane._PAGE

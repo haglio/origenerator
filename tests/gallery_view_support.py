@@ -276,7 +276,7 @@ class FakeDB:
         return [record for record in self.list_requests()
                 if record["source_prompt_id"] == source_prompt_id]
 
-    # --- custom folders (the groupings the user composes) ------------------
+    # --- custom collections (the groupings the user composes) ------------------
 
     def create_custom_folder(self, name, folder_id=None, side=None):
         if folder_id is None:
@@ -285,29 +285,29 @@ class FakeDB:
         self._custom[folder_id] = {"name": name, "side": side, "folders": {}, "items": {}}
         return folder_id
 
-    def delete_custom_folder(self, folder_id):
+    def delete_custom_collection(self, folder_id):
         self._custom.pop(folder_id, None)
 
-    def add_folders_to_custom_folder(self, folder_id, folders):
+    def add_folders_to_custom_collection(self, folder_id, folders):
         for folder_key, level, ref in folders:
             self._custom[folder_id]["folders"][folder_key] = (level, ref)
 
-    def remove_folder_from_custom_folder(self, folder_id, folder_key):
+    def remove_folder_from_custom_collection(self, folder_id, folder_key):
         self._custom[folder_id]["folders"].pop(folder_key, None)
 
-    def add_items_to_custom_folder(self, folder_id, prompt_ids):
+    def add_items_to_custom_collection(self, folder_id, prompt_ids):
         self._custom[folder_id]["items"].update(dict.fromkeys(prompt_ids))
 
-    def remove_items_from_custom_folder(self, folder_id, prompt_ids):
+    def remove_items_from_custom_collection(self, folder_id, prompt_ids):
         for prompt_id in prompt_ids:
             self._custom[folder_id]["items"].pop(prompt_id, None)
 
-    def list_custom_folders(self):
+    def list_custom_collections(self):
         return [{"id": fid, "name": f["name"], "side": f["side"], "folders": list(f["folders"]),
                  "items": list(f["items"])}
                 for fid, f in sorted(self._custom.items())]
 
-    def folders_in_custom_folders(self):
+    def folders_in_custom_collections(self):
         return [{"folder_id": fid, "folder_key": key, "level": level, "ref_prompt_id": ref}
                 for fid, f in self._custom.items()
                 for key, (level, ref) in f["folders"].items()]
@@ -369,7 +369,7 @@ def _side(tree, side=LANDSCAPE):
 
 
 def _top_level(tree, side=LANDSCAPE):
-    """One half's rows: its collections, its custom folders, its All.
+    """One half's rows: its collections, its custom collections, its All.
 
     Landscape by default because that is where these fixtures land — a row with
     no thumbnail, no file on disk and no size in its params has no shape to
@@ -1162,8 +1162,8 @@ def _pick(view, *keys):
 
 
 def _make_folder(view, name, keys):
-    folder_id = view._db.create_custom_folder(name)
-    view._db.add_folders_to_custom_folder(
+    folder_id = view._db.create_custom_collection(name)
+    view._db.add_folders_to_custom_collection(
         folder_id, [(key, "settings", None) for key in keys]
     )
     view.refresh()
@@ -1174,7 +1174,7 @@ def _make_folder(view, name, keys):
 # Every test below raises a real menu and answers it by the words the user reads,
 # because the menu is where the label is wired to the handler. Calling the handler
 # instead — which is what the rest of this file does — leaves that wiring covered
-# by nothing at all: swapping two arms of the custom folder's menu, so that its
+# by nothing at all: swapping two arms of the custom collection's menu, so that its
 # harmless entry deleted the folder, used to pass all 657 tests.
 
 def _tall_on_screen(view):

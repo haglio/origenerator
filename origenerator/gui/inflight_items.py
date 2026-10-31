@@ -171,12 +171,11 @@ class InFlightItems:
                 # workflow that happens to take an input (the pose transfer's
                 # structure image) is still an image being made, and its row is
                 # placed the way every other image's is — by the folder it joins.
-                source_image=(params.get("input_image")
-                              if kind in SOURCE_FRAME_KINDS else None),
+                source_image=start_frame_of(kind, params),
                 # What to stand under the wait: the image this run was
                 # requested of, else the frame it animates or enhances.
-                source_file=self._source_file(
-                    (records.get(pid) or {}).get("source_prompt_id"), row_by_id,
+                source_file=source_file_of(
+                    row_by_id.get((records.get(pid) or {}).get("source_prompt_id")),
                     params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
@@ -219,24 +218,6 @@ class InFlightItems:
             return
         self._on_go_to_item(image)
 
-    @staticmethod
-    def _source_file(requested_of, row_by_id: dict, params: dict,
-                     kind: str) -> str | None:
-        """A file showing what a queued run came from, or ``None``.
-
-        The image a request or a Modify was made of comes first: a Modify
-        queues a run per image and every one of them animates nothing, so the
-        image it rewrites is the only one it has. Failing that, the
-        start frame a video or an enhance is built on.
-        """
-        asked_of = (row_by_id.get(requested_of) or {}).get("thumbnail_path")
-        if asked_of:
-            return asked_of
-        if kind not in SOURCE_FRAME_KINDS:
-            return None
-        frame = resolve_input_image_path(params.get("input_image"))
-        return str(frame) if frame is not None else None
-
     def _folder_thumbnails(self, folder_key: str, cache: dict) -> tuple:
         """A few thumbnails already in the folder a queued job is headed for.
 
@@ -274,3 +255,23 @@ class InFlightItems:
                 self._db.recent_durations(workflow_name)
             )
         return cache[workflow_name]
+
+
+def start_frame_of(kind: str, params: dict) -> str | None:
+    return params.get("input_image") if kind in SOURCE_FRAME_KINDS else None
+
+
+def source_file_of(asked_of: dict | None, params: dict, kind: str) -> str | None:
+    """A file showing what a queued run came from, or ``None``.
+
+    The image a request or a Modify was made of comes first: a Modify
+    queues a run per image and every one of them animates nothing, so the
+    image it rewrites is the only one it has. Failing that, the
+    start frame a video or an enhance is built on.
+    """
+    thumbnail = (asked_of or {}).get("thumbnail_path")
+    if thumbnail:
+        return thumbnail
+    frame = resolve_input_image_path(start_frame_of(kind, params))
+    return str(frame) if frame is not None else None
+

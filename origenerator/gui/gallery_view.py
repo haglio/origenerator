@@ -141,6 +141,7 @@ from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
     BankActs,
@@ -532,6 +533,8 @@ class GalleryView(QWidget):
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
             names=self._item_names, radio=self._radio,
             turn_the_radio_on=lambda: self._bank.turn_the_radio_on())
+        self._starting = StartingRows(self)
+        self._starting.changed.connect(self._update_queue)
         # Combine: a video's settings run again on a dropped image, and the
         # spoken "animate as" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
@@ -539,7 +542,7 @@ class GalleryView(QWidget):
         self._combine = CombineController(
             self, parent=self, db=db, jobs=self._jobs, client=client,
             info_tabs_of=lambda: self._info_tabs, slideshows=self._slideshows,
-            names=self._item_names)
+            starting=self._starting, names=self._item_names)
         # The standalone enhance: its settings panel, what the Enhance button
         # would run on, and the live run's appearance on every surface showing
         # the image it improves
@@ -684,7 +687,7 @@ class GalleryView(QWidget):
         # open at the cost of the folder listing above it.
         self._queue = JobQueueView()
         self._queue.move_requested.connect(self._jobs.move)
-        self._jobs.reordered.connect(self.queue_changed)
+        self._jobs.reordered.connect(self._update_queue)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
         self._queue.start_now_requested.connect(self.start_now)
         self._queue.cancel_all_requested.connect(self.cancel_all)
@@ -3087,10 +3090,6 @@ class GalleryView(QWidget):
         """Every image row the gallery is holding, as its last rebuild read them."""
         return self._image_rows
 
-    def queue_changed(self) -> None:
-        """Redraw the line — a stand-in row went on it or came off it."""
-        self._update_queue()
-
     def tell(self, title: str, message: str) -> None:
         """Say something that needs acknowledging, in a dialog over this window."""
         QMessageBox.information(self, title, message)
@@ -3434,20 +3433,14 @@ class GalleryView(QWidget):
         return self._inflight_items(), self._foreign_queue.total
 
     def _inflight_items(self, rows=None, requests=None) -> list:
-        return self._browser.inflight_items(rows=rows, requests=requests)
+        return self._starting.placed_among(
+            self._browser.inflight_items(rows=rows, requests=requests), self._jobs)
 
     def _update_queue(self, inflight=None):
         """Feed the Job Queue every in-flight job, in the order ComfyUI will
         work through them, plus whatever another app has on ComfyUI — so the whole
         queue shows from anywhere, and one that isn't ours is visible before
         Generate rather than after.
-
-        After those, any Generate pressed but not yet turned into a job
-        (:meth:`CombineController._show_launching`). They go on here rather than
-        in the in-flight list itself: that list is what the database says is in
-        flight, and
-        these have no row in it: they are the press's answer, not a record of
-        anything, and they last only until the real row exists.
 
         An open slideshow is fed the same list twice over: once for the queue it
         covers, and once for the slides themselves, since a run that has begun to
@@ -3456,8 +3449,7 @@ class GalleryView(QWidget):
         ``inflight`` is the already-built card list, when the caller (the poll)
         holds one; every other caller lets it be built fresh here.
         """
-        items = (self._inflight_items() if inflight is None else inflight) \
-            + self._combine.launching_rows()
+        items = self._inflight_items() if inflight is None else inflight
         self._queue.set_items(items, self._foreign_queue.total)
         self._slideshows.note_queue(items, self._foreign_queue.total)
         self._slideshows.note_in_flight(items)

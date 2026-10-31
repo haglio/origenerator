@@ -409,7 +409,7 @@ class QueueRow(OpensAFolder, QWidget):
     run will land in (:mod:`origenerator.gui.queue_thumbs`).
 
     Only a wait worth explaining puts more text on the row, and only one this job
-    is in on its own — a press of Generate not yet submitted — and that note
+    is in on its own — one not sent to ComfyUI yet — and that note
     takes the rest of the width, after everything the row always says. A wait on another app is not one of them:
     that is the whole line's, and is said once, under the bar in the left half —
     the bar it is holding up, and the thing it is there to explain.
@@ -502,7 +502,7 @@ class QueueRow(OpensAFolder, QWidget):
         # in front of it means. The settings are worth an answer, just not the row.
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
         # One wait is worth explaining in a row's own width, being this job's
-        # alone: the stretch before a pressed Generate is a job at all. The
+        # alone: the stretch before what was asked for is a job at all. The
         # user's own place in the line is the line itself and needs no words, and
         # a wait on another app is about the server, not this job — the left
         # half says that one, under the bar that wait is holding up.

@@ -27,6 +27,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.starting_rows import StartingRows
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
@@ -223,7 +224,6 @@ class FakeHost:
 
     def __init__(self, *, rows=()):
         self.rows = list(rows)
-        self.queue_redraws = 0
         self.revealed = []
         self.told = []
 
@@ -238,9 +238,6 @@ class FakeHost:
 
     def folder_key_for(self, workflow_name, params, workflow_version=None):
         return f"folder-for-{workflow_name}-{workflow_version}"
-
-    def queue_changed(self):
-        self.queue_redraws += 1
 
     def reveal_launch(self, key):
         self.revealed.append(key)
@@ -286,7 +283,12 @@ def _video(prompt_id="clip", *, workflow_name=VIDEO_WORKFLOW, status="completed"
 
 
 @pytest.fixture
-def combine(qtbot, monkeypatch):
+def starting(qtbot):
+    return StartingRows()
+
+
+@pytest.fixture
+def combine(qtbot, monkeypatch, starting):
     """A controller under a parent this fixture keeps alive, with a recorder for
     a panel."""
     monkeypatch.setattr(module, "CombinePanel", FakePanel)
@@ -300,7 +302,7 @@ def combine(qtbot, monkeypatch):
         controller = CombineController(
             host, parent=parent, db=db or FakeDB(), jobs=jobs or FakeReroll(),
             client=client, info_tabs_of=lambda: tabs or FakeTabs(),
-            slideshows=slideshows or FakeSlideshows(), inbox=inbox)
+            slideshows=slideshows or FakeSlideshows(), starting=starting, inbox=inbox)
         # The wait between a press and a real job is what the stand-in row is
         # for; running it straight through is what lets a test press and look.
         controller._after_painting = lambda work: work()
@@ -496,39 +498,36 @@ def test_the_two_item_list_older_sessions_wrote_still_restores(combine):
 # --- the stand-in row -------------------------------------------------------
 
 
-def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine):
+def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine, starting):
     # The work between the press and a real job is seconds long, and a button
     # that seems to do nothing reads as an app that has died.
-    controller, host = combine(db=FakeDB([_image("img"), _video("clip")]))
+    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
-    key = controller._show_launching("img", video_id="clip")
+    key = controller._show_starting("img", video_id="clip")
 
-    (row,) = controller.launching_rows()
+    (row,) = starting.rows()
     assert row.key == key
     assert row.reading.status == "queued" and row.starting is True
     assert row.source_video_thumbnail == "clip-thumb.png"
-    assert host.queue_redraws == 1
 
 
-def test_a_picked_act_names_itself_rather_than_showing_a_video(combine):
+def test_a_picked_act_names_itself_rather_than_showing_a_video(combine, starting):
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    controller._show_launching("img", category="waving")
+    controller._show_starting("img", category="waving")
 
-    (row,) = controller.launching_rows()
+    (row,) = starting.rows()
     assert row.act == "waving"
     assert row.source_video_thumbnail is None
 
 
-def test_the_stand_in_row_comes_off_however_the_launch_ends(combine):
-    controller, host = combine(db=FakeDB([_image("img")]))
-    key = controller._show_launching("img", category="waving")
+def test_the_stand_in_row_comes_off_however_the_launch_ends(combine, starting):
+    controller, _host = combine(db=FakeDB([_image("img")]))  # its video is gone
 
-    controller._drop_launching(key)
-    controller._drop_launching(key)  # twice costs nothing
+    controller.panel.combine_requested.emit(CombineRequest(
+        image_id="img", video_id="clip", intent=act_settings.VIDEO))
 
-    assert controller.launching_rows() == []
-    assert host.queue_redraws == 2
+    assert starting.rows() == []
 
 
 # --- launching a dropped pair ----------------------------------------------
@@ -645,7 +644,7 @@ def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
         (None, "no past looping “waving” flick to take settings from yet", WARNING)]
 
 
-def test_the_stand_in_row_goes_whatever_the_match_answers(combine, monkeypatch):
+def test_the_stand_in_row_goes_whatever_the_match_answers(combine, starting, monkeypatch):
     monkeypatch.setattr(module.act_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.act_settings, "most_used_video", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
@@ -653,7 +652,7 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, monkeypatch):
     controller.panel.combine_requested.emit(CombineRequest(
         image_id="img", category="waving", intent=act_settings.VIDEO))
 
-    assert controller.launching_rows() == []
+    assert starting.rows() == []
 
 
 # --- opening one instead of running it --------------------------------------
@@ -1175,7 +1174,8 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
     qtbot.addWidget(parent)
     controller = CombineController(
         FakeHost(), parent=parent, db=FakeDB(), jobs=FakeReroll(), client=object(),
-        info_tabs_of=lambda: FakeTabs(), slideshows=FakeSlideshows())
+        info_tabs_of=lambda: FakeTabs(), slideshows=FakeSlideshows(),
+        starting=StartingRows())
 
     controller.panel._defaults_btn.click()
 

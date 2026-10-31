@@ -16,6 +16,7 @@ from origenerator.gui.action_picker import (
     SORT_BUTTON,
     ActionPicker,
 )
+from origenerator.gui.label_cells import LabelForm
 
 _STATES = ("state one", "state two", "state three")
 _ACTS = ("act one", "act two")
@@ -33,9 +34,9 @@ def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
 
 @pytest.fixture
 def picker(qtbot):
-    made = ActionPicker(_STATES, _ACTS)
-    qtbot.addWidget(made)
-    return made
+    host = QWidget()
+    qtbot.addWidget(host)
+    return ActionPicker(_STATES, _ACTS, LabelForm(host))
 
 
 def test_an_image_offers_every_state_and_opens_on_the_one_it_was_sorted_as(picker):
@@ -46,17 +47,15 @@ def test_an_image_offers_every_state_and_opens_on_the_one_it_was_sorted_as(picke
     assert picker.offered() == ["", *_STATES]
 
 
-def test_the_list_sits_one_gap_from_its_name_and_its_button_as_a_forms_field_does(picker):
+def test_the_list_sits_one_gap_from_its_button_as_a_forms_field_does(picker):
     picker.show_row(_row())
-    picker.resize(600, 40)
-    picker.show()
+    picker.parentWidget().resize(600, 40)
+    picker.parentWidget().show()
     picker.layout().activate()
-    name = next(label for label in picker.findChildren(QLabel) if label.text() == ACTION_LABEL)
     listed = picker.findChild(QComboBox)
     button = picker.findChild(QPushButton, SORT_BUTTON)
 
-    assert (listed.x() - (name.x() + name.width()),
-            button.x() - (listed.x() + listed.width())) == (GAP_MEDIUM, GAP_MEDIUM)
+    assert button.x() - (listed.x() + listed.width()) == GAP_MEDIUM
 
 
 def test_an_image_nobody_has_sorted_yet_opens_on_nothing(picker):
@@ -150,8 +149,10 @@ def test_a_tab_showing_nothing_shows_no_row(picker):
     assert picker.isHidden()
 
 
-def test_the_row_is_labelled_action(picker):
-    assert ACTION_LABEL in [label.text() for label in picker.findChildren(QLabel)]
+def test_the_row_is_labeled_action(picker):
+    name = picker.parentWidget().layout().labelForField(picker)
+
+    assert ACTION_LABEL in [label.text() for label in name.findChildren(QLabel)]
 
 
 def test_the_list_opens_on_a_dash_rather_than_a_phrase(picker):

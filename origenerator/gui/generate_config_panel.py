@@ -364,8 +364,9 @@ class GenerateConfigPanel(DropZone):
         layout.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
         self._build_preview()
         body = self._build_body_scroll()
-        self._build_saved_generation_block(body)
-        self._build_workflow_header(body)
+        header = LabelForm()
+        self._build_saved_generation_block(body, header)
+        self._build_workflow_header(body, header)
         self._build_related_media(body)
         # The slack goes here, under everything, so a short column rests at the
         # top of the scroll rather than spreading itself out.
@@ -431,7 +432,7 @@ class GenerateConfigPanel(DropZone):
         self._scroll.setWidget(body_host)
         return body
 
-    def _build_saved_generation_block(self, body: QVBoxLayout) -> None:
+    def _build_saved_generation_block(self, body: QVBoxLayout, header: LabelForm) -> None:
         """The output file, when it was made and the workflow version that made
         it, at the top of the scroll (shown only while displaying a saved
         generation). Above the form, because it names what the settings below it
@@ -444,9 +445,8 @@ class GenerateConfigPanel(DropZone):
         self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
-        self._action = ActionPicker(state_names(), act_settings.CATEGORIES)
+        self._action = ActionPicker(state_names(), act_settings.CATEGORIES, header)
         self._action.chosen.connect(self._on_action_chosen)
-        body.addWidget(self._action)
 
     def _on_action_chosen(self, prompt_id: str, said: str) -> None:
         """Record what the item on display shows: an image's in the column the
@@ -459,13 +459,12 @@ class GenerateConfigPanel(DropZone):
         else:
             self._db.set_act(prompt_id, said or None)
 
-    def _build_workflow_header(self, body: QVBoxLayout) -> None:
+    def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
         """The editable half: the workflow picker, its typical-time estimate, and
         the host the param form is swapped into whenever the workflow changes."""
         self._form_workflow_key = None  # which workflow the installed form belongs to
-        header = LabelForm()
         header.setContentsMargins(0, 0, 0, 0)
-        header.setHorizontalSpacing(GAP_MEDIUM)
+        header.setSpacing(GAP_MEDIUM)
         header.setLabelAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )

@@ -14,11 +14,13 @@ from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
 from PyQt6.QtGui import QColor, QDropEvent, QPalette, QPixmap, QTextCursor, QTextDocumentFragment
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFormLayout,
     QLabel,
     QPushButton,
     QSplitter,
     QSplitterHandle,
+    QWidget,
 )
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.icons import inline_icon
@@ -2383,6 +2385,25 @@ def test_the_enhancement_levels_sit_one_gap_under_the_settings_as_each_section_d
 
     assert "Enhancement Levels" in gaps
     assert gaps == dict.fromkeys(gaps, GAP_MEDIUM)
+
+
+@pytest.mark.parametrize("width", [480, 340])
+def test_the_action_and_workflow_dropdowns_line_up_as_a_sections_fields_do(
+        qtbot, saved_panel, width):
+    panel, db = saved_panel
+    image = _image_row(db)
+    panel.show_saved_generation(image, [image])
+    host = QWidget()
+    qtbot.addWidget(host)
+    panel.setParent(host)
+    panel.resize(width, 1400)
+    host.show()
+    panel.layout().activate()
+    body = panel._scroll.widget()
+    action = panel._action.findChild(QComboBox)
+
+    assert panel.width() == width
+    assert action.mapTo(body, QPoint(0, 0)).x() == panel._workflow_combo.mapTo(body, QPoint(0, 0)).x()
 
 
 def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(saved_panel):

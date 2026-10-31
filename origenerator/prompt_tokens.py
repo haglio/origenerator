@@ -82,11 +82,11 @@ class PromptReading:
             return [unboxed(text)]
         return self.flow(prompt_boxes(text))[0]
 
-    def stops_at(self, text: str) -> int | None:
-        if self.past_it != CUT_OFF:
+    def past_limit_at(self, text: str) -> int | None:
+        if self.past_it == READ_IN_PIECES:
             return None
-        offsets = self.tokenizer.encode(text, add_special_tokens=False).offsets
-        return offsets[self.reads_well][0] if len(offsets) > self.reads_well else None
+        starts = [start for group in self._groups(text) for start in group]
+        return starts[self.reads_well] if len(starts) > self.reads_well else None
 
     def _groups(self, text: str) -> list[list[int]]:
         if not self.weighted:

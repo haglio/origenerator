@@ -16,8 +16,8 @@ from origenerator.box_breaks import (
     unboxed,
 )
 from origenerator.gui import diff_text, tracked_prompt
-from origenerator.gui.unread_words import gray_past
-from origenerator.prompt_tokens import READ_IN_PIECES, PromptReading
+from origenerator.gui.past_the_limit import mark_past_the_limit
+from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
 COUNTING_DOWN_FROM = 15
 
@@ -41,7 +41,8 @@ class Countdown(QLabel):
 def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReading | None) -> None:
     text = diff_text.live_text(field)
     countdown.show_left(None if reading is None else reading.reads_well - reading.tokens(text))
-    gray_past(field, None if reading is None else reading.stops_at(text))
+    mark_past_the_limit(field, None if reading is None else reading.past_limit_at(text),
+                        unread=reading is not None and reading.past_it == CUT_OFF)
 
 
 class PromptBoxes(QWidget):

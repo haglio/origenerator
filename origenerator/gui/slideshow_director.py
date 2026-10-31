@@ -134,6 +134,8 @@ class SlideshowHost(Protocol):
     def selected_prompt_ids(self) -> list[str]:
         """The generations picked in the browser, in the order shown."""
 
+    def off_thread(self, work, done) -> None: ...
+
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
         app's -- the block a slideshow's HUD hangs at its foot."""
@@ -481,22 +483,35 @@ class SlideshowDirector:
         and goes on following it until it lands.
         """
         listed = self._host.listed_rows()
-        folder_items = None
+        hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
         if media is None:  # following a run: it has no place among the files yet
-            items, rows, start, folder_items = [], listed, 0, self.items_of(listed)
-        else:
-            rows = (listed if any(row["prompt_id"] == generation for row in listed)
-                    else self.rows_at(self._location_of(self._host.row_for(generation))))
-            items = self.items_of(rows)
-            start = _place_of(generation, items)
-            if start is None:
-                items, start = [(media[0], media[1], generation, None)], 0
-                rows = [row for row in [self._host.row_for(generation)] if row is not None]
-        return self.open(items, rows=rows, start=start, shuffle=in_order,
-                         folder_items=folder_items,
-                         hud=HudFacts(
-                             order_label=LATEST_LABEL,
-                             favorite_ids=self._favorite_prompt_ids()))
+            return self.open([], rows=listed, start=0, shuffle=in_order,
+                             folder_items=self.items_of(listed), hud=hud)
+        rows = (listed if any(row["prompt_id"] == generation for row in listed)
+                else self.rows_at(self._location_of(self._host.row_for(generation))))
+        opened_on = [row for row in rows if row["prompt_id"] == generation]
+        items = self.items_of(opened_on)
+        if not items:
+            return self.open([(media[0], media[1], generation, None)], start=0, shuffle=in_order,
+                             rows=[row for row in [self._host.row_for(generation)] if row],
+                             hud=hud)
+        side = majority_shape(map(row_orientation, rows))
+        slideshow = self.open(items, rows=opened_on, start=0, side=side, shuffle=in_order,
+                              hud=hud)
+        if slideshow is not None and len(rows) > 1:
+            self._host.off_thread(
+                lambda: (self.items_of(rows), self.versions_of(rows)),
+                partial(self._fill_in, slideshow, rows, generation, side=side, hud=hud))
+        return slideshow
+
+    def _fill_in(self, slideshow, rows, generation, folder, *, side, hud) -> None:
+        if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
+            return
+        items, levels = folder
+        start = _place_of(generation, items)
+        if start is not None:
+            self.open(items, rows=rows, start=start, side=side, shuffle=in_order, hud=hud,
+                      levels=levels)
 
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:
@@ -506,7 +521,7 @@ class SlideshowDirector:
 
     @looking_once
     def open(self, items, *, rows=(), folder_items=None, location=None,
-             side=None, resume=None, filters=None, **kwargs):
+             side=None, resume=None, filters=None, levels=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a slideshow is made, however it was asked for, so the toolbar's
@@ -556,7 +571,7 @@ class SlideshowDirector:
                       enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
-        levels = self.versions_of(rows)
+        levels = self.versions_of(rows) if levels is None else levels
         actions = self._slideshow_actions(where)
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:

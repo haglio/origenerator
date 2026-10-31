@@ -101,7 +101,7 @@ class _AudioPath(_Line):
         return widget.text().strip()
 
 
-# The zero-width characters the metadata block wraps a displayed path with.
+# The zero-width characters the Basic section wraps a displayed path with.
 _INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 
 

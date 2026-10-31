@@ -56,13 +56,13 @@ from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
-from origenerator.generation_metadata import MetaItem, created_item, file_item
+from origenerator.generation_metadata import BasicItem, created_item, file_item
 from origenerator.gui import icons, palette
+from origenerator.gui.basic_section import basic_cells, label_column_width
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
-from origenerator.gui.metadata_block import label_column_width, meta_cells
 from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
@@ -128,7 +128,7 @@ def _pass_mouse_through(widget) -> None:
     takes the press by default. That left only the margins around them live.
 
     It also settles which context menu a right-click gets. The value labels come
-    from the metadata block, where they are selectable text, and Qt gives
+    from the Basic section, where they are selectable text, and Qt gives
     selectable text its own Copy / Select All menu; over a version that menu is
     both meaningless (there is a Copy button on the row, for the one value worth
     copying) and in the way of the row's own Delete.
@@ -254,7 +254,7 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()   # the row is a different height in each shape
 
-    def _show_facts(self, items: list[MetaItem],
+    def _show_facts(self, items: list[BasicItem],
                     beside_copy: QWidget | None = None) -> None:
         """Lay this row's facts out as the same ``label: value`` cells a metadata
         block builds — so the enhancement that made a version, the file it wrote
@@ -266,9 +266,9 @@ class _Row(QWidget):
             widget.deleteLater()
         self._fact_cells = []
         self._resting_ink = {}
-        key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
+        key_width = label_column_width([BasicItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
-            label, value, copy, reveal = meta_cells(item, key_width)
+            label, value, copy, reveal = basic_cells(item, key_width)
             beside = (beside_copy,) if beside_copy is not None and copy is not None else ()
             for column, widget in enumerate((label, value, copy, *beside, reveal)):
                 if widget is None:
@@ -323,7 +323,7 @@ class _VersionRow(_Row):
             self._thumbnail.setToolTip("This version's file is no longer on disk")
         items = []
         if version.settings:
-            items.append(MetaItem("Enhancement", version.settings))
+            items.append(BasicItem("Enhancement", version.settings))
         items.append(file_item(version.file, held_days=held_days))
         items.append(created_item(version.file, created_fallback))
         trash = None
@@ -404,7 +404,7 @@ class _PendingRow(_Row):
         # second and each would otherwise rebuild the row under the cursor.
         if pending.settings != self._settings:
             self._settings = pending.settings
-            self._show_facts([MetaItem("Enhancement", pending.settings)] if pending.settings else [])
+            self._show_facts([BasicItem("Enhancement", pending.settings)] if pending.settings else [])
         self.setToolTip(
             f"An enhancement of this image is being generated at {pending.settings}"
             if pending.settings else "An enhancement of this image is being generated"
@@ -429,7 +429,7 @@ class _AddRow(_Row):
         self._thumbnail.setStyleSheet(_ADD_TILE_CSS)
         self._thumbnail.setPixmap(icon_pixmap("plus", _PLUS, BG_PRIMARY))
         if settings:
-            self._show_facts([MetaItem("Enhancement", settings)])
+            self._show_facts([BasicItem("Enhancement", settings)])
         # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse
         # events to a disabled widget, and the hover is exactly what the dimmed
         # state is for — it is how the row explains why it cannot be pressed.

@@ -1223,13 +1223,13 @@ def test_a_tabs_enhancements_and_details_come_back_folded(qtbot, tmp_path):
     tab = first._gallery_view._generate_pane.currentWidget()
     tab.prefill("sdxl_t2i", {})
     tab._versions.set_collapsed(True)
-    tab._metadata_block.set_folded(True)
+    tab._basic_section.set_folded(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
     tab = reopened._gallery_view._generate_pane.currentWidget()
-    assert (tab._versions.is_collapsed(), tab._metadata_block.is_folded()) == (True, True)
+    assert (tab._versions.is_collapsed(), tab._basic_section.is_folded()) == (True, True)
 
 
 def test_a_tabs_link_sections_come_back_folded_as_they_were_left(qtbot, tmp_path):

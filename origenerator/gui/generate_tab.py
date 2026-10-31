@@ -59,6 +59,7 @@ from origenerator.generation_config import (
 from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.gui import icons
 from origenerator.gui.action_dropdown import ActionDropdown
+from origenerator.gui.basic_section import BasicSection, wrappable
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
@@ -75,7 +76,6 @@ from origenerator.gui.how_many import GenerateWithHowMany, HowManyDropdown
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
 from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.message import set_marked_text
-from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
@@ -445,9 +445,9 @@ class GenerateTab(DropZones):
         What the item shows sits with them, for the same reason: it is a fact
         about the finished item rather than a setting that made it, and it is
         the one of these facts anyone can change."""
-        self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
-        self._metadata_block.hide()
-        body.addWidget(self._metadata_block)
+        self._basic_section = BasicSection(go_to_folder=self._go_to_folder)
+        self._basic_section.hide()
+        body.addWidget(self._basic_section)
         self._action = ActionDropdown(state_names(), act_settings.CATEGORIES, header)
         self._action.chosen.connect(self._on_action_chosen)
 
@@ -1284,7 +1284,7 @@ class GenerateTab(DropZones):
 
     def reread_name(self) -> None:
         if self._displayed_row is not None:
-            self._metadata_block.setVisible(self._metadata_block.show_name(self._item_name()))
+            self._basic_section.setVisible(self._basic_section.show_name(self._item_name()))
         for zone in self.reaches():
             zone.reread_name()
 
@@ -1367,7 +1367,7 @@ class GenerateTab(DropZones):
             self._media_border = self._media_split.dragged_sizes() or self._media_border
         return {"folds": self._param_form.folds() if self._param_form else {},
                 "enhancement_levels_folded": self._versions.is_collapsed(),
-                "details_folded": self._metadata_block.is_folded(),
+                "details_folded": self._basic_section.is_folded(),
                 "related_folds": self._related.folds(),
                 "media_border": self._media_border}
 
@@ -1380,7 +1380,7 @@ class GenerateTab(DropZones):
         if isinstance(saved.get("enhancement_levels_folded"), bool):
             self._versions.set_collapsed(saved["enhancement_levels_folded"])
         if isinstance(saved.get("details_folded"), bool):
-            self._metadata_block.set_folded(saved["details_folded"])
+            self._basic_section.set_folded(saved["details_folded"])
         if isinstance(saved.get("related_folds"), dict):
             self._related.set_folds(saved["related_folds"])
         self._media_border = saved.get("media_border", saved.get("picture_border"))
@@ -1806,7 +1806,7 @@ class GenerateTab(DropZones):
         """Hide every info/action element that belongs only to a saved generation —
         the state of a tab with none on display: blank, following a run still
         being made, or holding a whole folder's rewrite."""
-        self._metadata_block.hide()
+        self._basic_section.hide()
         self._action.clear()
         self._related.clear()
         self._versions.hide()
@@ -1815,14 +1815,14 @@ class GenerateTab(DropZones):
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         """Reveal the info and actions for the generation on display: the
-        read-only metadata block for every selection, the source tile + the lane
+        read-only Basic section for every selection, the source tile + the lane
         button for a video, and the Animations for an image. ``preview`` is the
         resolved ``(path, media_type)`` (or ``None``), so the lane button keys off the
         same lookup.
         """
         self.reread_folder_buttons()
-        self._metadata_block.setVisible(
-            self._metadata_block.show_row(row, self._upscale_of(row), self._item_name()))
+        self._basic_section.setVisible(
+            self._basic_section.show_row(row, self._upscale_of(row), self._item_name()))
         self._action.show_row(row)
         self._related.show_row(row, image_rows)
         self._refresh_versions()
@@ -1912,7 +1912,7 @@ class GenerateTab(DropZones):
         self._go_to_folder.setVisible(
             row is not None and can_go is not None and can_go(row))
         if row is not None:
-            self._metadata_block.setVisible(self._metadata_block.has_content())
+            self._basic_section.setVisible(self._basic_section.has_content())
 
     def _on_versions_delete_requested(self, positions: list):
         """Relay a version-list delete by filename, not by position.

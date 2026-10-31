@@ -807,7 +807,7 @@ def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
 
 
 def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
-    # The value labels come from the metadata block, where they are selectable
+    # The value labels come from the Basic section, where they are selectable
     # text — and Qt gives selectable text its own Copy / Select All menu. Over a
     # version that menu means nothing (the row has a Copy button for the one
     # value worth copying) and it is in the way of the row's own Delete.

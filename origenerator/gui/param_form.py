@@ -514,7 +514,7 @@ class ParamForm(QWidget):
         written = found.writes or key
         widget = self._widgets.get(written)
         if isinstance(widget, PromptBoxes):
-            widget.edit(found.fixed(widget.shown_value()))
+            widget.rewrite(found.fixed)
             return
         fixed = found.fixed(self._read_field(self._defs[written]))
         if written == "frame_count" and self._scenes is not None:

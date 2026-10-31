@@ -89,8 +89,8 @@ class PromptBoxes(QWidget):
         self._show_stored(value)
         self.textChanged.emit()
 
-    def shown_value(self) -> str:
-        return BOX_BREAK.join(self._texts)
+    def rewrite(self, change: Callable[[str], str]) -> None:
+        self.edit(change(BOX_BREAK.join(self._texts)))
 
     def edit(self, value: str) -> None:
         self._history.took(self.value())

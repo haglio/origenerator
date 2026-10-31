@@ -425,7 +425,7 @@ class GalleryView(QWidget):
         self._generating_tile: GeneratingTile | None = None
 
     def _forget_the_listing(self):
-        """Empty every slot a rebuild fills in.
+        """Empty every place a rebuild fills in.
 
         Called once at construction and never again: a rebuild replaces what is
         here rather than clearing it first, so these are the values a gallery has
@@ -1319,7 +1319,7 @@ class GalleryView(QWidget):
 
     def would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a
-        byte-identical past generation — the cue to re-roll rather than waste a slot.
+        byte-identical past generation — the cue to re-roll rather than waste a run.
 
         The form sends the seed its field shows, so the seed is taken as pinned
         here; a freshly drawn seed would simply never match.
@@ -4129,7 +4129,7 @@ class GalleryView(QWidget):
         """The looping-WebP preview for a video ``row`` once one is made — until then
         ``None``, and the tile shows its still while one is made off the window's
         thread and starts playing it when it is. Feeds the grid tiles, the Latest
-        collection and Combine's slots; the info pane's strip asks the same maker."""
+        collection and Combine's drop zones; the info pane's strip asks the same maker."""
         return self._moving_previews.of(row)
 
     def follow_link(self, prompt_id: str):

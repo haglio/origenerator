@@ -38,7 +38,7 @@ _DETECTOR_CATEGORY = "ultralytics/bbox"
 _OUTLINE_DETECTOR_CATEGORY = "ultralytics/segm"
 
 # The picker option that means "no LoRA": choosing it builds the graph with no
-# LoraLoader for that slot (see the workflows' ``build_api_payload``), so the
+# LoraLoader for that dropdown (see the workflows' ``build_api_payload``), so the
 # base model runs unmodified. Never a real filename — a file's option always
 # carries its extension — so it is safe as a sentinel.
 NO_LORA = "None"

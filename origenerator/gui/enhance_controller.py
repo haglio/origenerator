@@ -33,7 +33,7 @@ from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.training_run import TrainingRun
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -503,7 +503,7 @@ class EnhanceController:
                     gallery.describe_enhance_params(params))
         if not self._launch(row, params):
             return None, f"couldn't launch the {what} — see the log", ERROR
-        return row["prompt_id"], doing, NOTICE
+        return row["prompt_id"], doing, INFO
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
         """Locking a slide asked for it to be enhanced, first. Returns whether a

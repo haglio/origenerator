@@ -491,12 +491,12 @@ is the two hooks that call the guard, below.
   stop, his hand training scripts beside the library take and honor the same
   file, and a claim whose pid has died is stale: two trainings each yielding
   only to ComfyUI's line took the card together on 2026-10-29 and both crawled.
-- `tools/open_from_notification.py` — what Windows runs when a notification of
+- `tools/open_from_toast.py` — what Windows runs when a toast of
   this app's is clicked, registered as the command for the `origenerator:` link
-  every notice carries. It hands the generation to the copy that has the
+  every toast carries. It hands the generation to the copy that has the
   library if one is open, a preview included, and starts production
   Origenerator on it if none is; `origenerator.app_link` is all of the
-  deciding, and the registering is `DesktopNotices`. Every copy registers the
+  deciding, and the registering is `Toasts`. Every copy registers the
   production checkout's, his decision (2026-10-18): a toast opened the preview
   that had raised it, and he wants toasts to open production. So a change to
   what this handler decides reaches a click only once it ships, and a preview

@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 _POLL_MS = 15
 
-#: Nothing asked for, nothing moving: a look this often is enough to notice a
+#: Nothing asked for, nothing moving: a look this often is enough to catch a
 #: tooltip or a spinner, and costs a grab of a window nobody is touching.
 _IDLE_LOOK_S = 0.1
 

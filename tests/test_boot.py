@@ -93,7 +93,7 @@ def test_a_launch_that_finds_the_library_held_says_so_once_its_screen_is_down_an
     assert events == ["loading screen down", "Another copy of Origenerator is already running."]
 
 
-def test_a_click_on_a_notice_while_another_copy_runs_is_left_to_that_copy_without_a_word(
+def test_a_click_on_a_toast_while_another_copy_runs_is_left_to_that_copy_without_a_word(
         boot, monkeypatch):
     monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
     told = MagicMock()
@@ -205,16 +205,16 @@ def test_a_launch_without_a_crash_log_runs_with_nothing_watching_the_window(boot
     assert boot.freeze_watch is None
 
 
-# --- the listener for clicked notices -----------------------------------------
+# --- the listener for clicked toasts -----------------------------------------
 
 
 def test_the_boot_listens_for_clicks_on_the_production_checkouts_channel_before_it_has_a_window(
         boot, tmp_path):
     with patch("origenerator.gui.link_listener.LinkListener") as listener:
-        boot.listen_for_clicked_notices(tmp_path / "production")
+        boot.listen_for_clicked_toasts(tmp_path / "production")
 
     listener.assert_called_once_with(checkout=tmp_path / "production", parent=boot.app)
-    assert boot.clicked_notices is listener.return_value
+    assert boot.clicked_toasts is listener.return_value
 
 
 # --- the window, once built ---------------------------------------------------
@@ -229,7 +229,7 @@ def _a_window_saying_what_happens_to_it(events):
 
 def _whose_screen_and_listener_record(boot, events):
     _a_loading_screen_saying_when_it_goes_down(boot, events)
-    boot.clicked_notices = MagicMock()
+    boot.clicked_toasts = MagicMock()
     boot.clicked_notices.answer_with.side_effect = (
         lambda go_to: events.append(("clicks go to", go_to)))
     return boot

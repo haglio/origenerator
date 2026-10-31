@@ -26,7 +26,7 @@ class RunOutcome:
 
 
 @dataclass(frozen=True)
-class Notice:
+class Toast:
     title: str
     body: str
     ok: bool
@@ -41,13 +41,13 @@ def _title(outcome: RunOutcome) -> str | None:
     return None
 
 
-def notice_for(outcome: RunOutcome) -> Notice | None:
+def toast_for(outcome: RunOutcome) -> Toast | None:
     title = _title(outcome)
     if title is None or outcome.seconds is None or outcome.seconds < LONG_RUN_SECONDS:
         return None
     took = clock_duration(outcome.seconds)
     body = f"{outcome.display_name} · {took}" if outcome.ok else f"{outcome.display_name} · stopped after {took}"
-    return Notice(title, body, ok=outcome.ok, generation=outcome.generation)
+    return Toast(title, body, ok=outcome.ok, generation=outcome.generation)
 
 
 def outcome_of_row(row: dict, *, ok: bool, seconds: float | None) -> RunOutcome:

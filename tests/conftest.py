@@ -71,12 +71,12 @@ from origenerator import (
     config,
     enhance_presets,
     gallery,
-    notice_toast,
     osr2_driver,
     osr2_motion_driver,
     running_ahead,
+    toast_raising,
 )
-from origenerator.gui import desktop_notices, job_queue, motion_panel, omnipause, voice_router
+from origenerator.gui import job_queue, motion_panel, omnipause, toasts, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
@@ -417,20 +417,20 @@ def _never_take_the_real_device(monkeypatch):
 def keep_out_of_windows(setattr) -> None:
     """Keep the suite out of the registry and off the user's screen.
 
-    Every window this suite builds builds the desktop notices with it, and those
+    Every window this suite builds builds the desktop toasts with it, and those
     name the app to Windows: two values under HKEY_CURRENT_USER — what to call
-    this app over a notification, and what a click on one runs — and a mark
+    this app over a toast, and what a click on one runs — and a mark
     written beside them, all of which belong to a real launch rather than to a
-    test's fiftieth throwaway window. And a notice raised here would be a
-    notification on the user's desktop and a line in their notification center,
+    test's fiftieth throwaway window. And a toast raised here would be a
+    toast on the user's desktop and a line in their notification center,
     from a run that never happened. All three are replaced; the test that
     covers any of them supplies its own stand-in over these.
     """
     setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
-    setattr(desktop_notices, "register_notification_identity", lambda *_a, **_kw: None)
-    setattr(desktop_notices, "register_link_handler", lambda *_a, **_kw: None)
-    setattr(notice_toast, "show", lambda *_a, **_kw: None)
-    setattr(notice_toast, "take_back", lambda *_a, **_kw: None)
+    setattr(toasts, "register_toast_identity", lambda *_a, **_kw: None)
+    setattr(toasts, "register_link_handler", lambda *_a, **_kw: None)
+    setattr(toast_raising, "show", lambda *_a, **_kw: None)
+    setattr(toast_raising, "take_back", lambda *_a, **_kw: None)
 
 
 @pytest.fixture(scope="session")
@@ -448,7 +448,7 @@ def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
 
 @pytest.fixture(autouse=True)
 def _never_name_this_app_to_the_real_windows(monkeypatch, _this_tests_own_folder):
-    """keep_out_of_windows, with the notices' marks in an AppData of the run's own."""
+    """keep_out_of_windows, with the toasts' marks in an AppData of the run's own."""
     appdata = _this_tests_own_folder / "appdata"
     appdata.mkdir()
     monkeypatch.setenv("LOCALAPPDATA", str(appdata))

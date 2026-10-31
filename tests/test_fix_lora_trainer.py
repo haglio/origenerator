@@ -125,11 +125,11 @@ def test_a_fix_training_waits_for_the_card_while_another_trainer_holds_it_then_t
     assert card_claim.take("hand training", another_program.pid)
     waited = []
 
-    def let_go(seconds):
+    def let_go():
         waited.append(_status(job)["state"])
         card_claim.release(another_program.pid)
 
-    monkeypatch.setattr(fix_lora_trainer.time, "sleep", let_go)
+    monkeypatch.setattr(fix_lora_trainer, "_wait_for_the_card", let_go)
 
     fix_lora_trainer.run(job)
 

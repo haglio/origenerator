@@ -73,6 +73,7 @@ from origenerator.nav_map import (
     one_per_stretch,
     surroundings,
 )
+from origenerator.one_look import looking_once
 from origenerator.orientation import (
     filter_rows,
     oriented_key,
@@ -133,6 +134,8 @@ class SlideshowHost(Protocol):
     def selected_prompt_ids(self) -> list[str]:
         """The generations picked in the browser, in the order shown."""
 
+    def off_thread(self, work, done) -> None: ...
+
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
         app's -- the block a slideshow's HUD hangs at its foot."""
@@ -188,6 +191,21 @@ class HeldSlideshow:
     filters: SlideshowFilters
 
 
+class _KeptPerModel:
+    def __init__(self, stamp_of):
+        self._stamp_of = stamp_of
+        self._stamp = None
+        self._kept: dict = {}
+
+    def get(self, key, work_out):
+        stamp = self._stamp_of()
+        if stamp != self._stamp:
+            self._stamp, self._kept = stamp, {}
+        if key not in self._kept:
+            self._kept[key] = work_out()
+        return self._kept[key]
+
+
 def _still_up(slideshow):
     """*slideshow* if it is still on screen, else None — a closed one is no
     occupant of anything, however recently it was one."""
@@ -237,9 +255,18 @@ def _narrowed_to(held: HeldSlideshow, shape: str, ids) -> HeldSlideshow:
                    state=_place_among(ids, held.state))
 
 
-def _side_of_the_set(rows, items) -> str | None:
+def _shapes_in(rows, items) -> list[str]:
     ids = {item[2] for item in items}
-    return the_side_of(row_orientation(row) for row in rows if row["prompt_id"] in ids)
+    return [row_orientation(row) for row in rows if row["prompt_id"] in ids]
+
+
+def _side_of_the_set(rows, items) -> str | None:
+    return the_side_of(_shapes_in(rows, items))
+
+
+def _shape_of_the_set(rows, items) -> str:
+    shapes = _shapes_in(rows, items)
+    return majority_shape(shapes) if shapes else region_for_items(items)
 
 
 def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
@@ -247,9 +274,7 @@ def _shape_it_opens_on(side: str, rows, items, opened_on: str | None) -> str:
         return row_orientation(row)
     if (shape := the_one_shape_on(side)) is not None:
         return shape
-    if rows:
-        return majority_shape(map(row_orientation, rows))
-    return region_for_items(items)
+    return _shape_of_the_set(rows, items)
 
 
 class SlideshowDirector:
@@ -306,8 +331,9 @@ class SlideshowDirector:
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
-        self._held_at_stamp = None
-        self._held_at: dict[str, frozenset[str]] = {}
+        self._held_at = _KeptPerModel(browser.model_stamp)
+        self._library = _KeptPerModel(browser.model_stamp)
+        self._rows_by_id = _KeptPerModel(browser.model_stamp)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
@@ -445,6 +471,7 @@ class SlideshowDirector:
                 "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
                                 favorite_ids=self._favorite_prompt_ids())}
 
+    @looking_once
     def open_on_preview(self, media, generation):
         """A double-click on a tab's preview: open the folder of the generation
         it shows as a slideshow standing on that generation.
@@ -456,28 +483,43 @@ class SlideshowDirector:
         is still running under it — in which case the slideshow opens on that run
         and goes on following it until it lands.
         """
-        listed = self._folder_rows()
-        folder_items = None
+        listed = self._listed_rows()
+        hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
         if media is None:  # following a run: it has no place among the files yet
-            items, rows, start, folder_items = [], listed, 0, self.items_of(listed)
-        else:
-            rows = (listed if any(row["prompt_id"] == generation for row in listed)
-                    else self.rows_at(self._location_of(self._host.row_for(generation))))
-            items = self.items_of(rows)
-            start = _place_of(generation, items)
-            if start is None:
-                items, start = [(media[0], media[1], generation, None)], 0
-                rows = [row for row in [self._host.row_for(generation)] if row is not None]
-        return self.open(items, rows=rows, start=start, shuffle=in_order,
-                         folder_items=folder_items,
-                         hud=HudFacts(
-                             order_label=LATEST_LABEL,
-                             favorite_ids=self._favorite_prompt_ids()))
+            return self.open([], rows=listed, start=0, shuffle=in_order,
+                             folder_items=self.items_of(listed), hud=hud)
+        rows = (listed if any(row["prompt_id"] == generation for row in listed)
+                else self.rows_at(self._location_of(self._host.row_for(generation))))
+        opened_on = [row for row in rows if row["prompt_id"] == generation]
+        items = self.items_of(opened_on)
+        if not items:
+            return self.open([(media[0], media[1], generation, None)], start=0, shuffle=in_order,
+                             rows=[row for row in [self._host.row_for(generation)] if row],
+                             hud=hud)
+        side = majority_shape(map(row_orientation, rows))
+        slideshow = self.open(items, rows=opened_on, start=0, side=side, shuffle=in_order,
+                              hud=hud)
+        if slideshow is not None and len(rows) > 1:
+            self._host.off_thread(
+                lambda: (self.items_of(rows), self.versions_of(rows)),
+                partial(self._fill_in, slideshow, rows, generation, side=side, hud=hud))
+        return slideshow
 
-    def _folder_rows(self) -> list[dict]:
-        """The rows the browser lists, in its order."""
-        rows = (self._host.row_for(pid) for pid in self._host.listed_prompt_ids())
+    def _listed_rows(self) -> list[dict]:
+        by_id = self._rows_by_id.get(None, lambda: {
+            row["prompt_id"]: row for row in self._db.list_generations()})
+        rows = (by_id.get(prompt_id) or self._host.row_for(prompt_id)
+                for prompt_id in self._host.listed_prompt_ids())
         return [row for row in rows if row is not None]
+
+    def _fill_in(self, slideshow, rows, generation, folder, *, side, hud) -> None:
+        if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
+            return
+        items, levels = folder
+        start = _place_of(generation, items)
+        if start is not None:
+            self.open(items, rows=rows, start=start, side=side, shuffle=in_order, hud=hud,
+                      levels=levels)
 
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:
@@ -485,8 +527,9 @@ class SlideshowDirector:
         key = gallery.settings_folder_key(row, self._host.image_config_index())
         return oriented_key(key, row_orientation(row))
 
+    @looking_once
     def open(self, items, *, rows=(), folder_items=None, location=None,
-             side=None, resume=None, filters=None, **kwargs):
+             side=None, resume=None, filters=None, levels=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a slideshow is made, however it was asked for, so the toolbar's
@@ -513,7 +556,7 @@ class SlideshowDirector:
         # the whole screen.
         run = self._run_being_made_at(location) if not items else None
         where = side or (row_orientation(run) if run is not None
-                         else region_for_items(items or folder_items or []))
+                         else _shape_of_the_set(rows, items or folder_items or []))
         # And what that side IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
@@ -536,7 +579,7 @@ class SlideshowDirector:
                       enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
-        levels = self.versions_of(rows)
+        levels = self.versions_of(rows) if levels is None else levels
         actions = self._slideshow_actions(where)
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
@@ -656,14 +699,12 @@ class SlideshowDirector:
         and the HUD this app publishes goes with it — no window of ours."""
         occupant = self.region_slideshow(side)
         if occupant is not None:
-            occupant.play(items, hud=hud, **kwargs)
-            occupant.set_levels(levels)
+            occupant.play(items, hud=hud, levels=levels, **kwargs)
             return occupant
         slideshow = FunestraSlideshow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace_on(side), hud=hud,
-                          say=self._host.say, **kwargs)
-        slideshow.set_levels(levels)
+                          levels=levels, say=self._host.say, **kwargs)
         slideshow.shown.set_queue(*self._host.queue_now())
         self._region_slideshows[side] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
@@ -692,12 +733,10 @@ class SlideshowDirector:
         if built:
             view = SlideshowView(items, side=side, actions=actions,
                                  pace=self._pace_on(side), motion=self._motion, hud=hud,
-                                 **self._the_sound_standing_on_its_own(), **kwargs)
+                                 levels=levels, **self._the_sound_standing_on_its_own(),
+                                 **kwargs)
         else:
-            view.slideshow.play(items, actions=actions, hud=hud, **kwargs)
-        # Shift+Left/Right gets its own axis, so a level can be compared against
-        # the one below it at full size rather than in a thumbnail.
-        view.slideshow.set_levels(levels)
+            view.slideshow.play(items, actions=actions, hud=hud, levels=levels, **kwargs)
         if built:
             self._present_surface(view, side)
             view.set_queue(*self._host.queue_now())
@@ -716,6 +755,7 @@ class SlideshowDirector:
         elif built or view.isMinimized():
             view.showFullScreen()
 
+    @looking_once
     def items_of(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
         order given — the slideshow's playlist. The thumbnail is what the view
@@ -732,6 +772,7 @@ class SlideshowDirector:
                  row.get("thumbnail_path"))
                 for row, (path, media_type) in _with_files(rows)]
 
+    @looking_once
     def versions_of(self, rows) -> dict:
         """Each of ``rows``' versions, newest first, keyed by the file its slide
         plays -- the axis Shift+Left/Right steps along. One with a single version
@@ -760,7 +801,8 @@ class SlideshowDirector:
         """The generations a slideshow on *side* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
         clips against too, each over its own sources."""
-        return filter_rows([row for row in self._db.list_generations() if in_sight(row)], side)
+        return self._library.get(side, lambda: filter_rows(
+            [row for row in self._db.list_generations() if in_sight(row)], side))
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))
@@ -1359,13 +1401,8 @@ class SlideshowDirector:
         return prompt_id in held or self._recents_would_take(row, location)
 
     def _held_at_location(self, location) -> frozenset[str]:
-        stamp = self._browser.model_stamp()
-        if stamp != self._held_at_stamp:
-            self._held_at_stamp, self._held_at = stamp, {}
-        if location not in self._held_at:
-            self._held_at[location] = frozenset(
-                r["prompt_id"] for r in self.rows_at(location))
-        return self._held_at[location]
+        return self._held_at.get(location, lambda: frozenset(
+            r["prompt_id"] for r in self.rows_at(location)))
 
     def _recents_would_take(self, row: dict, location) -> bool:
         base, side = _split_collection_key(location)

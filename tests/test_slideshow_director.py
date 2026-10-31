@@ -14,6 +14,7 @@ import json
 import os
 import re
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -75,7 +76,7 @@ class FakeSignal:
 class FakeSlideshow:
     """A slideshow reduced to what the director asks of one."""
 
-    def __init__(self, items=(), *, actions=None, pace=None, hud=None, **kwargs):
+    def __init__(self, items=(), *, actions=None, pace=None, hud=None, levels=None, **kwargs):
         self.items = list(items)
         self.actions = actions
         self.pace = pace
@@ -93,7 +94,7 @@ class FakeSlideshow:
         self.said = []
         self.said_kinds = []
         self.runs_said = []
-        self.levels = None
+        self.levels = levels
         self.resumed = None
         self.taken_up = None
         self.filters = SlideshowFilters()
@@ -139,10 +140,12 @@ class FakeSlideshow:
         return self.visible
 
     # what the director tells it
-    def play(self, items, *, hud=None, **kwargs):
+    def play(self, items, *, hud=None, levels=None, **kwargs):
         self.items = list(items)
         self.hud = hud
+        self.levels = levels
         self.played.append(list(items))
+        self.played_with = kwargs
 
     def set_levels(self, levels):
         self.levels = levels
@@ -400,11 +403,13 @@ class FakeDB:
     def __init__(self, rows=(), requests=()):
         self.rows = {row["prompt_id"]: row for row in rows}
         self.requests = {record["prompt_id"]: record for record in requests}
+        self.listings = 0
 
     def get_request(self, prompt_id):
         return self.requests.get(prompt_id)
 
     def list_generations(self):
+        self.listings += 1
         return list(self.rows.values())
 
     def get_generation(self, prompt_id):
@@ -438,6 +443,7 @@ class FakeHost:
         self.core = object()
         self.visible = [row["prompt_id"] for row in self.rows]
         self.picked = []
+        self.holding = None
 
     def slideshow_location(self):
         return self.location
@@ -468,6 +474,12 @@ class FakeHost:
 
     def queue_now(self):
         return self.queue
+
+    def off_thread(self, work, done):
+        if self.holding is None:
+            done(work())
+        else:
+            self.holding.append(lambda: done(work()))
 
     def window(self):
         return self.core
@@ -649,6 +661,80 @@ def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(sli
 
     (slideshow,) = made
     assert slideshow.hud.order_label == LATEST_LABEL
+
+
+def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_folder_is_ready(
+        slideshows):
+    # Worked out whole before anything showed, a folder of thousands held its
+    # slideshow back for a second or more.
+    host = FakeHost(rows=[_row("a3"), _row("a2"), _row("a1")])
+    host.holding = []
+    director, _host, made = slideshows(host)
+
+    director.open_on_preview(("a2.png", "image"), "a2")
+
+    assert [item[2] for item in made[0].items] == ["a2"]
+    (fill_in,) = host.holding
+    fill_in()
+    assert [item[2] for item in made[0].items] == ["a3", "a2", "a1"]
+    assert made[0].played_with["start"] == 1
+
+
+def test_a_double_clicked_item_plays_the_rows_the_browser_listed_without_reading_each_again(
+        slideshows):
+    # Asked of the library one at a time, the rows of Latest kept a double-click
+    # waiting eleven seconds before its slideshow could open.
+    rows = [_row("a2"), _row("a1")]
+    host = FakeHost(rows=rows)
+    asked = []
+    host.row_for = asked.append
+    db = FakeDB(rows)
+    director, _host, made = slideshows(host, db=db)
+
+    director.open_on_preview(("a2.png", "image"), "a2")
+
+    assert [item[2] for item in made[0].items] == ["a2", "a1"]
+    assert asked == []
+
+
+def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_folder(
+        slideshows, monkeypatch, tmp_path):
+    # Asked after one at a time, the files of Latest's items held a double-click
+    # for a second; the folder they sit in is listed once instead.
+    for n in range(3):
+        (tmp_path / f"g{n}.png").write_bytes(b"x")
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    rows = [_row(f"g{n}", files=(f"g{n}.png",)) for n in range(3)]
+    director, _host, made = slideshows(FakeHost(rows=rows))
+    del director.items_of
+
+    def refused(asking):
+        def ask(path):
+            if tmp_path in path.parents:
+                pytest.fail(f"asked after {path.name} alone")
+            return asking(path)
+        return ask
+
+    with monkeypatch.context() as asked:
+        asked.setattr(Path, "exists", refused(Path.exists))
+        asked.setattr(Path, "is_file", refused(Path.is_file))
+        director.open_on_preview((str(tmp_path / "g1.png"), "image"), "g1")
+
+    assert [item[2] for item in made[0].items] == ["g0", "g1", "g2"]
+
+
+def test_a_double_clicked_item_s_slideshow_takes_the_shape_its_rows_say_opening_no_file(
+        slideshows, monkeypatch):
+    # Every item's file opened to measure it held a double-click on Latest for
+    # sixteen seconds, when the rows already say which shape each item is.
+    rows = [_shaped("g1", TALL), _shaped("g2", TALL), _shaped("g3", WIDE)]
+    director, _host, made = slideshows(FakeHost(rows=rows))
+    monkeypatch.setattr(module, "region_for_items",
+                        lambda items: pytest.fail("a file was opened to measure it"))
+
+    director.open_on_preview(("g3.png", "image"), "g3")
+
+    assert made[0].opened_with["side"] == PORTRAIT
 
 
 def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slideshows):
@@ -2077,6 +2163,19 @@ def _fox(prompt_id, *, seed):
     image = _image(prompt_id, "a red fox", seed=seed)
     image["output_files"] = json.dumps([{"filename": f"{prompt_id}.png"}])
     return image
+
+
+def test_the_map_reads_the_library_once_for_each_state_of_it(slideshows):
+    # Read afresh for every slide the map was drawn around, the library held
+    # each step of a slideshow, and its double-click, a tenth of a second.
+    rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
+    db = FakeDB(rows)
+    director, _host, _made = slideshows(_library(rows), db=db, browser=FakeBrowser(stamp=1))
+
+    director.neighbors_of("g1", side="portrait")
+    director.neighbors_of("g2", side="portrait")
+
+    assert db.listings == 1
 
 
 def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(slideshows, tmp_path):

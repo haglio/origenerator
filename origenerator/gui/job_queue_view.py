@@ -97,7 +97,7 @@ from origenerator.gui.inflight import (
     shield_every_job,
     starting_row_text,
 )
-from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
+from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -223,7 +223,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # the thing read are one object rather than a line of text with a separate
         # stripe under it. The same line, in the same words, as the browser pane's
         # in-flight tiles carry.
-        self._progress = ProgressCaption()
+        self._progress = ProgressBar()
         self._progress.setFixedHeight(BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)
         column.addWidget(self._progress)

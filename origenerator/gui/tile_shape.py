@@ -6,10 +6,10 @@ beside it. They stand shoulder to shoulder in one flow, so they are one size and
 their captions are set one way. Kept here rather than in any one of them so the
 family cannot drift apart the next time one is touched.
 
-The caption is set in the family's tiny type, and the band is two lines of it
+The caption is set in the family's tiny type, and the caption block is two lines of it
 tall, so a caption long enough to wrap -- a run in flight is captioned with its
 model and its prompt -- wraps rather than being clipped. The tile's height
-follows from the band, so a caption never quietly costs a line.
+follows from the caption block, so a caption never quietly costs a line.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ TILE_MARGIN = GAP_SMALL
 TILE_SPACING = GAP_SMALL
 
 def caption_font() -> QFont:
-    """The family's tiny type, which a tile's caption, count and breadcrumb are
+    """The family's tiny type, which a tile's caption, count and folder path are
     set in: a copy, since a caller may set it on a widget that then changes it."""
     return QFont(make_font(FONT_UI, SIZE_TINY))
 
@@ -38,13 +38,13 @@ def line_height() -> int:
 
 
 def caption_height() -> int:
-    """The caption band: two lines of :func:`caption_font`, so a caption long
+    """The caption block: two lines of :func:`caption_font`, so a caption long
     enough to wrap is read rather than cut in half."""
     return 2 * line_height()
 
 
 def tile_size() -> tuple:
-    """Every tile's outside — the thumbnail, the caption band under it, and the
+    """Every tile's outside — the thumbnail, the caption block under it, and the
     frame around both."""
     height = (2 * TILE_MARGIN + THUMBNAIL_SIZE[1] + TILE_SPACING + caption_height())
     return TILE_WIDTH, height
@@ -54,20 +54,20 @@ def thumbnail_size() -> QSize:
     return QSize(*THUMBNAIL_SIZE)
 
 
-def folder_tile_size(breadcrumb: bool = False) -> tuple:
+def folder_tile_size(folder_path: bool = False) -> tuple:
     """A folder's outside: the same tile as a generation's, plus a line of the
     caption's type saying how many items are in it, and another saying where it
     lives in the Favorites collection, where a folder is out of its parent's
     context."""
     width, height = tile_size()
     height += TILE_SPACING + line_height()
-    if breadcrumb:
+    if folder_path:
         height += TILE_SPACING + line_height()
     return width, height
 
 
 def style_caption(label) -> None:
-    """Set one tile's caption label to the family's font and band height."""
+    """Set one tile's caption label to the family's font and caption block height."""
     label.setFont(caption_font())
     label.setMaximumHeight(caption_height())
 

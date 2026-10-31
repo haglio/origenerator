@@ -358,7 +358,7 @@ def build_stylesheet() -> str:
         font-weight: bold;
         padding: {GAP_SMALL}px 0;
     }}
-    /* The fold header over each model+LoRA band of search results, and the
+    /* The fold header over each model+LoRA section of search results, and the
        time heading over each batch of tiles. Brighter
        than the muted captions and ruled off above, so it reads as the start of
        a section rather than as a label belonging to the tiles before it; left

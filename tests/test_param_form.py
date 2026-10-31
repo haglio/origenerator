@@ -1674,7 +1674,7 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
     assert rate.currentText() == "64 fps"
 
 
-# --- a story: a card per scene, its prompts and its length -----------------------
+# --- a story: a tile per scene, its prompts and its length -----------------------
 
 def _scene_defs():
     return [
@@ -1698,7 +1698,7 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
     # One row stands for the four, labeled as the scenes: a prompt row of the
-    # form's own beside the cards would read as the video's where the cards' are
+    # form's own beside the tiles would read as the video's where the tiles' are
     # the scenes'.
     assert form._present_keys["Prompts"] == ["scene_frames"]
 
@@ -1763,7 +1763,7 @@ def test_settings_from_before_scenes_load_as_one_scene_of_the_clips_length(qtbot
 
 def test_a_whole_clip_negative_carries_on_into_every_scene_of_a_story(qtbot):
     # A story made when the negative was the video's has one text for three
-    # scenes; the graph keeps it out of every scene, and so the cards show it
+    # scenes; the graph keeps it out of every scene, and so the tiles show it
     # on every scene -- what is seen is what renders.
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1813,8 +1813,8 @@ def test_scene_prompts_are_text_fields_for_find_and_read_back_as_one_story(qtbot
     assert form.get_values()["negative_prompt"] == "\n---\nn"
 
 
-def test_each_box_on_a_card_says_what_it_is(qtbot):
-    # Three fields to a card, so each is captioned and carries its param's help;
+def test_each_box_on_a_tile_says_what_it_is(qtbot):
+    # Three fields to a tile, so each is captioned and carries its param's help;
     # the lines field says as well that what goes in it is spoken.
 
     form = ParamForm(_scene_defs())
@@ -1891,7 +1891,7 @@ def test_stored_spoken_settings_open_with_their_prompts_already_shut_down(qtbot)
 
 def test_a_shut_down_prompt_actually_renders_dim(qtbot):
     # The dimming is a stylesheet property selector, which Qt only re-reads on a
-    # repolish -- so without one the card would go read-only while still looking
+    # repolish -- so without one the tile would go read-only while still looking
     # like an ordinary field. Rendered rather than asserted on the property:
     # that is the half a missing repolish breaks.
 
@@ -1926,7 +1926,7 @@ def test_a_shut_down_prompt_actually_renders_dim(qtbot):
 
 
 def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
-    # The loop has no lines param, so its cards carry no field for one: a field
+    # The loop has no lines param, so its tiles carry no field for one: a field
     # that nothing reads would be an invitation to type into the void.
 
     form = ParamForm([pd for pd in _scene_defs() if pd.key != "scene_lines"])

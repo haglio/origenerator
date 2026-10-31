@@ -71,7 +71,7 @@ def enhance_state(row: dict, settings) -> str | None:
     settings*. So the corner says "you have this one" only while the panel would
     reproduce what is already there, and goes back to offering another the moment
     a setting moves — which is the same question the version list's ``+ Enhance``
-    card and the button bank's Enhance both answer
+    row and the button bank's Enhance both answer
     (:func:`~origenerator.gallery.enhance.level_matching_settings`).
     """
     if not gallery.is_enhanceable_row(row):

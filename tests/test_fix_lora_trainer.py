@@ -121,7 +121,7 @@ def _whole_run(tmp_path, monkeypatch, *, crop_code: int, crop_says=None):
     return job, done
 
 
-def test_a_fix_training_waits_for_the_card_while_another_trainer_holds_it_then_takes_it(
+def test_a_fix_training_waits_for_the_tile_while_another_trainer_holds_it_then_takes_it(
         tmp_path, monkeypatch, another_program):
     job, done = _whole_run(tmp_path, monkeypatch, crop_code=0)
     assert card_claim.take("hand training", another_program.pid)

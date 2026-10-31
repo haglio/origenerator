@@ -32,7 +32,7 @@ def test_the_scrim_lies_over_the_thumbnail_it_is_about(host):
 
 
 def test_an_inset_holds_it_off_a_border_the_thumbnail_draws_itself(host):
-    # An in-flight card's blue "being made" edge says something; the scrim has no
+    # An in-flight tile's blue "being made" edge says something; the scrim has no
     # business painting over it.
     thumbnail = _thumbnail(host)
     scrim = StageScrim(host)

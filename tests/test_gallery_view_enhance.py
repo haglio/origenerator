@@ -412,7 +412,7 @@ def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_pa
 def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbot,
                                                                             tmp_path):
     # The level being made appears where the levels are, mirroring the run's
-    # frames like every other in-flight card in the app.
+    # frames like every other in-flight tile in the app.
 
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
@@ -507,7 +507,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
 
 def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
         qtbot, tmp_path, monkeypatch):
-    # An enhancement gets no card of its own — it shows on the tile of the image
+    # An enhancement gets no tile of its own — it shows on the tile of the image
     # it improves — so that tile's menu is the only thing in the middle column
     # that can be asked to stop it. Without the entry the run had to be hunted
     # down among the Job Queue's rows.
@@ -563,10 +563,10 @@ def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeyp
     assert not any(label.startswith("Cancel") for label in labels[0])
 
 
-def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
+def test_a_running_enhance_gets_no_tile_of_its_own_on_latest(qtbot, tmp_path):
     # An enhancement is a version of an image, not an item beside it — so the
     # collection shows the run on that image's own tile, under the scrim, and never as
-    # a second card claiming something else is being made. The Job Queue's
+    # a second tile claiming something else is being made. The Job Queue's
     # queue still lists it: that is what the GPU is doing.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -584,7 +584,7 @@ def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
 
 
 def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path):
-    # With no card of its own, the run shows only on the tile of the image it is
+    # With no tile of its own, the run shows only on the tile of the image it is
     # upgrading — and that image can have been made a thousand tiles ago, where
     # nobody would find it. What is being done to an image is the newest thing
     # about it, so the collection lists it by that, and it stays there once the
@@ -817,7 +817,7 @@ def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_p
     assert view._browser._thumb_widgets["g0"]._enhancing is not None
 
 
-def test_the_add_card_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
+def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

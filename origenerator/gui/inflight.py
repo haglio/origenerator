@@ -90,10 +90,7 @@ class InFlightItem:
     # run with no thumbnail of its own can be recognized by, its own output being
     # the thing that doesn't exist yet.
     folder_thumbnails: tuple = ()
-    # This one is not a job yet: it stands in for a press of Generate whose work
-    # to become one — choosing the settings, building the params, the submit itself
-    # — has not finished. It has no row, no id on the server, and nothing to
-    # cancel; it exists so the press has a visible answer.
+    # Not a job yet (:mod:`origenerator.gui.starting_rows`).
     starting: bool = False
     # One place up or down the line, where the queue lets it go that way: never
     # past a shielded run being made or what a slideshow is locked on, and never
@@ -323,16 +320,8 @@ def seconds_until_start(starts_at: float | None, *, now=time.monotonic) -> float
 
 
 def starting_row_text(starting: bool) -> str | None:
-    """What a row that is not a job yet says in place of a wait.
-
-    Pressing Generate in the Combine panel is not the same as queueing something:
-    an act has to be answered by settings first, and then the params built and the
-    prompt submitted. With nothing on screen for that stretch, the press reads as a
-    press that did nothing, which is indistinguishable from a wedged app. This row
-    is the answer, and it says outright that it is not in the line yet.
-
-    ``None`` once it is, which is every row that came off the database.
-    """
+    """What a row that is not a job yet says in place of a wait: ``None`` once it
+    is, which is every row that came off the database."""
     return "Starting…" if starting else None
 
 

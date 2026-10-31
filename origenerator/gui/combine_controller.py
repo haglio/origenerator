@@ -7,11 +7,8 @@ the act picked beside them, and every way settings are found and launched: the
 dropped video's own, the settings assigned for an act, the act's most-used past
 video, or the lane's own workflow as it starts.
 
-Two things ride with it because nothing else has them. The stand-in row a press
-puts in the queue before there is a job: everything between the press and a real
-job takes seconds, and a button that seems to do nothing reads as an app that has
-died. And the spoken "animate as", which is this same act asked for out loud: the
-clip handed on the moment it exists, and a second ask over the same image
+The spoken "animate as" rides with it, being this same act asked for out loud:
+the clip handed on the moment it exists, and a second ask over the same image
 refused, so saying it twice does not spend the GPU twice.
 
 What stays with the host is what a launch is *of* and where it lands: the folder
@@ -42,9 +39,8 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
-from origenerator.gui.generation_job import JobState
-from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType, media_type_from_filename
@@ -81,9 +77,6 @@ class CombineHost(Protocol):
                        workflow_version: str | None = None) -> str:
         """The same key, for a caller holding a config rather than a row."""
 
-    def queue_changed(self) -> None:
-        """Redraw the line: a stand-in row went on it or came off it."""
-
     def reveal_launch(self, key: str) -> None:
         """Show a just-launched combine — its folder if the tree has one, else
         the Recents collection its card will appear on."""
@@ -100,12 +93,14 @@ class CombineController(QObject):
     """The combine panel, and every way settings reach a dropped image."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
-                 info_tabs_of, slideshows, inbox: evolver_export.EvolverInbox | None = None,
+                 info_tabs_of, slideshows, starting: StartingRows,
+                 inbox: evolver_export.EvolverInbox | None = None,
                  names: ItemNames | None = None):
         super().__init__(parent)
         self._host = host
         self._db = db
         self._jobs = jobs
+        self._starting = starting
         self._names = names or ItemNames(db)
         self._files = FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
         # Where a clip is handed to Evolver. Asked for rather than performed
@@ -119,11 +114,6 @@ class CombineController(QObject):
         # exist by then.
         self._info_tabs_of = info_tabs_of
         self._slideshows = slideshows
-        # Stand-in queue rows for a Generate pressed but not yet a job, by key
-        # (:meth:`_show_launching`), and the counter their keys are drawn from —
-        # anything that can't be mistaken for a prompt id.
-        self._launching: dict[str, InFlightItem] = {}
-        self._launch_seq = 0
         # Combine: drop an image + an i2v video, Generate re-runs that video's
         # settings on the image. Needs a client to generate, so it hides without one.
         self.panel = CombinePanel(
@@ -334,13 +324,13 @@ class CombineController(QObject):
         they did — so the stand-in row would have appeared only once the work it
         was standing in for was already over.
         """
-        key = self._show_launching(image_id, video_id=video_id, intent=intent)
+        key = self._show_starting(image_id, video_id=video_id, intent=intent)
 
         def run():
             try:
                 self._generate_combination(image_id, video_id, intent=intent)
             finally:
-                self._drop_launching(key)
+                self._starting.drop(key)
 
         self._after_painting(run)
 
@@ -348,9 +338,9 @@ class CombineController(QObject):
         """The combine panel's Generate with an act picked, with the line showing
         it at once; :meth:`generate_category` drops the stand-in however the
         launch turns out."""
-        key = self._show_launching(image_id, category=category)
+        key = self._show_starting(image_id, category=category)
         self._after_painting(lambda: self.generate_category(
-            image_id, category, intent, launching=key))
+            image_id, category, intent, starting=key))
 
     def _after_painting(self, work) -> None:
         """Run ``work`` on the next turn of the event loop, once what has just
@@ -362,15 +352,12 @@ class CombineController(QObject):
         """
         defer(self, work)
 
-    def _show_launching(self, image_id: str, *, category: str = "",
+    def _show_starting(self, image_id: str, *, category: str = "",
                         video_id: str | None = None,
                         intent: str = act_settings.VIDEO) -> str:
-        """Put a stand-in row at the back of the line for a Generate just pressed,
-        and return its key. It carries everything already known about the run, so
-        the row that replaces it is the same row with its price filled in, and it
-        offers no Cancel: there is nothing on the server to stop yet."""
-        self._launch_seq += 1
-        key = f"launching-{self._launch_seq}"
+        """Put a stand-in row in the line for a Generate just pressed, and return
+        its key. It carries everything already known about the run, so the row
+        that replaces it is the same row with its price filled in."""
         video_row = self._db.get_generation(video_id) if video_id else None
         built = (self._combined_params(image_id, video_id, intent)
                  if video_id and not category else None)
@@ -378,11 +365,8 @@ class CombineController(QObject):
         if built is not None:
             workflow, params, _video_row, _image_row = built
             edited = gallery.prompts_differ_from(params, video_row, workflow)
-        self._launching[key] = InFlightItem(
-            key=key,
+        return self._starting.show(
             caption="A video from Combine, still being started",
-            reading=RunReading(status=JobState.QUEUED),
-            reveal=lambda: None,  # no folder to open yet: it has no settings
             media_type=MediaType.VIDEO,
             job_kind=gallery.JobKind.VIDEO,
             act=category,
@@ -391,21 +375,7 @@ class CombineController(QObject):
             source_video_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
             prompt_edited=edited,
             source_image=self._image_reference(image_id),
-            starting=True,
         )
-        self._host.queue_changed()
-        return key
-
-    def _drop_launching(self, key: str | None) -> None:
-        """Take a stand-in row back off the line — what it stood for is a real row
-        now, or never became one. A no-op for a key already gone, so an exit path
-        that drops it twice costs nothing."""
-        if key is not None and self._launching.pop(key, None) is not None:
-            self._host.queue_changed()
-
-    def launching_rows(self) -> list[InFlightItem]:
-        """Every Generate pressed but not yet turned into a job, for the line."""
-        return list(self._launching.values())
 
     # --- building and launching a combination --------------------------------
 
@@ -620,14 +590,14 @@ class CombineController(QObject):
 
     def generate_category(self, image_id: str, category: str,
                           intent: str = act_settings.VIDEO, send: bool = False,
-                          launching: str | None = None) -> None:
+                          starting: str | None = None) -> None:
         """Run the settings that fit ``category`` on the dropped image: the
         settings assigned for it, else the act's most-used past video. ``intent``
         chooses the lane both answer from; ``send`` hands the finished clip to
         Genau without a second ask.
 
-        ``launching`` is the stand-in row the press already put in the line
-        (:meth:`_show_launching`), taken back off however this ends.
+        ``starting`` is the row the press already put in the line, taken back
+        off however this ends.
         """
         try:
             if not self._generate_curated(image_id, category, intent, send):
@@ -635,7 +605,7 @@ class CombineController(QObject):
                 if video_id is not None:
                     self._generate_combination(image_id, video_id, send, category, intent)
         finally:
-            self._drop_launching(launching)
+            self._starting.drop(starting)
 
     def _open_category(self, image_id: str, category: str,
                        intent: str = act_settings.VIDEO) -> None:

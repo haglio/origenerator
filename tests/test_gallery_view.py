@@ -11937,6 +11937,21 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
     assert view._queue.rows() == []
 
 
+def test_a_row_standing_in_for_an_image_waits_in_front_of_the_videos(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._jobs.start_prepared("video/a", _WAN_I2V, dict(_WAN_I2V.default_params(), seed=3))
+    view._jobs.start_prepared("video/b", _WAN_I2V, dict(_WAN_I2V.default_params(), seed=4))
+    making, waiting = view._jobs.queue_order
+
+    standing = view._starting.show(caption="An image from a Request, still being started",
+                                   media_type=MediaType.IMAGE)
+
+    assert [item.key for item in view._queue._items] == [making, standing, waiting]
+    assert [item.key for item in view.queue_now()[0]] == [making, standing, waiting]
+
+
 # --- what a combine's run records about where its settings came from --------
 
 
@@ -12202,7 +12217,7 @@ def test_a_pressed_combine_stands_in_line_with_its_source_video_marked_as_its_ru
         CombineRequest(image_id="img", video_id="vid",
                        intent=view._combine.panel.selected_intent()))
 
-    (standing,) = view._combine.launching_rows()
+    (standing,) = view._starting.rows()
     assert standing.prompt_edited is stands_apart
 
 

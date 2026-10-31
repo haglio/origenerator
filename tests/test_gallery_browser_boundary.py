@@ -11,7 +11,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEW = REPO_ROOT / "origenerator" / "gui" / "gallery_view.py"
 PANE = REPO_ROOT / "origenerator" / "gui" / "browser_pane.py"
-MAX_GALLERY_VIEW_METHODS = 270
+MAX_GALLERY_VIEW_METHODS = 269
 MAX_BROWSER_PANE_METHODS = 79
 
 # A private attribute read through a privately held object — self._x._y — the

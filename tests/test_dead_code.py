@@ -71,7 +71,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-MAX_PROSE_LINES = 16040
+MAX_PROSE_LINES = 16014
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

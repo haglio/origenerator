@@ -19,6 +19,7 @@ from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
+from origenerator.media import MediaType
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -1920,6 +1921,25 @@ def test_an_image_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
     newer = _launch_image(queue, "i3", seed=3)
 
     assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
+
+
+def test_a_job_not_made_yet_is_placed_where_the_line_would_take_it(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    _launch_video(queue, "v1", seed=1)  # on the machine
+    waiting = _launch_video(queue, "v2", seed=2)
+
+    assert queue.joins_before(MediaType.IMAGE) == waiting.prompt_id
+    assert queue.joins_before(MediaType.VIDEO) is None  # the back
+
+
+def test_a_job_not_made_yet_is_placed_behind_every_job_put_first(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    waiting = _launch_image(queue, "i1", seed=1)
+    rendering = _launch_image(queue, "i2", seed=2)
+    video = _launch_video(queue, "v1", seed=3)
+    queue.put_first({waiting.prompt_id, rendering.prompt_id})
+
+    assert queue.joins_before(MediaType.IMAGE) == video.prompt_id
 
 
 def test_a_batch_of_images_lines_up_after_a_job_put_first_and_leaves_it_running(

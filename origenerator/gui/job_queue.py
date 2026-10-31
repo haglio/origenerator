@@ -23,6 +23,7 @@ import math
 import threading
 import time
 from itertools import pairwise
+from types import SimpleNamespace
 
 from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, pyqtSignal
 
@@ -878,6 +879,14 @@ class JobQueue(QObject):
     def _line(self) -> list[GenerationJob]:
         making_first = sorted(self._on_server, key=lambda job: job.state != JobState.RUNNING)
         return making_first + self._waiting
+
+    def joins_before(self, media_type: str) -> str | None:
+        newcomer = SimpleNamespace(media_type=media_type, prompt_id=None)
+        line = list(self._waiting)
+        line.insert(queue_line.insertion_index(line, newcomer), newcomer)
+        queue_line.put_first(line, self._first)
+        behind = line[line.index(newcomer) + 1:]
+        return behind[0].prompt_id if behind else None
 
     def move(self, prompt_id: str, before: str | None) -> None:
         line = self._line()

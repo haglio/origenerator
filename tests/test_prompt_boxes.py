@@ -349,14 +349,18 @@ def test_find_searches_every_box_and_hears_when_one_comes_or_goes(qtbot):
     assert len(form.text_fields()) == 2
 
 
-def test_the_copy_button_copies_the_prompt_as_stored(qtbot):
+def test_the_copy_button_copies_plain_text_that_pastes_back_into_boxes_of_whole_words(qtbot):
     QApplication.clipboard().clear()
     form = _form_with_a_prompt(qtbot)
     form.set_values({"positive_prompt": f"a b c{BOX_BREAK}d"})
 
     form._copy_buttons["positive_prompt"].click()
+    assert QApplication.clipboard().text() == "a b c d"
 
-    assert QApplication.clipboard().text() == f"a b c{BOX_BREAK}d"
+    pasted_into = _form_with_a_prompt(qtbot)
+    pasted_into._widgets["positive_prompt"].boxes()[0].paste()
+    qtbot.waitUntil(lambda: pasted_into.get_values()["positive_prompt"] == f"a b c{BOX_BREAK}d",
+                    timeout=5000)
 
 
 def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):

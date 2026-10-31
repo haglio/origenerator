@@ -22,6 +22,7 @@ from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
 from origenerator.base_models import loras_offered_beside
+from origenerator.box_breaks import unboxed
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
@@ -469,7 +470,7 @@ class ParamForm(QWidget):
         kind = self._kind(pd)
         extras: list[QWidget] = []
         if kind.copyable:
-            copy = CopyButton(lambda pd=pd: str(self._read_field(pd)))
+            copy = CopyButton(lambda pd=pd: unboxed(str(self._read_field(pd))))
             self._copy_buttons[pd.key] = copy
             extras.append(copy)
         if kind.randomizable:

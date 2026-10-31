@@ -44,8 +44,8 @@ from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
 from tests.test_combine_panel import _listed_under_recent
-from tests.test_gallery_view import _collection, _select_first_leaf, _selected_folder
 from tests.test_hard_to_miss import _faded_backgrounds
 
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier

@@ -70,6 +70,7 @@ from pytestqt.qtbot import QtBot
 from origenerator import (
     config,
     enhance_presets,
+    gallery,
     notice_toast,
     osr2_driver,
     osr2_motion_driver,
@@ -564,7 +565,7 @@ def _deliver_the_deletions_already_scheduled():
     teardown, but a posted DeferredDelete is only delivered once an event loop
     spins — which a test that never pumps one leaves undone. Until then the C++
     widget is still allocated and still connected, so the deletion has to be
-    driven rather than waited for: a lone ``pytest tests/test_gallery_view.py``
+    driven rather than waited for: a lone run of the gallery view's tests
     otherwise ends holding 1,048 widgets that are already condemned, and every
     one of them goes when this runs.
 
@@ -669,6 +670,19 @@ def pytest_configure(config):
         "markers",
         "real_thread_hop: leave the gallery's off-thread work on its pool thread")
     qInstallMessageHandler(_print_qt_message)
+
+
+@pytest.fixture
+def _stub_preview_resolution(monkeypatch):
+    """Keep the gallery view's tests off the real filesystem and media backend.
+
+    Each of their files asks for this by name. Preview resolution is exercised
+    in test_gallery.py and rendering in test_preview_widget.py; here it
+    defaults to "nothing to show" so a real PreviewWidget never starts WMF
+    playback (which deadlocks at teardown). Tests that assert routing override
+    this with their own return value.
+    """
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, places: None)
 
 
 @pytest.fixture(autouse=True)

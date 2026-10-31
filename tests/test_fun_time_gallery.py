@@ -34,15 +34,7 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
-from tests.marked_words import words
-from tests.slideshow_hud_support import (
-    engine_of,
-    funestra_of,
-    hud_button_names,
-    open_both_sides,
-    speaker_on_screen,
-)
-from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
+from tests.gallery_view_support import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
     _FakeRadio,
@@ -53,6 +45,14 @@ from tests.test_gallery_view import (  # the in-memory Database stand-in, and a 
     _row,
     _SignalMotion,
     _will_move_on,
+)
+from tests.marked_words import words
+from tests.slideshow_hud_support import (
+    engine_of,
+    funestra_of,
+    hud_button_names,
+    open_both_sides,
+    speaker_on_screen,
 )
 
 

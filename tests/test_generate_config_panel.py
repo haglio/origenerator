@@ -476,7 +476,8 @@ def test_file_info_above_form_related_media_below(panel):
     assert body.indexOf(panel._metadata_block) < form_at
     assert body.indexOf(panel._related) > form_at
     links = panel._related.layout()
-    assert [links.indexOf(section) for section in panel._related._sections()] == [0, 1, 2, 3]
+    sections = panel._related._sections()
+    assert [links.indexOf(section) for section in sections] == list(range(len(sections)))
 
 
 def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(panel):

@@ -60,6 +60,19 @@ def test_a_fixs_words_are_their_own_piece_ahead_of_a_boxed_prompts_boxes():
     assert _read_in_order(nodes, "fix0_positive") == ["sharp hands", "one ", "two"]
 
 
+def test_each_of_a_fixs_boxes_is_its_own_piece_ahead_of_a_boxed_prompts_boxes():
+    nodes = prompt_conditioning("fix0_positive", _CLIP, f"one {BOX_BREAK}two",
+                                ahead=f"open {BOX_BREAK}palms")
+
+    assert _read_in_order(nodes, "fix0_positive") == ["open ", "palms", "one ", "two"]
+
+
+def test_a_fixs_boxes_go_each_its_own_piece_ahead_of_a_prompt_made_before_the_boxes():
+    nodes = prompt_conditioning("fix0_positive", _CLIP, "a harbor", ahead=f"open {BOX_BREAK}palms")
+
+    assert _read_in_order(nodes, "fix0_positive") == ["open ", "palms", "a harbor"]
+
+
 def test_an_empty_box_is_never_read():
     nodes = prompt_conditioning("2", _CLIP, f"one {BOX_BREAK} {BOX_BREAK}two")
 

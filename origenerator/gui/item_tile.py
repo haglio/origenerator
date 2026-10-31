@@ -20,9 +20,9 @@ from origenerator.gui.corner_buttons import (
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import TICK_MS, RunReading
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
-from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
@@ -134,11 +134,11 @@ class ItemTile(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
-        # In a mixed listing (the Latest collection) a corner badge names the kind;
+        # In a mixed listing (the Latest collection) an item type icon names the kind;
         # inside a single-type folder the caller leaves it off as redundant. Which
-        # corner it takes is MediaBadge's own business, and it says so.
+        # corner it takes is ItemTypeIcon's own business, and it says so.
         if media_type:
-            MediaBadge(media_type, self)
+            ItemTypeIcon(media_type, self)
 
         # Star, trash and plus in the tile's other three corners: what the item is
         # (favorited, enhanced) and what can be done to it, as one mark each, all

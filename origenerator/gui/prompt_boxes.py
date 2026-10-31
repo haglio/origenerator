@@ -5,7 +5,13 @@ from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 from shared_ui.colors import AMBER, RED
 from shared_ui.spacing import GAP_SMALL
 
-from origenerator.box_breaks import BOX_BREAK, baselines_for, prompt_boxes, unboxed
+from origenerator.box_breaks import (
+    BOX_BREAK,
+    baselines_for,
+    cut_into_boxes,
+    prompt_boxes,
+    unboxed,
+)
 from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.prompt_field import PromptField, PromptHeights
 from origenerator.gui.unread_words import gray_past
@@ -46,6 +52,7 @@ class PromptBoxes(QWidget):
         self._reading: PromptReading | None = None
         self._texts: list[str] = []
         self._as_stored: str | None = None
+        self._cut = False
         self._baseline: str | None = None
         self._shares: list[str | None] = []
         self._in_use: tuple[bool, str] | None = None
@@ -110,9 +117,13 @@ class PromptBoxes(QWidget):
     def _show_stored(self, value: str) -> None:
         self._reflow.stop()
         self._flow_from = None
-        texts, self._as_stored = prompt_boxes(value), None
+        texts, self._as_stored, self._cut = prompt_boxes(value), None, False
         if self._one_box() and len(texts) > 1:
             texts, self._as_stored = [unboxed(value)], value
+        elif self._flows() and len(texts) == 1:
+            starts = [start for start, _tokens in self._reading.pieces(value)]
+            if len(starts) > 1:
+                texts, self._as_stored, self._cut = cut_into_boxes(value, starts), value, True
         self._show(texts)
 
     def _show(self, texts: list[str]) -> None:
@@ -123,8 +134,9 @@ class PromptBoxes(QWidget):
                 self._add_box()
             while len(self._boxes) > len(texts):
                 self._remove_last_box()
-            shares = (baselines_for(self._baseline, texts) if self._baseline is not None
-                      else [None] * len(texts))
+            shares = (baselines_for(self._baseline, texts,
+                                    self._as_stored if self._cut else None)
+                      if self._baseline is not None else [None] * len(texts))
             for index, (box, text, share) in enumerate(zip(self._boxes, texts, shares)):
                 if (diff_text.live_text(box), self._shares[index]) != (text, share):
                     _put(box, text, share)
@@ -169,7 +181,7 @@ class PromptBoxes(QWidget):
         if not self._burst.isActive():
             self._history.took(self.value())
         self._burst.start()
-        self._as_stored = None
+        self._as_stored, self._cut = None, False
         self._texts = texts
         self._count_down()
         if self._flows() or any(BOX_BREAK in text for text in texts):
@@ -224,6 +236,11 @@ class PromptBoxes(QWidget):
         self.textChanged.emit()
 
     def _count_down(self) -> None:
+        if self._cut:
+            for countdown, (_start, tokens) in zip(self._countdowns,
+                                                   self._reading.pieces(self._as_stored)):
+                countdown.show_left(self._reading.reads_well - tokens)
+            return
         for box, countdown in zip(self._boxes, self._countdowns):
             count_down(countdown, box, self._reading)
 

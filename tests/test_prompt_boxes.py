@@ -7,15 +7,16 @@ from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import AMBER, RED, TEXT_MUTED
 from shared_ui.spacing import GAP_SMALL
 
+from origenerator import config
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.gui import diff_text
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
 from origenerator.gui.prompt_field import PromptHeights
-from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE
+from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
-from tests.text_readers import word_reading
+from tests.text_readers import clip_reader, word_reading
 
 
 def _words(count: int) -> str:
@@ -353,3 +354,55 @@ def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):
 
     assert [(box.property("inert"), box.isReadOnly(), box.toolTip())
             for box in prompt.boxes()] == [(True, True, "not used")] * 2
+
+
+@pytest.fixture
+def made_before_the_boxes(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    widget = PromptBoxes("positive_prompt")
+    qtbot.addWidget(widget)
+    widget.set_reading(prompt_reading("sdxl_t2i", {}, "positive_prompt"))
+    with qtbot.waitExposed(widget):
+        widget.show()
+    return widget
+
+
+_CUT_IN_HALF = f"{_words(74)} dog"
+
+
+def test_a_prompt_made_before_the_boxes_opens_cut_where_sdxl_cut_it(made_before_the_boxes):
+    made_before_the_boxes.set_value(_CUT_IN_HALF)
+
+    assert _texts(made_before_the_boxes) == [f"{_words(74)} d", "og"]
+    assert made_before_the_boxes.value() == _CUT_IN_HALF
+    assert _shown(made_before_the_boxes) == [("0 left", AMBER.name())]
+
+
+def test_a_prompt_made_before_the_boxes_is_no_change_to_itself(made_before_the_boxes):
+    made_before_the_boxes.set_value(_CUT_IN_HALF)
+
+    made_before_the_boxes.track(_CUT_IN_HALF)
+
+    assert [_marks(box) for box in made_before_the_boxes.boxes()] == [
+        [(f"{_words(74)} d", "plain")], [("og", "plain")]]
+
+
+def test_the_first_edit_stores_each_box_as_shown_and_flows_from_the_box_edited_on(
+        qtbot, made_before_the_boxes):
+    made_before_the_boxes.set_value(_CUT_IN_HALF)
+
+    _type(qtbot, made_before_the_boxes, 1, 2, " cat")
+
+    assert _texts(made_before_the_boxes) == [f"{_words(74)} d", "og cat"]
+    assert made_before_the_boxes.value() == f"{_words(74)} d{BOX_BREAK}og cat"
+
+
+def test_undoing_the_first_edit_reads_back_as_it_was_stored(qtbot, made_before_the_boxes):
+    made_before_the_boxes.set_value(_CUT_IN_HALF)
+    _type(qtbot, made_before_the_boxes, 1, 2, " cat")
+
+    qtbot.keyClick(made_before_the_boxes.boxes()[1], Qt.Key.Key_Z,
+                   Qt.KeyboardModifier.ControlModifier)
+
+    assert made_before_the_boxes.value() == _CUT_IN_HALF

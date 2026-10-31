@@ -40,28 +40,37 @@ def flowed(boxes: list[str], tokens: Callable[[str], int], *, limit: int, start:
     return _caret_taken_out(texts)
 
 
-def baselines_for(baseline: str, texts: list[str]) -> list[str]:
-    ends, position = [], 0
+def cut_into_boxes(text: str, starts: list[int]) -> list[str]:
+    bounds = [*starts[1:], len(text)]
+    return [text[:bounds[0]].rstrip()] + [text[start:end].strip()
+                                          for start, end in zip(bounds, bounds[1:])]
+
+
+def baselines_for(baseline: str, texts: list[str], whole: str | None = None) -> list[str]:
+    whole = " ".join(texts) if whole is None else whole
+    spans, position = [], 0
     for text in texts:
-        position += len(text)
-        ends.append(position)
-        position += 1
+        start = whole.index(text, position)
+        position = start + len(text)
+        spans.append((start, position))
     owned = [""] * len(texts)
     position = 0
-    for kind, piece in diff_spans(unboxed(baseline), " ".join(texts)):
+    for kind, piece in diff_spans(unboxed(baseline), whole):
         if kind == REMOVED:
-            owned[_box_at(ends, position)] += piece
+            owned[_box_at(spans, position)] += piece
             continue
         for char in piece:
-            box = _box_at(ends, position)
-            if kind == SAME and position != ends[box]:
+            box = next((index for index, (start, end) in enumerate(spans)
+                        if start <= position < end), None)
+            if kind == SAME and box is not None:
                 owned[box] += char
             position += 1
     return owned
 
 
-def _box_at(ends: list[int], position: int) -> int:
-    return next((index for index, end in enumerate(ends) if position <= end), len(ends) - 1)
+def _box_at(spans: list[tuple[int, int]], position: int) -> int:
+    return next((index for index, (_start, end) in enumerate(spans) if position <= end),
+                len(spans) - 1)
 
 
 def _wordless(text: str) -> bool:

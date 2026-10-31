@@ -70,7 +70,7 @@ from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
-from origenerator.workflows.model_arch import KREA2
+from origenerator.workflows.model_arch import KREA2, WAN
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -4306,6 +4306,34 @@ def test_picking_a_lora_whose_trigger_word_the_prompt_lacks_warns_and_a_click_ad
     qtbot.mouseClick(form._warning_marks["positive_prompt"], Qt.MouseButton.LeftButton)
     assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait"
     assert form._warning_marks["lora"].isHidden()
+
+
+def test_a_prompt_that_tells_no_story_is_one_prompt_however_many_lines_of_dashes_it_holds(
+        qtbot, worded_style, blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form._widgets["positive_prompt"].boxes()[0].setPlainText(
+        "exmplstyle, part one\n---\npart two")
+    lora = form._widgets["lora"]
+
+    lora.setCurrentIndex(lora.findData("example_style.safetensors"))
+
+    assert form._warning_marks["lora"].isHidden()
+
+
+def test_a_story_lacks_its_loras_trigger_word_in_a_scene_without_it_and_a_click_adds_it_there(
+        qtbot, installed_models, worded_loras, blank_panel):
+    installed_models.add("loras", "example_style.safetensors", arch=WAN, lora=True)
+    worded_loras({"example_style": ["exmplstyle"]})
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form.set_values({"positive_prompt": "scene one\n---\nexmplstyle, scene two",
+                     "scene_frames": [81, 81], "lora_high": "example_style.safetensors"})
+
+    qtbot.mouseClick(form._warning_marks["scene_frames"], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == (
+        "exmplstyle, scene one\n---\nexmplstyle, scene two")
 
 
 def test_the_workflows_warning_click_adds_the_first_of_a_loras_several_trigger_words(

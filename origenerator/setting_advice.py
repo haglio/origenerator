@@ -72,6 +72,7 @@ class Advice(NamedTuple):
 class MissingTriggerWords(NamedTuple):
     lora: str
     words: tuple[str, ...]
+    in_scenes: bool = False
 
     writes = "positive_prompt"
 
@@ -88,7 +89,7 @@ class MissingTriggerWords(NamedTuple):
                 f"the Positive Prompt. Click to add {self.words[0]}.")
 
     def fixed(self, prompt: str) -> str:
-        return with_trigger_word(prompt, self.words)
+        return with_trigger_word(prompt, self.words, in_scenes=self.in_scenes)
 
 
 def fix_lora_model_advice(held, runs_on: frozenset[str] | None, trained_on: dict[str, str],
@@ -108,11 +109,13 @@ def fix_lora_model_advice(held, runs_on: frozenset[str] | None, trained_on: dict
     return {}
 
 
-def trigger_word_advice(params: dict, lora_keys) -> dict[str, MissingTriggerWords]:
+def trigger_word_advice(params: dict, lora_keys, *,
+                        in_scenes: bool = False) -> dict[str, MissingTriggerWords]:
     words = {key: _warned_trigger_words(params[key]) for key in lora_keys
              if not is_no_lora(params.get(key))}
-    return {key: MissingTriggerWords(params[key], found) for key, found in words.items()
-            if found and lacks_trigger_word(params["positive_prompt"], found)}
+    return {key: MissingTriggerWords(params[key], found, in_scenes) for key, found in words.items()
+            if found and lacks_trigger_word(params["positive_prompt"], found,
+                                            in_scenes=in_scenes)}
 
 
 def _warned_trigger_words(lora: str) -> tuple[str, ...]:

@@ -2408,7 +2408,8 @@ def test_a_story_wears_its_trigger_word_warning_beside_its_scenes_and_each_scene
     form = _wan_form(qtbot)
     form.set_values({"positive_prompt": "scene one\n---\nexmplstyle, scene two",
                      "scene_frames": [81, 81]})
-    form.set_warnings({"lora_high": _TRIGGER_WORD["lora"]})
+    form.set_warnings({"lora_high": MissingTriggerWords("example_style.safetensors",
+                                                        ("exmplstyle",), in_scenes=True)})
 
     qtbot.mouseClick(form._warning_marks["scene_frames"], Qt.MouseButton.LeftButton)
 

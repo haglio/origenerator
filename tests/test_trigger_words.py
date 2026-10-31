@@ -33,9 +33,14 @@ def test_any_one_of_a_loras_words_is_enough_and_none_of_them_is_missing():
 
 
 def test_a_word_missing_from_any_scene_of_a_story_is_missing():
-    assert lacks_trigger_word("exmplstyle, scene one\n---\nscene two", ["exmplstyle"])
+    assert lacks_trigger_word("exmplstyle, scene one\n---\nscene two", ["exmplstyle"],
+                              in_scenes=True)
     assert not lacks_trigger_word("exmplstyle, scene one\n---\nexmplstyle, scene two",
-                                  ["exmplstyle"])
+                                  ["exmplstyle"], in_scenes=True)
+
+
+def test_a_line_of_dashes_outside_a_story_is_part_of_the_one_prompt():
+    assert not lacks_trigger_word("exmplstyle, part one\n---\npart two", ["exmplstyle"])
 
 
 def test_a_missing_word_goes_at_the_start_of_the_prompt():
@@ -62,5 +67,10 @@ def test_a_prompt_holding_any_one_of_the_words_has_none_added():
 
 def test_a_word_goes_at_the_start_of_each_scene_of_a_story_missing_it():
     assert with_trigger_word("scene one\n---\nexmplstyle, scene two\n---\nscene three",
-                             ["exmplstyle"]) == (
+                             ["exmplstyle"], in_scenes=True) == (
         "exmplstyle, scene one\n---\nexmplstyle, scene two\n---\nexmplstyle, scene three")
+
+
+def test_a_word_goes_once_at_the_start_of_a_prompt_whose_dashes_tell_no_story():
+    assert with_trigger_word("part one\n---\npart two", ["exmplstyle"]) == (
+        "exmplstyle, part one\n---\npart two")

@@ -1,7 +1,7 @@
-"""Two copies of the whole table of contents, one per shape.
+"""Two copies of the whole tree of contents, one per shape.
 
 A mixed-shape set has no one screen to play on, so the tree is rooted on a
-Portrait row and a Landscape row and each carries the ENTIRE table of contents
+Portrait row and a Landscape row and each carries the ENTIRE tree of contents
 over its own shape's rows: the collections, the folders the user composed, and the
 All row over the library.  Standing anywhere is standing on one shape, so a
 slideshow started there has exactly one region to go to — and which one is read
@@ -207,7 +207,7 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    # Each half carries the whole table of contents, not a slice of it.
+    # Each half carries the whole tree of contents, not a slice of it.
     for side in ("portrait", "landscape"):
         assert _rows(view._tree, side) == ["All"]
         assert _under_all(view._tree, side)[:5] == [

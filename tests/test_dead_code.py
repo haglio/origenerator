@@ -291,7 +291,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_an_unscripted_video_carries_the_cursor_too and
 # test_a_pane_with_no_room_for_a_track_draws_nothing.
 #
-# 18710 when every mark in the table of contents moved into its level's column:
+# 18710 when every mark in the tree of contents moved into its level's column:
 # the notes on drawing a collection's mark in the caret column under its folder's own,
 # on starting its name where the folder's began, and on which rows go without a
 # mark, are test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_next,

@@ -321,7 +321,7 @@ def media_type_icon(media_type: str) -> QIcon:
     return glyph_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
-# --- the shape a side of the table of contents holds ------------------------
+# --- the shape a side of the tree of contents holds ------------------------
 
 MARK_BESIDE_A_WORD = 15  # on-screen size, for a mark that sits level with a word
 _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}

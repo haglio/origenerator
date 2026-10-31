@@ -2,7 +2,7 @@
 
 The pane draws one tree per side, each under a standing label and each scrolling
 on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`), and
-each carries the whole table of contents over the rows that side holds. Standing
+each carries the whole tree of contents over the rows that side holds. Standing
 anywhere is standing on one side, so a slideshow started there knows what to
 play (see :mod:`origenerator.orientation`).
 
@@ -167,7 +167,7 @@ class GalleryTree:
         self._drawn_sides = frozenset(side.side for side in sides)
 
     def _add_side(self, root, side, folder_meta) -> None:
-        """One side's whole table of contents, filling that side's section.
+        """One side's whole tree of contents, filling that side's section.
 
         Drawn even for a side with nothing in it yet: the split is what tells a
         slideshow which screen it is for, so the shape you have not generated

@@ -2,7 +2,7 @@
 
 One of the six tables `Database` used to hold all of. Its readers are
 `origenerator.trash_collection` and `origenerator.gallery_actions`, and neither has any
-business with `generations` or the custom folders.
+business with `generations` or the custom collections.
 
 A deleted generation's whole row travels here, plus where in the trash its files
 went, so the Trash collection can list it, put both back, or end it for good. The

@@ -243,7 +243,7 @@ def test_gallery_pane_button_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
               icons.delete_icon, icons.latest_icon, icons.radio_icon,
               icons.auto_generate_icon, icons.slideshow_icon, icons.enhance_icon,
-              icons.custom_folder_icon,
+              icons.custom_collection_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
     for make in makers:
         icon = make()
@@ -264,7 +264,7 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
             ("auto", icons.auto_generate_icon), ("slideshow", icons.slideshow_icon),
             ("enhance", icons.enhance_icon), ("delete", icons.delete_icon),
             ("radio", icons.radio_icon),
-            ("group", icons.custom_folder_icon),
+            ("group", icons.custom_collection_icon),
             ("star", lambda: icons.star_icon(filled=True)),
         )
     }
@@ -363,7 +363,7 @@ def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
         (icons.star_icon(filled=False), "star_outline", TEXT_PRIMARY),
         (icons.latest_icon(), "latest", TEXT_PRIMARY),
         (icons.flask_icon(), "flask", TEXT_PRIMARY),
-        (icons.custom_folder_icon(), "folder", TEXT_PRIMARY),
+        (icons.custom_collection_icon(), "folder", TEXT_PRIMARY),
         (icons.all_icon(), "database", TEXT_PRIMARY),
     )
     for icon, name, color in cases:

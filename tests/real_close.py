@@ -28,7 +28,9 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator import app, config, landed_while_away
 
-_the_application = None
+
+class _Watched:
+    application = None
 
 
 def _leave_no_watcher_behind(setattr) -> None:
@@ -61,8 +63,7 @@ def _say_what_python_owns(_freed) -> None:
 
 
 def _watch_the_application_go(_window) -> None:
-    global _the_application
-    _the_application = weakref.ref(QApplication.instance(), _say_what_python_owns)
+    _Watched.application = weakref.ref(QApplication.instance(), _say_what_python_owns)
 
 
 def _close_once_its_loop_runs(window) -> None:

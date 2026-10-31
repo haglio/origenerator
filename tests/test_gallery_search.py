@@ -27,6 +27,9 @@ class _Scope(NamedTuple):
     ids: set[str] | None
 
 
+_ALL = _Scope("All", None)
+
+
 def _row(prompt_id: str, prompt: str, seed: int = 1) -> dict:
     return {
         "prompt_id": prompt_id,
@@ -44,7 +47,7 @@ def _row(prompt_id: str, prompt: str, seed: int = 1) -> dict:
 class FakeHost:
     """A gallery reduced to what a search asks of one."""
 
-    def __init__(self, scope=_Scope("All", None), groups=None):
+    def __init__(self, scope=_ALL, groups=None):
         self.scope = scope
         self.groups = groups or {}
         self.shown = []          # every show_search_results call, in order

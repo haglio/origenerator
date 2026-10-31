@@ -13748,6 +13748,13 @@ def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
     assert view._osr2_motion.active is False
 
 
+def _logging(log, name, inner):
+    def logged(*args):
+        log.append(name)
+        return inner(*args)
+    return logged
+
+
 def _handoff_log(view, driver):
     """Every take and give-back of the device by either driver, in order."""
     log = []
@@ -13755,10 +13762,7 @@ def _handoff_log(view, driver):
                                 ("script lets go", driver, "stop"),
                                 ("motion takes", view._osr2_motion, "start"),
                                 ("motion lets go", view._osr2_motion, "stop")):
-        def logged(*args, _inner=getattr(owner, method), _name=name):
-            log.append(_name)
-            return _inner(*args)
-        setattr(owner, method, logged)
+        setattr(owner, method, _logging(log, name, getattr(owner, method)))
     return log
 
 
@@ -15865,9 +15869,9 @@ def test_picked_folders_offer_no_delete_when_one_of_them_cannot_be_deleted(
 class _QueueClient(ComfyUIClient):
     """A client whose ComfyUI queue holds ``foreign`` jobs of another app's."""
 
-    def __init__(self, foreign=ForeignQueue(running=[], pending=[]), fail=None):
+    def __init__(self, foreign=None, fail=None):
         super().__init__(folders=SUITE_FOLDERS)
-        self._foreign = foreign
+        self._foreign = foreign if foreign is not None else ForeignQueue(running=[], pending=[])
         self._fail = fail
         self.cleared = 0
 

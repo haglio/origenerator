@@ -49,6 +49,7 @@ LANDSCAPE = "landscape"
 # What a region plays with nothing else asked for: the whole library,
 # narrowed to that region's shape.
 ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
+_HELD_ON_G1 = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
 LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
 LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
@@ -750,7 +751,7 @@ def _shaped(prompt_id, params):
 
 def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
         slideshows, *, side=PORTRAIT, shapes=(TALL, TALL), monitor=PORTRAIT_MONITOR,
-        standing=SlideshowState(order=("g2", "g1"), current="g1", locked=True)):
+        standing=_HELD_ON_G1):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
     rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes, start=1)]

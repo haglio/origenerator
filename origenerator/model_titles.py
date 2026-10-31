@@ -106,7 +106,7 @@ def trained_when(path) -> datetime | None:
     metadata = safetensors_metadata(path)
     for key in _TRAINED_AT:
         try:
-            return datetime.fromtimestamp(float(metadata[key]))
+            return datetime.fromtimestamp(float(metadata[key])).astimezone()
         except (KeyError, TypeError, ValueError, OverflowError, OSError):
             continue
     return None

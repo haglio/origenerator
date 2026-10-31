@@ -251,7 +251,7 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
         QApplication.processEvents()
         over = []
 
-        def walk(widget):
+        def walk(widget, over=over):
             if not widget.isVisible():
                 return
             right = widget.mapTo(host, widget.rect().topRight()).x()
@@ -4169,7 +4169,7 @@ def test_a_tabs_lora_dropdown_says_when_its_picked_lora_was_trained(
     blank_panel._param_form.set_values({"lora": "example_look.safetensors"})
 
     assert blank_panel._param_form._widgets["lora"].toolTip().endswith(
-        f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}.")
+        f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}.")
 
 
 def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picked(

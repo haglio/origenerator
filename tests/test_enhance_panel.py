@@ -2084,7 +2084,7 @@ def test_a_fix_windows_lora_dropdown_says_when_its_picked_lora_was_trained(
     assert window.lora.toolTip() == ""
 
     window.lora.setCurrentIndex(window.lora.findData(r"fixes\hands 1.1.safetensors"))
-    assert window.lora.toolTip() == f"Trained {datetime.fromtimestamp(1792851468.891):%Y-%m-%d %H:%M}."
+    assert window.lora.toolTip() == f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}."
 
     window.lora.setCurrentIndex(window.lora.findData(NO_LORA))
     assert window.lora.toolTip() == ""

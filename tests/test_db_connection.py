@@ -45,7 +45,7 @@ def test_the_connection_is_closed_on_the_way_out(file):
 
 
 def test_the_connection_is_closed_even_when_the_block_raises(file):
-    with pytest.raises(ValueError), file.connect() as conn:
+    with pytest.raises(ValueError, match="something in the middle of a write"), file.connect() as conn:
         raise ValueError("something in the middle of a write")
 
     with pytest.raises(sqlite3.ProgrammingError):
@@ -53,7 +53,7 @@ def test_the_connection_is_closed_even_when_the_block_raises(file):
 
 
 def test_a_block_that_raises_writes_nothing(file):
-    with pytest.raises(ValueError), file.connect() as conn:
+    with pytest.raises(ValueError, match="half a batch"), file.connect() as conn:
         conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene two",))
         raise ValueError("half a batch")
 

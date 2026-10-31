@@ -503,12 +503,14 @@ def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_pl
     qtbot.addWidget(slideshow.shown)
 
     view._voice.listener.speak_command("pause slideshow")
-    assert omnipause.frozen() and slideshow.shown._paused
+    assert omnipause.frozen()
+    assert slideshow.shown._paused
     assert view._slideshows.showing is slideshow  # paused, not closed
     assert slideshow.dwell_s == DEFAULT_S
 
     view._voice.listener.speak_command("play slideshow")
-    assert not omnipause.frozen() and not slideshow.shown._paused
+    assert not omnipause.frozen()
+    assert not slideshow.shown._paused
     slideshow.close()
 
 
@@ -602,11 +604,13 @@ def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
     view._voice.listener.speak("Request, no hat, over.")  # answered a hop later
 
     (standing,) = view._queue._items
-    assert standing.starting and standing.requested
+    assert standing.starting
+    assert standing.requested
     assert [item.key for item in shown.queue_foot.hud_queue[0]] == [standing.key]
     qtbot.waitUntil(lambda: shown._working_request is None, timeout=5000)
     (queued,) = view._queue._items
-    assert queued.requested and not queued.starting
+    assert queued.requested
+    assert not queued.starting
     assert [item.key for item in shown.queue_foot.hud_queue[0]] == [queued.key]
 
 
@@ -1193,13 +1197,15 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     assert surface.culled == 1
 
     view._voice.listener.speak("lock")
-    assert surface.locked and surface.said == "locked this one"
+    assert surface.locked
+    assert surface.said == "locked this one"
 
     view._voice.listener.speak("lock")
     assert surface.said == "already locked"  # asked for a state, not a flip
 
     view._voice.listener.speak("unlock")
-    assert not surface.locked and surface.said == "let go"
+    assert not surface.locked
+    assert surface.said == "let go"
 
 
 def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_path):
@@ -1220,7 +1226,8 @@ def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path)
 
     view._voice.listener.speak("favorite")
 
-    assert surface.favorited == 1 and surface.said == "favorited"
+    assert surface.favorited == 1
+    assert surface.said == "favorited"
 
 
 def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_path):
@@ -1389,4 +1396,5 @@ def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):
     view._slideshows._slideshow = surface
 
     assert view._voice.listener.speak("a lock of hair over her eye") is None
-    assert surface.said is None and surface.steps == []
+    assert surface.said is None
+    assert surface.steps == []

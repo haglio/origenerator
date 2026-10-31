@@ -137,7 +137,8 @@ def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbo
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     view.osr2_control.set_state(OSR2_DRIVING)
-    assert driver.started and view._osr2_motion.active is False
+    assert driver.started
+    assert view._osr2_motion.active is False
 
     view.osr2_control.set_state(OSR2_PARKED)
 
@@ -158,6 +159,13 @@ def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
     assert view._osr2_motion.active is False
 
 
+def _logging(log, name, inner):
+    def logged(*args):
+        log.append(name)
+        return inner(*args)
+    return logged
+
+
 def _handoff_log(view, driver):
     """Every take and give-back of the device by either driver, in order."""
     log = []
@@ -165,10 +173,7 @@ def _handoff_log(view, driver):
                                 ("script lets go", driver, "stop"),
                                 ("motion takes", view._osr2_motion, "start"),
                                 ("motion lets go", view._osr2_motion, "stop")):
-        def logged(*args, _inner=getattr(owner, method), _name=name):
-            log.append(_name)
-            return _inner(*args)
-        setattr(owner, method, logged)
+        setattr(owner, method, _logging(log, name, getattr(owner, method)))
     return log
 
 
@@ -229,7 +234,8 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
     view.osr2_control.setChecked(True)
-    assert driver.started == [] and view._osr2_motion.active
+    assert driver.started == []
+    assert view._osr2_motion.active
 
     view.osr2_control.setChecked(False)  # off is parked: the motion stilled at home
     assert view._osr2_motion.held == OSR2_PARKED
@@ -243,12 +249,14 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     _on_screen(qtbot, view, 1400, 900)
     view.osr2_control.setChecked(True)
-    assert driver.started == [("pA", "aA")] and not view._osr2_motion.active
+    assert driver.started == [("pA", "aA")]
+    assert not view._osr2_motion.active
 
     gestures.press_key(view, Qt.Key.Key_Space)
 
     assert not view.osr2_control.isChecked()      # the switch went off, not the motion
-    assert driver.stopped >= 1 and view._osr2_motion.held == OSR2_PARKED
+    assert driver.stopped >= 1
+    assert view._osr2_motion.held == OSR2_PARKED
 
 
 def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_again(qtbot):
@@ -336,7 +344,8 @@ def test_the_radio_switch_round_trips_for_persistence(qtbot):
 
     view.set_radio_enabled(True)
 
-    assert view.radio_enabled() is True and view._bank.radio.isChecked()
+    assert view.radio_enabled() is True
+    assert view._bank.radio.isChecked()
     assert radio.starts == 1  # restoring the switch actually starts it playing
 
 
@@ -513,7 +522,8 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     win = panel._preview.open_fullscreen()
 
     qtbot.addWidget(win.shown)
-    assert win is not None and view._slideshows.showing is win
+    assert win is not None
+    assert view._slideshows.showing is win
     assert [slide.prompt_id for slide in win.whole_set()] == ["i1"]
     win.close()
 
@@ -529,7 +539,8 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     panel.osr2_drive_target = lambda: None
 
     view.osr2_control.setChecked(True)
-    assert view._osr2_motion.active and driver.started == []
+    assert view._osr2_motion.active
+    assert driver.started == []
 
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     panel.displayed_changed.emit()
@@ -555,7 +566,8 @@ def test_a_move_of_a_standing_slideshows_volume_turns_the_radio_on(qtbot, monkey
 
     slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
 
-    assert view._bank.radio.isChecked() and radio.starts == 1
+    assert view._bank.radio.isChecked()
+    assert radio.starts == 1
 
 
 def test_the_next_standing_slideshow_opens_at_the_volume_the_last_was_left_at(
@@ -773,7 +785,8 @@ def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
     view._gallery_owns_keys = lambda **_kw: False
 
     assert _press_escape(view) is True
-    assert omnipause.frozen() and view.osr2_control.isChecked()
+    assert omnipause.frozen()
+    assert view.osr2_control.isChecked()
 
 
 def _typing_in_a_text_field(qtbot, monkeypatch):
@@ -825,7 +838,8 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
 
     handled = _press_escape(view)
 
-    assert handled is False and driver.stopped == 0  # Esc left for the other window
+    assert handled is False
+    assert driver.stopped == 0
 
 
 def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
@@ -881,8 +895,10 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
 
-    assert omnipause.frozen() and radio.frozen
-    assert view._slideshows.showing is slideshow and slideshow.shown.isVisible()
+    assert omnipause.frozen()
+    assert radio.frozen
+    assert view._slideshows.showing is slideshow
+    assert slideshow.shown.isVisible()
     assert view._bank.radio.isChecked()
 
 
@@ -919,11 +935,14 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
     view._bank.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
-    assert omnipause.frozen() and radio.frozen
-    assert view._auto.is_active(key) and view._bank.radio.isChecked()
+    assert omnipause.frozen()
+    assert radio.frozen
+    assert view._auto.is_active(key)
+    assert view._bank.radio.isChecked()
 
     _press_escape_at_the_gallery(view)
-    assert not omnipause.frozen() and not radio.frozen
+    assert not omnipause.frozen()
+    assert not radio.frozen
 
 
 def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_again(
@@ -959,8 +978,10 @@ def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anythi
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._slideshows.showing is None and radio.starts == 0
-    assert not view._auto.is_active(key) and not view.osr2_control.isChecked()
+    assert view._slideshows.showing is None
+    assert radio.starts == 0
+    assert not view._auto.is_active(key)
+    assert not view.osr2_control.isChecked()
 
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
@@ -972,4 +993,5 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
+    assert view._bank.mic.isChecked()
+    assert view._voice.listener.commands_on

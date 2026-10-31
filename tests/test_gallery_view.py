@@ -208,10 +208,14 @@ def test_tree_rows_carry_a_folder_level_badge(qtbot):
 
     # Each level carries a chip as its row icon — right of the caret, reading as
     # the first character of the folder's name — and names itself in the tooltip.
-    assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
-    assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
-    assert not lora.icon(0).isNull() and lora.toolTip(0).endswith("· LoRA")
-    assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
+    assert not workflow.icon(0).isNull()
+    assert "Workflow" in workflow.toolTip(0)
+    assert not model.icon(0).isNull()
+    assert "Model" in model.toolTip(0)
+    assert not lora.icon(0).isNull()
+    assert lora.toolTip(0).endswith("· LoRA")
+    assert not source.icon(0).isNull()
+    assert "Source Image" in source.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
     # all, so its hover says its own name and nothing more.
     assert settings.toolTip(0).startswith(settings.text(0))
@@ -1975,16 +1979,19 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
+    assert not view._bank.back.isEnabled()
+    assert not view._bank.forward.isEnabled()
 
     _select_first_leaf(view)   # opening a folder is somewhere to come back from
     _click_tile(view, "i1")
     _click_tile(view, "i2")
-    assert view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
+    assert view._bank.back.isEnabled()
+    assert not view._bank.forward.isEnabled()
 
     for _ in range(3):
         view._navigation.go_back()
-    assert not view._bank.back.isEnabled() and view._bank.forward.isEnabled()
+    assert not view._bank.back.isEnabled()
+    assert view._bank.forward.isEnabled()
 
 
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):

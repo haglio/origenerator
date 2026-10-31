@@ -294,7 +294,8 @@ def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     placeholder = view._search.field.placeholderText()
     assert placeholder.startswith("Search …")       # said to be cut, at the front
     tail = placeholder[len("Search …"):]
-    assert scope.endswith(tail) and len(tail) < len(scope)  # elided from the left
+    assert scope.endswith(tail)
+    assert len(tail) < len(scope)
     assert placeholder.endswith(leaf.text(0))       # the folder itself survives
 
 
@@ -786,11 +787,13 @@ def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypa
     _find_next(view)
     assert _find_count(view) == "2 of 2"
     # The yellow highlight moved with it, on into the next field.
-    assert _yellow_matches(negative) == 1 and _yellow_matches(positive) == 0
+    assert _yellow_matches(negative) == 1
+    assert _yellow_matches(positive) == 0
 
     _find_next(view)
     assert _find_count(view) == "1 of 2"           # and around again
-    assert _yellow_matches(positive) == 1 and _yellow_matches(negative) == 0
+    assert _yellow_matches(positive) == 1
+    assert _yellow_matches(negative) == 0
 
 
 def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypatch):

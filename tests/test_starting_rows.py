@@ -35,7 +35,8 @@ def test_a_row_shown_stands_in_the_line_until_it_is_dropped(qtbot):
 
     (row,) = rows.rows()
     assert row.key == key
-    assert row.starting is True and row.reading.status == JobState.QUEUED
+    assert row.starting is True
+    assert row.reading.status == JobState.QUEUED
     assert row.cancel is None
     rows.drop(key)
     rows.drop(key)  # twice costs nothing

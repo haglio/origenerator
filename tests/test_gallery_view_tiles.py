@@ -516,7 +516,8 @@ def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_sh
 
     assert view._browser._thumb_widgets["v1"].findChildren(QMovie) == []
     qtbot.waitUntil(lambda: bool(view._browser._thumb_widgets["v1"].findChildren(QMovie)))
-    assert made_on and threading.main_thread() not in made_on
+    assert made_on
+    assert threading.main_thread() not in made_on
 
 
 def test_recents_tiles_are_badged_image_or_video(qtbot):
@@ -620,7 +621,8 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
 
     view._bank.delete.click()
 
-    assert actions.deleted and {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+    assert actions.deleted
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
 # --- the bank's act-on-this trio: star and enhance aim where delete aims ------
@@ -1020,10 +1022,12 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[0] == (view._bank.back, view._bank.forward)
     assert groups[1] == (view._bank.undo, view._bank.redo)
     assert groups[3] == (view._bank.favorite, view._bank.enhance, view._bank.delete)
-    assert view._bank.auto in groups[4] and view._bank.radio in groups[4]
+    assert view._bank.auto in groups[4]
+    assert view._bank.radio in groups[4]
     # The mic has a space of its own: the group beside it is what the app is
     # doing, and the mic is what it hears with.
-    assert groups[5] == (view._bank.mic,) and view._bank.mic not in groups[4]
+    assert groups[5] == (view._bank.mic,)
+    assert view._bank.mic not in groups[4]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -1039,7 +1043,8 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     gaps = {id(gap): gap for gap, _ in view._bank._groups}
     leading, group_gap = view._bank._groups[0][0], view._bank._groups[2][0]
     assert not leading.isVisible()          # nothing to separate from, at the front
-    assert view._bank.group.isHidden() and not group_gap.isVisible()
+    assert view._bank.group.isHidden()
+    assert not group_gap.isVisible()
     assert view._bank._groups[3][0].isVisible()  # the trio is always there
     assert len(gaps) == len(view._bank._groups)
 

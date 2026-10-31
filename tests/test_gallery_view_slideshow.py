@@ -512,7 +512,8 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     model = slideshow_hud_model(slideshow.shown.hud_side, slideshow, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.shown.hud_side}_enhanced"] and "Enhanceds" in model.title
+    assert lit[f"{slideshow.shown.hud_side}_enhanced"]
+    assert "Enhanceds" in model.title
     slideshow.close()
 
 

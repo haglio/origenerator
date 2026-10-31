@@ -806,7 +806,8 @@ def test_a_request_being_worked_out_stands_in_the_job_queue_at_once(router, star
     voice._begin_request("g1", Spoken("no hat"))
 
     (standing,) = starting.rows()
-    assert standing.requested and standing.starting
+    assert standing.requested
+    assert standing.starting
 
 
 def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starting):

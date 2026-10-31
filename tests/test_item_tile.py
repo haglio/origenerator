@@ -9,11 +9,11 @@ from PyQt6.QtGui import QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 
-from origenerator.gui import corner_controls, drag_thumbnail, icons, omnipause
+from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
 from origenerator.gui.browser_pane import REROLL_IMAGE, REROLL_VIDEO
-from origenerator.gui.corner_controls import CORNER_INSET
+from origenerator.gui.corner_buttons import CORNER_INSET
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.item_tile import CornerAction, ItemTile
+from origenerator.gui.item_tile import CornerButton, ItemTile
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
@@ -21,16 +21,16 @@ from tests.heard_drags import HeardDrags
 
 
 def _corners(tile):
-    """A tile's three corner controls, in the order they are laid out: the star,
+    """A tile's three corner buttons, in the order they are laid out: the star,
     the trash can, the plus."""
     return tile._controls.buttons()
 
 
-def _corner_actions():
+def _corner_button_specs():
     return [
-        CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
+        CornerButton(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
                      "Randomize video seed"),
-        CornerAction(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
+        CornerButton(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
                      "Randomize image seed"),
     ]
 
@@ -208,7 +208,7 @@ def test_no_corner_actions_by_default(qtbot):
 
 
 def test_corner_actions_build_hidden_buttons_with_tooltips(qtbot):
-    tw = ItemTile("p1", None, "label", corner_actions=_corner_actions())
+    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     assert [b.toolTip() for b in tw._corner_buttons] == [
         "Randomize video seed", "Randomize image seed",
@@ -217,7 +217,7 @@ def test_corner_actions_build_hidden_buttons_with_tooltips(qtbot):
 
 
 def test_corner_actions_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
-    tw = ItemTile("p1", None, "label", corner_actions=_corner_actions())
+    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     pos = QPointF(1, 1)
 
@@ -232,7 +232,7 @@ def test_corner_actions_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
 def test_corner_actions_stay_up_while_the_cursor_is_on_a_button(qtbot):
     # Moving onto a corner button fires the tile's leaveEvent; the buttons must
     # stay up (else they'd vanish under the cursor — a hover/hide flicker loop).
-    tw = ItemTile("p1", None, "label", corner_actions=_corner_actions())
+    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     pos = QPointF(1, 1)
     tw.enterEvent(QEnterEvent(pos, pos, pos))
@@ -243,17 +243,17 @@ def test_corner_actions_stay_up_while_the_cursor_is_on_a_button(qtbot):
 
 
 def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
-    tw = ItemTile("p1", None, "label", corner_actions=_corner_actions())
+    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     fired = []
-    tw.corner_action_triggered.connect(lambda pid, aid: fired.append((pid, aid)))
+    tw.corner_button_triggered.connect(lambda pid, aid: fired.append((pid, aid)))
 
     tw._corner_buttons[1].click()
 
     assert fired == [("p1", REROLL_IMAGE)]  # carries the tile's id and the chosen action
 
 
-# --- the three corner controls ------------------------------------------------
+# --- the three corner buttons ------------------------------------------------
 
 def test_every_corner_of_a_tile_is_up_at_rest(qtbot):
     # They are not hover-revealed: each reacts to the cursor on itself, and a
@@ -338,8 +338,8 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
     for button in _corners(tw):
         button.click()
 
-    assert fired == [("p1", corner_controls.STAR), ("p1", corner_controls.TRASH),
-                     ("p1", corner_controls.ENHANCE)]
+    assert fired == [("p1", corner_buttons.STAR), ("p1", corner_buttons.TRASH),
+                     ("p1", corner_buttons.ENHANCE)]
 
 
 def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
@@ -377,7 +377,7 @@ def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
     # The Trash collection's tiles: their item is already deleted, so there is nothing
     # to favorite, bin or enhance, and their own two acts take the corners.
     tw = ItemTile("p1", None, "label", controls=False,
-                         corner_actions=_corner_actions())
+                         corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     assert tw._controls is None
 
@@ -386,7 +386,7 @@ def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
     # Keep/reject (and the per-seed re-rolls) run along the edge the three corner
     # controls stay off, so neither set lands on the other.
     tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN,
-                         corner_actions=_corner_actions())
+                         corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     assert tw._corner_buttons[0].x() == tw._image_label.x() + CORNER_INSET
     for button in tw._corner_buttons:

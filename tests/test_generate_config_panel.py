@@ -47,7 +47,7 @@ from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, diff_text, icons
+from origenerator.gui import corner_buttons, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile
@@ -1946,9 +1946,9 @@ def test_a_preview_corner_relays_the_act_with_the_id_it_is_about(saved_panel):
     got = []
     panel.item_action_requested.connect(lambda pid, action: got.append((pid, action)))
 
-    panel._preview.action_triggered.emit("img1", corner_controls.STAR)
+    panel._preview.action_triggered.emit("img1", corner_buttons.STAR)
 
-    assert got == [("img1", corner_controls.STAR)]
+    assert got == [("img1", corner_buttons.STAR)]
 
 
 def test_a_favorite_preview_stays_favorite_through_an_enhance_setting_change(saved_panel):

@@ -4,20 +4,20 @@ The marks themselves live in :mod:`shared_ui.icons` now.  They used to be drawn
 here, and Fun Time drew its own copies of the ones it shares -- which is how the
 two apps ended up with microphones of different shapes on one screen.  What
 stays here is what is genuinely this app's: which button wears which mark, what
-color it wears it in, and the chips the badges sit on.
+color it wears it in, and the grounds the badges sit on.
 
 The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
-folder-level badges (:func:`level_badge_icon`) are lettered chips marking which
+folder-level badges (:func:`level_badge_icon`) are TOC initials marking which
 of workflow/model/LoRA a folder is; the media-type badges
-(:func:`media_type_badge`) are corner chips marking a Latest tile as an image
+(:func:`media_type_badge`) are item type icons marking a Latest tile as an image
 or a video.
 
 :func:`recent_mark_icon` is the dot at the start of the row of a folder lately
 worked in, drawn here because it is a color saying one thing, not a mark anyone
 reads.
 
-The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
+The corner buttons (:func:`corner_star_icon`, :func:`corner_trash_icon`,
 :func:`corner_enhance_icon`) are the marks an item wears in its
 own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
 with the cursor on it -- because each is a badge and a button at once: the mark
@@ -66,7 +66,7 @@ from origenerator.media import MediaType
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 
 # Hierarchy level badges. Every gallery folder above a settings leaf sits at one
-# of these levels, and a small lettered chip in the level's own color names
+# of these levels, and a small TOC initial in the level's own color names
 # which, so a tree row or a browser tile is self-describing without the reader
 # counting indentation.
 LEVEL_LABELS = {
@@ -79,19 +79,19 @@ _LEVEL_BADGES = {
 }
 
 # The Latest collection mixes images and videos in one flow, so each tile wears a
-# small corner badge naming its kind. A white glyph on a translucent dark chip,
+# small corner badge naming its kind. A white glyph on a translucent dark ground,
 # so it reads over a thumbnail of any color.
-_BADGE_CHIP = QColor(*palette.BLACK, 160)
+_BADGE_GROUND = QColor(*palette.BLACK, 160)
 _BADGE_GLYPH = WHITE
 _BADGE_DISPLAY = 22  # the badge's on-screen size, in px
 _BADGE_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 
-# Every chip carries its mark at one size, whichever mark it is. A star badge and
+# Every ground carries its mark at one size, whichever mark it is. A star badge and
 # a media badge can sit on the same tile, and the two only read as one system if
 # they are drawn to one scale — which they were not while each glyph was sized
 # for itself.
-_CHIP_GLYPH = 44
-_CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
+_GLYPH_ON_GROUND = 44
+_GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
 
 # A favorited item's star, in the green Fun Time paints its favorite ★ with: one
 # color means "favorited" across both apps, so a star learned in one reads in
@@ -281,7 +281,7 @@ def _disc(color):
 def experiment_verdict_icon(verdict: str) -> QIcon:
     """An experiment tile's review hover-buttons: a check ("up" — keep it, it
     joins the gallery) or a cross ("down" — reject it and teach the experimenter
-    what to avoid). White line art on the buttons' own translucent chip, like the
+    what to avoid). White line art on the buttons' own translucent ground, like the
     per-seed re-roll controls."""
     return QIcon(icon_pixmap("check" if verdict == "up" else "cross",
                              _SIZE, _REROLL_GLYPH))
@@ -292,7 +292,7 @@ def trash_action_icon(action: str) -> QIcon:
     """A Trash-collection tile's review hover-buttons: a circular arrow back
     ("restore" — the item and its files return to where they were) or a trash can
     ("purge" — end it for good; nothing else empties the Trash). White line art on
-    the buttons' own translucent chip, like the experiment verdict controls."""
+    the buttons' own translucent ground, like the experiment verdict controls."""
     name = "undo_arrow" if action == "restore" else "trash"
     return QIcon(icon_pixmap(name, _SIZE, _REROLL_GLYPH))
 
@@ -302,21 +302,21 @@ def media_type_badge(media_type: str) -> QPixmap:
     """A small corner badge marking a Latest tile as an image or a video.
 
     A white glyph — a play triangle for a video, a framed photo for an image — on
-    a translucent dark chip, so it reads over a thumbnail of any color. Cached and
+    a translucent dark ground, so it reads over a thumbnail of any color. Cached and
     pre-scaled to its on-screen size; the same two badges decorate every tile.
     """
     glyph = "play" if media_type == MediaType.VIDEO else "photo"
-    return _display_size(_render_chip(_BADGE_CHIP, glyph, _BADGE_GLYPH))
+    return _display_size(_render_on_ground(_BADGE_GROUND, glyph, _BADGE_GLYPH))
 
 
 @cache
 def media_type_icon(media_type: str) -> QIcon:
     """The same play/photo mark as :func:`media_type_badge`, bare.
 
-    The badge sits over a thumbnail, so it needs its dark chip to read against
+    The badge sits over a thumbnail, so it needs its dark ground to read against
     any thumbnail; this one sits in a row of text — a config tab's label, where it
     stands in for the thumbnail a tab has no result to show yet, or the row of a
-    folder of images or videos — so the chip would be a black square among words.
+    folder of images or videos — so the ground would be a black square among words.
     """
     return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
@@ -346,7 +346,7 @@ ENHANCE_OPEN = "open"   # nothing made of it yet: the offer of a first one
 ENHANCE_HELD = "held"   # it already holds the very version these settings make
 ENHANCE_MORE = "more"   # it holds one, and these settings would make another
 
-# A corner control at rest is there without shouting; under the cursor it goes
+# A corner button at rest is there without shouting; under the cursor it goes
 # the light gray that says "this is a button" — whatever it is filled with, so
 # the arming and the state it reports stay two separate readings of one mark.
 _CORNER_REST = TEXT_MUTED
@@ -402,7 +402,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     it has as a yellow shadow under the offer of another. The clear is safe here
     in the one way it is anywhere: this pixmap is ours and the only thing under
     the mark is the shadow just drawn, so what shows through the hollow is the
-    chip the button paints under it.
+    ground the button paints under it.
     """
     if state == ENHANCE_HELD:
         return _corner_icon("plus", YELLOW, armed=False)
@@ -421,15 +421,15 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
 
 
 def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
-    """One corner control's mark, at rest or armed — bare line art, since the
-    button paints the translucent chip under it that the badges draw into
+    """One corner button's mark, at rest or armed — bare line art, since the
+    button paints the translucent ground under it that the badges draw into
     themselves."""
     color = (arm_color or _CORNER_ARMED) if armed else ink
     return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
 
 
 def _mark(painter: QPainter, glyph: str, ink):
-    """Paint one corner control's glyph where every corner control's glyph goes."""
+    """Paint one corner button's glyph where every corner button's glyph goes."""
     draw_icon(painter, glyph, ink, size=_CORNER_MARK,
               x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
 
@@ -461,7 +461,7 @@ def _same_when_dead(pixmap: QPixmap) -> QIcon:
 
 
 def _display_size(pixmap: QPixmap, size: int = _BADGE_DISPLAY) -> QPixmap:
-    """A rendered chip scaled down to the size a tile shows it at."""
+    """A rendered ground scaled down to the size a tile shows it at."""
     return pixmap.scaled(
         size, size,
         Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
@@ -473,7 +473,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     """A thumbnail hover-button glyph: a regenerate ring around a small play/photo
     mark — "re-roll this video" (its motion) or "this image" (its start frame).
 
-    White line art; the button paints its own translucent chip under it, so the
+    White line art; the button paints its own translucent ground under it, so the
     glyph reads over a thumbnail of any color. The two differ by their inner mark,
     so a video seed control is never mistaken for an image seed one.
     """
@@ -507,11 +507,11 @@ def folder_badge(group) -> tuple[QIcon, str] | None:
 
 @cache
 def level_badge_icon(level: str) -> QIcon:
-    """The chip marking a folder's place in the hierarchy (see LEVEL_LABELS).
+    """The TOC initial marking a folder's place in the hierarchy (see LEVEL_LABELS).
 
     Its level's letter, in that level's own color.
 
-    Cached: the same few chips decorate many tree rows and tiles, so they're
+    Cached: the same few TOC initials decorate many tree rows and tiles, so they're
     rendered once and shared rather than re-drawn per folder.
     """
     icon = QIcon()
@@ -520,14 +520,14 @@ def level_badge_icon(level: str) -> QIcon:
     return icon
 
 
-def _render_chip(chip, glyph: str, ink) -> QPixmap:
-    """A rounded chip filled with *chip*, carrying *glyph* in *ink*."""
-    return _chip_pixmap(chip, lambda painter: draw_icon(
-        painter, glyph, ink, size=_CHIP_GLYPH, x=_CHIP_INSET, y=_CHIP_INSET))
+def _render_on_ground(ground, glyph: str, ink) -> QPixmap:
+    """A rounded ground filled with *ground*, carrying *glyph* in *ink*."""
+    return _ground_pixmap(ground, lambda painter: draw_icon(
+        painter, glyph, ink, size=_GLYPH_ON_GROUND, x=_GROUND_INSET, y=_GROUND_INSET))
 
 
-def _chip_pixmap(color, draw) -> QPixmap:
-    """A rounded chip filled with ``color``, with ``draw`` painting its mark."""
+def _ground_pixmap(color, draw) -> QPixmap:
+    """A rounded ground filled with ``color``, with ``draw`` painting its mark."""
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -541,8 +541,8 @@ def _chip_pixmap(color, draw) -> QPixmap:
 
 
 def _render_badge(letter: str, color) -> QPixmap:
-    """A chip with ``letter`` centered in readable contrast — dark on a light
-    chip, light on a saturated one."""
+    """A ground with ``letter`` centered in readable contrast — dark on a light
+    ground, light on a saturated one."""
     def draw(painter: QPainter):
         font = QFont(FONT_UI)
         font.setBold(True)
@@ -552,7 +552,7 @@ def _render_badge(letter: str, color) -> QPixmap:
         painter.drawText(QRectF(0, 0, _SIZE, _SIZE),
                          Qt.AlignmentFlag.AlignCenter, letter)
 
-    return _chip_pixmap(color, draw)
+    return _ground_pixmap(color, draw)
 
 
 _READS_AS_LIGHT = 150

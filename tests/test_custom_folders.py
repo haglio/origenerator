@@ -173,7 +173,7 @@ def test_a_custom_folder_wears_no_folder_level_but_names_its_tier():
     (folder,) = gallery.build_custom_folders(
         _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Mine", "folders": [], "items": []}]
     )
-    assert gallery.folder_level(folder) is None   # no lettered chip: it is no tier
+    assert gallery.folder_level(folder) is None   # no TOC initial: it is no tier
     assert gallery.group_level(folder) == "custom"
 
 

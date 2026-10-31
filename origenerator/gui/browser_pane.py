@@ -51,7 +51,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.placement import Placement
 from origenerator.gui import icons
 from origenerator.gui.collapsible_section import FOLD, FoldHeader
-from origenerator.gui.corner_controls import enhance_state
+from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.deferred import defer
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
@@ -64,7 +64,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.inflight_items import InFlightItems
 from origenerator.gui.inflight_tile import InFlightTile
-from origenerator.gui.item_tile import CornerAction, ItemTile
+from origenerator.gui.item_tile import CornerButton, ItemTile
 from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
@@ -394,7 +394,7 @@ class BrowserPane(QObject):
     folder_menu_requested = pyqtSignal(str, QPoint)  # right-click on a folder tile
     menu_requested = pyqtSignal(list, QPoint)  # right-click: the generation menu
     trash_menu_requested = pyqtSignal(QPoint)  # right-click on a deleted tile
-    item_action_triggered = pyqtSignal(str, str)   # a tile's corner control
+    item_action_triggered = pyqtSignal(str, str)   # a tile's corner button
     seed_reroll_requested = pyqtSignal(str, str)   # an i2v tile's seed corner
     experiment_verdict = pyqtSignal(str, str)      # a review tile's keep/reject
     trash_action_triggered = pyqtSignal(str, str)  # a deleted tile's restore/purge
@@ -864,11 +864,11 @@ class BrowserPane(QObject):
         redraw puts back where the user was reading."""
         return self._scroll.verticalScrollBar()
 
-    def _add_collection_thumbnail(self, flow, row, corner_actions=None):
+    def _add_collection_thumbnail(self, flow, row, corner_buttons=None):
         """Build one finished-item tile for a collection (Latest/Favorites/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
         to a combine slot, and right-click it for the same star / enhance / delete
-        menu a tile inside a folder offers; ``corner_actions`` become the tile's
+        menu a tile inside a folder offers; ``corner_buttons`` become the tile's
         hover controls (a review's keep/reject, wired to the verdict)."""
         def wire(tw):
             tw.pressed.connect(self.apply_selection)
@@ -879,17 +879,17 @@ class BrowserPane(QObject):
             # settings.
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
-            if corner_actions:
-                tw.corner_action_triggered.connect(self.experiment_verdict)
+            if corner_buttons:
+                tw.corner_button_triggered.connect(self.experiment_verdict)
 
         return self._draw_tile(
-            flow, row, _REVIEW_TILE if corner_actions else _COLLECTION_TILE, wire,
+            flow, row, _REVIEW_TILE if corner_buttons else _COLLECTION_TILE, wire,
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
             enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
             enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
-            corner_actions=corner_actions,
+            corner_buttons=corner_buttons,
         )
 
     def _draw_tile(self, flow, row, wiring: str, wire, *, caption: str | None = None,
@@ -1042,9 +1042,9 @@ class BrowserPane(QObject):
         and double-clicking opens its folder, like the other collections."""
         container, flow = self._fresh_tile_pane()
         actions = [
-            CornerAction("keep", icons.experiment_verdict_icon("up"),
+            CornerButton("keep", icons.experiment_verdict_icon("up"),
                          "Keep — add it to the gallery"),
-            CornerAction("reject", icons.experiment_verdict_icon("down"),
+            CornerButton("reject", icons.experiment_verdict_icon("down"),
                          "Reject — trash it and steer future experiments away"),
         ]
         rows = self._open_collection_rows(EXPERIMENTS_KEY)
@@ -1053,7 +1053,7 @@ class BrowserPane(QObject):
             return
 
         def draw(row):
-            self._add_collection_thumbnail(flow, row, corner_actions=list(actions))
+            self._add_collection_thumbnail(flow, row, corner_buttons=list(actions))
 
         headings = gallery.section_headings(rows)
         _open_sections(flow, headings)
@@ -1082,9 +1082,9 @@ class BrowserPane(QObject):
         automatic."""
         container, flow = self._fresh_tile_pane()
         actions = [
-            CornerAction("restore", icons.trash_action_icon("restore"),
+            CornerButton("restore", icons.trash_action_icon("restore"),
                          "Restore — put it and its files back where they were"),
-            CornerAction("purge", icons.trash_action_icon("purge"),
+            CornerButton("purge", icons.trash_action_icon("purge"),
                          "Delete permanently — remove it and its files for good"),
         ]
         rows = self._open_collection_rows(TRASH_KEY)
@@ -1096,7 +1096,7 @@ class BrowserPane(QObject):
                    item=row["prompt_id"])
             for row in rows])
 
-    def _add_trash_thumbnail(self, flow, row, corner_actions):
+    def _add_trash_thumbnail(self, flow, row, corner_buttons):
         """One deleted item's tile — a collection tile like any other, wired to
         everything a deleted item can still do.
 
@@ -1119,7 +1119,7 @@ class BrowserPane(QObject):
             tile.clicked.connect(self.thumbnail_activated)          # preview it here
             tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
             tile.context_requested.connect(self._trash_context_menu)
-            tile.corner_action_triggered.connect(self.trash_action_triggered)
+            tile.corner_button_triggered.connect(self.trash_action_triggered)
 
         name = self._host.item_name(row["prompt_id"])
         return self._draw_tile(
@@ -1129,7 +1129,7 @@ class BrowserPane(QObject):
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
             controls=False,       # its two acts are restore and purge, in the corners
-            corner_actions=corner_actions,
+            corner_buttons=corner_buttons,
         )
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
@@ -1256,7 +1256,7 @@ class BrowserPane(QObject):
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
             if i2v:
-                tw.corner_action_triggered.connect(self.seed_reroll_requested)
+                tw.corner_button_triggered.connect(self.seed_reroll_requested)
 
         def draw(row):
             self._draw_tile(
@@ -1265,7 +1265,7 @@ class BrowserPane(QObject):
                 favorite=bool(row.get("starred")),
                 enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
                 enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
-                corner_actions=self._seed_reroll_actions(row) if i2v else None,
+                corner_buttons=self._seed_reroll_actions(row) if i2v else None,
             )
 
         # The + leads, and the run in front of this folder's line stands last,
@@ -1323,10 +1323,10 @@ class BrowserPane(QObject):
     def _seed_reroll_actions(self, row) -> list:
         if not gallery.rerollable(row):
             return []
-        actions = [CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
+        actions = [CornerButton(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
                                 "Randomize video seed")]
         if gallery.rebuildable_source_image_id_in(row, self._image_index) is not None:
-            actions.append(CornerAction(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
+            actions.append(CornerButton(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
                                         "Randomize image seed"))
         return actions
 
@@ -1448,7 +1448,7 @@ class BrowserPane(QObject):
         self.menu_requested.emit(self.selected_prompt_ids(), global_pos)
 
     def _on_tile_control(self, prompt_id: str, action: str):
-        """A tile's corner control was pressed: favorite, trash or enhance THIS one.
+        """A tile's corner button was pressed: favorite, trash or enhance THIS one.
 
         One item, never the selection — the control is drawn on a particular
         thumbnail, in that thumbnail's own corner, so it has already said which item
@@ -1458,7 +1458,7 @@ class BrowserPane(QObject):
 
     def _enhance_state(self, row) -> str | None:
         """What the plus in this row's lower-right corner has to say, at the
-        Enhance panel's current settings (:func:`corner_controls.enhance_state`)."""
+        Enhance panel's current settings (:func:`corner_buttons.enhance_state`)."""
         return enhance_state(row, self._host.enhance_settings())
 
     def refresh_corners(self):

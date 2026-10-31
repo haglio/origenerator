@@ -334,7 +334,7 @@ def test_accepts_delegates_to_the_predicate(qtbot):
 def test_the_kind_badge_appears_only_once_filled(qtbot, kind):
     slot = _slot(qtbot, kind=kind)
     badge = slot.findChild(MediaBadge)
-    assert badge.media_type == kind      # an image/video chip, so you know what goes here
+    assert badge.media_type == kind      # an item type icon, so you know what goes here
     assert badge.isHidden()              # nothing dropped yet (isHidden works offscreen)
 
     _drop(slot, "x1")

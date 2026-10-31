@@ -392,6 +392,30 @@ def test_the_copy_button_copies_plain_text_that_pastes_back_into_boxes_of_whole_
                     timeout=5000)
 
 
+def test_a_prompt_not_in_use_hides_its_countdown_and_shows_it_again_once_used(qtbot):
+    form = _form_with_a_prompt(qtbot)
+    prompt = form._widgets["positive_prompt"]
+    form.set_values({"positive_prompt": "a b"})
+
+    set_in_use(prompt, form._labels["positive_prompt"], False, "not used")
+    assert _shown(prompt) == []
+
+    set_in_use(prompt, form._labels["positive_prompt"], True, "")
+    assert _shown(prompt) == [("1 left", AMBER.name())]
+
+
+def test_a_scene_that_speaks_hides_its_prompts_countdowns(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
+    qtbot.addWidget(form)
+    form.show_readings({"positive_prompt": word_reading(511, READ_WHOLE),
+                        "negative_prompt": word_reading(511, READ_WHOLE)})
+    form.set_values({"positive_prompt": _words(500)})
+
+    form._scenes.fields("scene_lines")[0].setPlainText("hello")
+
+    assert _shown(form._scenes) == []
+
+
 def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):
     form = _form_with_a_prompt(qtbot)
     prompt = form._widgets["positive_prompt"]

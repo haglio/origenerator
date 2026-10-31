@@ -153,7 +153,11 @@ class _Scene(QFrame):
             self._count_down(key)
 
     def _count_down(self, key: str) -> None:
-        count_down(self._countdowns[key], self.fields[key], self._readings.get(key))
+        count_down(self._countdowns[key], self.fields[key], self._readings.get(key),
+                   in_use=self._in_use(key))
+
+    def _in_use(self, key: str) -> bool:
+        return not self.speaking() and not self._shut_down.get(key)
 
     def speaking(self) -> bool:
         """Whether this scene has a line, and so renders as her speaking."""
@@ -166,6 +170,7 @@ class _Scene(QFrame):
             set_in_use(self.fields[key], self.captions[key],
                        SPEAKING_HELP if speaking else self._shut_down.get(key), param_help(key))
             self.captions[key].setText(TEXT_CAPTIONS[key] + (SPEAKING_NOTE if speaking else ""))
+            self._count_down(key)
 
     def frames(self) -> int:
         seconds = self.length.value()

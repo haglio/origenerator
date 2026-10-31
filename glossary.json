@@ -518,7 +518,7 @@
       ]
     },
     {
-      "id": "media_icon",
+      "id": "item_type_icon",
       "thing": "the small picture at the top-left of a Latest tile saying whether it is an image or a video",
       "screen": null,
       "his_word": "item type icon (2026-10-30)",
@@ -533,7 +533,7 @@
       ]
     },
     {
-      "id": "level_letter",
+      "id": "toc_initial",
       "thing": "the letter on a TOC row saying which level of the tree it is: W for a workflow, M for a model, L for a LoRA",
       "screen": [
         "W",
@@ -542,12 +542,15 @@
       ],
       "his_word": "TOC initials (2026-10-30)",
       "code_today": [
-        "level badge",
-        "badge"
+        "toc initial"
       ],
       "code_word": "toc initial",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "level badge",
+        "badge"
+      ]
     },
     {
       "id": "scrim",

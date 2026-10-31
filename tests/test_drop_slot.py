@@ -333,15 +333,15 @@ def test_accepts_delegates_to_the_predicate(qtbot):
 @pytest.mark.parametrize("kind", ["image", "video"])
 def test_the_item_type_icon_appears_only_once_filled(qtbot, kind):
     slot = _slot(qtbot, kind=kind)
-    badge = slot.findChild(ItemTypeIcon)
-    assert badge.media_type == kind      # an item type icon, so you know what goes here
-    assert badge.isHidden()              # nothing dropped yet (isHidden works offscreen)
+    icon = slot.findChild(ItemTypeIcon)
+    assert icon.media_type == kind      # an item type icon, so you know what goes here
+    assert icon.isHidden()               # nothing dropped yet (isHidden works offscreen)
 
     _drop(slot, "x1")
-    assert not badge.isHidden()
+    assert not icon.isHidden()
 
     slot.clear()
-    assert badge.isHidden()              # back to a bare drop zone
+    assert icon.isHidden()               # back to a bare drop zone
 
 
 def _actions(slot) -> dict:

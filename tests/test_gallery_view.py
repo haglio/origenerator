@@ -666,7 +666,7 @@ def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_i
 
 
 def test_a_folder_the_user_made_takes_no_favorite(qtbot):
-    # A bookmark of a bookmark collection gathers nothing, so its menu offers no
+    # A favorite of a favorite collection gathers nothing, so its menu offers no
     # Favorite — and the star its row shows on hover must not leave one either.
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
@@ -714,7 +714,7 @@ def _long_list_view(qtbot):
 def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
     # The gallery was read back and redrawn whole for one star — seconds of it on a
     # real library — and the redraw scrolled the list to the folder that was open,
-    # taking the row just starred out from under the mouse.
+    # taking the row just favorited out from under the mouse.
     view, folders = _long_list_view(qtbot)
     half = _side(view._tree)
     view._tree.setCurrentItem(folders[0])   # the folder that is open, up at the top
@@ -2688,7 +2688,7 @@ def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
     assert db.get_generation("e1")["experiment_verdict"] == "up"
 
 
-def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
+def test_a_tiles_star_corner_favorites_that_tile(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)

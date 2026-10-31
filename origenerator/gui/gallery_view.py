@@ -2129,7 +2129,7 @@ class GalleryView(QWidget):
 
     def _on_dropped(self, target_key: str, keys: list, prompt_ids: list = ()):
         """Folders or an item dragged onto a collecting row: Favorites favorites the
-        folders (the drag-and-drop way to bookmark), a custom folder gathers them
+        folders (the drag-and-drop way to favorite), a custom folder gathers them
         and takes the item."""
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _FAVORITES_KEY:
@@ -2888,8 +2888,8 @@ class GalleryView(QWidget):
         return all(row and row.get("starred") for row in rows)
 
     def _favorite_selection(self):
-        """The bank button's action: bookmark the picked thumbnails, or the
-        folder on screen — and un-bookmark them when they already are, so the one
+        """The bank button's action: favorite the picked thumbnails, or the
+        folder on screen — and un-favorite them when they already are, so the one
         button is the whole of the toggle."""
         if self._browser.selected_ids and not self._browser.showing_trash():
             pids = self.selected_prompt_ids()
@@ -3007,8 +3007,8 @@ class GalleryView(QWidget):
         return self._slideshows.region_slideshow(side)
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True):
-        """Bookmark a generation from a fullscreen slideshow (its Down key) — the same
-        star the gallery's own control sets — or take the bookmark back (its Up
+        """Favorite a generation from a fullscreen slideshow (its Down key) — the same
+        star the gallery's own control sets — or take the favorite back (its Up
         key over a favorite, the Funestras' "weird" on one)."""
         self.set_items_favorite([prompt_id], favorite)
 
@@ -3680,7 +3680,7 @@ class GalleryView(QWidget):
         """Run one corner control's act on one generation.
 
         The corner controls are drawn on a particular item, so unlike the menu
-        they never act on a selection: pressing the star on a tile bookmarks THAT
+        they never act on a selection: pressing the star on a tile favorites THAT
         tile, whichever tiles happen to be picked.
         """
         row = self._db.get_generation(prompt_id)

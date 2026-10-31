@@ -782,7 +782,7 @@ def test_a_folded_copy_combines_slot_had_is_listed_as_the_video_that_stays(tmp_p
     assert [use["video_prompt_id"] for use in db.list_combine_video_uses()] == ["sounded"]
 
 
-def test_a_starred_folder_keyed_from_a_folded_copy_keeps_its_star(tmp_path):
+def test_a_favorite_folder_keyed_from_a_folded_copy_stays_a_favorite(tmp_path):
     db = Database(tmp_path / "test.db")
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
@@ -791,8 +791,8 @@ def test_a_starred_folder_keyed_from_a_folded_copy_keeps_its_star(tmp_path):
 
     imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
 
-    (bookmark,) = db.folder_meta_full()
-    assert bookmark["ref_prompt_id"] == "sounded"
+    (folder_meta,) = db.folder_meta_full()
+    assert folder_meta["ref_prompt_id"] == "sounded"
 
 
 def test_a_found_sound_version_joins_the_found_video_that_carries_its_graph(tmp_path):

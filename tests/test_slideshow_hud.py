@@ -727,7 +727,7 @@ class TestASlideshowOverASessionsRegion:
     def test_its_versions_button_steps_the_image_on_screen(self, qtbot, tmp_path):
         enhanced, original = str(tmp_path / "e1.png"), str(tmp_path / "src.png")
         window = self._slideshow_over_a_region(qtbot, tmp_path, [(enhanced, "image", "id-a")])
-        window.slideshow.set_levels({enhanced: [(enhanced, "image", "Enhanced"), (original, "image", "Base")]})
+        window.slideshow.set_versions({enhanced: [(enhanced, "image", "Enhanced"), (original, "image", "Base")]})
         window._pane.tick()
 
         gestures.click(window._pane._window, button_on_screen(window, "portrait_cycle_version"))

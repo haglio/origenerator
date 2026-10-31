@@ -72,13 +72,13 @@ def enhance_state(row: dict, settings) -> str | None:
     reproduce what is already there, and goes back to offering another the moment
     a setting moves — which is the same question the version list's ``+ Enhance``
     row and the Gallery pane buttons' Enhance both answer
-    (:func:`~origenerator.gallery.enhance.level_matching_settings`).
+    (:func:`~origenerator.gallery.enhance.version_matching_settings`).
     """
     if not gallery.is_enhanceable_row(row):
         return None
     if not gallery.is_enhanced_row(row):
         return icons.ENHANCE_OPEN
-    held = gallery.level_matching_settings(row, settings)
+    held = gallery.version_matching_settings(row, settings)
     return icons.ENHANCE_HELD if held is not None else icons.ENHANCE_MORE
 
 

@@ -926,7 +926,7 @@ class WorkflowTemplate(ABC):
         When the run also saved its pre-enhance render (:meth:`base_save_node`),
         those files follow, each tagged ``role: "original"``. The order is the
         one the gallery reads as versions of one image — most enhanced first,
-        the original last — so an inline-enhanced run lists its levels the same
+        the original last — so an inline-enhanced run lists its versions the same
         way a standalone enhance folded into a row does.
         """
         outputs = history_data.get("outputs", {})

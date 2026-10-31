@@ -7,7 +7,7 @@ a folder may set — everything else about the job (the input file, the prompts
 steering the added texture) is read off the image being enhanced, and the seed is
 re-rolled per launch like any variation.
 
-The same keys are what a level is remembered by, so :func:`level_settings` and
+The same keys are what a version is remembered by, so :func:`version_settings` and
 :func:`describe_enhance_params` live here too: what one enhancement ran at, and
 the line the versions list says it in.
 """
@@ -50,14 +50,14 @@ def default_enhance_params() -> dict:
     return params
 
 
-def level_settings(params: dict) -> dict:
+def version_settings(params: dict) -> dict:
     """The settings one enhancement is remembered by, out of whatever it recorded.
 
     :data:`ENHANCE_SETTING_KEYS` filtered off ``params``, with the detail pass
     read through :func:`~origenerator.workflows.detail_parts.detail_fixes_of` —
-    so a level recorded under the old checkbox-and-two-detectors shape comes back as
+    so a version recorded under the old checkbox-and-two-detectors shape comes back as
     the parts it fixed, and captions, re-runs and duplicate checks all see one
-    thing. A level that recorded no pass keeps none rather than an empty dict:
+    thing. A version that recorded no pass keeps none rather than an empty dict:
     an enhancement whose settings are unknown must stay indistinguishable from one
     that recorded nothing at all, which is what an empty ``params`` means.
     """
@@ -73,7 +73,7 @@ def level_settings(params: dict) -> dict:
 
 
 def full_settings(params: dict) -> dict:
-    full = {**default_enhance_params(), **level_settings(params)}
+    full = {**default_enhance_params(), **version_settings(params)}
     full["enhance_fix_prompts"] = fix_prompts(full)
     return full
 
@@ -123,7 +123,7 @@ class EnhanceSettings:
 
 
 def describe_enhance_params(params: dict) -> str:
-    """A one-line summary of an enhancement's settings, for the levels list.
+    """A one-line summary of an enhancement's settings, for the versions list.
 
     Reads as "2x · 20 steps · 0.15 redraw" — the three numbers that actually
     distinguish one experiment from another, then each part the detail pass

@@ -132,7 +132,7 @@ def list_model_files(
 
 
 def list_lora_files(
-    fallback: list[str], *, accepts, expert: str | None = None, fix: str = "",
+    fallback: list[str], *, accepts, expert: str | None = None, fix: str | None = "",
 ) -> list[str]:
     """The LoRA picker's options: the "None" sentinel first, then the installed
     LoRAs this picker can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
@@ -144,7 +144,7 @@ def list_lora_files(
     """
     listing = _listing("loras", fallback, accepts, expert, want_lora=True)
     return [NO_LORA, *(name for name in listing if not is_no_lora(name)
-                       and (not is_a_fixs_lora(name) or fix_of(name) == fix))]
+                       and (fix is None or not is_a_fixs_lora(name) or fix_of(name) == fix))]
 
 
 def list_detector_files() -> list[str]:

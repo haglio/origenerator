@@ -73,9 +73,10 @@ class SlideshowActions:
     reset: Callable[[object], None] | None = None
     reorder: Callable[[object, bool], bool] | None = None
     browse_all: Callable[[object], bool] | None = None
-    # The block at the HUD's foot: ``move`` lets a row go just ahead of another
-    # (past the last for None), ``clear_queue`` drops another app's work off
-    # ComfyUI, ``start_now`` ends a video's wait, ``cancel_all`` asks, then cancels.
+    # The block at the HUD's foot: ``queue_now`` what is in it, ``move`` lets a row go
+    # just ahead of another (past the last for None), ``clear_queue`` drops another app's
+    # work off ComfyUI, ``start_now`` ends a video's wait, ``cancel_all`` asks, then cancels.
+    queue_now: Callable[[], tuple[list, int]] | None = None
     move: Callable[[str, str | None], None] | None = None
     clear_queue: Callable[[], None] | None = None
     start_now: Callable[[], None] | None = None

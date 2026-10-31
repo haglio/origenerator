@@ -40,7 +40,7 @@ from origenerator.gui.generation_job import (
 )
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.media import MediaType
-from origenerator.run_notice import RunOutcome
+from origenerator.run_toast import RunOutcome
 from origenerator.seed_history import SeedUseKind
 from origenerator.timing import elapsed_since
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -89,7 +89,7 @@ def _the_item_it_is_about(db, job) -> str:
 
     Its own, except for an enhance: that is an upgrade of an image already in
     the gallery, and its own row is folded into that image and deleted as it
-    lands, so its id names nothing by the time anyone can answer a notice of it.
+    lands, so its id names nothing by the time anyone can answer a toast of it.
     """
     row = db.get_generation(job.prompt_id) or {}
     return row.get("enhance_of") or job.prompt_id
@@ -182,7 +182,7 @@ class JobQueue(QObject):
     # finds the tab that launched it — the only tab its result belongs in.
     finished = pyqtSignal(str, str, str)
     failed = pyqtSignal(str, str)     # (folder key, message) a job failed
-    # A run ended, as one :class:`~origenerator.run_notice.RunOutcome`. The two
+    # A run ended, as one :class:`~origenerator.run_toast.RunOutcome`. The two
     # signals above say which folder to redraw; this says what the run *was*,
     # which is all anyone reporting it outside the window has to go on — by then
     # there is no tile left to write the news on.

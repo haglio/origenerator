@@ -22,7 +22,7 @@ from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
-from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.voice.app_commands import (
@@ -123,7 +123,7 @@ class FakeSlideshow:
         self.went_back_for.append(said_at)
         return self.said_over.get(said_at, self.target)
 
-    def note_voice_command(self, message, *, kind=NOTICE):
+    def note_voice_command(self, message, *, kind=INFO):
         self.said.append(message)
 
     def note_voice_run(self, prompt_id, message, *, kind):
@@ -132,7 +132,7 @@ class FakeSlideshow:
     def pause_for_request(self, paused, note):
         self.pauses.append((paused, note))
 
-    def note_request(self, message, spoken, *, working=False, kind=NOTICE):
+    def note_request(self, message, spoken, *, working=False, kind=INFO):
         self.requests.append((message, working, kind))
 
 
@@ -154,7 +154,7 @@ class FakeSlideshows:
     def surface_for(self, side):
         return self.by_side.get(side) if side is not None else self.showing
 
-    def answer(self, message, *, kind=NOTICE):
+    def answer(self, message, *, kind=INFO):
         self.answers.append(message)
         self.answer_kinds.append(kind)
 
@@ -246,19 +246,19 @@ class FakeHost:
 
     def enhance_it(self, prompt_id):
         self.enhanced.append(prompt_id)
-        return prompt_id, "enhancing…", NOTICE
+        return prompt_id, "enhancing…", INFO
 
     def fix_parts(self, prompt_id, parts):
         self.fixed.append((prompt_id, parts))
-        return prompt_id, "fixing hands…", NOTICE
+        return prompt_id, "fixing hands…", INFO
 
     def animate_it(self, image_id, asked):
         self.animated.append((image_id, asked))
-        return image_id, f"animating as “{asked.act}”…", NOTICE
+        return image_id, f"animating as “{asked.act}”…", INFO
 
     def queue_request(self, row, workflow, params, spoken, revision):
         self.queued.append((row["prompt_id"], revision))
-        return "queued it", NOTICE
+        return "queued it", INFO
 
 
 class Spoken:
@@ -559,7 +559,7 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
 
     assert pressed == [1]
     assert slideshows.answers == ["Undo: delete of 2 items"]
-    assert slideshows.answer_kinds == [NOTICE]
+    assert slideshows.answer_kinds == [INFO]
 
 
 def test_a_bank_word_whose_button_is_dead_says_why(router):
@@ -649,7 +649,7 @@ def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
     voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND, None))
 
     assert host.enhanced == ["g7"]
-    assert slideshow.runs == [("g7", "enhancing…", NOTICE)]
+    assert slideshow.runs == [("g7", "enhancing…", INFO)]
 
 
 def test_an_order_said_over_an_image_since_left_is_about_that_image_put_back(router):
@@ -685,7 +685,7 @@ def test_an_animation_goes_to_the_image_on_screen_with_the_lane_and_act_said(rou
     voice.on_command(SurfaceCommand(asked, None))
 
     assert host.animated == [("g7", asked)]
-    assert slideshow.runs == [("g7", "animating as “alpha”…", NOTICE)]
+    assert slideshow.runs == [("g7", "animating as “alpha”…", INFO)]
 
 
 def test_an_animation_asked_for_with_no_image_on_screen_says_so(router):
@@ -854,7 +854,7 @@ def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
         (_row("g1"), object(), {}, Spoken("no hat"), "portrait", None), Revision())
 
     assert [pid for pid, _rev in host.queued] == ["g1"]
-    assert slideshow.requests[-1] == ("queued it", False, NOTICE)
+    assert slideshow.requests[-1] == ("queued it", False, INFO)
 
 
 def test_a_request_with_nothing_to_act_on_is_answered_as_a_warning(router):

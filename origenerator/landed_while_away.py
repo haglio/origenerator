@@ -30,10 +30,10 @@ from origenerator.config import (
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.inflight import take_in_what_landed
-from origenerator.notice_toast import raise_notice
 from origenerator.output_places import OutputPlaces
-from origenerator.run_notice import Notice, notice_for, outcome_of_row
+from origenerator.run_toast import Toast, outcome_of_row, toast_for
 from origenerator.single_instance import Copies
+from origenerator.toast_raising import raise_toast
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ POLL_SECONDS = 15.0
 # Long enough for the longest run this app makes, short of asking all night.
 PATIENCE_SECONDS = 4 * 60 * 60
 
-CARRIES_THE_IDENTITY = "ORIGENERATOR_NOTICE_IDENTITY"
+CARRIES_THE_IDENTITY = "ORIGENERATOR_TOAST_IDENTITY"
 
 
 def runs_left_in_flight(db) -> list[dict]:
@@ -52,18 +52,18 @@ def runs_left_in_flight(db) -> list[dict]:
             and source_of(row) != GenerationSource.BACKFILL]
 
 
-def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Path) -> Notice | None:
+def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Path) -> Toast | None:
     """Record ``row`` if ComfyUI has finished it, and say what to announce."""
     if not take_in_what_landed(db, api, row, places, thumb_dir):
         return None
     landed = db.get_generation(row["prompt_id"]) or row
-    return notice_for(outcome_of_row(landed, ok=True, seconds=landed.get("duration_seconds")))
+    return toast_for(outcome_of_row(landed, ok=True, seconds=landed.get("duration_seconds")))
 
 
-def training_notice(job: dict) -> Notice | None:
+def training_toast(job: dict) -> Toast | None:
     trainer = lora_training.trainer_of(job)
     status = lora_training.read_status(job) or {}
-    return notice_for(lora_training.outcome_of(
+    return toast_for(lora_training.outcome_of(
         job, ok=status.get("state") == "done",
         seconds=None if trainer is None else lora_training.time_taken(job, trainer)))
 
@@ -76,8 +76,8 @@ def _training_ended(job: dict, announce) -> bool:
     trainer = lora_training.trainer_of(job)
     if trainer is not None and trainer.running():
         return False
-    if (notice := training_notice(job)) is not None:
-        announce(notice)
+    if (toast := training_toast(job)) is not None:
+        announce(toast)
     return True
 
 
@@ -96,15 +96,15 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
             return
         for row in waiting:
             try:
-                notice = take_what_landed(db, api, row,
+                toast = take_what_landed(db, api, row,
                                           places=places, thumb_dir=thumb_dir)
             except Exception as e:
                 # One unreadable run must not strand the others: the point of
                 # this process is the news, and it has no window to fail in.
                 logger.warning("Could not take in %s: %s", row.get("prompt_id"), e)
                 continue
-            if notice is not None:
-                announce(notice)
+            if toast is not None:
+                announce(toast)
         if now() >= giving_up_at:
             logger.info("Stopped waiting: gave up on %d run(s) still in flight",
                         len(runs_left_in_flight(db)))
@@ -116,7 +116,7 @@ def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monot
 def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
     """Start a watcher for the runs still in flight, and say whether it started.
 
-    *identity* is the name Windows draws over this copy's notifications.
+    *identity* is the name Windows draws over this copy's toasts.
     """
     if not runs_left_in_flight(db) and not running_trainings():
         return False
@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     _log_into_the_apps_file()
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
     watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT, folders=COMFYUI_FOLDERS),
-          announce=lambda notice: raise_notice(identity, notice),
+          announce=lambda toast: raise_toast(identity, toast),
           app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library)
     return 0
 

@@ -1,4 +1,4 @@
-"""The rows of the table of contents: where each one wears its mark."""
+"""The rows of the tree of contents: where each one wears its mark."""
 from __future__ import annotations
 
 import json

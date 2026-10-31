@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLayout, QWidget
-from shared_ui.colors import TEXT_PRIMARY, TEXT_SECONDARY
-from shared_ui.spacing import GAP_SMALL
+from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
+from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 from origenerator.gui.diff_text import request_change_html
 
@@ -13,7 +13,7 @@ _ASK = "What to change, e.g. two women"
 _NOTHING_TO_ASK_OF = "Pick an image to ask a change of"
 _UPDATING = "updating…"
 _FAILED = "couldn't work that into the prompts"
-_LINES_IN_VIEW = 6
+_LINES_AT_MOST = 20
 
 
 class _Turn(QWidget):
@@ -24,12 +24,15 @@ class _Turn(QWidget):
         column.setSpacing(0)
         self.said = QLabel(turn[0])
         self.said.setWordWrap(True)
-        self.said.setStyleSheet(f"color: {TEXT_PRIMARY.name()}")
+        self.said.setStyleSheet(f"color: {BLUE_LIGHT.name()}")
         self.answered = QLabel()
         self.answered.setWordWrap(True)
-        self.answered.setStyleSheet(f"color: {TEXT_SECONDARY.name()}")
+        self.answered.setStyleSheet(f"color: {TEXT_PRIMARY.name()}")
         column.addWidget(self.said)
-        column.addWidget(self.answered)
+        step = QHBoxLayout()
+        step.setContentsMargins(MARGIN_STANDARD, 0, 0, 0)
+        step.addWidget(self.answered)
+        column.addLayout(step)
         self.take(turn)
 
     def take(self, turn) -> None:
@@ -57,7 +60,6 @@ class RequestExchange(QWidget):
         self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll.setWidget(self._turns_box)
-        self._scroll.setMaximumHeight(self.fontMetrics().lineSpacing() * _LINES_IN_VIEW)
         self._scroll.verticalScrollBar().rangeChanged.connect(
             lambda _low, high: self._scroll.verticalScrollBar().setValue(high))
         self._scroll.hide()
@@ -87,8 +89,21 @@ class RequestExchange(QWidget):
         return [(entry.said.text(), entry.answered.text()) for entry in self._entries()]
 
     def _add(self, turn) -> None:
-        self._turns.addWidget(_Turn(turn))
+        entry = _Turn(turn)
+        self._turns.addWidget(entry)
+        entry.show()
         self._scroll.show()
+        self._fit()
+
+    def _fit(self) -> None:
+        self._turns.invalidate()
+        wanted = self._turns.totalHeightForWidth(self._scroll.viewport().width())
+        self._scroll.setFixedHeight(min(wanted, self.fontMetrics().lineSpacing() * _LINES_AT_MOST))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._turns.count():
+            self._fit()
 
     def show_exchange(self, turns) -> None:
         for entry in self._entries():
@@ -116,6 +131,7 @@ class RequestExchange(QWidget):
         self._turns.removeWidget(last)
         last.deleteLater()
         self._scroll.setVisible(self._turns.count() > 0)
+        self._fit()
         self._status.setText(_FAILED)
         self._status.show()
         self._line.setEnabled(self._available)

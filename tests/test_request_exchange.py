@@ -3,7 +3,8 @@ request is typed in and sent with Enter."""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from shared_ui.colors import TEXT_SECONDARY
+from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
+from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.db_requests import Turn
 from origenerator.gui.request_exchange import RequestExchange
@@ -55,7 +56,30 @@ def test_the_exchange_lists_each_turn_oldest_first_his_words_over_the_answer(qtb
     assert not exchange._scroll.isHidden()
     first = exchange._entries()[0]
     assert first.said.y() < first.answered.y()
-    assert TEXT_SECONDARY.name() in first.answered.styleSheet()
+
+
+def test_his_words_wear_one_color_and_the_answer_sits_a_step_to_the_right_in_plain_text(qtbot):
+    exchange = _exchange(qtbot)
+
+    exchange.show_exchange(EXCHANGE)
+
+    first = exchange._entries()[0]
+    assert BLUE_LIGHT.name() in first.said.styleSheet()
+    assert TEXT_PRIMARY.name() in first.answered.styleSheet()
+    assert first.answered.x() - first.said.x() == MARGIN_STANDARD
+
+
+def test_the_exchange_grows_with_the_conversation_until_twenty_lines(qtbot):
+    exchange = _exchange(qtbot)
+
+    exchange.show_exchange(EXCHANGE)
+    short = exchange._scroll.height()
+    exchange.show_exchange(EXCHANGE * 3)
+    taller = exchange._scroll.height()
+
+    assert short < taller
+    assert exchange._scroll.verticalScrollBar().maximum() == 0
+    assert taller <= exchange.fontMetrics().lineSpacing() * 20
 
 
 def test_with_no_exchange_only_the_line_shows(qtbot):
@@ -112,7 +136,7 @@ def test_a_long_exchange_scrolls_rather_than_growing_and_sits_at_its_end(qtbot):
     qtbot.waitUntil(lambda: exchange._scroll.verticalScrollBar().maximum() > 0, timeout=2000)
 
     bar = exchange._scroll.verticalScrollBar()
-    assert exchange._scroll.height() <= exchange._scroll.maximumHeight()
+    assert exchange._scroll.height() == exchange.fontMetrics().lineSpacing() * 20
     assert bar.value() == bar.maximum()
 
 

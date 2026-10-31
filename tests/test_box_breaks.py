@@ -4,7 +4,14 @@ import json
 
 import pytest
 
-from origenerator.box_breaks import BOX_BREAK, baselines_for, flowed, prompt_boxes, unboxed
+from origenerator.box_breaks import (
+    BOX_BREAK,
+    baselines_for,
+    cut_into_boxes,
+    flowed,
+    prompt_boxes,
+    unboxed,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import prompt_conditioning
 from tests.graph_reading import read_in_order as _read_in_order
@@ -156,3 +163,13 @@ def test_a_word_that_only_moved_to_another_box_is_no_change_to_either():
 
 def test_a_word_taken_out_is_marked_in_the_box_it_left():
     assert baselines_for("a b c d", ["a", "c d"]) == ["a b", "c d"]
+
+
+def test_an_unboxed_prompt_is_cut_into_boxes_where_its_reader_cut_it():
+    assert cut_into_boxes("a b c d", [0, 4]) == ["a b", "c d"]
+    assert cut_into_boxes("a quiet harbor", [0, 12]) == ["a quiet harb", "or"]
+
+
+def test_a_prompt_cut_where_its_reader_cut_it_is_no_change_to_itself():
+    assert baselines_for("a quiet harbor", ["a quiet harb", "or"], "a quiet harbor") == [
+        "a quiet harb", "or"]

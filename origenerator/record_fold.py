@@ -37,12 +37,12 @@ def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> N
             db.set_settings_source(row["prompt_id"], category=row.get("act"),
                                    video_prompt_id=stays)
     db.repoint_combine_video_uses(gone, stays)
-    for bookmark in db.folder_meta_full():
-        if bookmark.get("ref_prompt_id") == gone:
-            db.upsert_folder_meta(bookmark["folder_key"],
-                                  custom_name=bookmark.get("custom_name"),
-                                  favorite=bool(bookmark.get("starred")),
-                                  level=bookmark.get("level"), ref_prompt_id=stays)
+    for folder_meta in db.folder_meta_full():
+        if folder_meta.get("ref_prompt_id") == gone:
+            db.upsert_folder_meta(folder_meta["folder_key"],
+                                  custom_name=folder_meta.get("custom_name"),
+                                  favorite=bool(folder_meta.get("starred")),
+                                  level=folder_meta.get("level"), ref_prompt_id=stays)
     db.repoint_item_in_custom_folders(gone, stays)
     for held in db.folders_in_custom_folders():
         if held.get("ref_prompt_id") == gone:

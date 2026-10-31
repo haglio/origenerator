@@ -282,7 +282,7 @@ def _time_heading(text: str) -> QLabel:
 
 
 _NOW_HEADING = "Now"
-_NO_BOOKMARKS = ("No bookmarks yet.\n\nStar an image or video from its right-click menu, "
+_NO_FAVORITES = ("No bookmarks yet.\n\nStar an image or video from its right-click menu, "
                  "or favorite a folder from the list, to collect them here.")
 _NO_ENHANCED = ("No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
                 "in its corner to see it here.")
@@ -434,12 +434,12 @@ class BrowserPane(QObject):
                 render=lambda: self._show_gathered(
                     self._favorite_items(self._collection_side, self._collection_folder),
                     self._favorite_folders(self._collection_side, self._collection_folder),
-                    show_stars=False, empty=_NO_BOOKMARKS)),
+                    show_favorites=False, empty=_NO_FAVORITES)),
             ENHANCED_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._enhanced_rows, side, folder),
                 render=lambda: self._show_gathered(
                     self._open_collection_rows(ENHANCED_KEY), (),
-                    show_stars=False, empty=_NO_ENHANCED)),
+                    show_favorites=False, empty=_NO_ENHANCED)),
             EXPERIMENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
@@ -483,7 +483,7 @@ class BrowserPane(QObject):
 
         ``side_trees`` is per side (``{side: [folders]}``): a folder is
         drawn on whichever sides hold rows of that shape, so each Favorites collection
-        collects the copies of the bookmarks its own side has.
+        collects the copies of the favorites its own side has.
         """
         self._models_taken += 1
         self._recent_rows = _Listing(recent_rows)
@@ -631,12 +631,12 @@ class BrowserPane(QObject):
     def show_custom_folder(self, group):
         """Render a custom folder (saved, or the live multi-selection) the way
         Favorites shows what it gathers."""
-        self._show_gathered(group.rows, gallery.child_groups(group), show_stars=True,
+        self._show_gathered(group.rows, gallery.child_groups(group), show_favorites=True,
                             empty=f"“{group.label}” is empty.\n\nDrag folders from the list, "
                                   "or items, onto it, or pick several folders with "
                                   "Shift/Ctrl and group them.")
 
-    def _show_gathered(self, rows, groups, *, show_stars: bool, empty: str):
+    def _show_gathered(self, rows, groups, *, show_favorites: bool, empty: str):
         """Items as thumbnails, then a tile per folder, each captioned with its
         breadcrumb.
 
@@ -651,7 +651,7 @@ class BrowserPane(QObject):
 
         def folder(group):
             return lambda: self._add_folder_tile(
-                flow, group, favorite=show_stars and group.favorite,
+                flow, group, favorite=show_favorites and group.favorite,
                 context=self._tree.folder_context(group.key))
 
         self._show_paged(container, [
@@ -875,7 +875,7 @@ class BrowserPane(QObject):
             tw.clicked.connect(self.thumbnail_activated)  # preview it here, in the collection
             tw.double_clicked.connect(self._collection_double_clicked)  # or open its folder
             # Every collection gets the folder menu — an item is no less actionable for
-            # being listed by when it was made or by its bookmark rather than by its
+            # being listed by when it was made or by its favorite rather than by its
             # settings.
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
@@ -1151,7 +1151,7 @@ class BrowserPane(QObject):
     def showing_trash(self) -> bool:
         return base_of(self._tree.selected_folder_key()) == TRASH_KEY
 
-    # --- the Favorites collection: every bookmark — items and folders — in one place ---
+    # --- the Favorites collection: every favorite — items and folders — in one place ---
 
     def _favorite_items(self, side: str | None, folder: str) -> list[dict]:
         return self._placement(side).held_by(folder, gallery.favorite_generations(
@@ -1448,7 +1448,7 @@ class BrowserPane(QObject):
         self.menu_requested.emit(self.selected_prompt_ids(), global_pos)
 
     def _on_tile_control(self, prompt_id: str, action: str):
-        """A tile's corner control was pressed: bookmark, bin or enhance THIS one.
+        """A tile's corner control was pressed: favorite, bin or enhance THIS one.
 
         One item, never the selection — the control is drawn on a particular
         thumbnail, in that thumbnail's own corner, so it has already said which item

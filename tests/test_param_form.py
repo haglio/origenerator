@@ -841,7 +841,7 @@ def test_swapping_dimensions_emits_changed(qtbot):
 
 def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     # The button reads as linking the pair: vertically midway between the width
-    # and height rows, and in a gutter of its own to the left of the labels —
+    # and height rows, and in a margin of its own to the left of the labels —
     # squeezing it into whatever space the labels left over put it on top of the
     # words. A wide label ("Positive Prompt") gives the left column real room.
     form = ParamForm([
@@ -947,7 +947,7 @@ def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):
 
 def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     # Vertically midway between the width and height rows, and entirely within the
-    # reserved left gutter — so it never sits on top of the "Width"/"Height" labels.
+    # reserved left margin — so it never sits on top of the "Width"/"Height" labels.
     form = _sized_form(qtbot)
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
@@ -2478,9 +2478,9 @@ def test_every_warning_mark_sits_in_one_column_whether_or_not_its_row_can_warn(q
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
                                       size_deriver=lambda values: (464, 912)))
 
-    outside_the_size_gutter = [key for key in _shown_keys(form)
+    outside_the_size_margin = [key for key in _shown_keys(form)
                                if param_sections.section_title(key) != "Size"]
-    lefts = {key: _left(form, form._warning_marks[key]) for key in outside_the_size_gutter}
+    lefts = {key: _left(form, form._warning_marks[key]) for key in outside_the_size_margin}
 
     assert {"steps", "noise_seed", "lora_strength_high", "scene_frames"} <= set(lefts)
     assert len(set(lefts.values())) == 1, lefts

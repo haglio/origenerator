@@ -86,7 +86,7 @@ def test_the_countdown_follows_the_typing(prompt):
     assert _shown(prompt) == []
 
 
-def test_a_prompt_read_whole_counts_down_to_what_its_reader_reads_well_and_on_below_zero_in_red(
+def test_a_prompt_read_whole_counts_down_to_what_its_reader_reads_well_then_how_far_over_in_red(
         prompt):
     prompt.set_reading(word_reading(511, READ_WHOLE))
 
@@ -94,7 +94,7 @@ def test_a_prompt_read_whole_counts_down_to_what_its_reader_reads_well_and_on_be
     assert _shown(prompt) == [("11 left", AMBER.name())]
 
     prompt.set_value(_words(514))
-    assert _shown(prompt) == [("-3 left", RED.name())]
+    assert _shown(prompt) == [("3 over", RED.name())]
 
 
 def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it(qtbot):
@@ -104,7 +104,7 @@ def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it(
 
     sound.set_value(_words(79))
 
-    assert _shown(sound) == [("-3 left", RED.name())]
+    assert _shown(sound) == [("3 over", RED.name())]
     (box,) = sound.boxes()
     layout = box.document().firstBlock().layout()
     assert [(span.start, span.format.foreground().color().name()) for span in layout.formats()] == [
@@ -273,7 +273,7 @@ def test_a_prompt_read_whole_never_gets_a_second_box(qtbot, typed_into):
     _type(qtbot, typed_into, 0, 0, "a b c d")
 
     assert _texts(typed_into) == ["a b c d"]
-    assert _shown(typed_into) == [("-1 left", RED.name())]
+    assert _shown(typed_into) == [("1 over", RED.name())]
 
 
 def test_a_boxed_prompt_carried_to_a_prompt_read_whole_is_read_whole_each_break_a_space(

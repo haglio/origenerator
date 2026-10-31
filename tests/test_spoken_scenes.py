@@ -155,10 +155,13 @@ def test_the_speech_slot_offers_only_the_speech_model_and_the_experts_never_do(i
 
 def test_the_voice_is_a_preset_or_a_sample_and_only_the_one_shot_workflow_speaks():
     by_key = {pd.key: pd for pd in Wan22I2vWorkflow().param_definitions()}
-    assert by_key["voice"].type == "combo" and by_key["voice"].options[0] == by_key["voice"].default
-    assert by_key["voice_sample"].type == "audio" and by_key["voice_sample"].browse_dir is not None
+    assert by_key["voice"].type == "combo"
+    assert by_key["voice"].options[0] == by_key["voice"].default
+    assert by_key["voice_sample"].type == "audio"
+    assert by_key["voice_sample"].browse_dir is not None
     assert by_key["voice"].options[-1] == "Custom voice (a recording)"
-    assert by_key["voice_sample_text"].type == "str" and by_key["voice_sample_text"].multiline
+    assert by_key["voice_sample_text"].type == "str"
+    assert by_key["voice_sample_text"].multiline
     loop = Wan22Flf2vLoopWorkflow()
     assert "scene_lines" not in loop.default_params()
     assert "scene_lines" not in {pd.key for pd in loop.param_definitions()}

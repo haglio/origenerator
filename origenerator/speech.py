@@ -98,7 +98,7 @@ def scene_speech(params: dict) -> list[SceneSpeech | None]:
     if "scene_lines" not in params:
         return []
     frames = [int(n) for n in (params.get("scene_frames") or [])]
-    if len(frames) < 2:
+    if len(frames) <= 1:
         frames = [int(params["frame_count"])]
     lines = list(params.get("scene_lines") or [])
     voice = voice_request(params)

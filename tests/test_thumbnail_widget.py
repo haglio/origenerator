@@ -58,7 +58,8 @@ def test_thumbnail_without_a_movie_path_stays_a_still(qtbot, tmp_path):
     tw = ThumbnailWidget("i1", str(still), "label")  # image row: no movie_path
     qtbot.addWidget(tw)
     assert tw.findChildren(QMovie) == []
-    assert tw._image_label.pixmap() is not None and not tw._image_label.pixmap().isNull()
+    assert tw._image_label.pixmap() is not None
+    assert not tw._image_label.pixmap().isNull()
 
 
 def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
@@ -268,7 +269,8 @@ def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
     qtbot.addWidget(tw)
     star, trash, _plus = _corners(tw)
     assert tw._favorite is True
-    assert not star.isHidden() and not trash.isHidden()
+    assert not star.isHidden()
+    assert not trash.isHidden()
 
 
 def test_an_enhanced_tile_keeps_its_plus_up_and_says_it_is_spent(qtbot):
@@ -286,7 +288,8 @@ def test_an_enhanced_tile_that_could_take_another_offers_one(qtbot):
     tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_MORE)
     qtbot.addWidget(tw)
     _star, _trash, plus = _corners(tw)
-    assert not plus.isHidden() and plus.isEnabled()
+    assert not plus.isHidden()
+    assert plus.isEnabled()
 
 
 def test_a_video_tile_grows_no_plus_at_all(qtbot):
@@ -349,11 +352,15 @@ def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
     area = tw._image_label.geometry()
     for corner in (star, trash, plus):
         assert area.contains(corner)
-    assert star.left() > area.center().x() and star.top() < area.center().y()
-    assert trash.left() < area.center().x() and trash.top() > area.center().y()
-    assert plus.left() > area.center().x() and plus.top() > area.center().y()
+    assert star.left() > area.center().x()
+    assert star.top() < area.center().y()
+    assert trash.left() < area.center().x()
+    assert trash.top() > area.center().y()
+    assert plus.left() > area.center().x()
+    assert plus.top() > area.center().y()
     (badge,) = tw.findChildren(MediaBadge)
-    assert badge.x() < tw.width() // 2 and badge.y() < tw.height() // 2
+    assert badge.x() < tw.width() // 2
+    assert badge.y() < tw.height() // 2
     for corner in (star, trash, plus):
         assert badge.geometry().intersected(corner).isEmpty()
 

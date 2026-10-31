@@ -249,8 +249,9 @@ class CombineController(QObject):
         A list of two is what sessions before this wrote — the slots alone — and
         is still read, so an existing ``ui_state.json`` restores what it has.
         """
-        if isinstance(saved, (list, tuple)) and len(saved) == 2:
-            saved = {"image": saved[0], "video": saved[1]}
+        match saved:
+            case [image, video]:
+                saved = {"image": image, "video": video}
         if not isinstance(saved, dict):
             return
         image_id = saved.get("image")

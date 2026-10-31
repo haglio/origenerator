@@ -40,7 +40,8 @@ def test_each_scene_speaks_its_own_line_for_its_own_seconds():
     assert spoken[1] is None
     assert (spoken[0].text, spoken[0].frames, spoken[0].seconds) == ("Come in.", 161, pytest.approx(161 / 16))
     assert (spoken[2].text, spoken[2].frames) == ("Sit.", 161)
-    assert spoken[0].file.startswith(SPEECH_DIR + "/") and spoken[0].file.endswith(".wav")
+    assert spoken[0].file.startswith(SPEECH_DIR + "/")
+    assert spoken[0].file.endswith(".wav")
 
 
 def test_a_lone_scene_speaks_for_the_clip_length_whatever_its_own_entry_says():
@@ -123,7 +124,8 @@ def test_the_missing_lines_are_spoken_by_the_worker_under_the_speech_python(tmp_
     assert all(path.exists() for path in made)
     (cmd, kwargs, job), = calls
     assert cmd[:2] == [str(Path("C:/env/python.exe")), str(Path("worker.py"))]
-    assert kwargs["capture_output"] and kwargs["text"]
+    assert kwargs["capture_output"]
+    assert kwargs["text"]
     assert job["voice"] == {"mode": "preset", "speaker": "Vivian"}
     assert job["seed"] == 3
     assert [(item["text"], item["seconds"]) for item in job["items"]] == [
@@ -171,7 +173,9 @@ def test_a_worker_that_fails_or_writes_nothing_is_an_error_with_its_words(tmp_pa
 def test_a_line_is_padded_with_silence_or_cut_to_its_scenes_seconds():
     wave = np.ones(24000, dtype=np.float32)
     padded = speech_worker.fit_to_seconds(wave, 24000, 2.5)
-    assert len(padded) == 60000 and padded[:24000].tolist() == wave.tolist()
+    assert len(padded) == 60000
+    assert padded[:24000].tolist() == wave.tolist()
     assert not padded[24000:].any()
     cut = speech_worker.fit_to_seconds(wave, 24000, 0.5)
-    assert len(cut) == 12000 and cut.dtype == np.float32
+    assert len(cut) == 12000
+    assert cut.dtype == np.float32

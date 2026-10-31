@@ -196,7 +196,8 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
     ticker = _TickThread(tick, 0.025, now=now, sleep=sleep)
     ticker._run()  # the loop itself, on this thread, against a scripted clock
     gaps = [b - a for a, b in pairwise(ticks)]
-    assert gaps and all(abs(g - 0.025) < 1e-9 for g in gaps)
+    assert gaps
+    assert all(abs(g - 0.025) < 1e-9 for g in gaps)
 
 
 def test_the_bars_shape_the_status_line(qtbot):
@@ -240,7 +241,8 @@ def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtb
     assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
     assert "human inspired" in driver.status_text()
     driver.set_learned(False)
-    assert not driver.state.learned.active and not driver.state.learned.times
+    assert not driver.state.learned.active
+    assert not driver.state.learned.times
 
 
 def test_a_hold_leaves_amp_speed_and_center_where_they_were(qtbot):
@@ -429,10 +431,13 @@ def test_a_motion_started_in_a_frozen_room_waits_for_it_to_play(qtbot):
     driver.set_frozen(True)
 
     driver.start()
-    assert driver.active and broker.positions == [] and driver.tickers == []
+    assert driver.active
+    assert broker.positions == []
+    assert driver.tickers == []
 
     driver.set_frozen(False)
-    assert broker.positions and driver.tickers[0].started == 1
+    assert broker.positions
+    assert driver.tickers[0].started == 1
 
 
 def test_a_held_motion_stays_at_its_end_through_a_freeze(qtbot):

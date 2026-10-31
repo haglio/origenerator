@@ -154,7 +154,8 @@ def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
         none = wf.build_api_payload(dict(base, lora_high=NO_LORA, lora_low=NO_LORA))
         assert lora_count(none) == 0
         read = dual_sampler_model_files(none)
-        assert "lora_high" not in read and "lora_low" not in read
+        assert "lora_high" not in read
+        assert "lora_low" not in read
         assert read["unet_high"] == base["unet_high"]
         assert read["unet_low"] == base["unet_low"]
 
@@ -266,10 +267,12 @@ def test_wan_video_workflows_expose_editable_audio_params():
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         prompt = by_key["audio_prompt"]
-        assert prompt.type == "str" and prompt.multiline
+        assert prompt.type == "str"
+        assert prompt.multiline
         assert prompt.default == ""
         negative = by_key["audio_negative_prompt"]
-        assert negative.type == "str" and negative.multiline
+        assert negative.type == "str"
+        assert negative.multiline
         assert negative.default == "noisy, harsh"
         assert by_key["audio_seed"].type == "seed"
         assert "foley_model" not in by_key
@@ -296,7 +299,7 @@ def test_every_sdxl_t2i_setting_is_declared_as_a_paramdef():
 
 
 def test_a_setting_of_a_kind_no_form_can_edit_is_refused_where_it_is_declared():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="'integer' is not a valid ParamType"):
         ParamDef("steps", "Steps", "integer", 20)
 
 
@@ -533,8 +536,10 @@ def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
     # encoded in place of the zeroed positive.
     wf = Krea2T2iWorkflow()
     pds = {pd.key: pd for pd in wf.param_definitions()}
-    assert pds["negative_prompt"].type == "str" and pds["negative_prompt"].default == ""
-    assert pds["cfg"].label == "Prompt Strength" and pds["cfg"].default == 1.0
+    assert pds["negative_prompt"].type == "str"
+    assert pds["negative_prompt"].default == ""
+    assert pds["cfg"].label == "Prompt Strength"
+    assert pds["cfg"].default == 1.0
     assert pds["steps"].max_val >= 52
 
     payload = wf.build_api_payload(dict(wf.default_params(), negative_prompt="blurry",
@@ -545,7 +550,8 @@ def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
         "class_type": "CLIPTextEncode",
         "inputs": {"clip": [_node_id(payload, "CLIPLoader"), 0], "text": "blurry"}}
     assert _find_node(payload, "ConditioningZeroOut") is None
-    assert sampler["cfg"] == 3.5 and sampler["steps"] == 52
+    assert sampler["cfg"] == 3.5
+    assert sampler["steps"] == 52
 
 
 def test_krea2_runs_its_lora_on_the_model_alone():
@@ -1196,7 +1202,8 @@ def test_wan22_default_params_has_required_keys():
     }
     assert required.issubset(params.keys())
     # Output size is derived from the input image, so it isn't a stored param.
-    assert "width" not in params and "height" not in params
+    assert "width" not in params
+    assert "height" not in params
 
 
 def test_i2v_workflows_have_no_manual_width_height_controls():
@@ -1210,9 +1217,11 @@ def test_i2v_workflows_have_no_manual_width_height_controls():
     assert len(i2v_workflows) >= 2               # the 2.2 pair, at least
     for wf in i2v_workflows:
         keys = [d.key for d in wf.param_definitions()]
-        assert "width" not in keys and "height" not in keys, wf.name
+        assert "width" not in keys, wf.name
+        assert "height" not in keys, wf.name
         params = wf.default_params()
-        assert "width" not in params and "height" not in params, wf.name
+        assert "width" not in params, wf.name
+        assert "height" not in params, wf.name
 
 
 def test_every_input_image_workflow_derives_its_size():
@@ -1303,7 +1312,8 @@ def test_wan22_i2v_size_override_replaces_the_in_graph_derivation():
     }
     video = payload["14"]["inputs"]
     assert video["start_image"] == [scale_id, 0]
-    assert video["width"] == 1024 and video["height"] == 576
+    assert video["width"] == 1024
+    assert video["height"] == 576
 
 
 def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
@@ -1317,7 +1327,8 @@ def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
     # Both loop endpoints read the one explicitly scaled image.
     assert frame["start_image"] == [scale_id, 0]
     assert frame["end_image"] == [scale_id, 0]
-    assert frame["width"] == 848 and frame["height"] == 480
+    assert frame["width"] == 848
+    assert frame["height"] == 480
 
 
 def test_wan22_flf2v_payload_generates_synced_foley_audio():
@@ -1401,7 +1412,8 @@ def test_wan22_i2v_default_params_has_required_keys():
         "lora_strength_high", "lora_strength_low",
     }
     assert required.issubset(params.keys())
-    assert "width" not in params and "height" not in params
+    assert "width" not in params
+    assert "height" not in params
 
 
 def test_every_wan22_i2v_setting_is_declared_as_a_paramdef():
@@ -1441,7 +1453,8 @@ def test_wan22_i2v_build_api_payload_structure():
     assert i2v["inputs"]["width"] == [getsize_id, 0]
     assert i2v["inputs"]["height"] == [getsize_id, 1]
     assert i2v["inputs"]["start_image"] == [scale_id, 0]  # the correctly-sized frame
-    assert "width" not in params and "height" not in params
+    assert "width" not in params
+    assert "height" not in params
 
     # LoadImage feeds the start image
     assert payload[load_id]["inputs"]["image"] == "start.png"
@@ -2164,7 +2177,8 @@ def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=SINGLE_WINDOW_FRAMES))
     kinds = [n["class_type"] for n in payload.values()]
     assert kinds.count("KSamplerAdvanced") == 2
-    assert "ImageFromBatch" not in kinds and "ImageBatch" not in kinds
+    assert "ImageFromBatch" not in kinds
+    assert "ImageBatch" not in kinds
 
 
 def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame():
@@ -2476,7 +2490,8 @@ def test_a_loops_two_matched_ends_survive_the_frames_added_between_them():
         dict(wf.default_params(), frame_count=81, frame_rate=64.0))
 
     combine = _find_node(payload, "VHS_VideoCombine")["inputs"]
-    assert combine["loop_count"] == 0 and combine["pingpong"] is False
+    assert combine["loop_count"] == 0
+    assert combine["pingpong"] is False
     # multiplier new frames per GAP, so 81 frames become (81-1)*4+1 — the two
     # generated endpoints handed through, everything new strictly between them.
     multiplier = payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"]
@@ -2554,7 +2569,8 @@ def test_a_workflow_name_uses_no_model_card_shorthand_but_t2i_i2v_and_t2v(name):
 def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():
     wf = Wan22I2vWorkflow()
     keys = [pd.key for pd in wf.param_definitions()]
-    assert "cfg" not in keys and "cfg" not in wf.default_params()
+    assert "cfg" not in keys
+    assert "cfg" not in wf.default_params()
 
     params = dict(wf.default_params(), steps=24, split_step=3,
                   cfg_high=2.0, cfg_low=6.0)
@@ -2576,7 +2592,8 @@ def test_a_wan_2_2_form_offers_no_seed_for_the_pass_that_draws_no_new_noise(name
                      if node["class_type"] == "KSamplerAdvanced"
                      and node["inputs"]["add_noise"] == "disable"]
 
-    assert second_passes and all(p["sampler_name"] == "euler" for p in second_passes)
+    assert second_passes
+    assert all(p["sampler_name"] == "euler" for p in second_passes)
     assert "seed" not in {pd.key for pd in wf.param_definitions()}
 
 

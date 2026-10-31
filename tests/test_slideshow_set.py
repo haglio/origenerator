@@ -460,7 +460,8 @@ def test_more_seeds_with_nothing_beyond_the_row_changes_nothing():
     slideshow_set, dealt = _mapped(widen=lambda pid: ())
 
     assert slideshow_set.more_seeds() is False
-    assert dealt == [] and slideshow_set.loop is None
+    assert dealt == []
+    assert slideshow_set.loop is None
 
 
 def test_a_map_cell_the_pass_never_held_is_spliced_in_and_jumped_to():
@@ -481,7 +482,8 @@ def test_a_slide_the_set_took_in_past_its_switches_is_still_found_by_its_file():
 
     found = slideshow_set.slide_for_path("four.png")
 
-    assert found is not None and found.prompt_id == "id-4"
+    assert found is not None
+    assert found.prompt_id == "id-4"
 
 
 def test_a_jump_off_a_loops_axis_ends_the_loop():

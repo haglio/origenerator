@@ -438,7 +438,8 @@ def test_the_biggest_combination_leads():
 
 def test_a_heading_names_both_the_model_and_the_lora():
     heading = search.model_lora_heading(_lora_row("g1", "driftstyle"))
-    assert "example_high" in heading and "driftstyle_high" in heading
+    assert "example_high" in heading
+    assert "driftstyle_high" in heading
 
 
 # --- the synonym table -------------------------------------------------------
@@ -470,7 +471,8 @@ def _completion(content):
 def test_the_widening_request_names_every_word_of_the_query():
     messages = search.build_expansion_messages(("two", "dolls"), "RULES")
     assert messages[0] == {"role": "system", "content": "RULES"}
-    assert "- two" in messages[1]["content"] and "- dolls" in messages[1]["content"]
+    assert "- two" in messages[1]["content"]
+    assert "- dolls" in messages[1]["content"]
 
 
 def test_a_widening_reply_is_read_back_per_word():

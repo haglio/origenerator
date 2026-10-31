@@ -136,6 +136,6 @@ def step_in_ring(cells: tuple[Slide, ...], at: int, step: int) -> Slide | None:
     """The slide *step* places from *at* along a ring of *cells* with the corner
     at its head, or ``None`` on a ring of the corner alone, which has nowhere
     to go.  *at* is 0 for the corner and ``i + 1`` for the axis's *i*-th cell."""
-    if len(cells) < 2:
+    if len(cells) <= 1:
         return None
     return cells[(at + step) % len(cells)]

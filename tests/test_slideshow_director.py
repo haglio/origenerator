@@ -49,6 +49,7 @@ LANDSCAPE = "landscape"
 # What a region plays with nothing else asked for: the whole library,
 # narrowed to that region's shape.
 ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
+_HELD_ON_G1 = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
 LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
 LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
@@ -750,7 +751,7 @@ def _shaped(prompt_id, params):
 
 def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
         slideshows, *, side=PORTRAIT, shapes=(TALL, TALL), monitor=PORTRAIT_MONITOR,
-        standing=SlideshowState(order=("g2", "g1"), current="g1", locked=True)):
+        standing=_HELD_ON_G1):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
     rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes, start=1)]
@@ -1010,7 +1011,8 @@ def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullsc
     assert made[0].closes == 1
     assert director.region_slideshow(PORTRAIT) is None
     assert director.showing is made[-1]
-    assert made[-1].shown.fullscreen == 1 and made[-1].shown.motion is motion
+    assert made[-1].shown.fullscreen == 1
+    assert made[-1].shown.motion is motion
 
 
 def test_a_landing_reaches_the_slideshow_whose_own_folder_holds_it(slideshows):
@@ -1803,7 +1805,8 @@ def test_a_region_slideshow_is_placed_muted_frameless_and_on_top(slideshows):
     window = made[0].shown
     assert window.audio_muted is True
     assert window.geometry == (1920, 0, 960, 540)
-    assert window.raised == 1 and window.activated == 1
+    assert window.raised == 1
+    assert window.activated == 1
     assert window.window_flags & Qt.WindowType.FramelessWindowHint
     assert window.window_flags & Qt.WindowType.WindowStaysOnTopHint
 
@@ -2095,7 +2098,8 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sli
     assert [row.slide.prompt_id for row in around.column] == ["g2", "v1"]
     folder, act = (row.label for row in around.column)
     assert act == "alpha"
-    assert folder and folder not in ("alpha", "Source image")   # the tree's name for it
+    assert folder
+    assert folder not in ("alpha", "Source image")
 
 
 def test_a_video_sits_under_its_images_seed_with_the_image_down_its_column(slideshows, tmp_path):

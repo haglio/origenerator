@@ -189,5 +189,6 @@ def test_what_a_trainable_lora_offers_beside_its_dropdown(
     offer = look_training.training_offer("Example Look")
 
     assert (offer.label, offer.enabled, offer.pictures, offer.folder) == ("Retrain", True, 2, folder)
-    assert "Example Look" in offer.tooltip and str(folder) in offer.tooltip
+    assert "Example Look" in offer.tooltip
+    assert str(folder) in offer.tooltip
     assert "generations come first" in offer.tooltip

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from origenerator import recovery
@@ -10,7 +10,7 @@ from origenerator.db import Database
 from origenerator.db_connection import SqliteFile
 from origenerator.trash import Trash
 
-_NOW = datetime(2026, 8, 15, 3, 0, 0)
+_NOW = datetime(2026, 8, 15, 3, 0, 0, tzinfo=UTC).replace(tzinfo=None)
 
 
 def _record(prompt_id="p1", *, deleted_at=_NOW, row=None, batch=None):

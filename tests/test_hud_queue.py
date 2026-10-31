@@ -77,7 +77,8 @@ def test_a_job_queue_kept_blank_holds_its_room_and_draws_nothing():
     image, targets = _painted(blank)
 
     assert blank.size() == shown.size()
-    assert targets == [] and not _inked(image)
+    assert targets == []
+    assert not _inked(image)
 
 
 def _inked(image) -> bool:
@@ -179,7 +180,8 @@ def test_a_row_leads_with_an_up_and_a_down_arrow_ahead_of_its_shield():
     (up_x, _y, up_width, _h), up = drawn[f"{UP}|j1"]
     (down_x, _y, down_width, _h), down = drawn[f"{DOWN}|j1"]
     (shield_x, *_rest), _shield = drawn[f"{SHIELD}|j1"]
-    assert up_x + up_width <= down_x and down_x + down_width <= shield_x
+    assert up_x + up_width <= down_x
+    assert down_x + down_width <= shield_x
     assert (up.dim, down.dim) == (True, False)
 
 
@@ -223,11 +225,14 @@ def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top
     (_x, frame_y, _w, frame_height), _frame = drawn[f"{FRAME}|j1"]
     (all_x, all_y, all_width, all_height), shield_all = drawn[SHIELD_ALL]
     (cancel_x, cancel_y, cancel_width, cancel_height), cancel_all = drawn[CANCEL_ALL]
-    assert all_x == cancel_x and all_width == cancel_width
+    assert all_x == cancel_x
+    assert all_width == cancel_width
     assert all_x + all_width == 10 + 400  # flush with the block's right edge
     assert all_y + all_height < cancel_y
     above, below = all_y - frame_y, frame_y + frame_height - (cancel_y + cancel_height)
-    assert above >= 0 and below >= 0 and abs(above - below) <= 1
+    assert above >= 0
+    assert below >= 0
+    assert abs(above - below) <= 1
     assert image.getpixel((all_x - 1, frame_y + 1))[3] == 0
     assert (shield_all.glyph, cancel_all.glyph) == ("All", "Cancel All")
 
@@ -249,7 +254,8 @@ def test_a_usual_line_reads_in_full_across_the_portrait_satellites_hud(monkeypat
     _image, targets = _painted(section, width)
 
     rows = [rect for rect, button in targets if button.command.startswith(f"{OPEN}|")]
-    assert len(rows) == 2 and all((x, row) == (10, width) for x, _y, row, _h in rows)
+    assert len(rows) == 2
+    assert all((x, row) == (10, width) for x, _y, row, _h in rows)
     assert section.lines[1].lead in fitted
 
 

@@ -153,10 +153,9 @@ def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
         workflow_json="{}",
     )
 
-    with pytest.raises(ValueError) as refused:
+    with pytest.raises(ValueError, match="update_generation does not write workflow_name"):
         db.update_generation("upd-002", workflow_name="wan22_i2v")
 
-    assert "workflow_name" in str(refused.value)
     assert db.get_generation("upd-002")["workflow_name"] == "sdxl_t2i"
 
 
@@ -349,8 +348,10 @@ def test_taking_back_one_lane_leaves_the_other_send_standing(tmp_path):
     db.mark_genau_unsent("clip-002")
 
     row = db.get_generation("clip-002")
-    assert row["genau_exported_at"] is None and row["genau_unsent_at"] is not None
-    assert row["evolver_exported_at"] is not None and row["evolver_unsent_at"] is None
+    assert row["genau_exported_at"] is None
+    assert row["genau_unsent_at"] is not None
+    assert row["evolver_exported_at"] is not None
+    assert row["evolver_unsent_at"] is None
 
 
 def test_opening_db_without_evolver_column_migrates_it(tmp_path):
@@ -554,7 +555,8 @@ def test_a_favorite_set_through_the_plain_api_has_null_identity(tmp_path):
     db.set_folder_favorite("image/sdxl_t2i", True)
     (row,) = db.folder_meta_full()
     assert row["starred"] is True
-    assert row["level"] is None and row["ref_prompt_id"] is None
+    assert row["level"] is None
+    assert row["ref_prompt_id"] is None
 
 
 def test_upsert_folder_meta_overwrites_every_field(tmp_path):
@@ -563,8 +565,10 @@ def test_upsert_folder_meta_overwrites_every_field(tmp_path):
     db.upsert_folder_meta("k", custom_name="N", favorite=False,
                           level="model", ref_prompt_id="p2")
     (row,) = db.folder_meta_full()
-    assert row["custom_name"] == "N" and row["starred"] is False
-    assert row["level"] == "model" and row["ref_prompt_id"] == "p2"
+    assert row["custom_name"] == "N"
+    assert row["starred"] is False
+    assert row["level"] == "model"
+    assert row["ref_prompt_id"] == "p2"
 
 
 def test_delete_folder_meta_removes_the_row(tmp_path):
@@ -976,7 +980,8 @@ def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
         workflow_json="{}",
     )
     row = db.get_generation("clip-001")
-    assert row["genau_requested_at"] is None and row["genau_exported_at"] is None
+    assert row["genau_requested_at"] is None
+    assert row["genau_exported_at"] is None
 
     db.mark_genau_requested("clip-001")   # a spoken animation started this run
     db.mark_genau_exported("clip-001")    # and it was handed on once it existed
@@ -1021,4 +1026,5 @@ def test_opening_db_without_the_genau_columns_migrates_them(tmp_path):
     db.mark_genau_requested("old-001")
     db.mark_genau_exported("old-001")
     row = db.get_generation("old-001")
-    assert row["genau_requested_at"] is not None and row["genau_exported_at"] is not None
+    assert row["genau_requested_at"] is not None
+    assert row["genau_exported_at"] is not None

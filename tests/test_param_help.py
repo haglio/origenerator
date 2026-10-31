@@ -82,7 +82,8 @@ def test_a_field_for_one_pass_says_which_noise_that_pass_works_on(workflow_name)
 
 def test_the_seed_and_the_handoff_say_which_noise_each_pass_works_on():
     assert "high noise" in PARAM_HELP["noise_seed"]
-    assert "high noise" in PARAM_HELP["split_step"] and "low noise" in PARAM_HELP["split_step"]
+    assert "high noise" in PARAM_HELP["split_step"]
+    assert "low noise" in PARAM_HELP["split_step"]
 
 
 def test_composition_focus_says_what_composition_is():
@@ -90,7 +91,8 @@ def test_composition_focus_says_what_composition_is():
 
 
 def test_the_handoff_says_when_to_move_it_off_halfway():
-    assert "motion" in PARAM_HELP["split_step"] and "detail" in PARAM_HELP["split_step"]
+    assert "motion" in PARAM_HELP["split_step"]
+    assert "detail" in PARAM_HELP["split_step"]
 
 
 def test_the_prompt_strength_help_says_what_one_and_below_do_to_the_negative_prompt():

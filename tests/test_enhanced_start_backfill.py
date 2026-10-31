@@ -411,7 +411,8 @@ def test_a_finished_backfill_run_becomes_its_old_video_which_keeps_its_star_and_
     assert "again" not in listed
     video = listed["video"]
     assert json.loads(video["params_json"]) == {"noise_seed": 7, "audio_seed": 8}
-    assert video["starred"] and video["source"] == GenerationSource.GENERATED
+    assert video["starred"]
+    assert video["source"] == GenerationSource.GENERATED
     assert {flag: video[flag] for flag in sent} == sent
 
 
@@ -442,8 +443,10 @@ def test_the_old_version_waits_in_trash_as_an_item_of_its_own_marked_as_the_old_
     _fold(db, tmp_path)
 
     [old] = _old_versions_in_trash(db, tmp_path)
-    assert old["old_version_of"] == "video" and old["prompt_id"] != "video"
-    assert not old["starred"] and not old["evolver_exported_at"]
+    assert old["old_version_of"] == "video"
+    assert old["prompt_id"] != "video"
+    assert not old["starred"]
+    assert not old["evolver_exported_at"]
     [held] = gallery.row_output_files(old)
     assert gallery.output_file_path(held, _places(tmp_path)).read_bytes() == b"first made"
 
@@ -472,7 +475,8 @@ def test_a_video_the_earlier_fold_put_beside_its_old_one_is_remade_into_it(tmp_p
     assert _fold(db, tmp_path) == (1, [])
 
     video = db.get_generation("video")
-    assert video["source"] == GenerationSource.GENERATED and video["starred"]
+    assert video["source"] == GenerationSource.GENERATED
+    assert video["starred"]
     assert db.get_generation("again") is None
     assert first.read_bytes() == b"made again"
 
@@ -754,7 +758,8 @@ def test_a_backfill_run_whose_video_is_not_on_disk_leaves_both_videos_for_the_ne
     assert db.get_generation("again")["source"] == GenerationSource.BACKFILL
     old = db.get_generation("video")
     assert old["source"] == GenerationSource.GENERATED
-    assert old["evolver_exported_at"] and old["starred"]
+    assert old["evolver_exported_at"]
+    assert old["starred"]
 
 
 def test_a_backfill_run_never_shows_beside_the_video_it_is_to_replace(tmp_path):

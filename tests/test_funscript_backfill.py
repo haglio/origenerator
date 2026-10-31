@@ -60,7 +60,8 @@ def test_backfill_scripts_each_video_and_skips_images(tmp_path):
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
 
     assert sorted(seen) == ["v_i2v.mp4", "v_loop.mp4"]  # the still image isn't
-    assert result["written"] == 2 and result["skipped"] == 0
+    assert result["written"] == 2
+    assert result["skipped"] == 0
 
 
 def test_backfill_rewrites_the_scripts_synthesized_at_an_older_pace_and_says_how_many(tmp_path):
@@ -87,7 +88,8 @@ def test_backfill_is_idempotent(tmp_path):
 
     seen = []
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
-    assert result["written"] == 0 and result["skipped"] == 1
+    assert result["written"] == 0
+    assert result["skipped"] == 1
 
 
 def test_videos_sharing_a_name_are_each_scripted_for_their_own_length(tmp_path):
@@ -138,7 +140,8 @@ def test_a_video_no_other_shares_a_name_with_keeps_the_script_an_older_version_f
     result = backfill(FakeDB([_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
                       OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
 
-    assert seen == [] and result["skipped"] == 1
+    assert seen == []
+    assert result["skipped"] == 1
     assert older.read_text(encoding="utf-8") == "keep me"
 
 
@@ -166,7 +169,8 @@ def test_backfill_counts_a_video_whose_file_is_missing(tmp_path):
     seen = []
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
     assert seen == []  # nothing to script
-    assert result["missing"] == 1 and result["written"] == 0
+    assert result["missing"] == 1
+    assert result["written"] == 0
 
 
 def test_the_output_places_are_resolved_when_the_sweep_runs(tmp_path, monkeypatch):

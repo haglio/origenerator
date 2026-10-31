@@ -564,7 +564,8 @@ class TestTheQueueOnTheOneHud:
         window.set_queue([], 0)
 
         foot = window._hud_model().foot
-        assert not foot.blank and foot.empty_note == EMPTY_QUEUE_TEXT
+        assert not foot.blank
+        assert foot.empty_note == EMPTY_QUEUE_TEXT
 
     def test_the_hud_keeps_one_size_as_jobs_come_and_go_and_core_comes_into_view(
             self, qtbot):

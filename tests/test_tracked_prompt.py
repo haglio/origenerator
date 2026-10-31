@@ -165,7 +165,8 @@ def test_the_departed_words_wait_out_the_typing_rather_than_arriving_per_letter(
     _type_over(pair.edit, "cat", "dog")
 
     settle = _settle_timer(pair.edit)
-    assert settle.isActive() and settle.isSingleShot()
+    assert settle.isActive()
+    assert settle.isSingleShot()
     assert _marked(pair.edit, "struck") == ""  # nothing put back while typing
     # The number itself, not SETTLE_MS: read back through the constant that sets
     # it, a strike arriving on every letter passes just as well as this does.
@@ -202,7 +203,8 @@ def test_what_went_is_struck_through_in_red(pair, qtbot):
     cursor = QTextCursor(pair.edit.document())
     cursor.setPosition(pair.edit.toPlainText().index("cat") + 1)
     color = cursor.charFormat().foreground().color()
-    assert color.red() > 200 and color.green() < 100
+    assert color.red() > 200
+    assert color.green() < 100
 
 
 def test_the_caret_stays_where_it_was_typed_when_the_strike_arrives(pair, qtbot):

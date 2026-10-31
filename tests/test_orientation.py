@@ -530,7 +530,8 @@ def test_together_s_list_is_ruled_off_above_as_each_of_separate_s_lists_is(qtbot
     finally:
         app.setStyleSheet(prior)
 
-    assert None not in separate and len(set(separate)) == 1
+    assert None not in separate
+    assert len(set(separate)) == 1
     assert together == separate[:1]
 
 
@@ -760,7 +761,8 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
     view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, "portrait")])
     view._slideshows.start()
 
-    assert opened and opened[0]["side"] == "portrait"
+    assert opened
+    assert opened[0]["side"] == "portrait"
     assert opened[0]["location"] == oriented_key(RECENTS_KEY, "portrait")
 
 

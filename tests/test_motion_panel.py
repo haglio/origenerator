@@ -267,7 +267,8 @@ def test_the_speed_plus_dims_where_the_max_intensity_stops_the_speed(qtbot):
 
     plus, minus = (next(b for _r, b in panel._painter.buttons if b.command == command)
                    for command in ("robot_hand_speed_up", "robot_hand_speed_down"))
-    assert plus.dim and not minus.dim
+    assert plus.dim
+    assert not minus.dim
 
 
 def test_the_max_intensity_slider_asks_the_apps_one_switch_for_the_level(qtbot):
@@ -277,7 +278,8 @@ def test_the_max_intensity_slider_asks_the_apps_one_switch_for_the_level(qtbot):
 
     _slide(panel, 1.0)
 
-    assert control.max_intensities == [100] and motion.calls == []
+    assert control.max_intensities == [100]
+    assert motion.calls == []
 
 
 def test_a_panel_with_no_switch_hands_the_max_intensity_to_the_motion(qtbot):
@@ -406,7 +408,8 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     panel.drawing()
     marks = [b for _r, b in panel._painter.buttons
              if b.command.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
-    assert marks and all(b.dim for b in marks)
+    assert marks
+    assert all(b.dim for b in marks)
 
 
 def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
@@ -444,7 +447,8 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     hud = console_hud(motion, device=Osr2Mode.OFF)
 
     assert hud.console.osr2 is Osr2State.OFF
-    assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
+    assert hud.drive.driven == DRIVEN_BY_NOTHING
+    assert not hud.drive.live
 
 
 @pytest.mark.parametrize(("trouble", "said"), [(Osr2Trouble.NOT_FOUND, Osr2State.UNPLUGGED),
@@ -456,7 +460,8 @@ def test_an_osr2_the_broker_cannot_hear_says_why_and_drives_nothing(qtbot, troub
     hud = console_hud(motion, device=Osr2Mode.OFF, trouble=trouble)
 
     assert hud.console.osr2 is said
-    assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
+    assert hud.drive.driven == DRIVEN_BY_NOTHING
+    assert not hud.drive.live
 
 
 def test_the_panel_redraws_once_the_device_switches_under_what_it_drew(qtbot):
@@ -608,7 +613,9 @@ def test_no_state_draws_the_console_outside_the_room_kept_for_it():
         _raw, (width, height) = ConsolePainter(device_only=True).rgba(
             console_hud(motion, device=device, control=control, script=script))
 
-        assert width <= room_width and height <= room_height, (control, active, device)
+        fit = (control, active, device)
+        assert width <= room_width, fit
+        assert height <= room_height, fit
 
 
 def test_the_readout_holds_the_waves_drawing_still_between_knots(qtbot):

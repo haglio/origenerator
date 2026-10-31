@@ -16,13 +16,15 @@ def test_visiting_builds_a_stack_that_back_and_forward_traverse():
     history.visit("b")
     history.visit("c")
     assert history.current() == "c"
-    assert history.can_go_back() and not history.can_go_forward()
+    assert history.can_go_back()
+    assert not history.can_go_forward()
 
     assert history.back() == "b"
     assert history.back() == "a"
     assert not history.can_go_back()
     assert history.forward() == "b"
-    assert history.can_go_back() and history.can_go_forward()
+    assert history.can_go_back()
+    assert history.can_go_forward()
 
 
 def test_back_and_forward_return_none_at_the_ends():

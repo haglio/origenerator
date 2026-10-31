@@ -34,7 +34,7 @@ def parse_log_durations(text: str) -> list[tuple[float, float]]:
     """
     entries = []
     for stamp, duration in _LINE.findall(text):
-        when = datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S.%f")
+        when = datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S.%f").astimezone()
         entries.append((when.timestamp(), float(duration)))
     return entries
 

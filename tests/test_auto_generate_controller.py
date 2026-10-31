@@ -181,7 +181,8 @@ def test_auto_generating_in_a_new_folder_ends_it_in_the_old_one(qtbot):
 
     auto.start("b")
 
-    assert auto.is_active("b") and not auto.is_active("a")
+    assert auto.is_active("b")
+    assert not auto.is_active("a")
     assert stopped == ["a"]  # reported, so its switch is cleaned up
 
 
@@ -207,5 +208,6 @@ def test_a_new_folder_that_cannot_start_leaves_auto_generate_where_it_was(qtbot)
 
     auto.start("b")
 
-    assert auto.is_active("a") and not auto.is_active("b")
+    assert auto.is_active("a")
+    assert not auto.is_active("b")
     assert stopped == []

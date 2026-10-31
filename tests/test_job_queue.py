@@ -91,7 +91,8 @@ def test_start_prepared_launches_and_tracks_the_job(qtbot, tmp_path):
     assert "video/wf/deadbeef" in queue.jobs
     client.submit_job.assert_called_once()
     rows = db.list_generations()
-    assert len(rows) == 1 and rows[0]["status"] == "running"
+    assert len(rows) == 1
+    assert rows[0]["status"] == "running"
     # The seed is reused verbatim — start_prepared does not randomize it.
     assert json.loads(rows[0]["params_json"])["seed"] == 3
 
@@ -206,7 +207,8 @@ def test_reroll_video_seed_keeps_the_frame_and_rerolls_only_the_video_seed(qtbot
     # One job — the video itself — with no image re-roll first.
     client.submit_job.assert_called_once()
     rows = db.list_generations()
-    assert len(rows) == 1 and rows[0]["workflow_name"] == "wan22_i2v"
+    assert len(rows) == 1
+    assert rows[0]["workflow_name"] == "wan22_i2v"
     params = _launched_params(db, "wan22_i2v")
     assert params["input_image"] == "frame_001.png [output]"        # same start frame
     assert params["noise_seed"] != 11                                # video seed re-rolled
@@ -233,7 +235,8 @@ def test_reroll_image_seed_regenerates_the_frame_then_keeps_the_video_seed(qtbot
     assert client.submit_job.call_count == 2
     video_params = _launched_params(db, "wan22_i2v")
     assert video_params["input_image"] == "newframe.png [output]"     # fresh start frame
-    assert video_params["noise_seed"] == 11 and video_params["seed"] == 22  # video seed kept
+    assert video_params["noise_seed"] == 11
+    assert video_params["seed"] == 22
 
 
 def test_reroll_image_seed_is_a_noop_when_the_frame_is_not_rebuildable(qtbot, tmp_path):
@@ -708,7 +711,8 @@ def test_a_story_whose_lines_were_spoken_while_comfyui_went_down_waits_for_it_to
     voices[0].done()
 
     assert db.get_generation(job.prompt_id)["status"] == "pending"
-    assert queue.queue_order == [job.prompt_id] and not queue.making_something()
+    assert queue.queue_order == [job.prompt_id]
+    assert not queue.making_something()
     coming_up.finish.set()
     qtbot.waitUntil(lambda: len(voices) == 2, timeout=5000)
     assert said == []
@@ -727,7 +731,8 @@ def test_with_nothing_to_start_comfyui_a_story_it_never_heard_fails_like_any_ref
 
     voices[0].done()
 
-    assert len(said) == 1 and "10061" in said[0]
+    assert len(said) == 1
+    assert "10061" in said[0]
     assert db.get_generation(job.prompt_id)["status"] == "error"
 
 
@@ -2056,7 +2061,8 @@ def test_a_shield_on_a_videos_start_frame_stays_on_the_video_made_from_it(qtbot,
                         None, 1.0)
 
     video = queue.newest_job_for("k")
-    assert video is not frame and video.shielded
+    assert video is not frame
+    assert video.shielded
     assert db.get_generation(video.prompt_id)["shielded"]
 
 

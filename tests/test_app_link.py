@@ -48,7 +48,8 @@ def test_each_checkout_names_a_channel_of_its_own():
 
     assert live != preview
     assert live == app_link.channel_for(Path(r"c:\WORKSPACE\origenerator"))
-    assert live.isascii() and " " not in live
+    assert live.isascii()
+    assert " " not in live
 
 
 def test_the_checkout_it_answers_for_is_the_one_it_was_imported_from():

@@ -270,7 +270,8 @@ def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
 
     client_id = resolve_comfyui_client_id(state)
 
-    assert isinstance(client_id, str) and client_id
+    assert isinstance(client_id, str)
+    assert client_id
 
 
 def test_client_id_is_stable_across_launches(tmp_path, qtbot):
@@ -1159,7 +1160,7 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="imported", params_json="{}",
                          workflow_json="{}", source="imported")
-    finished = datetime(2026, 6, 29, 12, 20, 53).timestamp()
+    finished = datetime(2026, 6, 29, 12, 20, 53).astimezone().timestamp()
     image = config.OUTPUT_PLACES.folder("image") / "sdxl_t2i_00001_.png"
     image.parent.mkdir(parents=True, exist_ok=True)
     image.write_bytes(b"")

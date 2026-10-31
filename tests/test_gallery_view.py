@@ -687,10 +687,14 @@ def test_tree_rows_carry_a_folder_level_badge(qtbot):
 
     # Each level carries a chip as its row icon — right of the caret, reading as
     # the first character of the folder's name — and names itself in the tooltip.
-    assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
-    assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
-    assert not lora.icon(0).isNull() and lora.toolTip(0).endswith("· LoRA")
-    assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
+    assert not workflow.icon(0).isNull()
+    assert "Workflow" in workflow.toolTip(0)
+    assert not model.icon(0).isNull()
+    assert "Model" in model.toolTip(0)
+    assert not lora.icon(0).isNull()
+    assert lora.toolTip(0).endswith("· LoRA")
+    assert not source.icon(0).isNull()
+    assert "Source Image" in source.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
     # all, so its hover says its own name and nothing more.
     assert settings.toolTip(0).startswith(settings.text(0))
@@ -1391,7 +1395,8 @@ def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     placeholder = view._search.field.placeholderText()
     assert placeholder.startswith("Search …")       # said to be cut, at the front
     tail = placeholder[len("Search …"):]
-    assert scope.endswith(tail) and len(tail) < len(scope)  # elided from the left
+    assert scope.endswith(tail)
+    assert len(tail) < len(scope)
     assert placeholder.endswith(leaf.text(0))       # the folder itself survives
 
 
@@ -1902,11 +1907,13 @@ def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypa
     _find_next(view)
     assert _find_count(view) == "2 of 2"
     # The amber highlight moved with it, on into the next field.
-    assert _amber_matches(negative) == 1 and _amber_matches(positive) == 0
+    assert _amber_matches(negative) == 1
+    assert _amber_matches(positive) == 0
 
     _find_next(view)
     assert _find_count(view) == "1 of 2"           # and around again
-    assert _amber_matches(positive) == 1 and _amber_matches(negative) == 0
+    assert _amber_matches(positive) == 1
+    assert _amber_matches(negative) == 0
 
 
 def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypatch):
@@ -2776,7 +2783,8 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     view.restore_from_trash([])
     view.purge_from_trash([])
 
-    assert actions.restored == [] and actions.purged == []
+    assert actions.restored == []
+    assert actions.purged == []
 
 
 def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
@@ -2956,7 +2964,8 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     assert resolved is not None
     path, media_type = resolved
     assert media_type == "video"
-    assert Path(path).exists() and Path(path).is_relative_to(tmp_path / "trash")
+    assert Path(path).exists()
+    assert Path(path).is_relative_to(tmp_path / "trash")
 
 
 def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
@@ -3866,7 +3875,8 @@ def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_sh
 
     assert view._browser._thumb_widgets["v1"].findChildren(QMovie) == []
     qtbot.waitUntil(lambda: bool(view._browser._thumb_widgets["v1"].findChildren(QMovie)))
-    assert made_on and threading.main_thread() not in made_on
+    assert made_on
+    assert threading.main_thread() not in made_on
 
 
 def test_recents_tiles_are_badged_image_or_video(qtbot):
@@ -4452,16 +4462,19 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
+    assert not view._bank.back.isEnabled()
+    assert not view._bank.forward.isEnabled()
 
     _select_first_leaf(view)   # opening a folder is somewhere to come back from
     _click_tile(view, "i1")
     _click_tile(view, "i2")
-    assert view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
+    assert view._bank.back.isEnabled()
+    assert not view._bank.forward.isEnabled()
 
     for _ in range(3):
         view._navigation.go_back()
-    assert not view._bank.back.isEnabled() and view._bank.forward.isEnabled()
+    assert not view._bank.back.isEnabled()
+    assert view._bank.forward.isEnabled()
 
 
 def test_toolbar_is_a_group_of_compact_icon_buttons(qtbot):
@@ -4502,7 +4515,8 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
 
     view._bank.delete.click()
 
-    assert actions.deleted and {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+    assert actions.deleted
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
 # --- the bank's act-on-this trio: star and enhance aim where delete aims ------
@@ -4900,10 +4914,12 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[0] == (view._bank.back, view._bank.forward)
     assert groups[1] == (view._bank.undo, view._bank.redo)
     assert groups[3] == (view._bank.favorite, view._bank.enhance, view._bank.delete)
-    assert view._bank.auto in groups[4] and view._bank.radio in groups[4]
+    assert view._bank.auto in groups[4]
+    assert view._bank.radio in groups[4]
     # The mic has a space of its own: the group beside it is what the app is
     # doing, and the mic is what it hears with.
-    assert groups[5] == (view._bank.mic,) and view._bank.mic not in groups[4]
+    assert groups[5] == (view._bank.mic,)
+    assert view._bank.mic not in groups[4]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -4919,7 +4935,8 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     gaps = {id(gap): gap for gap, _ in view._bank._groups}
     leading, group_gap = view._bank._groups[0][0], view._bank._groups[2][0]
     assert not leading.isVisible()          # nothing to separate from, at the front
-    assert view._bank.group.isHidden() and not group_gap.isVisible()
+    assert view._bank.group.isHidden()
+    assert not group_gap.isVisible()
     assert view._bank._groups[3][0].isVisible()  # the trio is always there
     assert len(gaps) == len(view._bank._groups)
 
@@ -6545,7 +6562,8 @@ def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
     assert "Delete" in view._bank.redo.toolTip()
     view._bank.redo.click()
     assert actions.redo_count == 1
-    assert not view._bank.redo.isEnabled() and view._bank.undo.isEnabled()
+    assert not view._bank.redo.isEnabled()
+    assert view._bank.undo.isEnabled()
 
 
 def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
@@ -7527,7 +7545,8 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._bank.auto.isHidden() and view._bank.auto.isEnabled()
+    assert not view._bank.auto.isHidden()
+    assert view._bank.auto.isEnabled()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
 
@@ -8236,7 +8255,8 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     model = slideshow_hud_model(slideshow.shown.hud_side, slideshow, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.shown.hud_side}_enhanced"] and "Enhanceds" in model.title
+    assert lit[f"{slideshow.shown.hud_side}_enhanced"]
+    assert "Enhanceds" in model.title
     slideshow.close()
 
 
@@ -9766,7 +9786,8 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     client.preview_image.emit(job.prompt_id, frame)
     _generating_tile(view).selected.emit()
     panel = view._info_tabs.current_config_panel()
-    assert panel.watched_key() == key and _frame_shown(panel._preview, frame)
+    assert panel.watched_key() == key
+    assert _frame_shown(panel._preview, frame)
 
     view._poll()  # the rebuild the new running row triggers
 
@@ -9774,7 +9795,8 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     assert _generating_tile(view)._selected
     # The tab following the run kept its frame: a rebuild repaints no tab.
     assert view._info_tabs.current_config_panel() is panel
-    assert panel.watched_key() == key and _frame_shown(panel._preview, frame)
+    assert panel.watched_key() == key
+    assert _frame_shown(panel._preview, frame)
 
 
 def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp_path):
@@ -12789,7 +12811,8 @@ def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tm
     _select_first_leaf(view)
     button = view._enhance.panel._enhance_button
 
-    assert button.isEnabled() and view._bank.enhance.isEnabled()
+    assert button.isEnabled()
+    assert view._bank.enhance.isEnabled()
     assert button.toolTip() == view._bank.enhance.toolTip()
 
     button.click()
@@ -13129,7 +13152,8 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
     tiles = view._browser._thumb_widgets
-    assert tiles["g0"]._enhancing is not None and tiles["g1"]._enhancing is not None
+    assert tiles["g0"]._enhancing is not None
+    assert tiles["g1"]._enhancing is not None
     assert not tiles["g0"]._image_label.pixmap().isNull()
     assert follower.state == "idle"  # waiting in the line for its turn
     assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
@@ -13727,7 +13751,8 @@ def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbo
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     view.osr2_control.set_state(OSR2_DRIVING)
-    assert driver.started and view._osr2_motion.active is False
+    assert driver.started
+    assert view._osr2_motion.active is False
 
     view.osr2_control.set_state(OSR2_PARKED)
 
@@ -13748,6 +13773,13 @@ def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
     assert view._osr2_motion.active is False
 
 
+def _logging(log, name, inner):
+    def logged(*args):
+        log.append(name)
+        return inner(*args)
+    return logged
+
+
 def _handoff_log(view, driver):
     """Every take and give-back of the device by either driver, in order."""
     log = []
@@ -13755,10 +13787,7 @@ def _handoff_log(view, driver):
                                 ("script lets go", driver, "stop"),
                                 ("motion takes", view._osr2_motion, "start"),
                                 ("motion lets go", view._osr2_motion, "stop")):
-        def logged(*args, _inner=getattr(owner, method), _name=name):
-            log.append(_name)
-            return _inner(*args)
-        setattr(owner, method, logged)
+        setattr(owner, method, _logging(log, name, getattr(owner, method)))
     return log
 
 
@@ -13819,7 +13848,8 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
     view.osr2_control.setChecked(True)
-    assert driver.started == [] and view._osr2_motion.active
+    assert driver.started == []
+    assert view._osr2_motion.active
 
     view.osr2_control.setChecked(False)  # off is parked: the motion stilled at home
     assert view._osr2_motion.held == OSR2_PARKED
@@ -13833,12 +13863,14 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     _on_screen(qtbot, view, 1400, 900)
     view.osr2_control.setChecked(True)
-    assert driver.started == [("pA", "aA")] and not view._osr2_motion.active
+    assert driver.started == [("pA", "aA")]
+    assert not view._osr2_motion.active
 
     gestures.press_key(view, Qt.Key.Key_Space)
 
     assert not view.osr2_control.isChecked()      # the switch went off, not the motion
-    assert driver.stopped >= 1 and view._osr2_motion.held == OSR2_PARKED
+    assert driver.stopped >= 1
+    assert view._osr2_motion.held == OSR2_PARKED
 
 
 def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_again(qtbot):
@@ -13961,7 +13993,8 @@ def test_the_radio_switch_round_trips_for_persistence(qtbot):
 
     view.set_radio_enabled(True)
 
-    assert view.radio_enabled() is True and view._bank.radio.isChecked()
+    assert view.radio_enabled() is True
+    assert view._bank.radio.isChecked()
     assert radio.starts == 1  # restoring the switch actually starts it playing
 
 
@@ -14216,7 +14249,8 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     win = panel._preview.open_fullscreen()
 
     qtbot.addWidget(win.shown)
-    assert win is not None and view._slideshows.showing is win
+    assert win is not None
+    assert view._slideshows.showing is win
     assert [slide.prompt_id for slide in win.whole_set()] == ["i1"]
     win.close()
 
@@ -14232,7 +14266,8 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     panel.osr2_drive_target = lambda: None
 
     view.osr2_control.setChecked(True)
-    assert view._osr2_motion.active and driver.started == []
+    assert view._osr2_motion.active
+    assert driver.started == []
 
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     panel.displayed_changed.emit()
@@ -14272,7 +14307,8 @@ def test_a_move_of_a_standing_slideshows_volume_turns_the_radio_on(qtbot, monkey
 
     slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
 
-    assert view._bank.radio.isChecked() and radio.starts == 1
+    assert view._bank.radio.isChecked()
+    assert radio.starts == 1
 
 
 def test_the_next_standing_slideshow_opens_at_the_volume_the_last_was_left_at(
@@ -14507,7 +14543,8 @@ def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
     view._gallery_owns_keys = lambda **_kw: False
 
     assert _press_escape(view) is True
-    assert omnipause.frozen() and view.osr2_control.isChecked()
+    assert omnipause.frozen()
+    assert view.osr2_control.isChecked()
 
 
 def _typing_in_a_text_field(qtbot, monkeypatch):
@@ -14559,7 +14596,8 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
 
     handled = _press_escape(view)
 
-    assert handled is False and driver.stopped == 0  # Esc left for the other window
+    assert handled is False
+    assert driver.stopped == 0
 
 
 def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
@@ -14615,8 +14653,10 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
 
-    assert omnipause.frozen() and radio.frozen
-    assert view._slideshows.showing is slideshow and slideshow.shown.isVisible()
+    assert omnipause.frozen()
+    assert radio.frozen
+    assert view._slideshows.showing is slideshow
+    assert slideshow.shown.isVisible()
     assert view._bank.radio.isChecked()
 
 
@@ -14653,11 +14693,14 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
     view._bank.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
-    assert omnipause.frozen() and radio.frozen
-    assert view._auto.is_active(key) and view._bank.radio.isChecked()
+    assert omnipause.frozen()
+    assert radio.frozen
+    assert view._auto.is_active(key)
+    assert view._bank.radio.isChecked()
 
     _press_escape_at_the_gallery(view)
-    assert not omnipause.frozen() and not radio.frozen
+    assert not omnipause.frozen()
+    assert not radio.frozen
 
 
 def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_again(
@@ -14693,8 +14736,10 @@ def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anythi
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._slideshows.showing is None and radio.starts == 0
-    assert not view._auto.is_active(key) and not view.osr2_control.isChecked()
+    assert view._slideshows.showing is None
+    assert radio.starts == 0
+    assert not view._auto.is_active(key)
+    assert not view.osr2_control.isChecked()
 
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
@@ -14706,7 +14751,8 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
+    assert view._bank.mic.isChecked()
+    assert view._voice.listener.commands_on
 
 
 # --- folders the user composes: multi-select, group, drop, remove -------------
@@ -15495,7 +15541,8 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     _square_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["id"] == folder_id and record["folders"] == [cat]
+    assert record["id"] == folder_id
+    assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
 
 
@@ -15510,7 +15557,8 @@ def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, mo
     view.generation_menu(["i2"], QPoint(0, 0))
 
     (record,) = view._db.list_custom_folders()
-    assert record["items"] == [] and record["folders"] == [cat]
+    assert record["items"] == []
+    assert record["folders"] == [cat]
     assert view._db.get_generation("i2") is not None  # taken out of it, not deleted
 
 
@@ -15525,7 +15573,8 @@ def test_an_item_there_only_by_its_folder_offers_no_way_out_of_the_folder_of_you
 
     view.generation_menu(["i1"], QPoint(0, 0))
 
-    assert labels and "Remove from “Keepers”" not in labels
+    assert labels
+    assert "Remove from “Keepers”" not in labels
 
 
 def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
@@ -15577,7 +15626,8 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
     _tree_menu(view)  # no row under the cursor
 
     (record,) = view._db.list_custom_folders()
-    assert record["name"] == "Keepers" and record["folders"] == []
+    assert record["name"] == "Keepers"
+    assert record["folders"] == []
     assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
 
 
@@ -15865,9 +15915,9 @@ def test_picked_folders_offer_no_delete_when_one_of_them_cannot_be_deleted(
 class _QueueClient(ComfyUIClient):
     """A client whose ComfyUI queue holds ``foreign`` jobs of another app's."""
 
-    def __init__(self, foreign=ForeignQueue(running=[], pending=[]), fail=None):
+    def __init__(self, foreign=None, fail=None):
         super().__init__(folders=SUITE_FOLDERS)
-        self._foreign = foreign
+        self._foreign = foreign if foreign is not None else ForeignQueue(running=[], pending=[])
         self._fail = fail
         self.cleared = 0
 
@@ -16441,12 +16491,14 @@ def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_pl
     qtbot.addWidget(slideshow.shown)
 
     view._voice.listener.speak_command("pause slideshow")
-    assert omnipause.frozen() and slideshow.shown._paused
+    assert omnipause.frozen()
+    assert slideshow.shown._paused
     assert view._slideshows.showing is slideshow  # paused, not closed
     assert slideshow.dwell_s == DEFAULT_S
 
     view._voice.listener.speak_command("play slideshow")
-    assert not omnipause.frozen() and not slideshow.shown._paused
+    assert not omnipause.frozen()
+    assert not slideshow.shown._paused
     slideshow.close()
 
 
@@ -17245,13 +17297,15 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     assert surface.culled == 1
 
     view._voice.listener.speak("lock")
-    assert surface.locked and surface.said == "locked this one"
+    assert surface.locked
+    assert surface.said == "locked this one"
 
     view._voice.listener.speak("lock")
     assert surface.said == "already locked"  # asked for a state, not a flip
 
     view._voice.listener.speak("unlock")
-    assert not surface.locked and surface.said == "let go"
+    assert not surface.locked
+    assert surface.said == "let go"
 
 
 def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_path):
@@ -17272,7 +17326,8 @@ def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path)
 
     view._voice.listener.speak("favorite")
 
-    assert surface.favorited == 1 and surface.said == "favorited"
+    assert surface.favorited == 1
+    assert surface.said == "favorited"
 
 
 def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_path):
@@ -17441,7 +17496,8 @@ def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):
     view._slideshows._slideshow = surface
 
     assert view._voice.listener.speak("a lock of hair over her eye") is None
-    assert surface.said is None and surface.steps == []
+    assert surface.said is None
+    assert surface.steps == []
 
 
 # --- the pane→view wiring: each pane gesture reaches its view handler --------

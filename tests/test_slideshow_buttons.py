@@ -46,9 +46,12 @@ def test_the_switches_light_and_the_things_done_never_do():
     band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
                     _band(locked=True, favorites_filter=True, enhanced=True), strict=True))
 
-    assert band["lock"].lit and band["lock"].favorite
-    assert band["fmode"].lit and band["fmode"].favorite
-    assert band["enhanced"].lit and band["enhanced"].enhanced
+    assert band["lock"].lit
+    assert band["lock"].favorite
+    assert band["fmode"].lit
+    assert band["fmode"].favorite
+    assert band["enhanced"].lit
+    assert band["enhanced"].enhanced
     assert band["trash"].danger
     assert not any(band[name].lit for name in ("prev", "next", "trash", "reset"))
     at_rest = dict(zip(_names(_band()), _band(), strict=True))
@@ -248,4 +251,5 @@ def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
     hosted = next(b for b in _band(hosted=True) if b.command == "portrait_reset")
     alone = next(b for b in _band() if b.command == "portrait_reset")
 
-    assert "library" in hosted.tooltip and "library" not in alone.tooltip
+    assert "library" in hosted.tooltip
+    assert "library" not in alone.tooltip

@@ -40,6 +40,13 @@ class FakeComfy:
         return self._histories.get(prompt_id, {})
 
 
+def _recording(ran, name, real):
+    def recorded(*args, **kwargs):
+        ran.append(name)
+        return real(*args, **kwargs)
+    return recorded
+
+
 def _insert_in_flight(db, prompt_id, *, workflow="sdxl_t2i", status="running"):
     db.insert_generation(
         prompt_id=prompt_id, workflow_name=workflow, workflow_version="v",
@@ -337,7 +344,8 @@ def test_reconcile_repoints_both_favorites_across_the_enhancement_merge(tmp_path
     meta = db.folder_meta_map()
     assert meta.get(current_key, {}).get("starred") is True    # the star came along
     assert meta[current_key]["custom_name"] == "Cats"          # so did the name
-    assert plain_key not in meta and enhanced_key not in meta  # both old keys cleared
+    assert plain_key not in meta
+    assert enhanced_key not in meta
     assert summary["repointed"] == 2
 
 
@@ -595,9 +603,8 @@ def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path,
     db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
     ran = []
     for name in ("reconcile_folder_meta", "reconcile_custom_folders"):
-        monkeypatch.setattr(bookmark_reconcile, name, (
-            lambda *a, _n=name, _f=getattr(bookmark_reconcile, name), **k:
-            (ran.append(_n), _f(*a, **k))[1]))
+        monkeypatch.setattr(bookmark_reconcile, name,
+                            _recording(ran, name, getattr(bookmark_reconcile, name)))
 
     bookmark_reconcile.reconcile_bookmarks(db)
 

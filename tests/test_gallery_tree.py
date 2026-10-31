@@ -207,8 +207,10 @@ def test_images_wear_the_photo_and_videos_the_play_mark_and_say_which_they_are(q
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
     *_collections, images, videos = _children(all_row)
 
-    assert _wears(images, "photo") and images.toolTip(0) == "Images"
-    assert _wears(videos, "play") and videos.toolTip(0) == "Videos"
+    assert _wears(images, "photo")
+    assert images.toolTip(0) == "Images"
+    assert _wears(videos, "play")
+    assert videos.toolTip(0) == "Videos"
 
 
 def test_a_kind_folder_given_a_name_still_says_which_kind_it_holds(qtbot):

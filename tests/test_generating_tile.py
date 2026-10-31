@@ -196,7 +196,8 @@ def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     qtbot.addWidget(tile)
 
     thumbnail = tile._image.pixmap()
-    assert thumbnail is not None and not thumbnail.isNull()
+    assert thumbnail is not None
+    assert not thumbnail.isNull()
     assert thumbnail.width() > thumbnail.height()   # the pair, not one thumbnail alone
 
 
@@ -257,7 +258,8 @@ def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
     thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
 
     assert bar.bottomLeft().y() == thumbnail.bottomLeft().y()
-    assert bar.left() == thumbnail.left() and bar.width() == thumbnail.width()
+    assert bar.left() == thumbnail.left()
+    assert bar.width() == thumbnail.width()
     assert bar.top() > thumbnail.center().y()
 
 

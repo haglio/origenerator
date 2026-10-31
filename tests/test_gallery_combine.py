@@ -37,7 +37,8 @@ def test_a_combination_runs_the_settings_on_the_dropped_image_with_fresh_seeds()
     assert params["input_image"] == "sdxl_new.png [output]"
     assert params["positive_prompt"] == "a cat"
     assert params["steps"] == 20
-    assert params["noise_seed"] != 0 and params["audio_seed"] != 0
+    assert params["noise_seed"] != 0
+    assert params["audio_seed"] != 0
 
 
 def test_combined_params_fills_missing_params_from_workflow_defaults():
@@ -75,7 +76,8 @@ def test_combined_params_drops_the_videos_stored_size():
 
     params = gallery.combined_params(video, image, _I2V)
 
-    assert "width" not in params and "height" not in params
+    assert "width" not in params
+    assert "height" not in params
 
 
 def test_combined_params_payload_derives_the_size_from_the_dropped_image():

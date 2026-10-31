@@ -146,7 +146,8 @@ def test_an_absence_queues_a_batch_and_stops_at_the_limit(tmp_path):
         limit=3,
     )
 
-    assert queued == 3 and len(launched) == 3
+    assert queued == 3
+    assert len(launched) == 3
 
 
 def test_a_refused_launch_is_not_counted(tmp_path):
@@ -320,7 +321,8 @@ def test_the_batch_is_priced_from_what_the_renders_actually_take(tmp_path):
         budget_minutes=5,
     )
 
-    assert queued == 5 and len(launched) == 5
+    assert queued == 5
+    assert len(launched) == 5
 
 
 def test_an_untimed_workflow_is_priced_high_rather_than_guessed_low(tmp_path):
@@ -497,7 +499,8 @@ def test_a_repair_run_now_waits_for_history_rather_than_reading_an_empty_one(
 
     files = render_base_now(client, _SDXL, _base_params(), now=monotonic, sleep=sleep)
 
-    assert files == [_file("base.png")] and client.polls == 3
+    assert files == [_file("base.png")]
+    assert client.polls == 3
 
 
 def test_a_repair_that_never_finishes_gives_up_rather_than_waiting_forever():
@@ -527,7 +530,8 @@ def test_the_tool_reports_what_it_would_do_and_touches_nothing(tmp_path, capsys)
 
     said = capsys.readouterr().out
     assert "1 enhanced image(s) with no base render kept" in said
-    assert "sdxl_t2i: 1" in said and "--apply" in said
+    assert "sdxl_t2i: 1" in said
+    assert "--apply" in said
     assert not gallery.original_files_of(db.get_generation("gone"))
 
 

@@ -92,7 +92,8 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     job.progress.connect(lambda v, m: progress.append((v, m)))
 
     client.progress.emit("comfy-OTHER", "5", 5, 50)
-    assert started == [] and progress == []
+    assert started == []
+    assert progress == []
 
     # SDXL runs a 50-step base pass then a 20-step enhance pass, so progress
     # forwards as this job's position in a whole run budgeted for both.
@@ -221,7 +222,8 @@ def test_completion_generates_thumbnail_when_output_exists(qtbot, tmp_path):
     client.job_completed.emit("comfy-A", SDXL_HISTORY)
 
     _files, thumb, _dur = finished[0]
-    assert thumb is not None and Path(thumb).exists()
+    assert thumb is not None
+    assert Path(thumb).exists()
 
 
 def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
@@ -237,7 +239,8 @@ def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
     client.job_completed.emit("comfy-A", {"outputs": {}})
 
     assert finished == []
-    assert len(failed) == 1 and "without producing an output file" in failed[0]
+    assert len(failed) == 1
+    assert "without producing an output file" in failed[0]
     assert job.state == "failed"
 
 
@@ -427,7 +430,8 @@ def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot
 
     job.start()
 
-    assert job.started_at is not None and job.started_at <= heard_at[0] + 1
+    assert job.started_at is not None
+    assert job.started_at <= heard_at[0] + 1
 
 
 def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_path):

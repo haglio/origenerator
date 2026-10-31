@@ -30,7 +30,8 @@ def test_each_video_is_a_row_wearing_its_thumbnail_drained_of_color(qtbot, tmp_p
 
     middle = row.pixelColor(_where_the_thumbnail_is(row).center())
     assert dropdown.count() == 1
-    assert middle.saturation() == 0 and middle.lightness() > 0
+    assert middle.saturation() == 0
+    assert middle.lightness() > 0
     dropdown.hidePopup()
 
 

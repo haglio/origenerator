@@ -61,7 +61,8 @@ def test_renders_thumbnail_when_output_is_on_disk(tmp_path):
         SDXL, SDXL_HISTORY, OutputPlaces.in_one_folder(out), tmp_path / "thumbs", "n1"
     )
 
-    assert thumb is not None and Path(thumb).exists()
+    assert thumb is not None
+    assert Path(thumb).exists()
 
 
 def test_parses_execution_duration(tmp_path):
@@ -75,7 +76,8 @@ def test_no_output_yields_no_files_or_thumbnail(tmp_path):
     files, thumb, _dur = extract_completion(
         SDXL, {"outputs": {}}, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs", "n1"
     )
-    assert files == [] and thumb is None
+    assert files == []
+    assert thumb is None
 
 
 def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
@@ -198,4 +200,5 @@ def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tm
 
     assert files == [{"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
     assert (places.images / "sdxl_t2i_00001_.png").is_file()
-    assert thumb is not None and Path(thumb).is_file()
+    assert thumb is not None
+    assert Path(thumb).is_file()

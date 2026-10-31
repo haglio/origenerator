@@ -444,13 +444,16 @@ def test_build_rewrite_messages_carries_both_prompts_and_the_instruction():
     messages = build_rewrite_messages("a woman, tan", "blurry", "no tan lines", "SYSTEM")
     assert messages[0] == {"role": "system", "content": "SYSTEM"}
     content = messages[1]["content"]
-    assert "a woman, tan" in content and "blurry" in content and "no tan lines" in content
+    assert "a woman, tan" in content
+    assert "blurry" in content
+    assert "no tan lines" in content
 
 
 def test_the_answer_asked_for_shows_no_dots_a_model_could_copy_back_as_a_prompt():
     content = build_rewrite_messages("a woman, tan", "", "no tan lines", "SYSTEM")[1]["content"]
 
-    assert "..." not in content and "…" not in content
+    assert "..." not in content
+    assert "…" not in content
 
 
 def test_a_rewrite_sends_both_prompts_and_answers_with_both():
@@ -476,4 +479,5 @@ def test_rewrite_prompt_keeps_a_field_the_model_omits():
             base_url="http://x/v1", model="m", system_prompt="S",
         )
 
-    assert positive == "a man" and negative == "existing negative"  # negative preserved
+    assert positive == "a man"
+    assert negative == "existing negative"

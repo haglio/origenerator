@@ -51,7 +51,8 @@ def test_thumbnail_named_by_caller_not_by_source_stem(tmp_path):
     thumb_b = generate_thumbnail(b, "image", thumb_dir, name="row-b")
 
     assert thumb_a != thumb_b
-    assert thumb_a.exists() and thumb_b.exists()
+    assert thumb_a.exists()
+    assert thumb_b.exists()
     # Each thumbnail keeps its own source's proportions — no overwrite.
     assert Image.open(thumb_a).size[0] < Image.open(thumb_a).size[1]   # portrait
     assert Image.open(thumb_b).size[0] > Image.open(thumb_b).size[1]   # landscape
@@ -63,7 +64,8 @@ def test_animated_thumbnail_writes_a_looping_multiframe_webp(tmp_path, monkeypat
 
     result = generate_animated_thumbnail(tmp_path / "v.mp4", tmp_path / "thumbs", name="vid1")
 
-    assert result.exists() and result.suffix == ".webp"
+    assert result.exists()
+    assert result.suffix == ".webp"
     anim = Image.open(result)
     assert getattr(anim, "n_frames", 1) == 3  # every sampled frame is in the loop
 

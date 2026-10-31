@@ -36,6 +36,9 @@ IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
 
 
+_A_CLIENT = object()
+
+
 class FakePanel:
     """The combine panel reduced to what the controller drives."""
 
@@ -292,7 +295,7 @@ def combine(qtbot, monkeypatch):
     monkeypatch.setattr(module, "CombinePanel", FakePanel)
     built = []
 
-    def build(host=None, *, db=None, jobs=None, client=object(), slideshows=None,
+    def build(host=None, *, db=None, jobs=None, client=_A_CLIENT, slideshows=None,
               tabs=None, inbox=None):
         host = host or FakeHost()
         parent = QWidget()
@@ -505,7 +508,8 @@ def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine):
 
     (row,) = controller.launching_rows()
     assert row.key == key
-    assert row.reading.status == "queued" and row.starting is True
+    assert row.reading.status == "queued"
+    assert row.starting is True
     assert row.source_video_thumbnail == "clip-thumb.png"
     assert host.queue_redraws == 1
 
@@ -1025,7 +1029,8 @@ def test_an_act_this_image_cannot_do_is_said_and_nothing_is_run(combine,
         "img", AnimateRequest(act_settings.GENAU, "leaning"))
 
     assert prompt_id is None
-    assert "leaning" in message and kind == ERROR
+    assert "leaning" in message
+    assert kind == ERROR
 
 
 def test_an_image_nobody_has_sorted_yet_is_asked_about_first(combine, monkeypatch):
@@ -1037,7 +1042,8 @@ def test_an_image_nobody_has_sorted_yet_is_asked_about_first(combine, monkeypatc
         "img", AnimateRequest(act_settings.VIDEO, "waving"))
 
     assert prompt_id is None
-    assert "sorted" in message and kind == WARNING
+    assert "sorted" in message
+    assert kind == WARNING
 
 
 def test_animate_as_declines_a_video(combine):
@@ -1056,7 +1062,8 @@ def test_an_act_with_no_past_video_yet_says_so(combine, monkeypatch):
         "img", AnimateRequest(act_settings.GENAU, "waving"))
 
     assert prompt_id is None
-    assert "waving" in message and kind == WARNING
+    assert "waving" in message
+    assert kind == WARNING
 
 
 def test_a_second_loop_asked_for_over_an_image_with_one_coming_is_refused(

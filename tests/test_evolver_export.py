@@ -123,7 +123,7 @@ class TestTheFunscriptThatGoesWithIt:
 
         monkeypatch.setattr(evolver_export.shutil, "copy2", copy_all_but_the_script)
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError, match="unreadable"):
             export_video(clip, inbox, funscript=script)
 
         assert list(inbox.iterdir()) == []

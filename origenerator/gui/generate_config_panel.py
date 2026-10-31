@@ -226,7 +226,7 @@ class GenerateConfigPanel(DropZone):
     # and never the seeding a load does. What tells the tab strip this tab is
     # being worked in rather than looked at (see _loading_config).
     user_edited = pyqtSignal()
-    form_replaced = pyqtSignal()        # a new workflow swapped the param form out
+    prompt_fields_changed = pyqtSignal()  # a new form, or a prompt gained or lost a box
     link_clicked = pyqtSignal(str)
     item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
     context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
@@ -829,7 +829,7 @@ class GenerateConfigPanel(DropZone):
         self._detach_form()
         self._form_workflow_key = None
         if had_form:
-            self.form_replaced.emit()  # an open find must let go of its fields
+            self.prompt_fields_changed.emit()  # an open find must let go of its fields
 
     def _install_form(self, form: ParamForm):
         """Swap the workflow's ParamForm into the form host inside the scroll,
@@ -838,6 +838,7 @@ class GenerateConfigPanel(DropZone):
         self._detach_form()
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
+        self._param_form.text_fields_changed.connect(self.prompt_fields_changed)
         self._param_form.changed.connect(self._note_user_edit)
         self._param_form.changed.connect(self._follow_the_model)
         self._param_form.changed.connect(self._show_advice)
@@ -856,7 +857,7 @@ class GenerateConfigPanel(DropZone):
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
-        self.form_replaced.emit()
+        self.prompt_fields_changed.emit()
 
     def _offer_trainings(self, every_row: bool = False) -> None:
         wf = workflow_named(self._form_workflow_key)

@@ -986,7 +986,7 @@ class GalleryView(QWidget):
         panel.set_enhance_settings(self._enhance.settings)
         panel.set_fullscreen_factory(self._slideshows.open_on_preview)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
-        panel.form_replaced.connect(self._retarget_find)
+        panel.prompt_fields_changed.connect(self._retarget_find)
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.
         panel.form_edited.connect(self._find_bar.refresh)
@@ -1787,7 +1787,11 @@ class GalleryView(QWidget):
         return panel.prompt_fields() if panel is not None else []
 
     def _retarget_find(self):
+        typing = QApplication.focusWidget()
+        caret = typing.textCursor() if isinstance(typing, QPlainTextEdit) else None
         self._find_bar.retarget(self._prompt_fields())
+        if caret is not None:
+            typing.setTextCursor(caret)
 
     # --- searching the gallery (the field over the tree) ------------------------
 

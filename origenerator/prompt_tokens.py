@@ -12,6 +12,7 @@ from typing import NamedTuple
 from tokenizers import Regex, Tokenizer, models, normalizers, pre_tokenizers
 
 from origenerator import config
+from origenerator.box_breaks import flowed
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.prompt_readers import CLIP, QWEN3VL, SOUND_PROMPT_KEYS, T5, UMT5
 
@@ -71,6 +72,10 @@ class PromptReading:
                 starts.append(_opening_brackets_before(text, group[0]))
                 counts.append(0)
         return list(zip(starts, counts))
+
+    def flow(self, texts: list[str], *, start: int = 0, caret: tuple[int, int] | None = None
+             ) -> tuple[list[str], tuple[int, int] | None]:
+        return flowed(texts, self.tokens, limit=self.reads_well, start=start, caret=caret)
 
     def stops_at(self, text: str) -> int | None:
         if self.past_it != CUT_OFF:

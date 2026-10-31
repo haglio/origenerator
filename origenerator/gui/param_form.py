@@ -144,6 +144,7 @@ class ParamForm(QWidget):
 
     changed = pyqtSignal()          # any field's value changed
     train_requested = pyqtSignal(str)  # a LoRA row's Train was pressed (its key)
+    text_fields_changed = pyqtSignal()
     seed_drawn = pyqtSignal(str, object)
     item_activated = pyqtSignal(str)  # a zone's held gallery item was clicked (prompt_id)
 
@@ -584,8 +585,11 @@ class ParamForm(QWidget):
 
     def clear_prompt_rewrites(self) -> None:
         """Stop tracking every field, leaving each an ordinary prompt input."""
-        for widget in self.text_fields():
-            tracked_prompt.untrack(widget)
+        for field in self._scenes.text_fields() if self._scenes is not None else []:
+            tracked_prompt.untrack(field)
+        for widget in self._widgets.values():
+            if isinstance(widget, PromptBoxes):
+                widget.untrack()
 
     def text_fields(self) -> list[QPlainTextEdit]:
         """The form's multiline text inputs — its prompts — in the order they lay
@@ -858,6 +862,8 @@ class ParamForm(QWidget):
         widget = self._kind(pd).make(pd)
         if isinstance(widget, DropSlot):
             widget.activated.connect(self.item_activated)
+        if isinstance(widget, PromptBoxes):
+            widget.boxes_changed.connect(self.text_fields_changed)
         return widget
 
     def definitions(self) -> list[ParamDef]:

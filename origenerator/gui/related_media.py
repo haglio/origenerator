@@ -28,7 +28,7 @@ from origenerator.gallery import (
     was_made_from,
     was_taken_from,
 )
-from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.animations import Animations
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.moving_previews import MovingPreviews
@@ -95,7 +95,7 @@ class RelatedMedia(QWidget):
         self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
         self._previews.made.connect(self._show_made_preview)
         self._shown: tuple | None = None
-        self._in_strip: set[str] = set()
+        self._in_animations: set[str] = set()
         self._request_of = request_of
         self._requests_about = requests_about
         layout = QVBoxLayout(self)
@@ -108,10 +108,10 @@ class RelatedMedia(QWidget):
         layout.addWidget(self._source_section)
         self._requests_section = _Links("Requests")
         self._modifications_section = _Links("Modifications")
-        self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self.link_clicked)
+        self._animations = Animations()
+        self._animations.video_activated.connect(self.link_clicked)
         self._animations_section = CollapsibleSection("Animations")
-        self._animations_section.content_form().addRow(self._animated_strip)
+        self._animations_section.content_form().addRow(self._animations)
         self._animations_section.hide()
         self._combine_section = _Links("Combine")
         self._trims_section = _Links("Trims")
@@ -155,12 +155,11 @@ class RelatedMedia(QWidget):
         # Hides itself when empty, which for anything but an animated image it is.
         self._shown = (row, start_image_of, videos)
         items = self._animated_items(row, start_image_of, videos)
-        self._in_strip = {item[0] for item in items}
-        self._animated_strip.set_heading("Starting frame animated in"
-                                         if media_type_of_row(row) == MediaType.VIDEO
-                                         else "Animated in")
-        self._animated_strip.show_videos(items)
-        self._animations_section.setVisible(not self._animated_strip.isHidden())
+        self._in_animations = {item[0] for item in items}
+        self._animations.set_heading("Starting frame animated in"
+                                     if media_type_of_row(row) == MediaType.VIDEO else "")
+        self._animations.show_videos(items)
+        self._animations_section.setVisible(not self._animations.isHidden())
         self._show_videos_made_from(row.get("prompt_id"), videos)
         self._follow_the_sections()
 
@@ -179,12 +178,12 @@ class RelatedMedia(QWidget):
 
     def clear(self) -> None:
         """Put every link down — the tab has no generation on display."""
-        self._shown, self._in_strip = None, set()
+        self._shown, self._in_animations = None, set()
         self._source_tile.clear()
         self._source_video_tile.clear()
         self._source_section.hide()
         self.show_requests_and_modifications(None)
-        self._animated_strip.hide()
+        self._animations.hide()
         self._animations_section.hide()
         self._show_videos_made_from(None, [])
         self._follow_the_sections()
@@ -278,5 +277,5 @@ class RelatedMedia(QWidget):
                 == image["prompt_id"]]
 
     def _show_made_preview(self, prompt_id: str, _path: str) -> None:
-        if prompt_id in self._in_strip:
-            self._animated_strip.show_videos(self._animated_items(*self._shown))
+        if prompt_id in self._in_animations:
+            self._animations.show_videos(self._animated_items(*self._shown))

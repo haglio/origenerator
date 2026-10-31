@@ -191,7 +191,7 @@ class Database:
     def list_seed_uses(self) -> list[dict]:
         return self.seed_uses.list_seed_uses()
 
-    # --- what Combine's slot was given (see origenerator.db_combine_video_uses) -
+    # --- what Combine's drop zone was given (see origenerator.db_combine_video_uses) -
 
     def record_combine_video_use(self, intent: str, video_prompt_id: str,
                                  generation_prompt_id: str | None = None) -> None:

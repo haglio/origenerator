@@ -1,9 +1,9 @@
-"""A gallery folder's bookmark: the name the user gave it, and its star.
+"""A gallery folder's favorite: the name the user gave it, and its star.
 
-One of the six tables `Database` used to hold all of. `origenerator.bookmark_reconcile`
+One of the six tables `Database` used to hold all of. `origenerator.favorite_reconcile`
 and the gallery tree are its readers.
 
-A folder here is a tree key, which is derived rather than stored -- so a bookmark
+A folder here is a tree key, which is derived rather than stored -- so a favorite
 also carries the identity it can be re-derived from, the tier it sits at and one
 generation under it, and the reconcile re-points it when the key formula moves.
 `folder_meta_map` is the view's half (labels and stars); `folder_meta_full` is
@@ -42,7 +42,7 @@ class FolderMetaStore(Store):
             )
 
     def folder_meta_full(self) -> list[dict]:
-        """Every folder_meta row with its bookmark identity, for the reconcile.
+        """Every folder_meta row with its favorite identity, for the reconcile.
 
         Unlike :meth:`folder_meta_map` (which the view uses for labels/stars), this
         also carries ``level`` and ``ref_prompt_id`` so a stale key can be re-derived.
@@ -66,7 +66,7 @@ class FolderMetaStore(Store):
     def upsert_folder_meta(self, folder_key: str, *, custom_name: str | None,
                            favorite: bool, level: str | None, ref_prompt_id: str | None):
         """Write a folder_meta row in full — the reconcile's tool for re-pointing a
-        bookmark onto a new key and for stamping identity onto a matched one."""
+        favorite onto a new key and for stamping identity onto a matched one."""
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO folder_meta
@@ -81,7 +81,7 @@ class FolderMetaStore(Store):
             )
 
     def delete_folder_meta(self, folder_key: str):
-        """Drop a folder_meta row — used to clear a bookmark's old key after the
+        """Drop a folder_meta row — used to clear a favorite's old key after the
         reconcile has re-pointed it onto its current one."""
         with self._connect() as conn:
             conn.execute("DELETE FROM folder_meta WHERE folder_key = ?", (folder_key,))

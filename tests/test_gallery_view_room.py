@@ -396,7 +396,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
     order = view._browser.listed_prompt_ids()
     # Each entry carries its generation's id, so the slideshow's Up and Down can name
-    # what to trash and what to bookmark, and its stored thumbnail, which is the
+    # what to trash and what to favorite, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
     assert slideshow._set.playlist._items == [(f"{pid}.png", "image", pid, None)
                                           for pid in order]

@@ -122,7 +122,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     """The key of the ``level``-tier folder ``row`` belongs to, recomputed from the
     row under the *current* key formulas.
 
-    A bookmark stores its tier and a representative row under it; recomputing here
+    A favorite stores its tier and a representative row under it; recomputing here
     re-derives the folder's key so a star or custom name follows the folder even
     after a key formula changes — the silent orphaning the reconcile undoes.
     ``image_index`` (see :func:`build_image_config_index`) lets the source-image
@@ -186,7 +186,7 @@ def legacy_settings_folder_key(row: dict) -> str:
     """The settings-folder key ``row`` had under the pre-normalization formula:
     ``settings_only`` hashed with sort_keys, before :func:`canonical_settings`.
 
-    One historical key formula shift that orphaned bookmarks made before it. The
+    One historical key formula shift that orphaned favorites made before it. The
     reconcile recomputes this to re-point such a stale star or name onto the row's
     current settings folder."""
     media_type = media_type_of_row(row)
@@ -288,7 +288,7 @@ def favorite_folders(tree: list[MediaGroup]) -> list:
     """Every favorited folder in ``tree``, at any depth, in top-down tree order.
 
     Powers the gallery's Favorites collection: a folder is bookmarked in place (its
-    position in the tree never changes) and collected here so all bookmarks —
+    position in the tree never changes) and collected here so all favorites —
     however deeply nested — are reachable from one spot.
     """
     found: list = []
@@ -440,7 +440,7 @@ def recently_worked_folders(
 
 def favorite_generations(rows: list[dict]) -> list[dict]:
     """Every favorited image or video that produced an output, newest first — the
-    individual bookmarks the Favorites collection gathers alongside favorited folders.
+    individual favorites the Favorites collection gathers alongside favorited folders.
 
     Any produced row the user favorited qualifies, imported files included (unlike
     the Latest collection, which is app-made results only). ``rows`` arrive newest-first
@@ -656,7 +656,7 @@ def build_gallery_tree(
     :func:`placeable_rows`. Images lead Videos; every other folder is placed by
     the oldest of its rows, newest-made first (the caller orders rows
     newest-first); neither a new generation in a folder nor a star moves it —
-    bookmarks are gathered by :func:`favorite_folders` instead. ``folder_meta``
+    favorites are gathered by :func:`favorite_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and
     supplies the star state.
 
@@ -704,6 +704,6 @@ ALL_LABEL = "All"
 
 
 def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
-    """Images and Videos gathered under one folder, named and starred like any other."""
+    """Images and Videos gathered under one folder, named and favorited like any other."""
     label, favorite = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
     return AllGroup(ALL_KEY, label, list(tree_model), favorite)

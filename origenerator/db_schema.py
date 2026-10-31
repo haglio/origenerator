@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS generations (
     enhance_history TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
-    -- The user's per-item bookmark: a starred image or video, independent of the
+    -- The user's per-item favorite: a favorited image or video, independent of the
     -- folder-level star in folder_meta.
     starred         INTEGER NOT NULL DEFAULT 0,
     -- Last live progress of a still-running job (a ProgressTracker snapshot), so a
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS folder_meta (
     folder_key    TEXT PRIMARY KEY,
     custom_name   TEXT,
     starred       INTEGER NOT NULL DEFAULT 0,
-    -- A bookmark's identity: the tree tier it sits at and a generation under it, so
+    -- A favorite's identity: the tree tier it sits at and a generation under it, so
     -- its key can be recomputed under any future key formula (see reconcile).
     level         TEXT,
     ref_prompt_id TEXT
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS custom_folders (
 CREATE TABLE IF NOT EXISTS custom_folder_items (
     folder_id     INTEGER NOT NULL REFERENCES custom_folders(id) ON DELETE CASCADE,
     -- The gathered folder, by tree key, plus the same identity a folder_meta
-    -- bookmark carries so the reconcile can re-point it when a key formula moves.
+    -- favorite carries so the reconcile can re-point it when a key formula moves.
     folder_key    TEXT    NOT NULL,
     level         TEXT,
     ref_prompt_id TEXT,

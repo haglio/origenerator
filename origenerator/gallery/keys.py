@@ -27,7 +27,7 @@ import hashlib
 FOLDER_ID_CHARS = 8
 
 # How much of the digest a *key* carries. Wider than the name on purpose: the key
-# is the identity a bookmark is stored under, so it is sized against every folder
+# is the identity a favorite is stored under, so it is sized against every folder
 # that has ever existed rather than against the ones on screen together.
 _KEY_DIGEST_CHARS = 12
 

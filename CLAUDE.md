@@ -237,6 +237,46 @@ fix in the sorting window, not in code. The near miss that still counts: a
 is exactly the shape that was removed, and it leaves one question with two
 answers again.
 
+## A Request is the one path to the local model, and the model's notes are his
+
+The local model (`config.LOCAL_LLM_MODEL`, served by Ollama on this machine at
+`config.LOCAL_LLM_BASE_URL`) is asked through `local_llm.ask`, Ollama's own chat
+door, and nothing else; a Request, spoken or typed, is worked out by
+`prompt_edit.work_out` through `gui/request_answering.RequestAnswerer`, which
+is the one place a Request is asked. Never a second path beside Request: two
+paths to the model would answer the same words two ways, and one of them would
+be the path nobody checked keeps the model sandboxed. The model reads his
+prompts only there, speaks only to him, and reaches neither an agent nor the
+internet; its cloud models and web search are off by his environment, not by
+this code, so no test and no agent turns them on.
+
+The model and ComfyUI do not fit on the graphics card together.
+`graphics_card.wait_for_the_card` waits for ComfyUI's queue to drain, takes the
+card's one claim (`tools/card_claim.py`, which the LoRA trainers take too), asks
+ComfyUI to let go of its models, and `let_go_of_the_card` gives the claim back;
+a Request that waits past `RequestAnswerer`'s deadline is answered by the rules
+in `prompt_edit.apply_request` alone. The Job Queue holds its line while the
+model has the card (`hold_for_the_model` / `the_model_let_go`), so a job
+submitted meanwhile waits rather than meeting a card the model is on.
+
+The notes on the collection (`collection_notes.json` beside the library's
+records, `config.COLLECTION_NOTES_PATH`) are the model's reading of his
+prompts, batch by batch and then as patterns. They are his the way the prompts
+are: no agent reads them, prints them, or says what they contain, and every
+test's notes are invented. `origenerator.downtime` writes them while
+Origenerator is closed, in sittings that pick up where the last stopped, and
+takes them again once the collection has grown a tenth; a preview leaves them
+to production, so a preview answers Requests with the notes production wrote,
+or with none. Any trial of the model on his real prompts is one he runs
+himself from a launcher and judges; an agent's trials use invented prompts.
+
+Each turn of the exchange that led to an item is kept in `request_turns` (what
+he said, what the model answered, the prompt pair before and after), and
+`Database.exchange_of` walks the Requested-from links so the model remembers
+the whole chain when he asks again on the item it made. The pairs are prompts,
+so the table is read the way the rest of the gallery database is: its schema,
+never its rows.
+
 ## Where ComfyUI saves, and how an output reaches the library
 
 ComfyUI saves into a folder of its own (`comfyui_output_dir` in the settings

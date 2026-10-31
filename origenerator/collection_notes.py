@@ -22,7 +22,7 @@ GROWTH = 0.1  # this much more of the collection than the notes describe, and th
 TOLD_CHARS = 80_000  # how much of the batch notes a Request's ask carries, oldest first
 _NOTE_TOKENS = 600
 _PATTERNS_TOKENS = 1200
-_WINDOW_MARGIN = 256
+_NEARLY_FULL_TOKENS = 256
 _ASK_TIMEOUT_S = 1800.0
 
 
@@ -118,7 +118,7 @@ def _messages(user_text: str) -> list[dict]:
 
 
 def _fills_the_window(answer: dict, answer_tokens: int) -> bool:
-    return local_llm.tokens_read(answer) >= WINDOW_TOKENS - answer_tokens - _WINDOW_MARGIN
+    return local_llm.tokens_read(answer) >= WINDOW_TOKENS - answer_tokens - _NEARLY_FULL_TOKENS
 
 
 def take(prompts: list[str], notes: CollectionNotes | None, *, ask: Callable,

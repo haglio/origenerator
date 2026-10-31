@@ -93,7 +93,7 @@ class RequestStore(Store):
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 [(prompt_id, *Turn(*turn)) for turn in turns])
 
-    def turns_of(self, prompt_id: str) -> list[Turn]:
+    def _turns_of(self, prompt_id: str) -> list[Turn]:
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT said, answered, old_positive, old_negative, new_positive, new_negative
@@ -108,7 +108,7 @@ class RequestStore(Store):
         current: str | None = prompt_id
         while current and current not in seen:
             seen.add(current)
-            exchange = self.turns_of(current) + exchange
+            exchange = self._turns_of(current) + exchange
             request = self.get_request(current)
             current = request["source_prompt_id"] if request else None
         return exchange

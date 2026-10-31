@@ -312,6 +312,9 @@ class FakeDB:
     def get_generation(self, prompt_id):
         return self._by_id.get(prompt_id)
 
+    def exchange_of(self, prompt_id):
+        return []
+
     def recent_durations(self, workflow_name, limit=10):
         return [
             r["duration_seconds"] for r in self._rows

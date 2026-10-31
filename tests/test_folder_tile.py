@@ -32,19 +32,19 @@ def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
     assert all("›" not in t for t in texts)
 
 
-def test_folder_tile_shows_its_folder_level_badge(qtbot):
+def test_folder_tile_shows_its_toc_initial(qtbot):
     # A model/LoRA/workflow tile wears the same TOC initial the tree does, so a
     # folder's place in the hierarchy reads even in the mixed Favorites collection.
     tile = FolderTile("k", "wan model", [], 3,
-                      badge=icons.folder_badge(gallery.ModelGroup("k", "wan model", [])))
+                      kind_icon=icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", [])))
     qtbot.addWidget(tile)
 
-    badges = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
-    assert badges
-    assert not badges[0].pixmap().isNull()
+    initials = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
+    assert initials
+    assert not initials[0].pixmap().isNull()
 
 
-def test_folder_tile_without_a_level_shows_no_badge(qtbot):
+def test_folder_tile_without_a_level_shows_no_toc_initial(qtbot):
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)
 

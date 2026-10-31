@@ -76,7 +76,7 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
         [{"filename": "sdxl_t2i_src.png", "subfolder": "image", "type": "output"}]
     assert upgraded["thumbnail_path"] == "enh_thumb.jpg"  # shows enhanced pixels
     assert upgraded["starred"] == 1                       # the star survived
-    assert is_enhanced_row(upgraded)                      # wears the badge now
+    assert is_enhanced_row(upgraded)                      # wears the yellow plus now
     # Same node in the same folder: params and identity untouched.
     assert gallery.settings_folder_key(upgraded) == key_before
     # The transient job row is gone.
@@ -354,7 +354,7 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
 
 def test_original_files_survives_capture_and_restore(tmp_path):
     # The undoable-delete path restores rows verbatim; the enhanced marker (and
-    # with it the badge and the original's listing) must survive the round trip.
+    # with it the yellow plus and the original's listing) must survive the round trip.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",

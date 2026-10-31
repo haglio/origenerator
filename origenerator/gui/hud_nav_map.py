@@ -28,7 +28,7 @@ CORNER: Cell = ("corner", 0)
 
 
 class NavMapRow(NamedTuple):
-    """One row down the column: the slide it draws, the name in its gutter, and
+    """One row down the column: the slide it draws, the name in its margin, and
     whether that name is a configuration's folder rather than an act.
 
     The two are pressed differently — a configuration's button jumps to it and
@@ -78,7 +78,7 @@ class Loop:
 @dataclass(frozen=True)
 class NavMap:
     """The nav map the HUD draws: the corner, the row, the column, the lit cell,
-    the loop lighting one axis, and the words in the gutter."""
+    the loop lighting one axis, and the words in the margin."""
 
     corner: Slide
     seeds: tuple[Slide, ...]

@@ -564,7 +564,7 @@ def test_folder_meta_full_reports_identity_columns(tmp_path):
 
 
 def test_a_favorite_set_through_the_plain_api_has_null_identity(tmp_path):
-    # The view stars by key alone; a bookmark's identity (tier + a row under it)
+    # The view stars by key alone; a favorite's identity (tier + a row under it)
     # stays NULL until the reconcile backfills it, so folder_meta_full surfaces that.
     db = Database(tmp_path / "test.db")
     db.set_folder_favorite("image/sdxl_t2i", True)

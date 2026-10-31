@@ -42,7 +42,7 @@ from origenerator.outside_videos import (
     OutsideVideo,
     Places,
     Record,
-    journal_stars,
+    journal_favorites,
     outside_videos,
     pick_act,
     places_here,
@@ -446,7 +446,7 @@ def test_starring_a_video_from_another_source_tells_fun_time_through_the_journal
     _video, shown, _frame = _brought_in(tmp_path)
     places = _places(tmp_path)
 
-    journal_stars(places, [shown], True, now=lambda: 1_700_000_000.5)
+    journal_favorites(places, [shown], True, now=lambda: 1_700_000_000.5)
 
     [line] = places.journal.read_text(encoding="utf-8").splitlines()
     assert json.loads(line) == {"t": 1_700_000_000_500, "event": "favorite",
@@ -543,7 +543,7 @@ def test_a_star_set_here_since_its_record_was_written_stands_until_evolver_carri
     [shown] = _videos(db)
 
     db.set_generation_favorite(shown["prompt_id"], True)
-    journal_stars(places, [shown], True, now=lambda: 1_700_000_100)
+    journal_favorites(places, [shown], True, now=lambda: 1_700_000_100)
     scan(db, places, grab=_still)
 
     assert db.get_generation(shown["prompt_id"])["starred"] == 1

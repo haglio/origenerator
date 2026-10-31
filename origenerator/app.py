@@ -346,15 +346,15 @@ def _record_workflow_versions(library: Library):
     return stamp_unstamped(library.db)
 
 
-def _reconcile_bookmarks(library: Library):
+def _reconcile_favorites(library: Library):
     """Heal stars, custom names and hand-composed folders whose folder key
     drifted after a key formula change, and stamp identity onto live ones so the
     next change is handled automatically. Runs after the backfills above -- they
     can move a generation's folder by filling in its workflow/model/LoRA -- so
     the tree it reconciles against is final, and it is read once for both."""
-    from origenerator.bookmark_reconcile import reconcile_bookmarks
+    from origenerator.favorite_reconcile import reconcile_favorites
 
-    reconcile_bookmarks(library.db)
+    reconcile_favorites(library.db)
 
 
 #: The library maintenance every launch performs, in order -- a branch session's
@@ -413,7 +413,7 @@ MAINTENANCE = (
     BootPass("Recording workflow versions...", _record_workflow_versions,
              counted="Recorded the workflow version of %d generation(s)",
              failure="Recording workflow versions failed: %s"),
-    BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
+    BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )
 

@@ -661,7 +661,7 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
     assert view._current_collection_key() == oriented_key(LATEST_KEY, "portrait")
 
 
-def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
+def test_favorites_collects_the_favorites_of_its_own_side(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     db = FakeDB([tall, wide])

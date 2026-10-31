@@ -236,7 +236,7 @@ class GenerationStore(Store):
             )
 
     def set_generation_favorite(self, prompt_id: str, favorite: bool):
-        """Favorite (or unfavorite) one generation — the user's per-item bookmark.
+        """Favorite (or unfavorite) one generation — the user's per-item favorite.
 
         Its own method rather than a key of update_generation, which covers a
         job's lifecycle rather than a user gesture like this.

@@ -160,7 +160,7 @@ def rows_under(group) -> list[dict]:
 
 def group_level(group) -> str:
     """Which tier of the tree ``group`` sits at: all, media, workflow, model,
-    lora, source_image, custom, or settings. A bookmark records its tier so its key can
+    lora, source_image, custom, or settings. A favorite records its tier so its key can
     be recomputed from one of its rows under whatever key formula is current (see
     :func:`folder_key_at_level`)."""
     return group.level

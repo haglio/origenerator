@@ -77,7 +77,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, omnipause
+from origenerator.gui import corner_buttons, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
     REROLL_VIDEO,
@@ -960,7 +960,7 @@ class GalleryView(QWidget):
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source link,
-        and its preview's corner controls and right-click menu act on the shown
+        and its preview's corner buttons and right-click menu act on the shown
         generation exactly as a browser thumbnail's do.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
         and re-reads whether the tab still owns a run in flight, a double-click on
@@ -3677,20 +3677,20 @@ class GalleryView(QWidget):
         return leaf is not None and leaf is not self._tree.currentItem()
 
     def run_item_action(self, prompt_id: str, action: str):
-        """Run one corner control's act on one generation.
+        """Run one corner button's act on one generation.
 
-        The corner controls are drawn on a particular item, so unlike the menu
+        The corner buttons are drawn on a particular item, so unlike the menu
         they never act on a selection: pressing the star on a tile favorites THAT
         tile, whichever tiles happen to be picked.
         """
         row = self._db.get_generation(prompt_id)
         if row is None:
             return
-        if action == corner_controls.STAR:
+        if action == corner_buttons.STAR:
             self.set_items_favorite([prompt_id], not row.get("starred"))
-        elif action == corner_controls.TRASH:
+        elif action == corner_buttons.TRASH:
             self._delete_rows([row])
-        elif action == corner_controls.ENHANCE:
+        elif action == corner_buttons.ENHANCE:
             self._enhance.enhance_items([prompt_id])
 
     def set_items_favorite(self, prompt_ids, favorite: bool):

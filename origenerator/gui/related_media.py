@@ -2,8 +2,8 @@
 
 The links under a config tab's settings form, a section per relation: Source,
 the item this row was built from and the video whose settings Combine ran on
-it; Requests and Modifications, both ways; and Animations, the videos an image
-was animated into.
+it; Requests and Modifications, both ways; and the other ends of the Source
+links, Animations, Combine and Trims. Each link is drawn on both of its items.
 
 Fed one row at a time, asking the library only through the calls it is handed,
 so it can be stood up on its own. It is deliberately not the whole of what a tab
@@ -41,30 +41,25 @@ def _is_request(record: dict | None) -> bool:
     return bool(words_of(record))
 
 
-class _BothWays(CollapsibleSection):
-    """One relation's links both ways: the item the row on display was made
-    from, then each item made from it, newest first -- and no section at all
-    for a row with neither."""
+class _Links(CollapsibleSection):
+    """One relation's links, each tile headed by how its item is tied to the
+    row on display -- and no section at all for a row tied to none."""
 
     activated = pyqtSignal(str)
 
-    def __init__(self, title: str, from_heading: str, into_heading: str):
+    def __init__(self, title: str):
         super().__init__(title)
-        self._from_heading, self._into_heading = from_heading, into_heading
         host = QWidget()
         self._flow = FlowLayout(host, spacing=GAP_MEDIUM)
         self.content_form().addRow(host)
         self._tiles: list[SourceTile] = []
         self.hide()
 
-    def show_links(self, made_from: dict | None, made_into: list[dict],
-                   name_of: Callable[[str], str]) -> None:
+    def show_links(self, links: list[tuple[str, dict]], name_of: Callable[[str], str]) -> None:
         for tile in self._tiles:
             self._flow.removeWidget(tile)
             tile.setParent(None)
             tile.deleteLater()  # it may be the tile whose click is showing this row
-        links = ([(self._from_heading, made_from)] if made_from is not None else []) + [
-            (self._into_heading, row) for row in made_into]
         self._tiles = [self._tile(heading, row, name_of) for heading, row in links]
         for tile in self._tiles:
             self._flow.addWidget(tile)
@@ -91,11 +86,6 @@ class RelatedMedia(QWidget):
                  previews: MovingPreviews | None = None,
                  request_of: Callable[[str], dict | None],
                  requests_about: Callable[[str], list[dict]]):
-        """``video_rows`` answers the library's videos, and is asked only for a
-        row that could have animations — which is why it is a call rather than
-        a list. Reading it is a whole-table read and a parse per row, and every
-        video shown would otherwise pay for it to be told it has none.
-        """
         super().__init__(parent)
         self._video_rows = video_rows or (list)
         self._row_of = row_of
@@ -103,7 +93,7 @@ class RelatedMedia(QWidget):
         self._held_rows = held_rows
         self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
         self._previews.made.connect(self._show_made_preview)
-        self._shown: dict | None = None
+        self._shown: tuple | None = None
         self._in_strip: set[str] = set()
         self._request_of = request_of
         self._requests_about = requests_about
@@ -115,18 +105,20 @@ class RelatedMedia(QWidget):
         self._source_section = self._source_section_of(self._source_tile,
                                                        self._source_video_tile)
         layout.addWidget(self._source_section)
-        self._requests_section = _BothWays("Requests", "Requested from", "Requested into")
-        self._modifications_section = _BothWays(
-            "Modifications", "Modified from", "Modified into")
-        for section in (self._requests_section, self._modifications_section):
-            section.activated.connect(self.link_clicked)
-            layout.addWidget(section)
+        self._requests_section = _Links("Requests")
+        self._modifications_section = _Links("Modifications")
         self._animated_strip = AnimatedVideoStrip()
         self._animated_strip.video_activated.connect(self.link_clicked)
         self._animations_section = CollapsibleSection("Animations")
         self._animations_section.content_form().addRow(self._animated_strip)
         self._animations_section.hide()
-        layout.addWidget(self._animations_section)
+        self._combine_section = _Links("Combine")
+        self._trims_section = _Links("Trims")
+        for section in (self._requests_section, self._modifications_section,
+                        self._combine_section, self._trims_section):
+            section.activated.connect(self.link_clicked)
+        for section in self._sections():
+            layout.addWidget(section)
 
     def _source_section_of(self, *tiles: SourceTile) -> CollapsibleSection:
         side_by_side = QWidget()
@@ -149,17 +141,19 @@ class RelatedMedia(QWidget):
         the owner's, because the owner is what holds the library.
         """
         start_image_of = start_images_among([*image_rows, *self._held_of_kind(MediaType.IMAGE)])
+        videos = [*self._video_rows(), *self._held_of_kind(MediaType.VIDEO)]
         self._show_source_tile(row, start_image_of)
         self._show_source_video_tile(row)
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
         # Hides itself when empty, which for anything but an animated image it is.
-        self._shown = (row, start_image_of)
-        items = self._animated_items(row, start_image_of)
+        self._shown = (row, start_image_of, videos)
+        items = self._animated_items(row, start_image_of, videos)
         self._in_strip = {item[0] for item in items}
         self._animated_strip.show_videos(items)
         self._animations_section.setVisible(not self._animated_strip.isHidden())
+        self._show_videos_made_from(row.get("prompt_id"), videos)
 
     def folds(self) -> dict[str, bool]:
         return {section.title(): section.is_collapsed() for section in self._sections()}
@@ -171,8 +165,8 @@ class RelatedMedia(QWidget):
                 section.set_collapsed(folded)
 
     def _sections(self) -> tuple[CollapsibleSection, ...]:
-        return (self._source_section, self._requests_section,
-                self._modifications_section, self._animations_section)
+        return (self._source_section, self._requests_section, self._modifications_section,
+                self._animations_section, self._combine_section, self._trims_section)
 
     def clear(self) -> None:
         """Put every link down — the tab has no generation on display."""
@@ -183,6 +177,7 @@ class RelatedMedia(QWidget):
         self.show_requests_and_modifications(None)
         self._animated_strip.hide()
         self._animations_section.hide()
+        self._show_videos_made_from(None, [])
 
     def _show_source_tile(self, row: dict, start_image_of):
         """Reveal the source tile for whatever this row was built from, else hide
@@ -205,12 +200,23 @@ class RelatedMedia(QWidget):
         made_into = [(record, made)
                      for record in (self._requests_about(prompt_id) if prompt_id else [])
                      if (made := self._item(record["prompt_id"])) is not None]
-        for section, is_request in ((self._requests_section, True),
-                                    (self._modifications_section, False)):
+        for section, is_request, from_heading, into_heading in (
+                (self._requests_section, True, "Requested from", "Requested into"),
+                (self._modifications_section, False, "Modified from", "Modified into")):
             section.show_links(
-                made_from if _is_request(request) == is_request else None,
-                [made for record, made in made_into if _is_request(record) == is_request],
+                ([(from_heading, made_from)]
+                 if made_from is not None and _is_request(request) == is_request else [])
+                + [(into_heading, made) for record, made in made_into
+                   if _is_request(record) == is_request],
                 self._name_of)
+
+    def _show_videos_made_from(self, prompt_id: str | None, videos: list[dict]) -> None:
+        for section, names_it, heading in (
+                (self._combine_section, "source_video", "Source video for"),
+                (self._trims_section, "trimmed_from", "Trimmed into")):
+            section.show_links([(heading, video) for video in videos
+                                if prompt_id and video.get(names_it) == prompt_id],
+                               self._name_of)
 
     def _show_source_video_tile(self, row: dict) -> None:
         video_id = row.get("source_video")
@@ -242,17 +248,12 @@ class RelatedMedia(QWidget):
         return self._row_of(prompt_id) or next(
             (held for held in self._held_rows() if held["prompt_id"] == prompt_id), None)
 
-    def _animated_items(self, row: dict, start_image_of) -> list[tuple]:
+    def _animated_items(self, row: dict, start_image_of, videos: list[dict]) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video whose own
-        link names this image — empty for anything but an image with animations.
-
-        The library's videos are asked for only past that first test, so showing
-        a video costs no read at all.
-        """
+        link names this image — empty for anything but an image with animations."""
         if media_type_of_row(row) != MediaType.IMAGE:
             return []
-        could_name_it = videos_from_source_image(
-            row, [*self._video_rows(), *self._held_of_kind(MediaType.VIDEO)])
+        could_name_it = videos_from_source_image(row, videos)
         return [(video["prompt_id"], self._previews.of(video), video.get("thumbnail_path"))
                 for video in could_name_it
                 if (self._built_from(video, start_image_of)[0] or {}).get("prompt_id")

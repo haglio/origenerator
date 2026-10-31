@@ -1,10 +1,5 @@
-"""What else in the library a shown generation is tied to.
-
-Two links stacked under a config tab's settings form — the item this row was
-built from, and the videos an image was animated into — fed one row at a time.
-They were two attributes and two methods on the config panel, which has a dozen
-other things to be about; here they are one widget answering one question.
-"""
+"""What else in the library a shown generation is tied to: the links under a
+config tab's settings form, fed one row at a time."""
 from __future__ import annotations
 
 import pytest
@@ -140,6 +135,16 @@ def test_a_video_made_here_from_a_hidden_starting_frame_points_back_at_the_frame
     assert related._source_tile._prompt_id == "frame1"
 
 
+def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combine(make_related):
+    related = make_related(_combined_row("made1"), _combined_row("made2"))
+
+    related.show_row(_video_row("vid0"), [_image_row()])
+
+    section = related._combine_section
+    assert section._title == "Combine"
+    assert _links(section) == [("Source video for", "made1"), ("Source video for", "made2")]
+
+
 def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(make_related):
     related = make_related(_video_row("vid0"))
 
@@ -173,11 +178,12 @@ def _drawn_links(related, row, image_rows):
     """(made from, made into) for each link the pane draws on *row*."""
     related.show_row(row, image_rows)
     shown = row["prompt_id"]
-    source = related._source_tile
-    drawn = ({(source._prompt_id, shown)} if not source.isHidden()
-             and source._heading.text() == "From source image" else set())
+    drawn = {(tile._prompt_id, shown) for tile in (related._source_tile,
+                                                   related._source_video_tile)
+             if not tile.isHidden()}
     drawn |= {(shown, video) for video in _animated(related)}
-    for section in (related._requests_section, related._modifications_section):
+    for section in (related._requests_section, related._modifications_section,
+                    related._combine_section, related._trims_section):
         drawn |= {(other, shown) if heading.endswith(" from") else (shown, other)
                   for heading, other in _links(section)}
     return drawn
@@ -187,15 +193,17 @@ def test_every_link_is_drawn_on_both_of_the_items_it_ties(make_related):
     image, twin = _image_row("img1"), _image_row("twin")
     kept, trashed = _video_row("vid1"), _video_row("vid2")
     cut = _trim_row("cut1", trimmed_from="vid1")
+    combined, combined_in_trash = _combined_row("made1", "vid1"), _combined_row("made2", "vid2")
     requested = _image_row("img2", "sdxl_t2i_img2.png")
     modified = _image_row("img3", "sdxl_t2i_img3.png")
     asked_of_trash = _image_row("img4", "sdxl_t2i_img4.png")
-    related = make_related(kept, cut, rows=[image, twin, requested, asked_of_trash],
-                           held=[trashed, modified],
+    related = make_related(kept, cut, combined, rows=[image, twin, requested, asked_of_trash],
+                           held=[trashed, combined_in_trash, modified],
                            requests=[_request("img2", "img1", asked="two dogs"),
                                      _request("img3", "img1"),
                                      _request("img4", "img3", asked="two cats")])
-    items = [image, twin, kept, trashed, cut, requested, modified, asked_of_trash]
+    items = [image, twin, kept, trashed, cut, combined, combined_in_trash, requested,
+             modified, asked_of_trash]
     image_rows = [image, twin, requested, asked_of_trash]
 
     drawn = {item["prompt_id"]: _drawn_links(related, item, image_rows) for item in items}
@@ -205,7 +213,7 @@ def test_every_link_is_drawn_on_both_of_the_items_it_ties(make_related):
                  if (made_from, made_into) not in drawn[made_into if made_from == shown
                                                           else made_from]]
     assert one_ended == []
-    assert sum(map(len, drawn.values())) == 2 * 5
+    assert sum(map(len, drawn.values())) == 2 * 10
 
 
 def test_an_image_lists_the_videos_in_the_trash_it_was_animated_into(make_related):
@@ -411,6 +419,16 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
     assert related._source_tile._badge.media_type == "video"
 
 
+def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
+    related = make_related(_trim_row("cut1"), _trim_row("cut2"))
+
+    related.show_row(_video_row(), [_image_row()])
+
+    section = related._trims_section
+    assert section._title == "Trims"
+    assert _links(section) == [("Trimmed into", "cut1"), ("Trimmed into", "cut2")]
+
+
 def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):
     # A cut carries its source's params, start frame included. Asking for a start
     # frame first would answer with the image the ORIGINAL was animated from and
@@ -594,25 +612,16 @@ def test_an_image_lists_every_video_it_was_animated_into_however_many(make_relat
     assert _animated(related) == [f"vid{n}" for n in range(20)]
 
 
-def test_a_video_costs_no_read_of_the_library_s_videos(related):
-    # The pool is a whole-table read and a parse per row. Only a row that could
-    # have animations is worth paying it for, so it is asked for past that test
-    # rather than before it — a video shown must not pay to be told it has none.
-    related.show_row(_video_row(), [_image_row()])
-
-    assert related.asks == []
-
-
 def test_a_row_with_no_source_video_looks_none_up(related):
     related.show_row(_video_row(), [_image_row()])
 
     assert related.looked_up == []
 
 
-def test_an_image_asks_for_them_once(make_related):
-    image = _image_row()
+@pytest.mark.parametrize("shown", [_image_row(), _video_row()], ids=["image", "video"])
+def test_a_showing_asks_for_the_library_s_videos_once(make_related, shown):
     related = make_related(_video_row())
 
-    related.show_row(image, [image])
+    related.show_row(shown, [_image_row()])
 
     assert len(related.asks) == 1

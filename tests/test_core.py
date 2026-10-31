@@ -1236,7 +1236,8 @@ def test_a_tabs_link_sections_come_back_folded_as_they_were_left(qtbot, tmp_path
     first = _window(qtbot, tmp_path, AppState(path))
     panel = first._gallery_view._info_tabs.currentWidget()
     panel.prefill("sdxl_t2i", {})
-    left = {"Source": True, "Requests": True, "Modifications": False, "Animations": True}
+    left = {"Source": True, "Requests": True, "Modifications": False, "Animations": True,
+            "Combine": False, "Trims": True}
     panel._related.set_folds(left)
     first.close()
 

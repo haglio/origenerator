@@ -161,8 +161,10 @@ them as choices the user is being asked to make. That is exactly how the SDXL
 T2I form came to show WAN 2.2's high/low expert pairs, with nothing to
 say which one to pick or that neither belonged.
 
-So every picker states what its graph runs: `list_model_files(category, fallback,
-accepts=…)` and `list_lora_files(fallback, accepts=…)`, with `accepts` a family
+So every picker states what its graph runs: `model_picker(key, label, default,
+folder, accepts=…)`, which lists that folder with `list_model_files(category,
+fallback, accepts=…)` and keeps it on the picker, and `list_lora_files(fallback,
+accepts=…)`, with `accepts` a family
 from `workflows/model_arch.py`, a tuple of them, or `ANY` for a category that
 genuinely takes anything (the ESRGAN upscalers). Add `expert="high"` / `"low"` on
 a slot that fills one half of WAN 2.2's expert pair. `accepts` is keyword-only
@@ -173,7 +175,22 @@ every workflow, present and future, so nothing here needs a name added to a list
 
 The families are read from each file's own header, never its name — installed
 here is a checkpoint whose name says Flux and whose tensors say SDXL, and the
-tensors are right. **Unrecognized is not unwanted:**
+tensors are right. A WAN model's patch embedding says its kind too (16 channels
+text-to-video, `ref_conv` Fun Control), so the image-to-video forms take neither,
+and the SDXL graphs, which decode with the SDXL VAE, take no SD 1.5 checkpoint.
+A WAN LoRA's header cannot say which of the two it was trained for, so there
+the base model Civitai files it under decides (`base_models.json`, written by
+`tools/record_from_civitai.py`), and one filed under text-to-video is left out
+of the image-to-video forms too. A fix's own LoRA, in `loras\fixes`, is offered
+in no LoRA dropdown but its own fix's prompts window, his decision (2026-10-29):
+each fix's LoRA is trained for that fix alone. Krea 2 T2I's LoRA rows follow
+the Model picked beside them (`ParamDef.beside_model`): a LoRA leaves them while
+its base model and the Model's are both written down and neither is the other
+or a kind of it (`base_models._KIND_OF`: Raw and Turbo are kinds of Krea 2, and
+two kinds of it are apart). So the LoRA that turns Raw into Turbo, written down
+by hand as made for Krea 2 Raw, is offered beside Raw alone (his decision,
+2026-10-29).
+**Unrecognized is not unwanted:**
 `describe()` returns `arch=None` for a file it cannot read or match, and every
 filter keeps those. Be wrong in that direction. A listed option that errors on
 submit costs one run and says why; a working model missing from the dropdown has
@@ -209,9 +226,12 @@ it), on the settings form's LoRA rows and in a fix's prompts window alike,
 which is where he chose to see it (2026-10-29). A trained look LoRA's title
 and trigger words are written when the app takes the finished version
 (`look_training.take`).
-Installing a LoRA also writes down the trigger words it answers to, beside the
-titles in `trigger_words.json`, by running `tools/record_trigger_words.py`; a
-LoRA trained here gets its word written there by hand, from its training.
+Installing a LoRA also writes down the trigger words it answers to and the base
+model Civitai files it under, beside the titles in `trigger_words.json` and
+`base_models.json`, by running `tools/record_from_civitai.py`; a LoRA trained
+here gets its word written there by hand, from its training, and a base model
+Civitai lacks or files too broadly is written there by hand too, which the tool
+then leaves as it is.
 
 ## What a generation shows is said by hand, never read off its prompt
 
@@ -468,12 +488,16 @@ is the two hooks that call the guard, below.
   that had raised it, and he wants toasts to open production. So a change to
   what this handler decides reaches a click only once it ships, and a preview
   shows only what an open copy does with the item it is handed.
-- `tools/record_trigger_words.py` — asks Civitai, by each file's SHA-256, for
-  the trigger words of every installed LoRA with none written down yet, and
-  writes them in `config.TRIGGER_WORDS_PATH` beside the titles: `[]` for one
-  Civitai does not know or lists none for, so a later run skips it, and a fix's
-  own LoRAs are left out. It prints counts, never a name or a word. Run it from
-  the production checkout, where that path is the library's file.
+- `tools/record_from_civitai.py` — asks Civitai, by each file's SHA-256, for
+  the trigger words and the base model of every installed LoRA missing either,
+  and the base model of every model in `checkpoints` and `diffusion_models`
+  missing one (what a LoRA row following its Model compares a LoRA's against),
+  and writes each one only where it is missing, in `config.TRIGGER_WORDS_PATH`
+  and `config.BASE_MODELS_PATH` beside the titles: `[]` and `""` for one
+  Civitai does not know, so a later run skips it, and a fix's own LoRAs are
+  left out. A file several versions list answers with the version it is the
+  main file of. It prints counts, never a name or a word. Run it from the
+  production checkout, where those paths are the library's files.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

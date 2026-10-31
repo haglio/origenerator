@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import threading
 
+from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
 from origenerator.generation_state import (
@@ -58,6 +59,10 @@ def library_paths_in(output_files: str | None) -> set[str]:
         return set()
     return {file["library_path"] for file in files
             if isinstance(file, dict) and file.get("library_path")} if isinstance(files, list) else set()
+
+
+def _read_whole(prompt: str | None) -> str | None:
+    return None if prompt is None else unboxed(prompt)
 
 
 class GenerationStore(Store):
@@ -130,7 +135,7 @@ class GenerationStore(Store):
                     params_json, workflow_json, provenance, shielded)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (prompt_id, source, workflow_name, workflow_version,
-                 positive_prompt, negative_prompt, seed,
+                 _read_whole(positive_prompt), _read_whole(negative_prompt), seed,
                  params_json, workflow_json, provenance, 1 if shielded else 0),
             )
 

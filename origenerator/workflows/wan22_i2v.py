@@ -16,7 +16,8 @@ from origenerator.workflows.base import (
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import picked_loras
 from origenerator.workflows.model_arch import WAN_S2V
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
     FIRST_PASS_LORA_KEYS,
@@ -75,6 +76,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")
     lora_keys = LORA_KEYS_OF_BOTH_PASSES
+    text_reader = UMT5
     loras_keyed_only_when_named = LORAS_KEYED_ONLY_WHEN_NAMED
     output_node_id = "19"
 
@@ -124,9 +126,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        # The speech slot takes only the speech model: an expert in it would
-        # render deaf, and the expert slots never offer it.
-        speech = list_model_files("diffusion_models", [defaults["unet_s2v"]], accepts=(WAN_S2V,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("scene_frames", "Scenes", ParamType.SCENES, defaults["scene_frames"], min_val=5,
@@ -150,7 +149,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, defaults["cfg_low"], min_val=0.0, max_val=30.0, step=0.1, good=(3, 4)),
             wan_expert_shift_param(defaults),
             *wan_expert_model_params(defaults),
-            ParamDef("unet_s2v", "Speaking Model", ParamType.COMBO, defaults["unet_s2v"], options=speech),
+            # The speech slot takes only the speech model: an expert in it would
+            # render deaf, and the expert slots never offer it.
+            model_picker("unet_s2v", "Speaking Model", defaults["unet_s2v"], "diffusion_models",
+                         accepts=(WAN_S2V,)),
             *wan_expert_lora_params(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,

@@ -8,13 +8,11 @@ from PIL import Image
 
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.detail_parts as detail_module
-import origenerator.workflows.flux_t2i_upscaled as flux
 import origenerator.workflows.lora_rows as lora_rows_module
-import origenerator.workflows.sdxl_pose_transfer as pose
-import origenerator.workflows.sdxl_t2i as t2i
-import origenerator.workflows.wan_experts as experts
+import origenerator.workflows.model_pickers as pickers
 from origenerator import config, points_of_interest
-from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params
+from origenerator.box_breaks import BOX_BREAK
+from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params, texts_read
 from origenerator.gui.param_fields import clamped_number
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.media import MediaType
@@ -170,7 +168,7 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
         "loras": ["l.safetensors"],
     }
     picker = lambda category, fallback, **terms: installed[category]
-    monkeypatch.setattr(experts, "list_model_files", picker)
+    monkeypatch.setattr(pickers, "list_model_files", picker)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -989,8 +987,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
 
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
     picker = lambda category, fallback, **terms: installed.get(category, list(fallback))
-    monkeypatch.setattr(t2i, "list_model_files", picker)
-    monkeypatch.setattr(pose, "list_model_files", picker)
+    monkeypatch.setattr(pickers, "list_model_files", picker)
 
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
@@ -1011,7 +1008,8 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         assert denoise.default == 0.15
 
 
-_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_animate", "ltx", "krea2")
+_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_t2v", "wan_fun_control",
+             "wan_animate", "ltx", "krea2")
 # The categories that hold more than one architecture. upscale_models is left
 # out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
 # over them is meant to list everything.
@@ -1043,6 +1041,50 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
             checked += 1
             assert offered < planted, f"{name}.{pd.key} offers every architecture"
     assert checked, "no model pickers were exercised — the fixture stopped matching"
+
+
+def test_an_image_to_video_form_offers_no_model_that_makes_video_from_text_or_a_control_video(
+        installed_models):
+    families = ("wan", "wan_t2v", "wan_fun_control")
+    for family in families:
+        installed_models.add("diffusion_models", f"fam_{family}.safetensors", arch=family)
+    kinds = {f"fam_{family}.safetensors" for family in families}
+
+    for workflow in ("wan22_i2v", "wan22_flf2v_loop"):
+        for pd in WORKFLOW_REGISTRY[workflow].param_definitions():
+            if pd.key in ("unet_high", "unet_low"):
+                assert kinds.intersection(pd.options) == {"fam_wan.safetensors"}, (
+                    f"{workflow}.{pd.key}")
+
+
+def test_an_image_to_video_form_offers_no_lora_civitai_files_under_text_to_video(
+        installed_models, recorded_base_models):
+    for stem in ("a_t2v_look", "an_i2v_look", "a_look_not_on_civitai"):
+        installed_models.add("loras", f"{stem}.safetensors", arch="wan", lora=True)
+    recorded_base_models({"a_t2v_look": "Wan Video 2.2 T2V-A14B",
+                          "an_i2v_look": "Wan Video 2.2 I2V-A14B"})
+    looks = {"a_t2v_look.safetensors", "an_i2v_look.safetensors",
+             "a_look_not_on_civitai.safetensors"}
+
+    for workflow in ("wan22_i2v", "wan22_flf2v_loop", "wan22_animate"):
+        lora_keys = WORKFLOW_REGISTRY[workflow].lora_keys
+        pickers = [pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
+                   if pd.key in lora_keys]
+        assert pickers, workflow
+        for pd in pickers:
+            assert looks.intersection(pd.options) == looks - {"a_t2v_look.safetensors"}, (
+                f"{workflow}.{pd.key}")
+
+
+def test_a_form_that_decodes_with_the_sdxl_vae_offers_no_sd15_checkpoint(installed_models):
+    installed_models.add("checkpoints", "an_xl_model.safetensors", arch="sdxl")
+    installed_models.add("checkpoints", "a_15_model.safetensors", arch="sd15")
+
+    for workflow in ("sdxl_t2i", "sdxl_pose_transfer", "image_enhance"):
+        checkpoint = next(pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
+                          if pd.key == "checkpoint")
+        assert {"an_xl_model.safetensors", "a_15_model.safetensors"}.intersection(
+            checkpoint.options) == {"an_xl_model.safetensors"}, workflow
 
 
 def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
@@ -1933,7 +1975,8 @@ def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
     # models, like SDXL's checkpoint picker — the one thing a user varies most.
 
     installed = ["a_flux.gguf", "b_flux.gguf"]
-    monkeypatch.setattr(flux, "list_model_files", lambda category, fallback, **terms: installed)
+    monkeypatch.setattr(pickers, "list_model_files",
+                        lambda category, fallback, **terms: installed)
 
     wf = FluxT2iUpscaledWorkflow()
     by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -2617,6 +2660,34 @@ def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_images_
     assert payload[sampler["negative"][0]]["inputs"]["text"] == "blurry"
 
 
+def test_a_fix_reads_its_own_words_as_a_piece_ahead_of_a_boxed_prompts_boxes():
+    payload = _enhance_payload(
+        positive_prompt=f"a lantern {BOX_BREAK}on a jetty", negative_prompt="blurry",
+        enhance_detail_fixes={"hands": 0.45},
+        enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}},
+    )
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert texts_read(payload, payload[detailer["inputs"]["positive"][0]]) == [
+        "open palms", "a lantern ", "on a jetty"]
+    assert texts_read(payload, payload[detailer["inputs"]["negative"][0]]) == ["fists, blurry"]
+    sampler = _find_node(payload, "KSampler")["inputs"]
+    assert texts_read(payload, payload[sampler["positive"][0]]) == ["a lantern ", "on a jetty"]
+
+
+@pytest.mark.parametrize(("name", "prompt_ids"), [
+    ("sdxl_t2i", ("2", "3")), ("sdxl_pose_transfer", ("5", "6")), ("image_enhance", ("3", "4"))])
+def test_an_sdxl_graph_reads_each_box_of_a_prompt_on_its_own(name, prompt_ids):
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), input_image="pick.png",
+        positive_prompt=f"a lantern {BOX_BREAK}on a jetty", negative_prompt=f"blurry {BOX_BREAK}dim"))
+
+    assert [texts_read(payload, payload[node_id]) for node_id in prompt_ids] == [
+        ["a lantern ", "on a jetty"], ["blurry ", "dim"]]
+    assert BOX_BREAK not in json.dumps(payload)
+
+
 def test_an_image_with_no_prompt_leaves_a_part_its_own_prompts_alone():
     skin = next(part for part in detail_module.part_table() if part.name == "skin")
     payload = _enhance_payload(outlined=["skin_finder.pt"], positive_prompt="",
@@ -2637,3 +2708,8 @@ def test_a_fix_is_redrawn_toward_the_prompts_its_settings_give_it():
     (detailer,) = _nodes_of(payload, "DetailerForEach")
     assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == "open palms, a lantern on a jetty"
     assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == "fists, blurry"
+
+
+def test_only_a_workflow_with_scenes_tells_a_story():
+    assert {name for name, workflow in WORKFLOW_REGISTRY.items() if workflow.tells_a_story()} == {
+        "wan22_i2v", "wan22_flf2v_loop"}

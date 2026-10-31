@@ -25,10 +25,11 @@ from shared_ui.icons import inline_icon
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
-import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
+import origenerator.workflows.model_pickers as model_pickers_module
 from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
 from origenerator import export_lane as export_lane_module
 from origenerator.act_settings import CATEGORIES
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -64,9 +65,11 @@ from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
+from origenerator.workflows.model_arch import KREA2, WAN
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.text_readers import clap_reader, clip_reader, word_reader
 from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
 
 
@@ -1248,6 +1251,33 @@ def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
     assert panel._param_form.seed_is_random() is True
 
 
+def test_a_prompt_carried_from_a_workflow_that_reads_it_whole_flows_into_boxes_of_whole_words(
+        panel, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = " ".join(["cat"] * 74)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+    panel._param_form.set_values({"positive_prompt": f"{cats} abcdefgh"})
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+
+    boxes = panel._param_form._widgets["positive_prompt"].boxes()
+    assert [diff_text.live_text(box) for box in boxes] == [cats, "abcdefgh"]
+    assert panel._param_form.get_values()["positive_prompt"] == f"{cats}{BOX_BREAK}abcdefgh"
+
+
+def test_a_prompt_in_boxes_carried_to_a_workflow_that_reads_it_whole_is_read_whole(
+        panel, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    word_reader(tmp_path / "ComfyUI" / "comfy" / "text_encoders" / "t5_tokenizer"
+                / "tokenizer.json")
+    panel._param_form.set_values({"positive_prompt": f"a lantern{BOX_BREAK}on a jetty"})
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+
+    assert panel._param_form.get_values()["positive_prompt"] == "a lantern on a jetty"
+
+
 def test_a_pinned_seed_stays_pinned_across_a_switch_between_video_workflows(panel):
     panel.prefill("wan22_flf2v_loop", {})
     panel._param_form.put_seeds({"noise_seed": 99}, is_random=False)
@@ -2349,7 +2379,7 @@ def _notice(panel):
 
 
 def _set_prompt(panel, text):
-    panel._param_form._widgets["positive_prompt"].setPlainText(text)
+    _positive_field(panel).setPlainText(text)
 
 
 def test_a_browsed_generation_arrives_unmarked(saved_panel):
@@ -2584,6 +2614,41 @@ def test_the_missing_models_field_wears_a_warning_that_puts_an_installed_one_in_
     assert panel._generate_pair.isEnabled()
 
 
+def test_a_model_installed_but_not_made_for_the_workflow_says_so_rather_than_not_installed(
+        installed_models, saved_panel):
+    installed_models.add("checkpoints", "an_old_look.safetensors", arch="sd15")
+    panel, db = saved_panel
+    image = _image_made_with(db, "an_old_look.safetensors")
+
+    panel.show_saved_generation(image, [image])
+
+    mark = panel._param_form._warning_marks["checkpoint"]
+    assert (mark.isHidden(), mark.toolTip()) == (
+        False, "an_old_look isn't made for SDXL T2I, so it isn't offered here. "
+               "Click to use reapony_v80.")
+    assert _note(panel) == ""
+    assert panel._generate_pair.isEnabled()
+
+
+def test_a_lora_not_made_for_the_model_beside_it_says_so_on_its_row(
+        installed_models, recorded_base_models, saved_panel):
+    for model in ("raw_model", "turbo_model"):
+        installed_models.add("diffusion_models", f"{model}.safetensors", arch="krea2")
+    installed_models.add("loras", "speed_up.safetensors", arch="krea2", lora=True)
+    recorded_base_models({"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo",
+                          "speed_up": "Krea 2 Raw"})
+    panel, _db = saved_panel
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "krea2_t2i"))
+
+    panel._param_form.set_values({"unet": "turbo_model.safetensors",
+                                  "lora": "speed_up.safetensors"})
+
+    mark = panel._param_form._warning_marks["lora"]
+    assert (mark.isHidden(), mark.toolTip()) == (
+        False, "speed_up isn't made for turbo_model, so it isn't offered here. "
+               "Click to use None.")
+
+
 def test_generate_is_grayed_out_while_the_form_names_a_model_that_is_not_installed(
         installed_models, saved_panel):
     panel, db = saved_panel
@@ -2649,7 +2714,7 @@ def test_editing_a_shown_image_s_prompt_marks_how_it_now_differs(saved_panel, qt
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
 
     field.setPlainText("a dog on a couch")
 
@@ -2661,7 +2726,7 @@ def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
     field.moveCursor(QTextCursor.MoveOperation.End)
     qtbot.keyClicks(field, "s")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("couch", "couchs"), timeout=5000)
@@ -2878,7 +2943,7 @@ def _ask(panel, qtbot, words):
 
 
 def _positive(panel):
-    return diff_text.live_text(panel._param_form._widgets["positive_prompt"])
+    return panel._param_form._widgets["positive_prompt"].value()
 
 
 def test_an_image_a_request_made_shows_its_words_in_the_request_section(saved_panel):
@@ -2929,7 +2994,7 @@ def test_an_image_a_request_is_still_making_is_marked_against_the_one_it_was_ask
 
     panel.show_running_generation(running)
 
-    positive = panel._param_form._widgets["positive_prompt"]
+    positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
@@ -2957,7 +3022,7 @@ def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(
 
     panel.show_saved_generation(image, [image])
 
-    positive = panel._param_form._widgets["positive_prompt"]
+    positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
     assert _notice(panel) == ""
@@ -3006,6 +3071,21 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display(saved_panel, qtbot,
         ("a woman on a couch", "two women")]
     assert field._status.isHidden()
     assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_a_requests_rewrite_of_the_image_on_display_lands_in_boxes_of_whole_words(
+        saved_panel, qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
+    _rewriting(monkeypatch, answer=(cats[0], "blurry"))
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    panel.show_saved_generation(image, [image])
+
+    _ask(panel, qtbot, "eighty cats")
+
+    qtbot.waitUntil(lambda: _positive(panel) == f"{cats[1]}{BOX_BREAK}{cats[2]}", timeout=5000)
 
 
 def test_new_words_for_a_requested_image_redo_the_request_on_what_it_was_asked_of(
@@ -3214,7 +3294,7 @@ def modifying(blank_panel, tmp_path):
 
 
 def _positive_field(panel):
-    return panel._param_form._widgets["positive_prompt"]
+    return panel._param_form._widgets["positive_prompt"].boxes()[0]
 
 
 def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(modifying):
@@ -3409,14 +3489,14 @@ def test_showing_a_generation_ends_the_modify(modifying, tmp_path):
     assert modifying._generate_btn.text() == "Generate"
 
 
-def test_ending_the_modify_gives_the_prompts_their_undo_back(modifying):
-    # Undo is off while a field is tracked, since the document is rewritten under
-    # the typist; a field left over must not keep that.
-    assert not _positive_field(modifying).isUndoRedoEnabled()
-
+def test_ending_the_modify_leaves_the_prompts_their_undo(modifying, qtbot):
     modifying._end_folder_modify()
+    field = _positive_field(modifying)
 
-    assert _positive_field(modifying).isUndoRedoEnabled()
+    field.setPlainText("a dog on a couch")
+    qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert modifying._param_form._widgets["positive_prompt"].value() == "a cat on a couch"
 
 
 def test_picking_another_workflow_ends_the_modify(modifying):
@@ -3846,7 +3926,7 @@ def test_generate_is_off_while_its_folder_is_already_making_one(panel, qtbot):
     # used to make a second image nobody asked for.
     panel.set_making_one_check(
         lambda config: config.params["positive_prompt"] == "a folder making one")
-    prompt = panel._param_form._widgets["positive_prompt"]
+    prompt = _positive_field(panel)
 
     prompt.setPlainText("a folder making one")
     assert panel._generate_btn.isEnabled() is False
@@ -3874,7 +3954,7 @@ def recommended(monkeypatch):
     }
     monkeypatch.setattr(advice_module, "model_recommendations", lambda: models)
     monkeypatch.setattr(
-        sdxl_t2i_module, "list_model_files",
+        model_pickers_module, "list_model_files",
         lambda category, fallback, **terms: (
             [*fallback, "example_other.safetensors"] if category == "checkpoints" else list(fallback)))
     return models
@@ -3971,18 +4051,20 @@ def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
 
     form._widgets["cfg"].setValue(1.0)
 
-    field, label = form._widgets["negative_prompt"], form._labels["negative_prompt"]
+    (field,), label = form._widgets["negative_prompt"].boxes(), form._labels["negative_prompt"]
     assert field.property("inert") is True
     assert field.toolTip() == label.toolTip() == STRENGTH_ONE_HELP
 
 
-def _drawn_in(field) -> set[str]:
-    colors, cursor = set(), QTextCursor(field.document())
-    for position in range(1, len(field.toPlainText()) + 1):
-        cursor.setPosition(position)
-        own = cursor.charFormat().foreground()
-        colors.add((own.color() if own.style() != Qt.BrushStyle.NoBrush
-                    else field.palette().color(QPalette.ColorRole.Text)).name())
+def _drawn_in(prompt) -> set[str]:
+    colors = set()
+    for field in prompt.boxes():
+        cursor = QTextCursor(field.document())
+        for position in range(1, len(field.toPlainText()) + 1):
+            cursor.setPosition(position)
+            own = cursor.charFormat().foreground()
+            colors.add((own.color() if own.style() != Qt.BrushStyle.NoBrush
+                        else field.palette().color(QPalette.ColorRole.Text)).name())
     return colors
 
 
@@ -4045,6 +4127,95 @@ def test_a_story_too_long_for_its_good_range_is_among_the_workflows_warnings(qtb
     qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
 
     assert form.get_values()["frame_count"] == 161
+
+
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+               "Click to add it.")
+
+
+@pytest.fixture
+def worded_style(installed_models, worded_loras, titled_models):
+    installed_models.add("loras", "example_style.safetensors", arch=KREA2, lora=True)
+    worded_loras({"example_style": ["exmplstyle"]})
+    titled_models({"example_style": "Example Style 1.0"})
+
+
+def test_picking_a_lora_whose_trigger_word_the_prompt_lacks_warns_and_a_click_adds_it(
+        qtbot, worded_style, blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form._widgets["positive_prompt"].boxes()[0].setPlainText("a portrait")
+    lora = form._widgets["lora"]
+
+    lora.setCurrentIndex(lora.findData("example_style.safetensors"))
+
+    assert form._warning_marks["lora"].toolTip() == _STYLE_SAID
+    assert f"LoRA 1: Example Style 1.0. {_STYLE_SAID}" in (
+        blank_panel._workflow_warning.toolTip().split("\n"))
+    qtbot.mouseClick(form._warning_marks["positive_prompt"], Qt.MouseButton.LeftButton)
+    assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait"
+    assert form._warning_marks["lora"].isHidden()
+
+
+def test_a_prompt_that_tells_no_story_is_one_prompt_however_many_lines_of_dashes_it_holds(
+        qtbot, worded_style, blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form._widgets["positive_prompt"].boxes()[0].setPlainText(
+        "exmplstyle, part one\n---\npart two")
+    lora = form._widgets["lora"]
+
+    lora.setCurrentIndex(lora.findData("example_style.safetensors"))
+
+    assert form._warning_marks["lora"].isHidden()
+
+
+def test_a_story_lacks_its_loras_trigger_word_in_a_scene_without_it_and_a_click_adds_it_there(
+        qtbot, installed_models, worded_loras, blank_panel):
+    installed_models.add("loras", "example_style.safetensors", arch=WAN, lora=True)
+    worded_loras({"example_style": ["exmplstyle"]})
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form.set_values({"positive_prompt": "scene one\n---\nexmplstyle, scene two",
+                     "scene_frames": [81, 81], "lora_high": "example_style.safetensors"})
+
+    qtbot.mouseClick(form._warning_marks["scene_frames"], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == (
+        "exmplstyle, scene one\n---\nexmplstyle, scene two")
+
+
+def test_the_workflows_warning_click_adds_the_first_of_a_loras_several_trigger_words(
+        qtbot, installed_models, worded_loras, blank_panel):
+    installed_models.add("loras", "example_acts.safetensors", arch=KREA2, lora=True)
+    worded_loras({"example_acts": ["alpha", "beta"]})
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "krea2_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form._widgets["positive_prompt"].boxes()[0].setPlainText("a portrait")
+    lora = form._widgets["lora"]
+    lora.setCurrentIndex(lora.findData("example_acts.safetensors"))
+
+    qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == "alpha, a portrait"
+
+
+def test_a_shown_image_whose_prompt_left_off_its_loras_trigger_word_wears_the_warning(
+        worded_style, saved_panel):
+    panel, db = saved_panel
+    params = dict(WORKFLOW_REGISTRY["krea2_t2i"].default_params(), positive_prompt="a cat",
+                  lora="example_style.safetensors", seed=1)
+    db.insert_generation(prompt_id="img1", workflow_name="krea2_t2i", workflow_version="v001",
+                         positive_prompt="a cat", seed=1, params_json=json.dumps(params),
+                         workflow_json="{}")
+    db.update_generation("img1", status="completed",
+                         output_files=json.dumps([{"filename": "krea_img1.png",
+                                                   "subfolder": "image"}]))
+    image = db.get_generation("img1")
+
+    panel.show_saved_generation(image, [image])
+
+    assert panel._param_form._warning_marks["positive_prompt"].toolTip() == _STYLE_SAID
 
 
 def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtbot, blank_panel):
@@ -4206,3 +4377,18 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     assert blank_panel.pick_lora("lora", "example_look.safetensors") is True
     assert not controls.isHidden()
     assert blank_panel.pick_lora("seed", "example_look.safetensors") is False
+
+
+def test_a_sound_prompt_grays_the_words_past_where_its_reader_stops(
+        blank_panel, tmp_path, monkeypatch):
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
+    clap_reader(tmp_path / "hub")
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    read = " ".join(["rain"] * 76)
+
+    blank_panel._param_form.set_values({"audio_prompt": f"{read} on a tin roof"})
+
+    (field,) = blank_panel._param_form._widgets["audio_prompt"].boxes()
+    assert [(span.start, span.format.foreground().color().name())
+            for span in field.document().firstBlock().layout().formats()] == [
+        (len(read) + 1, TEXT_MUTED.name())]

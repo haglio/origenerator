@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.base_models import filed_apart
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.model_files import NO_LORA, is_no_lora, list_lora_files
 
@@ -34,6 +35,11 @@ def strength_without_its_lora(key: str, values: dict) -> bool:
     return lora in values and is_no_lora(values[lora])
 
 
+def a_lora_filed_apart_from_its_model(params: dict, definitions) -> bool:
+    return any(filed_apart(params.get(pd.key), params.get(pd.beside_model))
+               for pd in definitions if pd.beside_model)
+
+
 def keys_with_strengths(keys) -> tuple[str, ...]:
     return tuple(name for key in keys for name in (key, strength_key_of(key)))
 
@@ -49,13 +55,14 @@ def lora_strength(key: str, default: float, label: str = "") -> ParamDef:
 
 
 def lora_rows(defaults: dict, keys, *, accepts, expert: str | None = None,
-              qualifier: str = "") -> list[ParamDef]:
+              qualifier: str = "", beside_model: str = "") -> list[ParamDef]:
     rows: list[ParamDef] = []
     for number, key in enumerate(keys, start=1):
         label = _row_label(number, len(keys), qualifier)
         rows += [
             ParamDef(key, f"LoRA{label}", ParamType.COMBO, defaults[key],
-                     options=list_lora_files([defaults[key]], accepts=accepts, expert=expert)),
+                     options=list_lora_files([defaults[key]], accepts=accepts, expert=expert),
+                     beside_model=beside_model, folder="loras"),
             lora_strength(strength_key_of(key), defaults[strength_key_of(key)], label),
         ]
     return rows

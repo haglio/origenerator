@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate, prompt_conditioning
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
-from origenerator.workflows.model_arch import SD15, SDXL
-from origenerator.workflows.model_files import ANY, list_model_files
+from origenerator.workflows.model_arch import SDXL
+from origenerator.workflows.model_files import ANY
+from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import CLIP
+
+ENHANCE_MODEL_FAMILIES = (SDXL,)
 
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
@@ -48,6 +52,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     selectable = False
     model_keys = ("checkpoint",)
+    text_reader = CLIP
     output_node_id = "12"
 
     def default_params(self) -> dict:
@@ -72,21 +77,15 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
-        )
-        upscalers = list_model_files(
-            "upscale_models", [defaults["upscale_model"]], accepts=ANY,
-        )
         return [
             ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
-                     options=checkpoints),
+            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+                         accepts=ENHANCE_MODEL_FAMILIES),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
-            ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
-                     options=upscalers),
+            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+                         "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
@@ -133,14 +132,8 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
-            "3": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["2", 1], "text": params["positive_prompt"]},
-            },
-            "4": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["2", 1], "text": params["negative_prompt"]},
-            },
+            **prompt_conditioning("3", ["2", 1], params["positive_prompt"]),
+            **prompt_conditioning("4", ["2", 1], params["negative_prompt"]),
             "5": {
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},

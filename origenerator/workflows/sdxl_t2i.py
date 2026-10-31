@@ -5,11 +5,14 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    prompt_conditioning,
     sampler_params,
 )
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
-from origenerator.workflows.model_arch import SD15, SDXL
-from origenerator.workflows.model_files import ANY, list_model_files
+from origenerator.workflows.model_arch import SDXL
+from origenerator.workflows.model_files import ANY
+from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import CLIP
 
 
 class SdxlT2iWorkflow(WorkflowTemplate):
@@ -37,6 +40,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
     lora_keys = loras_keyed_only_when_named = LORA_KEYS
+    text_reader = CLIP
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "7"
     base_output_node_id = "15"  # the pre-enhance render, saved when the tail runs
@@ -69,22 +73,13 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        # SD1.5 alongside SDXL: it carries its own CLIP and runs here, just
-        # against the SDXL VAE this graph pairs it with. The video models filed
-        # under checkpoints carry no text encoder for node 2/3 to read at all.
         defaults = self.default_params()
-        checkpoints = list_model_files(
-            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
-        )
-        upscalers = list_model_files(
-            "upscale_models", [defaults["upscale_model"]], accepts=ANY,
-        )
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
-                     options=checkpoints),
-            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL, SD15)),
+            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+                         accepts=(SDXL,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(SDXL,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=64),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=64),
@@ -92,8 +87,8 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5, good=(3, 8)),
             *sampler_params(defaults),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
-            ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
-                     options=upscalers),
+            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+                         "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
@@ -118,14 +113,8 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
             **loras.nodes,
-            "2": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["positive_prompt"]},
-            },
-            "3": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": loras.clip, "text": params["negative_prompt"]},
-            },
+            **prompt_conditioning("2", loras.clip, params["positive_prompt"]),
+            **prompt_conditioning("3", loras.clip, params["negative_prompt"]),
             "4": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {

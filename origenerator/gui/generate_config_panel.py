@@ -91,15 +91,18 @@ from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.model_titles import model_title
 from origenerator.osr2_driver import drive_target_for
+from origenerator.prompt_tokens import prompt_readings
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
     not_installed,
     not_installed_advice,
+    not_offered_advice,
     recommendations,
     recommended_choices,
     setting_advice,
     spoken_list,
+    trigger_word_advice,
 )
 from origenerator.timing import estimate_label
 from origenerator.voice.dictation import words_of
@@ -223,7 +226,7 @@ class GenerateConfigPanel(DropZone):
     # and never the seeding a load does. What tells the tab strip this tab is
     # being worked in rather than looked at (see _loading_config).
     user_edited = pyqtSignal()
-    form_replaced = pyqtSignal()        # a new workflow swapped the param form out
+    prompt_fields_changed = pyqtSignal()  # a new form, or a prompt gained or lost a box
     link_clicked = pyqtSignal(str)
     item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
     context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
@@ -722,13 +725,13 @@ class GenerateConfigPanel(DropZone):
                                          items=self._zone_items(), lora_keys=wf.lora_keys))
             self._form_workflow_key = key
             defaults = wf.default_params()
-            carried = {
+            carried_over = {
                 k: v for k, v in edited.items()
                 if k in defaults and v != defaults[k]
             }
-            if carried:
-                self._param_form.set_values(carried)
-                self._param_form.put_seeds(carried, is_random=False)
+            if carried_over:
+                self._param_form.set_values(carried_over, carried=True)
+                self._param_form.put_seeds(carried_over, is_random=False)
             checkpoint = self._param_form.get_values().get("checkpoint")
             if not self._loading_config:
                 self._rebase_on_the_model(None, checkpoint, keep=edited)
@@ -782,14 +785,25 @@ class GenerateConfigPanel(DropZone):
         if form is not None:
             values = form.get_values()
             definitions = form.definitions()
-            missing = self._models_not_installed()
-            defaults = (workflow_named(self._form_workflow_key).default_params()
-                        if missing else {})
-            form.set_warnings({**setting_advice(values, definitions),
-                               **not_installed_advice(missing, definitions, defaults)})
+            workflow = workflow_named(self._form_workflow_key)
+            lora_keys = workflow.lora_keys if workflow is not None else ()
+            form.set_warnings({**trigger_word_advice(values, lora_keys,
+                                                     in_scenes=form.tells_a_story()),
+                               **setting_advice(values, definitions),
+                               **self._file_advice(values, definitions, workflow)})
+            form.show_readings(prompt_readings(self._form_workflow_key, values))
             form.mark_recommended(recommended_choices(values))
             form.explain(recommendations(values))
         self._workflow_warning.warn(form.every_warning() if form is not None else "")
+
+    def _file_advice(self, values: dict, definitions, workflow) -> dict:
+        if workflow is None:
+            return {}
+        defaults = workflow.default_params()
+        return {**not_offered_advice(values, definitions,
+                                     (*workflow.model_keys, *workflow.lora_keys), defaults,
+                                     workflow.display_name),
+                **not_installed_advice(self._models_not_installed(), definitions, defaults)}
 
     def _resolve_every_warning(self):
         self._param_form.resolve_every_warning()
@@ -816,7 +830,7 @@ class GenerateConfigPanel(DropZone):
         self._detach_form()
         self._form_workflow_key = None
         if had_form:
-            self.form_replaced.emit()  # an open find must let go of its fields
+            self.prompt_fields_changed.emit()  # an open find must let go of its fields
 
     def _install_form(self, form: ParamForm):
         """Swap the workflow's ParamForm into the form host inside the scroll,
@@ -825,6 +839,7 @@ class GenerateConfigPanel(DropZone):
         self._detach_form()
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
+        self._param_form.text_fields_changed.connect(self.prompt_fields_changed)
         self._param_form.changed.connect(self._note_user_edit)
         self._param_form.changed.connect(self._follow_the_model)
         self._param_form.changed.connect(self._show_advice)
@@ -843,7 +858,7 @@ class GenerateConfigPanel(DropZone):
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
-        self.form_replaced.emit()
+        self.prompt_fields_changed.emit()
 
     def _offer_trainings(self, every_row: bool = False) -> None:
         wf = workflow_named(self._form_workflow_key)
@@ -1741,7 +1756,8 @@ class GenerateConfigPanel(DropZone):
             self._param_form.request_field().done()
             return
         QThreadPool.globalInstance().start(ReviseTask(
-            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words))
+            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words,
+            in_scenes=self._param_form.tells_a_story()))
 
     def _on_rewritten(self, context, revision) -> None:
         asked, prompt_id = context
@@ -1752,7 +1768,7 @@ class GenerateConfigPanel(DropZone):
         if revision is None:
             field.failed()
             return
-        self._param_form.set_prompts(revision.positive, revision.negative)
+        self._param_form.set_prompts(revision.positive, revision.negative, typed=True)
         field.done()
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:

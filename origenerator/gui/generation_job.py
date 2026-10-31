@@ -455,7 +455,7 @@ class GenerationJob(QObject):
 
     def _payload_for(self, params: dict) -> dict:
         return saving_into_its_run_folder(
-            self.workflow.build_api_payload(params), self._places, self.prompt_id)
+            self.workflow.payload_for_comfyui(params), self._places, self.prompt_id)
 
     def _stop_on_server(self):
         """Take the prompt out of the server's line if it is waiting there, and

@@ -70,6 +70,7 @@ from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
     act_settings,
+    config,
     evolver_export,
     fix_training,
     gallery,
@@ -81,6 +82,7 @@ from origenerator import (
     search,
 )
 from origenerator.animate_command import AnimateRequest
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -168,6 +170,7 @@ from tests.test_combine_panel import _listed_under_recent
 from tests.test_enhance_panel import _dropped_on
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakePlayer
+from tests.text_readers import clip_reader
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 _WAN_I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -1888,6 +1891,24 @@ def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, mo
 
     assert _find_count(view) == "1 of 2"
     assert positive.textCursor().position() == positive.toPlainText().find("sparrows")
+
+
+def test_an_open_find_follows_a_prompt_as_it_gains_and_loses_boxes(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    prompt = _tab_with_prompts(view)._param_form._widgets["positive_prompt"]
+    _press_ctrl_f(view, monkeypatch)
+    _find_query(view).setText("dog")
+    first = prompt.boxes()[0]
+
+    first.setPlainText(" ".join(["cat"] * 75) + " dog")
+    qtbot.waitUntil(lambda: len(prompt.boxes()) == 2, timeout=5000)
+    assert _find_count(view) == "1 of 1"
+
+    first.setPlainText("cat")
+    qtbot.waitUntil(lambda: len(prompt.boxes()) == 1, timeout=5000)
+    assert _find_count(view) == "1 of 1"
 
 
 def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypatch):
@@ -11766,7 +11787,8 @@ def test_unticking_random_after_a_generate_keeps_the_seed_that_made_it(qtbot, tm
     _finish_reroll(view, made)
 
     panel._param_form.set_seed_random(False)
-    panel._param_form._widgets["positive_prompt"].setPlainText("a brand new prompt, at dusk")
+    panel._param_form._widgets["positive_prompt"].boxes()[0].setPlainText(
+        "a brand new prompt, at dusk")
     panel._on_generate()
 
     (tweaked,) = view._live_jobs.values()
@@ -16614,6 +16636,36 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
     assert job.params["seed"] == 7
     assert job.params["positive_prompt"] == "a woman, soft light"
     assert job.params["negative_prompt"] == "blurry"
+
+
+def test_a_request_rewritten_past_a_boxs_end_queues_in_boxes_of_whole_words(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=f"a hat, {cats[0]}")
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    assert job.params["positive_prompt"] == f"{cats[1]}{BOX_BREAK}{cats[2]}"
+
+
+def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (75, 5)]
+    stored = f"a hat,{BOX_BREAK}{cats[0]}{BOX_BREAK}{cats[1]}"
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=stored)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    record = view._db.get_request(job.prompt_id)
+    assert (record["old_positive"], record["new_positive"]) == (
+        stored, f"{cats[0]}{BOX_BREAK}{cats[1]}")
+    assert record["new_positive"] == job.params["positive_prompt"]
 
 
 def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):

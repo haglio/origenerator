@@ -21,6 +21,7 @@ from shared_ui.spacing import BUTTON_ICON
 from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gui import (
     diff_text,
@@ -42,18 +43,21 @@ from origenerator.gui.param_form import (
 )
 from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
 from origenerator.lora_training import TrainingOffer
+from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
 from origenerator.seed_history import SeedHistory, SeedUse
-from origenerator.setting_advice import Advice, setting_advice
+from origenerator.setting_advice import Advice, MissingTriggerWords, setting_advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 from origenerator.workflows.lora_rows import strength_key_of
 from origenerator.workflows.model_files import NO_LORA
+from tests.text_readers import word_reading
 from tests.thumbnail_rows import painted_row, square
 
 
@@ -88,7 +92,7 @@ def test_prompts_a_request_rewrites_show_their_whole_change_at_once(qtbot):
 
     form.set_prompts("a dog on a couch", "")
 
-    field = form._widgets["positive_prompt"]
+    (field,) = form._widgets["positive_prompt"].boxes()
     assert diff_text.live_text(field) == "a dog on a couch"
     assert "cat" in field.toPlainText()  # struck through beside the dog
 
@@ -195,7 +199,7 @@ def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
     ])
     qtbot.addWidget(form)
-    form._widgets["positive_prompt"].setPlainText("a red fox in snow")
+    form._widgets["positive_prompt"].boxes()[0].setPlainText("a red fox in snow")
 
     form._copy_buttons["positive_prompt"].click()
 
@@ -212,11 +216,11 @@ def test_prompt_fields_are_draggable_and_filed_under_their_param(qtbot):
         ParamDef("name", "Name", "str", ""),      # single-line: an ordinary field
     ])
     qtbot.addWidget(form)
-    prompt = form._widgets["positive_prompt"]
-    assert isinstance(prompt, PromptField)
-    assert prompt._key == "positive_prompt"
-    assert not isinstance(form._widgets["name"], PromptField)
-    assert form.text_fields() == [prompt]
+    (box,) = form._widgets["positive_prompt"].boxes()
+    assert isinstance(box, PromptField)
+    assert box._key == "positive_prompt"
+    assert not isinstance(form._widgets["name"], PromptBoxes)
+    assert form.text_fields() == [box]
 
 
 def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):
@@ -1996,15 +2000,17 @@ def test_the_sound_prompts_are_shut_down_while_every_scene_speaks(qtbot):
 
 
 def _shut_down_with(form, key, tip):
-    field, label = form._widgets[key], form._labels[key]
-    return (_row_visible(form, key) and field.isReadOnly() and field.property("inert") is True
-            and label.property("inert") is True and field.toolTip() == label.toolTip() == tip)
+    label = form._labels[key]
+    return (_row_visible(form, key) and label.property("inert") is True and label.toolTip() == tip
+            and all(box.isReadOnly() and box.property("inert") is True and box.toolTip() == tip
+                    for box in form._widgets[key].boxes()))
 
 
 def _in_use_with(form, key, tip):
-    field, label = form._widgets[key], form._labels[key]
-    return (_row_visible(form, key) and not field.isReadOnly() and field.property("inert") is False
-            and label.property("inert") is False and field.toolTip() == label.toolTip() == tip)
+    label = form._labels[key]
+    return (_row_visible(form, key) and label.property("inert") is False and label.toolTip() == tip
+            and all(not box.isReadOnly() and box.property("inert") is False
+                    and box.toolTip() == tip for box in form._widgets[key].boxes()))
 
 
 def test_the_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
@@ -2316,6 +2322,113 @@ def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):
             values.get("height")) == (40, "kept", 640, 960)
 
 
+_TRIGGER_WORD = {"lora": MissingTriggerWords("example_style.safetensors", ("exmplstyle",))}
+_TRIGGER_WORD_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive "
+                      "Prompt. Click to add it.")
+
+
+def _krea_form(qtbot):
+    return _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["krea2_t2i"].param_definitions()))
+
+
+def test_a_missing_trigger_word_warns_beside_the_prompt_and_beside_its_lora(qtbot, titled_models):
+    titled_models({"example_style": "Example Style 1.0"})
+    form = _krea_form(qtbot)
+
+    form.set_warnings(_TRIGGER_WORD)
+
+    marks = [form._warning_marks[key] for key in ("positive_prompt", "lora")]
+    assert [(mark.isHidden(), mark.toolTip()) for mark in marks] == [
+        (False, _TRIGGER_WORD_SAID)] * 2
+
+
+def test_a_trigger_word_clicked_in_goes_at_the_start_of_the_first_box_and_flows_on(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
+    form.show_readings({"positive_prompt": word_reading(3, READ_IN_PIECES)})
+    form.set_values({"positive_prompt": f"a b c{BOX_BREAK}d"})
+    form.set_warnings(_TRIGGER_WORD)
+
+    qtbot.mouseClick(form._warning_marks["positive_prompt"], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == (
+        f"exmplstyle, a{BOX_BREAK}b c d")
+
+
+def test_a_requests_rewrite_flows_into_boxes_of_whole_words(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+    form.show_readings({"positive_prompt": word_reading(3, READ_IN_PIECES),
+                        "negative_prompt": word_reading(3, READ_IN_PIECES)})
+
+    form.set_prompts("a b c d", "e f g h", typed=True)
+
+    values = form.get_values()
+    assert (values["positive_prompt"], values["negative_prompt"]) == (
+        f"a b c{BOX_BREAK}d", f"e f g{BOX_BREAK}h")
+
+
+@pytest.mark.parametrize("beside", ["positive_prompt", "lora"])
+def test_clicking_a_trigger_words_warning_puts_the_word_at_the_start_of_the_prompt(qtbot, beside):
+    form = _krea_form(qtbot)
+    form.set_values({"positive_prompt": "a portrait, soft light"})
+    form.set_warnings(_TRIGGER_WORD)
+
+    qtbot.mouseClick(form._warning_marks[beside], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait, soft light"
+
+
+def test_a_trigger_word_warning_beside_two_fields_is_one_line_of_each_warning_it_is_among(
+        qtbot, titled_models):
+    titled_models({"example_style": "Example Style 1.0"})
+    form = _krea_form(qtbot)
+
+    form.set_warnings(_TRIGGER_WORD)
+
+    line = f"LoRA 1: Example Style 1.0. {_TRIGGER_WORD_SAID}"
+    assert form.every_warning() == line
+    assert [form._sections[title].warning.toolTip()
+            for title in ("Prompts", "Models & LoRAs")] == [line, line]
+
+
+def test_one_click_adds_once_a_word_two_loras_both_lack(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "a portrait"})
+    form.set_warnings({
+        "lora_high": MissingTriggerWords("example_style_high.safetensors", ("exmplstyle",)),
+        "lora_low": MissingTriggerWords("example_style_low.safetensors", ("exmplstyle",))})
+
+    form.resolve_every_warning()
+
+    assert form.get_values()["positive_prompt"] == "exmplstyle, a portrait"
+
+
+def test_a_story_wears_its_trigger_word_warning_beside_its_scenes_and_each_scene_gets_the_word(
+        qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "scene one\n---\nexmplstyle, scene two",
+                     "scene_frames": [81, 81]})
+    form.set_warnings({"lora_high": MissingTriggerWords("example_style.safetensors",
+                                                        ("exmplstyle",), in_scenes=True)})
+
+    qtbot.mouseClick(form._warning_marks["scene_frames"], Qt.MouseButton.LeftButton)
+
+    assert form.get_values()["positive_prompt"] == (
+        "exmplstyle, scene one\n---\nexmplstyle, scene two")
+
+
+def test_the_scenes_warn_about_their_length_and_a_missing_trigger_word_on_two_lines(
+        qtbot, titled_models):
+    titled_models({"example_style": "Example Style 1.0"})
+    form = _wan_form(qtbot)
+    form.set_values({"positive_prompt": "a\n---\nb", "scene_frames": [81, 161]})
+
+    form.set_warnings({**_duration_advice(form), "lora_high": _TRIGGER_WORD["lora"]})
+
+    assert form._warning_marks["scene_frames"].toolTip() == (
+        f"Good range: 5–10 s. Click to use 10 s.\n{_TRIGGER_WORD_SAID}")
+
+
 def test_a_warning_mark_sits_left_of_its_label(qtbot):
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
 
@@ -2525,6 +2638,26 @@ def _lora_form(qtbot, **options):
     return form
 
 
+_FILED = {"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo", "speed_up": "Krea 2 Raw",
+          "a_look": "Krea 2"}
+
+
+def _offered(combo) -> list:
+    return [combo.itemData(row) for row in range(combo.count())]
+
+
+def _model_and_its_lora(qtbot, recorded_base_models, model):
+    recorded_base_models(_FILED)
+    form = ParamForm([
+        ParamDef("unet", "Model", "combo", model,
+                 options=["raw_model.safetensors", "turbo_model.safetensors"]),
+        ParamDef("lora", "LoRA", "combo", "None", beside_model="unet",
+                 options=["None", "speed_up.safetensors", "a_look.safetensors"]),
+    ])
+    qtbot.addWidget(form)
+    return form
+
+
 def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot, tmp_path, monkeypatch):
     form = _lora_form(qtbot, lora_keys=("lora",))
     controls = form._training_controls["lora"]
@@ -2560,3 +2693,78 @@ def test_a_form_told_no_lora_keys_offers_no_training(qtbot):
     form = _lora_form(qtbot)
 
     assert form._training_controls == {}
+
+
+def test_a_lora_filed_apart_from_the_picked_model_is_not_offered(
+        qtbot, recorded_base_models):
+    form = _model_and_its_lora(qtbot, recorded_base_models, "turbo_model.safetensors")
+
+    assert _offered(form._widgets["lora"]) == ["None", "a_look.safetensors"]
+
+
+def test_picking_another_model_offers_the_loras_made_for_it(qtbot, recorded_base_models):
+    form = _model_and_its_lora(qtbot, recorded_base_models, "turbo_model.safetensors")
+    unet = form._widgets["unet"]
+
+    unet.setCurrentIndex(unet.findData("raw_model.safetensors"))
+
+    assert _offered(form._widgets["lora"]) == [
+        "None", "speed_up.safetensors", "a_look.safetensors"]
+
+
+def test_a_lora_picked_beside_one_model_stays_picked_when_another_model_is(
+        qtbot, recorded_base_models):
+    form = _model_and_its_lora(qtbot, recorded_base_models, "raw_model.safetensors")
+    form.set_values({"lora": "speed_up.safetensors"})
+
+    form.set_values({"unet": "turbo_model.safetensors"})
+
+    assert form.get_values()["lora"] == "speed_up.safetensors"
+
+
+def test_every_krea_2_t2i_lora_row_follows_the_model_picked_beside_it(
+        qtbot, installed_models, recorded_base_models):
+    for model in ("raw_model", "turbo_model"):
+        installed_models.add("diffusion_models", f"{model}.safetensors", arch="krea2")
+    for lora in ("speed_up", "a_look"):
+        installed_models.add("loras", f"{lora}.safetensors", arch="krea2", lora=True)
+    recorded_base_models(_FILED)
+    form = ParamForm(WORKFLOW_REGISTRY["krea2_t2i"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.set_values({"unet": "turbo_model.safetensors"})
+
+    assert [_offered(form._widgets[key]) for key in ("lora", "lora_2", "lora_3")] == [
+        ["None", "a_look.safetensors"]] * 3
+
+
+
+def _grayed(field) -> list[tuple[int, int, str]]:
+    return [(span.start, span.length, span.format.foreground().color().name())
+            for span in field.document().firstBlock().layout().formats()]
+
+
+_READ = " ".join(["rain"] * 76)
+
+
+def test_a_prompt_grays_the_words_its_reader_never_reads(qtbot):
+    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
+    qtbot.addWidget(form)
+    form.set_values({"audio_prompt": f"{_READ} on a tin roof"})
+
+    form.show_readings({"audio_prompt": word_reading(76, CUT_OFF)})
+
+    (box,) = form._widgets["audio_prompt"].boxes()
+    assert _grayed(box) == [(len(_READ) + 1, len("on a tin roof"), TEXT_MUTED.name())]
+
+
+def test_a_prompt_read_to_its_end_grays_nothing(qtbot):
+    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
+    qtbot.addWidget(form)
+    form.set_values({"audio_prompt": f"{_READ} on a tin roof"})
+    form.show_readings({"audio_prompt": word_reading(76, CUT_OFF)})
+
+    form.set_values({"audio_prompt": "rain on a tin roof"})
+
+    (box,) = form._widgets["audio_prompt"].boxes()
+    assert _grayed(box) == []

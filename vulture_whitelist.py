@@ -9,10 +9,11 @@ that actually calls it.
 anything, so nothing may stay here once its subject is gone.
 
 Everything in it is now a caller vulture cannot follow -- Qt's C++ event loop,
-sqlite3, COM, funestra, one string-dispatch table. The section this file
-opened with, the 38 names the first scan reported and nobody had yet judged, is
-empty: backlog item 24 read each one and either deleted it or gave it a reader.
-An entry added here from now on says which of those five it is, or it does not
+sqlite3, COM, funestra, the tokenizers library, one string-dispatch table. The
+section this file opened with, the 38 names the first scan reported and nobody
+had yet judged, is empty: backlog item 24 read each one and either deleted it or
+gave it a reader.
+An entry added here from now on says which of those six it is, or it does not
 belong.
 """
 from __future__ import annotations
@@ -27,6 +28,7 @@ _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.mouseDoubleClickEvent  # noqa  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
 _.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
+_.highlightBlock  # noqa  # origenerator/gui/past_the_limit.py:12
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219
@@ -47,6 +49,10 @@ _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch
 
 # --- sqlite3 hands this back on rows nothing writes any more, which the listing keeps for every source the enum names ---
 _.STROKE_TRIM  # noqa  # origenerator/generation_state.py:25, the source on a Genau-lane cut, read through _KNOWN_SOURCES in origenerator/db_generations.py
+
+# --- the tokenizers library reads these off the Tokenizer they were set on, in its own Rust code ---
+_.normalizer  # noqa  # origenerator/prompt_tokens.py:193, origenerator/prompt_tokens.py:205, origenerator/prompt_tokens.py:239
+_.pre_tokenizer  # noqa  # origenerator/prompt_tokens.py:195, origenerator/prompt_tokens.py:206, origenerator/prompt_tokens.py:240
 
 # --- style-option fields written for Qt's painter to read, never read back here ---
 _.textVisible  # noqa  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl

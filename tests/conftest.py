@@ -125,6 +125,9 @@ ARCH_TENSOR_NAMES = {
     "flux": ["double_blocks.0.img_attn.qkv.weight", "single_blocks.0.linear1.weight"],
     "qwen": ["transformer_blocks.0.attn.to_q.weight", "txt_norm.weight"],
     "wan": ["blocks.0.self_attn.q.weight", "patch_embedding.weight"],
+    "wan_t2v": ["blocks.0.self_attn.q.weight", "patch_embedding.weight"],
+    "wan_fun_control": ["blocks.0.self_attn.q.weight", "patch_embedding.weight",
+                        "ref_conv.weight"],
     "wan_s2v": ["audio_injector.injector.0.k.weight", "blocks.0.self_attn.q.weight",
                 "patch_embedding.weight"],
     "wan_animate": ["blocks.0.self_attn.q.weight", "pose_patch_embedding.weight",
@@ -132,6 +135,7 @@ ARCH_TENSOR_NAMES = {
     "ltx": ["patchify_proj.weight", "transformer_blocks.0.attn1.to_q.weight"],
     "krea2": ["first.weight", "blocks.0.attn.wq.weight", "txtfusion.projector.weight"],
 }
+_ARCH_TENSOR_SHAPES = {"wan_t2v": {"patch_embedding.weight": [5120, 16, 1, 2, 2]}}
 
 
 class ModelTree:
@@ -157,9 +161,11 @@ class ModelTree:
         names = list(ARCH_TENSOR_NAMES[arch]) if arch else ["unknown.weight"]
         if lora:
             names = [f"{name}.lora_A.weight" for name in names]
+        shapes = _ARCH_TENSOR_SHAPES.get(arch, {})
         header = json.dumps({
             **({"__metadata__": metadata} if metadata is not None else {}),
-            **{n: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for n in names},
+            **{n: {"dtype": "F16", "shape": shapes.get(n, [1]), "data_offsets": [0, 2]}
+               for n in names},
         }).encode()
         path.write_bytes(struct.pack("<Q", len(header)) + header + b"\x00\x00")
         return path
@@ -172,26 +178,29 @@ def installed_models(tmp_path, monkeypatch):
     return ModelTree(tmp_path)
 
 
-@pytest.fixture
-def titled_models(tmp_path, monkeypatch):
-    path = tmp_path / "model_titles.json"
-    monkeypatch.setattr(config, "MODEL_TITLES_PATH", path)
+def _kept_by_stem_in(tmp_path, monkeypatch, path_name: str):
+    path = tmp_path / f"{path_name}.json"
+    monkeypatch.setattr(config, path_name, path)
 
-    def write(titles: dict[str, str]) -> None:
-        path.write_text(json.dumps(titles), encoding="utf-8")
+    def write(kept: dict) -> None:
+        path.write_text(json.dumps(kept), encoding="utf-8")
 
     return write
+
+
+@pytest.fixture
+def titled_models(tmp_path, monkeypatch):
+    return _kept_by_stem_in(tmp_path, monkeypatch, "MODEL_TITLES_PATH")
 
 
 @pytest.fixture
 def worded_loras(tmp_path, monkeypatch):
-    path = tmp_path / "trigger_words.json"
-    monkeypatch.setattr(config, "TRIGGER_WORDS_PATH", path)
+    return _kept_by_stem_in(tmp_path, monkeypatch, "TRIGGER_WORDS_PATH")
 
-    def write(words: dict[str, list[str]]) -> None:
-        path.write_text(json.dumps(words), encoding="utf-8")
 
-    return write
+@pytest.fixture
+def recorded_base_models(tmp_path, monkeypatch):
+    return _kept_by_stem_in(tmp_path, monkeypatch, "BASE_MODELS_PATH")
 
 
 class FakeCommandAndRequestListener(QObject):

@@ -25,6 +25,8 @@ WAN = "wan"
 WAN_S2V = "wan_s2v"
 # WAN 2.2 Animate: WAN with the pose embedding that follows a video's person.
 WAN_ANIMATE = "wan_animate"
+WAN_T2V = "wan_t2v"
+WAN_FUN_CONTROL = "wan_fun_control"
 LTX = "ltx"
 KREA2 = "krea2"
 
@@ -63,6 +65,8 @@ _SHARD = re.compile(r"-\d+-of-\d+\.[^.]+$")
 # so an unanchored search would file each of those under low-noise.
 _EXPERT_CAMEL = re.compile(r"(?<=[a-z0-9])(High|Low)")
 _EXPERT_BOUNDED = re.compile(r"(?:^|[^A-Za-z])(high|low)", re.IGNORECASE)
+_EXPERT_AFTER_PRECISION = re.compile(r"(?:fp|bf)\d+([HL])\.[^.]+$", re.IGNORECASE)
+_EXPERT_INITIALS = {"h": "high", "l": "low"}
 
 # What a Krea 2 block holds and a WAN block never does -- wq/wk/wv/wo and a gated
 # MLP -- dotted, or flattened as lycoris spells it (`lycoris_blocks_0_attn_wq`).
@@ -73,6 +77,8 @@ _KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|u
 # where SD1.5 has one, so a second block tells the two apart without the encoders.
 _SD_UNET_LORA = re.compile(r"^lora_unet_(?:input|output|middle)_block")
 _SDXL_STACKED_BLOCKS = re.compile(r"transformer_blocks_[1-9]")
+
+_WAN_LATENT_CHANNELS = 16
 
 
 @dataclass(frozen=True)
@@ -151,13 +157,13 @@ def _remember(described: dict[tuple[str, int, int], ModelFile]) -> None:
 def _describe(path: Path) -> ModelFile:
     if _SHARD.search(path.name):
         return ModelFile(arch=None, is_lora=False, expert=None, is_shard=True)
-    keys = _tensor_names(path)
+    shapes = _tensor_shapes(path)
     expert = _expert_from_name(path.name)
-    if keys is None:
+    if shapes is None:
         return ModelFile(arch=None, is_lora=False, expert=expert, is_shard=False)
     return ModelFile(
-        arch=_arch_from(keys),
-        is_lora=any(marker in key for key in keys for marker in _LORA_MARKERS),
+        arch=_arch_from(shapes),
+        is_lora=any(marker in key for key in shapes for marker in _LORA_MARKERS),
         expert=expert,
         is_shard=False,
     )
@@ -174,6 +180,8 @@ def _expert_from_name(name: str) -> str | None:
         for match in (*_EXPERT_BOUNDED.finditer(name), *_EXPERT_CAMEL.finditer(name))
     }
     found = {word for word in found if word in ("high", "low")}
+    found |= {_EXPERT_INITIALS[match.group(1).lower()]
+              for match in _EXPERT_AFTER_PRECISION.finditer(name)}
     return found.pop() if len(found) == 1 else None
 
 
@@ -184,23 +192,34 @@ def _components(keys: list[str]) -> set[str]:
     (``lora_unet_double_blocks_0_img_attn_qkv``), so the signatures below test
     these by prefix as well as by equality.
     """
-    out = set()
-    for key in keys:
-        for wrapper in _WRAPPERS:
-            if key.startswith(wrapper):
-                key = key[len(wrapper):]
-                break
-        out.add(key.split(".")[0])
-    return out
+    return {_unwrapped(key).split(".")[0] for key in keys}
 
 
-def _arch_from(keys: list[str]) -> str | None:
+def _unwrapped(key: str) -> str:
+    for wrapper in _WRAPPERS:
+        if key.startswith(wrapper):
+            return key[len(wrapper):]
+    return key
+
+
+def _wan_kind(shapes: dict[str, list[int] | None]) -> str:
+    if any(_unwrapped(key).startswith("ref_conv.") for key in shapes):
+        return WAN_FUN_CONTROL
+    patches = next((shape for key, shape in shapes.items()
+                    if _unwrapped(key) == "patch_embedding.weight"), None)
+    takes_the_latent_alone = bool(patches) and len(patches) > 1 and (
+        patches[1] == _WAN_LATENT_CHANNELS)
+    return WAN_T2V if takes_the_latent_alone else WAN
+
+
+def _arch_from(shapes: dict[str, list[int] | None]) -> str | None:
     """The architecture these tensor names belong to, or ``None`` if unrecognized.
 
     Order is load-bearing: several families share a component name and are told
     apart only by a marker one of them also has, so the more specific signature
     has to be asked first. Each rule below says which collision it settles.
     """
+    keys = list(shapes)
     components = _components(keys)
 
     def has(*names: str) -> bool:
@@ -245,7 +264,7 @@ def _arch_from(keys: list[str]) -> str | None:
     # around them, VACE's parallel stack, or a kohya LoRA's flattened form.
     if (has("blocks", "patch_embedding", "text_embedding", "time_projection", "vace_blocks")
             or starts("lora_unet_blocks_")):
-        return WAN
+        return _wan_kind(shapes)
     # SD1.5 last, as the family defined by lacking SDXL's additions: its
     # checkpoint marker, its single-text-encoder LoRA marker, and the original
     # ControlNet shape, which is SD1.5's only because no SDXL marker fired.
@@ -254,8 +273,8 @@ def _arch_from(keys: list[str]) -> str | None:
     return None
 
 
-def _tensor_names(path: Path) -> list[str] | None:
-    """The tensor names in *path*, or ``None`` when they can't be read.
+def _tensor_shapes(path: Path) -> dict[str, list[int] | None] | None:
+    """Each tensor name in *path* and its shape, or ``None`` when they can't be read.
 
     ``None`` covers every "we could not tell" case — a format with no readable
     index (``.ckpt``, ``.pt``), a truncated or corrupt file, a header too large
@@ -263,9 +282,10 @@ def _tensor_names(path: Path) -> list[str] | None:
     """
     try:
         if path.suffix == ".safetensors":
-            return _safetensors_names(path)
+            return _safetensors_shapes(path)
         if path.suffix == ".gguf":
-            return _gguf_names(path)
+            names = _gguf_names(path)
+            return None if names is None else dict.fromkeys(names)
     except (OSError, struct.error, UnicodeDecodeError, ValueError, KeyError):
         return None   # KeyError: a GGUF metadata value of a type we don't know
     return None
@@ -283,9 +303,12 @@ def _safetensors_header(path: Path) -> dict | None:
     return json.loads(header)
 
 
-def _safetensors_names(path: Path) -> list[str] | None:
-    header = _safetensors_header(path)
-    return None if header is None else [key for key in header if key != "__metadata__"]
+def _safetensors_shapes(path: Path) -> dict[str, list[int] | None] | None:
+    index = _safetensors_header(path)
+    if not isinstance(index, dict):
+        return None
+    return {key: entry.get("shape") if isinstance(entry, dict) else None
+            for key, entry in index.items() if key != "__metadata__"}
 
 
 def safetensors_metadata(path: Path) -> dict:
@@ -293,7 +316,7 @@ def safetensors_metadata(path: Path) -> dict:
         header = _safetensors_header(path)
     except (OSError, struct.error, UnicodeDecodeError, ValueError):
         return {}
-    metadata = (header or {}).get("__metadata__")
+    metadata = header.get("__metadata__") if isinstance(header, dict) else None
     return metadata if isinstance(metadata, dict) else {}
 
 

@@ -6,13 +6,13 @@ from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QLabel
 
+from origenerator.gui.prompt_boxes import set_in_use
 from origenerator.gui.prompt_field import (
     DEFAULT_HEIGHT,
     MAX_HEIGHT,
     PROMPT_HEIGHTS,
     PromptField,
     PromptHeights,
-    set_in_use,
 )
 
 

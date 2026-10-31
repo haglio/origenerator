@@ -7,6 +7,7 @@ already received.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 
 import pytest
@@ -41,11 +42,13 @@ import origenerator.gui.enhance_panel as enhance_panel_module
 import origenerator.gui.training_controls as training_controls_module
 import origenerator.workflows.detail_parts as parts
 from origenerator import config, fix_training
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.enhance_presets import Preset
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceLevel,
     EnhanceSettings,
+    SettingsGroup,
     default_enhance_params,
     full_settings,
 )
@@ -70,6 +73,7 @@ from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from origenerator.workflows.model_files import NO_LORA
 from tests import gestures
 from tests.drop_style_seen import worn
+from tests.text_readers import clip_reader
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
@@ -1844,7 +1848,7 @@ def test_a_fixs_prompts_fit_an_enhance_panel_dragged_as_short_as_it_goes(qtbot):
 
     window = panel._fix_prompt_windows["hands"]
     assert window.geometry() == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size())
-    for field in (window.positive, window.negative):
+    for field in (*window.positive.boxes(), *window.negative.boxes()):
         assert field.height() >= 2 * field.fontMetrics().lineSpacing()
 
 
@@ -1876,7 +1880,7 @@ def test_each_fixs_edit_button_checkbox_name_and_value_sit_inside_one_thin_gray_
 def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, monkeypatch,
                                                                     titled_models):
     monkeypatch.setattr(enhance_panel_module, "list_lora_files",
-                        lambda fallback, accepts: ["None", "my_hands.safetensors"])
+                        lambda fallback, **terms: ["None", "my_hands.safetensors"])
     titled_models({"my_hands": "My Hands v1"})
     panel, edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
@@ -1890,6 +1894,252 @@ def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, mon
 
     kept = edits[-1].params["enhance_fix_prompts"]["hands"]
     assert (kept["lora"], kept["strength"]) == ("my_hands.safetensors", 0.7)
+
+
+def test_a_fixs_prompts_offer_only_the_loras_the_enhance_model_can_run(qtbot, installed_models):
+    installed_models.add("loras", "an_xl_fix.safetensors", arch="sdxl", lora=True)
+    installed_models.add("loras", "a_15_fix.safetensors", arch="sd15", lora=True)
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    lora = panel._fix_prompt_windows["hands"].lora
+
+    offered = {lora.itemData(row) for row in range(lora.count())}
+    assert {"an_xl_fix.safetensors", "a_15_fix.safetensors"} & offered == {
+        "an_xl_fix.safetensors"}
+
+
+def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, installed_models):
+    hands = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
+    for name in ("an_xl_look.safetensors", hands,
+                 os.path.join("fixes", "faces 2026-10-20 0910.safetensors")):
+        installed_models.add("loras", name, arch="sdxl", lora=True)
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    lora = panel._fix_prompt_windows["hands"].lora
+
+    assert {lora.itemData(row) for row in range(lora.count())} == {
+        "None", "an_xl_look.safetensors", hands}
+
+
+_HANDS_LORA = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
+_TRAINED_ON_SAID = "The Hands fix's LoRA was trained on trained_on. Click to use trained_on."
+
+
+@pytest.fixture
+def hands_trained_on(qtbot, monkeypatch, tmp_path, installed_models):
+    for model in ("picked.safetensors", "trained_on.safetensors"):
+        installed_models.add("checkpoints", model, arch="sdxl")
+    monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
+    work = tmp_path / "fix training" / "hands"
+    work.mkdir(parents=True)
+    (work / "job.json").write_text(json.dumps({
+        "part": "hands", "output_name": "hands 2026-10-19 1444",
+        "base_model": str(installed_models.root / "models" / "checkpoints"
+                          / "trained_on.safetensors")}), encoding="utf-8")
+    panel, edits = _panel(qtbot)
+
+    def shown(fixes, model="picked.safetensors"):
+        panel.show_settings(EnhanceSettings(auto=False, params={
+            "checkpoint": model, "enhance_detail_fixes": fixes,
+            "enhance_fix_prompts": {"hands": {"lora": _HANDS_LORA}}}))
+        return panel, edits
+
+    return shown
+
+
+def test_a_ticked_fixs_lora_trained_on_another_model_warns_beside_the_model(hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+
+    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+        False, _TRAINED_ON_SAID)
+
+
+def test_clicking_the_models_warning_picks_the_model_the_fixs_lora_was_trained_on(
+        qtbot, hands_trained_on):
+    panel, edits = hands_trained_on({"hands": 0.45})
+
+    qtbot.mouseClick(panel._model_warning, Qt.MouseButton.LeftButton)
+
+    assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
+    assert panel._model_warning.isHidden()
+
+
+def test_no_model_warning_while_the_fix_is_off_or_the_model_is_the_one_it_was_trained_on(
+        hands_trained_on):
+    assert hands_trained_on({})[0]._model_warning.isHidden()
+    assert hands_trained_on({"hands": 0.45}, "trained_on.safetensors")[0]._model_warning.isHidden()
+
+
+def _made_by(model: str, *, file: str = "one.png") -> dict:
+    return {"prompt_id": file, "workflow_name": "sdxl_t2i", "status": "completed",
+            "output_files": json.dumps([{"filename": file}]),
+            "params_json": json.dumps({"checkpoint": model})}
+
+
+def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_the_fixs_model(
+        hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_images_in_front([_made_by("trained_on.safetensors"),
+                                _made_by("picked.safetensors", file="two.mp4")])
+
+    assert panel._model_warning.isHidden()
+
+
+def test_matching_the_source_warns_while_a_picked_image_is_made_by_another_model(
+        hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_images_in_front([_made_by("trained_on.safetensors"),
+                                _made_by("picked.safetensors", file="two.png")])
+
+    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+        False, _TRAINED_ON_SAID)
+
+
+def _folder(*rows) -> SettingsGroup:
+    return SettingsGroup("a folder", "A folder", list(rows))
+
+
+@pytest.mark.parametrize(("folder", "hidden"), [
+    (_folder(_made_by("trained_on.safetensors"), _made_by("trained_on.safetensors", file="b.png")),
+     True),
+    (_folder(_made_by("picked.safetensors")), False)])
+def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
+        hands_trained_on, folder, hidden):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_images_in_front([], folder)
+
+    assert panel._model_warning.isHidden() is hidden
+    assert hidden or panel._model_warning.toolTip() == _TRAINED_ON_SAID
+
+
+_NO_GUARANTEE_SAID = ("There's no guarantee the images here were made by trained_on, which the "
+                      "Hands fix's LoRA was trained on. Click to use trained_on.")
+
+
+@pytest.mark.parametrize("folder", [
+    _folder(_made_by("trained_on.safetensors"), _made_by("picked.safetensors", file="b.png")),
+    None])
+def test_matching_the_source_in_a_folder_of_several_models_or_a_collection_says_there_is_no_guarantee(
+        hands_trained_on, folder):
+    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+
+    panel.show_images_in_front([], folder)
+
+    assert (panel._model_warning.isHidden(), panel._model_warning.toolTip()) == (
+        False, _NO_GUARANTEE_SAID)
+
+
+def test_clicking_the_no_guarantee_warning_picks_the_model_the_fixs_lora_was_trained_on(
+        qtbot, hands_trained_on):
+    panel, edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    panel.show_images_in_front([])
+
+    qtbot.mouseClick(panel._model_warning, Qt.MouseButton.LeftButton)
+
+    assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
+
+
+_CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw Amount")
+
+
+def _caption_lefts(panel) -> dict[str, int]:
+    return {label.text(): label.mapTo(panel, QPoint()).x()
+            for label in panel.findChildren(QLabel) if label.text() in _CAPTIONS}
+
+
+def test_the_models_warning_sits_left_of_its_caption_with_the_captions_in_line(
+        hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+    _laid_out_at(panel, 2000)
+
+    lefts = _caption_lefts(panel)
+    caption = next(label for label in panel.findChildren(QLabel) if label.text() == "Model")
+    mark = panel._model_warning
+    assert mark.mapTo(panel, QPoint()).x() + mark.width() <= lefts["Model"]
+    assert _rows_of(panel, mark) & _rows_of(panel, caption)
+    assert lefts["Model"] == lefts["Upscaler"] == lefts["Scale"]
+
+
+def test_the_captions_stay_where_they_are_while_the_models_warning_is_hidden(hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+    _laid_out_at(panel, 2000)
+    warned = _caption_lefts(panel)
+
+    hands_trained_on({})
+    _laid_out_at(panel, 2000)
+
+    assert panel._model_warning.isHidden()
+    assert _caption_lefts(panel) == warned
+
+
+def test_a_caption_moved_onto_a_line_of_its_own_keeps_in_line_with_the_others(hands_trained_on):
+    panel, _edits = hands_trained_on({"hands": 0.45})
+
+    _laid_out_at(panel, panel.minimumSizeHint().width())
+
+    assert len(set(_caption_lefts(panel).values())) == 1
+
+
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+               "Click to add it.")
+
+
+@pytest.fixture
+def worded_fix(qtbot, monkeypatch, worded_loras, titled_models):
+    monkeypatch.setattr(enhance_panel_module, "list_lora_files",
+                        lambda fallback, **terms: ["None", "example_style.safetensors"])
+    worded_loras({"example_style": ["exmplstyle"]})
+    titled_models({"example_style": "Example Style 1.0"})
+    panel, _edits = _panel(qtbot)
+    panel._fix_prompt_buttons["hands"].click()
+    window = panel._fix_prompt_windows["hands"]
+    window.positive.boxes()[0].setPlainText("a close-up")
+    window.lora.setCurrentIndex(window.lora.findData("example_style.safetensors"))
+    return window
+
+
+def test_a_fixs_lora_whose_trigger_word_its_prompt_lacks_warns_beside_its_prompt_and_lora(
+        worded_fix):
+    marks = (worded_fix.prompt_warning, worded_fix.lora_warning)
+
+    assert [(mark.isHidden(), mark.toolTip()) for mark in marks] == [(False, _STYLE_SAID)] * 2
+
+
+@pytest.mark.parametrize("mark", ["prompt_warning", "lora_warning"])
+def test_clicking_a_fixs_trigger_word_warning_puts_the_word_at_the_start_of_its_prompt(
+        qtbot, worded_fix, mark):
+    qtbot.mouseClick(getattr(worded_fix, mark), Qt.MouseButton.LeftButton)
+
+    assert worded_fix.positive.value() == "exmplstyle, a close-up"
+    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+
+
+def test_a_fixs_prompt_is_one_prompt_however_many_lines_of_dashes_it_holds(worded_fix):
+    worded_fix.positive.boxes()[0].setPlainText("exmplstyle, part one\n---\npart two")
+
+    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+
+
+def test_a_fixs_trigger_word_warning_goes_once_its_lora_is_put_on_none(worded_fix):
+    worded_fix.lora.setCurrentIndex(worded_fix.lora.findData("None"))
+
+    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+
+
+def test_a_fixs_trigger_word_warnings_sit_left_of_the_prompt_and_lora_captions(worded_fix):
+    worded_fix.resize(700, 600)
+    worded_fix.layout().activate()
+
+    for mark, caption in ((worded_fix.prompt_warning, "Positive Prompt"),
+                          (worded_fix.lora_warning, "LoRA")):
+        label = next(label for label in worded_fix.findChildren(QLabel)
+                     if label.text() == caption)
+        left_of_label = label.mapTo(worded_fix, QPoint()).x()
+        assert mark.mapTo(worded_fix, QPoint()).x() + mark.width() <= left_of_label
+        assert _rows_of(worded_fix, mark) & _rows_of(worded_fix, label)
 
 
 def test_a_fixs_lora_strength_says_what_range_works_well_as_every_forms_does(qtbot):
@@ -2048,8 +2298,8 @@ def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
     panel, edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    window.positive.setPlainText("open palms")
-    window.negative.setPlainText("fists")
+    window.positive.boxes()[0].setPlainText("open palms")
+    window.negative.boxes()[0].setPlainText("fists")
 
     window.accept()
 
@@ -2059,9 +2309,59 @@ def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
     panel._fix_prompt_buttons["hands"].click()
     again = panel._fix_prompt_windows["hands"]
     assert (again.prompts()["prompt"], again.prompts()["avoid"]) == ("open palms", "fists")
-    again.positive.setPlainText("something else")
+    again.positive.boxes()[0].setPlainText("something else")
     again.reject()
     assert len(edits) == kept
+
+
+@pytest.fixture
+def clip_installed(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+
+
+@pytest.fixture
+def boxed_fix(qtbot, clip_installed):
+    panel, edits = _panel(qtbot)
+    panel.show_settings(EnhanceSettings(params={
+        **default_enhance_params(),
+        "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}))
+    panel._fix_prompt_buttons["hands"].click()
+    return panel._fix_prompt_windows["hands"], edits
+
+
+def _cats(count: int) -> str:
+    return " ".join(["cat"] * count)
+
+
+def test_a_fixs_prompt_flows_into_boxes_of_whole_words_and_ok_keeps_them(qtbot, boxed_fix):
+    window, edits = boxed_fix
+    (box,) = window.positive.boxes()
+
+    box.setPlainText(f"{_cats(74)} open palms")
+    qtbot.waitUntil(lambda: len(window.positive.boxes()) == 2, timeout=5000)
+    window.accept()
+
+    assert edits[-1].params["enhance_fix_prompts"]["hands"]["prompt"] == (
+        f"{_cats(74)}{BOX_BREAK}open palms")
+
+
+def test_a_fixs_one_prompt_box_fills_its_column_as_its_field_always_has(boxed_fix):
+    window, _edits = boxed_fix
+    window.resize(700, 600)
+    window.layout().activate()
+
+    (box,) = window.positive.boxes()
+    assert box.height() == window.positive.height() > 4 * box.fontMetrics().lineSpacing()
+
+
+def test_a_fixs_trigger_word_clicked_in_goes_at_the_start_of_its_first_box_and_flows_on(
+        qtbot, clip_installed, worded_fix):
+    worded_fix.positive.boxes()[0].setPlainText(_cats(70))
+
+    qtbot.mouseClick(worded_fix.prompt_warning, Qt.MouseButton.LeftButton)
+
+    assert worded_fix.positive.value() == f"exmplstyle, {_cats(64)}{BOX_BREAK}{_cats(6)}"
 
 
 def test_a_fixs_prompts_already_open_are_brought_forward_rather_than_opened_twice(qtbot):

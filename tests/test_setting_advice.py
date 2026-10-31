@@ -5,12 +5,15 @@ import pytest
 import origenerator.setting_advice as advice_module
 from origenerator.setting_advice import (
     STRENGTH_BELOW_ONE,
+    fix_lora_model_advice,
     fresh_settings,
     not_installed,
     not_installed_advice,
+    not_offered_advice,
     recommendations,
     recommended_choices,
     setting_advice,
+    trigger_word_advice,
 )
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.lora_rows import lora_strength
@@ -297,6 +300,55 @@ def test_a_missing_model_whose_default_is_gone_too_is_answered_with_the_first_in
     assert found["checkpoint"].fix == "installed_a.safetensors"
 
 
+_LISTED_FROM_A_FOLDER = [
+    ParamDef("checkpoint", "Model", ParamType.COMBO, "installed_a.safetensors",
+             options=["installed_a.safetensors", "installed_b.safetensors"],
+             folder="checkpoints"),
+]
+
+
+def test_a_model_installed_but_not_offered_is_never_called_not_installed(installed_models):
+    installed_models.add("checkpoints", "not_offered.safetensors", arch="sd15")
+
+    assert not_installed({"checkpoint": "not_offered.safetensors"}, _LISTED_FROM_A_FOLDER,
+                         ("checkpoint",)) == {}
+
+
+def test_a_model_installed_but_not_made_for_the_workflow_says_so_and_a_click_uses_its_default(
+        installed_models, titled_models):
+    installed_models.add("checkpoints", "not_offered.safetensors", arch="sd15")
+    titled_models({"not_offered": "Not Offered 1.5", "installed_b": "Installed B"})
+
+    found = not_offered_advice({"checkpoint": "not_offered.safetensors"}, _LISTED_FROM_A_FOLDER,
+                               ("checkpoint",), {"checkpoint": "installed_b.safetensors"},
+                               "Example T2I")
+
+    assert found["checkpoint"].said == ("Not Offered 1.5 isn't made for Example T2I, so it isn't "
+                                        "offered here. Click to use Installed B.")
+    assert found["checkpoint"].fixed("not_offered.safetensors") == "installed_b.safetensors"
+
+
+_A_MODEL_AND_ITS_LORA = [
+    ParamDef("unet", "Model", ParamType.COMBO, "raw_model.safetensors",
+             options=["raw_model.safetensors", "turbo_model.safetensors"]),
+    ParamDef("lora", "LoRA", ParamType.COMBO, "None", beside_model="unet",
+             options=["None", "speed_up.safetensors", "a_look.safetensors"]),
+]
+
+
+def test_a_lora_offered_by_the_workflow_but_not_beside_the_model_names_the_model(
+        recorded_base_models, titled_models):
+    recorded_base_models({"turbo_model": "Krea 2 Turbo", "speed_up": "Krea 2 Raw"})
+    titled_models({"turbo_model": "Turbo Model", "speed_up": "Speed Up"})
+
+    found = not_offered_advice({"unet": "turbo_model.safetensors", "lora": "speed_up.safetensors"},
+                               _A_MODEL_AND_ITS_LORA, ("unet", "lora"), {"lora": "None"},
+                               "Example T2I")
+
+    assert found["lora"].said == ("Speed Up isn't made for Turbo Model, so it isn't offered "
+                                  "here. Click to use None.")
+
+
 _STRENGTHS_ON_AN_IMAGE = [lora_strength(key, 1.0)
                            for key in ("lora_strength", "lora_strength_2", "lora_strength_3")]
 
@@ -344,3 +396,134 @@ def test_a_loras_page_holds_its_strength_in_any_row_even_while_loras_share_its_p
         "Example Speed's page recommends a strength of 1.", 1)
     assert advice["lora_strength_low"].text == (
         "Good range while another LoRA is picked for this pass: 0.6–0.8.")
+
+
+_STYLE = "example_style.safetensors"
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+               "Click to add it.")
+
+
+@pytest.fixture
+def worded_style(worded_loras, titled_models):
+    worded_loras({"example_style": ["exmplstyle"]})
+    titled_models({"example_style": "Example Style 1.0"})
+
+
+def test_a_picked_lora_whose_trigger_word_the_prompt_lacks_says_so_by_its_title(worded_style):
+    found = trigger_word_advice({"positive_prompt": "a portrait", "lora": _STYLE}, ("lora",))
+
+    assert (found["lora"].said, found["lora"].value_shown) == (_STYLE_SAID, "Example Style 1.0")
+
+
+def test_the_click_on_a_missing_trigger_word_puts_it_at_the_start_of_the_positive_prompt(
+        worded_style):
+    found = trigger_word_advice({"positive_prompt": "a portrait", "lora": _STYLE}, ("lora",))
+
+    assert found["lora"].writes == "positive_prompt"
+    assert found["lora"].fixed("a portrait, soft light") == "exmplstyle, a portrait, soft light"
+
+
+def test_a_lora_whose_trigger_word_the_prompt_holds_gets_no_warning(worded_style):
+    params = {"positive_prompt": "(Exmplstyle:1.1), a portrait", "lora": _STYLE}
+
+    assert trigger_word_advice(params, ("lora",)) == {}
+
+
+def test_a_lora_row_on_none_or_a_lora_with_no_word_written_down_gets_no_warning(worded_style):
+    params = {"positive_prompt": "a portrait", "lora": "None",
+              "lora_low": "example_plain.safetensors"}
+
+    assert trigger_word_advice(params, ("lora", "lora_low")) == {}
+
+
+def test_only_the_lora_rows_asked_about_are_checked(worded_style):
+    params = {"positive_prompt": "a portrait", "lora": _STYLE, "lora_low": _STYLE}
+
+    assert set(trigger_word_advice(params, ("lora_low",))) == {"lora_low"}
+
+
+@pytest.fixture
+def worded_acts(worded_loras, titled_models):
+    worded_loras({"example_acts": ["alpha", "beta", "gamma", "delta"]})
+    titled_models({"example_acts": "Example Acts 1.0"})
+
+
+def test_a_lora_with_several_trigger_words_names_them_all_and_its_click_adds_the_first(
+        worded_acts):
+    found = trigger_word_advice({"positive_prompt": "a portrait",
+                                 "lora": "example_acts.safetensors"}, ("lora",))["lora"]
+
+    assert found.said == ("Example Acts 1.0's trigger words, alpha, beta, gamma and delta, "
+                          "aren't in the Positive Prompt. Click to add alpha.")
+    assert found.fixed("a portrait") == "alpha, a portrait"
+
+
+def test_a_lora_with_several_trigger_words_warns_only_while_none_of_them_is_in_the_prompt(
+        worded_acts):
+    params = {"positive_prompt": "a portrait, gamma", "lora": "example_acts.safetensors"}
+
+    assert trigger_word_advice(params, ("lora",)) == {}
+
+
+def test_an_entry_longer_than_five_words_is_never_warned_about(worded_loras, titled_models):
+    worded_loras({"example_scene": ["one two three four five six"],
+                  "example_mixed": ["alpha", "one two three four five six"]})
+    titled_models({"example_mixed": "Example Mixed 1.0"})
+    params = {"positive_prompt": "a portrait", "lora": "example_scene.safetensors",
+              "lora_low": "example_mixed.safetensors"}
+
+    found = trigger_word_advice(params, ("lora", "lora_low"))
+
+    assert list(found) == ["lora_low"]
+    assert found["lora_low"].said == ("Example Mixed 1.0's trigger word, alpha, isn't in the "
+                                      "Positive Prompt. Click to add it.")
+
+
+def test_a_trigger_word_of_five_words_is_still_one_to_warn_about(worded_loras):
+    worded_loras({"example_scene": ["one two three four five"]})
+    params = {"positive_prompt": "a portrait", "lora": "example_scene.safetensors"}
+
+    assert set(trigger_word_advice(params, ("lora",))) == {"lora"}
+
+
+def test_a_setting_advices_click_uses_its_fix_whatever_the_setting_holds():
+    found = setting_advice(_image(steps=50))["steps"]
+
+    assert (found.writes, found.fixed(50), found.said) == (
+        "", 40, "Example Model's page recommends 20–40 steps. Click to use 40.")
+
+
+def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_click_uses_it(
+        titled_models):
+    titled_models({"trained_on": "Trained On v1"})
+
+    found = fix_lora_model_advice("picked.safetensors", {"picked.safetensors"},
+                                  {"hands": "trained_on.safetensors"},
+                                  ["picked.safetensors", "trained_on.safetensors"])
+
+    assert found["checkpoint"].said == (
+        "The Hands fix's LoRA was trained on Trained On v1. Click to use Trained On v1.")
+    assert found["checkpoint"].fixed("picked.safetensors") == "trained_on.safetensors"
+
+
+def test_a_fixs_lora_held_against_models_nobody_can_know_says_there_is_no_guarantee(
+        titled_models):
+    titled_models({"trained_on": "Trained On v1"})
+
+    found = fix_lora_model_advice("(match the source image)", None,
+                                  {"hands": "trained_on.safetensors"}, ["trained_on.safetensors"])
+
+    assert found["checkpoint"].said == (
+        "There's no guarantee the images here were made by Trained On v1, which the Hands fix's "
+        "LoRA was trained on. Click to use Trained On v1.")
+    assert found["checkpoint"].fixed("(match the source image)") == "trained_on.safetensors"
+
+
+def test_no_model_advice_while_a_fixs_lora_has_its_model_or_that_model_is_not_installed():
+    assert fix_lora_model_advice("trained_on.safetensors", {"trained_on.safetensors"},
+                                 {"hands": "trained_on.safetensors"},
+                                 ["trained_on.safetensors"]) == {}
+    assert fix_lora_model_advice("picked.safetensors", {"picked.safetensors"},
+                                 {"hands": "gone.safetensors"}, ["picked.safetensors"]) == {}
+    assert fix_lora_model_advice("(match the source image)", None,
+                                 {"hands": "gone.safetensors"}, ["picked.safetensors"]) == {}

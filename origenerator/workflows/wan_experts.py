@@ -18,7 +18,7 @@ from __future__ import annotations
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.lora_rows import lora_defaults, lora_rows, numbered_lora_keys
 from origenerator.workflows.model_arch import WAN
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_pickers import model_picker
 
 FIRST_PASS_LORA_KEYS = numbered_lora_keys("_high")
 SECOND_PASS_LORA_KEYS = numbered_lora_keys("_low")
@@ -35,12 +35,10 @@ def wan_expert_model_params(defaults: dict) -> list[ParamDef]:
     expert. Names claiming neither half stay in both, since nothing inside a
     WAN 2.2 file distinguishes the two."""
     return [
-        ParamDef("unet_high", "Model (First Pass)", ParamType.COMBO, defaults["unet_high"],
-                 options=list_model_files("diffusion_models", [defaults["unet_high"]],
-                                          accepts=(WAN,), expert="high")),
-        ParamDef("unet_low", "Model (Second Pass)", ParamType.COMBO, defaults["unet_low"],
-                 options=list_model_files("diffusion_models", [defaults["unet_low"]],
-                                          accepts=(WAN,), expert="low")),
+        model_picker("unet_high", "Model (First Pass)", defaults["unet_high"],
+                     "diffusion_models", accepts=(WAN,), expert="high"),
+        model_picker("unet_low", "Model (Second Pass)", defaults["unet_low"],
+                     "diffusion_models", accepts=(WAN,), expert="low"),
     ]
 
 

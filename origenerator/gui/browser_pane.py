@@ -578,7 +578,7 @@ class BrowserPane(QObject):
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)), favorite=favorite, context=context,
-            badge=icons.folder_badge(group),
+            kind_icon=icons.folder_kind_icon(group),
         )
         tile.clicked.connect(self._drill_into)
         tile.context_requested.connect(self.folder_menu_requested)
@@ -622,7 +622,7 @@ class BrowserPane(QObject):
         rows = self.rows_for_collection(key)
         collection = folder_collection(base_of(key))
         tile = FolderTile(key, COLLECTION_LABELS[collection.which], _thumbnails_of(rows), len(rows),
-                          badge=icons.collection_badge(collection.which))
+                          kind_icon=icons.collection_kind_icon(collection.which))
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 

@@ -101,7 +101,7 @@ def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
 
 def test_folder_level_names_the_folder_levels_and_nothing_else():
     # The workflow -> model -> LoRA -> source-image folders each report their
-    # level, so each carries a badge saying which it is. A settings leaf is
+    # level, so each carries a TOC initial saying which it is. A settings leaf is
     # where the generations live and reports none.
     assert folder_level(WorkflowGroup("k", "wf", "WF", [])) == "workflow"
     assert folder_level(ModelGroup("k", "M", [])) == "model"

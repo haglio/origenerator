@@ -10,8 +10,8 @@ you happened to open.
 
 Each mark is the state and the button at once. A filled green star IS the
 favorite, and pressing it is what takes the favorite away; the yellow plus IS
-the enhancement the image holds. That is why the badges these replaced are gone
-rather than sitting beside them: an item can no longer carry a badge saying
+the enhancement the image holds. That is why the signs these replaced are gone
+rather than sitting beside them: an item can no longer carry a sign saying
 one thing next to a control doing another, because there is only the one mark.
 
 All three are up whenever there is a generation under them — they are not

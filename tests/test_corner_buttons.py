@@ -116,7 +116,7 @@ def test_an_item_the_enhancer_cannot_take_grows_no_plus(qtbot):
     assert plus.isHidden()
 
 
-def test_a_spent_enhance_corner_is_a_badge_rather_than_a_button(qtbot):
+def test_a_spent_enhance_corner_is_a_sign_rather_than_a_button(qtbot):
     host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_HELD)
     plus = controls.buttons()[2]

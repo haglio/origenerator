@@ -138,6 +138,7 @@ class PromptBoxes(QWidget):
 
     def set_in_use(self, in_use: bool, tip: str) -> None:
         self._in_use = (in_use, tip)
+        self.setToolTip(tip)
         for box in self._boxes:
             _mark_in_use(box, in_use, tip)
         self._count_down()

@@ -397,10 +397,10 @@ def test_a_prompt_not_in_use_hides_its_countdown_and_shows_it_again_once_used(qt
     prompt = form._widgets["positive_prompt"]
     form.set_values({"positive_prompt": "a b"})
 
-    set_in_use(prompt, form._labels["positive_prompt"], False, "not used")
+    set_in_use(prompt, form._labels["positive_prompt"], "not used", "")
     assert _shown(prompt) == []
 
-    set_in_use(prompt, form._labels["positive_prompt"], True, "")
+    set_in_use(prompt, form._labels["positive_prompt"], None, "")
     assert _shown(prompt) == [("1 left", AMBER.name())]
 
 
@@ -433,7 +433,7 @@ def test_a_scene_that_speaks_hides_its_prompts_countdowns(qtbot):
 def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):
     form = _form_with_a_prompt(qtbot)
     prompt = form._widgets["positive_prompt"]
-    set_in_use(prompt, form._labels["positive_prompt"], False, "not used")
+    set_in_use(prompt, form._labels["positive_prompt"], "not used", "")
 
     form.set_values({"positive_prompt": f"a b c{BOX_BREAK}d"})
 

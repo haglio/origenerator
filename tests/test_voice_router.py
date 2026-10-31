@@ -23,6 +23,7 @@ from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.voice.app_commands import (
     AppCommand,
@@ -270,12 +271,32 @@ class Spoken:
         self.opened_at = opened_at
 
 
+class FakePool:
+    """The global pool, holding what it is handed rather than running it: what
+    it would run asks the local model."""
+
+    def __init__(self):
+        self.tasks = []
+
+    def globalInstance(self):
+        return self
+
+    def start(self, task):
+        self.tasks.append(task)
+
+
 @pytest.fixture
-def router(qtbot, monkeypatch):
+def starting(qtbot):
+    return StartingRows()
+
+
+@pytest.fixture
+def router(qtbot, monkeypatch, starting):
     """A router under a parent this fixture keeps alive: a QObject whose parent is
     collected takes its timers down with it. Its listener, bank and motion are
     all recorders."""
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
+    monkeypatch.setattr(module, "QThreadPool", FakePool())
     built = []
 
     def build(host=None, *, slideshows=None, db=None, client=object(), motion=None,
@@ -285,7 +306,7 @@ def router(qtbot, monkeypatch):
         parent = QWidget()
         qtbot.addWidget(parent)
         router = VoiceRouter(host, parent=parent, db=db or FakeDB(), slideshows=slideshows,
-                             client=client, motion=motion)
+                             client=client, motion=motion, starting=starting)
         built.append((parent, router))
         buttons = dict(bank or {})
         router.bind_the_bank(
@@ -777,6 +798,25 @@ def test_a_video_this_app_cannot_rebuild_is_answered_here(router):
         "this one can't be re-made, so there's nothing to revise")
 
 
+def test_a_request_being_worked_out_stands_in_the_job_queue_at_once(router, starting):
+    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]))
+
+    voice._begin_request("g1", Spoken("no hat"))
+
+    (standing,) = starting.rows()
+    assert standing.requested and standing.starting
+
+
+def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starting):
+    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]))
+    voice._begin_request("g1", Spoken("no hat"))
+    (standing,) = starting.rows()
+
+    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None, standing.key), None)
+
+    assert starting.rows() == []
+
+
 def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
     class Revision:
         changed = False
@@ -784,7 +824,7 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
 
     voice, host, _slideshows = router()
 
-    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None), Revision())
+    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None, None), Revision())
 
     assert host.queued == []
     assert words(voice.status) == "“hat” is already how you asked for it"
@@ -793,7 +833,7 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
 def test_a_revision_nobody_could_read_says_so(router):
     voice, host, _slideshows = router()
 
-    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None), None)
+    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None, None), None)
 
     assert host.queued == []
     assert words(voice.status) == "didn't catch what to change in “no hat”"
@@ -808,7 +848,7 @@ def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
     voice, host, _slideshows = router(slideshows=FakeSlideshows(by_side={"portrait": slideshow}))
 
     voice._on_revised(
-        (_row("g1"), object(), {}, Spoken("no hat"), "portrait"), Revision())
+        (_row("g1"), object(), {}, Spoken("no hat"), "portrait", None), Revision())
 
     assert [pid for pid, _rev in host.queued] == ["g1"]
     assert slideshow.requests[-1] == ("queued it", False, NOTICE)
@@ -818,7 +858,7 @@ def test_a_request_with_nothing_to_act_on_is_answered_as_a_warning(router):
     slideshow = FakeSlideshow()
     voice, host, _slideshows = router(slideshows=FakeSlideshows(by_side={"portrait": slideshow}))
 
-    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), "portrait"), None)
+    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), "portrait", None), None)
 
     assert host.queued == []
     assert slideshow.requests[-1] == (

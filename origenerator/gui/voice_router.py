@@ -46,8 +46,10 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
+from origenerator.gui.inflight_items import requested_of
 from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE, WARNING, set_marked_text
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.starting_rows import StartingRows
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
@@ -188,12 +190,13 @@ class VoiceRouter(QObject):
     caption_shown = pyqtSignal(bool)   # the caption has a line to show, or none
 
     def __init__(self, host: VoiceHost, *, parent: QObject, db, slideshows, client,
-                 motion):
+                 motion, starting: StartingRows):
         super().__init__(parent)
         self._host = host
         self._db = db
         self._slideshows = slideshows
         self._client = client
+        self._starting = starting
         # One listener over two vocabularies: the spoken commands, and the
         # dictation that collects "Request … over" across as many utterances as
         # it takes. The commands said outright are what the recognizer is asked
@@ -738,8 +741,9 @@ class VoiceRouter(QObject):
         params = filled_params(row, workflow)
         self._answer_request(slideshow, f"working out “{spoken.text}”…", spoken,
                              working=True)
+        standing = self._starting.show(**requested_of(row, workflow, params))
         QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken, side),
+            self._revision, (row, workflow, params, spoken, side, standing),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
             spoken.text,
         ))
@@ -751,7 +755,13 @@ class VoiceRouter(QObject):
         a couple of seconds still lands wherever the speaker is looking — on
         the region the request named, hosted, since two of them are up.
         """
-        row, workflow, params, spoken, side = context
+        row, workflow, params, spoken, side, standing = context
+        try:
+            self._answer_the_revision(row, workflow, params, spoken, side, revision)
+        finally:
+            self._starting.drop(standing)
+
+    def _answer_the_revision(self, row, workflow, params, spoken, side, revision) -> None:
         slideshow = self._slideshows.surface_for(side)
         if revision is None:
             self._answer_request(

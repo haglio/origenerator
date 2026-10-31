@@ -16586,6 +16586,22 @@ def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeyp
     assert not view._slideshows.showing._keeps()
 
 
+def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    shown = view._slideshows.showing.shown
+
+    view._voice.listener.speak("Request, no hat, over.")  # answered a hop later
+
+    (standing,) = view._queue._items
+    assert standing.starting and standing.requested
+    assert [item.key for item in shown.queue_foot.hud_queue[0]] == [standing.key]
+    qtbot.waitUntil(lambda: shown._working_request is None, timeout=5000)
+    (queued,) = view._queue._items
+    assert queued.requested and not queued.starting
+    assert [item.key for item in shown.queue_foot.hud_queue[0]] == [queued.key]
+
+
 def test_a_finished_request_queues_the_revision_with_the_same_seed(
         qtbot, tmp_path, monkeypatch):
     # "the same image but without X" means the image, so the one thing not

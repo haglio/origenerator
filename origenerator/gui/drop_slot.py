@@ -147,7 +147,7 @@ class DropSlot(DropZone):
         self._caption.setWordWrap(True)
         tile_shape.style_caption(self._caption)
         layout.addWidget(self._caption)
-        # A corner chip naming this slot's kind, shown only once something's dropped.
+        # An item type icon naming this slot's kind, shown only once something's dropped.
         self._badge = MediaBadge(kind, self)
         self._render()
         under_way.started.connect(self._light_for)
@@ -209,7 +209,7 @@ class DropSlot(DropZone):
             self._label.setPixmap(icon_pixmap("check", 2 * self._label.fontMetrics().height(),
                                               TEXT_PRIMARY))
         self._badge.setVisible(True)
-        self._badge.raise_()  # keep the kind chip above the preview
+        self._badge.raise_()  # keep the item type icon above the preview
 
     def _show_where_a_click_goes(self, held: str | None, named: str) -> None:
         leads = held is not None and self._leads_to(held) is not None

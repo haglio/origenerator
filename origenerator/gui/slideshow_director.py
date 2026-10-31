@@ -128,7 +128,7 @@ class SlideshowHost(Protocol):
     def image_config_index(self) -> dict:
         """The settings-signature index a folder name is derived against."""
 
-    def listed_rows(self) -> list[dict]:
+    def listed_prompt_ids(self) -> list[str]:
         """The generations the browser lists, in the order shown."""
 
     def selected_prompt_ids(self) -> list[str]:
@@ -333,6 +333,7 @@ class SlideshowDirector:
         self._enhance_status: dict[str, str] = {}
         self._held_at = _KeptPerModel(browser.model_stamp)
         self._library = _KeptPerModel(browser.model_stamp)
+        self._rows_by_id = _KeptPerModel(browser.model_stamp)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
@@ -482,7 +483,7 @@ class SlideshowDirector:
         is still running under it — in which case the slideshow opens on that run
         and goes on following it until it lands.
         """
-        listed = self._host.listed_rows()
+        listed = self._listed_rows()
         hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
         if media is None:  # following a run: it has no place among the files yet
             return self.open([], rows=listed, start=0, shuffle=in_order,
@@ -503,6 +504,13 @@ class SlideshowDirector:
                 lambda: (self.items_of(rows), self.versions_of(rows)),
                 partial(self._fill_in, slideshow, rows, generation, side=side, hud=hud))
         return slideshow
+
+    def _listed_rows(self) -> list[dict]:
+        by_id = self._rows_by_id.get(None, lambda: {
+            row["prompt_id"]: row for row in self._db.list_generations()})
+        rows = (by_id.get(prompt_id) or self._host.row_for(prompt_id)
+                for prompt_id in self._host.listed_prompt_ids())
+        return [row for row in rows if row is not None]
 
     def _fill_in(self, slideshow, rows, generation, folder, *, side, hud) -> None:
         if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:

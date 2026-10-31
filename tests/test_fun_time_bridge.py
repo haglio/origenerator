@@ -809,7 +809,7 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
     view = _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     folder = _stills(tmp_path, "scene-wide", 2, (200, 100))
     clicked = folder[1]
-    monkeypatch.setattr(view, "listed_rows", lambda: [_row_of(item) for item in folder])
+    monkeypatch.setattr(view, "listed_prompt_ids", lambda: [item[2] for item in folder])
     monkeypatch.setattr(view, "row_for", lambda pid: next(
         (_row_of(item) for item in folder if item[2] == pid), None))
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [

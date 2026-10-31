@@ -3429,9 +3429,6 @@ class GalleryView(QWidget):
     def listed_prompt_ids(self) -> list[str]:
         return self._browser.listed_prompt_ids()
 
-    def listed_rows(self) -> list[dict]:
-        return self._browser.listed_rows()
-
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
         app's — the pair the Job Queue and a slideshow's corner plate both draw."""

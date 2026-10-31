@@ -492,7 +492,7 @@ def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_rela
 
 def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
     # The video was deleted out from under it. The relation it can still show is
-    # the one its copied params carry, rather than an empty slot.
+    # the one its copied params carry, rather than an empty drop zone.
     related = make_related()
 
     related.show_row(_trim_row(trimmed_from="deleted"), [_image_row()])

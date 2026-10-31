@@ -503,7 +503,7 @@ class GenerationJob(QObject):
         self._client.job_error.connect(self._on_error)
 
     def _detach(self):
-        for signal, slot in (
+        for signal, handler in (
             (self._client.progress, self._on_progress),
             (self._client.node_executing, self._on_node_executing),
             (self._client.preview_image, self._on_preview),
@@ -511,7 +511,7 @@ class GenerationJob(QObject):
             (self._client.job_error, self._on_error),
         ):
             try:
-                signal.disconnect(slot)
+                signal.disconnect(handler)
             except TypeError:
                 pass
 

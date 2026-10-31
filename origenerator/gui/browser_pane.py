@@ -682,7 +682,7 @@ class BrowserPane(QObject):
 
         Either way the tiles behave exactly as they do elsewhere in the gallery: a
         folder drills in on a click, and an item previews here, opens its own
-        folder on a double-click, drags to a combine slot and right-clicks for
+        folder on a double-click, drags to a Combine drop zone and right-clicks for
         star / enhance / delete — a result is the same thing wherever it was found.
 
         At most :data:`SEARCH_DRAW_LIMIT` tiles are drawn, newest first; the
@@ -867,7 +867,7 @@ class BrowserPane(QObject):
     def _add_collection_thumbnail(self, flow, row, corner_buttons=None):
         """Build one finished-item tile for a collection (Latest/Favorites/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
-        to a combine slot, and right-click it for the same star / enhance / delete
+        to a Combine drop zone, and right-click it for the same star / enhance / delete
         menu a tile inside a folder offers; ``corner_buttons`` become the tile's
         hover controls (a review's keep/reject, wired to the verdict)."""
         def wire(tw):
@@ -1110,7 +1110,7 @@ class BrowserPane(QObject):
 
         What it doesn't get is the ordinary tile's right-click menu or its corner
         controls — star, enhance, delete all want a row in the gallery — and no
-        drag to a combine slot, whose graphs read files out of ComfyUI's output
+        drag to a Combine drop zone, whose graphs read files out of ComfyUI's output
         folder, not ours. In their place the corners and the menu offer the two
         actions that do apply: restore, or end it for good.
         """

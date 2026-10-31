@@ -170,7 +170,7 @@ class ElidingTabBar(QTabBar):
     def minimumTabSizeHint(self, index):
         size = super().minimumTabSizeHint(index)
         # Let a tab shrink to no more than an equal share of the bar, so every
-        # tab keeps a slot as more are opened — the row packs them tighter rather
+        # tab keeps a place as more are opened — the row packs them tighter rather
         # than pushing the overflow off the edge (there are no scroll buttons).
         if self.count() > 0 and self.width() > 0:
             size.setWidth(min(size.width(), self.width() // self.count()))

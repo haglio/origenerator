@@ -65,7 +65,7 @@ REMEMBERED = {
                                 if splitter.remembered_as],
     "experiments_enabled": lambda view: [view._experiments_cb],
     "enhance_settings": lambda view: _within(view._enhance.panel),
-    "search_sort": lambda view: [view._search._sort_combo],
+    "search_sort": lambda view: [view._search._sort_dropdown],
     "gallery_combine": lambda view: _within(view._combine.panel),
     "audio_enabled": lambda view: [view._bank.radio],
     "mic_enabled": lambda view: [view._bank.mic],

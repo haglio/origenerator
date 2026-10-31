@@ -10,7 +10,7 @@ from origenerator.workflows.base import ParamDef, WorkflowTemplate
 
 class FakeWorkflow(WorkflowTemplate):
     """A minimal registered workflow for policy tests: one numeric dim, one
-    combo dim, a prompt, and a seed."""
+    dropdown dim, a prompt, and a seed."""
 
     name = "fake_t2i"
     version = "v001"
@@ -35,7 +35,7 @@ class FakeWorkflow(WorkflowTemplate):
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("batch_size", "Batch Size", "int", 1, min_val=1, max_val=8),
-            ParamDef("sampler_name", "Sampler", "combo", "euler",
+            ParamDef("sampler_name", "Sampler", "dropdown", "euler",
                      options=["euler", "dpmpp_2m", "uni_pc"]),
         ]
 
@@ -59,7 +59,7 @@ class FakeI2vWorkflow(FakeWorkflow):
     def param_definitions(self) -> list:
         return super().param_definitions() + [
             ParamDef("input_image", "Input Image", "image", ""),
-            ParamDef("lora_name", "LoRA", "combo", "style_a.safetensors",
+            ParamDef("lora_name", "LoRA", "dropdown", "style_a.safetensors",
                      options=["None", "style_a.safetensors", "style_b.safetensors"]),
             ParamDef("lora_strength", "LoRA Strength", "float", 1.0,
                      min_val=0.0, max_val=2.0, step=0.05),
@@ -112,7 +112,7 @@ def test_machinery_is_never_an_experiment_base_whatever_it_is_called():
     # tree that spelled it -- so a second machinery workflow would silently have
     # become an experiment base, and a rename would have left the guard matching
     # nothing. The app already models it as `selectable`, which is what the
-    # Generate form's picker reads.
+    # Generate form's dropdown reads.
     machinery = FakeWorkflow()
     machinery.name = "machine_only"
     machinery.selectable = False
@@ -312,10 +312,10 @@ class FakeTwoLoraWorkflow(FakeWorkflow):
     def param_definitions(self) -> list:
         loras = ["None", "style_a.safetensors", "style_b.safetensors"]
         return super().param_definitions() + [
-            ParamDef("lora", "LoRA 1", "combo", "style_a.safetensors", options=loras),
+            ParamDef("lora", "LoRA 1", "dropdown", "style_a.safetensors", options=loras),
             ParamDef("lora_strength", "LoRA Strength 1", "float", 1.0,
                      min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_2", "LoRA 2", "combo", "None", options=loras),
+            ParamDef("lora_2", "LoRA 2", "dropdown", "None", options=loras),
             ParamDef("lora_strength_2", "LoRA Strength 2", "float", 1.0,
                      min_val=0.0, max_val=2.0, step=0.05),
         ]
@@ -346,9 +346,9 @@ class FakeFollowingLoraWorkflow(FakeWorkflow):
     def param_definitions(self) -> list:
         return [
             *super().param_definitions(),
-            ParamDef("unet", "Model", "combo", "raw_model.safetensors",
+            ParamDef("unet", "Model", "dropdown", "raw_model.safetensors",
                      options=["raw_model.safetensors", "turbo_model.safetensors"]),
-            ParamDef("lora", "LoRA", "combo", "None", beside_model="unet",
+            ParamDef("lora", "LoRA", "dropdown", "None", beside_model="unet",
                      options=["None", "speed_up.safetensors", "a_look.safetensors"]),
             ParamDef("lora_strength", "LoRA Strength", "float", 1.0,
                      min_val=0.0, max_val=2.0, step=0.05),

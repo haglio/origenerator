@@ -36,7 +36,7 @@ ENHANCE = "enhance"
 # The geometry the browser pane's other hover controls (a tile's per-seed
 # re-rolls, a review collection's keep/reject) already use, shared so the star can sit
 # in a row with them along the top of a tile and read as one bank rather than as
-# a stray chip beside two matching ones.
+# a stray button beside two matching ones.
 CORNER_SIZE = BUTTON_SIZE
 CORNER_GAP = BUTTON_GAP
 # How far a control sits inside the item it is laid over. Small: the corners
@@ -45,9 +45,9 @@ CORNER_GAP = BUTTON_GAP
 CORNER_INSET = GAP_SMALL
 _GLYPH_SIZE = CORNER_SIZE - 8
 
-# The translucent chip every hover control sits on, so white or colored line art
+# The translucent ground every hover control sits on, so white or colored line art
 # reads over a thumbnail of any color.
-CHIP_CSS = (
+GROUND_CSS = (
     f"QPushButton {{ background: {as_rgba(BLACK, 0.55)}; border: none; border-radius: {BUTTON_RADIUS}px; }}"
 )
 
@@ -82,8 +82,8 @@ def enhance_state(row: dict, settings) -> str | None:
     return icons.ENHANCE_HELD if held is not None else icons.ENHANCE_MORE
 
 
-class _CornerButton(QPushButton):
-    """One corner's chip, which re-draws itself while the cursor is on it.
+class _CornerButtonFace(QPushButton):
+    """One corner button's face, which re-draws itself while the cursor is on it.
 
     Qt's own hover state would do this through a stylesheet, but what changes
     here is the *mark* rather than the button — a trash can going red, a star
@@ -96,7 +96,7 @@ class _CornerButton(QPushButton):
         self._armed = False
         self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
         self.setIconSize(QSize(_GLYPH_SIZE, _GLYPH_SIZE))
-        self.setStyleSheet(CHIP_CSS)
+        self.setStyleSheet(GROUND_CSS)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.hide()
@@ -120,7 +120,7 @@ class _CornerButton(QPushButton):
         self.redraw()
 
 
-class CornerControls(QObject):
+class CornerButtons(QObject):
     """The three controls laid over the item one host widget shows.
 
     The host says where the item currently is (:meth:`place`), because only
@@ -135,12 +135,12 @@ class CornerControls(QObject):
         self._available = False   # is there a saved generation here to act on?
         self._favorite = False
         self._enhance: str | None = None
-        self._star = _CornerButton(
+        self._star = _CornerButtonFace(
             host, lambda armed: icons.corner_star_icon(favorite=self._favorite,
                                                        armed=armed))
-        self._trash = _CornerButton(host, lambda armed: icons.corner_trash_icon(
+        self._trash = _CornerButtonFace(host, lambda armed: icons.corner_trash_icon(
             armed=armed))
-        self._enhance_button = _CornerButton(
+        self._enhance_button = _CornerButtonFace(
             host, lambda armed: icons.corner_enhance_icon(
                 self._enhance or icons.ENHANCE_OPEN, armed=armed))
         self._star.clicked.connect(lambda: self.triggered.emit(STAR))

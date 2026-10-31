@@ -10,12 +10,12 @@ from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.gui import palette, tile_shape
-from origenerator.gui.corner_controls import (
-    CHIP_CSS,
+from origenerator.gui.corner_buttons import (
     CORNER_GAP,
     CORNER_INSET,
     CORNER_SIZE,
-    CornerControls,
+    GROUND_CSS,
+    CornerButtons,
 )
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
@@ -28,12 +28,12 @@ from origenerator.gui.stage_scrim import StageScrim
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()  # the thumbnail area, inside the family tile
 _BORDER_PX = 2
-# Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
-# collection's keep/reject): the same translucent chip the corner controls sit on, blue
+# Hover-revealed corner buttons (an i2v tile's per-seed re-rolls, a review
+# collection's keep/reject): the same translucent ground the corner buttons sit on, blue
 # on hover, laid along the tile's top-left edge — the one edge the three corner
 # controls leave alone.
 _CORNER_BUTTON_CSS = (
-    CHIP_CSS + f"QPushButton:hover {{ background: {as_rgba(BLUE, 0.9)}; }}"
+    GROUND_CSS + f"QPushButton:hover {{ background: {as_rgba(BLUE, 0.9)}; }}"
 )
 
 # A selected thumbnail fills its whole tile — under both the image and the
@@ -50,7 +50,7 @@ _BORDER_UNSELECTED = f"2px solid {palette.TILE_BORDER}"
 _BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
-class CornerAction(NamedTuple):
+class CornerButton(NamedTuple):
     """One hover control on a tile's corner: what it asks for, the icon it wears,
     and what it says on hover."""
 
@@ -64,20 +64,20 @@ class ItemTile(QWidget):
     clicked = pyqtSignal(str)  # prompt_id, let go of without being dragged
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
-    corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
-    control_triggered = pyqtSignal(str, str)  # prompt_id, corner_controls.STAR/TRASH/ENHANCE
+    corner_button_triggered = pyqtSignal(str, str)  # prompt_id, action_id
+    control_triggered = pyqtSignal(str, str)  # prompt_id, corner_buttons.STAR/TRASH/ENHANCE
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, favorite: bool = False,
                  enhance: str | None = None, controls: bool = True,
                  enhancing: RunReading | None = None,
-                 corner_actions: list[CornerAction] | None = None):
+                 corner_buttons: list[CornerButton] | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self.look = self.look_of(prompt_id, thumb_path, label_text, media_type=media_type,
                                  movie_path=movie_path, controls=controls,
-                                 corner_actions=corner_actions)
+                                 corner_buttons=corner_buttons)
         self._selected = False
         self._favorite = favorite
         self._enhance = enhance       # what the enhance corner has to say, if anything
@@ -147,7 +147,7 @@ class ItemTile(QWidget):
         # here to favorite, trash or enhance, and its own restore/purge controls are
         # the two acts left.
         layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
-        self._controls = CornerControls(self) if controls else None
+        self._controls = CornerButtons(self) if controls else None
         if self._controls is not None:
             self._controls.place(self._image_label.geometry())
             self._controls.triggered.connect(
@@ -177,16 +177,16 @@ class ItemTile(QWidget):
 
         # An i2v folder's tiles carry top-left hover controls to re-roll one seed
         # on its own; other tiles pass none and grow no buttons.
-        self._build_corner_actions(corner_actions or [])
+        self._build_corner_buttons(corner_buttons or [])
 
     @staticmethod
     def look_of(prompt_id: str, thumb_path: str | None, label_text: str, *,
                 media_type: str | None = None, movie_path: str | None = None,
                 controls: bool = True,
-                corner_actions: list[CornerAction] | None = None, **_mutable) -> tuple:
+                corner_buttons: list[CornerButton] | None = None, **_mutable) -> tuple:
         """What a tile cannot be changed into once built."""
         return (prompt_id, thumb_path, label_text, media_type, movie_path, controls,
-                tuple(action.action_id for action in corner_actions or ()))
+                tuple(action.action_id for action in corner_buttons or ()))
 
     def set_selected(self, selected: bool):
         """Lighten the whole tile when selected; restore the resting look when not."""
@@ -197,7 +197,7 @@ class ItemTile(QWidget):
 
     def enhance_state(self) -> str | None:
         """What this tile's enhance corner is saying, or ``None`` where it has no
-        plus at all (:mod:`origenerator.gui.corner_controls`)."""
+        plus at all (:mod:`origenerator.gui.corner_buttons`)."""
         return self._enhance
 
     def set_enhance(self, enhance: str | None):
@@ -319,13 +319,13 @@ class ItemTile(QWidget):
             f"background-color: transparent; border: {border}; border-radius: {BUTTON_RADIUS}px;"
         )
 
-    # --- corner action buttons (hover-revealed per-seed re-rolls) -----------
+    # --- corner buttons (hover-revealed per-seed re-rolls) -----------
 
-    def _build_corner_actions(self, actions: list[CornerAction]):
-        """Lay out one hidden button per :class:`CornerAction` along the tile's
+    def _build_corner_buttons(self, actions: list[CornerButton]):
+        """Lay out one hidden button per :class:`CornerButton` along the tile's
         top-left edge.
 
-        Each fires :attr:`corner_action_triggered` with this tile's prompt_id and
+        Each fires :attr:`corner_button_triggered` with this tile's prompt_id and
         its action_id. Hidden until the tile is hovered (see :meth:`enterEvent`);
         an event filter keeps them up while the cursor sits on a button rather than
         the tile itself, so they don't flicker out from under the pointer.
@@ -344,10 +344,10 @@ class ItemTile(QWidget):
             button.installEventFilter(self)  # keep the set up while hovering a button
             button.clicked.connect(
                 lambda _=False, a=action.action_id:
-                self.corner_action_triggered.emit(self.prompt_id, a))
+                self.corner_button_triggered.emit(self.prompt_id, a))
             self._corner_buttons.append(button)
 
-    def _set_corner_actions_visible(self, visible: bool):
+    def _set_corner_buttons_visible(self, visible: bool):
         for button in self._corner_buttons:
             button.setVisible(visible)
 
@@ -358,7 +358,7 @@ class ItemTile(QWidget):
 
     def _hover_buttons(self) -> list:
         """Every child a cursor can be over while it is still "on the tile" — the
-        collection's own actions and the three corner controls alike."""
+        collection's own actions and the three corner buttons alike."""
         controls = [] if self._controls is None else self._controls.buttons()
         return self._corner_buttons + controls
 
@@ -367,16 +367,16 @@ class ItemTile(QWidget):
         # the tile entirely) is where an off-tile exit from a button surfaces.
         if event.type() == QEvent.Type.Leave and obj in self._hover_buttons():
             if not self._cursor_over_tile():
-                self._set_corner_actions_visible(False)
+                self._set_corner_buttons_visible(False)
         return super().eventFilter(obj, event)
 
     def enterEvent(self, event):
-        self._set_corner_actions_visible(True)
+        self._set_corner_buttons_visible(True)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         if not self._cursor_over_tile():  # moving onto a button isn't leaving the tile
-            self._set_corner_actions_visible(False)
+            self._set_corner_buttons_visible(False)
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):

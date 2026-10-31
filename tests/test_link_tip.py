@@ -123,7 +123,7 @@ def test_a_widget_with_nothing_to_say_shows_no_tip(qtbot):
 
 
 def test_a_links_color_is_set_so_it_reads_as_a_link(qtbot):
-    # Qt's default anchor color is the desktop's, which against these dark panels
+    # Qt's default anchor color is the desktop's, which against these dark surfaces
     # can come out unreadable — and a link nobody sees is the same as no link.
     assert 'href="go"' in link("go", "Go to it")
     assert "color:" in link("go", "Go to it")

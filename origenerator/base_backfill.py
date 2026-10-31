@@ -241,7 +241,7 @@ def attach_base(db, target_id: str, files: list[dict]) -> bool:
 
     The enhanced file keeps its place at the head of the target's
     ``output_files`` — it is still what the row shows — and the base joins it
-    there as the version the info pane offers as ``Original``. ``False`` when there
+    there as the version the Generate pane offers as ``Original``. ``False`` when there
     is nothing to attach it to: the target was deleted meanwhile, or something
     else repaired it first.
     """

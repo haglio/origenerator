@@ -4,7 +4,7 @@ deletable paths, and tracing a copy of one elsewhere back to its generation.
 
 A row's ``output_files`` are the ground truth the gallery shows — the tree holds
 only rows that produced one, a row's media type follows its file rather than its
-workflow's declared type, and both the preview panel and delete path resolve
+workflow's declared type, and both the preview and delete path resolve
 through here. Independent of the folder hierarchy; depends only on the workflow's
 declared output type for the pending-row fallback.
 """

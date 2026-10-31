@@ -415,7 +415,7 @@ def build_stylesheet() -> str:
     /* What fills a pane that takes drops is clear, so the pane's own ground
        shows through it when the drop zones' style lights the pane. */
     GalleryPaneScrollArea > QWidget#qt_scrollarea_viewport > .QWidget,
-    QWidget#enhancePanel .QWidget, QWidget#enhancePanel QLabel,
+    QWidget#enhancePane .QWidget, QWidget#enhancePane QLabel,
     QScrollArea#enhanceSettings {{
         background-color: transparent;
     }}{drop_style.ground_rules()}

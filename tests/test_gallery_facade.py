@@ -30,7 +30,7 @@ PUBLISHED = {
     "build_custom_folders", "build_gallery_tree", "build_image_config_index",
     "child_groups", "combined_params", "command_phrases", "config_folder_key",
     "config_folder_name",
-    "config_tab_title", "custom_folder_id",
+    "generate_tab_title", "custom_folder_id",
     "custom_folder_key", "default_enhance_params", "describe_enhance_params",
     "disown_foreign_runs",
     "displayed_levels", "enhance_levels", "enhance_params_for",

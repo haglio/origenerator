@@ -65,7 +65,7 @@ def test_available_categories_are_those_with_a_video_to_mine_or_pinned_settings(
     ]
     # The acts the gallery can mine settings for, plus "gamma" — the example
     # overlay pins settings for it, so it needs no past video. The rest have
-    # nothing to answer with, so the panel greys them out.
+    # nothing to answer with, so Combine greys them out.
     assert act_settings.available_categories(rows) == {"beta", "epsilon", "gamma"}
 
 

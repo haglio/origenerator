@@ -33,7 +33,7 @@ _MADE_FROM_NOTHING = Combination()
 
 class GeneratingTile(QFrame):
     cancel_requested = pyqtSignal()
-    selected = pyqtSignal()  # clicked, to drive the info pane
+    selected = pyqtSignal()  # clicked, to drive the Generate pane
     context_requested = pyqtSignal(QPoint)  # global position
 
     def __init__(self, job, parent=None, *, auto_generating=False,
@@ -96,7 +96,7 @@ class GeneratingTile(QFrame):
         self._tick.start()
 
     def set_selected(self, selected: bool):
-        """Fill the tile with the selected blue when it drives the info pane."""
+        """Fill the tile with the selected blue when it drives the Generate pane."""
         self._selected = selected
         self.setStyleSheet(_SELECTED_FRAME_CSS if selected else _RESTING_FRAME_CSS)
 

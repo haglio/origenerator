@@ -162,7 +162,7 @@ def mic_icon() -> QIcon:
     """A microphone — say a command or a request.
 
     The family's one microphone: Fun Time's dashboard paints this same drawing
-    into its voice panel, so the two apps side by side show one control rather
+    into its voice controls, so the two apps side by side show one control rather
     than two marks that merely mean the same thing."""
     return qt_icon("mic", size=_SIZE)
 
@@ -313,7 +313,7 @@ def media_type_icon(media_type: str) -> QIcon:
     """The same play/photo mark as :func:`item_type_icon`, bare.
 
     The item type icon sits over a thumbnail, so it needs its dark ground to read against
-    any thumbnail; this one sits in a row of text — a config tab's label, where it
+    any thumbnail; this one sits in a row of text — a Generate tab's label, where it
     stands in for the thumbnail a tab has no result to show yet, or the row of a
     folder of images or videos — so the ground would be a black square among words.
     """
@@ -395,7 +395,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     there is nothing here to press and the mark is a sign alone.
 
     :data:`ENHANCE_MORE` is both at once, which is the state that needs saying:
-    the image holds an enhancement AND the settings on the panel would make a
+    the image holds an enhancement AND the settings on the Enhance pane would make a
     different one. So the solid yellow plus goes down first, shifted a little,
     and is then cleared back out under the hollow one — leaving the enhancement
     it has as a yellow shadow under the offer of another. The clear is safe here

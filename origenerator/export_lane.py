@@ -1,7 +1,7 @@
 """The lanes a finished video is handed down to a sibling app.
 
 One :class:`ExportLane` per lane, :data:`EXPORT_LANES` is all of them, and
-:func:`lane_for` is the one lane the config tab offers a video.
+:func:`lane_for` is the one lane the Generate tab offers a video.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ class ExportLane:
     Both lanes are the same errand — copy the video on display into the inbox
     Evolver watches, then stamp the row so the send survives a restart — and
     they differ in nothing but the fields below. Written out twice they were
-    fifty lines of code with four literals swapped, and the panel's own docstring
+    fifty lines of code with four literals swapped, and the tab's own docstring
     said so; a third lane would have been a third copy. It is a row of this
     table now.
 
@@ -38,7 +38,7 @@ class ExportLane:
     columns — the send and its withdrawal — because the reader on the other
     side selects them by name and they are the promise this repo publishes.
     ``mark`` stamps the first and ``unmark`` the second. Each names the database method
-    outright rather than by a string the panel would have to look up: reached by
+    outright rather than by a string the tab would have to look up: reached by
     name, a stamp nothing else calls reads as dead code and is deleted by the
     next person to run the scan. ``noun`` is what the failure dialog calls the
     file: the two lanes call the same file a video and a clip, and each says it

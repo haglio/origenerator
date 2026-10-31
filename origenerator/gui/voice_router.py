@@ -239,7 +239,7 @@ class VoiceRouter(QObject):
         self._flash_timer.timeout.connect(self._revert)
         # What that caption goes back to saying rather than the idle line: the
         # request it is still working out, and which request that is. It has one
-        # slot, so a line flashed over the promise has to know what to restore
+        # place, so a line flashed over the promise has to know what to restore
         # — the slideshow's notice keeps its own copy of the same pair.
         self._working_status = ""
         self._working_request = None

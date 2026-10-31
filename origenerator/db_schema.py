@@ -240,9 +240,9 @@ CREATE TABLE IF NOT EXISTS seed_uses (
     media_type     TEXT
 );
 
--- A video put in Combine's (custom) slot by hand, under the lane showing then,
+-- A video put in Combine's (custom) drop zone by hand, under the lane showing then,
 -- and a generation launched from one, by that generation's prompt_id. One made
--- from the slot that no row here names was launched before anything was written
+-- from the drop zone that no row here names was launched before anything was written
 -- here, so which lane it was for is not known.
 CREATE TABLE IF NOT EXISTS combine_video_uses (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1121,7 +1121,7 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
 
 
 def _seed_combine_db(tmp_path, videos=("vid",)):
-    """Put a completed image + i2v video in the window's DB so the combine slots
+    """Put a completed image + i2v video in the window's DB so the Combine drop zones
     can be filled from persisted ids."""
     db = Database(tmp_path / "t.db")
     db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
@@ -1144,8 +1144,8 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     _seed_combine_db(tmp_path)
     win = _window(qtbot, tmp_path, AppState(path))
-    win._gallery_view._combine.panel.image_slot.set_item("img")
-    win._gallery_view._combine.panel.video_slot.set_item("vid")
+    win._gallery_view._combine.panel.image_zone.set_item("img")
+    win._gallery_view._combine.panel.video_zone.set_item("vid")
 
     win.close()
 
@@ -1161,12 +1161,12 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.panel.image_slot.current_id() == "img"
-    assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
+    assert win._gallery_view._combine.panel.image_zone.current_id() == "img"
+    assert win._gallery_view._combine.panel.video_zone.current_id() == "vid"
 
 
 def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot, tmp_path):
-    # Earlier sessions wrote the two slots as a bare list. A user updating into
+    # Earlier sessions wrote the two drop zones as a bare list. A user updating into
     # this build has one of those in their ui_state.json, and it must not read as
     # nothing saved.
     _seed_combine_db(tmp_path)
@@ -1175,8 +1175,8 @@ def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.panel.image_slot.current_id() == "img"
-    assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
+    assert win._gallery_view._combine.panel.image_zone.current_id() == "img"
+    assert win._gallery_view._combine.panel.video_zone.current_id() == "vid"
 
 
 def test_how_many_generate_makes_at_once_survives_close_and_reopen(qtbot, tmp_path):
@@ -1340,38 +1340,38 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick an image, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
-    # matters as much as the slots — it is which videos the next Generate is
-    # answered from, and which lane's dropped video the slot shows.
+    # matters as much as the drop zones — it is which videos the next Generate is
+    # answered from, and which lane's dropped video the drop zone shows.
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.panel.image_slot.set_item("img")
-    first._gallery_view._combine.panel.video_slot.set_item("vid")
+    first._gallery_view._combine.panel.image_zone.set_item("img")
+    first._gallery_view._combine.panel.video_zone.set_item("vid")
     first._gallery_view._combine.panel._genau_radio.setChecked(True)  # as a click does
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
     combine = reopened._gallery_view._combine.panel
-    assert combine.image_slot.current_id() == "img"
+    assert combine.image_zone.current_id() == "img"
     assert combine.selected_intent() == act_settings.GENAU
-    assert combine.video_slot.current_id() is None
+    assert combine.video_zone.current_id() is None
     combine._video_radio.setChecked(True)
-    assert combine.video_slot.current_id() == "vid"
+    assert combine.video_zone.current_id() == "vid"
 
 
 def test_the_videos_recent_lists_come_back_after_close_and_reopen(qtbot, tmp_path):
     _seed_combine_db(tmp_path, videos=("vid", "vid2"))
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.panel.video_slot.set_item("vid")
-    first._gallery_view._combine.panel.video_slot.set_item("vid2")
+    first._gallery_view._combine.panel.video_zone.set_item("vid")
+    first._gallery_view._combine.panel.video_zone.set_item("vid2")
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
     combine = reopened._gallery_view._combine.panel
-    assert combine.video_slot.current_id() == "vid2"
+    assert combine.video_zone.current_id() == "vid2"
     assert _listed_under_recent(combine) == ["vid2", "vid"]
 
 

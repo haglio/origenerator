@@ -4,7 +4,7 @@ A thumbnail in the browser pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
 favorite it (top right), trash it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
-Top-LEFT is not one of them: the media-type badge has always lived there, and a
+Top-LEFT is not one of them: the item type icon has always lived there, and a
 control that landed on it would be a control that moves depending on which collection
 you happened to open.
 
@@ -177,7 +177,7 @@ class CornerButtons(QObject):
     def place(self, area: QRect):
         """Put each control in its own corner of ``area``, in host coordinates.
 
-        Three of the four: top-left belongs to the media-type badge, and to the
+        Three of the four: top-left belongs to the item type icon, and to the
         review controls a collection lays along that edge.
         """
         inner = area.adjusted(CORNER_INSET, CORNER_INSET,

@@ -2,7 +2,7 @@
 
 A hosting Fun Time session shows portrait media on the portrait region and
 landscape on the landscape one, so the folder list is drawn a side per shape:
-the whole table of contents on each, built from that shape's rows alone, so
+the whole tree of contents on each, built from that shape's rows alone, so
 whatever you stand on has exactly one region to play on, read off the key
 rather than measured back out of the items. On its own the app can draw it once
 over both shapes instead, for a slideshow that mixes them

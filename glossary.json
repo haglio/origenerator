@@ -1,0 +1,1053 @@
+{
+  "app": "Origenerator",
+  "drafted": "2026-10-30",
+  "columns": {
+    "thing": "where it is on the screen and what it looks like",
+    "screen": "the words on the screen that name it (a label, a button, a tooltip), quoted; null when no label names it",
+    "his_word": "the word the user says for it, from his own messages and the spoken commands, with the date he said it; null when he has none yet",
+    "code_today": "the words the code says for it now; each has to be in the code, or the row is stale",
+    "code_word": "the one word the code is to say for it; null while unruled",
+    "status": "ruled: his word, given where `ruled` says | his_word: a word he has used, not yet put to him as the code's | agreed: screen, user and code already say one word | unruled: no word of his yet, the row waits for him | kept: a name from outside this app, which keeps it",
+    "retired": "code words for it that are gone and stay gone; `keep` lists the tokens that may still carry the letters (another thing's name)"
+  },
+  "things": [
+    {
+      "id": "core",
+      "thing": "this app's main window: the TOC down the left, the Gallery pane in the middle, the Generate tabs on the right",
+      "screen": [
+        "Origenerator"
+      ],
+      "his_word": "Core",
+      "code_today": [
+        "core",
+        "main window",
+        "gallery view"
+      ],
+      "code_word": "core",
+      "status": "ruled",
+      "ruled": "CLAUDE.md, One word per thing: the parts no label names have the user's names"
+    },
+    {
+      "id": "standalone",
+      "thing": "this app run on its own, outside a Fun Time session",
+      "screen": null,
+      "his_word": "Standalone",
+      "code_today": [
+        "standalone"
+      ],
+      "code_word": "standalone",
+      "status": "ruled",
+      "ruled": "CLAUDE.md, One word per thing"
+    },
+    {
+      "id": "toc",
+      "thing": "the list of folders down the left of Core, one section per shape under a standing label",
+      "screen": null,
+      "his_word": "TOC, for tree of contents (2026-10-30; table of contents from 2026-10-17 until then)",
+      "code_today": [
+        "toc",
+        "tree",
+        "folder tree",
+        "folder list",
+        "gallery tree",
+        "split folder tree"
+      ],
+      "code_word": "toc",
+      "status": "ruled",
+      "ruled": "2026-10-17 and 2026-10-30, his words; CLAUDE.md, One word per thing"
+    },
+    {
+      "id": "caret",
+      "thing": "the mark on a TOC row that opens and shuts the folder",
+      "screen": null,
+      "his_word": "caret (2026-10-17)",
+      "code_today": [
+        "caret"
+      ],
+      "code_word": "caret",
+      "status": "ruled",
+      "ruled": "2026-10-17, his words; the back and forward buttons' chevrons and the text cursor's caret are other things"
+    },
+    {
+      "id": "leaf_folder",
+      "thing": "a folder with no folders inside it, so no caret: the one at the end of a path, which holds the items",
+      "screen": null,
+      "his_word": "leaf folder (2026-10-21)",
+      "code_today": [
+        "settings folder",
+        "settings leaf",
+        "leaf"
+      ],
+      "code_word": "leaf folder",
+      "status": "ruled",
+      "ruled": "2026-10-21, his words"
+    },
+    {
+      "id": "hud",
+      "thing": "the controls a Funestra draws over what it plays, a slideshow's included",
+      "screen": null,
+      "his_word": "HUD (2026-10-28: 'by panel do you mean HUD')",
+      "code_today": [
+        "hud",
+        "panel"
+      ],
+      "code_word": "hud",
+      "status": "ruled",
+      "ruled": "2026-10-28, his words; CLAUDE.md, One word per thing"
+    },
+    {
+      "id": "job_queue",
+      "thing": "the list of jobs in flight or waiting: along the foot of Core, and at the foot of a slideshow's HUD",
+      "screen": [
+        "Job Queue",
+        "Move this job up the Job Queue",
+        "Cancel every job in the Job Queue"
+      ],
+      "his_word": "Job Queue (2026-10-28)",
+      "code_today": [
+        "job queue",
+        "generation queue",
+        "queue",
+        "strip"
+      ],
+      "code_word": "job queue",
+      "status": "ruled",
+      "ruled": "2026-10-28, his words; CLAUDE.md, One word per thing"
+    },
+    {
+      "id": "auto_generate",
+      "thing": "the button over the Gallery pane that keeps a folder making new variations until it is pressed again",
+      "screen": [
+        "Auto-generate: repeatedly generate variations of this folder until toggled off"
+      ],
+      "his_word": "Auto-Generate (2026-09-28)",
+      "code_today": [
+        "auto generate",
+        "auto"
+      ],
+      "code_word": "auto generate",
+      "status": "ruled",
+      "ruled": "CLAUDE.md, One word per thing: never a loop",
+      "retired": [
+        "cooking"
+      ]
+    },
+    {
+      "id": "video",
+      "thing": "a video the gallery holds",
+      "screen": [
+        "Videos",
+        "Drop a video",
+        "Delete 2 items"
+      ],
+      "his_word": "video",
+      "code_today": [
+        "video",
+        "clip"
+      ],
+      "code_word": "video",
+      "status": "ruled",
+      "ruled": "2026-09-26, CLAUDE.md, One word per thing: the code's word is the one the app shows; CLIP the text model, the clipboard and clipRect keep their letters",
+      "keep": [
+        "clipboard",
+        "clipRect",
+        "clip_name",
+        "clip_vision",
+        "clip_skip",
+        "clip_l",
+        "clip_g",
+        "clipl",
+        "clipg",
+        "CLIPLoader",
+        "CLIPTextEncode"
+      ]
+    },
+    {
+      "id": "image",
+      "thing": "an image the gallery holds",
+      "screen": [
+        "Images",
+        "Drop an image",
+        "Enhance 3 images"
+      ],
+      "his_word": "image",
+      "code_today": [
+        "image",
+        "picture"
+      ],
+      "code_word": "image",
+      "status": "ruled",
+      "ruled": "2026-10-25, CLAUDE.md, One word per thing: an item is an image or a video; saved names (picture_state, picture_states, pictures.json) keep theirs",
+      "keep": [
+        "picture_state",
+        "picture_states",
+        "picture_border",
+        "pictures_being_looked_over",
+        "pictures.json",
+        "HOLD_PICTURE"
+      ]
+    },
+    {
+      "id": "item",
+      "thing": "an image or a video, when either will do",
+      "screen": [
+        "3 items",
+        "Delete 2 items permanently",
+        "Pick an item to delete permanently"
+      ],
+      "his_word": "item",
+      "code_today": [
+        "item",
+        "record"
+      ],
+      "code_word": "item",
+      "status": "ruled",
+      "ruled": "2026-10-25, CLAUDE.md, One word per thing: neither is a picture or a record"
+    },
+    {
+      "id": "thumbnail",
+      "thing": "the small picture on a tile, a Job Queue row or an in-flight card",
+      "screen": null,
+      "his_word": "thumbnail (2026-09-26, 2026-10-21, 2026-10-25)",
+      "code_today": [
+        "thumbnail",
+        "thumb",
+        "swatch"
+      ],
+      "code_word": "thumbnail",
+      "status": "ruled",
+      "ruled": "2026-10-25, CLAUDE.md, One word per thing"
+    },
+    {
+      "id": "icon",
+      "thing": "the small picture on a button",
+      "screen": null,
+      "his_word": "icon (2026-10-13, 2026-10-16, 2026-10-18)",
+      "code_today": [
+        "icon",
+        "mark",
+        "glyph"
+      ],
+      "code_word": "icon",
+      "status": "ruled",
+      "ruled": "2026-10-16, his words, for the whole family: icon, never mark or glyph"
+    },
+    {
+      "id": "loading_screen",
+      "thing": "the window that shows while the app starts",
+      "screen": null,
+      "his_word": "loading screen (2026-10-13)",
+      "code_today": [
+        "loading screen",
+        "splash"
+      ],
+      "code_word": "loading screen",
+      "status": "ruled",
+      "ruled": "2026-10-16, his words, for the whole family (Fun Time's cover became the loading screen)"
+    },
+    {
+      "id": "generation",
+      "thing": "the saved row an item stands on",
+      "screen": [
+        "Select a generation to preview",
+        "New generation",
+        "Generation failed"
+      ],
+      "his_word": "generation",
+      "code_today": [
+        "generation"
+      ],
+      "code_word": "generation",
+      "status": "ruled",
+      "ruled": "CLAUDE.md, One word per thing: a generation is the saved row"
+    },
+    {
+      "id": "job",
+      "thing": "one piece of work submitted, from the press to the saved row",
+      "screen": [
+        "Job Queue",
+        "Cancel the job in the Job Queue?"
+      ],
+      "his_word": "job",
+      "code_today": [
+        "job"
+      ],
+      "code_word": "job",
+      "status": "ruled",
+      "ruled": "CLAUDE.md, One word per thing"
+    },
+    {
+      "id": "settings",
+      "thing": "what a Generate tab's form holds",
+      "screen": [
+        "Pick a preset to use its settings"
+      ],
+      "his_word": "settings",
+      "code_today": [
+        "settings",
+        "config",
+        "params"
+      ],
+      "code_word": "settings",
+      "status": "ruled",
+      "ruled": "CLAUDE.md, One word per thing: settings are what the form holds, a ConfigSnapshot is one reading of them; recipe is no word of his"
+    },
+    {
+      "id": "gallery_pane",
+      "thing": "the middle column of Core, showing what the chosen TOC folder holds: folder tiles, a leaf folder's tiles, or a collection",
+      "screen": null,
+      "his_word": "Gallery pane (2026-10-10, 2026-10-18); middle pane (2026-09-28); the gallery (2026-10-20)",
+      "code_today": [
+        "browser pane",
+        "browser",
+        "pane"
+      ],
+      "code_word": "gallery pane",
+      "status": "his_word"
+    },
+    {
+      "id": "generate_tab",
+      "thing": "one tab on the right of Core: an item's preview, its settings and the Generate button; the column of them is the Generate pane",
+      "screen": [
+        "Close this configuration",
+        "New generation"
+      ],
+      "his_word": "Generate tab (2026-09-28, 2026-10-28); Generate pane (2026-09-28); tab (2026-10-24)",
+      "code_today": [
+        "config tab",
+        "info pane",
+        "panel",
+        "configuration",
+        "tab"
+      ],
+      "code_word": "generate tab",
+      "status": "his_word"
+    },
+    {
+      "id": "enhance_pane",
+      "thing": "the Enhance settings at the foot of the Gallery pane: the auto tick, the upscaler, the fixes",
+      "screen": [
+        "Enhance",
+        "Fixes"
+      ],
+      "his_word": "Enhancement pane (2026-10-13, 2026-10-25); Enhance subpanel (2026-08-14)",
+      "code_today": [
+        "enhance panel",
+        "subpanel",
+        "panel"
+      ],
+      "code_word": "enhance pane",
+      "status": "his_word"
+    },
+    {
+      "id": "combine",
+      "thing": "the Combine controls under the TOC: the drop zones, the Kino and Genau choice, the Action list and Generate",
+      "screen": [
+        "Combine",
+        "Edit individual…",
+        "Edit default…"
+      ],
+      "his_word": "Combine widget (2026-10-21, 2026-10-24, 2026-10-25)",
+      "code_today": [
+        "combine panel",
+        "panel"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "drop_zone",
+      "thing": "where an image or a video is dropped: the two in Combine, and the Start image on a tab",
+      "screen": [
+        "Drop an image",
+        "Drop a video",
+        "Paste Origenerator name"
+      ],
+      "his_word": "drop zone (2026-10-21, 2026-10-24, 2026-10-25); drop area (2026-10-13)",
+      "code_today": [
+        "drop slot",
+        "slot",
+        "drop zone",
+        "zone"
+      ],
+      "code_word": "drop zone",
+      "status": "his_word"
+    },
+    {
+      "id": "tile",
+      "thing": "the square in the Gallery pane that shows one item: its thumbnail with its name under it",
+      "screen": null,
+      "his_word": "tile (2026-10-09: 'that tile', 'the generating tile'); card (2026-08-19: 'middle pane cards')",
+      "code_today": [
+        "tile",
+        "card",
+        "grid card",
+        "thumbnail widget"
+      ],
+      "code_word": "tile",
+      "status": "his_word"
+    },
+    {
+      "id": "folder_tile",
+      "thing": "the square in the Gallery pane that opens a folder: up to four small pictures, with the folder's name and count under them",
+      "screen": [
+        "3 items",
+        "empty"
+      ],
+      "his_word": "folder square (2026-09-27)",
+      "code_today": [
+        "folder tile",
+        "collage",
+        "card"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "generating_tile",
+      "thing": "the tile in a leaf folder for the item being made now, with its progress",
+      "screen": null,
+      "his_word": "generating tile (2026-10-09)",
+      "code_today": [
+        "generating tile"
+      ],
+      "code_word": "generating tile",
+      "status": "agreed"
+    },
+    {
+      "id": "new_tile",
+      "thing": "the '+' leading a leaf folder: a fresh item from the folder's settings with a new seed",
+      "screen": [
+        "New (random seed)"
+      ],
+      "his_word": "new ('when I click new', 2026-10-09); 'the tile for making a new one'",
+      "code_today": [
+        "reroll tile",
+        "reroll"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "in_flight_card",
+      "thing": "on Latest, the square for a run still being made: its live frame and status",
+      "screen": null,
+      "his_word": "card (2026-08-19: 'when you do enhance a card, that card should still get bumped up to the top of the Recents')",
+      "code_today": [
+        "in flight card",
+        "card",
+        "backdrop"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "corner_button",
+      "thing": "the three small controls that show at the corners of a thumbnail or preview under the pointer: star, enhance, trash",
+      "screen": [
+        "Favorite",
+        "Enhance",
+        "Delete"
+      ],
+      "his_word": "'have the corners of middle pane cards be buttons' (2026-08-19); 'trash icon' (2026-10-18)",
+      "code_today": [
+        "corner controls",
+        "corner button",
+        "corner action",
+        "chip"
+      ],
+      "code_word": "corner button",
+      "status": "his_word"
+    },
+    {
+      "id": "media_icon",
+      "thing": "the small picture at the top-left of a Latest tile saying whether it is an image or a video",
+      "screen": null,
+      "his_word": "'an icon to indicate whether it's video or image' (2026-10-13)",
+      "code_today": [
+        "media badge",
+        "badge",
+        "chip"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "level_letter",
+      "thing": "the letter on a TOC row saying which level of the tree it is: W for a workflow, M for a model, L for a LoRA",
+      "screen": [
+        "W",
+        "M",
+        "L"
+      ],
+      "his_word": "'W, M, etc.' (2026-10-13)",
+      "code_today": [
+        "level badge",
+        "badge",
+        "chip"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "scrim",
+      "thing": "the dimmed cover with one line of words over a tile or a preview while something is being made of it",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "stage scrim",
+        "scrim",
+        "banner"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "plate",
+      "thing": "the gray square a large faint icon sits on where a thumbnail would be (the '+' tile, an empty drop zone); also the small box floating a message at the top-left of a preview",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "mark plate",
+        "plate"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "animations_row",
+      "thing": "under 'Animations' on an image's tab, the row of looping previews of the videos made from it",
+      "screen": [
+        "Animations"
+      ],
+      "his_word": null,
+      "code_today": [
+        "animated video strip",
+        "strip"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "find_bar",
+      "thing": "the line Ctrl+F opens over a tab's prompts",
+      "screen": [
+        "Find in prompts:"
+      ],
+      "his_word": null,
+      "code_today": [
+        "find strip",
+        "find bar"
+      ],
+      "code_word": "find bar",
+      "status": "kept",
+      "ruled": "shared_ui's FindBar, used as it is"
+    },
+    {
+      "id": "cell",
+      "thing": "one square of a grid: a thumbnail's place on a Job Queue row, a lit square on the nav map, a label and its value in the Basic block",
+      "screen": null,
+      "his_word": "cell (2026-10-24, 2026-10-25, of grid cells)",
+      "code_today": [
+        "cell"
+      ],
+      "code_word": "cell",
+      "status": "his_word"
+    },
+    {
+      "id": "empty_cell",
+      "thing": "a cell with nothing in it, drawn faint, on a Job Queue row or the '+ Enhance' row",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "slot"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "osr2_console",
+      "thing": "the OSR2 controls at the top left of Core, and the same section on a slideshow's HUD",
+      "screen": [
+        "OSR2"
+      ],
+      "his_word": "'the OSR2 part of the HUD' (2026-09-20)",
+      "code_today": [
+        "console",
+        "motion panel",
+        "panel"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "nav_map",
+      "thing": "the map a slideshow's HUD draws around the item on screen: a row per action, a column per seed",
+      "screen": null,
+      "his_word": "nav map (2026-09-20, 2026-09-21, 2026-09-22)",
+      "code_today": [
+        "slideshow map",
+        "nav map",
+        "map",
+        "gamma"
+      ],
+      "code_word": "nav map",
+      "status": "his_word"
+    },
+    {
+      "id": "message",
+      "thing": "the one line that flashes at the top center of a slideshow: 'Locked', 'Loop off', 'More seeds'",
+      "screen": [
+        "Locked",
+        "Unlocked",
+        "Loop off",
+        "More seeds"
+      ],
+      "his_word": "message (2026-10-24: 'those messages don't appear in a corner. they appear center top')",
+      "code_today": [
+        "notice overlay",
+        "notice",
+        "flash"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "toast",
+      "thing": "the Windows notification that pops up when a run ends, with the app closed or open",
+      "screen": null,
+      "his_word": "toast (2026-10-17, 2026-10-18, 2026-10-25: 'what's a notice? you mean a Windows toast?')",
+      "code_today": [
+        "notice",
+        "toast",
+        "notification"
+      ],
+      "code_word": "toast",
+      "status": "his_word"
+    },
+    {
+      "id": "progress_bar",
+      "thing": "the bar showing how far a run has got, with its words written across it",
+      "screen": null,
+      "his_word": "progress bar (2026-09-06, 2026-10-17, 2026-10-22)",
+      "code_today": [
+        "progress caption",
+        "bar"
+      ],
+      "code_word": "progress bar",
+      "status": "his_word"
+    },
+    {
+      "id": "pass_band",
+      "thing": "the thin colored line along the foot of a progress bar saying which pass a two-pass video is on",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "band"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "gutter",
+      "thing": "a margin something floats in: left of the Size fields, where the swap-width-and-height button sits; left of the nav map, where a row's name sits",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "gutter"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "scrubber",
+      "thing": "the bar under a video on a tab showing where it is playing",
+      "screen": null,
+      "his_word": "scrubber (2026-10-08, 2026-10-17); 'play cursor' (2026-09-27)",
+      "code_today": [
+        "video timeline",
+        "timeline"
+      ],
+      "code_word": "scrubber",
+      "status": "his_word"
+    },
+    {
+      "id": "folder_path",
+      "thing": "the line over the Gallery pane giving the open folder's path, one step after another",
+      "screen": null,
+      "his_word": "folder path (2026-10-10)",
+      "code_today": [
+        "folder path header",
+        "breadcrumb",
+        "header"
+      ],
+      "code_word": "folder path",
+      "status": "his_word"
+    },
+    {
+      "id": "toolbar",
+      "thing": "the row of buttons over the Gallery pane: Back, Forward, Undo, Redo, the slideshow, Auto-generate, Favorite, Enhance, Delete, Radio and Listen",
+      "screen": [
+        "Listen: bare words for the collections and this bank"
+      ],
+      "his_word": "'the buttons above the gallery' (2026-10-20); 'the buttons' (2026-10-10)",
+      "code_today": [
+        "toolbar bank",
+        "bank",
+        "toolbar"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "latest",
+      "thing": "the collection of the newest items, the first row of each TOC section",
+      "screen": [
+        "Latest",
+        "No recent images yet."
+      ],
+      "his_word": "Recents (2026-08-14, 2026-08-16, 2026-08-19)",
+      "code_today": [
+        "recents",
+        "latest"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "favorite",
+      "thing": "an item or folder he has starred, and the Favorites collection they gather in",
+      "screen": [
+        "Favorites",
+        "Favorite",
+        "No bookmarks yet."
+      ],
+      "his_word": "favorite; star; Starred (2026-08-14)",
+      "code_today": [
+        "favorite",
+        "star",
+        "bookmark"
+      ],
+      "code_word": "favorite",
+      "status": "his_word"
+    },
+    {
+      "id": "trash",
+      "thing": "deleted items, held in the Trash collection until restored or deleted for good",
+      "screen": [
+        "Trash",
+        "Delete",
+        "Restore",
+        "Delete permanently"
+      ],
+      "his_word": "trash; delete",
+      "code_today": [
+        "trash",
+        "recovery bin",
+        "deletion"
+      ],
+      "code_word": "trash",
+      "status": "his_word"
+    },
+    {
+      "id": "collection",
+      "thing": "Latest, Favorites, Enhanced, Experiments and Trash: the rows every TOC section leads with",
+      "screen": null,
+      "his_word": "special folders (2026-08-14, 2026-08-16)",
+      "code_today": [
+        "collection",
+        "shelf"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "custom_folder",
+      "thing": "a folder he gathered by hand from other folders and items",
+      "screen": [
+        "Group the selected folders into a folder of your own",
+        "New folder…"
+      ],
+      "his_word": null,
+      "code_today": [
+        "custom folder",
+        "custom group"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "shape",
+      "thing": "which of the TOC's two sections an item belongs to: Portrait or Landscape",
+      "screen": [
+        "Portrait",
+        "Landscape",
+        "Both",
+        "Separate",
+        "Together",
+        "A list for each shape"
+      ],
+      "his_word": "'next shape', 'previous shape' (spoken commands)",
+      "code_today": [
+        "side",
+        "orientation",
+        "shape"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "action",
+      "thing": "what a video shows, picked when it is launched; what an image shows, said in the sorting window",
+      "screen": [
+        "Set image actions…",
+        "Action"
+      ],
+      "his_word": "action (2026-10-14: 'the grid of image actions'; 2026-10-26: 'action dropdown'; 2026-10-23: 'Action row')",
+      "code_today": [
+        "act",
+        "action"
+      ],
+      "code_word": null,
+      "status": "his_word",
+      "keep": [
+        "recipe_category"
+      ]
+    },
+    {
+      "id": "enhancement_level",
+      "thing": "one version of an image: the original, then each enhancement made of it",
+      "screen": [
+        "Enhancement levels",
+        "Other versions of this one"
+      ],
+      "his_word": "enhancement level (2026-10-25); versions (2026-10-21)",
+      "code_today": [
+        "level",
+        "version"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "basic",
+      "thing": "the block of facts at the top of a tab: Name, Created, File, Workflow version",
+      "screen": [
+        "Basic"
+      ],
+      "his_word": "'the basic section' (2026-10-29)",
+      "code_today": [
+        "metadata block",
+        "meta"
+      ],
+      "code_word": null,
+      "status": "his_word"
+    },
+    {
+      "id": "section",
+      "thing": "a titled group on a tab that folds open and shut: Prompts, Seed, Request, Enhancement levels, Animations",
+      "screen": [
+        "Prompts",
+        "Seed",
+        "Request",
+        "Animations",
+        "Source"
+      ],
+      "his_word": "section (2026-10-25, 2026-10-28, 2026-10-30)",
+      "code_today": [
+        "section",
+        "collapsible section"
+      ],
+      "code_word": "section",
+      "status": "agreed"
+    },
+    {
+      "id": "contact_sheet",
+      "thing": "the preview of a whole folder on a folder's tab: every thumbnail, edge to edge",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "contact sheet"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "dropdown",
+      "thing": "a control that opens a list to pick from: the Seed, Model, LoRA and Action lists",
+      "screen": null,
+      "his_word": "dropdown (2026-09-26, 2026-10-24, 2026-10-26, 2026-10-29)",
+      "code_today": [
+        "combo",
+        "dropdown",
+        "picker"
+      ],
+      "code_word": "dropdown",
+      "status": "his_word"
+    },
+    {
+      "id": "checkbox",
+      "thing": "a box that is ticked or not: Enhance's auto tick, 'Run experiments while the app is closed'",
+      "screen": [
+        "Run experiments while the app is closed"
+      ],
+      "his_word": "checkbox (2026-10-19, 2026-10-20)",
+      "code_today": [
+        "tick",
+        "checkbox"
+      ],
+      "code_word": "checkbox",
+      "status": "his_word"
+    },
+    {
+      "id": "field",
+      "thing": "one setting's box on a tab: a prompt, the seed, a size",
+      "screen": null,
+      "his_word": "field (2026-10-28: 'field labels'; 2026-10-29: 'Request field'; 2026-10-30: 'negative prompt field')",
+      "code_today": [
+        "field"
+      ],
+      "code_word": "field",
+      "status": "agreed"
+    },
+    {
+      "id": "preview",
+      "thing": "the large image or video at the top of a tab",
+      "screen": [
+        "No preview available",
+        "Select a generation to preview"
+      ],
+      "his_word": "preview (2026-09-03)",
+      "code_today": [
+        "preview"
+      ],
+      "code_word": "preview",
+      "status": "agreed"
+    },
+    {
+      "id": "slide",
+      "thing": "one thing a slideshow shows",
+      "screen": [
+        "Previous slide",
+        "Next slide"
+      ],
+      "his_word": null,
+      "code_today": [
+        "slide"
+      ],
+      "code_word": "slide",
+      "status": "agreed"
+    },
+    {
+      "id": "clip_seconds",
+      "thing": "the HUD row that sets how long each slide stays up",
+      "screen": [
+        "Clip seconds",
+        "Move on sooner",
+        "Leave each clip longer"
+      ],
+      "his_word": null,
+      "code_today": [
+        "clip seconds",
+        "dwell",
+        "pace"
+      ],
+      "code_word": null,
+      "status": "kept",
+      "ruled": "Fun Time's HUD words, shared with its Satellites; ruled in Fun Time's glossary"
+    },
+    {
+      "id": "lane",
+      "thing": "where a finished video is sent: down the Kino lane to the Satellites, or the Genau lane",
+      "screen": [
+        "Kino",
+        "Genau",
+        "Send this video down the Kino lane"
+      ],
+      "his_word": null,
+      "code_today": [
+        "lane",
+        "export lane"
+      ],
+      "code_word": "lane",
+      "status": "agreed"
+    },
+    {
+      "id": "sorting_window",
+      "thing": "the window that asks what each image shows, one press per image, its buttons wearing his drawings",
+      "screen": [
+        "Origenerator — what does this image show?",
+        "Skip",
+        "Same as last",
+        "Undo"
+      ],
+      "his_word": "'the grid of image actions' (2026-10-14); tile (2026-10-14, of one of its buttons)",
+      "code_today": [
+        "sorting window",
+        "tile",
+        "grid"
+      ],
+      "code_word": "sorting window",
+      "status": "agreed"
+    },
+    {
+      "id": "pane",
+      "thing": "one of the columns of Core, parted by the thick handles he drags: the TOC, the Gallery pane, the Generate pane",
+      "screen": null,
+      "his_word": "pane (2026-09-13, 2026-09-28, 2026-10-10, 2026-10-18, 2026-10-25)",
+      "code_today": [
+        "pane",
+        "pane splitter"
+      ],
+      "code_word": "pane",
+      "status": "his_word"
+    },
+    {
+      "id": "panel",
+      "thing": "no one thing: the code's word for a Generate tab, the Combine, the Enhance pane, the HUD and the OSR2 console alike",
+      "screen": null,
+      "his_word": "none: 'by panel do you mean HUD' (2026-10-28)",
+      "code_today": [
+        "panel"
+      ],
+      "code_word": null,
+      "status": "unruled"
+    },
+    {
+      "id": "widget",
+      "thing": "Qt's word for any drawn part; he has said it once, of Combine",
+      "screen": null,
+      "his_word": "'Combine widget' (2026-10-21)",
+      "code_today": [
+        "widget"
+      ],
+      "code_word": "widget",
+      "status": "kept",
+      "ruled": "Qt's own word, kept where the code means a QWidget"
+    },
+    {
+      "id": "tray",
+      "thing": "Windows' notification area at the right of the taskbar, and this app's icon in it",
+      "screen": null,
+      "his_word": "tray (2026-09-28, 2026-10-11)",
+      "code_today": [
+        "tray"
+      ],
+      "code_word": "tray",
+      "status": "kept",
+      "ruled": "Windows' own word"
+    },
+    {
+      "id": "funestra",
+      "thing": "the family's player, the window a slideshow plays in",
+      "screen": null,
+      "his_word": "Funestra",
+      "code_today": [
+        "funestra"
+      ],
+      "code_word": "funestra",
+      "status": "kept",
+      "ruled": "the family's word, ruled with Fun Time"
+    }
+  ]
+}

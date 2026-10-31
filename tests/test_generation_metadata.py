@@ -12,7 +12,7 @@ from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 def _row(**overrides):
     """A completed video — the shape whose file this block still carries.
 
-    An image's files are each a version of it, listed with the level that made
+    An image's files are each a version of it, listed with the version that made
     them; a video has no versions, so its file has nowhere else to be.
     """
     row = {

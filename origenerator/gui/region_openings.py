@@ -15,7 +15,7 @@ from origenerator.gui.off_thread import run_off_thread
 class RegionOpening:
     rows: list[dict]
     items: list
-    levels: dict
+    versions: dict
     enhanced_ids: set[str]
     scripts: dict[str, Path | None]
     lead: int = 0

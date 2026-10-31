@@ -112,7 +112,7 @@ class FakeActions:
     def purge_deleted(self, prompt_ids):
         self.purged.append(list(prompt_ids))
 
-    def delete_enhance_levels(self, row, filenames):
+    def delete_enhance_versions(self, row, filenames):
         return True
 
     def reject_experiment(self, row):

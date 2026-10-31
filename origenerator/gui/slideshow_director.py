@@ -62,12 +62,12 @@ from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
-from origenerator.gui.level_stepper import Version
 from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from origenerator.gui.version_stepper import Version
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.nav_map import (
@@ -526,11 +526,11 @@ class SlideshowDirector:
     def _fill_in(self, slideshow, rows, generation, folder, *, side, hud) -> None:
         if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
             return
-        items, levels = folder
+        items, versions = folder
         start = _place_of(generation, items)
         if start is not None:
             self.open(items, rows=rows, start=start, side=side, shuffle=in_order, hud=hud,
-                      levels=levels)
+                      versions=versions)
 
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:
@@ -592,18 +592,18 @@ class SlideshowDirector:
                       enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the HUD's versions button walk.
-        levels = self.versions_of(rows) if levels is None else levels
+        versions = self.versions_of(rows) if versions is None else versions
         actions = self._slideshow_actions(where)
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
             slideshow = self._hand_to_the_funestra(items, where, channel, actions=actions,
-                                            hud=hud, levels=levels, opening=opening, **kwargs)
+                                            hud=hud, versions=versions, opening=opening, **kwargs)
         else:
             shape = (_shape_it_opens_on(where, rows, items,
                                         _item_opened_on(items, kwargs.get("start"), resume))
                      if self._fun_time is None else where)
             slideshow = self._open_a_window(items, where, shape=shape, actions=actions,
-                                            hud=hud, levels=levels, **kwargs)
+                                            hud=hud, versions=versions, **kwargs)
             if self._fun_time is None:
                 self._standalone_showing = _side_of_the_set(rows, items) or shape
         self._slideshow = slideshow
@@ -616,7 +616,7 @@ class SlideshowDirector:
             filters = self._filters if self._fun_time is None else SlideshowFilters()
         slideshow.take_up(filters, keep_the_slide=keep_the_slide)
         if resume is not None:
-            # After the levels a window armed above: the version a slide was
+            # After the versions a window armed above: the version a slide was
             # left showing is only a version once they are armed.
             slideshow.resume(resume, opened_on_it=keep_the_slide)
         if not keep_the_slide:
@@ -708,17 +708,17 @@ class SlideshowDirector:
             self.pause_or_play_the_room()
 
     def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
-                            levels, opening=None, **kwargs):
+                            versions, opening=None, **kwargs):
         """A slideshow on one of the session's Funestras: the set goes to the Funestra
         and the HUD this app publishes goes with it — no window of ours."""
         occupant = self.region_slideshow(side)
         if occupant is not None:
-            occupant.play(items, hud=hud, levels=levels, **kwargs)
+            occupant.play(items, hud=hud, versions=versions, **kwargs)
             return occupant
         slideshow = FunestraSlideshow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace_on(side), hud=hud,
-                          levels=levels, say=self._host.say, opening=opening, **kwargs)
+                          versions=versions, say=self._host.say, opening=opening, **kwargs)
         self._region_slideshows[side] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
         # way a window one does.
@@ -726,7 +726,7 @@ class SlideshowDirector:
             slideshow.set_paused(True)
         return slideshow
 
-    def _open_a_window(self, items, side: str, *, shape: str, actions, hud, levels,
+    def _open_a_window(self, items, side: str, *, shape: str, actions, hud, versions,
                        **kwargs):
         """A slideshow in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
@@ -746,10 +746,10 @@ class SlideshowDirector:
         if built:
             view = SlideshowView(items, side=side, actions=actions,
                                  pace=self._pace_on(side), motion=self._motion, hud=hud,
-                                 levels=levels, **self._the_sound_standing_on_its_own(),
+                                 versions=versions, **self._the_sound_standing_on_its_own(),
                                  **kwargs)
         else:
-            view.slideshow.play(items, actions=actions, hud=hud, levels=levels, **kwargs)
+            view.slideshow.play(items, actions=actions, hud=hud, versions=versions, **kwargs)
         if built:
             self._present_surface(view, side)
         else:
@@ -797,13 +797,13 @@ class SlideshowDirector:
             resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
                         if media_type == MediaType.VIDEO else None)
             upscale = upscales.upscale_of(resolved[0]) if resolved is not None else None
-            levels = gallery.displayed_levels(row, upscale)
-            if len(levels) <= 1:
+            versions = gallery.displayed_versions(row, upscale)
+            if len(versions) <= 1:
                 continue
-            entries = [Version(gallery.output_file_path(level.file, OUTPUT_PLACES),
-                               media_type, level.label,
-                               points_of_interest.boxes_of(level.file, framed_together=framed_together))
-                       for level in levels]
+            entries = [Version(gallery.output_file_path(version.file, OUTPUT_PLACES),
+                               media_type, version.label,
+                               points_of_interest.boxes_of(version.file, framed_together=framed_together))
+                       for version in versions]
             playlists[str(entries[0][0])] = entries
         return playlists
 
@@ -1219,7 +1219,7 @@ class SlideshowDirector:
             return False
         self.open(opening.items, rows=opening.rows, location=self.base_location(side), side=side,
                   hud=HudFacts(favorite_ids=self._favorite_prompt_ids()),
-                  levels=opening.levels, opening=opening)
+                  versions=opening.versions, opening=opening)
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
                     side, len(opening.items), (time.perf_counter() - began) * 1000)
@@ -1232,7 +1232,7 @@ class SlideshowDirector:
     def _opening_of(self, rows: list[dict]) -> RegionOpening:
         items = self.items_of(rows)
         return RegionOpening(
-            rows=rows, items=items, levels=self.versions_of(rows),
+            rows=rows, items=items, versions=self.versions_of(rows),
             enhanced_ids=self._enhanced_ids_of(rows),
             scripts={str(path): funscript_of(path, places=OUTPUT_PLACES)
                      for path, media_type, *_rest in items if media_type == MediaType.VIDEO},
@@ -1294,7 +1294,7 @@ class SlideshowDirector:
             slideshow.reset_in_place()
             return
         self._repoint(slideshow, key)
-        slideshow.set_levels(self.versions_of(rows))
+        slideshow.set_versions(self.versions_of(rows))
         slideshow.retune(items, enhanced_ids=self._enhanced_ids_of(rows))
 
     def _repoint(self, slideshow, key: str) -> None:
@@ -1326,7 +1326,7 @@ class SlideshowDirector:
         if not items:
             return False
         self._repoint(slideshow, key)
-        slideshow.set_levels(self.versions_of(rows))
+        slideshow.set_versions(self.versions_of(rows))
         slideshow.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows),
                      keep_slide=keep_slide)
         return True
@@ -1510,7 +1510,7 @@ class SlideshowDirector:
         for surface in self.surfaces():
             surface.note_enhanced(row["prompt_id"], preview[0], preview[1],
                                   still=row.get("thumbnail_path"))
-            surface.add_levels(versions)
+            surface.add_versions(versions)
 
     def note_enhancing(self, statuses: dict, frames=None) -> None:
         self._enhance_status = dict(statuses)

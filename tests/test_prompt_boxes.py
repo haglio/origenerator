@@ -270,12 +270,12 @@ def test_a_prompt_read_whole_never_gets_a_second_box(qtbot, typed_into):
     assert _shown(typed_into) == [("-1 left", RED.name())]
 
 
-def test_a_boxed_prompt_carried_to_a_prompt_read_whole_shows_whole_and_reads_back_as_stored(
+def test_a_boxed_prompt_carried_to_a_prompt_read_whole_is_read_whole_each_break_a_space(
         qtbot, typed_into):
     typed_into.set_reading(word_reading(3, READ_WHOLE))
 
     typed_into.set_value(f"a b{BOX_BREAK}c")
-    assert (_texts(typed_into), typed_into.value()) == (["a b c"], f"a b{BOX_BREAK}c")
+    assert (_texts(typed_into), typed_into.value()) == (["a b c"], "a b c")
 
     _type(qtbot, typed_into, 0, 5, " d")
     assert typed_into.value() == "a b c d"

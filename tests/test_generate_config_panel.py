@@ -74,7 +74,7 @@ from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
-from tests.text_readers import clap_reader, clip_reader
+from tests.text_readers import clap_reader, clip_reader, word_reader
 from tests.thumbnail_rows import looping_clip, painted_row, where_the_thumbnail_is
 
 
@@ -1254,6 +1254,18 @@ def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
 
     assert panel._param_form.seed_is_random() is True
+
+
+def test_a_prompt_in_boxes_carried_to_a_workflow_that_reads_it_whole_is_read_whole(
+        panel, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    word_reader(tmp_path / "ComfyUI" / "comfy" / "text_encoders" / "t5_tokenizer"
+                / "tokenizer.json")
+    panel._param_form.set_values({"positive_prompt": f"a lantern{BOX_BREAK}on a jetty"})
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+
+    assert panel._param_form.get_values()["positive_prompt"] == "a lantern on a jetty"
 
 
 def test_a_pinned_seed_stays_pinned_across_a_switch_between_video_workflows(panel):

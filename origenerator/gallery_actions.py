@@ -31,7 +31,7 @@ from pathlib import Path
 from origenerator import trash_collection
 from origenerator.gallery import (
     output_disk_files,
-    remove_enhance_levels,
+    remove_enhance_versions,
     resolve_preview,
 )
 from origenerator.gallery.output import with_files_renamed
@@ -114,13 +114,13 @@ class GalleryActions:
         self._history.push(UndoEntry(_delete_label(len(rows)), undo,
                               redo=lambda: self.delete_rows(rows)))
 
-    def delete_enhance_levels(self, row: dict, filenames: list[str]) -> bool:
+    def delete_enhance_versions(self, row: dict, filenames: list[str]) -> bool:
         """Trash some of one image's versions, keeping the generation itself.
 
-        A level is a file, not a generation: binning the 0.3-denoise experiment
+        A version is a file, not a generation: trashing the 0.3-denoise experiment
         leaves the image where it is, in its folder, with its star and its other
         versions. So this trashes those files and rewrites only the row's version
-        bookkeeping (:func:`~origenerator.gallery.enhance.remove_enhance_levels`),
+        bookkeeping (:func:`~origenerator.gallery.enhance.remove_enhance_versions`),
         as one undoable step.
 
         Returns whether anything was deleted — ``False`` when the names match no
@@ -134,7 +134,7 @@ class GalleryActions:
         off the stack is what ends them.
         """
         prompt_id = row["prompt_id"]
-        updates = remove_enhance_levels(row, filenames)
+        updates = remove_enhance_versions(row, filenames)
         if not updates:
             return False
         before = {
@@ -153,8 +153,8 @@ class GalleryActions:
             self._redraw_thumbnail(prompt_id)
             return prompt_id
 
-        self._history.push(UndoEntry(_level_label(len(filenames)), undo, batch.purge,
-                              redo=lambda: self.delete_enhance_levels(row, filenames)))
+        self._history.push(UndoEntry(_version_label(len(filenames)), undo, batch.purge,
+                              redo=lambda: self.delete_enhance_versions(row, filenames)))
         return True
 
     def _redraw_thumbnail(self, prompt_id: str) -> None:
@@ -200,7 +200,7 @@ class GalleryActions:
         and re-queuing minutes of GPU work on an undo nobody asked to re-launch
         would be the worse surprise.
 
-        The versions delete (:meth:`delete_enhance_levels`) deliberately does
+        The versions delete (:meth:`delete_enhance_versions`) deliberately does
         NOT come through here: it takes files off a row that stays, and an
         enhance re-derives from the original either way, so its run is still
         going to have somewhere to land.
@@ -458,7 +458,7 @@ def _delete_label(count: int) -> str:
     return f"Delete {count} item{'s' if count != 1 else ''}"
 
 
-def _level_label(count: int) -> str:
+def _version_label(count: int) -> str:
     return f"Delete {count} version{'s' if count != 1 else ''}"
 
 

@@ -214,7 +214,7 @@ model, where the honest shrug only leaves it listed.
 
 ## A model is shown by its title, and installing one gives it its title
 
-The dropdowns, the TOC and the Enhancement Levels name a model or LoRA file by
+The dropdowns, the TOC and the Enhancements name a model or LoRA file by
 its title (`model_titles.model_title`): the name its page on Civitai or Hugging
 Face gives it, tidied, with the version, the expert half and the precision where
 two files would otherwise read alike. Titles live in `model_titles.json` beside

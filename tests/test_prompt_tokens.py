@@ -112,6 +112,13 @@ def test_a_weighted_phrase_too_short_to_split_starts_the_next_piece_whole(comfyu
         text.index(phrase) + len(phrase) + 1 + 4 * 68, 2)]
 
 
+def test_a_line_of_dashes_outside_a_story_is_part_of_the_one_prompt(comfyui):
+    reading = _clip(comfyui)
+    text = f"{_cats(40)}\n---\n{_cats(40)}"
+
+    assert [tokens for _start, tokens in reading.pieces(text)] == [75, reading.tokens(text) - 75]
+
+
 def test_an_escaped_bracket_is_read_as_a_bracket_where_the_pieces_are_cut(comfyui):
     text = _cats(74) + r" \(cat\) cat"
 

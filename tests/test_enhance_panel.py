@@ -1074,7 +1074,7 @@ def test_a_level_let_go_of_has_its_facts_back_in_gray(qtbot):
     assert [_ink(label) for label in first._fact_cells if isinstance(label, QLabel)] == resting
 
 
-def test_delete_and_backspace_bin_the_picked_levels(qtbot):
+def test_delete_and_backspace_trash_the_picked_levels(qtbot):
     # Sent to the row, not to the list: a click leaves the focus on the row it
     # picked (the rows take click focus), so the key has to reach the list from
     # there rather than only when the list itself happens to hold the focus.
@@ -1110,7 +1110,7 @@ def test_deleting_the_only_version_is_refused(qtbot):
     assert asked == []
 
 
-def test_delete_with_only_the_original_picked_bins_nothing(qtbot):
+def test_delete_with_only_the_original_picked_trashes_nothing(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)))
@@ -1124,7 +1124,7 @@ def test_delete_with_only_the_original_picked_bins_nothing(qtbot):
     assert asked == []
 
 
-def test_delete_with_the_original_picked_bins_only_the_other_picked_versions(qtbot):
+def test_delete_with_the_original_picked_trashes_only_the_other_picked_versions(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)))

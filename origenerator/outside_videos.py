@@ -172,7 +172,7 @@ def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VID
     new = [(video, record_of(video.path, places.records_folder))
            for video in outside_videos(places.upscaled_dir, skip_sources=places.skip_sources,
                                        rows=rows,
-                                       held=db.library_paths() | db.binned_library_paths())]
+                                       held=db.library_paths() | db.trashed_library_paths())]
     kinds = _kinds_by_site(rows, new)
     images = _bring_up_to_records(db, places, rows, keep_going, kinds)
     wanted = itertools.takewhile(lambda _new: keep_going(), new)

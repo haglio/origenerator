@@ -237,22 +237,22 @@ class FakeDB:
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
 
-    # --- the recovery bin (deletions held for the Trash collection) --------
+    # --- the Trash (deletions held for the Trash collection) --------
 
-    def record_deletion(self, prompt_id, row, batch):
+    def record_trashed(self, prompt_id, row, batch):
         self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
         self._deletions[prompt_id] = {
             "prompt_id": prompt_id, "row": row, "batch": batch,
             "deleted_at": "2026-08-15 03:00:00",
         }
 
-    def list_deletions(self):
+    def list_trashed(self):
         return list(reversed(self._deletions.values()))  # newest first
 
-    def get_deletion(self, prompt_id):
+    def get_trashed(self, prompt_id):
         return self._deletions.get(prompt_id)
 
-    def forget_deletion(self, prompt_id):
+    def forget_trashed(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
     # --- spoken requests, and the folder-wide one typed on a tab -----------
@@ -540,7 +540,7 @@ def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, *
                 source="experiment", experiment_verdict=verdict, **extra)
 
 
-def _bin_db(rows=(), held=(), inherited=()):
+def _trash_db(rows=(), held=(), inherited=()):
     """A gallery whose bin already holds ``held`` — ``(prompt_id, row)`` pairs,
     oldest first — the way a previous session's deletes would have left it.
 
@@ -549,9 +549,9 @@ def _bin_db(rows=(), held=(), inherited=()):
     """
     db = FakeDB(list(rows))
     for prompt_id, row in held:
-        db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+        db.record_trashed(prompt_id, row, {"moves": [], "subdir": None})
     for prompt_id, row in inherited:
-        db.record_deletion(prompt_id, row, {
+        db.record_trashed(prompt_id, row, {
             "moves": [[f"out/{prompt_id}.png", f"trash/{prompt_id}/0_{prompt_id}.png"]],
             "subdir": f"trash/{prompt_id}",
         })
@@ -562,7 +562,7 @@ def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
     """The Trash collection open over the deletions given as ``(prompt_id, prompt)``,
     with the first of them picked."""
     view = GalleryView(
-        _bin_db(held=[(pid, _image(pid, prompt, 50, n))
+        _trash_db(held=[(pid, _image(pid, prompt, 50, n))
                       for n, (pid, prompt) in enumerate(held, start=1)]),
         actions=actions,
     )

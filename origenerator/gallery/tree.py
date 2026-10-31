@@ -287,7 +287,7 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
 def favorite_folders(tree: list[MediaGroup]) -> list:
     """Every favorited folder in ``tree``, at any depth, in top-down tree order.
 
-    Powers the gallery's Favorites collection: a folder is bookmarked in place (its
+    Powers the gallery's Favorites collection: a folder is favorited in place (its
     position in the tree never changes) and collected here so all favorites —
     however deeply nested — are reachable from one spot.
     """

@@ -810,95 +810,95 @@ def _as_read_before_the_rename(row: dict) -> dict:
     return {STORED_NAMES.get(key, key): value for key, value in row.items()}
 
 
-def test_a_deletion_held_since_before_two_columns_were_renamed_comes_back_under_the_new_names(
+def test_a_trashed_item_held_since_before_two_columns_were_renamed_comes_back_under_the_new_names(
         tmp_path):
-    # A held deletion keeps its row as it was read then, and until the code
+    # A trashed item keeps its row as it was read then, and until the code
     # called them act and source_video, rows were read under their stored names.
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
                          params_json="{}", workflow_json="{}")
     db.set_settings_source("c-001", category="dancing", video_prompt_id="vid-9")
-    db.record_deletion("c-001", _as_read_before_the_rename(db.get_generation("c-001")), {})
+    db.record_trashed("c-001", _as_read_before_the_rename(db.get_generation("c-001")), {})
     db.delete_generation("c-001")
 
-    held = db.get_deletion("c-001")["row"]
+    held = db.get_trashed("c-001")["row"]
     assert (held["act"], held["source_video"]) == ("dancing", "vid-9")
     db.restore_generation(held)
     assert db.get_generation("c-001")["source_video"] == "vid-9"
 
 
-def test_a_deletion_held_since_before_the_image_state_was_renamed_comes_back_with_its_state(
+def test_a_trashed_item_held_since_before_the_image_state_was_renamed_comes_back_with_its_state(
         tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="pic-001", workflow_name="sdxl_t2i", workflow_version="v001",
                          params_json="{}", workflow_json="{}")
     db.set_image_state("pic-001", "state two")
-    db.record_deletion("pic-001", _as_read_before_the_rename(db.get_generation("pic-001")), {})
+    db.record_trashed("pic-001", _as_read_before_the_rename(db.get_generation("pic-001")), {})
     db.delete_generation("pic-001")
 
-    held = db.get_deletion("pic-001")["row"]
+    held = db.get_trashed("pic-001")["row"]
     assert held["image_state"] == "state two"
     db.restore_generation(held)
     assert db.get_generation("pic-001")["image_state"] == "state two"
 
 
-# --- the recovery bin (held deletions) -------------------------------------
+# --- the Trash (trashed items) -------------------------------------
 
 
-def test_a_recorded_deletion_comes_back_as_data(tmp_path):
+def test_a_recorded_trashed_item_comes_back_as_data(tmp_path):
     db = Database(tmp_path / "test.db")
     row = {"prompt_id": "d-1", "seed": 7}
     batch = {"moves": [["out/a.png", "trash/abc/0_a.png"]], "subdir": "trash/abc"}
 
-    db.record_deletion("d-1", row, batch)
+    db.record_trashed("d-1", row, batch)
 
-    held = db.get_deletion("d-1")
+    held = db.get_trashed("d-1")
     assert held["prompt_id"] == "d-1"
     assert held["row"] == row       # JSON columns arrive parsed, not as strings
     assert held["batch"] == batch
     assert held["deleted_at"]       # stamped, so the sweep can age it out
 
 
-def test_held_deletions_list_newest_first(tmp_path):
+def test_trashed_items_list_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for prompt_id in ("d-1", "d-2", "d-3"):
-        db.record_deletion(prompt_id, {"prompt_id": prompt_id}, {})
+        db.record_trashed(prompt_id, {"prompt_id": prompt_id}, {})
 
     # Same-second stamps tie, so the insertion order is what breaks it.
-    assert [r["prompt_id"] for r in db.list_deletions()] == ["d-3", "d-2", "d-1"]
+    assert [r["prompt_id"] for r in db.list_trashed()] == ["d-3", "d-2", "d-1"]
 
 
 def test_re_deleting_an_item_restarts_its_window(tmp_path):
     # Deleted, restored, deleted again: one record, held from the latest delete.
     db = Database(tmp_path / "test.db")
-    db.record_deletion("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "first"})
-    db.record_deletion("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "second"})
+    db.record_trashed("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "first"})
+    db.record_trashed("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "second"})
 
-    (held,) = db.list_deletions()
+    (held,) = db.list_trashed()
     assert held["batch"]["subdir"] == "second"
 
 
-def test_forgetting_a_deletion_drops_it_from_the_bin(tmp_path):
+def test_forgetting_a_trashed_item_drops_it_from_the_trash(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.record_deletion("d-1", {"prompt_id": "d-1"}, {})
+    db.record_trashed("d-1", {"prompt_id": "d-1"}, {})
 
-    db.forget_deletion("d-1")
+    db.forget_trashed("d-1")
 
-    assert db.get_deletion("d-1") is None
-    assert db.list_deletions() == []
+    assert db.get_trashed("d-1") is None
+    assert db.list_trashed() == []
 
 
-def test_an_unheld_deletion_is_simply_absent(tmp_path):
+def test_an_unheld_trashed_item_is_simply_absent(tmp_path):
     db = Database(tmp_path / "test.db")
-    assert db.get_deletion("never") is None
-    db.forget_deletion("never")  # must not raise
+    assert db.get_trashed("never") is None
+    db.forget_trashed("never")  # must not raise
 
 
 def _held_in_the_trash(db, tmp_path, prompt_id: str, original: Path) -> Path:
     held = tmp_path / "trash" / prompt_id / f"1_{original.name}"
     held.parent.mkdir(parents=True)
     held.write_bytes(b"fabricated image bytes")
-    db.record_deletion(prompt_id, {"prompt_id": prompt_id},
+    db.record_trashed(prompt_id, {"prompt_id": prompt_id},
                        {"moves": [[str(original), str(held)]], "subdir": str(held.parent)})
     return held
 

@@ -260,7 +260,7 @@ def test_a_rows_path_steps_from_its_side_down_through_every_row_holding_it(qtbot
         assert side == PathStep(SIDE_LABELS[side_of(key)], None)
         assert [step.key for step in steps] == [
             held.data(0, TREE_KEY_ROLE) for held in _rows_down_to(row)]
-        assert tree.breadcrumb(row) == PATH_SEPARATOR.join(
+        assert tree.folder_path(row) == PATH_SEPARATOR.join(
             step.name for step in (side, *steps))
 
 
@@ -299,7 +299,7 @@ def test_an_item_belongs_to_its_folder_in_its_own_place_not_to_a_copy_of_it(qtbo
     _pane, tree, _model = _gathered_tree(qtbot, [_image("i1", "a cat")],
                                          _keepers_holding_the_images)
 
-    assert tree.breadcrumb(tree.leaf_by_id["i1"]).startswith("Landscape  ›  All  ›  ")
+    assert tree.folder_path(tree.leaf_by_id["i1"]).startswith("Landscape  ›  All  ›  ")
 
 
 def _outer_holding_inner_holding_the_images(model):
@@ -324,8 +324,8 @@ def test_a_folder_drawn_again_inside_a_folder_of_your_own_is_found_first_in_its_
                                         _keepers_holding_the_images)
     own, again = tree.keys_for_folder(model[0].key)
 
-    assert tree.breadcrumb(tree.item_by_key[own]) == "Landscape  ›  All  ›  Images"
-    assert tree.breadcrumb(tree.item_by_key[again]) == "Landscape  ›  Keepers  ›  Images"
+    assert tree.folder_path(tree.item_by_key[own]) == "Landscape  ›  All  ›  Images"
+    assert tree.folder_path(tree.item_by_key[again]) == "Landscape  ›  Keepers  ›  Images"
 
 
 def test_a_folder_worked_in_lately_wears_its_mark_inside_a_folder_of_your_own_too(qtbot):
@@ -334,7 +334,7 @@ def test_a_folder_worked_in_lately_wears_its_mark_inside_a_folder_of_your_own_to
     _pane, tree, _model = _gathered_tree(qtbot, rows, _keepers_holding_the_images,
                                          recently_worked=[(LANDSCAPE, leaf_key)])
 
-    marked = [tree.breadcrumb(row) for row in tree.item_by_key.values()
+    marked = [tree.folder_path(row) for row in tree.item_by_key.values()
               if row.data(0, RECENT_ROLE)]
     assert [path.split("  ›  ")[1] for path in marked] == ["All", "Keepers"]
 

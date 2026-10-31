@@ -264,12 +264,12 @@ def test_the_field_says_what_it_would_search(qtbot):
 
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
-    assert view._search.field.placeholderText() ==         f"Search {view._tree_view.breadcrumb(videos)}…"
+    assert view._search.field.placeholderText() ==         f"Search {view._tree_view.folder_path(videos)}…"
 
     leaf = _at(videos, 0, 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     placeholder = view._search.field.placeholderText()
-    assert placeholder == f"Search {view._tree_view.breadcrumb(leaf)}…"
+    assert placeholder == f"Search {view._tree_view.folder_path(leaf)}…"
     assert leaf.text(0) in placeholder      # right down to the folder itself
     assert videos.text(0) in placeholder    # and every branch above it
 
@@ -467,14 +467,14 @@ def test_search_matches_a_generation_by_its_lora(qtbot):
 
 
 def _section_headers(view):
-    """The fold headers of the open search's model + LoRA bands, in shown order."""
+    """The fold headers of the open search's model + LoRA sections, in shown order."""
     return [w for w in view._scroll.widget().findChildren(QPushButton)
             if w.objectName() == "tileGroupHeading"]
 
 
 def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     # The other question a search answers: not "where is it" but "which
-    # model and LoRA was that" — so the hits are cut into a labelled band per
+    # model and LoRA was that" — so the hits are cut into a labelled section per
     # model + LoRA combination instead of interleaved.
     rows = [_i2v_video("v1", "styleA", prompt="a cat indoors"),
             _i2v_video("v2", "styleA", prompt="a cat outdoors"),
@@ -490,7 +490,7 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     assert len(headings) == 2
     assert any("styleA" in h and h.endswith("(2)") for h in headings)
     assert any("styleB" in h and h.endswith("(1)") for h in headings)
-    assert headings[0].endswith("(2)")   # the bigger band leads
+    assert headings[0].endswith("(2)")   # the bigger section leads
 
 
 def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
@@ -513,18 +513,18 @@ def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
     _search_for(view, "cat")
     view.set_search_sort(search.SORT_MODEL_LORA)
     header = _section_headers(view)[0]
-    band = view._scroll.widget().layout().itemAt(1).widget()
-    assert band.isVisible() or not view.isVisible()  # laid out open to begin with
+    section = view._scroll.widget().layout().itemAt(1).widget()
+    assert section.isVisible() or not view.isVisible()  # laid out open to begin with
 
     header.click()
 
-    assert band.isHidden()
+    assert section.isHidden()
     assert header.fold == "chevron_right"   # and the chevron says so
 
 
 def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     # A rebuild, a landing generation or a widening all redraw the pane; springing
-    # the bands you shut back open each time would make folding pointless.
+    # the sections you shut back open each time would make folding pointless.
     db = FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
                  _i2v_video("v2", "styleB", prompt="a cat")])
     view = GalleryView(db)

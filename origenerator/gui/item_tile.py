@@ -23,7 +23,7 @@ from origenerator.gui.inflight import TICK_MS, RunReading
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
-from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
+from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.stage_scrim import StageScrim
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()  # the thumbnail area, inside the family tile
@@ -163,7 +163,7 @@ class ItemTile(QWidget):
         # thumbnail rather than replacing it — the base render is out and worth
         # looking at, which is the point of generating it first.
         self._enhancing_overlay = StageScrim(self)
-        self._enhancing_bar = ProgressCaption(self)
+        self._enhancing_bar = ProgressBar(self)
         self._enhancing_bar.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._enhancing_bar.hide()

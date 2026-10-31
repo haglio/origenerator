@@ -7,7 +7,7 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from origenerator.slideshow_buttons import answer, slideshow_rows
 
 
-def _band(**fields) -> tuple:
+def _button_row(**fields) -> tuple:
     return slideshow_rows("portrait", **fields)[-1]
 
 
@@ -16,14 +16,14 @@ def _names(buttons) -> list[str]:
 
 
 def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
-    assert _names(_band()) == [
+    assert _names(_button_row()) == [
         "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
         "shuffle", "latest", "cycle_version"]
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
     """"portrait_next", "landscape_trash" — the same spelling a satellite's
-    band posts, so the session routes a slideshow's press with no new verbs; and
+    button row posts, so the session routes a slideshow's press with no new verbs; and
     every glyph on this HUD is cryptic on purpose, so each one names itself
     on hover."""
     for side in ("portrait", "landscape"):
@@ -34,8 +34,8 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
     """A run of evenly spaced squares reads as one undifferentiated strip; the
-    wider gap opens at the seams the Funestras' own band opens them at."""
-    assert [name for name, button in zip(_names(_band()), _band(), strict=True) if button.group_break] == [
+    wider gap opens at the seams the Funestras' own button row opens them at."""
+    assert [name for name, button in zip(_names(_button_row()), _button_row(), strict=True) if button.group_break] == [
         "lock", "enhanced", "shuffle", "cycle_version"]
 
 
@@ -43,32 +43,32 @@ def test_the_switches_light_and_the_things_done_never_do():
     """The lock and the two filters are states the slideshow sits in — the lock and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
     image's own yellow; a step, the Trash and reset are things done."""
-    band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
-                    _band(locked=True, favorites_filter=True, enhanced=True), strict=True))
+    row = dict(zip(_names(_button_row(locked=True, favorites_filter=True, enhanced=True)),
+                    _button_row(locked=True, favorites_filter=True, enhanced=True), strict=True))
 
-    assert band["lock"].lit
-    assert band["lock"].favorite
-    assert band["fmode"].lit
-    assert band["fmode"].favorite
-    assert band["enhanced"].lit
-    assert band["enhanced"].enhanced
-    assert band["trash"].danger
-    assert not any(band[name].lit for name in ("prev", "next", "trash", "reset"))
-    at_rest = dict(zip(_names(_band()), _band(), strict=True))
+    assert row["lock"].lit
+    assert row["lock"].favorite
+    assert row["fmode"].lit
+    assert row["fmode"].favorite
+    assert row["enhanced"].lit
+    assert row["enhanced"].enhanced
+    assert row["trash"].danger
+    assert not any(row[name].lit for name in ("prev", "next", "trash", "reset"))
+    at_rest = dict(zip(_names(_button_row()), _button_row(), strict=True))
     assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
 
 
 def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
     for order, lit in ((SHUFFLE_LABEL, ["shuffle"]), (LATEST_LABEL, ["latest"]), ("", [])):
-        band = _band(order=order)
-        assert [name for name, button in zip(_names(band), band, strict=True)
+        row = _button_row(order=order)
+        assert [name for name, button in zip(_names(row), row, strict=True)
                 if name in ("shuffle", "latest") and button.lit] == lit, order
 
 
 def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize():
     """Hosted, this slideshow covers a Satellite Funestra and has no window of its own
     to park, so the mode pair leads the HUD with this mode lit — and the
-    minimize a Funestra's band ends with is not declared at all."""
+    minimize a Funestra's button row ends with is not declared at all."""
     rows = slideshow_rows("portrait", hosted=True)
     mode_row = [button.command for button in rows[0]]
 
@@ -89,7 +89,7 @@ def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
 
 def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
     """The Funestra's window is the session's, so minimize is the session's; and
-    the mode pair is on the HUD the session draws around this band, not in
+    the mode pair is on the HUD the session draws around this button row, not in
     it.  What is left is exactly what the slideshow itself answers."""
     rows = slideshow_rows("portrait", hosted=True, own_window=False)
 
@@ -186,8 +186,8 @@ def test_filter_said_of_a_side_narrows_to_the_act_on_screen():
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():
     """An image nobody enhanced, a video Evolver never upscaled: there is
     nothing to step to, so the button is drawn faded rather than offered."""
-    assert dict(zip(_names(_band()), _band(), strict=True))["cycle_version"].dim
-    lively = _band(has_other_versions=True)
+    assert dict(zip(_names(_button_row()), _button_row(), strict=True))["cycle_version"].dim
+    lively = _button_row(has_other_versions=True)
     assert not dict(zip(_names(lively), lively, strict=True))["cycle_version"].dim
 
 
@@ -248,8 +248,8 @@ def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
     """Hosted it is the region's base state — that side's whole library, the
     way a Funestra's reset leaves it browsing its own; standalone there is no
     such state and it is this set from the top."""
-    hosted = next(b for b in _band(hosted=True) if b.command == "portrait_reset")
-    alone = next(b for b in _band() if b.command == "portrait_reset")
+    hosted = next(b for b in _button_row(hosted=True) if b.command == "portrait_reset")
+    alone = next(b for b in _button_row() if b.command == "portrait_reset")
 
     assert "library" in hosted.tooltip
     assert "library" not in alone.tooltip

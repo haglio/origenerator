@@ -30,7 +30,7 @@ from origenerator.gui import palette, tile_shape
 from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import TICK_MS, InFlightItem, queue_wait_text
 from origenerator.gui.item_type_icon import ItemTypeIcon
-from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
+from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.stage_scrim import StageScrim
 
 _IMAGE_SIZE = tile_shape.THUMBNAIL_SIZE  # the family shape, so tiles flow with tiles
@@ -86,7 +86,7 @@ class InFlightTile(QWidget):
         # Both ride over the frame rather than taking a row of their own, so the
         # thumbnail keeps the height a finished tile's has.
         self._scrim = StageScrim(self)
-        self._bar = ProgressCaption(self)
+        self._bar = ProgressBar(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         # Its own clock rather than the gallery's poll, so the count advances a

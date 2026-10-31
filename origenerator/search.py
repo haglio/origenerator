@@ -559,7 +559,7 @@ class SearchTile:
     itself (``group`` ``None``).
 
     ``row`` is the newest hit either way: the tile's thumbnail when it stands
-    alone, and what decides the model + LoRA band it lands in when sorted that
+    alone, and what decides the model + LoRA section it lands in when sorted that
     way — every row in a settings folder ran the same settings, so any of them
     answers that.
     """

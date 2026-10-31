@@ -118,7 +118,7 @@ class SideModel:
 
 class GalleryTree:
     """The folder tree: builds it from the gallery model and answers the lookups
-    (key→item, prompt→item, breadcrumb, the selected folder's key) the view
+    (key→item, prompt→item, folder path, the selected folder's key) the view
     navigates by. The pane holding the two trees is owned by the view."""
 
     def __init__(self, tree):
@@ -230,7 +230,7 @@ class GalleryTree:
 
     def _add_custom_folder(self, group, parent_item, side, inside=()) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a collection-shaped row carrying
-        its group (so the view's folder machinery — breadcrumb, tiles, slideshow —
+        its group (so the view's folder machinery — folder path, tiles, slideshow —
         treats it like any other folder), and collecting the folders dropped onto
         it."""
         count = len(gallery.rows_under(group))
@@ -350,5 +350,5 @@ class GalleryTree:
             steps.append(PathStep(SIDE_LABELS[side], None))
         return steps[::-1]
 
-    def breadcrumb(self, item) -> str:
+    def folder_path(self, item) -> str:
         return path_text(self.path_steps(item))

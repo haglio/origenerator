@@ -265,7 +265,7 @@ class TestTheOneHudASlideshowWears:
         assert channel.read_text(encoding="utf-8").split() == ["portrait_next"]
 
     def test_a_press_on_the_transport_still_reaches_the_slideshow(self, qtbot):
-        """The device rows sit beside the side's own band, not in place of it."""
+        """The device rows sit beside the side's own button row, not in place of it."""
         window = self._window(qtbot)
         window.wear_the_hud("portrait")
         before = window.slideshow._set.playlist.index

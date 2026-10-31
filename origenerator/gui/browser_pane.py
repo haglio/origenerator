@@ -358,7 +358,7 @@ class TreeNavigation:
 
     # The tree key of the selected row (a folder's, or a collection's), or ``None``.
     selected_folder_key: Callable[[], str | None]
-    # Where folder ``key`` lives — the breadcrumb of its parent, "" at the top.
+    # Where folder ``key`` lives — the folder path of its parent, "" at the top.
     # What a tile drawn far from the tree is captioned with, so identically
     # named folders from opposite corners stay tellable apart.
     folder_context: Callable[[str], str]
@@ -638,9 +638,9 @@ class BrowserPane(QObject):
 
     def _show_gathered(self, rows, groups, *, show_favorites: bool, empty: str):
         """Items as thumbnails, then a tile per folder, each captioned with its
-        breadcrumb.
+        folder path.
 
-        The breadcrumb is what makes this readable at all — a grouping can hold two
+        The folder path is what makes this readable at all — a grouping can hold two
         folders that are both called "30 steps" from opposite corners of the tree,
         so the bare label the hierarchy relies on isn't enough here.
         """
@@ -670,9 +670,9 @@ class BrowserPane(QObject):
 
         Two orders, because a search answers two different questions. Newest-first
         is "where is the one I made recently"; Model / LoRA is "which model and LoRA
-        was that", and there the tiles are cut into a labelled band per
+        was that", and there the tiles are cut into a labelled section per
         combination rather than interleaved, so the answer is the heading you
-        stopped scrolling at. Those bands fold shut on their headers — with a
+        stopped scrolling at. Those sections fold shut on their headers — with a
         dozen combinations under a broad query, being able to shut the ones you
         are not asking about is what makes the sort usable rather than merely
         sorted. ``collapsed`` is the set of headings to open shut, and
@@ -712,7 +712,7 @@ class BrowserPane(QObject):
         """The tiles under one foldable heading per model + LoRA combination.
 
         A column of flows rather than one flow with headings in it, because the
-        column is what makes folding cheap: a band is one widget to hide rather
+        column is what makes folding cheap: a section is one widget to hide rather
         than a run of tiles to pick out of a shared layout.
         """
         container = QWidget()
@@ -720,30 +720,30 @@ class BrowserPane(QObject):
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(_SECTION_SPACING)
         for heading, section in search.group_by_model_lora(tiles):
-            band = QWidget()
-            band_flow = FlowLayout(band, spacing=_TILE_SPACING)
+            section_widget = QWidget()
+            section_flow = FlowLayout(section_widget, spacing=_TILE_SPACING)
             shut = heading in collapsed
             column.addWidget(
-                self._section_header(heading, len(section), band, shut, on_toggled))
-            # A shut band's tiles are still built and still counted: they are the
+                self._section_header(heading, len(section), section_widget, shut, on_toggled))
+            # A shut section's tiles are still built and still counted: they are the
             # results, and folding is about what you are looking at, not what the
             # search found — so unfolding is instant and the shown order (which
             # Shift-select and the slideshow read) stays the order on screen.
             for tile in section:
-                self._add_search_tile(band_flow, tile)
-            band.setVisible(not shut)
-            column.addWidget(band)
+                self._add_search_tile(section_flow, tile)
+            section_widget.setVisible(not shut)
+            column.addWidget(section_widget)
         column.addStretch(1)  # sections stay their own height; slack falls to the end
         return container
 
     @staticmethod
-    def _section_header(heading: str, count: int, band: QWidget, shut: bool,
+    def _section_header(heading: str, count: int, section_widget: QWidget, shut: bool,
                         on_toggled) -> FoldHeader:
-        """The band's foldable header: the family's chevron, the model and LoRA, and how
+        """The section's foldable header: the family's chevron, the model and LoRA, and how
         many are in it.
 
         A flat, full-width button rather than a label — the whole strip is the
-        target, which is what a fold control has to be when the bands are tall
+        target, which is what a fold control has to be when the sections are tall
         enough that you are aiming at it after a scroll.
         """
         button = FoldHeader(warns=False)
@@ -755,7 +755,7 @@ class BrowserPane(QObject):
         def paint(collapsed: bool):
             button.set_fold(FOLD[collapsed])
 
-        # The fold state is carried here rather than read back off the band: a
+        # The fold state is carried here rather than read back off the section: a
         # widget whose window hasn't been shown yet reports isVisible() false
         # however it was set, so asking it would make the first click on a
         # freshly drawn pane a no-op.
@@ -763,7 +763,7 @@ class BrowserPane(QObject):
 
         def toggle():
             state["shut"] = not state["shut"]
-            band.setVisible(not state["shut"])
+            section_widget.setVisible(not state["shut"])
             paint(state["shut"])
             if on_toggled is not None:
                 on_toggled(heading, state["shut"])
@@ -776,7 +776,7 @@ class BrowserPane(QObject):
         """Draw one result — a folder tile or a single item — and record its place.
 
         The shown order matters beyond the drawing: Shift-select and the slideshow
-        both read it, so it has to be the order the bands were laid out in rather
+        both read it, so it has to be the order the sections were laid out in rather
         than the order the search scored them.
         """
         if tile.group is not None:

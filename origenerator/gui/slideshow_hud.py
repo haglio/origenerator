@@ -76,7 +76,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         # collection lists: it lights when the item on screen is a favorite.
         is_favorite=slideshow.hud_is_favorite,
         item_note=slideshow.hud_item_note,
-        # The buttons this slideshow answers, in the bands the HUD draws them in —
+        # The buttons this slideshow answers, in the rows the HUD draws them in —
         # which ones depends on what is drawing it.
         rows=slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
                             enhanced=enhanced, order=order_label, hosted=hosted,

@@ -12,15 +12,17 @@ the app's flat blue under the writing rather than a wash over it — a
 translucent fill tints the letters as it passes under them, which is the one
 place the text has to stay legible.
 
-A job made of several sampler passes gets a second, thinner band along the bar's
-foot: the bar itself is the whole run, and the band is the pass being taken
+A job made of several sampler passes gets a second, thinner bar along the first's
+foot: the bar itself is the overall progress bar, the whole run, and the thin one is
+the substep progress bar, the pass being taken
 right now (:meth:`origenerator.progress.ProgressTracker.current_pass`). An
 enhancement that upscales and then fixes faces and hands is three passes or
 more, and with one bar between them the only honest thing a bar can do is
 restart per pass — so the run looks like several jobs, and nothing on screen
 answers "how far through the whole thing". Split, each reading gets its own
-band: the big one only advances, the small one is free to start over as each
-fix begins. Runs of a single pass show no band, having nothing to say twice.
+bar: the overall one only advances, the substep one is free to start over as each
+fix begins. Runs of a single pass show no substep progress bar, having nothing to
+say twice.
 
 A caption too long for the bar elides at its tail rather than being clipped
 mid-letter at both ends, which is what centered text in a narrow bar does
@@ -51,14 +53,14 @@ _SCROLL_MS = 33
 _SCROLL_PX = 1.0
 _SCROLL_GAP = GAP_DIALOG
 _HOLD_TICKS = 45
-_BAND_PX = 6      # the current pass's band, along the foot of a 26px bar
-_BAND_RADIUS = BUTTON_RADIUS  # the stylesheet's corner radius, so the band's ends match
-# The band reads as a groove cut into the bar rather than a second fill of the
+_SUBSTEP_BAR_PX = 6      # the substep progress bar, along the foot of a 26px bar
+_SUBSTEP_BAR_RADIUS = BUTTON_RADIUS  # the stylesheet's corner radius, so its ends match
+# The substep progress bar reads as a groove cut into the bar rather than a second fill of the
 # same blue: darkest ground beneath, the palette's lighter blue over it. Same
 # blue family as the run's own fill, a shade up, so which is which is legible
-# whether the band lies over the filled part of the bar or the empty part.
-_BAND_TROUGH = BG_PRIMARY
-_BAND_FILL = BLUE_LIGHT
+# whether it lies over the filled part of the bar or the empty part.
+_SUBSTEP_BAR_TROUGH = BG_PRIMARY
+_SUBSTEP_BAR_FILL = BLUE_LIGHT
 
 
 # How tall the bar is drawn wherever it is laid along a thumbnail's foot: a line of
@@ -67,12 +69,12 @@ _BAND_FILL = BLUE_LIGHT
 BAR_HEIGHT = 26
 
 
-class ProgressCaption(QProgressBar):
+class ProgressBar(QProgressBar):
     """A determinate-or-indeterminate bar whose caption reads across its face."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("progressCaption")
+        self.setObjectName("progressBar")
         self.setTextVisible(True)
         self._caption = ""
         self._pass_progress: tuple[int, int] | None = None
@@ -102,7 +104,6 @@ class ProgressCaption(QProgressBar):
         return self._caption
 
     def caption(self) -> str:
-        """The whole caption, whether or not it fits the bar at once."""
         return self._caption
 
     def scrolling(self) -> bool:
@@ -110,7 +111,6 @@ class ProgressCaption(QProgressBar):
         return QFontMetrics(self.font()).horizontalAdvance(self._caption) > self._room()
 
     def scrolled(self) -> float:
-        """How far left the caption has slid, in pixels."""
         return self._scrolled
 
     def _room(self) -> int:
@@ -118,7 +118,7 @@ class ProgressCaption(QProgressBar):
         return max(0, self.width() - _TEXT_MARGIN)
 
     def pass_progress(self) -> tuple[int, int] | None:
-        """The ``(done, total)`` the band along the foot is drawing, if any."""
+        """The ``(done, total)`` the substep progress bar along the foot is drawing, if any."""
         return self._pass_progress
 
     def show_progress(self, caption: str, progress: tuple[int, int] | None,
@@ -131,7 +131,7 @@ class ProgressCaption(QProgressBar):
         "started and going nowhere".
 
         ``pass_progress`` is the pass running right now, on its own count, drawn
-        as the band along the bar's foot. ``None`` — a single-pass run, or one
+        as the substep progress bar along the bar's foot. ``None`` — a single-pass run, or one
         with nothing to measure — leaves the bar whole.
         """
         self._caption = caption
@@ -191,18 +191,18 @@ class ProgressCaption(QProgressBar):
         self._retime_scroll()   # a bar widened past its caption stops sliding
 
     def paintEvent(self, event):
-        """Groove and fill, then the current pass's band, then the caption.
+        """Groove and fill, then the substep progress bar, then the caption.
 
         Three layers in that order, because the caption has to be the top one:
-        the band is painted over the foot of the bar, which is where a line of
-        text keeps its descenders, and a band drawn last strikes the foot of
+        the substep progress bar is painted over the foot of the bar, which is where a line of
+        text keeps its descenders, and one drawn last strikes the foot of
         every letter out. So the style is asked for the bar without its label
         (the caption it would draw is taken out of the option), and the writing
-        goes on by hand once the band is down.
+        goes on by hand once the substep progress bar is down.
 
-        The band is painted over the bar rather than laid out beside it, so
+        It is painted over the bar rather than laid out beside it, so
         every surface holding one of these keeps the height it already allots:
-        the band takes its few pixels out of the fill, and the caption stays
+        it takes its few pixels out of the fill, and the caption stays
         centered on the bar as a whole.
         """
         painter = QStylePainter(self)
@@ -211,7 +211,7 @@ class ProgressCaption(QProgressBar):
         caption, option.text = option.text, ""
         option.textVisible = False
         painter.drawControl(QStyle.ControlElement.CE_ProgressBar, option)
-        self._paint_pass_band(painter)
+        self._paint_substep_bar(painter)
         if self.isTextVisible() and caption:
             self._paint_caption(painter, caption)
 
@@ -243,25 +243,25 @@ class ProgressCaption(QProgressBar):
             )
         painter.restore()
 
-    def _paint_pass_band(self, painter):
-        """Lay the current pass's band along the foot of the bar, if there is one."""
+    def _paint_substep_bar(self, painter):
+        """Lay the substep progress bar along the foot of the bar, if there is one."""
         if self._pass_progress is None or self.maximum() <= 0:
             return  # nothing to split, or a sweeping bar with no foot to split
         done, total = self._pass_progress
         if total <= 0:
             return
         inner = self.rect().adjusted(1, 1, -1, -1)  # inside the styled border
-        if inner.height() <= _BAND_PX or inner.width() <= 0:
+        if inner.height() <= _SUBSTEP_BAR_PX or inner.width() <= 0:
             return  # too short to give any of itself away
         painter.save()
         rounded_inside = QPainterPath()
-        rounded_inside.addRoundedRect(QRectF(inner), _BAND_RADIUS, _BAND_RADIUS)
+        rounded_inside.addRoundedRect(QRectF(inner), _SUBSTEP_BAR_RADIUS, _SUBSTEP_BAR_RADIUS)
         painter.setClipPath(rounded_inside)
-        band = QRect(inner.x(), inner.bottomLeft().y() - _BAND_PX + 1,
-                     inner.width(), _BAND_PX)
-        painter.fillRect(band, _BAND_TROUGH)
-        filled = round(band.width() * min(done, total) / total)
+        substep = QRect(inner.x(), inner.bottomLeft().y() - _SUBSTEP_BAR_PX + 1,
+                        inner.width(), _SUBSTEP_BAR_PX)
+        painter.fillRect(substep, _SUBSTEP_BAR_TROUGH)
+        filled = round(substep.width() * min(done, total) / total)
         if filled > 0:
-            painter.fillRect(QRect(band.x(), band.y(), filled, band.height()),
-                             _BAND_FILL)
+            painter.fillRect(QRect(substep.x(), substep.y(), filled, substep.height()),
+                             _SUBSTEP_BAR_FILL)
         painter.restore()

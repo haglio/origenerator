@@ -146,7 +146,7 @@ def test_the_spoken_lock_and_unlock_each_leave_the_slide_the_way_they_name(
 
 
 def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
-    """The reset on the shared control band, spoken to a slideshow: the lock
+    """The reset on the shared button row, spoken to a slideshow: the lock
     releases and the top of the set comes back."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)

@@ -389,7 +389,7 @@ class GenerateConfigPanel(DropZones):
         """The pane leading the column: a running re-roll's frames (driven from
         outside), the browsed generation's output when one is loaded, and the
         newest matching result otherwise."""
-        self._preview = PreviewWidget(show_timeline=True)
+        self._preview = PreviewWidget(show_scrubber=True)
         # Its corners and its right-click go to the gallery, which owns the
         # favorite, the Trash and the enhance queue — the same route the browser
         # pane's thumbnails take, so an act means the same thing either side.

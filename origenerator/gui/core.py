@@ -353,8 +353,8 @@ class Core(QMainWindow):
     def _wear_the_session(self, session: FunTimeSession) -> None:
         # A managed window of the hosting session: frameless so the client
         # area IS the rect Fun Time named (the Random Favs Browser's), and
-        # in the topmost band where every managed window lives — Fun Time
-        # decides who within the band is in front.
+        # in the topmost layer where every managed window lives — Fun Time
+        # decides who within the layer is in front.
         self._dress_for_the_room(session)
         if session.in_a_headset:
             self._fill_the_frame_cap()

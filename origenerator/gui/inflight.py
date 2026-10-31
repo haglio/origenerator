@@ -185,8 +185,8 @@ class RunReading:
     status: str                              # JobState.RUNNING, QUEUED or SPEAKING
     frame: bytes | None = None               # latest live frame, if one has arrived
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps
-    # The pass running right now, on its own count, for the band along the foot
-    # of the bar. An enhancement is the run that most needs it: the upscale and
+    # The pass running right now, on its own count, for the substep progress bar
+    # along the foot of the bar. An enhancement is the run that most needs it: the upscale and
     # each detail fix is a pass of its own, and one bar between them can only
     # restart per fix.
     pass_progress: tuple[int, int] | None = None
@@ -209,7 +209,7 @@ class RunReading:
                                                             compact=compact)
 
     def bars(self) -> tuple:
-        """What the bar and its band show — nothing at all while the run is still
+        """What the overall and substep progress bars show — nothing at all while the run is still
         waiting, which has no progress to report and no time to count down."""
         return (self.progress, self.pass_progress) if self.rendering else (None, None)
 

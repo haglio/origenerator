@@ -29,7 +29,7 @@ _CURSOR = _at_full_strength(CURSOR)
 _FLOAT_OFF_EVERY_EDGE = BAR_INSET_Y
 
 
-class VideoTimeline(QWidget):
+class Scrubber(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._actions: list[dict] = []

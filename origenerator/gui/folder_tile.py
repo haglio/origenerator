@@ -48,8 +48,8 @@ class FolderTile(QFrame):
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # The same tile the generations beside it in the flow stand in, plus the
-        # breadcrumb line the Favorites collection's tiles carry.
-        self.setFixedSize(*tile_shape.folder_tile_size(breadcrumb=bool(context)))
+        # folder path line the Favorites collection's tiles carry.
+        self.setFixedSize(*tile_shape.folder_tile_size(folder_path=bool(context)))
         self.setStyleSheet(tile_shape.idle_css("folderTile"))
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(

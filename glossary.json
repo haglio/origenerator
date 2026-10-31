@@ -734,27 +734,41 @@
     },
     {
       "id": "progress_bar",
-      "thing": "the bar showing how far a run has got, with its words written across it",
+      "thing": "the bar showing how far a run has got, with its words written across it: the overall progress bar, which only ever advances",
       "screen": null,
-      "his_word": "progress bar (2026-09-06, 2026-10-17, 2026-10-22)",
+      "his_word": "progress bar (2026-09-06, 2026-10-17, 2026-10-22); overall progress bar, of the one showing the whole run (2026-10-30)",
       "code_today": [
-        "progress caption",
+        "progress bar",
         "bar"
       ],
       "code_word": "progress bar",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "progress caption"
+      ],
+      "keep": [
+        "_progress.caption()"
+      ]
     },
     {
-      "id": "pass_band",
-      "thing": "the thin colored line along the foot of a progress bar saying which pass a two-pass video is on",
+      "id": "substep_progress_bar",
+      "thing": "the thin line along the foot of a progress bar showing the pass under way, which starts over at each pass of a run of several",
       "screen": null,
-      "his_word": "'overall progress bar' and 'substep progress bar' (2026-10-30), the two bars of a broken-down progress bar; which is which is open",
+      "his_word": "substep progress bar (2026-10-30: the two bars of a broken-down progress bar are the overall progress bar and the substep progress bar, named by what each shows)",
       "code_today": [
+        "substep progress bar"
+      ],
+      "code_word": "substep progress bar",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words; the thin line counts the pass, so it is the substep one, and the big fill the overall one",
+      "retired": [
         "band"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "keep": [
+        "fold its band away",
+        "Model + LoRA bands"
+      ]
     },
     {
       "id": "gutter",
@@ -774,12 +788,20 @@
       "screen": null,
       "his_word": "scrubber (2026-10-08, 2026-10-17); 'play cursor' (2026-09-27)",
       "code_today": [
-        "video timeline",
-        "timeline"
+        "scrubber"
       ],
       "code_word": "scrubber",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "video timeline",
+        "timeline"
+      ],
+      "keep": [
+        "funestra.timeline",
+        "TIMELINE_HEIGHT",
+        "timeline_h"
+      ]
     },
     {
       "id": "folder_path",
@@ -787,13 +809,16 @@
       "screen": null,
       "his_word": "folder path (2026-10-10)",
       "code_today": [
-        "folder path header",
-        "breadcrumb",
+        "folder path",
         "header"
       ],
       "code_word": "folder path",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "folder path header",
+        "breadcrumb"
+      ]
     },
     {
       "id": "toolbar",

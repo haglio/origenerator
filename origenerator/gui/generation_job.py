@@ -217,7 +217,7 @@ class GenerationJob(QObject):
         """The sampler pass running right now, on its own count — or ``None``
         for a single-pass run, which has nothing the whole-run reading doesn't.
 
-        What a bar draws in the band along its foot, so a job made of several
+        What a bar draws in the substep progress bar along its foot, so a job made of several
         passes shows how far through *this* fix it is without the reading above
         it having to restart per fix."""
         return self._last_pass_progress
@@ -296,7 +296,7 @@ class GenerationJob(QObject):
             # what it is doing from its first repaint rather than staying mute
             # until ComfyUI's next push.
             self._note_stage(tracker.get("node") or "")
-            # The band along the bar's foot comes back with the ramp, so a
+            # The substep progress bar along the foot comes back with the ramp, so a
             # reconnected multi-pass job shows which pass it is in rather than a
             # whole bar until its next tick.
             self._last_pass_progress = self._progress_tracker.current_pass()

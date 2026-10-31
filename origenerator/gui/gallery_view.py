@@ -95,7 +95,7 @@ from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS, EnhanceController, Offer
 from origenerator.gui.folder_modify_tile import FolderModifyTile
-from origenerator.gui.folder_path_header import FolderPathHeader
+from origenerator.gui.folder_path import FolderPath
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.folder_tree import offer_collapse_and_expand
 from origenerator.gui.gallery_navigation import NavigationController
@@ -199,7 +199,7 @@ _SEARCH_MIN_CHARS = 3
 
 
 class _SearchScope(NamedTuple):
-    """What a search covers: the selected row's breadcrumb and the generations it
+    """What a search covers: the selected row's folder path and the generations it
     holds (``None`` for no restriction at all).
 
     The path rather than the folder's own name, everywhere it is said: a folder
@@ -513,7 +513,7 @@ class GalleryView(QWidget):
         self._pending_combine_key: str | None = None
         # The user's own folders, resolved against the live tree on each rebuild,
         # and the throwaway one a multi-selection stands up (None with 0 or 1 row
-        # picked). Both are CustomGroups, so the pane, breadcrumb, and slideshow
+        # picked). Both are CustomGroups, so the pane, folder path, and slideshow
         # treat them exactly as they treat a derived folder.
         self._custom_folders: list = []
         self._custom_folders_by_side: dict[str, list] = {}
@@ -776,7 +776,7 @@ class GalleryView(QWidget):
         standing at its foot, under a handle of their own.
         """
         browser, browser_column = pane()
-        self._folder_path = FolderPathHeader()
+        self._folder_path = FolderPath()
         self._folder_path.folder_chosen.connect(self._go_to_folder)
         browser_column.addWidget(self._folder_path)
         # The button bank over this pane (:mod:`origenerator.gui.toolbar_bank`).
@@ -1895,7 +1895,7 @@ class GalleryView(QWidget):
         try. The All row is what covers the library entire, since every other
         folder narrows the answer before the query does.
 
-        ``path`` is the row's breadcrumb — what the field, the header and the
+        ``path`` is the row's folder path — what the field, the header and the
         empty-result message all name the scope by.
         """
         item = self._tree.currentItem()
@@ -2310,13 +2310,13 @@ class GalleryView(QWidget):
         return self._tree_view.collection_item(collection_key, side or self.side_in_view())
 
     def _folder_context(self, key: str) -> str:
-        """Where folder ``key`` lives: the breadcrumb of its parent, or "" at the
+        """Where folder ``key`` lives: the folder path of its parent, or "" at the
         top of the tree. The caption a tile drawn far from the tree wears
         (see :class:`~origenerator.gui.browser_pane.TreeNavigation`)."""
         item = self._tree_item_for(key)
         if item is None or item.parent() is None:
             return ""
-        return self._tree_view.breadcrumb(item.parent())
+        return self._tree_view.folder_path(item.parent())
 
     def current_group(self):
         """The folder on screen, or ``None`` (a collection, a search, or an empty
@@ -2748,7 +2748,7 @@ class GalleryView(QWidget):
         if self._showing_search():
             return "these results"
         if self._current_collection_key() is not None:
-            return self._tree_view.breadcrumb(self._tree.currentItem())
+            return self._tree_view.folder_path(self._tree.currentItem())
         return "this folder"
 
     # --- standalone enhance: the bank button, the selection action, the queue ---

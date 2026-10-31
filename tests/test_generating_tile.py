@@ -170,7 +170,7 @@ def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
 
 
 def test_the_bar_says_which_pass_is_being_taken(qtbot):
-    # A video run is three passes, and the band along the bar's foot restarts
+    # A video run is three passes, and the substep progress bar along the foot restarts
     # once per pass. Named, the caption says which of them is being done — the
     # one thing a twelve-minute run can report while the countdown is still too
     # early to mean anything.

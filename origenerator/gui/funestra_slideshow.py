@@ -311,7 +311,7 @@ class FunestraSlideshow(QObject):
     @property
     def has_other_versions(self) -> bool:
         """Whether the item on screen was filed more than once — what draws
-        the band's versions button live rather than faded."""
+        the HUD's versions button live rather than faded."""
         return len(self._levels.levels(base=self._current_base())) > 1
 
     def slideshow_step_version(self, delta: int) -> None:

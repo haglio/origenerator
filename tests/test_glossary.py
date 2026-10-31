@@ -27,7 +27,7 @@ SCREEN_NOUNS = frozenset((
     "panel", "console", "band", "toast", "banner", "gutter", "shelf", "tray", "drawer",
     "dial", "pill", "ribbon", "dock", "sidebar", "swatch", "plaque", "placard", "sticker",
     "lozenge", "bubble", "veil", "backdrop", "halo", "glow", "sheet", "deck", "hud", "map",
-    "bank", "toolbar", "collage", "breadcrumb", "splash", "notice", "recents", "bookmark",
+    "bank", "toolbar", "collage", "folder path", "splash", "notice", "recents", "bookmark",
 ))
 
 _IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_]*")

@@ -821,7 +821,7 @@ class _FakeRerollJob:
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
-        self.last_pass_progress = pass_progress  # the pass in hand, for the bar's band
+        self.last_pass_progress = pass_progress  # the pass in hand, for the substep progress bar
         self.last_stage = stage                  # and what the caption calls it
         self.foreign_ahead = foreign_ahead  # another app's jobs ahead of it, if any
         self.started_at = started_at        # when ComfyUI began it; None while queued

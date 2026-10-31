@@ -5,14 +5,14 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.colors import BG_PRIMARY, BLUE, BLUE_LIGHT
 
-from origenerator.gui import progress_caption
-from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui import progress_bar
+from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.stylesheet import build_stylesheet
 
 
 @pytest.fixture
 def bar(qtbot):
-    b = ProgressCaption()
+    b = ProgressBar()
     qtbot.addWidget(b)
     b.resize(220, 22)
     return b
@@ -25,7 +25,7 @@ def styled_bar(qtbot):
     host = QWidget()
     host.setStyleSheet(build_stylesheet())
     layout = QVBoxLayout(host)
-    b = ProgressCaption()
+    b = ProgressBar()
     b.setFixedHeight(22)
     layout.addWidget(b)
     qtbot.addWidget(host)
@@ -68,7 +68,7 @@ def test_a_caption_too_long_for_the_bar_scrolls_past_instead_of_being_cut(qtbot)
     # It used to elide, which on these lines means losing whichever readings the
     # bar has no room for — the stage on a wide bar, the countdown on a tile.
     # Slid past, all of it is read in turn.
-    narrow = ProgressCaption()
+    narrow = ProgressBar()
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
@@ -80,7 +80,7 @@ def test_a_caption_too_long_for_the_bar_scrolls_past_instead_of_being_cut(qtbot)
 
 def test_a_caption_that_fits_does_not_move(qtbot):
     # A line crawling across a bar it already fits in reads as a fault.
-    wide = ProgressCaption()
+    wide = ProgressBar()
     qtbot.addWidget(wide)
     wide.resize(400, 22)
     wide.show_progress("50%", (10, 20))
@@ -92,13 +92,13 @@ def test_a_caption_that_fits_does_not_move(qtbot):
 def test_the_scroll_holds_at_the_top_of_a_lap_then_sets_off(qtbot):
     # The line leads with the stage the run is at, so a scroll that swept
     # straight past would show that word only in motion.
-    narrow = ProgressCaption()
+    narrow = ProgressBar()
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show()
     narrow.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
 
-    for _ in range(progress_caption._HOLD_TICKS):
+    for _ in range(progress_bar._HOLD_TICKS):
         narrow._advance()
     assert narrow.scrolled() == 0        # still held at the start of the line
 
@@ -109,12 +109,12 @@ def test_the_scroll_holds_at_the_top_of_a_lap_then_sets_off(qtbot):
 def test_the_scroll_carries_on_when_only_the_clock_in_it_changed(qtbot):
     # The elapsed count ticks every second, so a scroll that started over on
     # every caption would never leave the first few words.
-    narrow = ProgressCaption()
+    narrow = ProgressBar()
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show()
     narrow.show_progress("First pass · 40% · 12:30 elapsed · ~16:02 left", (10, 20))
-    for _ in range(progress_caption._HOLD_TICKS + 5):
+    for _ in range(progress_bar._HOLD_TICKS + 5):
         narrow._advance()
     travelled = narrow.scrolled()
 
@@ -126,7 +126,7 @@ def test_the_scroll_carries_on_when_only_the_clock_in_it_changed(qtbot):
 def test_a_bar_nobody_can_see_stops_scrolling(qtbot):
     # One of these per queue row, per collection tile and per tile: a repaint every
     # tick for bars that are not on screen is a cost with nothing bought by it.
-    narrow = ProgressCaption()
+    narrow = ProgressBar()
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show()
@@ -148,7 +148,7 @@ def test_the_fill_is_the_flat_blue_behind_the_writing(styled_bar):
 
 
 def _foot(bar) -> int:
-    """A row inside the band along the bar's foot, clear of the caption."""
+    """A row inside the substep progress bar along the foot, clear of the caption."""
     return bar.height() - 4
 
 
@@ -170,12 +170,12 @@ def test_the_band_fills_with_the_pass_it_measures(styled_bar):
 
     assert image.pixelColor(8, foot) == BLUE_LIGHT
     # Its own count, not the bar's: nearly through this fix, and the far end of
-    # the band is the little that is left of it.
+    # the substep progress bar is the little that is left of it.
     assert image.pixelColor(styled_bar.width() - 9, foot) == BG_PRIMARY
 
 
 def test_a_single_pass_run_keeps_the_whole_bar(styled_bar):
-    # Nothing to split: a band tracking the same steps as the fill above it
+    # Nothing to split: a substep progress bar tracking the same steps as the fill above it
     # would spend a sixth of the bar's height saying it twice.
     styled_bar.show_progress("50%", (1, 1))
     image = styled_bar.grab().toImage()
@@ -185,34 +185,34 @@ def test_a_single_pass_run_keeps_the_whole_bar(styled_bar):
 
 
 def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
-    # The band lies along the foot of the bar, which is where a line of text
+    # The substep progress bar lies along the foot of the bar, which is where a line of text
     # keeps the lower third of its letters. Painted last it strikes them out —
     # which is what it did, until the caption was moved to the top layer.
     #
     # Offscreen has no real fonts, so the glyphs come out as squares; the point
-    # size is raised until a square reaches into the band, which is what a
+    # size is raised until a square reaches into the substep progress bar, which is what a
     # descender does at the app's own size on a real display. Only the middle of
-    # the band is read: the rounded ends carry border pixels of their own, which
-    # would answer "something other than the band is here" whatever happened to
+    # the substep progress bar is read: the rounded ends carry border pixels of their own, which
+    # would answer "something other than the substep progress bar is here" whatever happened to
     # the caption.
     font = QFont(styled_bar.font())
     font.setPointSize(16)
     styled_bar.setFont(font)
     styled_bar.setFixedHeight(26)  # the height every surface gives one of these
     styled_bar.parent().layout().activate()
-    styled_bar.show_progress("50%", (30, 60), (20, 20))  # band filled end to end
+    styled_bar.show_progress("50%", (30, 60), (20, 20))  # substep progress bar filled end to end
     image = styled_bar.grab().toImage()
 
-    band = range(styled_bar.height() - 7, styled_bar.height() - 1)
+    substep = range(styled_bar.height() - 7, styled_bar.height() - 1)
     middle = range(styled_bar.width() // 3, styled_bar.width() * 2 // 3)
-    written = [(x, y) for y in band for x in middle
+    written = [(x, y) for y in substep for x in middle
                if image.pixelColor(x, y) not in (BLUE_LIGHT, BG_PRIMARY)]
     assert written
 
 
 def test_a_sweeping_bar_grows_no_band(styled_bar):
     # A job ComfyUI hasn't started has no run to measure, so there is nothing
-    # for a band under it to be a part of.
+    # for a substep progress bar under it to be a part of.
     styled_bar.show_progress("Waiting on 2 jobs from another app", None, (3, 20))
     image = styled_bar.grab().toImage()
 

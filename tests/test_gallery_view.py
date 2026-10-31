@@ -872,7 +872,7 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
-    # The Favorites collection sits just below Recents, above the media folders.
+    # The Favorites collection sits just below Latest, above the media folders.
     assert list(_alls(view._tree))[:2] == ["Latest", "Favorites"]
     # Selecting it lists a tile for each favorited folder, wherever it lives.
     collection = _alls(view._tree)["Favorites"]
@@ -939,7 +939,7 @@ def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
 
 def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
     # An experiment has a folder like anything else, so the collection's double-click
-    # is the same jump Recents and Favorites make — no verdict needed first.
+    # is the same jump Latest and Favorites make — no verdict needed first.
     experiment = _experiment_row("e1", steps=30)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
@@ -1217,13 +1217,13 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
         f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
 
-def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
+def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]  # newest first
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Recents leads its side, above Favorites and the media folders.
+    # Latest leads its side, above Favorites and the media folders.
     assert list(_alls(view._tree))[0] == "Latest"
     # Selecting it lists every recently generated item, newest first — not folders.
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1231,7 +1231,7 @@ def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
     assert view._browser._listed_folders == []
 
 
-def test_recents_collection_lists_imported_files_too(qtbot):
+def test_latest_collection_lists_imported_files_too(qtbot):
     # A file ComfyUI wrote on its own arrives at the launch that finds it, and
     # Latest is where it is looked for then -- it used to sit in its workflow's
     # folder alone, with nothing to say why it was not the newest thing here.
@@ -1256,7 +1256,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     # Its details fill the info pane, but the collection stays put — no navigation, so
     # every recent item is still listed.
     assert view.selected_generation() == "i2"
-    assert view._browser.showing_recents()
+    assert view._browser.showing_latest()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
 
 
@@ -1270,7 +1270,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     # Double-clicking a recent tile is the whole jump — no button stands in for it.
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
-    assert view._browser.showing_recents() is False             # out of the collection...
+    assert view._browser.showing_latest() is False             # out of the collection...
     assert set(view.listed_prompt_ids()) == {"i2"}     # ...into the dog's own folder
     # The item lands selected — its tile picked and highlighted, not merely
     # previewed — as if we'd navigated in and clicked it.
@@ -1294,7 +1294,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     assert view._info_tabs._preview_panel is None
 
 
-def test_recents_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
+def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     pending = _row("wip", "sdxl_t2i", {"seed": 9}, "wip.png", status="running", output_files=None)
     view = GalleryView(FakeDB([pending]))
     qtbot.addWidget(view)
@@ -1304,7 +1304,7 @@ def test_recents_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     assert view.listed_prompt_ids() == []  # nothing to show: just the hint
 
 
-def test_recents_collection_stays_selected_across_a_refresh(qtbot):
+def test_latest_collection_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1315,15 +1315,15 @@ def test_recents_collection_stays_selected_across_a_refresh(qtbot):
     assert view._tree.currentItem().text(0) == "Latest"
 
 
-def _many_recents(count):
+def _many_latest(count):
     """``count`` generated images, newest first, so the collection runs past one page."""
     return [_image(f"i{n}", "a cat", 50, n) for n in reversed(range(count))]
 
 
-def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
+def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
     # The collection lists every generation ever made, so it draws a page of tiles at a
     # time rather than all 120 at once.
-    view = GalleryView(FakeDB(_many_recents(120)))
+    view = GalleryView(FakeDB(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1339,8 +1339,8 @@ def _scroll_to_the_end(view):
     bar.setValue(bar.maximum())
 
 
-def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
-    view = GalleryView(FakeDB(_many_recents(120)))
+def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
+    view = GalleryView(FakeDB(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = len(_drawn(view))
@@ -1354,11 +1354,11 @@ def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
     assert _drawn(view) == [f"i{n}" for n in reversed(range(120))]
 
 
-def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
+def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
     # A generation landing rebuilds the gallery under the open collection. That must not
     # collapse it back to one page and throw away everything the user scrolled
     # down through — the new item just joins the top of what's already drawn.
-    db = FakeDB(_many_recents(120))
+    db = FakeDB(_many_latest(120))
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1373,7 +1373,7 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
 
 def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB(_many_recents(120)))
+    view = GalleryView(FakeDB(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1431,7 +1431,7 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 def test_another_latest_opens_on_its_first_page(qtbot):
     # Another Latest is a new listing, not a redraw of the one on screen, so it
     # starts at its newest item instead of holding the pages already scrolled.
-    view = GalleryView(FakeDB(_many_recents(120)))
+    view = GalleryView(FakeDB(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = _drawn(view)
@@ -1457,7 +1457,7 @@ def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
     assert "rr1" not in view._browser._inflight_cards
 
 
-def test_a_new_generation_appears_at_the_top_of_recents(qtbot):
+def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
     db = FakeDB([_image("old", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -2139,7 +2139,7 @@ def test_history_spans_folder_navigation(qtbot):
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
 
-def test_back_returns_to_the_recents_collection_then_forward_reopens_the_folder(qtbot):
+def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2147,19 +2147,19 @@ def test_back_returns_to_the_recents_collection_then_forward_reopens_the_folder(
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
-    assert view._browser.showing_recents() is False
+    assert view._browser.showing_latest() is False
     assert view._bank.back.isEnabled()                    # the collection is somewhere to go back to
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # Back returns to the Recents collection
+    assert view._browser.showing_latest()                       # Back returns to the Latest collection
 
     view._navigation.go_forward()
-    assert view._browser.showing_recents() is False              # Forward re-opens the folder
+    assert view._browser.showing_latest() is False              # Forward re-opens the folder
     assert view.selected_generation() == "i2"
 
 
 def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
-    # The reported bug: a folder was no history stop at all, so leaving Recents by
+    # The reported bug: a folder was no history stop at all, so leaving Latest by
     # clicking one in the tree recorded nothing and Back had nowhere to go from —
     # the collection was on the stack, but the cursor was still sitting on it.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
@@ -2171,12 +2171,12 @@ def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
     view._tree.setCurrentItem(
         _at(_image_workflow(view._tree), 0, 0, 0)
     )
-    assert view._browser.showing_recents() is False
+    assert view._browser.showing_latest() is False
     assert view._bank.back.isEnabled()
 
     view._navigation.go_back()
 
-    assert view._browser.showing_recents()
+    assert view._browser.showing_latest()
 
 
 def test_back_walks_folders_the_way_it_walks_generations(qtbot):
@@ -2234,7 +2234,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
     assert view._tree.currentItem() is _collection(view, FAVORITES_KEY)  # Back returns to Favorites
 
 
-def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
+def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2242,10 +2242,10 @@ def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i2")         # select i2 in the collection
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
-    assert view._browser.showing_recents() is False
+    assert view._browser.showing_latest() is False
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # back in the collection...
+    assert view._browser.showing_latest()                       # back in the collection...
     assert view.selected_generation() == "i2"            # ...with i2 previewed again
     assert view._browser._thumb_widgets["i2"]._selected       # and its tile re-highlighted
 
@@ -2263,7 +2263,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
         _click_tile(view, pid)       # browse a few previews
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # still in the collection...
+    assert view._browser.showing_latest()                       # still in the collection...
     assert view.selected_generation() == "i2"            # ...on the one before
 
     view._navigation.go_back()
@@ -2355,7 +2355,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
 
     view._navigation.go_back()
 
-    assert view._browser.showing_recents()
+    assert view._browser.showing_latest()
     assert view.selected_generation() == "i1"
 
 

@@ -1,6 +1,6 @@
-"""A small corner badge marking a Recents tile as an image or a video.
+"""A small corner badge marking a Latest tile as an image or a video.
 
-The gallery's Recents collection mixes images and videos in one flow, so each tile
+The gallery's Latest collection mixes images and videos in one flow, so each tile
 wears a translucent chip in its top-left corner — a play triangle for a video, a
 framed photo for an image — to tell them apart at a glance. Elsewhere (inside a
 single Images or Videos folder) the type is unambiguous, so no badge is drawn.
@@ -27,7 +27,7 @@ _INSET = MARGIN_STANDARD  # px from the tile's top-left corner, so the badge sit
 
 
 class MediaBadge(QLabel):
-    """A play/photo chip overlaid on the top-left corner of a Recents tile."""
+    """A play/photo chip overlaid on the top-left corner of a Latest tile."""
 
     def __init__(self, media_type: str, tile: QWidget):
         super().__init__(tile)

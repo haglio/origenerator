@@ -24,7 +24,7 @@ from origenerator import (
 )
 from origenerator.gallery.collection import (
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.sides import LANDSCAPE, SIDE_LABELS
@@ -273,7 +273,7 @@ def test_the_field_says_what_it_would_search(qtbot):
     assert leaf.text(0) in placeholder      # right down to the folder itself
     assert videos.text(0) in placeholder    # and every branch above it
 
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert view._search.field.placeholderText() == "Search Landscape  ›  All  ›  Latest…"
 
 

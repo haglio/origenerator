@@ -32,8 +32,8 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_LABEL,
     FAVORITES_KEY,
     FAVORITES_LABEL,
-    RECENTS_KEY,
-    RECENTS_LABEL,
+    LATEST_KEY,
+    LATEST_LABEL,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -54,7 +54,7 @@ SIDES = (PORTRAIT, LANDSCAPE)
 # The collections, addressed by the names they wear in the tree, so a rename
 # carries into the vocabulary rather than leaving it saying the old word.
 COLLECTION_KEYS: dict[str, str] = {
-    RECENTS_LABEL.lower(): RECENTS_KEY,
+    LATEST_LABEL.lower(): LATEST_KEY,
     FAVORITES_LABEL.lower(): FAVORITES_KEY,
     EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
     TRASH_LABEL.lower(): TRASH_KEY,

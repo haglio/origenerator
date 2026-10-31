@@ -2,7 +2,7 @@
 
 Every slideshow wears the Funestras' own HUD: the set and its map
 (:mod:`origenerator.gui.hud_nav_map`), the device where this app's window drives
-one (:class:`~origenerator.gui.console.SlideshowDevice`), and at its foot the
+one (:class:`~origenerator.gui.osr2_controls_state.Osr2ControlsState`), and at its foot the
 Job Queue (:mod:`origenerator.gui.hud_queue`).  A slideshow on a session's
 Funestra publishes the model for the session to draw; a slideshow on this app's own
 Funestra hands it over in process, and the Funestra draws it.
@@ -47,7 +47,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
     (:func:`~origenerator.slideshow_buttons.slideshow_rows`) and what reset goes back to;
     both default to what a region slideshow wants.  *foot* is the Job Queue
     (:mod:`origenerator.gui.hud_queue`) and *device* what this window is doing
-    to the OSR2 (:class:`~origenerator.gui.console.SlideshowDevice`) -- each None
+    to the OSR2 (:class:`~origenerator.gui.osr2_controls_state.Osr2ControlsState`) -- each None
     where there is none, which is what a slideshow on a session's Funestra answers.
     """
     shown = slideshow.hud_map()

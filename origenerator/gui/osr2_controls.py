@@ -1,13 +1,13 @@
-"""The OSR2's section of Genau's console, at the top left of Core.
+"""The OSR2 controls, at the top left of Core.
 
 Nothing on it is drawn here. :class:`funestra.console_hud.ConsolePainter`
 paints it, and this widget renders that into a bitmap and blits it: the
 hands-free row, the OSR2 line and the drive readout under them, all the code
 Fun Time runs.  What goes on it and what a press takes off it are
-:mod:`origenerator.gui.console`'s, which a slideshow's own panel asks the same
+:mod:`origenerator.gui.osr2_controls_state`'s, which a slideshow's own HUD asks the same
 questions of.
 
-The on/off switch IS on it: the console's OSR2 switch -- on driving, off
+The on/off switch IS on it: the OSR2 controls' switch -- on driving, off
 parked -- is the app's one, and the Gallery pane buttons' separate one is gone.
 
 This is the surface with no slideshow under it.  A slideshow does not float one of these:
@@ -26,18 +26,18 @@ from PyQt6.QtCore import QTimer
 from shared_ui.pressable_drawing import PressableDrawing
 
 from origenerator import osr2
-from origenerator.gui.console import (
+from origenerator.gui.osr2_controls_state import (
     REPAINT_MS,
-    console_hud,
-    panel_room,
+    osr2_controls_hud,
+    osr2_controls_room,
     post_device_action,
 )
 
 DEVICE_WATCH_MS = 1000
 
 
-class MotionPanel(PressableDrawing):
-    """The console, floated over whichever surface hosts it.
+class Osr2Controls(PressableDrawing):
+    """The OSR2 controls, floated over whichever surface hosts them.
 
     It is always here, motion or no motion. With nothing driving, its readout
     grays and its trace holds still rather than animating a wave nobody is
@@ -64,9 +64,9 @@ class MotionPanel(PressableDrawing):
         self._ask_device = device
         self._ask_trouble = trouble
         self._drawn_device = None
-        self.setFixedSize(*panel_room(motion))
+        self.setFixedSize(*osr2_controls_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
-        # moving — and only while it is. A still console redrawn ten times a
+        # moving — and only while it is. Still OSR2 controls redrawn ten times a
         # second is the same drawing at Pillow's price, and with the panel now
         # always up that price would be paid for the whole session.
         self._repaint = QTimer(self)
@@ -126,11 +126,11 @@ class MotionPanel(PressableDrawing):
 
     def _post(self, action: str) -> None:
         """Do here what Fun Time would route to whichever Funestra owns it —
-        through the one router both of this app's consoles press into."""
+        through the one router both of this app's OSR2 controls press into."""
         post_device_action(action, motion=self._motion, control=self._control)
         self.update()
 
-    # --- painting: the console's own painter, blitted ----------------------
+    # --- painting: the Funestras' console's own painter, blitted ----------------------
 
     def _script(self):
         """The app's funscript driver, when the switch handed one over."""
@@ -144,12 +144,12 @@ class MotionPanel(PressableDrawing):
                 else self._control.state())
 
     def drawing(self) -> tuple[bytes, tuple[int, int]]:
-        """The console drawn — the drawing, before it is a widget. Returned
+        """The OSR2 controls drawn — the drawing, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         self._drawn_device = self._device()
         device, trouble, broker_running = self._drawn_device
-        return self._painter.rgba(console_hud(
+        return self._painter.rgba(osr2_controls_hud(
             self._motion, device=device, trouble=trouble,
             control=self._osr2_control(), script=self._script(), broker_running=broker_running))
 

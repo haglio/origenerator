@@ -9,7 +9,7 @@ from funestra import drive_layout
 from funestra.console import OSR2_CONTROL_BUTTONS
 from funestra.drive_readout import CONTROL_TIPS, track_command
 
-from origenerator.console_commands import (
+from origenerator.osr2_controls_commands import (
     ROBOT_HAND,
     level_asked_for,
     max_intensity_asked_for,

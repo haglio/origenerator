@@ -813,7 +813,7 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
 def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
     """Half the column is configurations and half is acts, and the two are
     pressed differently — so the map says which a row is rather than leaving it
-    to be guessed from the words in its gutter."""
+    to be guessed from the words in its margin."""
     a_configuration = Slide("one-x.png", "image", "id-1x")
     an_act = Slide("one-y.png", "image", "id-1y")
     both = lambda pid: NavMapNeighbors(  # noqa: E731

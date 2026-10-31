@@ -833,16 +833,19 @@
       ]
     },
     {
-      "id": "gutter",
+      "id": "margin",
       "thing": "a margin something floats in: left of the Size fields, where the swap-width-and-height button sits; left of the nav map, where a row's name sits",
       "screen": null,
       "his_word": "margins (2026-10-30)",
       "code_today": [
-        "gutter"
+        "margin"
       ],
       "code_word": "margin",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "gutter"
+      ]
     },
     {
       "id": "scrubber",

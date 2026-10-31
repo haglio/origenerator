@@ -625,7 +625,7 @@ class ParamForm(QWidget):
     def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
 
-        It floats in a gutter opened to the left of the two labels, midway between
+        It floats in a margin opened to the left of the two labels, midway between
         their rows, so it reads as linking the pair rather than trailing either
         field. As a free child of the Dimensions section's content (not a form
         cell) it folds away with the section and needs manual placement — see
@@ -646,10 +646,10 @@ class ParamForm(QWidget):
         content.installEventFilter(self)
 
     def _center_between_dimension_rows(self, btn, top_row, lower_row):
-        """Center ``btn`` between the width and height rows, inside a left gutter
+        """Center ``btn`` between the width and height rows, inside a left margin
         reserved for it so it sits clear of the "Width"/"Height" labels.
 
-        The gutter is the section's left margin, sized to the button here (its
+        The margin is the section's left margin, sized to the button here (its
         final width isn't known until its font and stylesheet apply, after
         construction). Squeezing the button into whatever space the labels
         happened to leave is what put it on top of the words. In the Dimensions
@@ -664,16 +664,16 @@ class ParamForm(QWidget):
         if self._sections["Size"].is_collapsed():
             return
         btn.adjustSize()
-        gutter = btn.width() + 10  # room for the button plus a gap to the labels
+        margin = btn.width() + 10  # room for the button plus a gap to the labels
         form = self._sections["Size"].content_form()
-        if form.contentsMargins().left() != gutter:
-            # Push the labels over to open the gutter; the relayout re-invokes us
+        if form.contentsMargins().left() != margin:
+            # Push the labels over to open the margin; the relayout re-invokes us
             # with the rows in their new positions.
-            form.setContentsMargins(gutter, GAP_SMALL, 0, GAP_SMALL)
+            form.setContentsMargins(margin, GAP_SMALL, 0, GAP_SMALL)
             return
         top, lower = top_row.geometry(), lower_row.geometry()
         y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
-        btn.move(max(0, (gutter - btn.width()) // 2), y)
+        btn.move(max(0, (margin - btn.width()) // 2), y)
         btn.raise_()
 
     def _position_swap_button(self):
@@ -722,7 +722,7 @@ class ParamForm(QWidget):
         section that reads as plain values while locked (like the read-only
         passthrough rows — "864", not an input field) and turns into editable
         spinners when unlocked. A floating padlock toggle, centered between the
-        two rows in a reserved left gutter so it clears the labels, does the
+        two rows in a reserved left margin so it clears the labels, does the
         unlocking. A no-op for a workflow that sets its size by hand (its own
         width/height params already fill this section) or has none.
         """

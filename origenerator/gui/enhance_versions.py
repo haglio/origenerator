@@ -535,7 +535,7 @@ class EnhanceVersions(QWidget):
         running, and no row to press.
         """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
-        # related-media strips use, so no row outlives the levels it described.
+        # related-media rows use, so no row outlives the levels it described.
         form = self._section.content_form()
         form.removeRow(self._host)
         self._host = QWidget()

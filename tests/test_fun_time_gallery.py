@@ -1238,8 +1238,8 @@ def _moving_thumbnails(view):
 
 def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
     """Swept rather than listed: after the freeze, no movie under this window is
-    running — the grid tiles, the collections, a tab's history strip, the "Animated
-    in" strip, the Generate pane's own animated still.
+    running — the grid tiles, the collections, a tab's version list, the
+    Animations, the Generate pane's own animated still.
 
     Written this way because the listed version was wrong three times over: the
     tiles were wired to OmniPause and the other three kinds of looping preview

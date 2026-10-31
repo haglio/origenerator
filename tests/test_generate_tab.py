@@ -50,7 +50,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_tab as generate_tab_module
-from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.animations import _VideoTile
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
@@ -474,7 +474,7 @@ def test_info_and_form_share_one_scroll(tab):
     # together — not the form walled into its own cramped scroll while the info sits in
     # a separate static footer.
     for widget in (tab._metadata_block, tab._related._source_tile,
-                   tab._related._animated_strip, tab._param_form):
+                   tab._related._animations, tab._param_form):
         assert _is_descendant(widget, tab._scroll)
 
 
@@ -1620,7 +1620,7 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert tab._displayed_row is None
     assert tab._metadata_block.isHidden()
     assert tab._versions.isHidden()
-    assert tab._related._animated_strip.isHidden()
+    assert tab._related._animations.isHidden()
     assert tab._related._source_tile.isHidden()
     assert tab._lane_button.isHidden()
 
@@ -2110,8 +2110,8 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
 
     tab.show_saved_generation(image, image_rows)
 
-    assert not tab._related._animated_strip.isHidden()
-    assert len(tab._related._animated_strip.findChildren(_VideoTile)) == 1
+    assert not tab._related._animations.isHidden()
+    assert len(tab._related._animations.findChildren(_VideoTile)) == 1
     assert tab._related._source_tile.isHidden()   # an image has no source-image tile
     assert tab._lane_button.isHidden()   # Evolver is for videos
     assert tab._displayed_row is image
@@ -2126,7 +2126,7 @@ def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypa
     got = []
     tab.link_clicked.connect(got.append)
 
-    tab._related._animated_strip.video_activated.emit("vid1")
+    tab._related._animations.video_activated.emit("vid1")
 
     assert got == ["vid1"]
 
@@ -2145,7 +2145,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     assert not tab._related._source_tile.isHidden()   # its start frame is a known generation
     assert tab._related._source_tile._prompt_id == "img1"   # the tile points at that image
     assert tab._related._source_tile._name.text() == name   # called by its name, not its file
-    assert tab._related._animated_strip.isHidden()    # a video isn't animated into anything
+    assert tab._related._animations.isHidden()    # a video isn't animated into anything
 
 
 def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, monkeypatch,

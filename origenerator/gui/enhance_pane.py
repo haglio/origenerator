@@ -14,7 +14,7 @@ and the settings persist with the rest of the session state. Auto-enhance is a
 bare switch on the title row rather than a labeled checkbox among the settings: it
 is the pane's power, not one of its settings.
 
-An enhancement level dragged in from the Generate pane's version strip is absorbed:
+An enhancement level dragged in from the Generate pane's version list is absorbed:
 the settings that made that version become the ones on the pane, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 

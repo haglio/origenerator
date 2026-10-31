@@ -1,7 +1,7 @@
 """Each table's queries, reached without the other five.
 
 `Database` was one 626-line class over six unrelated tables, so a unit that
-touches one of them — recovery reads only `deletions`, reconcile only
+touches one of them — trash_collection reads only `deletions`, reconcile only
 `folder_meta` and `custom_folder_items` — had to be handed the whole surface,
 and could be given no narrow fake. The queries live one table to a module now, and these are the tests
 that a store is a whole object on its own, and that the facade over them is
@@ -26,19 +26,19 @@ from origenerator.db import Database
 from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_custom_folders import CustomFolderStore
-from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_item_numbers import ItemNumberStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_schema import GENERATION_COLUMNS
 from origenerator.db_seed_uses import SeedUseStore
+from origenerator.db_trash import TrashStore
 
 # The attribute each store hangs off `Database` under, and a read that proves it
 # is talking to its own table.
 STORES = {
     "generations": (GenerationStore, lambda s: s.list_generations()),
-    "deletions": (DeletionStore, lambda s: s.list_deletions()),
+    "deletions": (TrashStore, lambda s: s.list_trashed()),
     "requests": (RequestStore, lambda s: s.list_requests()),
     "folder_meta": (FolderMetaStore, lambda s: s.folder_meta_full()),
     "custom_folders": (CustomFolderStore, lambda s: s.list_custom_folders()),
@@ -100,25 +100,25 @@ def test_every_store_is_one(file):
                     if isinstance(value, (Store, Database, sqlite3.Connection))], attribute
 
 
-class TestDeletionStore:
-    """recovery.py and gallery_actions.py are its only readers, and neither has
+class TestTrashStore:
+    """trash_collection.py and gallery_actions.py are its only readers, and neither has
     any business with `generations` or the custom folders."""
 
     def test_what_it_records_it_can_read_back(self, file):
         row = {"prompt_id": "gen-alpha", "workflow_name": "sdxl_t2i",
                "output_files": "alpha_00001_.png"}
-        deletions = DeletionStore(file)
+        trash = TrashStore(file)
 
-        deletions.record_deletion("gen-alpha", row, {"trash": "batch-one"})
+        trash.record_trashed("gen-alpha", row, {"trash": "batch-one"})
 
-        assert deletions.get_deletion("gen-alpha")["row"] == row
+        assert trash.get_trashed("gen-alpha")["row"] == row
 
     def test_the_facade_and_the_store_are_looking_at_the_same_rows(self, file):
         db = Database(file.path)
-        DeletionStore(file).record_deletion("gen-beta", {"prompt_id": "gen-beta"}, {})
+        TrashStore(file).record_trashed("gen-beta", {"prompt_id": "gen-beta"}, {})
 
-        assert [held["prompt_id"] for held in db.list_deletions()] == ["gen-beta"]
-        assert db.deletions.get_deletion("gen-beta") is not None
+        assert [held["prompt_id"] for held in db.list_trashed()] == ["gen-beta"]
+        assert db.deletions.get_trashed("gen-beta") is not None
 
 
 class TestItemNumberStore:

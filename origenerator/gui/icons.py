@@ -6,7 +6,7 @@ two apps ended up with microphones of different shapes on one screen.  What
 stays here is what is genuinely this app's: which button wears which mark, what
 color it wears it in, and the grounds the TOC initials and item type icons sit on.
 
-The toolbar-button icons each return a QIcon carrying a normal and a muted
+The Gallery pane buttons' icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
 TOC initials (:func:`toc_initial_icon`) mark which
 of workflow/model/LoRA a folder is; the item type icons
@@ -66,7 +66,7 @@ _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the butto
 
 # TOC initials. Every gallery folder above a settings leaf sits at one
 # of these levels, and a small TOC initial in the level's own color names
-# which, so a tree row or a browser tile is self-describing without the reader
+# which, so a tree row or a Gallery pane tile is self-describing without the reader
 # counting indentation.
 LEVEL_LABELS = {
     "workflow": "Workflow", "model": "Model", "lora": "LoRA",
@@ -122,7 +122,7 @@ def undo_icon() -> QIcon:
 
 def redo_icon() -> QIcon:
     """Undo's mirror image, head to the right — redo. The pair is a mirror on
-    purpose: side by side in the bank, two arrowheads pointing opposite ways say
+    purpose: side by side among the Gallery pane buttons, two arrowheads pointing opposite ways say
     which is which faster than any difference in the arc could."""
     return qt_icon("redo_arrow", size=_SIZE)
 
@@ -184,7 +184,7 @@ def trash_icon(*, color=None) -> QIcon:
 
 
 def delete_icon() -> QIcon:
-    """The button-bank trash can, in red — the one control in the bank that
+    """The Gallery pane buttons' trash can, in red — the one control among them that
     takes something away, and the only one worth stopping on before clicking."""
     return trash_icon(color=RED)
 
@@ -196,7 +196,7 @@ def star_icon(*, filled: bool) -> QIcon:
     A favorited one is green (:data:`_STAR_GLYPH`), the color the corner button and
     Fun Time's favorite ★ both wear; the outline stays the chrome's own gray,
     because it is an offer to favorite rather than a thing that is favorited. The
-    button bank's Favorite wears the filled one, so the control and the mark it
+    Gallery pane buttons' Favorite wears the filled one, so the control and the mark it
     leaves on a tile are one symbol in one color."""
     if filled:
         icon = qt_icon("star", color=_STAR_GLYPH, size=_SIZE)
@@ -247,7 +247,7 @@ def all_icon() -> QIcon:
 
 
 def custom_folder_icon() -> QIcon:
-    """A folder — the mark on a folder the user composed, and the toolbar button
+    """A folder — the mark on a folder the user composed, and the Gallery pane button
     that composes one out of the picked folders."""
     return qt_icon("folder", size=_SIZE)
 
@@ -381,7 +381,7 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
 
     Red under the cursor rather than the other two's light gray — it is the one
     corner whose act takes something away, and it wears the very can, in the very
-    red, that the button bank's Delete does."""
+    red, that the Gallery pane buttons' Delete does."""
     return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
 
 

@@ -570,18 +570,18 @@ def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    view._browser.apply_selection(held[0][0], _NO_MOD)
+    view._gallery_pane.apply_selection(held[0][0], _NO_MOD)
     return view
 
 
 def _click_tile(view, prompt_id):
-    QTest.mouseClick(view._browser._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
+    QTest.mouseClick(view._gallery_pane._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
 
 
 def _right_click(view, prompt_id):
     """Right-click a tile the way Qt does — through the widget's own custom-context
     signal — so a menu the pane never connected registers as no menu at all."""
-    view._browser._thumb_widgets[prompt_id].customContextMenuRequested.emit(QPoint(0, 0))
+    view._gallery_pane._thumb_widgets[prompt_id].customContextMenuRequested.emit(QPoint(0, 0))
 
 
 def _answer_menu(monkeypatch, label):
@@ -644,7 +644,7 @@ def _scroll_bar(view):
 
 def _drawn(view):
     """The items whose tiles the pane has drawn so far, in the order drawn."""
-    return list(view._browser._thumb_widgets)
+    return list(view._gallery_pane._thumb_widgets)
 
 
 def _write_looping_webp(path, size=(64, 48)):
@@ -668,7 +668,7 @@ def _click_off(view):
     a folder opens on its first item is how Favorite, Enhance and Delete come to be
     aimed at the whole folder again (see
     test_clicking_the_pane_background_drops_the_selection)."""
-    view._browser.clear_thumbnail_selection()
+    view._gallery_pane.clear_thumbnail_selection()
 
 
 def _reroll_client():
@@ -761,7 +761,7 @@ MODE_VERBS = frozenset(action for action, _label, _lit in MODE_BUTTONS)
 
 
 def _in_view(view, prompt_id) -> bool:
-    tile = view._browser._thumb_widgets[prompt_id]
+    tile = view._gallery_pane._thumb_widgets[prompt_id]
     viewport = view._scroll.viewport()
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
@@ -1237,7 +1237,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
             request_applier(in_scenes)(positive, negative, request),
         parent=view)
     view._voice._revision.revised.connect(view._voice._on_revised)
-    view._bank.mic.setChecked(True)  # the switch, as the user flips it
+    view._buttons.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)
     view._slideshows.start()

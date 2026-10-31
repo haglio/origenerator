@@ -1,4 +1,4 @@
-"""The GalleryView / BrowserPane boundary, held at zero, and the two classes'
+"""The GalleryView / GalleryPane boundary, held at zero, and the two classes'
 sizes, held under ceilings that only come down."""
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEW = REPO_ROOT / "origenerator" / "gui" / "gallery_view.py"
-PANE = REPO_ROOT / "origenerator" / "gui" / "browser_pane.py"
+PANE = REPO_ROOT / "origenerator" / "gui" / "gallery_pane.py"
 MAX_GALLERY_VIEW_METHODS = 269
-MAX_BROWSER_PANE_METHODS = 79
+MAX_GALLERY_PANE_METHODS = 79
 
 # A private attribute read through a privately held object — self._x._y — the
 # reach-through shape the audit counted 93 of. Zero everywhere in both files:
@@ -53,7 +53,7 @@ def test_neither_knot_file_reaches_a_private_through_a_private():
 def test_the_pane_holds_no_view():
     """The back-pointer stays deleted. The regex above would miss a re-added
     self._v that only called public attributes, so the handle itself is banned:
-    no name in browser_pane.py mentions GalleryView, and the constructor's
+    no name in gallery_pane.py mentions GalleryView, and the constructor's
     parameters are exactly the collaborators the split ended on."""
     tree = ast.parse(PANE.read_text(encoding="utf-8"))
     named = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} \
@@ -62,7 +62,7 @@ def test_the_pane_holds_no_view():
            for a in n.names}
     assert "GalleryView" not in named  # docstring prose may say it; code may not
     assert "_v" not in named  # the handle itself, under the name it had
-    init = next(n for n in _class_def(PANE, "BrowserPane").body
+    init = next(n for n in _class_def(PANE, "GalleryPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [
         "self", "scroll", "db", "jobs", "auto", "tree", "host"]
@@ -70,8 +70,8 @@ def test_the_pane_holds_no_view():
 
 @pytest.mark.parametrize(("path", "name", "ceiling"), [
     (VIEW, "GalleryView", MAX_GALLERY_VIEW_METHODS),
-    (PANE, "BrowserPane", MAX_BROWSER_PANE_METHODS),
-], ids=["GalleryView", "BrowserPane"])
+    (PANE, "GalleryPane", MAX_GALLERY_PANE_METHODS),
+], ids=["GalleryView", "GalleryPane"])
 def test_neither_class_outgrows_its_ceiling(path, name, ceiling):
     methods = sum(isinstance(x, ast.FunctionDef) for x in _class_def(path, name).body)
 

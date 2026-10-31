@@ -8,13 +8,13 @@ one.
 What lives here is the whole path an utterance takes. The microphone and what it
 is listening for. The caption that says what was heard and what it did, with the
 one promise it holds while a request is still being worked out. The matching of
-an utterance to a collection, a switch, a bar, a bank button, an order about the
+an utterance to a collection, a switch, a bar, a Gallery pane button, an order about the
 image on screen, or a request said over several breaths -- and, for a hosted
 app, the same matching of words the session's own microphone heard and posted on
 this app's channel.
 
 What it does NOT hold is the doing. A slideshow's own words went to the slideshows when
-they came out (:mod:`origenerator.gui.slideshow_director`); a bank button's press is
+they came out (:mod:`origenerator.gui.slideshow_director`); a Gallery pane button's press is
 the button's own click; and the three orders about an image -- enhance it, fix a
 part of it, make a Genau flick of it -- stay with the seams that run them.
 :class:`VoiceHost` names each of those.
@@ -117,12 +117,12 @@ _BARS = {
     "center": "set_center",
 }
 
-# The refusal each bank word carries when its button cannot run — ``None`` to use
+# The refusal each button word carries when its button cannot run — ``None`` to use
 # the button's own tooltip, which for most of them already says why ("Nothing to
 # undo", "Nothing here to favorite"). Only the two whose tips are bare labels, and
 # Group, whose tip explains the button rather than refusing it, carry their own
 # words.
-_BANK_REFUSALS = {
+_BUTTON_REFUSALS = {
     AppCommand.BACK: "nowhere back",
     AppCommand.FORWARD: "nowhere forward",
     AppCommand.CULL: None,
@@ -142,7 +142,7 @@ _FILTERS = {
 }
 
 # The words that are about the slide on screen when there is one. The rest of
-# the bank (undo, redo, group) is the gallery's whether or not a slideshow covers it:
+# the Gallery pane buttons (undo, redo, group) is the gallery's whether or not a slideshow covers it:
 # undoing a cull you regret is exactly a thing to do mid-show.
 _ABOUT_THE_SLIDE = frozenset({
     AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
@@ -243,9 +243,9 @@ class VoiceRouter(QObject):
         # — the slideshow's message keeps its own copy of the same pair.
         self._working_status = ""
         self._working_request = None
-        # The bank the spoken words act through, bound once it exists.
+        # The Gallery pane buttons the spoken words act through, bound once it exists.
         self._switches: dict[str, QWidget | None] = {}
-        self._bank: dict = {}
+        self._buttons: dict = {}
         self._enhance = None
         self._hold_the_motion(motion)
 
@@ -268,7 +268,7 @@ class VoiceRouter(QObject):
         self._hold_the_motion(motion)
         self._switches.update({_RADIO: radio, _DRIVE: drive, _MIC: mic})
 
-    def bind_the_bank(self, *, auto, radio, drive, mic, actions, enhance) -> None:
+    def bind_the_buttons(self, *, auto, radio, drive, mic, actions, enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, by keyword
         and by object rather than by attribute name: spelled as strings, a renamed
         button broke the microphone silently.
@@ -285,7 +285,7 @@ class VoiceRouter(QObject):
         the motion words find nothing to move rather than a driver that is absent.
         """
         self._switches = {_AUTO: auto, _RADIO: radio, _DRIVE: drive, _MIC: mic}
-        self._bank = dict(actions)
+        self._buttons = dict(actions)
         self._enhance = enhance
 
     # --- the microphone -----------------------------------------------------
@@ -514,11 +514,11 @@ class VoiceRouter(QObject):
     def _flip_switch(self, command: AppCommand) -> None:
         """Set one of the app-wide switches, through its button rather than
         around it — a spoken switch is the same event as a clicked one, so the
-        bank lights the same way and nothing has to be kept in step.
+        button lights the same way and nothing has to be kept in step.
 
         "Mic off" is the one with no way back: a shut mic hears nothing, so the
         button is what turns it on again. Its answer is still worth saying —
-        with a slideshow up it lands in the slideshow's message, where the bank is not
+        with a slideshow up it lands in the slideshow's message, where the Gallery pane buttons are not
         visible to say it instead.
         """
         switch, want, name = _SWITCHES[command]
@@ -567,21 +567,21 @@ class VoiceRouter(QObject):
         self._slideshows.answer(self._motion.status_text())
 
     def _run_in_gallery(self, command: AppCommand) -> None:
-        """A word said with no slideshow to take it: the bank button it names, aimed
+        """A word said with no slideshow to take it: the Gallery pane button it names, aimed
         exactly as a click on it would be."""
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
             self._slideshows.answer(f"{command.value} is a slideshow's — none is up",
                                     kind=WARNING)
             return
-        button, act = self._bank[command]
-        self._press_bank_button(button, act, _BANK_REFUSALS[command])
+        button, act = self._buttons[command]
+        self._press_gallery_pane_button(button, act, _BUTTON_REFUSALS[command])
 
-    def _press_bank_button(self, button, act, refusal: str | None = None) -> None:
-        """Do what a bank button does, and answer in that button's own words.
+    def _press_gallery_pane_button(self, button, act, refusal: str | None = None) -> None:
+        """Do what a Gallery pane button does, and answer in that button's own words.
 
         Its tip already says what it will do to what is in front of you — "Favorite
         3 items", "Undo: delete of 2 items" — which is precisely what a speaker
-        who is not looking at the bank needs told back, and it cannot drift from
+        who is not looking at the buttons needs told back, and it cannot drift from
         what the button does. A button that is away or dead says why instead of
         quietly doing nothing: ``refusal``, or its tip where that already reads
         as one.
@@ -589,7 +589,7 @@ class VoiceRouter(QObject):
         if button.isHidden() or not button.isEnabled():
             self._slideshows.answer(refusal or button.toolTip(), kind=WARNING)
             return
-        said = button.toolTip()  # read first: the action re-aims the bank
+        said = button.toolTip()  # read first: the action re-aims the buttons
         act()
         self._slideshows.answer(said)
 
@@ -602,19 +602,19 @@ class VoiceRouter(QObject):
         and neither is the active window, so naming one is the only way to say
         which image is meant.  Unnamed, it goes to whichever slideshow is up.
         Answered out of the slideshow's own note — the speaker is looking at it, not
-        at this pane. Said with no slideshow up, "enhance" falls to the bank button of
+        at this pane. Said with no slideshow up, "enhance" falls to the Gallery pane button of
         the same name; the other two have no "on screen" to act on, and the
         utterance has already been claimed as a command by the time it gets here,
         so the caption says so rather than letting it vanish."""
         slideshow = self._slideshows.surface_for(command.side)
         if slideshow is None:
             if command.command == gallery.ENHANCE_COMMAND:
-                # The word names a bank button too, and with no image filling
+                # The word names a Gallery pane button too, and with no image filling
                 # the screen the button is what it means — aimed the way a click
                 # aims it, at the picked thumbnails else the folder's unenhanced
                 # images. A refusal here would be a dead end where there is a
                 # perfectly good thing to do.
-                self._press_bank_button(*self._enhance)
+                self._press_gallery_pane_button(*self._enhance)
                 return
             wants = (_WANTS_ANIMATING
                      if isinstance(command.command, AnimateRequest)

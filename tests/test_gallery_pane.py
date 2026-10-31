@@ -1,6 +1,6 @@
-"""The browser pane, constructed alone — no GalleryView anywhere in sight.
+"""The Gallery pane, constructed alone — no GalleryView anywhere in sight.
 
-Until the coupling inversion this file could not exist: BrowserPane took the
+Until the coupling inversion this file could not exist: GalleryPane took the
 whole view and reached into it 93 times, so its 668 statements were exercised
 only from inside tests/test_gallery_view.py. Now it takes six narrow
 collaborators, and the stubs below are the whole of what standing one up
@@ -32,15 +32,15 @@ from origenerator.gallery.collection import (
     FolderCollection,
 )
 from origenerator.gallery.sides import LANDSCAPE
-from origenerator.gui import browser_pane
-from origenerator.gui.browser_pane import (
-    BrowserPane,
-    BrowserScrollArea,
+from origenerator.gui import gallery_pane
+from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.gallery_pane import (
+    GalleryPane,
+    GalleryPaneScrollArea,
     LeadTiles,
     PaneHost,
     TreeNavigation,
 )
-from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.item_tile import ItemTile
 from origenerator.orientation import oriented_key
 from tests.thumbnail_rows import looping_video
@@ -112,9 +112,9 @@ class _StubAuto:
 def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None,
           selected=None, animated_preview=lambda row: None):
     if scroll is None:
-        scroll = BrowserScrollArea()
+        scroll = GalleryPaneScrollArea()
         qtbot.addWidget(scroll)
-    pane = BrowserPane(
+    pane = GalleryPane(
         scroll, _StubDB(rows), jobs or _StubJobQueue(), _StubAuto(),
         TreeNavigation(
             selected_folder_key=lambda: selected,
@@ -170,7 +170,7 @@ def test_a_tile_is_captioned_with_the_name_the_gallery_gives_its_item(qtbot):
 def test_the_second_look_for_a_place_goes_with_the_canvas_it_was_for(qtbot):
     holder = QWidget()
     qtbot.addWidget(holder)
-    pane, scroll = _pane(qtbot, scroll=BrowserScrollArea(holder))
+    pane, scroll = _pane(qtbot, scroll=GalleryPaneScrollArea(holder))
     pane.show_empty()
     pane.return_to(pane.place())
 
@@ -256,7 +256,7 @@ def test_a_settings_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
-    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(_drawn(scroll)) == gallery_pane._PAGE
     assert pane.listed_prompt_ids() == [row["prompt_id"] for row in rows]
 
 
@@ -267,7 +267,7 @@ def test_favorites_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
 
     pane.show_collection(FAVORITES_KEY, LANDSCAPE)
 
-    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(_drawn(scroll)) == gallery_pane._PAGE
     assert len(pane.listed_prompt_ids()) == 60
 
 
@@ -278,7 +278,7 @@ def test_the_trash_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
 
     pane.show_collection(TRASH_KEY)
 
-    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(_drawn(scroll)) == gallery_pane._PAGE
     assert len(pane.listed_prompt_ids()) == 60
 
 
@@ -289,7 +289,7 @@ def test_the_experiments_draw_a_page_at_a_time_of_everything_they_list(qtbot):
 
     pane.show_collection(EXPERIMENTS_KEY)
 
-    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(_drawn(scroll)) == gallery_pane._PAGE
     assert len(pane.listed_prompt_ids()) == 60
 
 
@@ -300,7 +300,7 @@ def test_a_folder_of_your_own_draws_a_page_at_a_time_of_everything_it_lists(qtbo
     pane.show_custom_folder(gallery.CustomGroup(key="custom:1", label="mine", children=[],
                                                 rows=rows, folder_id=1))
 
-    assert len(_drawn(scroll)) == browser_pane._PAGE
+    assert len(_drawn(scroll)) == gallery_pane._PAGE
     assert len(pane.listed_prompt_ids()) == 60
 
 
@@ -311,7 +311,7 @@ def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot):
 
     pane.show_folder_tiles(folders)
 
-    assert len(_drawn(scroll, FolderTile)) == browser_pane._PAGE
+    assert len(_drawn(scroll, FolderTile)) == gallery_pane._PAGE
 
 
 def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot):
@@ -324,7 +324,7 @@ def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     drawn_to = scroll.widget().heightForWidth(scroll.viewport().width())
-    assert drawn_to >= scroll.viewport().height() + browser_pane._REACH
+    assert drawn_to >= scroll.viewport().height() + gallery_pane._REACH
     assert len(_drawn(scroll)) < len(rows)
 
 
@@ -774,8 +774,8 @@ def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeyp
     # dealt the whole listing out to the side afresh: thirteen passes over the
     # library per rebuild for five collections.
     dealt = []
-    filter_rows = browser_pane.filter_rows
-    monkeypatch.setattr(browser_pane, "filter_rows",
+    filter_rows = gallery_pane.filter_rows
+    monkeypatch.setattr(gallery_pane, "filter_rows",
                         lambda rows, side: dealt.append(side) or filter_rows(rows, side))
     rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
     pane, _scroll = _pane(qtbot, rows)

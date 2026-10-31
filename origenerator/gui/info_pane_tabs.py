@@ -496,7 +496,7 @@ class InfoPaneTabs(QTabWidget):
         self.setCurrentWidget(panel)
         return panel
 
-    # --- loading the browser selection into a tab --------------------------
+    # --- loading the Gallery pane selection into a tab --------------------------
 
     def load_selection(self, row: dict, image_rows: list[dict]):
         """Show a single-clicked generation in a tab, without leaving a trail of

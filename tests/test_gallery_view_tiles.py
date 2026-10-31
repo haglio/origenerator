@@ -44,7 +44,7 @@ from origenerator.gui.drop_style import LIT
 from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, enhance_level_mime
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.workflows import detail_parts
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -520,8 +520,8 @@ def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_sh
     assert threading.main_thread() not in made_on
 
 
-def test_recents_tiles_are_badged_image_or_video(qtbot):
-    # The collection mixes kinds, so each finished tile wears a corner badge naming its
+def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
+    # The collection mixes kinds, so each finished tile wears an item type icon naming its
     # own — an image thumbnail and a video thumbnail, told apart at a glance.
     rows = [
         _image("i1", "a cat", 50, 1),
@@ -532,16 +532,16 @@ def test_recents_tiles_are_badged_image_or_video(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    def badge_type(pid):
+    def icon_type(pid):
         badges = view._browser._thumb_widgets[pid].findChildren(MediaBadge)
-        return badges[0].media_type if badges else None
+        return icons_found[0].media_type if icons_found else None
 
-    assert badge_type("i1") == "image"
-    assert badge_type("v1") == "video"
+    assert icon_type("i1") == "image"
+    assert icon_type("v1") == "video"
 
 
-def test_inflight_card_is_badged_by_its_media_type(qtbot):
-    # A running video row with no file yet still badges its in-flight card a video,
+def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
+    # A running video row with no file yet still marks its in-flight tile a video,
     # inferred from the workflow — so the kind reads before the first frame lands.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("rr1", workflow="wan22_i2v"))
@@ -965,7 +965,7 @@ def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
 
 def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp_path):
     # An image holding the very version the panel describes has nothing to gain
-    # from a press, so its plus is the solid yellow badge alone. Turn a setting and
+    # from a press, so its plus is the solid yellow sign alone. Turn a setting and
     # what it holds is one enhancement short of what the panel now describes, so
     # the plus goes back to offering — with the one it has as a shadow under it.
     db = _enhanceable_db(tmp_path, count=1)

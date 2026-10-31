@@ -4,7 +4,7 @@ The gallery's combine panel pairs two slots — an image slot and a video slot �
 a zone between them that drops into both. A slot holds whatever its ``lent_by``
 says a dropped generation lends it and turns away one that lends it nothing; it
 previews what it holds — a video loops, an image shows its still — names
-it underneath, and wears a corner badge of its own kind. What it holds means
+it underneath, and wears an item type icon of its own kind. What it holds means
 nothing to it; its owner supplies ``lent_by``, the preview and the name.
 
 A slot whose item is held only for its settings is built ``grayscale``, and draws
@@ -28,8 +28,8 @@ from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT, light
 from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.looping_preview import looping_movie
-from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 DROP_AN_IMAGE = "Drop an image"
@@ -148,7 +148,7 @@ class DropSlot(DropZone):
         tile_shape.style_caption(self._caption)
         layout.addWidget(self._caption)
         # An item type icon naming this slot's kind, shown only once something's dropped.
-        self._badge = MediaBadge(kind, self)
+        self._item_type_icon = ItemTypeIcon(kind, self)
         self._render()
         under_way.started.connect(self._light_for)
         under_way.ended.connect(self._put_out_for_the_drag)
@@ -190,7 +190,7 @@ class DropSlot(DropZone):
         if self._current_id is None:
             self._label.setPixmap(QPixmap())  # drop any prior preview
             self._label.setText(self._placeholder)
-            self._badge.setVisible(False)
+            self._item_type_icon.setVisible(False)
             return
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
@@ -208,8 +208,8 @@ class DropSlot(DropZone):
             self._label.setText("")  # held, but no thumbnail to show
             self._label.setPixmap(icon_pixmap("check", 2 * self._label.fontMetrics().height(),
                                               TEXT_PRIMARY))
-        self._badge.setVisible(True)
-        self._badge.raise_()  # keep the item type icon above the preview
+        self._item_type_icon.setVisible(True)
+        self._item_type_icon.raise_()  # keep the item type icon above the preview
 
     def _show_where_a_click_goes(self, held: str | None, named: str) -> None:
         leads = held is not None and self._leads_to(held) is not None

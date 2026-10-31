@@ -157,7 +157,7 @@ def test_a_video_animated_from_another_videos_starting_frame_points_at_that_vide
     related.show_row(made_here, [_hidden_frame()])
 
     tile = related._source_tile
-    assert (tile._prompt_id, tile._heading.text(), tile._badge.media_type) == (
+    assert (tile._prompt_id, tile._heading.text(), tile._item_type_icon.media_type) == (
         "vid1", "From starting frame of", "video")
 
 

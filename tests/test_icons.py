@@ -66,17 +66,17 @@ def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
             assert one != other
 
 
-def test_media_type_badges_render_for_image_and_video(qtbot):
+def test_item_type_icons_render_for_image_and_video(qtbot):
     # The Latest collection marks each tile image-or-video with a small corner badge;
     # both types must draw a non-blank pixmap so neither shows an empty square.
-    image_badge = icons.media_type_badge(MediaType.IMAGE)
-    video_badge = icons.media_type_badge(MediaType.VIDEO)
-    assert not image_badge.isNull()
-    assert image_badge.width() > 0
-    assert not video_badge.isNull()
-    assert video_badge.width() > 0
+    image_icon = icons.item_type_icon(MediaType.IMAGE)
+    video_icon = icons.item_type_icon(MediaType.VIDEO)
+    assert not image_icon.isNull()
+    assert image_icon.width() > 0
+    assert not video_icon.isNull()
+    assert video_icon.width() > 0
     # The two glyphs differ, so an image is never mistaken for a video.
-    assert image_badge.toImage() != video_badge.toImage()
+    assert image_icon.toImage() != video_icon.toImage()
 
 
 def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):

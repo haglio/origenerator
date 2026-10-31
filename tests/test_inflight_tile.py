@@ -8,7 +8,7 @@ from PyQt6.QtCore import QPoint, Qt
 
 from origenerator.gui.inflight import InFlightItem, RunReading, foreign_queue_text
 from origenerator.gui.inflight_tile import InFlightTile
-from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.item_type_icon import ItemTypeIcon
 
 
 def _png_bytes(color=(200, 50, 50)):
@@ -65,15 +65,15 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
     assert tile._scrim.geometry().intersects(tile._image.geometry())
 
 
-def test_media_badge_shows_only_when_the_item_names_a_type(qtbot):
+def test_item_type_icon_shows_only_when_the_item_names_a_type(qtbot):
     # An in-flight tile in the Latest collection wears the same image/video badge as a
     # finished tile, so a queued video reads as a video before its first frame.
     plain = InFlightTile(_item())                    # no type known → no badge
     qtbot.addWidget(plain)
-    assert plain.findChildren(MediaBadge) == []
+    assert plain.findChildren(ItemTypeIcon) == []
     badged = InFlightTile(_item(media_type="video"))
     qtbot.addWidget(badged)
-    assert len(badged.findChildren(MediaBadge)) == 1
+    assert len(badged.findChildren(ItemTypeIcon)) == 1
 
 
 def test_clicking_the_tile_emits_its_key(qtbot):

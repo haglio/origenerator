@@ -25,7 +25,7 @@ from funestra import drive_layout
 #: changed there turns a test red instead of arriving as an unknown press.
 ROBOT_HAND = "robot_hand_"
 
-#: The three axes a band sets outright, read off the module that draws them.
+#: The three axes a preset sets outright, read off the module that draws them.
 AXES = (drive_layout.AMPLITUDE, drive_layout.CENTER, drive_layout.SPEED)
 
 

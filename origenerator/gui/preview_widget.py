@@ -52,8 +52,8 @@ from origenerator.gui.drag_thumbnail import (
     label_thumbnail,
 )
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import VideoSurface
-from origenerator.gui.video_timeline import VideoTimeline
 from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
@@ -76,7 +76,7 @@ class PreviewWidget(QWidget):
     context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 show_timeline: bool = False):
+                 show_scrubber: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -131,7 +131,7 @@ class PreviewWidget(QWidget):
         # Rescale the media whenever the label itself resizes — see eventFilter for
         # why this can't ride on the widget's own resizeEvent.
         self._image_label.installEventFilter(self)
-        # The media area itself resizes when the timeline appears or goes, whichever
+        # The media area itself resizes when the scrubber appears or goes, whichever
         # page is up -- and a video's page is not the label -- so what is placed
         # against the media's rect re-places off the host too (see eventFilter).
         media_host.installEventFilter(self)
@@ -175,12 +175,12 @@ class PreviewWidget(QWidget):
         self._controls = CornerButtons(self)
         self._controls.triggered.connect(self._on_control)
 
-        self._timeline = VideoTimeline() if show_timeline else None
-        if self._timeline is not None:
-            outer.addWidget(self._timeline)
-            self._timeline.hide()
-            self._player.durationChanged.connect(self._timeline.set_duration)
-            self._player.positionChanged.connect(self._timeline.set_position)
+        self._scrubber = Scrubber() if show_scrubber else None
+        if self._scrubber is not None:
+            outer.addWidget(self._scrubber)
+            self._scrubber.hide()
+            self._player.durationChanged.connect(self._scrubber.set_duration)
+            self._player.positionChanged.connect(self._scrubber.set_position)
 
         # The real WMF backend can deadlock during Qt/Python shutdown if a player
         # is still active, so release it before the app quits. Injected test
@@ -200,7 +200,7 @@ class PreviewWidget(QWidget):
 
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
-        combination and the wall), the timeline drops, the playback stops,
+        combination and the wall), the scrubber drops, the playback stops,
         the message and the corner buttons — both of which are about the item
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
@@ -214,7 +214,7 @@ class PreviewWidget(QWidget):
         """
         self._set_movie(None)
         self._pixmap = None
-        self._hide_timeline()
+        self._hide_scrubber()
         if stop_player:
             self._stop_playback()
         if not enhancing:
@@ -253,7 +253,7 @@ class PreviewWidget(QWidget):
         self._player.play()
         if omnipause.frozen():
             self._player.pause()  # a video loaded into a frozen room opens held
-        self._show_timeline(path)
+        self._show_scrubber(path)
 
     def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
@@ -404,7 +404,7 @@ class PreviewWidget(QWidget):
         slideshows' neighbor stills) needs to know to keep clear of the item.
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
-        screen at all -- and never to the timeline along the foot, which is no
+        screen at all -- and never to the scrubber along the foot, which is no
         part of the item: a corner button laid over it, attached to the video's lower edge.
         """
         drawn = self._drawn_size()
@@ -413,8 +413,8 @@ class PreviewWidget(QWidget):
         rect = QRect(QPoint(0, 0), drawn)
         # Centered on the media area itself, not on the label: a stacked layout
         # sizes only the page it is showing, so while a video is up the label
-        # keeps whatever geometry it last had -- the pane's before the timeline
-        # took its rows -- and a rect centered on it sits low by half the timeline.
+        # keeps whatever geometry it last had -- the pane's before the scrubber
+        # took its rows -- and a rect centered on it sits low by half the scrubber.
         rect.moveCenter(self._media_host.geometry().center())
         return rect
 
@@ -520,18 +520,18 @@ class PreviewWidget(QWidget):
         self._place_controls()
         super().resizeEvent(event)
 
-    def _show_timeline(self, video_path) -> None:
-        if self._timeline is None:
+    def _show_scrubber(self, video_path) -> None:
+        if self._scrubber is None:
             return
         actions = (read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
                    if video_path else [])
-        self._timeline.set_actions(actions)
-        self._timeline.setVisible(bool(video_path))
+        self._scrubber.set_actions(actions)
+        self._scrubber.setVisible(bool(video_path))
 
-    def _hide_timeline(self) -> None:
-        if self._timeline is not None:
-            self._timeline.set_actions([])
-            self._timeline.hide()
+    def _hide_scrubber(self) -> None:
+        if self._scrubber is not None:
+            self._scrubber.set_actions([])
+            self._scrubber.hide()
 
     def mousePressEvent(self, event) -> None:
         # The media children are transparent to the mouse, so a press over the

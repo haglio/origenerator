@@ -23,8 +23,8 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QWidget,
 )
+from shared_ui import folder_path as shared_folder_path
 from shared_ui.colors import TEXT_PRIMARY
-from shared_ui.folder_path import FolderPath
 from shared_ui.icons import icon_then_text
 from shared_ui.spacing import MARGIN_STANDARD
 
@@ -306,7 +306,7 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
 
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    # The title carries the full breadcrumb, which the narrow tree truncates.
+    # The title carries the full folder path, which the narrow tree truncates.
     assert "SDXL T2I" in view._folder_path.display_text()
     assert "All" in view._folder_path.display_text()
 
@@ -1750,12 +1750,12 @@ def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
 
 
 def _path_links(view) -> dict[str, str]:
-    drawn = view._folder_path.findChild(FolderPath).text()
+    drawn = view._folder_path.findChild(shared_folder_path.FolderPath).text()
     return {name: href for href, name in re.findall(r'<a href="([^"]*)"[^>]*>([^<]*)</a>', drawn)}
 
 
 def _click_path_step(view, name):
-    view._folder_path.findChild(FolderPath).linkActivated.emit(_path_links(view)[name])
+    view._folder_path.findChild(shared_folder_path.FolderPath).linkActivated.emit(_path_links(view)[name])
 
 
 def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
@@ -1768,7 +1768,7 @@ def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
     _click_path_step(view, workflow.text(0))
 
     assert view._tree.currentItem() is workflow
-    assert view._folder_path.display_text() == view._tree_view.breadcrumb(workflow)
+    assert view._folder_path.display_text() == view._tree_view.folder_path(workflow)
 
 
 def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
@@ -1790,7 +1790,7 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
 
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
-    path = view._folder_path.findChild(FolderPath)
+    path = view._folder_path.findChild(shared_folder_path.FolderPath)
     assert list(_path_links(view)) == ["All"]
     assert icon_then_text("star", "Favorites", color=TEXT_PRIMARY,
                           size=path.fontMetrics().height()) in path.text()
@@ -1804,7 +1804,7 @@ def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
 
     view._tree.setCurrentItem(_collection(view, ENHANCED_KEY))
 
-    path = view._folder_path.findChild(FolderPath)
+    path = view._folder_path.findChild(shared_folder_path.FolderPath)
     assert icon_then_text("plus", "Enhanced", color=TEXT_PRIMARY,
                           size=path.fontMetrics().height()) in path.text()
 

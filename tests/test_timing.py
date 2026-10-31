@@ -215,7 +215,7 @@ def test_progress_status_label_leads_with_how_far_along_it_is():
 
 
 def test_the_line_leads_with_the_step_being_taken():
-    # What the user asked for: the band along the bar's foot restarts once per
+    # What the user asked for: the substep progress bar along the foot restarts once per
     # pass, and nothing on screen said which pass that was. It leads because it
     # is the part that says what is happening — and because a caption too wide
     # for its bar elides from the right, so the name has to be leftmost to
@@ -225,7 +225,7 @@ def test_the_line_leads_with_the_step_being_taken():
 
 
 def test_a_run_with_no_step_to_name_reads_as_it_did():
-    # A single-pass job has no band and so no name; its line is unchanged.
+    # A single-pass job has no substep progress bar and so no name; its line is unchanged.
     assert RunTiming(83.0, (10, 20), 724.0).status_label() == "50% · 1:23 elapsed · ~6:02 left"
 
 

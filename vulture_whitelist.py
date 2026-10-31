@@ -5,7 +5,7 @@ Nothing imports or runs it; `_` is the placeholder `--make-whitelist` writes for
 "some object". Grouped by reason, so each entry can be checked against the thing
 that actually calls it.
 
-`tests/test_dead_code.py` fails on an entry that has stopped suppressing
+The family's dead-code gate fails on an entry that has stopped suppressing
 anything, so nothing may stay here once its subject is gone.
 
 Everything in it is now a caller vulture cannot follow -- Qt's C++ event loop,

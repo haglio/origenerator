@@ -121,7 +121,7 @@ _RANDOM_SEED_TIP = (
 # bar beside it — enough that nothing reads as jammed into a corner, small
 # enough that a narrow pane still spends its width on the fields.
 # How far the "never narrower than its contents" floor below is allowed to go.
-# One thing in the tab is wider than a tiling-narrow window can give the info pane
+# One thing in the tab is wider than a tiling-narrow window can give the Generate pane
 # — an image's list of versions, a thumbnail beside a file's facts and buttons — and
 # a floor that insisted on it would take the whole window out of the monitor-third
 # place it has to fit (see tests/test_core.py). Past this the settings scroll
@@ -201,12 +201,12 @@ def _pick_installed_ones_first(names: list[str]) -> str:
     return f"{shown} aren't installed anymore — pick installed ones first"
 
 
-class GenerateConfigPanel(DropZones):
+class GenerateTab(DropZones):
     """One generation configuration: pick a workflow and set its params.
 
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
     for the gallery to launch as a re-roll of this config's settings folder. The
-    panel is one column: a fixed preview on top, then a single button row over
+    tab is one column: a fixed preview on top, then a single button row over
     one scroll holding the File/Created block above the editable form and, at its
     foot, the displayed generation's related media. Generate's caption says when a
     press will draw a fresh seed rather than re-create what these settings have
@@ -217,7 +217,7 @@ class GenerateConfigPanel(DropZones):
     does, and right-clicking it raises the same menu. Each file row carries a
     "Go to folder" beside its Show in Explorer.
 
-    A fresh panel opens with no workflow picked — the pane's resting state.
+    A fresh tab opens with no workflow picked — the pane's resting state.
     """
 
     title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
@@ -293,7 +293,7 @@ class GenerateConfigPanel(DropZones):
         # items the press will run, and the settings it opened on — which is
         # what says whether anything has actually been rewritten yet.
         self._folder_modify: FolderModify | None = None
-        # Where this tab's settings came from, when the Combine panel opened them
+        # Where this tab's settings came from, when the Combine opened them
         # here: the act picked in its dropdown, the video whose settings they are and
         # the lane, as (category, video_prompt_id, intent). Carried so a run launched
         # from this tab — as opened, or edited first — says in the queue what it was
@@ -380,7 +380,7 @@ class GenerateConfigPanel(DropZones):
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
         self._media_border: list[int] | None = None
-        # Lays out the empty state on a fresh panel — no form, no estimate, and a
+        # Lays out the empty state on a fresh tab — no form, no estimate, and a
         # Generate with nothing to run — and everything below the dropdown once a
         # workflow is chosen. Last, because everything it lays out has to exist.
         self._on_workflow_changed()
@@ -522,7 +522,7 @@ class GenerateConfigPanel(DropZones):
         body.addWidget(self._related)
         # The preview opens on the most-enhanced version, and this is where the
         # earlier levels (and the original) are, each captioned with what made
-        # it and draggable onto the Enhance subpanel to reuse those settings.
+        # it and draggable onto the Enhance pane to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
         self._versions = EnhanceVersions()
         # What the list is showing, in its order: the positions its rows report
@@ -712,7 +712,7 @@ class GenerateConfigPanel(DropZones):
             deriver = wf.derived_display_size if wf.derives_size_from_input else None
             # The enhance params stay off the form: everything laid out here
             # decides which gallery folder a run lands in, and an enhancement
-            # doesn't — the Gallery pane's Enhance subpanel owns it per folder.
+            # doesn't — the Gallery pane's Enhance pane owns it per folder.
             # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
                                          size_source=wf.derived_size_source,
@@ -808,7 +808,7 @@ class GenerateConfigPanel(DropZones):
         self._param_form.resolve_every_warning()
 
     def _detach_form(self):
-        """Take the installed form off the panel, if there is one.
+        """Take the installed form off the tab, if there is one.
 
         Detached from its parent at once (not just scheduled for deletion), so it
         leaves the screen immediately instead of lingering under whatever comes
@@ -822,7 +822,7 @@ class GenerateConfigPanel(DropZones):
         self._param_form = None
 
     def _clear_form(self):
-        """Leave the panel with no form at all — the state of a tab whose dropdown
+        """Leave the tab with no form at all — the state of a tab whose dropdown
         is still on its placeholder. Which params exist is the workflow's answer,
         so until one is chosen there is nothing truthful to lay out."""
         had_form = self._param_form is not None
@@ -1251,7 +1251,7 @@ class GenerateConfigPanel(DropZones):
     def is_blank(self) -> bool:
         """Has this tab been used for anything yet?
 
-        True only for a panel still on the dropdown's placeholder with nothing on
+        True only for a tab still on the dropdown's placeholder with nothing on
         display — the pane's resting tab. Such a tab is what a clicked generation
         loads into rather than opening beside; a tab whose workflow has been
         picked holds a choice someone made, so it is left alone.
@@ -1884,7 +1884,7 @@ class GenerateConfigPanel(DropZones):
     def set_enhance_settings(self, settings: EnhanceSettings):
         """The app-wide enhance settings the ``+ Enhance`` row would run at.
 
-        Pushed in by the gallery whenever the Enhance panel changes, so the row
+        Pushed in by the gallery whenever the Enhance pane changes, so the row
         names the current settings and knows whether they would only duplicate a
         version this image already holds.
         """

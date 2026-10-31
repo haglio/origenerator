@@ -1,7 +1,7 @@
 """How a folder's enhancement is configured, and how one is described.
 
 What an enhancement is configured with is a property of the FOLDER, not of any
-one image: :class:`EnhanceSettings` is what the gallery's Enhance subpanel edits
+one image: :class:`EnhanceSettings` is what the gallery's Enhance pane edits
 and stores per settings folder. :data:`ENHANCE_SETTING_KEYS` is the whole of what
 a folder may set — everything else about the job (the input file, the prompts
 steering the added texture) is read off the image being enhanced, and the seed is
@@ -24,7 +24,7 @@ from origenerator.workflows.detail_parts import detail_fixes_of, fix_prompts
 # generation of its own: its defaults are where an unconfigured folder starts.
 ENHANCE_WORKFLOW = "image_enhance"
 
-# The settings the Enhance subpanel offers, and so the only params a folder's
+# The settings the Enhance pane offers, and so the only params a folder's
 # settings may override on an enhance run. Everything else about the job — the
 # input file, the prompts steering the added texture — is read off the image
 # being enhanced, and the seed is re-rolled per launch like any variation.
@@ -35,14 +35,14 @@ ENHANCE_SETTING_KEYS = (
 
 # What a folder's settings leave to the source image rather than pinning: the
 # refining checkpoint, which by default is whichever one made the image, so an
-# enhanced image stays in its own style. The subpanel offers this as an option
+# enhanced image stays in its own style. The Enhance pane offers this as an option
 # on its model dropdown; picking a real checkpoint pins it instead.
 MATCH_SOURCE_MODEL = "(match the source image)"
 
 
 def default_enhance_params() -> dict:
     """The ``image_enhance`` workflow's own defaults, narrowed to the settings a
-    folder may set — what the subpanel shows for a folder that has never been
+    folder may set — what the Enhance pane shows for a folder that has never been
     configured."""
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
     params = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
@@ -82,7 +82,7 @@ def full_settings(params: dict) -> dict:
 class EnhanceSettings:
     """One folder's enhancement configuration.
 
-    ``auto`` is the subpanel's tick: with it on, every image the folder newly
+    ``auto`` is the Enhance pane's tick: with it on, every image the folder newly
     generates is enhanced as it lands, so a folder can be left to produce
     finished images rather than raw ones. ``params`` holds the settings
     (:data:`ENHANCE_SETTING_KEYS`); a key absent from it falls back to the

@@ -152,7 +152,7 @@ def list_detector_files() -> list[str]:
 
     No fallback, unlike every other dropdown here: a checkpoint the app names but
     ComfyUI lacks is a rare accident, whereas an install with no detector at all
-    is the ordinary starting state — and the Enhance panel has to be able to see
+    is the ordinary starting state — and the Enhance pane has to be able to see
     it, so it can dim the detail pass rather than offer a run that would be
     rejected on submit.
 

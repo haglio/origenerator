@@ -23,7 +23,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.sides import LANDSCAPE
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.motion_panel import MotionPanel
+from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.orientation import key_holds, oriented_key
 from origenerator.slideshow import LIVE
@@ -190,7 +190,7 @@ def _standalone_slideshow(qtbot, monkeypatch):
 
 def test_a_standalone_slideshow_wears_the_funestras_own_hud(qtbot, monkeypatch):
     # Nothing about a slideshow is different for not being inside a session: it is
-    # the same set played the same way, so it wears the same panel a region
+    # the same set played the same way, so it wears the same tab a region
     # slideshow wears — and the view's own furnishings come off, because the map
     # says all of it.
 
@@ -625,12 +625,12 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
 def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
     # A slideshow used to float two: the Funestras' HUD over the set, and Genau's whole
     # OSR2 controls under it for the device.  Between them the status was said twice
-    # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
+    # and disagreed, and prev/next/lock/trash were drawn on both.  One tab
     # now -- the HUD, carrying the device's line, the readout and the two rows
     # that aim them.
 
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
-    assert slideshow.findChildren(MotionPanel) == []
+    assert slideshow.findChildren(Osr2Controls) == []
     posted = [button.command for _rect, button in hud_targets(slideshow.shown).buttons]
     assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
     assert any(command.endswith("_clip_seconds_up") for command in posted)  # and the pace's
@@ -714,7 +714,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     assert view._gallery_pane.selected_ids == {shown}     # with that image picked
     # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
-    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == shown
 
 
 def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
@@ -737,7 +737,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
     assert view._slideshows.showing is None
     assert held in view.listed_prompt_ids()       # its own folder in the pane...
     assert view._gallery_pane.selected_ids == {held}    # ...with it picked...
-    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == held
 
 
 def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
@@ -1015,7 +1015,7 @@ def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
 
 def _looping_actions_on_a_video(qtbot, monkeypatch, *, elsewhere=()):
     """A folder of two images, the first animated twice, looping that image's
-    actions from the panel's loop button and standing on the first video."""
+    actions from the tab's loop button and standing on the first video."""
     view, slideshow = _slideshow_of_the_folder_of(
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
                              _animated_from("v1", "p1", 1), _animated_from("v2", "p1", 2),
@@ -1359,7 +1359,7 @@ def test_locking_a_slide_enhances_it_unless_one_is_already_in_flight(qtbot, tmp_
 
 
 def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
-    # A hold is made with no view of the Enhance panel, so an image that already
+    # A hold is made with no view of the Enhance pane, so an image that already
     # carries an enhancement must not be re-derived at whatever the settings happen
     # to say now — however far those settings have moved since. Re-enhancing is
     # the thumbnail menu's job, pressed while looking at the settings it uses.

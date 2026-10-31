@@ -1,8 +1,8 @@
-"""One in-flight generation, tracked independently of any Generate panel.
+"""One in-flight generation, tracked independently of any Generate tab.
 
 The gallery re-rolls a folder's settings in place, so it needs to submit a
 workflow to ComfyUI and follow it — progress, live preview, completion, cancel —
-without a panel or a Generate subtab. This wraps that lifecycle: it filters the
+without a tab or a Generate subtab. This wraps that lifecycle: it filters the
 shared client's multiplexed signals down to its own job and reports them as
 plain Qt signals. It owns no database or widget state; the caller decides what
 to persist and how to display it.

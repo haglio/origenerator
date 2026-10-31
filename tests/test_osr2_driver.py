@@ -10,7 +10,7 @@ from tests.running_ahead_support import record_the_app_running_ahead
 
 class FakePlayer:
     """Only exposes position() — the driver follows the playhead and doesn't gate
-    on QMediaPlayer's playback state (the info-pane preview auto-plays and has no
+    on QMediaPlayer's playback state (the Generate pane preview auto-plays and has no
     pause control; the Drive OSR2 button is the on/off)."""
 
     def __init__(self, pos=0):

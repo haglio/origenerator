@@ -947,7 +947,7 @@ class WorkflowTemplate(ABC):
         this that base render is computed and thrown away, leaving an enhanced
         result with nothing to compare it against. Saved under its own prefix,
         it becomes the row's original — the version a re-enhance runs from and
-        the one the info pane offers beside the enhanced one. Empty when the
+        the one the Generate pane offers beside the enhanced one. Empty when the
         tail isn't running, since then the primary save IS the base render.
         """
         if not params.get("enhance"):

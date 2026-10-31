@@ -3,7 +3,7 @@
 The row itself is vague. A row the import scan reconstructed keeps the tail's
 numbers under the generic names any sampler has — ``steps`` and ``denoise`` — and
 says nothing at all about the upscale, so folding it on its params alone would
-file the level with a blank settings line and leave the Enhance panel unable to
+file the level with a blank settings line and leave the Enhance pane unable to
 tell it apart from a level it has not made yet. The graph that ran is exact about
 all of it, and it is stored on the row.
 

@@ -272,7 +272,7 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
     does leave is one every collection filters out for having produced nothing. So it
     used to simply disappear: minutes of GPU, the tile gone off the Job Queue, and no
     word anywhere but the log. Someone watching read that as a success and went
-    looking for the clip."""
+    looking for the video."""
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1706,7 +1706,7 @@ def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, 
 
 def test_a_picked_act_shows_no_source_video_at_all(qtbot):
     # The act names what the video will do, which is the whole of what was
-    # chosen. The clip its settings were mined out of answers a question nobody
+    # chosen. The video its settings were mined out of answers a question nobody
     # asked, and an image of a video the user never picked reads as a job that
     # is that video.
     db = FakeDB([])
@@ -2235,7 +2235,7 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     assert item.cancel is None            # nothing on the server to stop yet
 
 
-def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_shows_the_dropped_video(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     db.update_generation("vid", thumbnail_path="thumbs/vid.jpg")
     view = GalleryView(db, client=_reroll_client())
@@ -2254,7 +2254,7 @@ def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypat
 
 def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, monkeypatch):
     # It stands in for a launch, so it must not outlive one that never happened.
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip: no epsilon video
+    db = _combine_db(tmp_path)  # its one video is a "dance" video: no epsilon video
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()

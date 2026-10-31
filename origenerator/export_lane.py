@@ -1,4 +1,4 @@
-"""The lanes a finished clip is handed down to a sibling app.
+"""The lanes a finished video is handed down to a sibling app.
 
 One :class:`ExportLane` per lane, :data:`EXPORT_LANES` is all of them, and
 :func:`lane_for` is the one lane the config tab offers a video.
@@ -24,7 +24,7 @@ class ExportLane:
     """One outbound lane: a folder in Evolver's inbox, a column on the row, and
     the words its button and its failure wear.
 
-    Both lanes are the same errand — copy the clip on display into the inbox
+    Both lanes are the same errand — copy the video on display into the inbox
     Evolver watches, then stamp the row so the send survives a restart — and
     they differ in nothing but the fields below. Written out twice they were
     fifty lines of code with four literals swapped, and the panel's own docstring

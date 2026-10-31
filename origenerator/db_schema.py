@@ -58,23 +58,23 @@ CREATE TABLE IF NOT EXISTS generations (
     -- the same write: the pair is one fact, and half-written it would either hide
     -- a copy Evolver still holds or condemn one just sent. Evolver reads this
     -- column out of this table (it reads no other app's), and deletes every copy
-    -- of the clip it is holding -- the send is a file copy, so undoing it has to
+    -- of the video it is holding -- the send is a file copy, so undoing it has to
     -- be a file delete, and only the app whose folders they are can find them.
     -- It stays set afterwards rather than being cleared, because nothing on this
     -- side learns when Evolver has finished; it is the standing answer to "should
-    -- this clip be in the library", not a request that drains.
+    -- this video be in the library", not a request that drains.
     evolver_unsent_at TEXT,
-    -- The twin of evolver_exported_at for the Genau lane: a clip sent to be
+    -- The twin of evolver_exported_at for the Genau lane: a video sent to be
     -- upscaled and delivered to Genau's folder. Separate because the two sends
     -- go to different source folders and mean different things, so a video can
     -- have had one, the other, or both.
     genau_exported_at TEXT,
-    -- The Genau lane's twin of evolver_unsent_at, and read the same way: a clip
+    -- The Genau lane's twin of evolver_unsent_at, and read the same way: a video
     -- withdrawn here is deleted from Genau's own folder as well as from the
     -- pipeline that put it there.
     genau_unsent_at TEXT,
     -- Set at launch on a run a spoken animation started, so its completion hands
-    -- the clip on without being asked again. On the row rather than in memory
+    -- the video on without being asked again. On the row rather than in memory
     -- because a restart mid-generation is routine, and it is the only thing
     -- separating such a run from the identical loop workflow started by hand,
     -- which must stay put until Send-to-Genau is pressed.
@@ -98,17 +98,17 @@ CREATE TABLE IF NOT EXISTS generations (
     -- origenerator.gallery.enhance.enhance_target_id). NULL on a row from
     -- before this was recorded, which falls back to matching the file.
     enhance_of TEXT,
-    -- The clip this row is one cycle of, by that clip's prompt_id. Nothing
-    -- writes it any more: cutting a finished clip down was how a Genau flick was
+    -- The video this row is one cycle of, by that video's prompt_id. Nothing
+    -- writes it any more: cutting a finished video down was how a Genau flick was
     -- made for one afternoon, until the lane learned to ask the sampler for a
     -- loop one cycle long instead (origenerator.gallery.combine.cycle_shaped),
     -- which is the same answer without a second file. The cuts that were made
     -- are still here and still in Genau's folder, so the column stays and the
-    -- Generate tab still follows it back to the clip each came out of. An
+    -- Generate tab still follows it back to the video each came out of. An
     -- identity rather than a filename, for the reason enhance_of is one, and the
     -- whole of what the two rows know about each other: a cut's params are its
     -- source's, so it sits in the same settings folder and nothing else on it
-    -- says which of that folder's clips it was cut from.
+    -- says which of that folder's videos it was cut from.
     trimmed_from TEXT,
     -- What made the row, as a JSON block (origenerator.provenance): stamped at
     -- launch, or worked out later for a row from before launches were stamped.

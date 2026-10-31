@@ -163,7 +163,7 @@ def _video_in_flight(prompt_id: str, frame: Path, **params) -> dict:
 def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
     """A folder's key names the image the run animates, and that image can be
     on the other side — here a tall image in a folder whose size says
-    landscape, so the image sits under Landscape while the clip made from its
+    landscape, so the image sits under Landscape while the video made from its
     tall frame sits under Portrait. Each side draws its own tree, but from the
     whole library's start frames: keyed off its own side's images alone, the
     Portrait tree would draw this folder under a name nothing else in the app

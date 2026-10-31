@@ -95,7 +95,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     def build_api_payload(self, params: dict) -> dict:
         loras = self.lora_chain("13", ["1", 0], picked_loras(params, LORA_KEYS),
                                 clip_ref=["2", 0])
-        model_ref, clip_ref = loras.model, loras.clip
+        model_ref, clip_ref = loras.model, loras.clip_ref
         if params.get("enhance"):
             # The tail's own upscale is this workflow's namesake 4x, so the
             # plain output stays reachable either way — it is what the base save

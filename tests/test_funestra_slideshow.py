@@ -577,6 +577,31 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
         ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up"]]
 
 
+def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before_its_list(
+        qtbot, tmp_path, monkeypatch):
+    """The session draws whatever HUD is out when its Funestra takes the list,
+    so a HUD that came after the list, or filled in after it, was a Satellite
+    switching to Origenerator mode in stages (2026-10-29)."""
+    out_when_the_list_went: list = []
+    hand_the_list_over = FunestraChannel.write_playlist
+
+    def write_playlist(channel, items):
+        out_when_the_list_went.append(
+            parse_hud(channel.hud_file.read_text(encoding="utf-8"))
+            if channel.hud_file.exists() else None)
+        hand_the_list_over(channel, items)
+
+    monkeypatch.setattr(FunestraChannel, "write_playlist", write_playlist)
+
+    _slideshow(qtbot, tmp_path, levels=_LEVELS,
+               actions=SlideshowActions(queue_now=lambda: ([_inflight("j1")], 0)))
+
+    hud = out_when_the_list_went[0]
+    assert f"{OPEN}|j1" in [button.command for _rect, button in hud.foot.targets]
+    assert not next(button for row in hud.rows for button in row
+                    if button.command == "portrait_cycle_version").dim
+
+
 class _Core:
     def __init__(self, *, minimized: bool) -> None:
         self._minimized = minimized

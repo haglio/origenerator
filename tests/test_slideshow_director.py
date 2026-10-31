@@ -75,7 +75,7 @@ class FakeSignal:
 class FakeSlideshow:
     """A slideshow reduced to what the director asks of one."""
 
-    def __init__(self, items=(), *, actions=None, pace=None, hud=None, **kwargs):
+    def __init__(self, items=(), *, actions=None, pace=None, hud=None, levels=None, **kwargs):
         self.items = list(items)
         self.actions = actions
         self.pace = pace
@@ -93,7 +93,7 @@ class FakeSlideshow:
         self.said = []
         self.said_kinds = []
         self.runs_said = []
-        self.levels = None
+        self.levels = levels
         self.resumed = None
         self.taken_up = None
         self.filters = SlideshowFilters()
@@ -1445,7 +1445,7 @@ def test_a_slideshow_handed_to_a_sessions_funestra_opens_with_what_is_in_flight(
 
     director.fill_the_region(PORTRAIT)
 
-    assert made[0].shown.queue_set == ([waiting], 3)
+    assert made[0].actions.queue_now() == ([waiting], 3)
 
 
 def test_what_is_in_flight_reaches_a_slideshow_on_a_sessions_funestra(slideshows):
@@ -1907,7 +1907,7 @@ def test_the_queue_block_comes_up_filled_rather_than_blank(slideshows):
 
     director.open([("a.png", "image", "g1", None)])
 
-    assert made[0].shown.queue_set == ([waiting], 3)
+    assert made[0].actions.queue_now() == ([waiting], 3)
 
 
 def test_the_blocks_clear_drops_another_apps_work(slideshows):

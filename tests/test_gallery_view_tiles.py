@@ -36,7 +36,7 @@ from origenerator.gallery.collection import (
     LATEST_KEY,
 )
 from origenerator.gui import (
-    corner_controls,
+    corner_buttons,
     icons,
 )
 from origenerator.gui.drag_thumbnail import DragOut

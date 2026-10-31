@@ -33,7 +33,7 @@ def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
 
 
 def test_folder_tile_shows_its_folder_level_badge(qtbot):
-    # A model/LoRA/workflow tile wears the same lettered chip the tree does, so a
+    # A model/LoRA/workflow tile wears the same TOC initial the tree does, so a
     # folder's place in the hierarchy reads even in the mixed Favorites collection.
     tile = FolderTile("k", "wan model", [], 3,
                       badge=icons.folder_badge(gallery.ModelGroup("k", "wan model", [])))

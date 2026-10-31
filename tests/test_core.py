@@ -11,6 +11,7 @@ from xml.etree import ElementTree
 
 import pytest
 from app_support import loading_screen as launchers_screen
+from app_support.frame_channel import _HEADER
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
@@ -25,7 +26,6 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import RECENTS_KEY, FolderCollection

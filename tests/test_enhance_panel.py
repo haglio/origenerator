@@ -42,6 +42,7 @@ import origenerator.gui.enhance_panel as enhance_panel_module
 import origenerator.gui.training_controls as training_controls_module
 import origenerator.workflows.detail_parts as parts
 from origenerator import config, fix_training
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.enhance_presets import Preset
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
@@ -72,6 +73,7 @@ from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from origenerator.workflows.model_files import NO_LORA
 from tests import gestures
 from tests.drop_style_seen import worn
+from tests.text_readers import clip_reader
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
@@ -1846,7 +1848,7 @@ def test_a_fixs_prompts_fit_an_enhance_panel_dragged_as_short_as_it_goes(qtbot):
 
     window = panel._fix_prompt_windows["hands"]
     assert window.geometry() == QRect(panel.mapToGlobal(QPoint(0, 0)), panel.size())
-    for field in (window.positive, window.negative):
+    for field in (*window.positive.boxes(), *window.negative.boxes()):
         assert field.height() >= 2 * field.fontMetrics().lineSpacing()
 
 
@@ -2094,7 +2096,7 @@ def worded_fix(qtbot, monkeypatch, worded_loras, titled_models):
     panel, _edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    window.positive.setPlainText("a close-up")
+    window.positive.boxes()[0].setPlainText("a close-up")
     window.lora.setCurrentIndex(window.lora.findData("example_style.safetensors"))
     return window
 
@@ -2111,7 +2113,7 @@ def test_clicking_a_fixs_trigger_word_warning_puts_the_word_at_the_start_of_its_
         qtbot, worded_fix, mark):
     qtbot.mouseClick(getattr(worded_fix, mark), Qt.MouseButton.LeftButton)
 
-    assert worded_fix.positive.toPlainText() == "exmplstyle, a close-up"
+    assert worded_fix.positive.value() == "exmplstyle, a close-up"
     assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
 
 
@@ -2290,8 +2292,8 @@ def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
     panel, edits = _panel(qtbot)
     panel._fix_prompt_buttons["hands"].click()
     window = panel._fix_prompt_windows["hands"]
-    window.positive.setPlainText("open palms")
-    window.negative.setPlainText("fists")
+    window.positive.boxes()[0].setPlainText("open palms")
+    window.negative.boxes()[0].setPlainText("fists")
 
     window.accept()
 
@@ -2301,9 +2303,59 @@ def test_ok_on_a_fixs_prompts_keeps_them_and_cancel_keeps_nothing(qtbot):
     panel._fix_prompt_buttons["hands"].click()
     again = panel._fix_prompt_windows["hands"]
     assert (again.prompts()["prompt"], again.prompts()["avoid"]) == ("open palms", "fists")
-    again.positive.setPlainText("something else")
+    again.positive.boxes()[0].setPlainText("something else")
     again.reject()
     assert len(edits) == kept
+
+
+@pytest.fixture
+def clip_installed(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+
+
+@pytest.fixture
+def boxed_fix(qtbot, clip_installed):
+    panel, edits = _panel(qtbot)
+    panel.show_settings(EnhanceSettings(params={
+        **default_enhance_params(),
+        "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}))
+    panel._fix_prompt_buttons["hands"].click()
+    return panel._fix_prompt_windows["hands"], edits
+
+
+def _cats(count: int) -> str:
+    return " ".join(["cat"] * count)
+
+
+def test_a_fixs_prompt_flows_into_boxes_of_whole_words_and_ok_keeps_them(qtbot, boxed_fix):
+    window, edits = boxed_fix
+    (box,) = window.positive.boxes()
+
+    box.setPlainText(f"{_cats(74)} open palms")
+    qtbot.waitUntil(lambda: len(window.positive.boxes()) == 2, timeout=5000)
+    window.accept()
+
+    assert edits[-1].params["enhance_fix_prompts"]["hands"]["prompt"] == (
+        f"{_cats(74)}{BOX_BREAK}open palms")
+
+
+def test_a_fixs_one_prompt_box_fills_its_column_as_its_field_always_has(boxed_fix):
+    window, _edits = boxed_fix
+    window.resize(700, 600)
+    window.layout().activate()
+
+    (box,) = window.positive.boxes()
+    assert box.height() == window.positive.height() > 4 * box.fontMetrics().lineSpacing()
+
+
+def test_a_fixs_trigger_word_clicked_in_goes_at_the_start_of_its_first_box_and_flows_on(
+        qtbot, clip_installed, worded_fix):
+    worded_fix.positive.boxes()[0].setPlainText(_cats(70))
+
+    qtbot.mouseClick(worded_fix.prompt_warning, Qt.MouseButton.LeftButton)
+
+    assert worded_fix.positive.value() == f"exmplstyle, {_cats(64)}{BOX_BREAK}{_cats(6)}"
 
 
 def test_a_fixs_prompts_already_open_are_brought_forward_rather_than_opened_twice(qtbot):

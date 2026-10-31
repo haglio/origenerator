@@ -81,8 +81,10 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
+from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
+from origenerator.prompt_tokens import prompt_reading
 from origenerator.setting_advice import fix_lora_model_advice, trigger_word_advice
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
@@ -776,6 +778,13 @@ class EnhancePanel(QWidget):
         self._emit()
 
 
+def _prompt_boxes(key: str, text: str) -> PromptBoxes:
+    boxes = PromptBoxes(QPlainTextEdit)
+    boxes.set_reading(prompt_reading(ENHANCE_WORKFLOW, {}, key))
+    boxes.set_value(text)
+    return boxes
+
+
 def _side_by_side(*widgets) -> QWidget:
     host = QWidget()
     row = QHBoxLayout(host)
@@ -799,8 +808,8 @@ class FixPromptsDialog(QDialog):
         heading = QLabel(self.windowTitle())
         heading.setStyleSheet("font-weight: bold;")
         layout.addWidget(heading)
-        self.positive = QPlainTextEdit(current["prompt"])
-        self.negative = QPlainTextEdit(current["avoid"])
+        self.positive = _prompt_boxes("positive_prompt", current["prompt"])
+        self.negative = _prompt_boxes("negative_prompt", current["avoid"])
         self.prompt_warning, self.lora_warning = WarningMark(), WarningMark()
         side_by_side = QHBoxLayout()
         for caption, field in (((self.prompt_warning, QLabel("Positive Prompt")), self.positive),
@@ -842,7 +851,7 @@ class FixPromptsDialog(QDialog):
         self._warn_of_a_missing_trigger_word()
 
     def _missing_trigger_word(self):
-        return trigger_word_advice({"positive_prompt": self.positive.toPlainText(),
+        return trigger_word_advice({"positive_prompt": self.positive.value(),
                                     "lora": self.lora.currentData()}, ("lora",)).get("lora")
 
     def _warn_of_a_missing_trigger_word(self) -> None:
@@ -853,7 +862,7 @@ class FixPromptsDialog(QDialog):
     def _add_the_missing_trigger_word(self) -> None:
         missing = self._missing_trigger_word()
         if missing is not None:
-            self.positive.setPlainText(missing.fixed(self.positive.toPlainText()))
+            self.positive.rewrite(missing.fixed)
 
     def show_training(self, text: str | None) -> None:
         self._running = text
@@ -875,7 +884,7 @@ class FixPromptsDialog(QDialog):
 
     def prompts(self) -> dict:
         return fix_prompts_of(self._part, {
-            "prompt": self.positive.toPlainText(), "avoid": self.negative.toPlainText(),
+            "prompt": self.positive.value(), "avoid": self.negative.value(),
             "lora": self.lora.currentData(), "strength": self.strength.value()})
 
     def show_over_parent(self) -> None:

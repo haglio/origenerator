@@ -6,7 +6,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QApplication
-from shared_ui.colors import AMBER, RED, TEXT_MUTED
+from shared_ui.colors import AMBER, BG_PRIMARY, RED, TEXT_MUTED
 from shared_ui.fonts import FONT_UI, SIZE_BODY
 from shared_ui.spacing import GAP_SMALL
 
@@ -70,7 +70,7 @@ def test_a_box_with_more_than_15_tokens_to_spare_shows_no_countdown(prompt):
     assert _shown(prompt) == []
 
 
-def test_a_box_counts_down_its_last_15_tokens_in_amber(prompt):
+def test_a_box_counts_down_its_last_15_tokens_in_yellow(prompt):
     prompt.set_value(_words(60))
     assert _shown(prompt) == [("15 left", AMBER.name())]
 
@@ -97,7 +97,38 @@ def test_a_prompt_read_whole_counts_down_to_what_its_reader_reads_well_then_how_
     assert _shown(prompt) == [("3 over", RED.name())]
 
 
-def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it(qtbot):
+def _past_the_limit(box) -> list[tuple[str, str, str]]:
+    text = box.toPlainText()
+    return [(text[span.start:span.start + span.length], span.format.background().color().name(),
+             span.format.foreground().color().name())
+            for span in box.document().firstBlock().layout().formats()]
+
+
+def test_the_words_past_what_a_prompt_read_whole_reads_well_are_highlighted_in_yellow(qtbot):
+    prompt = _prompt_fields("positive_prompt")
+    qtbot.addWidget(prompt)
+    prompt.set_reading(word_reading(3, READ_WHOLE))
+
+    prompt.set_value("a b c d e")
+
+    (box,) = prompt.boxes()
+    assert _past_the_limit(box) == [("d e", AMBER.name(), BG_PRIMARY.name())]
+
+
+def test_on_a_tab_showing_an_item_only_the_prompts_own_words_past_the_limit_are_yellow(qtbot):
+    prompt = _prompt_fields("positive_prompt")
+    qtbot.addWidget(prompt)
+    prompt.set_reading(word_reading(3, READ_WHOLE))
+    prompt.set_value("a b c d")
+
+    prompt.track("a x b c d y")
+
+    (box,) = prompt.boxes()
+    assert box.toPlainText() == "a x b c d y"
+    assert [text for text, _ground, _ink in _past_the_limit(box)] == ["d"]
+
+
+def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it_on_yellow(qtbot):
     sound = _prompt_fields("audio_prompt")
     qtbot.addWidget(sound)
     sound.set_reading(word_reading(76, CUT_OFF))
@@ -106,9 +137,7 @@ def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it(
 
     assert _shown(sound) == [("3 over", RED.name())]
     (box,) = sound.boxes()
-    layout = box.document().firstBlock().layout()
-    assert [(span.start, span.format.foreground().color().name()) for span in layout.formats()] == [
-        (len(_words(76)) + 1, TEXT_MUTED.name())]
+    assert _past_the_limit(box) == [(_words(3), AMBER.name(), TEXT_MUTED.name())]
 
 
 def test_a_prompt_whose_reader_is_not_installed_counts_nothing(prompt):

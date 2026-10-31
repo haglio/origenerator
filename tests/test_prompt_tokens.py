@@ -168,8 +168,21 @@ def test_a_sound_prompt_past_its_cut_off_says_where_its_reader_stops(comfyui, tm
     read = " ".join(["rain"] * 76)
     reading = prompt_reading("wan22_i2v", {}, "audio_prompt")
 
-    assert (reading.stops_at(f"{read} on a tin roof"), reading.stops_at("hiss")) == (
+    assert (reading.past_limit_at(f"{read} on a tin roof"), reading.past_limit_at("hiss")) == (
         len(read) + 1, None)
+
+
+def test_a_prompt_read_whole_says_where_it_runs_past_what_its_reader_reads_well(comfyui):
+    word_reader(comfyui / "comfy" / "text_encoders" / "t5_tokenizer" / "tokenizer.json")
+    read = " ".join(["(alpha:1.1)"] * 511)
+    reading = prompt_reading("flux_t2i_upscaled", {}, "positive_prompt")
+
+    assert (reading.past_limit_at(f"{read} beta"), reading.past_limit_at(read)) == (
+        len(read) + 1, None)
+
+
+def test_an_sdxl_prompt_runs_past_no_limit_since_its_boxes_flow(comfyui):
+    assert _clip(comfyui).past_limit_at(_cats(80)) is None
 
 
 def test_a_form_hears_how_each_of_its_prompts_is_read(comfyui, tmp_path):

@@ -28,7 +28,7 @@ _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.mouseDoubleClickEvent  # noqa  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
 _.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
-_.highlightBlock  # noqa  # origenerator/gui/unread_words.py:11
+_.highlightBlock  # noqa  # origenerator/gui/past_the_limit.py:12
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219

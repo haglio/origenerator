@@ -205,6 +205,17 @@ class _Tracker(QObject):
             doc += len(text)
         return doc
 
+    def prompt_ranges_from(self, prompt_offset: int) -> list[tuple[int, int]]:
+        ranges, doc, prompt = [], 0, 0
+        for kind, text in self._layout:
+            if kind != REMOVED:
+                start = max(prompt_offset - prompt, 0)
+                if start < len(text):
+                    ranges.append((doc + start, doc + len(text)))
+                prompt += len(text)
+            doc += len(text)
+        return ranges
+
     # --- rendering ----------------------------------------------------------
 
     def _paint(self, spans: list, caret: int) -> None:
@@ -341,6 +352,13 @@ def caret_in_prompt(edit: QPlainTextEdit) -> int:
     position = edit.textCursor().position()
     trackers = edit.findChildren(_Tracker)
     return trackers[0].prompt_offset(position) if trackers else position
+
+
+def prompt_ranges_from(edit: QPlainTextEdit, offset: int) -> list[tuple[int, int]]:
+    trackers = edit.findChildren(_Tracker)
+    if not trackers:
+        return [(offset, len(edit.toPlainText()))]
+    return trackers[0].prompt_ranges_from(offset)
 
 
 def put_caret_in_prompt(edit: QPlainTextEdit, offset: int) -> None:

@@ -8,7 +8,7 @@ from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.generation_state import GenerationSource
-from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.animations import _VideoTile
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.source_tile import SourceTile
 
@@ -99,7 +99,7 @@ def related(make_related):
 def test_a_row_tied_to_nothing_shows_no_links(related):
     assert related._source_section.isHidden()
     assert related._source_tile.isHidden()
-    assert related._animated_strip.isHidden()
+    assert related._animations.isHidden()
 
 
 def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
@@ -109,7 +109,7 @@ def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
 
     assert not related._source_tile.isHidden()
     assert related._source_tile._prompt_id == "img1"
-    assert related._animated_strip.isHidden()   # a video is animated into nothing
+    assert related._animations.isHidden()   # a video is animated into nothing
 
 
 def test_the_start_image_is_called_by_its_name_not_its_file(related):
@@ -147,7 +147,7 @@ def test_a_video_lists_what_its_starting_frame_was_animated_into(make_related):
     related.show_row(video, [_hidden_frame()])
 
     assert _animated(related) == ["vid2"]
-    assert related._animated_strip._heading.text() == "Starting frame animated in"
+    assert related._animations._heading.text() == "Starting frame animated in"
 
 
 def test_a_video_animated_from_another_videos_starting_frame_points_at_that_video(make_related):
@@ -170,14 +170,14 @@ def test_two_videos_animated_from_one_starting_frame_are_not_listed_on_each_othe
     assert related._animations_section.isHidden()
 
 
-def test_an_image_keeps_its_own_heading_after_a_videos_starting_frame_was_shown(make_related):
+def test_an_image_has_no_heading_after_a_videos_starting_frame_was_shown(make_related):
     video, image = _taken_out_of(), _image_row()
     related = make_related(video, _video_row("vid2", input_image="frame1.jpg"), _video_row("vid3"))
     related.show_row(video, [_hidden_frame(), image])
 
     related.show_row(image, [_hidden_frame(), image])
 
-    assert related._animated_strip._heading.text() == "Animated in"
+    assert related._animations._heading.isHidden()
 
 
 def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combine(make_related):
@@ -209,14 +209,14 @@ def test_an_image_lists_the_videos_it_was_animated_into(make_related):
 
     related.show_row(image, [image])
 
-    assert not related._animated_strip.isHidden()
-    assert len(related._animated_strip.findChildren(_VideoTile)) == 1
+    assert not related._animations.isHidden()
+    assert len(related._animations.findChildren(_VideoTile)) == 1
     assert related._source_tile.isHidden()      # an image has no start frame
 
 
 def _animated(related):
-    """The prompt id of each video in the image's Animated in strip, in its order."""
-    return [tile._prompt_id for tile in related._animated_strip._host.findChildren(_VideoTile)]
+    """The prompt id of each video in the image's Animations, in its order."""
+    return [tile._prompt_id for tile in related._animations._host.findChildren(_VideoTile)]
 
 
 def _drawn_links(related, row, image_rows):
@@ -426,7 +426,7 @@ def test_the_animations_sit_in_a_section_headed_animations(make_related):
     section = related._animations_section
     assert section._title == "Animations"
     assert not section.isHidden()
-    assert section.isAncestorOf(related._animated_strip)
+    assert section.isAncestorOf(related._animations)
 
 
 def test_a_row_animated_into_nothing_shows_no_animations_section(make_related):
@@ -446,7 +446,7 @@ def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
     named = []
     related.link_clicked.connect(named.append)
 
-    tile, = related._animated_strip.findChildren(_VideoTile)
+    tile, = related._animations.findChildren(_VideoTile)
     tile.mousePressEvent(QMouseEvent(
         QMouseEvent.Type.MouseButtonPress, QPoint(1, 1).toPointF(),
         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,

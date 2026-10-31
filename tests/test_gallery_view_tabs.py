@@ -16,7 +16,7 @@ from origenerator import (
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui import generate_tab as generate_tab_module
-from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.animations import _VideoTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.preview_widget import PreviewWidget
@@ -35,8 +35,8 @@ from tests.gallery_view_support import (
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
-def _animated_strip(view):
-    return view._info_tabs.current_config_panel()._related._animated_strip
+def _animations(view):
+    return view._generate_pane.current_generate_tab()._related._animations
 
 
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
@@ -49,11 +49,11 @@ def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
     view.refresh()
 
     view._on_thumbnail_clicked("img1")
-    assert not _animated_strip(view).isHidden()
-    assert len(_animated_strip(view).findChildren(_VideoTile)) == 1
+    assert not _animations(view).isHidden()
+    assert len(_animations(view).findChildren(_VideoTile)) == 1
 
     # Clicking the preview navigates to that video.
-    _animated_strip(view).video_activated.emit("vid1")
+    _animations(view).video_activated.emit("vid1")
     assert view._selected["prompt_id"] == "vid1"
 
 
@@ -69,11 +69,11 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
         tab._preview.show_media = MagicMock()  # don't start WMF playback
 
     view._on_thumbnail_clicked("vid1")   # a video isn't "animated into" anything
-    assert _animated_strip(view).isHidden()
+    assert _animations(view).isHidden()
 
     view._on_thumbnail_clicked("img2")   # an image nothing was made from
-    assert _animated_strip(view).isHidden()
-    assert _animated_strip(view).findChildren(_VideoTile) == []
+    assert _animations(view).isHidden()
+    assert _animations(view).findChildren(_VideoTile) == []
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
@@ -157,7 +157,7 @@ def test_the_generate_pane_is_a_tab_widget_of_editable_generate_tabs(qtbot):
     # special or permanent tab. The first one opens on construction, hosting the
     # preview a selection lands in.
     assert isinstance(view._generate_pane, QTabWidget)
-    # The pane is the tabs plus the find strip that searches them, so the splitter
+    # The pane is the tabs plus the find bar that searches them, so the splitter
     # holds a wrapper rather than the tab widget itself.
     assert view._arrangement.panes.widget(1).isAncestorOf(view._generate_pane)
     assert isinstance(view._generate_pane.widget(0), GenerateTab)

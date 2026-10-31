@@ -10,7 +10,7 @@ whoever built it remembered to say so.
 What a freeze reaches is registered rather than wired per widget:
 :func:`~origenerator.gui.looping_preview.play_in` builds every looping
 thumbnail in the app, so one call there covers the grid, the collections, a tab's
-history strip and the "Animated in" strip together.
+version list and the Animations together.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class _TheRoom:
 
 # Weak, because everything here is parented to the widget that shows it: PyQt
 # keeps a parented wrapper alive as long as its parent, so an entry lives
-# exactly as long as the thing it stands for and a rebuilt strip leaves nothing.
+# exactly as long as the thing it stands for and a rebuilt row leaves nothing.
 _held: weakref.WeakSet = weakref.WeakSet()
 
 

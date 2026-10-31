@@ -16620,6 +16620,23 @@ def test_a_request_rewritten_past_a_boxs_end_queues_in_boxes_of_whole_words(
     assert job.params["positive_prompt"] == f"{cats[1]}{BOX_BREAK}{cats[2]}"
 
 
+def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (75, 5)]
+    stored = f"a hat,{BOX_BREAK}{cats[0]}{BOX_BREAK}{cats[1]}"
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=stored)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    record = view._db.get_request(job.prompt_id)
+    assert (record["old_positive"], record["new_positive"]) == (
+        stored, f"{cats[0]}{BOX_BREAK}{cats[1]}")
+    assert record["new_positive"] == job.params["positive_prompt"]
+
+
 def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 

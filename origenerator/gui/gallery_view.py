@@ -2916,10 +2916,10 @@ class GalleryView(QWidget):
         the one thing deliberately not re-rolled is the seed that draws it.
         """
         name = row.get("workflow_name") or ""
-        params = {**params, **{key: boxed_as_typed(name, params, key, said) for key, said in (
+        revised = {**params, **{key: boxed_as_typed(name, params, key, said) for key, said in (
             ("positive_prompt", revision.positive), ("negative_prompt", revision.negative))}}
-        key = self.folder_key_for(name, params)
-        if not self._jobs.start_prepared(key, workflow, params):
+        key = self.folder_key_for(name, revised)
+        if not self._jobs.start_prepared(key, workflow, revised):
             return "couldn't queue the request — see the log", ERROR
         job = self._jobs.newest_job_for(key)
         logger.info("Request on %s: term %s, queued as %s", row.get("prompt_id"),
@@ -2927,10 +2927,10 @@ class GalleryView(QWidget):
         self._db.record_request(
             prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
             heard=spoken.heard, asked=spoken.text, term=revision.term,
-            polarity=revision.polarity,
-            action=revision.action, old_positive=revision.old_positive,
-            old_negative=revision.old_negative, new_positive=revision.positive,
-            new_negative=revision.negative,
+            polarity=revision.polarity, action=revision.action,
+            old_positive=params.get("positive_prompt", ""),
+            old_negative=params.get("negative_prompt", ""),
+            new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
         )
         self.refresh()  # the queue marks the job as a request the moment it is spoken
         return "Request submitted", NOTICE

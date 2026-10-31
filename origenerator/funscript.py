@@ -28,6 +28,7 @@ from funestra.heatmap import build_heatmap
 
 from origenerator.evolver_upscales import original_stem
 from origenerator.media import VIDEO_EXTS, video_header
+from origenerator.one_look import is_file
 from origenerator.output_places import OutputPlaces
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ def library_funscript_of(video_path, *, videos_dir, scripts_dir) -> Path | None:
 
 
 def _first_file(paths) -> Path | None:
-    return next((path for path in paths if path.is_file()), None)
+    return next((path for path in paths if is_file(path)), None)
 
 
 def _script_of_upscaled(stem: str, places: OutputPlaces) -> Path | None:

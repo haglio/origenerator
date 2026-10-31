@@ -21,7 +21,7 @@ from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.preview import Preview
 
-from origenerator import act_settings, app_link, downtime, gallery, notice_toast, ui_scale
+from origenerator import act_settings, app_link, downtime, gallery, toast_raising, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -31,7 +31,7 @@ from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.sides import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import core, desktop_notices
+from origenerator.gui import core, toasts
 from origenerator.gui.core import Core
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.panes import PaneSplitter
@@ -40,7 +40,7 @@ from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.window_monitor import the_window_on
 from origenerator.media import MediaType
 from origenerator.orientation import oriented_key
-from origenerator.run_notice import RunOutcome
+from origenerator.run_toast import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -628,7 +628,7 @@ def test_once_the_window_has_gone_comfyui_is_asked_with_nothing_of_the_windows_r
         qtbot, tmp_path):
     """While the window is up, a hand-over waits on a thread of its own and the
     window's events run meanwhile, so it keeps answering. Once it has gone those
-    are a closed window's events -- a click on a notification would put it back
+    are a closed window's events -- a click on a toast would put it back
     on screen -- so each hand-over waits for ComfyUI where it is."""
     db = Database(tmp_path / "t.db")
     for prompt_id in ("first", "second"):
@@ -1690,10 +1690,10 @@ def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
 def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     # The whole chain, because every link in it is one the app has no other
     # reason to have: the queue's news leaves the gallery, the window hands it to
-    # the notices, and Windows shows it wherever the user has got to.
+    # the toasts, and Windows shows it wherever the user has got to.
     win = _window(qtbot, tmp_path)
     said = []
-    monkeypatch.setattr(notice_toast, "show",
+    monkeypatch.setattr(toast_raising, "show",
                         lambda app_id, xml, **_filing: said.append(xml))
 
     win._gallery_view._jobs.run_ended.emit(
@@ -1706,29 +1706,29 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     assert app_link.generation_in(toast.get("launch")) == "alpha-1"
 
 
-def test_a_video_watched_in_the_window_takes_its_notice_back(qtbot, tmp_path, monkeypatch):
+def test_a_video_watched_in_the_window_takes_its_toast_back(qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
     filed, taken_back = [], []
-    monkeypatch.setattr(notice_toast, "show",
+    monkeypatch.setattr(toast_raising, "show",
                         lambda app_id, xml, **filing: filed.append(filing["tag"]))
-    monkeypatch.setattr(notice_toast, "take_back",
+    monkeypatch.setattr(toast_raising, "take_back",
                         lambda app_id, **filing: taken_back.append(filing["tag"]))
-    monkeypatch.setattr(desktop_notices, "app_in_front", lambda: True)
-    monkeypatch.setattr(desktop_notices, "seconds_since_input", lambda: 0.0)
+    monkeypatch.setattr(toasts, "app_in_front", lambda: True)
+    monkeypatch.setattr(toasts, "seconds_since_input", lambda: 0.0)
     win._gallery_view._jobs.run_ended.emit(
         RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
     front_tab = win._gallery_view._info_tabs.current_config_panel()
     monkeypatch.setattr(front_tab, "video_on_screen", lambda: "alpha-1")
 
-    win._notices.look()
+    win._toasts.look()
 
     assert taken_back == filed
 
 
-def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(
+def test_answering_a_toast_brings_the_window_forward_and_opens_the_item(
         qtbot, tmp_path, monkeypatch):
-    # The whole point of a notice being clickable: whatever the user was doing,
+    # The whole point of a toast being clickable: whatever the user was doing,
     # the app comes up in front of it showing the thing that just landed.
     win = _window(qtbot, tmp_path)
     win.showMinimized()
@@ -1743,9 +1743,9 @@ def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(
     assert went == ["alpha-1"]
 
 
-def test_answering_a_notice_for_an_item_that_has_since_gone_still_comes_forward(
+def test_answering_a_toast_for_an_item_that_has_since_gone_still_comes_forward(
         qtbot, tmp_path):
-    # A notice waits in Windows' notification center until it is answered, which
+    # A toast waits in Windows' notification center until it is answered, which
     # can be after the thing it announced was deleted.
     win = _window(qtbot, tmp_path)
 
@@ -1754,7 +1754,7 @@ def test_answering_a_notice_for_an_item_that_has_since_gone_still_comes_forward(
     assert win._gallery_view.selected_prompt_id() is None
 
 
-def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
+def test_answering_a_toast_in_a_session_asks_the_room_for_origenerator_mode(
         qtbot, tmp_path, monkeypatch):
     # Hosted, this window is the session's to show: in video mode it sits
     # parked under the players, so taking the foreground for itself would be a

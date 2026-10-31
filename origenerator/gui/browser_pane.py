@@ -384,7 +384,7 @@ class BrowserPane(QObject):
     """Fills the middle scroll area (folder tiles / thumbnail grid / collections) and
     owns the thumbnail multi-selection and in-flight tiles. Held by the GalleryView,
     which connects the signals below to its own handlers — a gesture on a tile is
-    the pane's to notice and the view's to answer."""
+    the pane's to see and the view's to answer."""
 
     thumbnail_activated = pyqtSignal(str)   # a tile was clicked: preview this item
     tab_pin_requested = pyqtSignal()        # an "I'm staying" gesture: keep the tab

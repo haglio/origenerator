@@ -140,7 +140,7 @@ def test_the_panel_is_one_column_with_no_side_pane(panel):
 def test_the_column_reads_preview_then_generate_then_settings(panel):
     """Generate heads the settings under the line below the preview, rather
     than trailing them in the lower right corner, where Windows pops up its
-    notices over whatever is there."""
+    messages over whatever is there."""
     panel.show()
     panel.resize(700, 800)
     QApplication.processEvents()
@@ -2467,11 +2467,11 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     assert corner(panel._action).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
 
 
-# --- the modified notice: the preview no longer answers the form -------------
+# --- the modified message: the preview no longer answers the form -------------
 
-def _notice(panel):
+def _message(panel):
     """What the preview is saying over its image, or "" when it says nothing."""
-    return "" if panel._preview._notice.isHidden() else panel._preview._notice.text()
+    return "" if panel._preview._message.isHidden() else panel._preview._message.text()
 
 
 def _set_prompt(panel, text):
@@ -2484,7 +2484,7 @@ def test_a_browsed_generation_arrives_unmarked(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def test_editing_a_setting_marks_the_image_as_not_generated_yet(saved_panel):
@@ -2494,7 +2494,7 @@ def test_editing_a_setting_marks_the_image_as_not_generated_yet(saved_panel):
 
     _set_prompt(panel, "a dog")
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_putting_the_setting_back_clears_the_mark(saved_panel):
@@ -2505,7 +2505,7 @@ def test_putting_the_setting_back_clears_the_mark(saved_panel):
 
     _set_prompt(panel, "a cat")
 
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def _video_of_a_workflow_the_app_lacks(db, workflow_name, prompt_id="old1"):
@@ -2539,7 +2539,7 @@ def test_a_video_from_a_retired_workflow_says_so_under_the_workflow_dropdown(sav
     panel.show_saved_generation(video, [])
 
     assert _note(panel) == _RETIRED_NOTE
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def test_the_note_under_the_workflow_dropdown_leads_with_the_familys_warning(saved_panel):
@@ -2644,7 +2644,7 @@ def test_an_image_made_with_a_model_that_is_not_installed_says_so_under_the_work
     assert _note(panel) == ("This was made with retired_checkpoint, which isn't installed "
                             "anymore, so no new ones can be made with it until an installed one "
                             "is picked in its place.")
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
@@ -2769,7 +2769,7 @@ def test_picking_an_installed_model_brings_generate_back(installed_models, saved
 
     assert panel._generate_pair.isEnabled()
     assert _note(panel) == ""
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_a_video_made_with_two_models_that_are_not_installed_names_both(installed_models, saved_panel):
@@ -2815,10 +2815,10 @@ def test_editing_a_shown_image_s_prompt_marks_how_it_now_differs(saved_panel, qt
     field.setPlainText("a dog on a couch")
 
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
-def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
+def test_undoing_a_prompt_edit_takes_the_message_back_down(saved_panel, qtbot):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
@@ -2830,7 +2830,7 @@ def test_undoing_a_prompt_edit_takes_the_notice_back_down(saved_panel, qtbot):
     qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
 
     qtbot.waitUntil(lambda: diff_text.live_text(field) == "a cat on a couch", timeout=5000)
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def test_showing_the_image_a_tab_already_shows_still_marks_what_is_typed(saved_panel, qtbot):
@@ -2917,7 +2917,7 @@ def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
 
     assert panel._param_form.seed_is_random() is True
     assert panel._param_form.get_values()["seed"] != image["seed"]
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_re_rolling_the_seed_marks_it_too(saved_panel):
@@ -2929,7 +2929,7 @@ def test_re_rolling_the_seed_marks_it_too(saved_panel):
 
     panel._param_form.set_seed_random(True)
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_a_tab_with_nothing_on_display_is_never_marked(panel):
@@ -2937,7 +2937,7 @@ def test_a_tab_with_nothing_on_display_is_never_marked(panel):
     # edited constantly and must not carry a warning about an empty pane.
     _set_prompt(panel, "a dog")
     assert panel._displayed_row is None
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def _resting_on(panel, image, monkeypatch, tmp_path):
@@ -2959,11 +2959,11 @@ def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
 
     _resting_on(panel, image, monkeypatch, tmp_path)
     assert panel._displayed_row is not None
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
     _set_prompt(panel, "a dog")
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_the_idle_autoshow_is_marked_while_random_is_ticked(saved_panel, monkeypatch, tmp_path):
@@ -2972,7 +2972,7 @@ def test_the_idle_autoshow_is_marked_while_random_is_ticked(saved_panel, monkeyp
 
     _resting_on(panel, image, monkeypatch, tmp_path)
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_switching_workflow_leaves_no_stale_mark(saved_panel):
@@ -2982,11 +2982,11 @@ def test_switching_workflow_leaves_no_stale_mark(saved_panel):
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
     _set_prompt(panel, "a dog")
-    assert _notice(panel) != ""
+    assert _message(panel) != ""
 
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
 
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def _frame_bytes(tmp_path, size: int = 8) -> bytes:
@@ -3011,13 +3011,13 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
 
     panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
     # ...and it goes on standing as the run streams, rather than blinking off
     # with every frame that arrives.
     panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path, 10), "2x"))
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
@@ -3043,7 +3043,7 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     panel.refresh_displayed(enhanced, [enhanced])
     panel.set_pending_enhancement(None)  # the run is over; the pane goes back
 
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
@@ -3056,7 +3056,7 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
 
     panel._preview.show_message("Waiting for preview…", live=True)
 
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 # --- the Request section: words the image on display is asked to change by --
@@ -3148,7 +3148,7 @@ def test_an_image_a_request_is_still_making_is_marked_against_the_one_it_was_ask
     positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def test_an_image_a_request_is_still_making_links_to_the_one_it_was_asked_of(saved_panel):
@@ -3176,7 +3176,7 @@ def test_an_image_a_request_made_is_marked_against_the_one_it_was_asked_of(
     positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
     assert _positive(panel) == "a cat"
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
 
 
 def test_generate_on_a_request_leaves_what_the_request_changed_marked(saved_panel, qtbot):
@@ -3234,7 +3234,7 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display(saved_panel, qtbot,
     assert [(positive, words) for positive, _negative, words in calls] == [
         ("a woman on a couch", "two women")]
     assert field._status.isHidden()
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 def test_a_requests_rewrite_of_the_image_on_display_lands_in_boxes_of_whole_words(
@@ -3359,7 +3359,7 @@ def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(sav
     for key in ("noise_seed", "audio_seed"):
         panel._param_form._randomize_checks[key].click()
 
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
 
 
@@ -3379,7 +3379,7 @@ def test_a_video_just_clicked_says_generate_will_draw_a_random_seed(saved_panel,
 
 def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_random_seed(
         saved_panel, qtbot):
-    # Wherever the item on display came from, the notice gone means these are
+    # Wherever the item on display came from, the message gone means these are
     # the settings it was made with, and the button says so the same way.
     panel, db = saved_panel
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a cat",
@@ -3392,7 +3392,7 @@ def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_rand
 
     panel.show_saved_generation(db.get_generation("imp"), [])
 
-    assert _notice(panel) == ""
+    assert _message(panel) == ""
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
 
 
@@ -3426,7 +3426,7 @@ def test_a_run_that_lands_after_its_tab_was_changed_leaves_generate_on_the_shown
 
     qtbot.wait(gcp_module._CAPTION_DELAY_MS * 3)
     assert panel._generate_btn.text() == "Generate"
-    assert _notice(panel) == "(not yet generated with modifications)"
+    assert _message(panel) == "(not yet generated with modifications)"
 
 
 # --- Modify (all seeds): a whole folder's prompt, rewritten ------------------
@@ -3613,7 +3613,7 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
 
 def test_a_modify_tab_holds_no_generation_of_its_own(modifying):
     # It is about a folder, so there is no file on display and nothing for the
-    # "not yet generated with modifications" notice to be measured against.
+    # "not yet generated with modifications" message to be measured against.
     assert modifying.displayed_row() is None
     assert modifying._displayed_config is None
 

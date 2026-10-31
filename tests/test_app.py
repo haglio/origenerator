@@ -1012,7 +1012,7 @@ def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_b
     assert window not in [fronting.args[0] for fronting in fronted.call_args_list]
 
 
-def test_a_boot_answers_a_clicked_notice_with_the_window_it_just_built(qapp):
+def test_a_boot_answers_a_clicked_toast_with_the_window_it_just_built(qapp):
     # The listening starts before the window does (a launch here is slow enough
     # to click into twice), so the window has to be handed to it once there is
     # one -- with anything that arrived meanwhile still waiting.
@@ -1779,7 +1779,7 @@ class TestASecondCopy:
         comfyui.assert_not_called()
         window.assert_not_called()
 
-    def test_one_started_by_a_click_on_a_notice_leaves_it_to_that_copy_without_a_word(
+    def test_one_started_by_a_click_on_a_toast_leaves_it_to_that_copy_without_a_word(
             self, qapp, monkeypatch):
         # The click only had to see that some copy opens to show what it is
         # about, and the copy already open or on its loading screen has done it.
@@ -1885,7 +1885,7 @@ def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_sayin
 def test_a_click_that_waited_in_vain_for_a_closing_copy_is_told_why_nothing_opened(
         qapp, monkeypatch):
     # The copy it waited a minute for is stuck closing, not open, so nothing
-    # will show what the notice was about.
+    # will show what the toast was about.
     monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
     copies = _the_copies(monkeypatch, None, closing=True)
     copies.claim_the_library_once_the_closing_one_lets_go.return_value = None

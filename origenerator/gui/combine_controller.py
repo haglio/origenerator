@@ -39,7 +39,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
-from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_names import ItemNames
@@ -461,7 +461,7 @@ class CombineController(QObject):
 
         ``send`` hands the video to Genau the moment it exists, as a spoken
         animation asks, and takes no dialog at all, because such a command is
-        answered in the slideshow's notice. ``category`` names the act the dropdown was
+        answered in the slideshow's message. ``category`` names the act the dropdown was
         set to, when one was picked.
         """
         built = self._combined_params(image_id, video_id, intent, category)
@@ -490,7 +490,7 @@ class CombineController(QObject):
             return False
         if send:
             self._mark_for_sending(going.prompt_id, send)
-            self._slideshows.note_voice_run(None, ALREADY_MAKING_ONE, kind=NOTICE)
+            self._slideshows.note_voice_run(None, ALREADY_MAKING_ONE, kind=INFO)
         self._host.reveal_launch(key)
         return True
 
@@ -514,7 +514,7 @@ class CombineController(QObject):
         return video_id
 
     def _say_no_past_video(self, category: str, intent: str) -> None:
-        """Say the act has no past video to take settings from — in the notice of the
+        """Say the act has no past video to take settings from — in the message of the
         fullscreen surface being spoken to when one is up, and in a dialog
         otherwise. A dialog thrown over an image someone is looking at is the one
         place this must never appear."""
@@ -697,7 +697,7 @@ class CombineController(QObject):
             return None, act_settings.no_past_video(act, asked.lane), WARNING
         logger.info("animate as: image=%s lane=%s -> act=%s", image_id, asked.lane, act)
         self.generate_category(image_id, act, asked.lane, send=loop)
-        return image_id, f"animating as “{act}”", NOTICE
+        return image_id, f"animating as “{act}”", INFO
 
 
 def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:

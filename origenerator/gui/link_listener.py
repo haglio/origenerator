@@ -1,4 +1,4 @@
-"""Where a click on one of this app's notifications reaches the running app.
+"""Where a click on one of this app's toasts reaches the running app.
 
 Windows answers a click by running the production checkout's handler
 (:mod:`origenerator.app_link`), which hands the generation over here or starts
@@ -38,7 +38,7 @@ class LinkListener(QObject):
         self._server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
         self._server.newConnection.connect(self._take_a_click)
         if not self._server.listen(app_link.channel_for(checkout)):
-            logger.warning("Clicks on this app's notices cannot be answered here: %s",
+            logger.warning("Clicks on this app's toasts cannot be answered here: %s",
                            self._server.errorString())
 
     def answer_with(self, go_to: Callable[[str], None]) -> None:
@@ -70,7 +70,7 @@ class LinkListener(QObject):
             if generation:
                 logger.warning("A click asked for something that is not a generation")
             return
-        logger.info("A click on a notice asked for %s", wanted)
+        logger.info("A click on a toast asked for %s", wanted)
         if self._answer is None:
             self._waiting.append(wanted)
         else:

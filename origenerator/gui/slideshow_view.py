@@ -40,8 +40,8 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueueFoot
+from origenerator.gui.message import HEARD_MARK, INFO, Message
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, NoticeOverlay
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
     OPENS_IN,
@@ -102,10 +102,10 @@ class SlideshowView(QWidget):
         palette.setColor(QPalette.ColorRole.Window, BLACK)
         self.setPalette(palette)
 
-        # A Fun Time notice, at the top center where Fun Time flashes the same
+        # A Fun Time message, at the top center where Fun Time flashes the same
         # kind of line over a Funestra.
-        self._note = NoticeOverlay(self)
-        # What the notice reads while a spoken request pauses the slideshow, and
+        self._note = Message(self)
+        # What the message reads while a spoken request pauses the slideshow, and
         # afterwards while the request said is still being worked out -- held
         # rather than flashed, and cleared by that request's own answer.
         self._request_note = ""
@@ -332,7 +332,7 @@ class SlideshowView(QWidget):
 
     # --- the lines it flashes over the slide --------------------------------
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 1500, mark: str = "") -> None:
+    def flash(self, text: str, *, kind: str = INFO, ms: int = 1500, mark: str = "") -> None:
         """Say something for a moment, then fall back to whatever the note would
         otherwise be saying."""
         self._note.say(text, kind=kind, mark=mark)
@@ -348,13 +348,13 @@ class SlideshowView(QWidget):
         self._refresh_note()
 
     def request_line(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         """Say what the spoken *request* did, where the speaker is looking.
 
-        *working* means it has not done it yet, so the notice holds that line
+        *working* means it has not done it yet, so the message holds that line
         rather than flashing it, and it comes down only for the request that
         put it up -- a second request said over the first would otherwise blank
-        the notice while that one is still out.
+        the message while that one is still out.
         """
         if working:
             self._working_note, self._working_request = message, request
@@ -367,9 +367,9 @@ class SlideshowView(QWidget):
 
     def _refresh_note(self):
         if self._request_note:
-            self._note.say(self._request_note, kind=NOTICE, mark=HEARD_MARK)
+            self._note.say(self._request_note, kind=INFO, mark=HEARD_MARK)
         elif self._working_note:
-            self._note.say(self._working_note, kind=NOTICE, mark=HEARD_MARK)
+            self._note.say(self._working_note, kind=INFO, mark=HEARD_MARK)
         else:
             self._note.hide()
 

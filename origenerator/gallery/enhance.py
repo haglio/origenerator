@@ -330,7 +330,7 @@ def enhance_run_targets_row(enhance_of: str | None, input_image: str | None,
     (:func:`enhance_targets_row`).
 
     The one predicate every live surface asks — the tile under its scrim, the
-    tab's version list, the slideshow's notice — so they all point the same run at
+    tab's version list, the slideshow's message — so they all point the same run at
     the same image.
     """
     if enhance_of:

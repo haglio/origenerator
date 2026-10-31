@@ -26,7 +26,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
-from origenerator.gui.notice_overlay import HEARD_MARK
+from origenerator.gui.message import HEARD_MARK
 from origenerator.gui.region_openings import RegionOpening
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView

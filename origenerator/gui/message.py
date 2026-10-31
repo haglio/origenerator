@@ -1,10 +1,10 @@
-"""What a slideshow has to say, in the overlay Fun Time says it in.
+"""What a slideshow has to say, in the message Fun Time says it in.
 
-Fun Time flashes its notices — "Clip saved", "No other seeds", "Next seed" — at
+Fun Time flashes its messages — "Clip saved", "No other seeds", "Next seed" — at
 the top center of the Funestra they are about, in one shape everywhere: the panel
 gray, a hairline of the text's own color, a bold heading face, rounded corners
-(``fun_time.notice_overlay.NoticeOverlay``). This is that overlay, worn by
-Origenerator's own notices: the request being spoken, and what a press or a
+(Fun Time's own message, in its ``notice_overlay``). This is that message, worn by
+Origenerator's own: the request being spoken, and what a press or a
 spoken word just did. A plate of its own down at the foot of the slideshow would be
 a second dialect for the same job, said in the same room, on a surface that
 already wears the Funestras' own HUD.
@@ -35,11 +35,11 @@ from shared_ui.notice_shape import (
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 
-NOTICE = "notice"
+INFO = "info"
 WARNING = "warning"
 ERROR = "error"
 FAVORITE = "favorite"
-_INK = {NOTICE: TEXT_PRIMARY, WARNING: YELLOW, ERROR: RED, FAVORITE: GREEN}
+_INK = {INFO: TEXT_PRIMARY, WARNING: YELLOW, ERROR: RED, FAVORITE: GREEN}
 
 HEARD_MARK = "mic"
 
@@ -53,7 +53,7 @@ def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
     label.setText(icon_then_text(mark, text, color=color, size=label.fontMetrics().height()))
 
 
-class NoticeOverlay(QLabel):
+class Message(QLabel):
     """One line, centered across the top of the surface it belongs to."""
 
     def __init__(self, host: QWidget):
@@ -63,7 +63,7 @@ class NoticeOverlay(QLabel):
         float_over_media(self)
         self.hide()
 
-    def say(self, text: str, *, kind: str = NOTICE, mark: str = "") -> None:
+    def say(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
         """Put *text* up, and keep it up until something says otherwise."""
         ink = _INK[kind].name()
         self.setStyleSheet(

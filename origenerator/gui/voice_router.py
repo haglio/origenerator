@@ -47,7 +47,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
-from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE, WARNING, set_marked_text
+from origenerator.gui.message import ERROR, HEARD_MARK, INFO, WARNING, set_marked_text
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.voice.app_commands import (
@@ -240,7 +240,7 @@ class VoiceRouter(QObject):
         # What that caption goes back to saying rather than the idle line: the
         # request it is still working out, and which request that is. It has one
         # place, so a line flashed over the promise has to know what to restore
-        # — the slideshow's notice keeps its own copy of the same pair.
+        # — the slideshow's message keeps its own copy of the same pair.
         self._working_status = ""
         self._working_request = None
         # The bank the spoken words act through, bound once it exists.
@@ -327,7 +327,7 @@ class VoiceRouter(QObject):
 
     def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
         """Flash a line on the caption. The slideshows use this when there is no
-        slideshow up whose own notice could carry it."""
+        slideshow up whose own message could carry it."""
         self._show(message, transient=True, mark=mark)
 
     def _set_caption(self, text: str | None, mark: str = HEARD_MARK) -> None:
@@ -381,11 +381,11 @@ class VoiceRouter(QObject):
     def _on_error(self, message: str) -> None:
         self._say_both(message, kind=ERROR)
 
-    def _say_both(self, message: str, *, kind: str = NOTICE) -> None:
+    def _say_both(self, message: str, *, kind: str = INFO) -> None:
         """Put what voice heard or hit in front of whoever is listening.
 
         Both places, because they are different screens: this pane's caption for
-        someone working in the window, and the slideshow's own notice for someone
+        someone working in the window, and the slideshow's own message for someone
         watching a slideshow — who can see nothing of this window at all, and
         for whom a mic that heard nothing and one that heard the wrong words
         look exactly alike.
@@ -518,7 +518,7 @@ class VoiceRouter(QObject):
 
         "Mic off" is the one with no way back: a shut mic hears nothing, so the
         button is what turns it on again. Its answer is still worth saying —
-        with a slideshow up it lands in the slideshow's notice, where the bank is not
+        with a slideshow up it lands in the slideshow's message, where the bank is not
         visible to say it instead.
         """
         switch, want, name = _SWITCHES[command]
@@ -636,7 +636,7 @@ class VoiceRouter(QObject):
         """One step of a spoken request — from the mic's dictation, or from the
         hosting session's channel with the region it was said to.
 
-        While it is still being said the slideshow pauses and its notice says so;
+        While it is still being said the slideshow pauses and its message says so;
         finished, it queues a revision of the item it was opened over. The
         target is taken at the opening step and kept, because a request is about
         the image that prompted it, not whatever is up when the words run out.
@@ -675,7 +675,7 @@ class VoiceRouter(QObject):
 
     def _pause_for_request(self, slideshow, spoken) -> None:
         """Pause (or release) the slideshow while the sentence is being said, and say
-        so — in the slideshow's own notice when one is up, since that is where the
+        so — in the slideshow's own message when one is up, since that is where the
         speaker is looking, and in this pane's voice caption otherwise."""
         note = (f"Request: {spoken.text}… — say “over” to submit"
                 if spoken.listening else "")
@@ -685,7 +685,7 @@ class VoiceRouter(QObject):
             self._show(note, transient=False)
 
     def _answer_request(self, slideshow, message: str, spoken, *,
-                        working: bool = False, kind: str = NOTICE) -> None:
+                        working: bool = False, kind: str = INFO) -> None:
         """Say what *spoken* did, where the speaker is looking.
 
         *working* is the one line that is not an answer but a promise of one, so

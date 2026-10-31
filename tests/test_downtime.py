@@ -238,7 +238,7 @@ def test_a_training_evolver_started_is_announced_once_when_it_ends_unless_alread
     downtime.announce_trainings_that_ended(announced.append)
     downtime.announce_trainings_that_ended(announced.append)
 
-    assert [(notice.title, notice.body.split(" · ")[0]) for notice in announced] == [
+    assert [(toast.title, toast.body.split(" · ")[0]) for toast in announced] == [
         ("LoRA ready", "Hands fix 1.0")]
 
 

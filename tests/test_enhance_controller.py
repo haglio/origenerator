@@ -23,7 +23,7 @@ from origenerator.gui.enhance_controller import (
     EnhanceController,
     Offer,
 )
-from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DetailPart
 
@@ -783,7 +783,7 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
 
     assert prompt_id == "i1"
     assert message == "fixing hands…"
-    assert kind == NOTICE
+    assert kind == INFO
 
 
 def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):

@@ -1,4 +1,4 @@
-"""The notification Windows itself raises, and what it is told to draw.
+"""The toast Windows itself raises, and what it is told to draw.
 
 Nothing here shows one: a toast raised by a test is a toast on the user's
 screen and a line in their notification center, so what is exercised is
@@ -59,7 +59,7 @@ def test_a_workflow_name_with_markup_in_it_is_said_rather_than_read():
 
 def test_windows_reads_what_a_toast_document_says():
     # The document is Windows' own parser's, not this app's: a toast it cannot
-    # read is a notification that never appears, and there is nothing to see.
+    # read is a toast that never appears, and there is nothing to see.
     document = windows_toast.document_of(
         windows_toast.toast_xml("Video ready", "Example Workflow · 4:12",
                                 link="origenerator:go-to?generation=alpha-1",
@@ -89,5 +89,5 @@ def test_a_name_longer_than_windows_files_under_is_refused_before_anything_is_ra
 
 
 def test_taking_back_a_notification_nobody_raised_is_no_error():
-    # Under an app id nothing uses, so it reaches no notification of the user's.
+    # Under an app id nothing uses, so it reaches no toast of the user's.
     windows_toast.take_back("Example.NothingUsesThisId", tag="never-raised", group="runs")

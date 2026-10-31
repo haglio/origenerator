@@ -210,7 +210,7 @@ def render_base_now(client, workflow, params: dict, *,
     (:func:`rows_missing_their_base`), what settings reproduce it
     (:func:`base_params_for`), and how the result is attached
     (:func:`attach_base`). A submit loop kept alone in ``tools/`` is the one
-    piece nothing here would notice going out of step.
+    piece nothing here would catch going out of step.
 
     ``now`` and ``sleep`` are injected so the wait can be tested without one.
     """

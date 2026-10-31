@@ -74,10 +74,10 @@ from origenerator.gui.generate_button import (
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
 from origenerator.gui.label_cells import LabelCell, LabelForm
+from origenerator.gui.message import set_marked_text
 from origenerator.gui.metadata_block import MetadataBlock, wrappable
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.no_wheel import NoWheelComboBox
-from origenerator.gui.notice_overlay import set_marked_text
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
@@ -130,7 +130,7 @@ _FLOOR_CAP = 330
 
 # What the preview says once the form has been edited away from the generation
 # on it: that item was generated, these settings have not been.
-_MODIFIED_NOTICE = "(not yet generated with modifications)"
+_MODIFIED_MESSAGE = "(not yet generated with modifications)"
 
 # What the preview says while following a run that has streamed no frame yet,
 # where the gallery has nothing more specific to say about the wait.
@@ -842,7 +842,7 @@ class GenerateConfigPanel(DropZones):
         self._param_form.changed.connect(self._note_user_edit)
         self._param_form.changed.connect(self._follow_the_model)
         self._param_form.changed.connect(self._show_advice)
-        self._param_form.changed.connect(self.refresh_modified_notice)
+        self._param_form.changed.connect(self.refresh_modified_message)
         self._param_form.changed.connect(self._mark_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
@@ -1396,7 +1396,7 @@ class GenerateConfigPanel(DropZones):
         The folder's own settings fill the form, its prompts are marked against
         what they say now (:mod:`origenerator.gui.tracked_prompt`), and its images
         fill the preview, tiled. Nothing about it is one generation, so the tab
-        shows no file, no footer and no "modified" notice. ``thumbnails`` carries one
+        shows no file, no footer and no "modified" message. ``thumbnails`` carries one
         entry per run the press will make, whether or not there is a thumbnail for
         it, so the count in the hover is of images rather than of readable files.
         """
@@ -1409,7 +1409,7 @@ class GenerateConfigPanel(DropZones):
         )
         self._hide_footer()
         self._set_displayed_row(None)  # a folder, not a generation on display
-        self._displayed_config = None  # ...so no settings for a notice to deviate from
+        self._displayed_config = None  # ...so no settings for a message to deviate from
         self._preview.show_folder(thumbnails)
         self._reflow_for_the_media()
         if self._param_form is not None:
@@ -1458,7 +1458,7 @@ class GenerateConfigPanel(DropZones):
         self._hide_footer()
         self._related.show_requests_and_modifications(row["prompt_id"])
         self._preview.clear()          # whatever was up is not this run's
-        self._note_displayed_config(being_made=row)  # nothing saved for a notice to deviate from
+        self._note_displayed_config(being_made=row)  # nothing saved for a message to deviate from
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
@@ -1641,8 +1641,8 @@ class GenerateConfigPanel(DropZones):
             # user's edits as the new baseline, and the "not yet generated with
             # modifications" plate vanished the moment an enhancement landed, from
             # over the very frames it had been standing over. Only re-asserted,
-            # because the item put up above took the notice off with the old one.
-            self.refresh_modified_notice()
+            # because the item put up above took the message off with the old one.
+            self.refresh_modified_message()
         self._sync_generate()
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
@@ -1681,7 +1681,7 @@ class GenerateConfigPanel(DropZones):
     def _note_displayed_config(self, made_with: dict | None = None, *,
                                being_made: dict | None = None):
         """Take the settings a generation arriving in this tab was made with
-        as the mark to measure edits against, and clear any notice left from the
+        as the mark to measure edits against, and clear any message left from the
         last one: the form's, or ``made_with`` for a result of this tab's own
         Generate, since the form may have been edited while that run was made.
         What happens to the generation already on display leaves the mark alone
@@ -1698,7 +1698,7 @@ class GenerateConfigPanel(DropZones):
                     self._param_form.clear_prompt_rewrites()
                 else:
                     self._param_form.track_prompt_rewrites(marked_against)
-        self.refresh_modified_notice()
+        self.refresh_modified_message()
 
     def _marked_against(self) -> dict | None:
         aim = self._request_aim
@@ -1787,16 +1787,16 @@ class GenerateConfigPanel(DropZones):
                               {**params, **self._param_form.item_seeds()},
                               seed_is_random=False)
 
-    def refresh_modified_notice(self):
+    def refresh_modified_message(self):
         """Mark the preview when the form no longer describes the item on it.
 
-        Putting the settings back takes the notice away again. Public because the
+        Putting the settings back takes the message away again. Public because the
         version list re-shows a level of the same row from outside the form, which
-        clears the notice, so whoever did that re-asserts it.
+        clears the message, so whoever did that re-asserts it.
         """
         modified = (self._displayed_config is not None
                     and not self._would_remake_what_it_shows())
-        self._preview.set_notice(_MODIFIED_NOTICE if modified else None)
+        self._preview.set_message(_MODIFIED_MESSAGE if modified else None)
 
     def _would_remake_what_it_shows(self) -> bool:
         return (self._displayed_config is not None
@@ -1871,7 +1871,7 @@ class GenerateConfigPanel(DropZones):
             return
         self._preview.show_media(*preview, row["prompt_id"])
         self._arm_preview_actions()
-        self.refresh_modified_notice()  # the item is back; so is anything said about it
+        self.refresh_modified_message()  # the item is back; so is anything said about it
 
     def set_fullscreen_factory(self, make):
         """Wire what a double-click on this tab's preview opens — a slideshow of
@@ -1998,7 +1998,7 @@ class GenerateConfigPanel(DropZones):
             self._preview.show_media(path, media_type_of_row(self._displayed_row),
                                      self._displayed_row["prompt_id"])
             self._arm_preview_actions()  # still the same generation, still actionable
-            self.refresh_modified_notice()  # a version of the same generation, same notice
+            self.refresh_modified_message()  # a version of the same generation, same message
 
     def _video_rows(self) -> list[dict]:
         return self._library.now().video_rows

@@ -31,9 +31,9 @@ _SWP_NOZORDER = 0x0004
 _SWP_NOACTIVATE = 0x0010
 
 # What this app calls itself to Windows. It is not decoration: the taskbar
-# groups by it, and it is the name Windows prints over a notification this app
+# groups by it, and it is the name Windows prints over a toast this app
 # raises, so it is this app's name and no one else's. It read
-# "FunTime.Origenerator" until the notifications made that visible.
+# "FunTime.Origenerator" until the toasts made that visible.
 APP_USER_MODEL_ID = "Origenerator"
 
 
@@ -47,14 +47,14 @@ def _write_string_values(key_path: str, values: dict[str, str]) -> None:
             winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
 
 
-def register_notification_identity(app_id: str, *, name: str, icon: Path,
+def register_toast_identity(app_id: str, *, name: str, icon: Path,
                                    write=_write_string_values) -> None:
-    """Say what Windows calls this app over a notification, and what mark
+    """Say what Windows calls this app over a toast, and what mark
     it draws.
 
     It takes both from whatever is registered under the AppUserModelID the
     process claims; with nothing registered it prints the id itself beside a
-    generic glyph, which is how this app's first notification came out headed
+    generic glyph, which is how this app's first toast came out headed
     "FunTime.Origenerator". Written on every launch rather than once, so a mark
     that has moved or been deleted comes back, and never fatal.
     """
@@ -63,14 +63,14 @@ def register_notification_identity(app_id: str, *, name: str, icon: Path,
               {"DisplayName": name, "IconUri": str(icon)})
     except OSError as exc:
         logging.getLogger(__name__).warning(
-            "Could not register the notification identity: %s", exc)
+            "Could not register the toast identity: %s", exc)
 
 
 def register_link_handler(scheme: str, *, name: str, command: str,
                           write=_write_string_values) -> None:
     """Say what Windows runs to follow a link of this app's.
 
-    A notification carries a link rather than a way back to the process that
+    A toast carries a link rather than a way back to the process that
     raised it, because it outlives that process (:mod:`origenerator.app_link` is
     what Windows runs and why). Written on every launch, and never fatal.
     """

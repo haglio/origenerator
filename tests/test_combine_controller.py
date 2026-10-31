@@ -26,7 +26,7 @@ from origenerator.gui import file_pick
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
-from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
@@ -988,7 +988,7 @@ def test_animate_as_runs_the_act_it_names_in_the_lane_it_names(combine, monkeypa
 
     answer = controller.animate_it("img", AnimateRequest(act_settings.GENAU, "waving"))
 
-    assert answer == ("img", "animating as “waving”", NOTICE)
+    assert answer == ("img", "animating as “waving”", INFO)
     assert launched == [(("img", "waving", act_settings.GENAU), {"send": True})]
 
 

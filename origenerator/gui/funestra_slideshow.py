@@ -43,7 +43,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
 from origenerator.gui.level_stepper import LevelStepper
-from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.message import HEARD_MARK, INFO, WARNING
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -628,11 +628,11 @@ class FunestraSlideshow(QObject):
             self.slideshow_loop(SEED)
             return
         said, narrowed = narrow_to_acts(self._set, query)
-        self._flash(said, kind=NOTICE if narrowed else WARNING)
+        self._flash(said, kind=INFO if narrowed else WARNING)
 
     def slideshow_filter_to_the_act_on_screen(self) -> None:
         said, narrowed = narrow_to_the_act_on_screen(self._set)
-        self._flash(said, kind=NOTICE if narrowed else WARNING)
+        self._flash(said, kind=INFO if narrowed else WARNING)
 
     def slideshow_nav(self, direction: str) -> None:
         target = self._set.nav_target(direction)
@@ -843,19 +843,19 @@ class FunestraSlideshow(QObject):
         self.shown.dictating(note if paused else "")
 
     def note_request(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         self.shown.request_line(message, request, working=working, kind=kind)
 
-    def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
+    def note_voice_command(self, message: str, *, kind: str = INFO) -> None:
         self.shown.flash(message, kind=kind, ms=2500, mark=HEARD_MARK)
 
-    def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
+    def note_voice_run(self, prompt_id, message: str, *, kind: str = INFO) -> None:
         if prompt_id is not None:
             self._set.note_enhancement_asked(prompt_id)
             self._publish()
         self.note_voice_command(message, kind=kind)
 
-    def _flash(self, message: str, *, kind: str = NOTICE, mark: str = "") -> None:
+    def _flash(self, message: str, *, kind: str = INFO, mark: str = "") -> None:
         self.shown.flash(message, kind=kind, mark=mark)
 
     def release_media(self, paths) -> None:
@@ -952,12 +952,12 @@ class OnASessionsFunestra:
         if text != self._published and publish_whole(self._channel.hud_file, text):
             self._published = text
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 0, mark: str = "") -> None:
+    def flash(self, text: str, *, kind: str = INFO, ms: int = 0, mark: str = "") -> None:
         if self._say is not None:
             self._say(text, mark=mark)
 
     def request_line(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         self.flash(message, kind=kind, mark=HEARD_MARK)
 
     def dictating(self, note: str) -> None:

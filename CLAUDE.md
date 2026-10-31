@@ -129,6 +129,18 @@ for one thing cost four. So:
   another word: an audit that called the HUD a "panel", the Job Queue
   "the list of pictures and videos being made or waiting" and Standalone
   "on its own" left him asking whether each meant his word.
+- **`glossary.json` lists the things on this app's screen and their words, and
+  `tests/test_glossary.py` holds the code to it.** One row per thing: the word
+  on the screen, the word the user says, the words the code says today, the one
+  word the code is to say, and whether he has ruled. A noun the code reaches
+  for to name a drawn thing (tile, card, badge, chip, scrim, plate, strip, cell,
+  slot, pane, panel, console, band, toast, and the rest the test names) is a
+  row there before it is a word in the code, so a new name is a row he rules
+  on rather than a word an agent invents. A rename moves the old word from the
+  row's `code_today` to its `retired`, which the test then holds at zero, and a
+  row naming a code word the code no longer says is stale, which the test says
+  too. A thing with no word of his yet has a row that says so, and the next
+  piece of work on that thing asks him for one.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 

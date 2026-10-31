@@ -57,7 +57,7 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 def _looping_video(db, prompt_id="loop"):
-    """A past looping clip for the Genau lane to mine, sampled the long way --
+    """A past looping video for the Genau lane to mine, sampled the long way --
     21 frames at 16fps, which is a cycle and a half and the whole problem."""
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     db.insert_generation(
@@ -72,9 +72,9 @@ def _looping_video(db, prompt_id="loop"):
 
 
 def test_the_genau_lane_asks_for_settings_one_cycle_long(qtbot, tmp_path):
-    """The lane used to choose only WHICH past clip was mined, and from there a
+    """The lane used to choose only WHICH past video was mined, and from there a
     Genau flick was made exactly like any other video. It cannot be: what Genau
-    needs of a clip is a property of its LENGTH, and the clip being mined was
+    needs of a video is a property of its LENGTH, and the video being mined was
     made before anyone knew that."""
     db = _combine_db(tmp_path)
     wf = _looping_video(db)
@@ -117,7 +117,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
 
 
 def test_the_video_lane_takes_the_mined_settings_as_they_stand(qtbot, tmp_path):
-    # A clip for a Funestra is watched at its own rate and wants the settings that
+    # A video for a Funestra is watched at its own rate and wants the settings that
     # made the one it was mined from.
     db = _combine_db(tmp_path)
     wf = _looping_video(db)
@@ -344,7 +344,7 @@ def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
 
 
 def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip
+    db = _combine_db(tmp_path)  # its one video is a "dance" video
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
 
@@ -389,7 +389,7 @@ def _launched_row(view):
 
 def test_settings_from_a_dropped_video_name_that_video(qtbot, tmp_path):
     # Nothing in the params says which video the settings were lifted off, and
-    # the queue row draws that clip in gray beside the frame being animated.
+    # the queue row draws that video in gray beside the frame being animated.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -572,8 +572,8 @@ def _combine_view_with_a_looping_video(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    clip = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
-    view.animated_preview = lambda row: clip
+    video = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
+    view.animated_preview = lambda row: video
     return view
 
 
@@ -748,7 +748,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
 
 
 def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon video exists
+    db = _combine_db(tmp_path)  # its one video is a "dance" video — no epsilon video exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()

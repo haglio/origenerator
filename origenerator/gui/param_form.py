@@ -62,7 +62,7 @@ from origenerator.workflows.lora_rows import lora_key_of, strength_without_its_l
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive
 # prompt), what each scene keeps out (stored as the negative prompt), each
-# scene's length, each scene's lines, and the clip's length they add up to.
+# scene's length, each scene's lines, and the video's length they add up to.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines",
                "frame_count")
 
@@ -139,7 +139,7 @@ class ParamForm(QWidget):
     :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
     whether a seed written in by :meth:`set_values` also clears its Random tick.
     False (video) leaves the tick ticked and a fresh seed in the field, so the
-    settings of a clip loaded into a tab don't quietly pin every later run to its
+    settings of a video loaded into a tab don't quietly pin every later run to its
     seed.
     """
 
@@ -1021,7 +1021,7 @@ class ParamForm(QWidget):
         }
         if (self._scenes is not None and "frame_count" in params
                 and len(params.get("scene_frames") or []) <= 1):
-            # A lone scene is the whole clip and runs for the clip length, which
+            # A lone scene is the whole video and runs for the video length, which
             # is all that settings from before scenes (or from the overlay) carry.
             params = {**params, "scene_frames": [params["frame_count"]]}
         # The story first: it sets how many scenes there are, and every other

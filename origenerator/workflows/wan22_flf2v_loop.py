@@ -4,7 +4,7 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
-    LONGEST_CLIP_FRAMES,
+    LONGEST_VIDEO_FRAMES,
     ParamDef,
     ParamType,
     WorkflowTemplate,
@@ -93,7 +93,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("scene_frames", "Scenes", ParamType.SCENES, defaults["scene_frames"], min_val=5,
-                     max_val=LONGEST_CLIP_FRAMES, step=4, options=DURATION_OPTIONS,
+                     max_val=LONGEST_VIDEO_FRAMES, step=4, options=DURATION_OPTIONS,
                      unit="s", rate=NATIVE_FPS),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
@@ -101,7 +101,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
             ParamDef("audio_seed", "Sound Seed", ParamType.SEED, defaults["audio_seed"]),
-            ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=LONGEST_CLIP_FRAMES, step=4,
+            ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=LONGEST_VIDEO_FRAMES, step=4,
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS, good=(17, 49)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(4, 8)),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1, good=(1, 1)),
@@ -205,7 +205,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         # frame (WorkflowTemplate.chain_segments); its frames come back joined.
         segments, decoded_ref, total_frames = self.chain_segments(params, frame_ref, segment)
         # Scored for the frames the scenes really add up to, which is what the
-        # stored clip length says whenever the form wrote it.
+        # stored video length says whenever the form wrote it.
         foley, audio_ref = self.foley_audio_nodes(
             "19", "20", "21", decoded_ref, {**params, "frame_count": total_frames})
         # Foley scores the decoded frames; VHS_VideoCombine writes the

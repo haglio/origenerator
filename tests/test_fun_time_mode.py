@@ -230,8 +230,8 @@ def test_videos_without_stills_are_probed_rather_than_defaulted(tmp_path):
     # all, and "nothing" fell to landscape — which is how a portrait slideshow
     # once landed on the landscape region.  With no stills to vote, the first
     # video's own frame answers.
-    clip = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
-    items = [(str(clip), "video", "a", None), (str(clip), "video", "b", None)]
+    video = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
+    items = [(str(video), "video", "a", None), (str(video), "video", "b", None)]
     assert region_for_items(items) == "portrait"
 
 

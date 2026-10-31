@@ -939,9 +939,9 @@ def _spoken_genau_rows(view):
 
 def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, monkeypatch):
     # Saying it twice is what you do when the first time appeared to do nothing,
-    # and it does appear to: the clip queues after whatever the machine is on
+    # and it does appear to: the video queues after whatever the machine is on
     # and the image on screen doesn't change. Two identical runs would spend
-    # minutes of the one GPU making a clip that is already coming.
+    # minutes of the one GPU making a video that is already coming.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
     view._slideshows._slideshow = surface
@@ -957,7 +957,7 @@ def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, mo
 
 def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    # A clip that has arrived is still a clip of this image — asking again
+    # A video that has arrived is still a video of this image — asking again
     # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_act")
@@ -976,7 +976,7 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
-    # Asking again is the only way to get a clip after a failure, so a row that
+    # Asking again is the only way to get a video after a failure, so a row that
     # produced nothing must not read as this image having been Genau'd.
     view = _genau_view(qtbot, tmp_path)
     view._slideshows._slideshow = _VoiceSurface("img_act")
@@ -1128,12 +1128,12 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
 
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     # The folder is read off the lane, so a spoken send and a pressed one cannot
-    # differ about where a clip lands.
+    # differ about where a video lands.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")   # as a spoken launch would have
-    clip = Path("C:/out/flf2v_loop_1.mp4")
+    video = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (clip, "video"))
+                        lambda row, out: (video, "video"))
     sent = []
     monkeypatch.setattr(combine_controller.evolver_export, "export_video",
                         lambda src, dest, funscript=None:
@@ -1141,7 +1141,7 @@ def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
 
     view._on_reroll_finished("k", "loop")
 
-    assert sent == [(clip, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert sent == [(video, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
     assert view._db.get_generation("loop")["genau_exported_at"]
 
 
@@ -1161,7 +1161,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
 
 
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
-    # The inbox copy is the only thing that failed; the clip itself is fine, and
+    # The inbox copy is the only thing that failed; the video itself is fine, and
     # Send-to-Genau is still there to retry with.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")

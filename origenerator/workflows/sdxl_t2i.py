@@ -113,8 +113,8 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
             **loras.nodes,
-            **prompt_conditioning("2", loras.clip, params["positive_prompt"]),
-            **prompt_conditioning("3", loras.clip, params["negative_prompt"]),
+            **prompt_conditioning("2", loras.clip_ref, params["positive_prompt"]),
+            **prompt_conditioning("3", loras.clip_ref, params["negative_prompt"]),
             "4": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {

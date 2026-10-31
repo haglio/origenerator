@@ -287,9 +287,9 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
 
 
 def test_the_corner_stands_the_source_video_beside_the_frame_where_there_is_one(queue, tmp_path):
-    # A combine's job is an image and a past clip's settings, and that is what
+    # A combine's job is an image and a past video's settings, and that is what
     # the config tab shows above the form. The corner says the same thing, the
-    # clip drawn gray beside the frame — so it needs the room for two.
+    # video drawn gray beside the frame — so it needs the room for two.
 
     frame = _image(tmp_path / "frame.png")
     video = _image(tmp_path / "source.png", color=(255, 0, 0))
@@ -1401,7 +1401,7 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
 
 
 def test_a_combine_row_shows_the_frame_and_the_source_video_it_follows(queue, tmp_path):
-    # Not the source video alone: that reads as a job that IS that clip. The
+    # Not the source video alone: that reads as a job that IS that video. The
     # frame being animated leads, and the video whose settings are being reused
     # sits beside it (drawn gray, see queue_thumbs).
     frame = _image(tmp_path / "frame.png")

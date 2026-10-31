@@ -31,6 +31,7 @@ SCREEN_NOUNS = frozenset((
 ))
 
 _IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+_IDENTIFIER_ONLY = re.compile(r"[A-Za-z0-9_]+")
 _WORD = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 
 
@@ -50,7 +51,7 @@ def _word_streams():
     for where, number, line in _source_lines():
         tokens = _IDENTIFIER.findall(line)
         words = [w for token in tokens for w in _words_of(token)]
-        yield where, number, tokens, words
+        yield where, number, tokens, words, line
 
 
 @pytest.fixture(scope="module")
@@ -65,20 +66,42 @@ def streams():
 
 def _said_somewhere(phrase: str, streams) -> bool:
     wanted = " " + " ".join(phrase.lower().split()) + " "
-    return any(wanted in " " + " ".join(w.lower() for w in words) + " " for _, _, _, words in streams)
+    return any(wanted in " " + " ".join(w.lower() for w in words) + " " for _, _, _, words, _ in streams)
 
 
-def _mentions(word: str, keep: list[str], streams) -> list[str]:
-    """Where the code still says ``word`` as a word of its own, outside ``keep``."""
+def _kept(token: str, line: str, keep: list[str]) -> bool:
+    """A keep that is one identifier spares the tokens holding it; one with a space
+    or a stop in it is a phrase, and spares the lines that say it."""
+    return any(k.lower() in (token if _IDENTIFIER_ONLY.fullmatch(k) else line).lower() for k in keep)
+
+
+def _counted(word: str, token: str) -> bool:
+    """An acronym (CLIP, TOC, HUD) is not the word; a constant spelled in capitals is."""
+    return not word.isupper() or (token.isupper() and "_" in token)
+
+
+def _forms(word: str) -> set[str]:
+    return {word, word + "s", word + "es"}
+
+
+def _says(wanted: list[str], words: list[str]) -> bool:
+    return words[:-1] == wanted[:-1] and words[-1] in _forms(wanted[-1])
+
+
+def _mentions(retired: str, keep: list[str], streams) -> list[str]:
+    """Where the code still says ``retired``, outside ``keep``: a word as a word of
+    its own, plural or not; a phrase as those words one after another, in one
+    identifier or across a line."""
+    wanted = retired.lower().split()
     hits = []
-    for where, number, tokens, _ in streams:
-        for token in tokens:
-            if any(k.lower() in token.lower() for k in keep):
-                continue
-            for w in _words_of(token):
-                if w.lower() == word.lower() and not w.isupper():
-                    hits.append(f"{where}:{number} {token}")
-                    break
+    for where, number, tokens, _, line in streams:
+        said = [(w.lower(), token) for token in tokens if not _kept(token, line, keep)
+                for w in _words_of(token) if _counted(w, token)]
+        for at in range(len(said) - len(wanted) + 1):
+            run = said[at:at + len(wanted)]
+            if _says(wanted, [w for w, _ in run]):
+                hits.append(f"{where}:{number} {' '.join(token for _, token in run)}")
+                break
     return hits
 
 
@@ -118,6 +141,6 @@ def test_every_screen_noun_in_the_code_has_a_row_in_the_glossary(glossary, strea
              for row in glossary["things"]
              for phrase in row["code_today"] + [row["code_word"] or ""] + row.get("retired", [])
              for w in phrase.split()}
-    said = {w.lower() for _, _, _, words in streams for w in words}
+    said = {w.lower() for _, _, _, words, _ in streams for w in words}
     outside = sorted((SCREEN_NOUNS & said) - named)
     assert not outside, f"the code says these nouns for things on screen and the glossary has no row for them: {outside}"

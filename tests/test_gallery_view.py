@@ -1827,8 +1827,8 @@ def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtb
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
-    clip = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
-    view = GalleryView(FakeDB([still, clip]))
+    video = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
+    view = GalleryView(FakeDB([still, video]))
     qtbot.addWidget(view)
     view.refresh()
     looping = workflow_label("wan22_flf2v_loop")

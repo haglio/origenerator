@@ -306,7 +306,7 @@ def test_mark_evolver_exported_persists_across_reopen(tmp_path):
 
 def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
     # The two stamps are one fact read from both sides: this app's button asks
-    # whether the clip is out there, and Evolver asks whether to delete it.
+    # whether the video is out there, and Evolver asks whether to delete it.
     db_path = tmp_path / "test.db"
     db = Database(db_path)
     db.insert_generation(
@@ -347,7 +347,7 @@ def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
 
 
 def test_taking_back_one_lane_leaves_the_other_send_standing(tmp_path):
-    # A clip can be in both apps' hands; withdrawing it from one says nothing
+    # A video can be in both apps' hands; withdrawing it from one says nothing
     # about the other.
     db = Database(tmp_path / "test.db")
     db.insert_generation(

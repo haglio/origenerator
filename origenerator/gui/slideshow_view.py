@@ -314,7 +314,7 @@ class SlideshowView(QWidget):
 
     def room_paused(self, paused: bool) -> None:
         """Freeze or resume the Funestra here whole, with the room: a frozen
-        image stops counting down its pace, a frozen clip stops, and a slide
+        image stops counting down its pace, a frozen video stops, and a slide
         stepped to while frozen arrives frozen too."""
         self._paused = paused
         self._pane.set_paused(paused)

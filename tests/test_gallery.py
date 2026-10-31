@@ -89,9 +89,9 @@ def test_the_all_group_gathers_images_and_videos_and_walks_to_every_row():
 
 
 def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
-    clip, still = _i2v("v1", "styleA"), _img("i1", "a cat", 50, 1)
+    video, still = _i2v("v1", "styleA"), _img("i1", "a cat", 50, 1)
 
-    images, videos = build_gallery_tree([clip, still])
+    images, videos = build_gallery_tree([video, still])
 
     assert (images.key, images.label, group_level(images)) == ("image", "Images", "media")
     assert (videos.key, videos.label, group_level(videos)) == ("video", "Videos", "media")
@@ -1128,7 +1128,7 @@ def _loop_output(prompt_id, filename):
 
 
 _LOOP_STILL = _loop_output("still", "flf2v_loop_00001_.png")
-_LOOP_CLIP = _loop_output("clip", "flf2v_loop_00002_.mp4")
+_LOOP_VIDEO = _loop_output("clip", "flf2v_loop_00002_.mp4")
 _LOOPING = workflow_label("wan22_flf2v_loop")
 
 
@@ -1138,7 +1138,7 @@ def _workflow_labels(rows, meta=None):
 
 
 def test_a_retired_workflows_folder_keeps_the_name_it_had():
-    retired = dict(_LOOP_CLIP, prompt_id="old", workflow_name="wan21_ati_i2v")
+    retired = dict(_LOOP_VIDEO, prompt_id="old", workflow_name="wan21_ati_i2v")
 
     assert _workflow_labels([retired]) == {
         "video/wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)"}
@@ -1147,16 +1147,16 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():
     # The two no longer share a parent, Images holding the one and Videos the
     # other, so neither needs telling apart from its twin by what it holds.
-    assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP]) == {
+    assert _workflow_labels([_LOOP_STILL, _LOOP_VIDEO]) == {
         "image/wan22_flf2v_loop": _LOOPING, "video/wan22_flf2v_loop": _LOOPING}
-    assert _workflow_labels([_LOOP_CLIP]) == {"video/wan22_flf2v_loop": _LOOPING}
+    assert _workflow_labels([_LOOP_VIDEO]) == {"video/wan22_flf2v_loop": _LOOPING}
 
 
 def test_copies_given_one_name_each_wear_it_as_given():
     named = {"image/wan22_flf2v_loop": {"custom_name": "Odds"},
              "video/wan22_flf2v_loop": {"custom_name": "Odds"}}
 
-    assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP], named) == {
+    assert _workflow_labels([_LOOP_STILL, _LOOP_VIDEO], named) == {
         "image/wan22_flf2v_loop": "Odds", "video/wan22_flf2v_loop": "Odds"}
 
 
@@ -1634,7 +1634,7 @@ def test_recent_generations_lists_a_run_by_when_it_finished_not_when_it_was_aske
 def test_recent_generations_lists_imported_files_where_they_arrived():
     # A file ComfyUI wrote that no instance of this app queued joins the collection at
     # the launch that found it, which is when it is looked for there; leaving
-    # imports off Latest hid a clip queued straight on ComfyUI in its workflow's
+    # imports off Latest hid a video queued straight on ComfyUI in its workflow's
     # folder alone.
     generated = _img("gen", "a cat", 50, 1)
     imported = _row(prompt_id="imp", source="imported", id=2,
@@ -2002,7 +2002,7 @@ def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies()
 def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     # A row from before scenes carries only frame_count; its re-roll writes the
     # one scene out as scene_frames. Both are the same settings, and a scene list
-    # of one that disagrees with the clip length is overruled by it in the graph
+    # of one that disagrees with the video length is overruled by it in the graph
     # too, so it must not split the folder.
 
     before = canonical_settings("wan22_i2v", {"frame_count": 121})

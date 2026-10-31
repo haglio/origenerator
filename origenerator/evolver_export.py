@@ -23,7 +23,7 @@ from origenerator.config import EVOLVER_INBOX_DIR
 
 @dataclass(frozen=True)
 class EvolverInbox:
-    """Where this app hands a finished clip over, and the only thing that knows.
+    """Where this app hands a finished video over, and the only thing that knows.
 
     The destination used to be a config constant that two Qt widgets reached for
     in the middle of a send, so the one fact the whole hand-off turns on -- which

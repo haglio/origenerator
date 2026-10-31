@@ -244,8 +244,8 @@ def test_two_loras_picked_together_both_reach_the_prompts_one_after_the_other(na
     readers = [node["inputs"]["clip"] for node in payload.values()
                if node["class_type"] == "CLIPTextEncode"]
     assert readers
-    assert all(_loras_behind(payload, clip, "clip") == [
-        ("first_look.safetensors", 0.7), ("second_look.safetensors", 0.6)] for clip in readers)
+    assert all(_loras_behind(payload, clip_ref, "clip") == [
+        ("first_look.safetensors", 0.7), ("second_look.safetensors", 0.6)] for clip_ref in readers)
 
 
 def _each_pass_loras(payload: dict) -> dict[str, list[list[tuple[str, float]]]]:

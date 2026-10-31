@@ -101,7 +101,7 @@ def _off_the_gui_thread(run) -> None:
 
     For the one call in this module that waits on the server: the submit.
     ComfyUI can take a minute to accept a prompt (fifty seconds on 2026-09-05,
-    validating a two-scene clip), and the follow-up on a late answer waits
+    validating a two-scene video), and the follow-up on a late answer waits
     longer still (``comfyui_api.submit_job``). Made on the GUI thread, that
     wait was the window freezing solid -- no paint, no click -- which reads as
     a crash, and the row the launch had just written could not be shown. So the

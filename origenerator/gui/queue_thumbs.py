@@ -10,7 +10,7 @@ one a row gets is decided by what the job is:
   apart. A combine given a dropped video adds a second cell beside it: that
   video, in gray (:mod:`origenerator.gui.grayscale`). Gray because it is not
   what is being made — drawn in full color, and worse drawn alone, the row reads
-  as a job that *is* that clip.
+  as a job that *is* that video.
 * **What its folder already holds** — for everything else, up to four of the
   folder's own thumbnails. It says nothing about this run in particular; it says
   which collection of the gallery the run is headed for, which is what a thumbnail-less
@@ -152,7 +152,7 @@ def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
 
     The source video is drained of color because it is not what is being made. Beside
     the frame in full color it reads as a second subject, and the row of a job
-    whose frame hasn't rendered yet would read as a job that *is* that clip.
+    whose frame hasn't rendered yet would read as a job that *is* that video.
     """
     frame = fitted_cell(made_from.image, cell)
     source_video = fitted_cell(made_from.source_video, cell, gray=True)

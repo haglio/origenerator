@@ -105,7 +105,7 @@ def synthesize_actions(duration_s: float, *, hz: float) -> list[dict]:
 def write_funscript(path, actions: list[dict], *, duration_seconds: int | None = None) -> None:
     """Write ``actions`` as the family's funscript document, credited to this app.
 
-    *duration_seconds* is the clip the script was authored for, which only a
+    *duration_seconds* is the video the script was authored for, which only a
     caller that measured it knows; without one, the script's own span answers,
     which is the closest this app can get for a motion it was handed rather
     than synthesized.

@@ -12,7 +12,7 @@ calling each one an equal share of the work is what made a WAN 2.2 I2V bar read
 backwards: its 20 video steps against the audio pass's 50 put three quarters of
 the bar on the audio, and that three quarters went by in fifteen seconds after
 the first quarter had taken eleven minutes. The two are not comparable units — a
-WAN step denoises every frame of the clip through a 14B model, and a foley step
+WAN step denoises every frame of the video through a 14B model, and a foley step
 denoises a few seconds of audio through a small one — so the bar is budgeted in
 *seconds of sampling* instead, and each pass is sized by what a step of it
 actually costs (:data:`_VIDEO_STEP_SECONDS_PER_FRAME` and the constants beside
@@ -46,13 +46,13 @@ from __future__ import annotations
 # faster or slower card moves every one of these together. Two fits from those
 # durations:
 #
-#   WAN 2.2 I2V at 8 steps, the same settings but for the clip's length: 81
+#   WAN 2.2 I2V at 8 steps, the same settings but for the video's length: 81
 #   frames took ~355s and 161 frames ~730s. The difference is all sampling, and
 #   it divides out at about half a second per frame per step — which is also what
 #   a 161-frame run showed directly, at 35s a step.
 #
 #   The audio pass under it ran its 50 steps in about fifteen seconds on ten
-#   seconds of audio. Its cost follows the clip's length the same way the video's
+#   seconds of audio. Its cost follows the video's length the same way the video's
 #   does, being a diffusion over an audio latent of that length.
 #
 # A still has no frame count to scale by, so it is sized flat; a detail fix's crop
@@ -63,11 +63,11 @@ _AUDIO_STEP_SECONDS_PER_SECOND = 0.03
 _IMAGE_STEP_SECONDS = 0.5
 _DETAIL_STEP_SECONDS = 0.15
 
-# The inputs every latent builder that measures a clip carries together —
+# The inputs every latent builder that measures a video carries together —
 # WanImageToVideo, WanFirstLastFrameToVideo,
 # EmptyHunyuanLatentVideo. Matched on that shape rather than on a list of class
 # names, so a video workflow written next year is sized as one without anyone
-# remembering to add it here; a name list that goes stale sizes a clip's samplers
+# remembering to add it here; a name list that goes stale sizes a video's samplers
 # as stills, which is the exact mistake this module exists to undo.
 # ``ImageFromBatch`` carries a ``length`` too and is not one of these, which is
 # why the match needs all four.
@@ -134,7 +134,7 @@ def _video_latent_frames(payload: dict) -> int:
     """Frames in the video latent this payload samples — 0 when it samples a still.
 
     Read off the latent builder (see :data:`_LATENT_SIZE_INPUTS`), because that
-    is the one place a clip's length is a plain number: the samplers downstream
+    is the one place a video's length is a plain number: the samplers downstream
     of it only ever see a latent. 0 for a payload with no such node, and for one
     whose length is itself derived in-graph — both of which fall back to sizing
     the samplers as stills.

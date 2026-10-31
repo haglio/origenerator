@@ -1080,7 +1080,7 @@ def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_pat
     assert panel._generate_btn.isEnabled() is False
 
 
-# --- the Genau lane: a looping clip, made but not sent anywhere ---------------
+# --- the Genau lane: a looping video, made but not sent anywhere ---------------
 
 
 def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):

@@ -33,7 +33,7 @@ LIFECYCLE_COLUMNS = frozenset({
     "progress_json",
 })
 
-#: Set while a sibling app is holding a copy of the row's clip, one column per
+#: Set while a sibling app is holding a copy of the row's video, one column per
 #: lane it can be sent down (:meth:`GenerationStore._record_send` clears it
 #: again when the send is taken back).
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
@@ -101,7 +101,7 @@ class GenerationStore(Store):
 
     def _record_send(self, prompt_id: str, at_column: str, unsent_column: str,
                      *, sent: bool):
-        """Say whether a sibling app is holding this clip — both stamps at once,
+        """Say whether a sibling app is holding this video — both stamps at once,
         because half-written the row would either hide a copy the sibling still
         holds or condemn one that was just handed over."""
         held, taken_back = ("datetime('now')", "NULL") if sent else ("NULL", "datetime('now')")
@@ -292,7 +292,7 @@ class GenerationStore(Store):
         """Record that this generation's video was sent to Evolver's inbox.
 
         Stamps the current time so the gallery remembers the send across
-        sessions, and retracts any earlier withdrawal in the same write: a clip
+        sessions, and retracts any earlier withdrawal in the same write: a video
         handed over again must not still be down for deletion.
         """
         self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",
@@ -310,7 +310,7 @@ class GenerationStore(Store):
                           sent=False)
 
     def mark_genau_exported(self, prompt_id: str):
-        """Record that this generation's clip was sent down the Genau lane.
+        """Record that this generation's video was sent down the Genau lane.
 
         The twin of :meth:`mark_evolver_exported`, down to retracting a
         withdrawal: the two lanes are separate errands and each keeps its own
@@ -322,7 +322,7 @@ class GenerationStore(Store):
     def mark_genau_unsent(self, prompt_id: str):
         """Take the Genau send back — the twin of :meth:`mark_evolver_unsent`.
 
-        A clip this far down the lane has left the pipeline for the folder Genau
+        A video this far down the lane has left the pipeline for the folder Genau
         plays from, which is the reason the delete cannot be done from here.
         """
         self._record_send(prompt_id, "genau_exported_at", "genau_unsent_at",
@@ -331,7 +331,7 @@ class GenerationStore(Store):
     def mark_genau_requested(self, prompt_id: str):
         """Record that a spoken animation started this run.
 
-        Stamped at launch, read at completion: it is what tells the finished clip
+        Stamped at launch, read at completion: it is what tells the finished video
         to hand itself to the Genau lane without a second ask.
         """
         self._stamp(prompt_id, "genau_requested_at")

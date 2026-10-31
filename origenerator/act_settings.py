@@ -67,7 +67,7 @@ def loops(row) -> bool:
     return bool(workflow and workflow.looping)
 
 # Params that are no part of the settings: the prompt, the start frame, the seeds, the
-# bookkeeping, and the values derived rather than chosen (the output size, the clip
+# bookkeeping, and the values derived rather than chosen (the output size, the video
 # length, the dual-sampler split points). Excluding them keeps the signature on the
 # real levers, so one setup on different frames groups as one.
 _SETTINGS_EXCLUDE = frozenset((

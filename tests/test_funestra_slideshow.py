@@ -190,7 +190,7 @@ def test_a_funestra_that_says_nothing_leaves_the_slideshow_as_it_was(qtbot, tmp_
 
 
 def test_a_file_the_funestra_would_not_open_is_stepped_past(qtbot, tmp_path):
-    """A clip carries no pace of its own -- its length is its pace -- so a file the
+    """A video carries no pace of its own -- its length is its pace -- so a file the
     Funestra cannot open would be a black screen for the rest of the slideshow."""
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
@@ -247,15 +247,15 @@ def test_a_slideshow_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):
     assert played == ["one.png", "two.png", "three.png"]
 
 
-def _scripted(monkeypatch, tmp_path, *clips: str) -> dict[str, Path]:
+def _scripted(monkeypatch, tmp_path, *videos: str) -> dict[str, Path]:
     output = tmp_path / "output"
     monkeypatch.setattr(slideshow_pass, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     scripts = {}
-    for clip in clips:
-        script = funscript_path_for(clip, places=OutputPlaces.in_one_folder(output))
+    for video in videos:
+        script = funscript_path_for(video, places=OutputPlaces.in_one_folder(output))
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("{}", encoding="utf-8")
-        scripts[clip] = script
+        scripts[video] = script
     return scripts
 
 
@@ -306,7 +306,7 @@ def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
-    """The Funestra walks the list by itself — an image's pace runs out, a clip
+    """The Funestra walks the list by itself — an image's pace runs out, a video
     ends — so which item the map lights, the star answers about and a spoken
     "this one" means is the Funestra's answer, read back."""
     slideshow = _slideshow(qtbot, tmp_path)
@@ -1356,7 +1356,7 @@ def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
 def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
     """A row holding only the image on screen cannot be looped, and the press
     still means "this one" — so the Funestra is told to lock it, the way its own
-    loop button locks a clip whose group holds only that clip."""
+    loop button locks a video whose group holds only that video."""
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)

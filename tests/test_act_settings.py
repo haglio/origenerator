@@ -31,7 +31,7 @@ def _video(pid, act, created, **params):
 
 def _loop(pid, act, created, **params):
     """The same row from a looping workflow — the only kind Genau settings can
-    come from, since a Genau clip has to return to the frame it started on."""
+    come from, since a Genau video has to return to the frame it started on."""
     return {**_video(pid, act, created, **params), "workflow_name": "wan22_flf2v_loop"}
 
 
@@ -106,7 +106,7 @@ def test_most_used_video_groups_ignoring_prompt_seed_and_input_image():
 
 
 def test_settings_grouping_ignores_derived_size_and_length_params():
-    # Same model+LoRA, but different output size (derived from the input image), clip
+    # Same model+LoRA, but different output size (derived from the input image), video
     # length, and sampler split points — none of which define the settings.
     rows = [
         _video("a1", "alpha", "2026-01-01", lora_high="X", steps=20,

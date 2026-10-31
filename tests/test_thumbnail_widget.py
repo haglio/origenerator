@@ -436,7 +436,7 @@ def test_a_picked_tiles_thumbnail_wears_a_white_frame(qtbot):
 
 def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     """The hosting session's OmniPause reaches these: a paused room with the
-    gallery in it must not be a wall of clips still playing.
+    gallery in it must not be a wall of videos still playing.
 
     Held app-wide rather than tile by tile — the tile has no switch of its own,
     because a switch per widget is how three of the four kinds of looping

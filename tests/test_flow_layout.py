@@ -63,7 +63,7 @@ def test_the_row_gap_defaults_to_the_one_between_buttons(qtbot):
 
 
 def test_flow_layout_lays_every_item_out_at_its_own_size(qtbot):
-    # What a QHBoxLayout does instead: squeeze past the minimum and clip, which is
+    # What a QHBoxLayout does instead: squeeze past the minimum and cut off, which is
     # how a bank of buttons came out reading "o fo", "to E", "ner".
     host = QWidget()
     qtbot.addWidget(host)

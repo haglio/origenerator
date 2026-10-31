@@ -647,10 +647,10 @@ def _refuse_a_library_of_its_own(checkout: Path, fun_time) -> int:
 def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
     """Name every value the two apps have stopped spelling the same, and open.
 
-    A send copies a clip into a folder of Evolver's and the gallery reads its
+    A send copies a video into a folder of Evolver's and the gallery reads its
     upscale back out of another; four values decide where, and each is written
     down in both apps (:mod:`origenerator.evolver_agreement`). A rename on
-    either side left clips arriving nowhere with both apps silent, and the test
+    either side left videos arriving nowhere with both apps silent, and the test
     that holds the two together skips wherever no Evolver sits beside the
     checkout -- which is every run of this repo's gate, so on the one machine
     with both apps installed nothing compared anything.

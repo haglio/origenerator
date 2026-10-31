@@ -1,7 +1,7 @@
 """The scenes of a story, one card each: what it shows, what it keeps out,
 what she says, and how long it runs.
 
-A clip longer than one segment is rendered as segments chained from each
+A video longer than one segment is rendered as segments chained from each
 other's last frame (:meth:`~origenerator.workflows.base.WorkflowTemplate.
 chain_segments`), so a story can change what happens as it goes: each scene is
 its own texts, run for its own length, started on the frame before it. This is
@@ -318,7 +318,7 @@ class ScenesEditor(QWidget):
             tracked_prompt.write(field, str(text))
 
     def total_frames(self) -> int:
-        """The clip's length: the scenes end to end, each after the first
+        """The video's length: the scenes end to end, each after the first
         starting on the frame before it."""
         return chained_frames(self.scene_frames())
 

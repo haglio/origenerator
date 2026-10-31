@@ -94,7 +94,7 @@ def test_workflows_declare_the_params_that_identify_their_lora():
 
 
 def test_only_the_flf2v_workflow_declares_itself_looping():
-    # The funscript synthesized alongside a video tiles seamlessly only for a clip
+    # The funscript synthesized alongside a video tiles seamlessly only for a video
     # that returns to its start, so the loop workflow marks itself looping and the
     # others (a one-shot i2v, the still-image workflows) don't.
     assert Wan22Flf2vLoopWorkflow().looping is True
@@ -244,7 +244,7 @@ def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
 
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # Reusing a still's settings pins its seed: the composition is the point of
-    # editing one. Reusing a clip's does not — a pinned video seed would ride
+    # editing one. Reusing a video's does not — a pinned video seed would ride
     # every prompt edit out of that lineage, and one seed sampled over and over
     # says nothing about the motion. Registry-wide, so a new video workflow is
     # covered the day it is registered.
@@ -260,7 +260,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
 def test_wan_video_workflows_expose_editable_audio_params():
     # The audio prompt/negative/seed are ordinary editable fields (the foley
     # model files stay read-only passthroughs, like clip_name/vae_name): a run
-    # can steer what the clip sounds like, or leave the prompt blank to let the
+    # can steer what the video sounds like, or leave the prompt blank to let the
     # foley model score the frames on its own.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -1377,7 +1377,7 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
     # The loop workflow gets the same HunyuanVideo-Foley pass as the one-shot
     # i2v, but its writer is VHS_VideoCombine, so the audio rides its ``audio``
     # input. (The track won't loop seamlessly the way the frames do — Funestras
-    # restart it each cycle — but the clip itself is scored to its motion.)
+    # restart it each cycle — but the video itself is scored to its motion.)
     wf = Wan22Flf2vLoopWorkflow()
     params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3)
     payload = wf.build_api_payload(params)
@@ -1397,7 +1397,7 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
 
 
 def test_foley_duration_never_undercuts_the_models_one_second_floor():
-    # HunyuanFoley rejects sub-second durations, so a clip shorter than 1s (the
+    # HunyuanFoley rejects sub-second durations, so a video shorter than 1s (the
     # default 21-frame loop at 16fps is 1.3s, but 5 frames is 0.2s) asks for a
     # clamped 1s of audio; the mux just carries the sliver of overhang.
     wf = Wan22Flf2vLoopWorkflow()
@@ -2159,7 +2159,7 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
     # Seconds are counted at the rate the MODEL paces motion at, never at the
-    # playback rate: that is what makes a clip's length hold when its rate moves.
+    # playback rate: that is what makes a video's length hold when its rate moves.
     assert frames.rate == NATIVE_FPS
     assert frames.options == [1, 5, 10, 15, 30, 60]
     assert frames.unit == "s"
@@ -2186,7 +2186,7 @@ def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
-    # More steps cost only time, and a long clip already costs hours of it;
+    # More steps cost only time, and a long video already costs hours of it;
     # a step count the machine can finish is nothing the form should refuse.
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     assert defs["steps"].max_val == 100
@@ -2195,7 +2195,7 @@ def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
 
 
 def _segments(payload: dict, conditioning: str) -> list[dict]:
-    """A clip's conditioning nodes in the order their segments run: the first
+    """A video's conditioning nodes in the order their segments run: the first
     is fed by the scaled start image, each later one by a frame cut out of the
     decode before it, whose samplers lead back to the previous conditioning."""
     nodes = [n for n in payload.values() if n["class_type"] == conditioning]
@@ -2214,7 +2214,7 @@ def _segments(payload: dict, conditioning: str) -> list[dict]:
 
 @pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
 def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
-    # A clip of today's lengths is one segment: one conditioning node, fed by
+    # A video of today's lengths is one segment: one conditioning node, fed by
     # the scaled start image, nothing cut out of a decode or joined back on.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=SINGLE_WINDOW_FRAMES))
@@ -2226,8 +2226,8 @@ def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
 
 def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame():
     # 481 frames as one window is 31 GB of activations on a 16 GB card, and
-    # windows blended over each other crossfade and drift. So a long clip is
-    # rendered as clips of the longest length one window takes, each started
+    # windows blended over each other crossfade and drift. So a long video is
+    # rendered as videos of the longest length one window takes, each started
     # from the last frame the one before it decoded: no blend, one scene.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
@@ -2238,8 +2238,8 @@ def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame(
         assert last["class_type"] == "ImageFromBatch"
         assert (last["inputs"]["batch_index"], last["inputs"]["length"]) == (160, 1)
         # the same frame is what its CLIP-Vision conditioning looks at
-        clip = payload[segment["inputs"]["clip_vision_output"][0]]
-        assert clip["inputs"]["image"] == segment["inputs"]["start_image"]
+        clip_vision = payload[segment["inputs"]["clip_vision_output"][0]]
+        assert clip_vision["inputs"]["image"] == segment["inputs"]["start_image"]
 
 
 def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_frame():
@@ -2376,7 +2376,7 @@ def test_each_scene_keeps_out_its_own_negative(name, conditioning):
 def test_each_scene_runs_for_its_own_frames_and_reads_its_own_prompt(name, conditioning):
     # A story is scenes of their own lengths: 10 s, 5 s and 10 s here, each a
     # segment started from the frame before it, each conditioned on its own
-    # scene's text. The clip is the scenes end to end, one shared frame at each
+    # scene's text. The video is the scenes end to end, one shared frame at each
     # seam, and the audio is scored for that whole length.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(
@@ -2398,7 +2398,7 @@ def test_a_scene_longer_than_one_window_is_two_segments_of_the_same_scene():
 
 
 def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
-    # One scene is the whole clip, and the clip length is what every other
+    # One scene is the whole video, and the video length is what every other
     # reader of the settings goes by (settings from the overlay carry only that),
     # so a single entry never overrules it.
     wf = Wan22I2vWorkflow()
@@ -2407,7 +2407,7 @@ def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
 
 
 def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
-    # The stored clip length is derived from the scenes by the form; settings
+    # The stored video length is derived from the scenes by the form; settings
     # whose scenes and length disagree scores its audio for the frames it will
     # really render.
     wf = Wan22I2vWorkflow()
@@ -2488,7 +2488,7 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
 def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
     # A rate typed by hand — or carried in by settings saved before the rates
     # were multiples — doesn't get to skew the tempo: the graph interpolates to
-    # the nearest reachable rate and writes at THAT, so the clip lands a little
+    # the nearest reachable rate and writes at THAT, so the video lands a little
     # off the rate asked for and exactly on time.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=60.0))
@@ -2511,7 +2511,7 @@ def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
 @pytest.mark.parametrize("name", _SCORED_VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
     # Foley scores the DECODED frames — the motion the model actually authored,
-    # at the rate it authored them in — so the track is the clip's real seconds
+    # at the rate it authored them in — so the track is the video's real seconds
     # and lands on the same beats however many frames the file ends up holding.
     wf = WORKFLOW_REGISTRY[name]
     params = dict(wf.default_params(), frame_count=81, frame_rate=MAX_PLAYBACK_FPS)

@@ -396,7 +396,7 @@ def recently_worked_folders(
     trees: dict[str, list], rows: list[dict], limit: int = RECENTLY_WORKED_COUNT,
     *, bumped=None,
 ) -> set[tuple[str, str]]:
-    """The ``(side, folder key)`` pairs of the folders worked in most recently.
+    """The ``(shape, folder key)`` pairs of the folders worked in most recently.
 
     A folder no longer moves when a generation lands in it — it is placed by the
     row that made it, so the tree of contents keeps the order the settings were
@@ -409,8 +409,8 @@ def recently_worked_folders(
     anything anywhere under it is, which is nearly always, so a mark on one
     would say nothing about it.
 
-    A folder's recency is the newest row in it, by :func:`row_recency`. Side by
-    side, because both sides draw the same folder key over rows of their own
+    A folder's recency is the newest row in it, by :func:`row_recency`. Shape by
+    shape, because both shapes draw the same folder key over rows of their own
     shape: portrait work must not light the landscape copy of a folder nothing
     portrait-shaped ever touched.
     """
@@ -418,22 +418,22 @@ def recently_worked_folders(
         bumped = enhancement_recency(rows)
     ranked: list[tuple[tuple[datetime, int], tuple[str, str]]] = []
 
-    def walk(group, side: str) -> None:
+    def walk(group, shape: str) -> None:
         children = child_groups(group)
         if children:
             for child in children:
-                walk(child, side)
+                walk(child, shape)
             return
         freshest = max(
             (row_recency(row, bumped) for row in getattr(group, "rows", ())),
             default=None,
         )
         if freshest is not None:
-            ranked.append((freshest, (side, group.key)))
+            ranked.append((freshest, (shape, group.key)))
 
-    for side, model in trees.items():
+    for shape, model in trees.items():
         for group in model:
-            walk(group, side)
+            walk(group, shape)
     ranked.sort(key=lambda entry: entry[0], reverse=True)
     return {folder for _freshest, folder in ranked[:limit]}
 
@@ -622,7 +622,7 @@ def start_frame_index(rows: list[dict]) -> dict:
     Hand this to :func:`build_gallery_tree` wherever the tree is built from a
     *slice* of the library — one shape's rows, say. The key of a video's folder
     names the image it animates, and that image can perfectly well be on the
-    other side of the split (a portrait frame with the size unlocked to a
+    other shape of the split (a portrait frame with the size unlocked to a
     landscape video, or a run placed by the size it asked for while its frame is
     measured). An index built from the slice alone misses it, and keys the folder
     to something nothing else in the app computes. The folder is still drawn — it

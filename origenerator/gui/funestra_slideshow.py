@@ -76,24 +76,24 @@ class FunestraSlideshow(QObject):
     # Enter on an item, and a lock: the gallery lands on that generation.  Only
     # the lock reaches it here — a Funestra has no Enter to press.
     open_requested = pyqtSignal(str)
-    # The slideshow is over: the side has nothing of this app's on it now.
+    # The slideshow is over: the shape has nothing of this app's on it now.
     closed = pyqtSignal()
     # A different item is on screen.
     media_changed = pyqtSignal()
 
-    def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
+    def __init__(self, items, *, shape: str, channel, frames: FrameFiles, actions=None,
                  hud=None, pace=None, start=None, shuffle=None, versions=None,
                  say=None, shown=None, clock=None, opening=None, parent=None):
         super().__init__(parent)
         self._clock = clock or time.monotonic
         self._on_screen = OnScreenHistory()
-        self._side = side
+        self._shape = shape
         self.channel = channel
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
         self._actions = actions if actions is not None else SlideshowActions()
         self.shown = shown if shown is not None else OnASessionsFunestra(
-            self, side, channel, say, actions=self._actions)
+            self, shape, channel, say, actions=self._actions)
         self._frames = frames
         self._scripts_on_opening = opening.scripts if opening is not None else {}
         self._request_holds_it = False
@@ -199,7 +199,7 @@ class FunestraSlideshow(QObject):
     def _send(self, verb: str) -> None:
         if not self.channel.send(verb):
             logger.warning("Dropped %s for the %s Funestra (command file locked)",
-                           verb, self._side)
+                           verb, self._shape)
 
     # --- the pace ----------------------------------------------------------
 
@@ -275,7 +275,7 @@ class FunestraSlideshow(QObject):
         if self._refusal_checked or fields.get("idle") != "1" or status.paused:
             return
         self._refusal_checked = True
-        logger.warning("The %s Funestra would not open a file; stepping past it", self._side)
+        logger.warning("The %s Funestra would not open a file; stepping past it", self._shape)
         self._unlock()
         self._send(NEXT)
 
@@ -454,7 +454,7 @@ class FunestraSlideshow(QObject):
         self._set.playlist.remove_current()
         self._frames.forget(item.prompt_id)
         if self._set.playlist.is_empty():
-            # A slideshow culled empty is over, and the side goes back to its base
+            # A slideshow culled empty is over, and the shape goes back to its base
             # state — which hands the Funestra another list to move on to.
             self.close()
         elif self._set.end_a_loop_of_one():
@@ -483,7 +483,7 @@ class FunestraSlideshow(QObject):
         try:
             self._actions.delete(prompt_id)
         except OSError:
-            logger.exception("The %s Funestra kept a condemned generation open", self._side)
+            logger.exception("The %s Funestra kept a condemned generation open", self._shape)
             self._flash("couldn't delete that one — the Funestra still has it open",
                         kind=WARNING, mark="trash")
 
@@ -501,7 +501,7 @@ class FunestraSlideshow(QObject):
         return True
 
     def slideshow_reset(self) -> None:
-        """Put the side back how it started — the region's base state, which
+        """Put the shape back how it started — the region's base state, which
         the gallery owns, else this set from the top."""
         if self._actions.reset is not None:
             self._actions.reset(self)
@@ -902,11 +902,11 @@ class FunestraSlideshow(QObject):
         self._set.take_up(filters, keep_the_slide=keep_the_slide)
 
     def is_showing(self) -> bool:
-        """Whether this slideshow still holds its side."""
+        """Whether this slideshow still holds its shape."""
         return self._open
 
     def close(self) -> None:
-        """Give the side back, handing the gallery the slide that was on it.
+        """Give the shape back, handing the gallery the slide that was on it.
 
         The HUD goes with it, so the session draws its own again; the Funestra
         keeps playing this list until the session hands it its own, which is
@@ -936,17 +936,17 @@ class OnASessionsFunestra:
 
     player = None
 
-    def __init__(self, slideshow, side: str, channel, say=None, *, actions) -> None:
+    def __init__(self, slideshow, shape: str, channel, say=None, *, actions) -> None:
         self._slideshow = slideshow
-        self._side = side
+        self._shape = shape
         self._channel = channel
         self._say = say
         self._published = ""
         self.queue_foot = QueueFoot(actions)
-        self._job_queue_file = JobQueueFile(channel.hud_file, side)
+        self._job_queue_file = JobQueueFile(channel.hud_file, shape)
 
     def hud_changed(self) -> None:
-        model = slideshow_hud_model(self._side, self._slideshow, hosted=True, own_window=False,
+        model = slideshow_hud_model(self._shape, self._slideshow, hosted=True, own_window=False,
                                     foot=self._job_queue_file.of(self.queue_foot.section()))
         text = hud_text(model) if model is not None else ""
         if text != self._published and publish_whole(self._channel.hud_file, text):

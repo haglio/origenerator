@@ -17,14 +17,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.icons import qt_icon
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
 from origenerator.base_models import loras_offered_beside
 from origenerator.box_breaks import unboxed
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
-from origenerator.gallery.sides import SIDE_LABELS
+from origenerator.gallery.shapes import SHAPE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
@@ -252,11 +252,11 @@ class ParamForm(QWidget):
         if size is None:
             self._sections["Size"].set_mark(None, "")
             return
-        orientation = orientation_of_size(*size)
-        tip = SIDE_LABELS[orientation]
+        shape = shape_of_size(*size)
+        tip = SHAPE_LABELS[shape]
         if size[0] == size[1]:
             tip = f"Square, so it goes under {tip}"
-        self._sections["Size"].set_mark(icons.side_mark(orientation), tip)
+        self._sections["Size"].set_mark(icons.shape_mark(shape), tip)
 
     def _wire_row_rules(self):
         self.changed.connect(self._refresh_row_rules)

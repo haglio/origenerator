@@ -13,12 +13,12 @@ from origenerator.osr2_controls_commands import (
     ROBOT_HAND,
     level_asked_for,
     max_intensity_asked_for,
-    side_press,
-    side_spoken_to,
+    shape_press,
+    shape_spoken_to,
     spelled_for,
 )
 
-SIDES = ("portrait", "landscape")
+SHAPES = ("portrait", "landscape")
 
 
 @pytest.mark.parametrize("axis", [drive_layout.AMPLITUDE, drive_layout.CENTER,
@@ -58,22 +58,22 @@ def test_a_press_that_is_not_the_max_intensity_leaves_it_alone():
 
 
 def test_a_side_press_is_the_verb_it_asks_and_what_it_carries():
-    assert side_press("portrait", "portrait_next") == ("next", "")
-    assert side_press("portrait", "portrait_play_video", "C:/x/y.mp4") == (
+    assert shape_press("portrait", "portrait_next") == ("next", "")
+    assert shape_press("portrait", "portrait_play_video", "C:/x/y.mp4") == (
         "play_video", "C:/x/y.mp4")
 
 
 def test_the_one_verb_spelled_the_other_way_round_carries_the_row_it_names():
-    assert side_press("landscape", "filter_landscape_seeds") == ("filter", "seeds")
+    assert shape_press("landscape", "filter_landscape_seeds") == ("filter", "seeds")
 
 
 def test_a_side_spells_a_verb_the_way_the_press_it_takes_apart_was_spelled():
-    assert side_press("portrait", spelled_for("portrait", "trash")) == ("trash", "")
+    assert shape_press("portrait", spelled_for("portrait", "trash")) == ("trash", "")
 
 
 def test_a_verb_names_the_side_it_is_said_to_however_it_is_cased():
-    assert side_spoken_to("PORTRAIT_NEXT", SIDES) == "portrait"
-    assert side_spoken_to("FILTER_LANDSCAPE_SEEDS", SIDES) == "landscape"
-    assert side_spoken_to("landscape_lock", SIDES) == "landscape"
-    assert side_spoken_to("CLOSE_SLIDESHOWS", SIDES) is None
-    assert side_spoken_to("PORTRAITS_OF_NOBODY", SIDES) is None
+    assert shape_spoken_to("PORTRAIT_NEXT", SHAPES) == "portrait"
+    assert shape_spoken_to("FILTER_LANDSCAPE_SEEDS", SHAPES) == "landscape"
+    assert shape_spoken_to("landscape_lock", SHAPES) == "landscape"
+    assert shape_spoken_to("CLOSE_SLIDESHOWS", SHAPES) is None
+    assert shape_spoken_to("PORTRAITS_OF_NOBODY", SHAPES) is None

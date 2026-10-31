@@ -47,9 +47,9 @@ _DOT = 6     # diameter of the lately-worked-in mark
 # folder). Rows without it refuse a drop, so a folder can never be dragged into
 # the derived hierarchy, whose shape belongs to the generations' settings.
 DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
-# A row's own key in the tree: its folder's key with the side it is drawn on
+# A row's own key in the tree: its folder's key with the shape it is drawn on
 # appended, so the two copies of one folder are tellable apart (see
-# origenerator.orientation). What a folder key alone can't say is which of
+# origenerator.item_shape). What a folder key alone can't say is which of
 # them you picked, hovered, or dragged.
 TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
 COUNT_ROLE = Qt.ItemDataRole.UserRole + 4
@@ -183,7 +183,7 @@ class FolderTree(QTreeWidget):
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         index = self.indexAt(event.pos())
-        # The row's key, not the folder's: both sides draw the folder, and only
+        # The row's key, not the folder's: both shapes draw the folder, and only
         # the row under the mouse should light up.
         hovered = index.data(TREE_KEY_ROLE) if self._group_with_actions(index) else None
         self._set_hover(hovered)
@@ -269,9 +269,9 @@ class FolderTree(QTreeWidget):
         """The tree keys of the picked folder rows, top-down. Collection rows that hold
         no folder of their own (Latest, Experiments) contribute nothing.
 
-        Tree keys rather than folder keys so a set picked across both sides
+        Tree keys rather than folder keys so a set picked across both shapes
         stays two distinct folders: composing one out of a folder key alone
-        would resolve every folder onto whichever side happened to be open, and
+        would resolve every folder onto whichever shape happened to be open, and
         a grouping of mixed shapes is the one thing the split exists to stop.
         """
         keys = []

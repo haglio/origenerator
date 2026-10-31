@@ -230,7 +230,7 @@ def _a_window_saying_what_happens_to_it(events):
 def _whose_screen_and_listener_record(boot, events):
     _a_loading_screen_saying_when_it_goes_down(boot, events)
     boot.clicked_toasts = MagicMock()
-    boot.clicked_notices.answer_with.side_effect = (
+    boot.clicked_toasts.answer_with.side_effect = (
         lambda go_to: events.append(("clicks go to", go_to)))
     return boot
 

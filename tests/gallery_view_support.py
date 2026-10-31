@@ -974,7 +974,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
     ``media`` is what the pane was showing — ``None`` for a generation still
     running under it — and the generation it names is the tile these tests
     clicked, which is what the tab shows.
-    ``target`` stands in for the OSR2 drive target the clip on screen would
+    ``target`` stands in for the OSR2 drive target the video on screen would
     offer, since these tests carry no real scripted video.
     """
     shown = view.selected_prompt_id() if media is not None else None
@@ -986,7 +986,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
 
 
 def _aim_slideshow(view, slideshow, target):
-    """Say what the clip on screen offers the device, and reconcile as a step
+    """Say what the video on screen offers the device, and reconcile as a step
     onto it would."""
     slideshow.osr2_drive_target = lambda: target
     view.reconcile_osr2()

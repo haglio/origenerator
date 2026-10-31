@@ -174,7 +174,7 @@ def test_clear_releases_the_video_file(make_preview, tmp_path):
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")
     w.clear()
-    # Dropping the source unlocks the file, so a previewed clip can be deleted
+    # Dropping the source unlocks the file, so a previewed video can be deleted
     # (a held media handle blocks the move-to-trash on Windows).
     w._player.setSource.assert_called_with(QUrl())
 
@@ -183,12 +183,12 @@ def test_clear_releases_the_video_file(make_preview, tmp_path):
 
 def test_release_media_drops_the_file_it_is_showing(make_preview, tmp_path):
     w = make_preview()
-    clip = tmp_path / "clip.mp4"
-    w.show_video(clip)
+    video = tmp_path / "clip.mp4"
+    w.show_video(video)
 
-    w.release_media([clip])
+    w.release_media([video])
 
-    assert not w.is_showing_any([clip])
+    assert not w.is_showing_any([video])
     w._player.setSource.assert_called_with(QUrl())  # the handle is let go
 
 
@@ -205,24 +205,24 @@ def test_release_media_leaves_a_pane_showing_something_else_alone(make_preview, 
 
 def test_release_media_matches_the_same_file_spelled_differently(make_preview, tmp_path):
     w = make_preview()
-    clip = tmp_path / "clip.mp4"
-    w.show_video(clip)
+    video = tmp_path / "clip.mp4"
+    w.show_video(video)
 
     w.release_media([tmp_path / "sub" / ".." / "clip.mp4"])  # same file, other spelling
 
-    assert not w.is_showing_any([clip])
+    assert not w.is_showing_any([video])
 
 
 def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_path):
     # A fullscreen slideshow built over this pane holds the file open too.
     w = make_preview()
-    clip = tmp_path / "clip.mp4"
-    w.show_video(clip)
+    video = tmp_path / "clip.mp4"
+    w.show_video(video)
     w._fullscreen = MagicMock()
 
-    w.release_media([clip])
+    w.release_media([video])
 
-    w._fullscreen.release_media.assert_called_once_with([clip])
+    w._fullscreen.release_media.assert_called_once_with([video])
 
 
 def test_a_video_plays_with_no_sound_output_at_all(make_preview, tmp_path):
@@ -520,7 +520,7 @@ def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monk
 
 
 def test_the_corners_keep_off_the_timeline_while_a_videos_size_is_unknown(qtbot, tmp_path):
-    # A clip's resolution arrives late, or never (a backend need not report it),
+    # A video's resolution arrives late, or never (a backend need not report it),
     # and until it does the item is taken to be the whole media area. That
     # is not the whole pane: the timeline along the foot is no part of the item, and a
     # chip laid over it read as a dark tab hanging off the video's lower edge.
@@ -558,7 +558,7 @@ def test_the_timeline_takes_the_videos_length_from_the_player(qtbot, tmp_path):
 
 def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp_path):
     # The timeline appears with the video, a layout pass later, and takes its rows
-    # from the media area. A clip whose resolution is known is placed against
+    # from the media area. A video whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
     # shrinks; placed once, against the pane as it was, the bin chip stayed
     # straddling the video's lower edge and the timeline.
@@ -921,9 +921,9 @@ def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, t
     # nothing, which is exactly what this is not.
     w = make_preview()
     frame = _make_png(tmp_path / "frame.png")
-    clip = _animated_webp(tmp_path / "source.webp")
+    video = _animated_webp(tmp_path / "source.webp")
 
-    w.show_combination(Combination(frame, clip))
+    w.show_combination(Combination(frame, video))
 
     assert w._stack.currentWidget() is w._combination
     assert not w._combination.image_label.pixmap().isNull()
@@ -1006,7 +1006,7 @@ def test_an_edit_marked_on_the_pair_on_screen_encloses_its_clip_without_restarti
 
 
 def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path):
-    # Its clip would otherwise keep looping under whatever replaced it.
+    # Its video would otherwise keep looping under whatever replaced it.
     w = make_preview()
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
                                    _animated_webp(tmp_path / "source.webp")))
@@ -1146,7 +1146,7 @@ def test_showing_a_video_puts_down_all_the_pane_was_holding(make_preview, tmp_pa
     path = tmp_path / "clip.mp4"
     w.show_video(path)
 
-    assert not w._player.stop.called        # setSource takes over from the old clip
+    assert not w._player.stop.called        # setSource takes over from the old video
     assert w._notice.isHidden()
     assert w._actions_id is None
     assert w._media == (path, "video")

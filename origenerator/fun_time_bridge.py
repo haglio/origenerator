@@ -167,7 +167,7 @@ class FunTimeBridge(QObject):
             return
         playlists = {side: channel.playlist for side in SIDES
                      if (channel := self._session.funestra(side)) is not None}
-        self._radio = deal_to_the_funestras(playlists, clips_dir=self._radio_dir)
+        self._radio = deal_to_the_funestras(playlists, videos_dir=self._radio_dir)
 
     def take_the_radio_back(self) -> None:
         """Silence the stations dealt to the session's Funestras: this app is

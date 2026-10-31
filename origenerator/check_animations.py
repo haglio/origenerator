@@ -80,7 +80,7 @@ def the_animation_window():
               if gallery.media_type_of_row(row) == MediaType.IMAGE]
 
     def look(sample: dict):
-        """The image this clip was made from, and the clip's own loop."""
+        """The image this video was made from, and the video's own loop."""
         source = gallery.find_source_image_id(sample, images)
         row = db.get_generation(source) if source else None
         still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None

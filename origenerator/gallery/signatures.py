@@ -176,7 +176,7 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
             settings.pop(key, None)
             settings.pop(strength_key_of(key), None)
     if "scene_frames" in settings and len(settings["scene_frames"] or []) <= 1:
-        # A story of one scene is the whole clip and runs for the clip length
+        # A story of one scene is the whole video and runs for the video length
         # (WorkflowTemplate.scene_plan), so a row from before scenes and its
         # re-roll, which writes the scene out, are the same settings.
         settings["scene_frames"] = [settings.get("frame_count", params.get("frame_count"))]

@@ -82,7 +82,7 @@ class FunestraSlideshow(QObject):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
-                 hud=None, pace=None, start=None, shuffle=None,
+                 hud=None, levels=None, pace=None, start=None, shuffle=None,
                  say=None, shown=None, clock=None, parent=None):
         super().__init__(parent)
         self._clock = clock or time.monotonic
@@ -112,9 +112,11 @@ class FunestraSlideshow(QObject):
         self._refusal_checked = False
         self._loads_seen: str | None = None
         self._levels = LevelStepper()
+        self._levels.arm(levels or {})
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
             self._showing = self._funestra_status().video
+        self._publish()
         self._hand_over(land=opened_on_a_slide)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)

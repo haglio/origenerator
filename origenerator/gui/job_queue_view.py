@@ -107,7 +107,7 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 # looking at (the full-size preview is still one click away). The Job Queue never
 # opens taller than this however long the line gets, so the panes above it don't
 # move on their own — only on a drag of the handle at its top edge.
-_STRIP_HEIGHT = 88
+_ROW_HEIGHT = 88
 # The bar the clock is written across, sized off the line it carries — "45% ·
 # 12:30 elapsed · ~16:02 left" runs about 270px at the app's own font, and a bar
 # narrower than its caption elides the countdown away. The queue's names are
@@ -208,7 +208,7 @@ class RunningPreview(OpensAFolder, QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
         self._frame = QLabel()
-        self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
+        self._frame.setFixedSize(_ROW_HEIGHT, _ROW_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # Pinned to the foot, so it still sits in the Job Queue's corner once the
         # Job Queue is dragged taller than the square it stops growing at.
@@ -361,7 +361,7 @@ class RunningPreview(OpensAFolder, QWidget):
         The label is sized to what it draws, since the pair is twice as wide as
         the square a single thumbnail (or a live frame) fills.
         """
-        side = min(self.height(), _STRIP_HEIGHT)
+        side = min(self.height(), _ROW_HEIGHT)
         pixmap = QPixmap()
         frame = None if item is None else item.reading.frame
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
@@ -387,7 +387,7 @@ class RunningPreview(OpensAFolder, QWidget):
         to read the line, and every pixel past that goes to the rows.
         """
         super().resizeEvent(event)
-        if min(self.height(), _STRIP_HEIGHT) != self._frame.height():
+        if min(self.height(), _ROW_HEIGHT) != self._frame.height():
             self._render_frame(self._item)
 
 
@@ -466,7 +466,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._thumbs = QueueThumbs(self.THUMB)
         layout.addWidget(self._thumbs)
         # What the row says about the job, in the type the rows always used,
-        # elided rather than widen the row past a narrow strip.
+        # elided rather than widen the row past a narrow pane.
         self._lead = ElidingLabel()
         self._lead.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._lead)
@@ -625,7 +625,7 @@ class JobQueueView(QWidget):
         # A floor, not a fixed height: the Job Queue opens one bar tall and grows only
         # when its splitter handle is dragged, so the panes above never move on
         # their own however long the line gets.
-        self.setMinimumHeight(_STRIP_HEIGHT)
+        self.setMinimumHeight(_ROW_HEIGHT)
         self._items: list = []
         self._drop_at: int | None = None  # where a drag in progress would land
 
@@ -716,7 +716,7 @@ class JobQueueView(QWidget):
         down to leave the hint the full width, asks for exactly the room a busy
         one does, so the splitter above it doesn't shift as the queue drains.
         """
-        return QSize(super().sizeHint().width(), _STRIP_HEIGHT + 1)  # and its rule
+        return QSize(super().sizeHint().width(), _ROW_HEIGHT + 1)  # and its rule
 
     def rows(self) -> list[QueueRow]:
         """Every job in the line, in order — the one being made first.

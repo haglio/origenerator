@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 
-from origenerator import app_link, config, content, evolver_agreement, gallery, recovery
+from origenerator import app_link, config, content, evolver_agreement, gallery, trash_collection
 from origenerator.app import (
     MAINTENANCE,
     Library,
@@ -275,7 +275,7 @@ def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
 
 
 def test_client_id_is_stable_across_launches(tmp_path, qtbot):
-    # The crux of restart recovery: two launches (two AppStates over the same file)
+    # The crux of restart trash_collection: two launches (two AppStates over the same file)
     # give ComfyUIClients the same id, so ComfyUI keeps routing a running job's live
     # progress/preview/completion messages to the reconnecting session.
     path = tmp_path / "ui.json"
@@ -765,8 +765,8 @@ def test_the_window_is_watched_before_the_app_runs(qapp, monkeypatch):
 
 
 def test_main_reclaims_unreachable_trash_on_startup(qapp):
-    """The trash folders no held deletion names are reclaimed before the window
-    opens. Nothing the bin holds is touched, however old it is."""
+    """The trash folders no trashed item names are reclaimed before the window
+    opens. Nothing the Trash holds is touched, however old it is."""
     trash = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
@@ -776,7 +776,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash", return_value=trash), \
-         patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
+         patch("origenerator.trash_collection.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
@@ -1177,12 +1177,12 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
     assert db.get_generation("p1")["duration_seconds"] == 15.26
 
 
-def _held_deletion(library_path, prompt_id, *, days_ago):
-    """A deletion the bin has been holding for ``days_ago`` days."""
+def _held_trashed(library_path, prompt_id, *, days_ago):
+    """A deletion the Trash has been holding for ``days_ago`` days."""
     db = Database(library_path)
     row = _completed_image(db, prompt_id)
     db.delete_generation(prompt_id)
-    db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+    db.record_trashed(prompt_id, row, {"moves": [], "subdir": None})
     then = (datetime.now(UTC).replace(tzinfo=None)
             - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
     with closing(sqlite3.connect(library_path)) as conn:
@@ -1190,18 +1190,18 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
         conn.commit()
 
 
-def test_the_launch_keeps_a_deletion_however_long_it_has_been_held(qapp, library):
-    # Nothing ages out. The bin holds what it holds until the user restores it
+def test_the_launch_keeps_a_trashed_item_however_long_it_has_been_held(qapp, library):
+    # Nothing ages out. The Trash holds what it holds until the user restores it
     # or ends it from the Trash collection, and two years is no different from two
     # minutes.
-    _held_deletion(library, "p1", days_ago=730)
+    _held_trashed(library, "p1", days_ago=730)
 
     db = _boot(library)
 
-    assert [record["prompt_id"] for record in db.list_deletions()] == ["p1"]
+    assert [record["prompt_id"] for record in db.list_trashed()] == ["p1"]
 
 
-def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
+def test_the_launch_reclaims_a_trash_folder_no_trashed_item_names(qapp, library):
     # The one thing launch still clears: a batch nothing can reach, left over
     # by a crash between the move and the record. Without it the trash only ever
     # grows.
@@ -1279,7 +1279,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
-        "origenerator.recovery.reclaim_orphans": 0,
+        "origenerator.trash_collection.reclaim_orphans": 0,
         "origenerator.comfyui_client.ComfyUIClient": DEFAULT,
         "PyQt6.QtWidgets.QApplication.exec": 0,
     }
@@ -1335,7 +1335,7 @@ def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qap
     ran = []
 
     with _a_faked_boot(ran) as _, \
-         patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
+         patch("origenerator.trash_collection.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.branch_session.is_branch_session", return_value=True):
         assert main([]) == 0
 
@@ -1397,7 +1397,7 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old
     assert db.get_generation("first")["starred"]
     assert db.get_generation("again") is None
     assert (output / "video" / "first_00001.mp4").read_bytes() == b"made again"
-    [old] = recovery.bin_items(db.list_deletions())
+    [old] = trash_collection.trash_items(db.list_trashed())
     assert old["old_version_of"] == "first"
     [held] = gallery.row_output_files(old)
     assert gallery.output_file_path(held, library.places).read_bytes() == b"first made"
@@ -1444,7 +1444,7 @@ def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path
     assert _fold_enhancements(library) == 1
 
     assert db.get_generation("enhancement") is None
-    assert db.get_deletion("enhancement") is not None
+    assert db.get_trashed("enhancement") is not None
     assert not (output / "image" / "image_enhance_00001_.png").exists()
 
 
@@ -1471,7 +1471,7 @@ def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_start
     _tidy_video_previews(library)
 
     assert db.get_generation("first-frame") is None
-    assert db.get_deletion("first-frame") is not None
+    assert db.get_trashed("first-frame") is not None
     assert db.get_generation("video") is not None
     assert (output / "video" / "scene_one_00001.mp4").exists()
 

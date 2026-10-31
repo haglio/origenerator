@@ -25,7 +25,7 @@ where its row says, by name, across every place outputs are kept:
   one is this row's. Broken is visible; repointed at another generation's file
   is not.
 
-A record with a place of its own -- a file the bin moved to the trash, a starting
+A record with a place of its own -- a file the Trash moved to the trash, a starting
 frame, a video in the library -- is skipped: none of them is in the output tree.
 """
 

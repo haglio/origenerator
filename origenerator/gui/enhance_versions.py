@@ -19,7 +19,7 @@ it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
 Levels are deleted here by a version's trash can, by Delete or Backspace over
-picked rows, or by the right-click menu. A binned version is a file, not a
+picked rows, or by the right-click menu. A trashed version is a file, not a
 generation — the image keeps its folder, its star and its other versions — and
 the delete is undoable. Never deleted here: the original, and the last version,
 since an image with no file left is a deleted generation, the gallery's own.
@@ -476,7 +476,7 @@ class EnhanceVersions(QWidget):
 
     level_selected = pyqtSignal(int)
     enhance_requested = pyqtSignal()   # the "+ Enhance" row was pressed
-    delete_requested = pyqtSignal(list)  # positions of the levels to bin
+    delete_requested = pyqtSignal(list)  # positions of the levels to trash
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -528,7 +528,7 @@ class EnhanceVersions(QWidget):
         ``held_days`` is set only for a deleted image, and each level's File line
         leads with how long it has been in the trash.
 
-        ``deletable`` is ``False`` for versions that are not this list's to bin:
+        ``deletable`` is ``False`` for versions that are not this list's to trash:
         a video's, which are the video itself and the copy Evolver keeps.
 
         Hidden only when there is nothing at all to show — no versions, nothing
@@ -649,8 +649,8 @@ class EnhanceVersions(QWidget):
             self.delete_requested.emit(doomed)
 
     def _deleted_by(self, positions: list[int]) -> list[int]:
-        """The versions a delete of ``positions`` bins: all but the original, or
-        none when they are not this list's to bin or would leave the image none.
+        """The versions a delete of ``positions`` trashes: all but the original, or
+        none when they are not this list's to trash or would leave the image none.
 
         An image with no file left is a deleted generation, and deleting a
         generation is the gallery's own action, reached from its thumbnail — a
@@ -662,7 +662,7 @@ class EnhanceVersions(QWidget):
         return doomed
 
     def keyPressEvent(self, event):
-        """Delete or Backspace bins the picked levels — the keys that delete a
+        """Delete or Backspace trashes the picked levels — the keys that delete a
         picked thumbnail, over the picked versions instead — an arrow picks
         and shows the row over or under the one last clicked, and Enter presses
         the Enhance row the arrows have reached."""

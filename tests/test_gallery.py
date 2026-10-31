@@ -1911,7 +1911,7 @@ def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
     assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (thumb, "image")
 
 
-def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
+def test_resolve_preview_follows_a_file_the_trash_has_re_pointed(tmp_path):
     # A deleted generation's files sit in the trash, and its row says so — which
     # is what lets the Trash collection play a deleted video rather than offer a still.
     out = tmp_path / "output"

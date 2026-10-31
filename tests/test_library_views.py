@@ -45,7 +45,7 @@ def test_a_change_to_the_library_is_read_at_once(tmp_path):
 def test_a_reading_holds_what_the_trash_holds(tmp_path):
     db = Database(tmp_path / "test.db")
     _image(db, "pic-1", 1)
-    db.record_deletion("pic-1", db.get_generation("pic-1"), {"moves": [], "subdir": None})
+    db.record_trashed("pic-1", db.get_generation("pic-1"), {"moves": [], "subdir": None})
     db.delete_generation("pic-1")
 
     assert [row["prompt_id"] for row in LibraryViews(db).now().held_rows] == ["pic-1"]

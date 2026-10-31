@@ -65,7 +65,6 @@ from tests.gallery_view_support import (
     _alls,
     _answer_menu,
     _at,
-    _bin_db,
     _children_by_prompt,
     _click_beside_the_mark_of,
     _click_off,
@@ -102,6 +101,7 @@ from tests.gallery_view_support import (
     _single_i2v_db,
     _subs,
     _top_level,
+    _trash_db,
     _tree_menu,
     _two_leaf_view,
     _video_workflow,
@@ -496,7 +496,7 @@ def _both_kinds_in_every_collection():
     experiment of each kind, and one of each deleted."""
     image, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
     image["starred"] = video["starred"] = 1
-    return _bin_db(rows=[image, video,
+    return _trash_db(rows=[image, video,
                          {**_image("ie", "a dog", 50, 2), "source": "experiment"},
                          {**_i2v_video("ve", "styleB"), "source": "experiment"}],
                    held=[("di", _image("di", "a bird", 50, 3)),
@@ -593,7 +593,7 @@ def test_images_lend_no_one_workflows_time_when_nothing_in_them_was_timed(qtbot)
 
 
 def test_a_folders_collection_row_counts_what_that_folder_holds(qtbot):
-    view = GalleryView(_bin_db(rows=[_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")],
+    view = GalleryView(_trash_db(rows=[_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")],
                                held=[("d1", _image("d1", "a cat", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2870,7 +2870,7 @@ def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_
     monkeypatch.setattr(
         gallery, "animated_preview_if_made",
         lambda row, places, thumb_dir: asked.append((places, thumb_dir)))
-    view = GalleryView(_bin_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path / "output"),
+    view = GalleryView(_trash_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path / "output"),
                                                  thumb_dir=tmp_path / "thumbs"))
     qtbot.addWidget(view)
 

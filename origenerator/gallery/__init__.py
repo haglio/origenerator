@@ -148,6 +148,7 @@ from origenerator.gallery.source_image import (
     source_image_id_in,
     source_image_id_of,
     source_image_of,
+    start_images_among,
     videos_from_source_image,
     was_made_from,
 )
@@ -308,6 +309,7 @@ __all__ = [
     "source_image_id_of",
     "source_image_of",
     "start_frame_index",
+    "start_images_among",
     "unreviewed_experiments",
     "video_file_of",
     "videos_from_source_image",

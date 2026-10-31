@@ -10,12 +10,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cache, partial
 
 from origenerator.gallery.output import (
     frame_names_of,
     input_image_reference,
     media_type_of_row,
-    row_output_files,
 )
 from origenerator.gallery.signatures import (
     _frame_name,
@@ -54,12 +54,18 @@ def _image_named(input_image: str | None, image_rows: list[dict]) -> dict | None
         return None
     target = _frame_name(input_image)
     return next((image for image in image_rows
-                 if any(_frame_name(f.get("filename")) == target
-                        for f in row_output_files(image))), None)
+                 if target in frame_names_of(image.get("output_files"))), None)
 
 
 def source_image_of(row: dict, image_rows: list[dict]) -> dict | None:
-    return _image_named(parse_params(row.get("params_json")).get("input_image"), image_rows)
+    return _image_named(_start_frame_of(row), image_rows)
+
+
+def start_images_among(image_rows: list[dict]) -> Callable[[dict], dict | None]:
+    """:func:`source_image_of` for many rows over one pool, each start frame
+    looked for once however many rows share it."""
+    named = cache(partial(_image_named, image_rows=image_rows))
+    return lambda row: named(_start_frame_of(row))
 
 
 def rebuildable_source_image(row: dict, image_rows: list[dict]) -> dict | None:
@@ -147,9 +153,8 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
 
 
 def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[dict]:
-    """The video rows that used this image as their input — the videos it was
-    animated into. The inverse of :func:`find_source_image_id`, for showing an
-    image the animations made from it."""
+    """The video rows that started from one of this image's files: every video
+    whose link back could name it."""
     image_id = image_row.get("prompt_id")
     if image_id is None:
         return []

@@ -114,7 +114,7 @@ def test_a_two_word_command_is_not_shadowed_by_its_first_word():
     assert match_app_command("next shape") is AppCommand.NEXT_SHAPE
 
 
-# --- the bank, and the app-wide switches ------------------------------------
+# --- the Gallery pane buttons, and the app-wide switches ------------------------------------
 
 @pytest.mark.parametrize("said, wanted", [
     ("undo", AppCommand.UNDO),

@@ -4,7 +4,7 @@ versions -- and what a click with a modifier does to that.
 Pure list-and-set logic, lifted out of the pane that draws the tiles. Three of the
 pane's sixteen fields were this -- what it lists in the order it shows them,
 which of those are picked, and the tile a Shift-click measures its run from -- and
-the rule between them is a file browser's: Ctrl toggles one, Shift extends a
+the rule between them is a file manager's: Ctrl toggles one, Shift extends a
 contiguous run from the anchor, a plain click resets to one.
 
 No Qt here on purpose. The pane turns the held modifiers into two booleans and
@@ -62,7 +62,7 @@ class Picking:
 
         Ctrl toggles that one entry; Shift extends a contiguous run from the
         anchor; a plain click resets to just this entry. Mirrors a typical file
-        browser.
+        manager.
 
         A Shift-click whose anchor is no longer listed -- a pane redrawn under
         it -- has no run to measure, so it lands as a plain click rather than as

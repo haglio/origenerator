@@ -110,7 +110,7 @@ class HudFacts:
     between loops.
 
     The defaults are a shuffled set with nothing favorited — a slideshow asked for by
-    the toolbar, which is the ordinary case.
+    the Gallery pane buttons, which is the ordinary case.
     """
 
     order_label: str = SHUFFLE_LABEL

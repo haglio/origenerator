@@ -8,7 +8,7 @@ Fun Time runs.  What goes on it and what a press takes off it are
 questions of.
 
 The on/off switch IS on it: the console's OSR2 switch -- on driving, off
-parked -- is the app's one, and the toolbar's separate one is gone.
+parked -- is the app's one, and the Gallery pane buttons' separate one is gone.
 
 This is the surface with no slideshow under it.  A slideshow does not float one of these:
 it wears ONE panel (:mod:`origenerator.gui.slideshow_hud`), which carries the device

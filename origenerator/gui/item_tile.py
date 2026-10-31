@@ -37,7 +37,7 @@ _CORNER_BUTTON_CSS = (
 )
 
 # A selected thumbnail fills its whole tile — under both the image and the
-# caption — the way a file browser highlights a picked item. Two things make
+# caption — the way a file manager highlights a picked item. Two things make
 # the fill actually show:
 #   * WA_StyledBackground, or a plain QWidget subclass paints no stylesheet
 #     background at all; and

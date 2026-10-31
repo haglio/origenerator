@@ -130,13 +130,13 @@ from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.moving_previews import MovingPreviews
+from origenerator.gui.new_tile import NewTile
 from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
-from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -462,7 +462,7 @@ class GalleryView(QWidget):
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
         self._item_names = ItemNames(db)
         # The browser pane renders the middle column (tiles / thumbnails / collections)
-        # and owns the thumbnail multi-selection and in-flight cards. Its signals
+        # and owns the thumbnail multi-selection and in-flight tiles. Its signals
         # carry every gesture made on a tile; the handlers here answer them. The
         # scroll area is its canvas — built here so it can be handed over, placed
         # into the layout by _build_ui.
@@ -1331,7 +1331,7 @@ class GalleryView(QWidget):
         """A tab's Generate: launch each of ``batch`` as a re-roll of its settings
         folder and land the browser there, its live tile showing the run.
 
-        Identical in outcome to clicking the folder's re-roll "+": the jobs land in
+        Identical in outcome to clicking the folder's New tile: the jobs land in
         that folder (its :class:`GeneratingTile` shows the leading run's live frame), so
         an edited config's brand-new folder appears and is navigated to at once —
         the running row it inserts gives the folder a tree node immediately (see
@@ -1387,7 +1387,7 @@ class GalleryView(QWidget):
         saying whether the tree had a row to open at all.
 
         The ways here are one move — a Generate, a folder's prompt rewrite, a
-        combine's launch, the Auto-Generate tip's link, a click on an in-flight card —
+        combine's launch, the Auto-Generate tip's link, a click on an in-flight tile —
         and in all of them the open is a step on the way to that run's tile rather
         than somewhere browsed to. So it lands on no saved item of its own
         (:meth:`_land_on_the_first_item`): one loaded here would paint an item
@@ -1528,7 +1528,7 @@ class GalleryView(QWidget):
                 self._fingerprint = fingerprint
                 self._rebuild(rows, meta)
             else:
-                # No DB change, but the in-flight cards still need each running
+                # No DB change, but the in-flight tiles still need each running
                 # re-roll's live frame pushed in — it advances between rebuilds.
                 # Wherever they were drawn: the Latest collection, or a folder with
                 # a batch of them in flight.
@@ -2345,7 +2345,7 @@ class GalleryView(QWidget):
         if not self._can_reroll(group):
             return LeadTiles()
         job = self._jobs.job_for(group.key)
-        plus = RerollTile(making_one=job is not None)
+        plus = NewTile(making_one=job is not None)
         plus.add_requested.connect(lambda: self._start_reroll(group.key))
         return LeadTiles(
             reroll=plus,
@@ -2374,7 +2374,7 @@ class GalleryView(QWidget):
         """Right-click a folder's live tile: throw away the run it is showing.
 
         The same act as the button on its face, on the gesture the rest of the
-        grid answers — a right-click that worked on every other card and died on
+        grid answers — a right-click that worked on every other tile and died on
         this one read as a tile that wasn't listening. The wording is the
         button's, so both say the same thing about the same press.
 
@@ -2432,7 +2432,7 @@ class GalleryView(QWidget):
     def _open_folder_modify(self, group):
         """Open this folder's prompt in a tab, ready to be rewritten.
 
-        Nothing is launched: the card is the start of an edit made by hand, which
+        Nothing is launched: the tile is the start of an edit made by hand, which
         is the whole reason it is typed rather than spoken. The tab carries the
         folder's settings, its prompts marked against themselves, and its images
         tiled in the preview — see
@@ -3120,7 +3120,7 @@ class GalleryView(QWidget):
         """Show a just-launched combine. If its (image × settings) folder already
         exists, open it and mirror the live tile; otherwise it's a brand-new
         combination with no folder yet, so park on Latest — where its in-flight
-        card shows — and remember the key for :meth:`_on_reroll_finished` to drill
+        tile shows — and remember the key for :meth:`_on_reroll_finished` to drill
         into once the finished row gives the folder a node."""
         if self._stand_on_the_run_in(key):
             return  # an existing folder: watch the live tile there
@@ -3132,7 +3132,7 @@ class GalleryView(QWidget):
         """Which side a job just launched in folder ``key`` will land on.
 
         Read off the size it asked for, since it has no result to measure yet —
-        the same thing that puts its in-flight card in one Latest collection rather
+        the same thing that puts its in-flight tile in one Latest collection rather
         than the other. With no job to ask, the side being browsed.
         """
         job = self._jobs.job_for(key)
@@ -3143,7 +3143,7 @@ class GalleryView(QWidget):
 
     def _reveal_reroll(self, key: str):
         """Open the folder a re-roll runs in and select its live tile — an
-        in-flight card's click, relayed by the browser pane.
+        in-flight tile's click, relayed by the browser pane.
 
         Leaves a running search first: results take the pane over, and picking
         a tree row underneath them re-scopes the search rather than showing the
@@ -3173,7 +3173,7 @@ class GalleryView(QWidget):
         progress, its button discards it, and its preview follows the run's
         frames to the item they land as
         (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the
-        tile or on the collection's card asks for, and the tab comes to the front as a
+        tile or on the collection's tile asks for, and the tab comes to the front as a
         clicked thumbnail's does.
 
         The folder tile's "+" lands its run the same way: that press is a press
@@ -3459,7 +3459,7 @@ class GalleryView(QWidget):
         covers, and once for the slides themselves, since a run that has begun to
         look like something is a slide of that slideshow.
 
-        ``inflight`` is the already-built card list, when the caller (the poll)
+        ``inflight`` is the already-built tile list, when the caller (the poll)
         holds one; every other caller lets it be built fresh here.
         """
         items = self._inflight_items() if inflight is None else inflight
@@ -3604,7 +3604,7 @@ class GalleryView(QWidget):
         the whole selection to the opposite state.
 
         Another act appears only while something is being made of a picked image:
-        cancel the enhancement in flight. An enhancement has no card of its own —
+        cancel the enhancement in flight. An enhancement has no tile of its own —
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
         it the run had to be hunted down among the Job Queue's rows. It sits

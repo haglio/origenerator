@@ -41,7 +41,7 @@ from origenerator.gui.browser_pane import (
     TreeNavigation,
 )
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.item_tile import ItemTile
 from origenerator.orientation import oriented_key
 from tests.thumbnail_rows import looping_video
 
@@ -145,7 +145,7 @@ def _shown_in_order(scroll):
 
 
 def _named(widget):
-    if isinstance(widget, ThumbnailWidget):
+    if isinstance(widget, ItemTile):
         return widget.prompt_id
     if isinstance(widget, QLabel):
         return widget.text()
@@ -237,7 +237,7 @@ def _sixty():
     return [_row(f"g{n}", n) for n in range(1, 61)]
 
 
-def _drawn(scroll, kind=ThumbnailWidget):
+def _drawn(scroll, kind=ItemTile):
     return list(scroll.widget().findChildren(kind))
 
 
@@ -409,7 +409,7 @@ def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_i
     _open_latest(pane, finished)
 
     [heading] = gallery.section_headings(finished)
-    assert _shown_in_order(scroll) == [heading, "InFlightCard", "g1"]
+    assert _shown_in_order(scroll) == [heading, "InFlightTile", "g1"]
 
 
 def _waiting(prompt_id, seed, created_at=None):
@@ -419,7 +419,7 @@ def _waiting(prompt_id, seed, created_at=None):
 
 def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtbot):
     # Latest reads newest first, and the run being made is the next to land, so
-    # its card stands beside the newest finished item, where it will go; the
+    # its tile stands beside the newest finished item, where it will go; the
     # last run in the line stands farthest from it.
     finished = [_row("g1", 1, _ago(minutes=5))]
     rows = [_running("j1", 2), _waiting("j2", 3), _waiting("j3", 4), *finished]
@@ -427,10 +427,10 @@ def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtb
 
     _open_latest(pane, finished)
 
-    assert list(pane._inflight_cards) == ["j3", "j2", "j1"]
+    assert list(pane._inflight_tiles) == ["j3", "j2", "j1"]
 
 
-def test_latest_redraws_its_cards_when_the_line_changes_order(qtbot):
+def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot):
     # A drag in the queue, or a run ComfyUI turns out to be making, moves runs
     # without adding or taking away any.
     jobs = _StubJobQueue(order=["j1", "j2"])
@@ -441,7 +441,7 @@ def test_latest_redraws_its_cards_when_the_line_changes_order(qtbot):
 
     pane.refresh_inflight()
 
-    assert list(pane._inflight_cards) == ["j1", "j2"]
+    assert list(pane._inflight_tiles) == ["j1", "j2"]
 
 
 def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qtbot):
@@ -450,7 +450,7 @@ def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qt
     _open_latest(pane, finished)
 
     [heading] = gallery.section_headings(finished)
-    assert _shown_in_order(scroll) == ["Now", "InFlightCard", heading, "g1"]
+    assert _shown_in_order(scroll) == ["Now", "InFlightTile", heading, "g1"]
 
 
 def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot):
@@ -583,9 +583,9 @@ def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_las
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     [heading] = gallery.section_headings([finished])
-    assert _shown_in_order(scroll) == [heading, "new", "InFlightCard", "InFlightCard",
+    assert _shown_in_order(scroll) == [heading, "new", "InFlightTile", "InFlightTile",
                                        "generating", "g1"]
-    assert list(pane._inflight_cards) == ["r3", "r2"]
+    assert list(pane._inflight_tiles) == ["r3", "r2"]
 
 
 def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(qtbot):
@@ -597,7 +597,7 @@ def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(
                                                rows=[running, finished]))
 
     [heading] = gallery.section_headings([finished])
-    assert _shown_in_order(scroll) == ["Now", "InFlightCard", heading, "g1"]
+    assert _shown_in_order(scroll) == ["Now", "InFlightTile", heading, "g1"]
 
 
 def test_the_experiments_collection_heads_each_batch_it_collected(qtbot):
@@ -693,7 +693,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot):
 
     pane.show_collection(FolderCollection(LATEST_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
-    assert list(pane._inflight_cards) == ["a2"]
+    assert list(pane._inflight_tiles) == ["a2"]
 
 
 def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_below_it(qtbot):

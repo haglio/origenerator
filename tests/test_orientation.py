@@ -259,22 +259,22 @@ def _drawing(view, side: str) -> None:
 
 @pytest.mark.parametrize("side", SIDES)
 def test_every_sides_latest_leads_with_the_runs_in_flight_it_holds(qtbot, side):
-    """Queued or running, a run's card is on the Latest of each side that holds
-    its shape. Together's Latest once showed none at all: its cards were picked
+    """Queued or running, a run's tile is on the Latest of each side that holds
+    its shape. Together's Latest once showed none at all: its tiles were picked
     by matching each run's shape against the side, which Both never matches."""
     view = _view_of_runs(qtbot)
     _drawing(view, side)
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(LATEST_KEY, side)])
 
-    assert set(view._browser._inflight_cards) == {
+    assert set(view._browser._inflight_tiles) == {
         run for run, shape in _RUNS.items() if side_holds(side, shape)}
 
 
 @pytest.mark.parametrize("opened_first", SIDES)
 def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
         qtbot, tmp_path, opened_first):
-    """A folder's cards are the runs waiting in it. They were picked by the side
+    """A folder's tiles are the runs waiting in it. They were picked by the side
     of the Latest opened last, so after Together's Latest no folder showed any,
     and after Landscape's no portrait folder did."""
     finished = _shaped(_image("t1", "scene six", 50, 1), tmp_path, 90, 160)
@@ -294,7 +294,7 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(folder, holding_the_folder)])
 
-    assert set(view._browser._inflight_cards) == {"t2", "t3"}
+    assert set(view._browser._inflight_tiles) == {"t2", "t3"}
 
 
 @pytest.mark.parametrize("side", SIDES)

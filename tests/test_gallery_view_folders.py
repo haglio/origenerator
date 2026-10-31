@@ -31,6 +31,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import FOLDER_KEYS_MIME, TREE_KEY_ROLE, _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.orientation import oriented_key
@@ -180,7 +181,7 @@ def test_a_custom_folder_shows_the_items_it_holds_ahead_of_its_folders(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["Mine"])
 
     assert _shown(_top_level(view._tree)["Mine"]) == "(2) Mine"
-    assert _tile_kinds_in_order(view) == [ThumbnailWidget, FolderTile]
+    assert _tile_kinds_in_order(view) == [ItemTile, FolderTile]
     assert view._browser.listed_prompt_ids() == ["i1"]
     assert view._browser._listed_folders == [dog]
     assert [r["prompt_id"] for r in view.rows_to_play()] == ["i1", "i2"]

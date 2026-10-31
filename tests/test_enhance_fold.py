@@ -336,7 +336,7 @@ def test_an_enhancement_whose_image_is_gone_is_one_to_scrap(tmp_path):
 
 
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
-    # The transient job row shows as an in-flight card on Latest, never as an
+    # The transient job row shows as an in-flight tile on Latest, never as an
     # "Image Enhance" folder in the tree; a completed one that has not been
     # folded yet does.
     db = Database(tmp_path / "t.db")

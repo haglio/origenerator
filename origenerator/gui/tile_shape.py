@@ -1,14 +1,14 @@
-"""The shape every card in a folder's grid shares — items and offers alike.
+"""The shape every tile in a folder's grid shares — items and offers alike.
 
-A settings folder's grid holds finished thumbnails, live in-flight cards, and the
-two cards that aren't generations at all: the re-roll "+" and the Modify card
+A settings folder's grid holds finished thumbnails, live in-flight tiles, and the
+two tiles that aren't generations at all: the New tile and the Modify tile
 beside it. They stand shoulder to shoulder in one flow, so they are one size and
 their captions are set one way. Kept here rather than in any one of them so the
 family cannot drift apart the next time one is touched.
 
 The caption is set in the family's tiny type, and the band is two lines of it
 tall, so a caption long enough to wrap -- a run in flight is captioned with its
-model and its prompt -- wraps rather than being clipped. The card's height
+model and its prompt -- wraps rather than being clipped. The tile's height
 follows from the band, so a caption never quietly costs a line.
 """
 from __future__ import annotations
@@ -19,16 +19,16 @@ from PyQt6.QtWidgets import QLabel
 from shared_ui.fonts import FONT_UI, SIZE_TINY, make_font
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
-# The thumbnail a card gives to its content, and the frame around it. The thumbnail
-# is what the grid is for, so the card's height is what gives when the caption
+# The thumbnail a tile gives to its content, and the frame around it. The thumbnail
+# is what the grid is for, so the tile's height is what gives when the caption
 # needs more room, never this.
-CARD_WIDTH = 180
+TILE_WIDTH = 180
 THUMBNAIL_SIZE = (172, 160)
-CARD_MARGIN = GAP_SMALL
-CARD_SPACING = GAP_SMALL
+TILE_MARGIN = GAP_SMALL
+TILE_SPACING = GAP_SMALL
 
 def caption_font() -> QFont:
-    """The family's tiny type, which a card's caption, count and breadcrumb are
+    """The family's tiny type, which a tile's caption, count and breadcrumb are
     set in: a copy, since a caller may set it on a widget that then changes it."""
     return QFont(make_font(FONT_UI, SIZE_TINY))
 
@@ -43,31 +43,31 @@ def caption_height() -> int:
     return 2 * line_height()
 
 
-def card_size() -> tuple:
-    """Every card's outside — the thumbnail, the caption band under it, and the
+def tile_size() -> tuple:
+    """Every tile's outside — the thumbnail, the caption band under it, and the
     frame around both."""
-    height = (2 * CARD_MARGIN + THUMBNAIL_SIZE[1] + CARD_SPACING + caption_height())
-    return CARD_WIDTH, height
+    height = (2 * TILE_MARGIN + THUMBNAIL_SIZE[1] + TILE_SPACING + caption_height())
+    return TILE_WIDTH, height
 
 
 def thumbnail_size() -> QSize:
     return QSize(*THUMBNAIL_SIZE)
 
 
-def folder_card_size(breadcrumb: bool = False) -> tuple:
-    """A folder's outside: the same card as a generation's, plus a line of the
+def folder_tile_size(breadcrumb: bool = False) -> tuple:
+    """A folder's outside: the same tile as a generation's, plus a line of the
     caption's type saying how many items are in it, and another saying where it
     lives in the Favorites collection, where a folder is out of its parent's
     context."""
-    width, height = card_size()
-    height += CARD_SPACING + line_height()
+    width, height = tile_size()
+    height += TILE_SPACING + line_height()
     if breadcrumb:
-        height += CARD_SPACING + line_height()
+        height += TILE_SPACING + line_height()
     return width, height
 
 
 def style_caption(label) -> None:
-    """Set one card's caption label to the family's font and band height."""
+    """Set one tile's caption label to the family's font and band height."""
     label.setFont(caption_font())
     label.setMaximumHeight(caption_height())
 
@@ -77,19 +77,19 @@ from shared_ui.icons import draw_icon
 from shared_ui.palette import BORDER_SUBTLE, TEXT_MUTED, as_hex
 
 from origenerator.gui.palette import (
-    CARD_HOVER_BORDER,
     EMPTY_PLATE,
     SELECTED_BORDER,
     SELECTED_FILL,
+    TILE_HOVER_BORDER,
 )
 
 _CORNER = f"border-radius: {BUTTON_RADIUS}px;"
 
-# The resting dashed outline, versus the blue and white marking the card as the item
+# The resting dashed outline, versus the blue and white marking the tile as the item
 # driving the info pane — the same marks a selected thumbnail wears.
 IDLE_FRAME_CSS = (
     "#{name} {{ border: 1px dashed " + as_hex(BORDER_SUBTLE) + "; " + _CORNER + " }}"
-    "#{name}:hover {{ border-color: " + CARD_HOVER_BORDER + "; }}"
+    "#{name}:hover {{ border-color: " + TILE_HOVER_BORDER + "; }}"
     "#{name}:disabled {{ border-color: " + as_hex(BORDER_SUBTLE) + "; }}"
     "#{name} QLabel:disabled {{ color: " + as_hex(TEXT_MUTED) + "; }}"
 )

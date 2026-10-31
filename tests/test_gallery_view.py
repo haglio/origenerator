@@ -1041,7 +1041,7 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     view.set_experiments_enabled(True)  # the switch a seeded session restores
 
     assert view.experiments_enabled() is False   # forced off, however it was saved
-    assert not view._experiments_cb.isEnabled()  # greyed, with the reason beneath
+    assert not view._experiments_cb.isEnabled()  # grayed, with the reason beneath
     assert "production app" in view._experiments_status.text()
 
     view._experiments_cb.setChecked(True)  # and the gate holds even forced on

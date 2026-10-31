@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.icons import inline_icon
+from shared_ui.spacing import GAP_MEDIUM
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
@@ -46,6 +47,7 @@ from origenerator.gui import corner_controls, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.eliding import ElidingLabel
@@ -2339,6 +2341,56 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
     panel.layout().activate()
 
     assert gap() == before   # the column closed up; the space did not move down
+
+
+def _gaps_between_sections(panel) -> dict[str, int]:
+    body = panel._scroll.widget()
+    panel.layout().activate()
+
+    def top(widget):
+        return widget.mapTo(body, QPoint(0, 0)).y()
+
+    shown = sorted((section for section in body.findChildren(CollapsibleSection)
+                    if section.isVisibleTo(body)), key=top)
+    return {lower.title(): top(lower) - (top(upper) + upper.height())
+            for upper, lower in zip(shown, shown[1:])}
+
+
+def test_the_enhancement_levels_sit_one_gap_under_the_settings_as_each_section_does(saved_panel):
+    panel, db = saved_panel
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+    panel.resize(480, 1400)
+    panel.show()
+
+    gaps = _gaps_between_sections(panel)
+
+    assert "Enhancement levels" in gaps
+    assert gaps == dict.fromkeys(gaps, GAP_MEDIUM)
+
+
+def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db)
+    panel.show_saved_generation(_video_row(db, input_image="sdxl_img1.png"), [image])
+    panel.resize(480, 1600)
+    panel.show()
+    panel.layout().activate()
+    body = panel._scroll.widget()
+
+    def corner(widget):
+        return widget.mapTo(body, QPoint(0, 0))
+
+    def span(widget):
+        return corner(widget).x(), corner(widget).x() + widget.width()
+
+    name = panel._metadata_block.findChild(CollapsibleSection)
+    spans = {section.title(): span(section) for section in body.findChildren(CollapsibleSection)
+             if section.isVisibleTo(body)}
+
+    assert spans == dict.fromkeys(spans, span(panel._form_host))
+    assert corner(name).y() == body.layout().contentsMargins().top()
+    assert corner(panel._action).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
 
 
 # --- the modified notice: the preview no longer answers the form -------------

@@ -182,7 +182,7 @@ def test_show_row_replaces_the_previous_render(block):
 
 
 def test_an_image_renders_no_block(block):
-    # Its files are its versions, listed with the enhancement levels that made
+    # Its files are its versions, listed with the versions that made
     # them; there is nothing left for this block to repeat.
     block.show_row(_row(workflow_name="sdxl_t2i", output_files=json.dumps(
         [{"filename": "out.png", "subfolder": "image"}])))

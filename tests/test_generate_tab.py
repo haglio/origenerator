@@ -55,7 +55,7 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.eliding import ElidingLabel
-from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
+from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _PendingRow, _VersionRow
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
@@ -1652,8 +1652,8 @@ def _fold_enhancement(db, prompt_id="img1"):
     return db.get_generation(prompt_id)
 
 
-def _level_rows(tab):
-    return tab._versions._host.findChildren(_LevelRow)
+def _version_rows(tab):
+    return tab._versions._host.findChildren(_VersionRow)
 
 
 def _row_texts(row):
@@ -1668,7 +1668,7 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     tab.resize(480, 1400)
     tab.show()
     tab.layout().activate()
-    facts = next(row for row in _level_rows(panel) if "Enhancement" in _row_texts(row))._facts
+    facts = next(row for row in _version_rows(tab) if "Enhancement" in _row_texts(row))._facts
     lines = [line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)]
     keys = [facts.itemAtPosition(line, 0).widget() for line in lines]
     values = [facts.itemAtPosition(line, 1).widget() for line in lines]
@@ -1687,7 +1687,7 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_pan
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
     assert not tab._versions.isHidden()
-    (row,) = _level_rows(tab)
+    (row,) = _version_rows(tab)
     assert "Original" in _row_texts(row)
     assert tab._versions._host.findChildren(_AddRow)
 
@@ -1723,7 +1723,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video(saved_panel, 
 
     tab.show_saved_generation(video, [])
 
-    rows = _level_rows(tab)
+    rows = _version_rows(tab)
     assert [row._title.text() for row in rows] == ["Evolved", "Original"]
     assert upscale.name in _row_texts(rows[0])
     assert tab._metadata_block.isHidden()   # its file is listed with its versions
@@ -1736,7 +1736,7 @@ def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkey
     tab.show_saved_generation(video, [])
     tab._preview.show_media.reset_mock()
 
-    tab._show_level(0)
+    tab._show_version(0)
 
     tab._preview.show_media.assert_called_once_with(upscale, "video", "vid1")
 
@@ -1747,7 +1747,7 @@ def test_an_upscaled_videos_versions_have_no_trash_can(saved_panel, monkeypatch,
 
     tab.show_saved_generation(video, [])
 
-    rows = _level_rows(tab)
+    rows = _version_rows(tab)
     assert len(rows) == 2
     assert [row.findChild(QPushButton, "deleteButton") for row in rows] == [None, None]
 
@@ -1758,7 +1758,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     tab.show_saved_generation(image, [image])
 
     assert not tab._versions.isHidden()
-    rows = _level_rows(tab)
+    rows = _version_rows(tab)
     first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
     assert first.startswith("Enhancement 1/1")
     assert "2x" in first
@@ -1777,7 +1777,7 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
 
-    rows = _level_rows(tab)
+    rows = _version_rows(tab)
     assert "image/image_enhance_00001_.png" in _row_texts(rows[0])
     assert "image/sdxl_img1.png" in _row_texts(rows[1])
     assert [[b.objectName() for b in row.findChildren(QPushButton)] for row in rows] == [
@@ -1804,7 +1804,7 @@ def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
     assert not tab._metadata_block.isHidden()
     assert [b.objectName() for b in tab._metadata_block.findChildren(QPushButton)
             if b.objectName() != "foldingSectionHeader"] == ["goToFolderButton"]
-    for row in _level_rows(tab):
+    for row in _version_rows(tab):
         assert "goToFolderButton" not in [b.objectName()
                                           for b in row.findChildren(QPushButton)]
 
@@ -1821,7 +1821,7 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     assert tab._versions._host.findChildren(_PendingRow)
     # The original stays beside it — the base render is out and worth looking at
     # while its enhancement is made, which is the point of generating it first.
-    assert _level_rows(tab)
+    assert _version_rows(tab)
 
     tab.set_pending_enhancement(None)
     assert not tab._versions._host.findChildren(_PendingRow)
@@ -1861,7 +1861,7 @@ def test_picked_levels_are_deleted_by_filename(saved_panel):
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
     asked = []
-    tab.levels_delete_requested.connect(lambda pid, names: asked.append((pid, names)))
+    tab.versions_delete_requested.connect(lambda pid, names: asked.append((pid, names)))
 
     tab._versions.delete_requested.emit([0])
 
@@ -1885,7 +1885,7 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     tab.show_saved_generation(image, [image])
     tab._preview.show_media.reset_mock()
 
-    tab._show_level(1)   # the original
+    tab._show_version(1)   # the original
 
     tab._preview.show_media.assert_called_once_with(
         output_dir / "image" / "sdxl_img1.png", "image", "img1"
@@ -1903,7 +1903,7 @@ def test_an_arrow_after_a_level_is_clicked_puts_the_next_level_in_the_preview(
     monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
-    newest = _level_rows(tab)[0]
+    newest = _version_rows(tab)[0]
     qtbot.mouseClick(newest, Qt.MouseButton.LeftButton)
     tab._preview.show_media.reset_mock()
 
@@ -1921,7 +1921,7 @@ def test_up_onto_the_enhance_row_and_enter_asks_for_an_enhance_of_the_image(save
     tab.show_saved_generation(image, [image])
     asked = []
     tab.enhance_requested.connect(asked.append)
-    newest = _level_rows(tab)[0]
+    newest = _version_rows(tab)[0]
     qtbot.mouseClick(newest, Qt.MouseButton.LeftButton)
 
     qtbot.keyClick(newest, Qt.Key.Key_Up)
@@ -2082,7 +2082,7 @@ def test_an_image_the_tab_puts_up_itself_carries_its_own_file_row(
     tab.prefill("sdxl_t2i", _wiz_params())
 
     assert tab.displayed_row()["prompt_id"] == "g1"
-    (row,) = _level_rows(tab)
+    (row,) = _version_rows(tab)
     assert "image/sdxl_g1.png" in _row_texts(row)
     names = [b.objectName() for b in row.findChildren(QPushButton)]
     assert names == ["copyButton", "revealButton"]
@@ -2411,7 +2411,7 @@ def _gaps_between_sections(tab) -> dict[str, int]:
             for upper, lower in pairwise(shown)}
 
 
-def test_the_enhancement_levels_sit_one_gap_under_the_settings_as_each_section_does(saved_panel):
+def test_the_enhancements_sit_one_gap_under_the_settings_as_each_section_does(saved_panel):
     tab, db = saved_panel
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
@@ -2420,7 +2420,7 @@ def test_the_enhancement_levels_sit_one_gap_under_the_settings_as_each_section_d
 
     gaps = _gaps_between_sections(tab)
 
-    assert "Enhancement Levels" in gaps
+    assert "Enhancements" in gaps
     assert gaps == dict.fromkeys(gaps, GAP_MEDIUM)
 
 

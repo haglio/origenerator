@@ -39,14 +39,14 @@ from origenerator.gallery import (
     config_folder_key,
     config_folder_name,
     describe_enhance_params,
-    displayed_levels,
+    displayed_versions,
     enhance_params_for,
-    level_matching_settings,
     media_type_of_row,
     output_file_path,
     prompts_differ_from,
     resolve_preview,
     settings_signature,
+    version_matching_settings,
     workflow_output_type,
 )
 from origenerator.gallery.sides import PORTRAIT
@@ -240,7 +240,7 @@ class GenerateTab(DropZones):
     how_many_chosen = pyqtSignal(int)
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
-    levels_delete_requested = pyqtSignal(str, list)  # trash these versions of this image (prompt_id, filenames)
+    versions_delete_requested = pyqtSignal(str, list)  # trash these versions of this image (prompt_id, filenames)
     train_requested = pyqtSignal(str)        # a LoRA row's Train was pressed (the row's key)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
@@ -521,16 +521,16 @@ class GenerateTab(DropZones):
         self._related.link_clicked.connect(self.link_clicked)
         body.addWidget(self._related)
         # The preview opens on the most-enhanced version, and this is where the
-        # earlier levels (and the original) are, each captioned with what made
+        # earlier versions (and the original) are, each captioned with what made
         # it and draggable onto the Enhance pane to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
         self._versions = EnhanceVersions()
         # What the list is showing, in its order: the positions its rows report
         # are only good against this.
-        self._listed_levels = []
-        self._versions.level_selected.connect(self._show_level)
+        self._listed_versions = []
+        self._versions.version_selected.connect(self._show_version)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
-        self._versions.delete_requested.connect(self._on_levels_delete_requested)
+        self._versions.delete_requested.connect(self._on_versions_delete_requested)
         body.addWidget(self._versions)
 
     def _build_settings_pane(self) -> QWidget:
@@ -1507,7 +1507,7 @@ class GenerateTab(DropZones):
         is displaying, else leave the tab alone.
 
         A tab holds the row it was given rather than a live view of the database,
-        so an enhancement folding in a new level would otherwise show only the next
+        so an enhancement folding in a new version would otherwise show only the next
         time the tab was opened. The form is left exactly as the user has it.
         """
         shown = self._displayed_row
@@ -1791,7 +1791,7 @@ class GenerateTab(DropZones):
         """Mark the preview when the form no longer describes the item on it.
 
         Putting the settings back takes the message away again. Public because the
-        version list re-shows a level of the same row from outside the form, which
+        version list re-shows a version of the same row from outside the form, which
         clears the message, so whoever did that re-asserts it.
         """
         modified = (self._displayed_config is not None
@@ -1840,7 +1840,7 @@ class GenerateTab(DropZones):
         """Reflect an enhancement being generated for the image on display.
 
         ``pending`` is a :class:`RunningEnhancement` while one is running, ``None``
-        otherwise. A frame updates the level's row in place and goes up to the
+        otherwise. A frame updates the version's row in place and goes up to the
         preview; only a run starting or ending rebuilds the list. These frames keep
         whatever the pane says about the item rather than clearing it, which
         every other live frame does: an enhancement is the coming state of that
@@ -1914,7 +1914,7 @@ class GenerateTab(DropZones):
         if row is not None:
             self._metadata_block.setVisible(self._metadata_block.has_content())
 
-    def _on_levels_delete_requested(self, positions: list):
+    def _on_versions_delete_requested(self, positions: list):
         """Relay a version-list delete by filename, not by position.
 
         The list is rebuilt from the row on every refresh, so a position is only
@@ -1924,40 +1924,40 @@ class GenerateTab(DropZones):
         row = self._displayed_row
         if row is None:
             return
-        levels = self._listed_levels
-        names = [levels[p].file.get("filename") for p in positions
-                 if 0 <= p < len(levels)]
+        versions = self._listed_versions
+        names = [versions[p].file.get("filename") for p in positions
+                 if 0 <= p < len(versions)]
         if names:
-            self.levels_delete_requested.emit(row["prompt_id"], names)
+            self.versions_delete_requested.emit(row["prompt_id"], names)
 
     def _refresh_versions(self):
         """Rebuild the version list for whatever this tab is displaying.
 
         The preview is already on ``output_files[0]`` — the most-enhanced
-        version — so the list leads with that level and offers the rest below
+        version — so the list leads with that version and offers the rest below
         it, under the ``+ Enhance`` row. A video has no row to press — the
         enhancer takes images — and lists versions only once Evolver has
         upscaled it, none of them trashed from here.
         """
         row = self._displayed_row
         if row is None:
-            self._listed_levels = []
-            self._versions.show_levels([])
+            self._listed_versions = []
+            self._versions.show_versions([])
             return
         if media_type_of_row(row) != MediaType.IMAGE:
-            self._listed_levels = displayed_levels(row, self._upscale_of(row))
+            self._listed_versions = displayed_versions(row, self._upscale_of(row))
             # A video file is no image, so both versions wear its thumbnail.
-            self._versions.show_levels(
-                [(level, row.get("thumbnail_path")) for level in self._listed_levels],
+            self._versions.show_versions(
+                [(version, row.get("thumbnail_path")) for version in self._listed_versions],
                 created_fallback=str(row.get("created_at", "")),
                 held_days=row.get("days_in_trash"), deletable=False,
             )
             return
-        self._listed_levels = displayed_levels(row)
-        # Each drawn from its own file, so a level shows what it actually looks
+        self._listed_versions = displayed_versions(row)
+        # Each drawn from its own file, so a version shows what it actually looks
         # like rather than the row's one shared thumbnail.
-        self._versions.show_levels(
-            [(level, self._level_path(level)) for level in self._listed_levels],
+        self._versions.show_versions(
+            [(version, self._version_path(version)) for version in self._listed_versions],
             self._pending_enhancement, self._add_row_for(row),
             str(row.get("created_at", "")), row.get("days_in_trash"),
         )
@@ -1975,25 +1975,25 @@ class GenerateTab(DropZones):
         """What the ``+ Enhance`` row on ``row`` would run, and what it repeats."""
         params = enhance_params_for(row, self._enhance_settings)
         return EnhanceOffer(describe_enhance_params(params or {}),
-                            level_matching_settings(row, self._enhance_settings))
+                            version_matching_settings(row, self._enhance_settings))
 
     @staticmethod
-    def _level_path(level) -> Path:
+    def _version_path(version) -> Path:
         """Where one version's file lives — under ComfyUI's output folder, or in
         the trash once the generation has been deleted."""
-        return output_file_path(level.file, OUTPUT_PLACES)
+        return output_file_path(version.file, OUTPUT_PLACES)
 
-    def _show_level(self, position: int):
+    def _show_version(self, position: int):
         """Put one of the displayed generation's versions in the preview.
 
         Only the preview changes: the row on display, its form, its metadata and
-        the OSR2 drive all still belong to the generation — the levels are
+        the OSR2 drive all still belong to the generation — the versions are
         versions of one image or video, not separate generations, so switching
         between them is a look rather than a navigation.
         """
-        if self._displayed_row is None or not 0 <= position < len(self._listed_levels):
+        if self._displayed_row is None or not 0 <= position < len(self._listed_versions):
             return
-        path = self._level_path(self._listed_levels[position])
+        path = self._version_path(self._listed_versions[position])
         if path.exists():
             self._preview.show_media(path, media_type_of_row(self._displayed_row),
                                      self._displayed_row["prompt_id"])

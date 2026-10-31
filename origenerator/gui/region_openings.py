@@ -7,8 +7,8 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject
 
+from origenerator.gui.hud_nav_map import NavMapNeighbors
 from origenerator.gui.off_thread import run_off_thread
-from origenerator.gui.slideshow_map import MapNeighbors
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class RegionOpening:
     enhanced_ids: set[str]
     scripts: dict[str, Path | None]
     lead: int = 0
-    lead_neighbors: MapNeighbors | None = None
+    lead_neighbors: NavMapNeighbors | None = None
 
 
 class RegionOpenings(QObject):

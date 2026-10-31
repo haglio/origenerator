@@ -479,7 +479,7 @@ class PreviewWidget(QWidget):
 
         ``prompt_id`` is the saved generation on screen — the row every act here
         lands on — with the state its corners report beside it: whether it is
-        bookmarked, and what its enhance corner has to say
+        favorited, and what its enhance corner has to say
         (:func:`~origenerator.gui.corner_controls.enhance_state`). ``None`` leaves
         the item inert, which is what everything transient is: a live frame is
         a file that does not exist yet, and a message is not an item at all.

@@ -15,9 +15,9 @@ of times. Any new mutation empties the redo stack, as everywhere else: once
 history has forked, the branch you left is gone.
 
 Falling off that stack no longer ends anything, though: a delete also files the
-row and its trashed files in the recovery bin, which holds them for weeks (see
-:mod:`origenerator.recovery`). So the stack is the quick "that was a mistake",
-and the bin — restored or ended from the gallery's Trash collection, through
+row and its trashed files in the Trash, which holds them for weeks (see
+:mod:`origenerator.trash_collection`). So the stack is the quick "that was a mistake",
+and the Trash — restored or ended from the gallery's Trash collection, through
 :meth:`GalleryActions.restore_deleted` and :meth:`GalleryActions.purge_deleted` —
 is the slow one.
 """
@@ -28,7 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from origenerator import recovery
+from origenerator import trash_collection
 from origenerator.gallery import (
     output_disk_files,
     remove_enhance_levels,
@@ -87,7 +87,7 @@ class GalleryActions:
     def delete_rows(self, rows: list[dict]) -> None:
         """Trash each row's files and drop its DB record, as one undoable step.
 
-        Each row's files go into a batch of their own, filed in the recovery bin
+        Each row's files go into a batch of their own, filed in the Trash
         beside the row it dropped — so an item stays restorable from the Trash
         collection long after this session's undo stack has forgotten the delete, and
         one item of a deleted folder can be brought back without the rest.
@@ -99,16 +99,16 @@ class GalleryActions:
         batches = self._trash_files(rows)
         for row, batch in batches:
             self._db.delete_generation(row["prompt_id"])
-            self._db.record_deletion(row["prompt_id"], row, batch.record())
+            self._db.record_trashed(row["prompt_id"], row, batch.record())
 
         def undo() -> str | None:
             for row, batch in batches:
                 self._db.restore_generation(with_files_renamed(row, batch.restore()))
-                self._db.forget_deletion(row["prompt_id"])
+                self._db.forget_trashed(row["prompt_id"])
             return batches[0][0]["prompt_id"]  # a restored item to navigate back to
 
         # No commit hook: an entry falling off the stack ends nothing now — the
-        # bin goes on holding the files until the user says otherwise.
+        # Trash goes on holding the files until the user says otherwise.
         # Redo re-deletes the same rows: undo restored them exactly as captured,
         # so the dicts still describe what is there to take away again.
         self._history.push(UndoEntry(_delete_label(len(rows)), undo,
@@ -128,7 +128,7 @@ class GalleryActions:
         file left is a deleted generation, and that is the gallery's own delete,
         reached from the thumbnail rather than from this list.
 
-        Nothing is filed in the recovery bin: the bin holds a row and the files
+        Nothing is filed in the Trash: the Trash holds a row and the files
         it was deleted with, and this row was not deleted. So these files keep
         the old arrangement — the trash holds them, and the undo entry falling
         off the stack is what ends them.
@@ -162,7 +162,7 @@ class GalleryActions:
 
         The thumbnail is a separate JPEG keyed by prompt_id, so deleting the
         version it was rendered from leaves it showing a file that is gone —
-        the gallery would still be advertising the enhancement you just binned.
+        the gallery would still be advertising the enhancement you just trashed.
         Rendering is best-effort: a row that can't be redrawn keeps the thumbnail
         it has rather than losing its tile.
         """
@@ -212,7 +212,7 @@ class GalleryActions:
         """Move the files ``rows`` own into the trash — a batch per row — after
         telling the app to let go of them. Returns ``(row, batch)`` pairs.
 
-        A batch per row is what lets the bin restore or end one item on its own;
+        A batch per row is what lets the Trash restore or end one item on its own;
         deleting a whole folder is still one undo step, made of them.
 
         ``names`` narrows each row to those output files, for a delete that takes
@@ -257,32 +257,32 @@ class GalleryActions:
             by_row.append(files)
         return by_row
 
-    # --- the recovery bin: putting a delete back, or ending it ---------------
+    # --- the Trash: putting a delete back, or ending it ---------------
 
     def restore_deleted(self, prompt_ids) -> str | None:
-        """Bring deleted items back out of the bin — files to where they were,
+        """Bring deleted items back out of the Trash — files to where they were,
         rows to the gallery — and return one to navigate to.
 
         Not pushed onto the undo stack: undoing a restore is just deleting the
         item again, which the user can do directly and which would only file it
-        back in the bin. Unknown ids (already restored, already ended) are
+        back in the Trash. Unknown ids (already restored, already ended) are
         skipped rather than treated as an error.
         """
         restored = None
         for prompt_id in prompt_ids:
-            record = self._db.get_deletion(prompt_id)
+            record = self._db.get_trashed(prompt_id)
             if record is not None:
-                restored = recovery.restore(self._db, record)
+                restored = trash_collection.restore(self._db, record)
         return restored
 
     def purge_deleted(self, prompt_ids) -> None:
-        """End held deletions for good — nothing else ever will: the files
-        are removed and the bin forgets them. Irreversible, and deliberately not
+        """End trashed items for good — nothing else ever will: the files
+        are removed and the Trash forgets them. Irreversible, and deliberately not
         undoable — the caller confirms with the user first."""
         for prompt_id in prompt_ids:
-            record = self._db.get_deletion(prompt_id)
+            record = self._db.get_trashed(prompt_id)
             if record is not None:
-                recovery.purge(self._db, record)
+                trash_collection.purge(self._db, record)
 
     def reject_experiment(self, row: dict) -> None:
         """Reject a background experiment: trash its files and clear their
@@ -293,7 +293,7 @@ class GalleryActions:
         The verdict is recorded here, with the file cleanup, so the whole
         rejection is one reversible unit rather than half in the view.
 
-        Nothing is filed in the recovery bin: the bin holds *deleted rows*, and
+        Nothing is filed in the Trash: the Trash holds *deleted rows*, and
         this row is kept — it stays in the gallery's own hands, verdict and all,
         so there is no orphan for a Trash collection to offer back.
 

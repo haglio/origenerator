@@ -46,7 +46,6 @@ from tests.gallery_view_support import (
     _answer_confirmation,
     _answer_menu,
     _at,
-    _bin_db,
     _click_beside_the_mark_of,
     _click_off,
     _click_tile,
@@ -64,6 +63,7 @@ from tests.gallery_view_support import (
     _shown_view_with_one_image,
     _top_level,
     _trash_collection_view,
+    _trash_db,
     _video_workflow,
     _workflow_rows,
 )
@@ -75,11 +75,11 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
-# --- the Trash collection: deleted items, still recoverable -----------------
+# --- the Trash collection: deleted items, still in the Trash -----------------
 
 
 def test_the_trash_collection_is_always_reachable(qtbot):
-    # A bin you can only find once you have something to recover is no use: the
+    # A Trash you can only find once you have something to recover is no use: the
     # point is knowing, before you delete, that deleting is not the end.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
@@ -90,7 +90,7 @@ def test_the_trash_collection_is_always_reachable(qtbot):
 
 
 def test_the_trash_collection_label_counts_what_it_holds(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -99,7 +99,7 @@ def test_the_trash_collection_label_counts_what_it_holds(qtbot):
 
 
 def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
-    view = GalleryView(_bin_db(held=[("old", _image("old", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("old", _image("old", "a cat", 50, 1)),
                                      ("new", _image("new", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -109,7 +109,7 @@ def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
 
 
 def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -139,7 +139,7 @@ def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, t
 
 
 def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -153,7 +153,7 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
     # Nothing counts down any more, so the caption has no deadline to carry and
     # says only what the item is.
     held = _image("d1", "a cat", 50, 1)
-    view = GalleryView(_bin_db(held=[("d1", held)]))
+    view = GalleryView(_trash_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -164,7 +164,7 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
 
 def test_an_old_version_the_backfill_sent_to_the_trash_says_so_on_its_tile(qtbot):
     held = {**_image("d1", "a cat", 50, 1), "old_version_of": "the video it was made again as"}
-    view = GalleryView(_bin_db(held=[("d1", held)]))
+    view = GalleryView(_trash_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -174,7 +174,7 @@ def test_an_old_version_the_backfill_sent_to_the_trash_says_so_on_its_tile(qtbot
 
 
 def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -194,7 +194,7 @@ def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
 
 def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -223,13 +223,13 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     assert "SDXL T2I" in _workflow_rows(view._tree)      # back in the tree...
     assert view.listed_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
-    assert view._db.list_deletions() == []
+    assert view._db.list_trashed() == []
 
 
 def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     # The one gallery action with no undo and no second copy under it.
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -384,7 +384,7 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
     # The picked items are already deleted, so the button's one remaining
     # meaning is "for good" — rather than a live-looking control doing nothing.
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -400,7 +400,7 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
 
 
 def test_the_delete_button_is_dark_on_an_unpicked_trash_collection(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -426,11 +426,11 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view.listed_prompt_ids() == []
-    assert db.list_deletions() == []
+    assert db.list_trashed() == []
 
 
 def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
-    view = GalleryView(_bin_db([_image("i1", "a cat", 50, 1)],
+    view = GalleryView(_trash_db([_image("i1", "a cat", 50, 1)],
                                held=[("d1", _image("d1", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -442,11 +442,11 @@ def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
     assert view._tree.currentItem() is _collection(view, TRASH_KEY)
 
 
-def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypatch):
+def test_a_preview_offers_every_trashed_item_like_the_live_app(qtbot, monkeypatch):
     # One library, one trash: what any instance deleted, any instance can put
     # back, so the collection holds the same items whichever app is looking at it.
     monkeypatch.setenv(ENV_FLAG, "1")
-    db = _bin_db(held=[("mine", _image("mine", "a dog", 50, 2))],
+    db = _trash_db(held=[("mine", _image("mine", "a dog", 50, 2))],
                  inherited=[("live", _image("live", "a cat", 50, 1))])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -459,17 +459,17 @@ def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypat
     view.restore_from_trash(["mine"])
 
     assert db.get_generation("mine") is not None
-    assert db.get_deletion("live") is not None  # still offered, untouched
+    assert db.get_trashed("live") is not None  # still offered, untouched
 
 
 # --- a deleted item is still a generation you can look at -------------------
 
 
 def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
-    # Its row left the gallery, but the bin kept it whole and its files are all
+    # Its row left the gallery, but the Trash kept it whole and its files are all
     # in the trash — so it fills a config tab with the settings that made it,
     # which is the whole point of being able to look before you decide.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
@@ -484,7 +484,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
 def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
     # The gesture a folder's tiles carry, since the one a collection's carry — jump to
     # its folder — is the single thing a deleted item hasn't got.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
@@ -497,10 +497,10 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
 
 
 def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
-    # Deciding what to keep out of a bin of sixty days' deletions is exactly what
+    # Deciding what to keep out of a Trash of sixty days' deletions is exactly what
     # a slideshow is for — one at a time, full size, rather than a grid of stamps.
     _resolve_by_id(monkeypatch)
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -518,7 +518,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
     # Left/Right work here for the same reason they work in a folder: the collection's
     # items resolve to real files, so there is a set to step through.
     _resolve_by_id(monkeypatch)
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()

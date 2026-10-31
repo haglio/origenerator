@@ -15,7 +15,7 @@ from app_support import haglio_settings
 from funestra.video_families import seed_group_key
 from PIL import Image
 
-from origenerator import config, evolver_agreement, funscript_backfill, recovery
+from origenerator import config, evolver_agreement, funscript_backfill, trash_collection
 from origenerator.db import Database
 from origenerator.gallery import (
     SourceImageGroup,
@@ -269,7 +269,7 @@ def test_a_scan_stops_at_the_next_video_once_it_is_told_to(tmp_path):
 
 def _deleted(db, row: dict) -> None:
     db.delete_generation(row["prompt_id"])
-    db.record_deletion(row["prompt_id"], row, {"moves": [], "subdir": None})
+    db.record_trashed(row["prompt_id"], row, {"moves": [], "subdir": None})
 
 
 def test_a_video_waiting_in_the_trash_is_not_brought_in_again(tmp_path):
@@ -290,7 +290,7 @@ def test_a_video_deleted_for_good_is_not_brought_in_again(tmp_path):
     [shown] = _videos(db)
     _deleted(db, shown)
 
-    recovery.purge(db, db.get_deletion(shown["prompt_id"]))
+    trash_collection.purge(db, db.get_trashed(shown["prompt_id"]))
 
     assert scan(db, places, grab=_still) == 0
 
@@ -303,7 +303,7 @@ def test_a_video_made_from_words_alone_takes_its_starting_frame_when_deleted_for
     frame = _frame_of(db, shown)
     _deleted(db, shown)
 
-    recovery.purge(db, db.get_deletion(shown["prompt_id"]))
+    trash_collection.purge(db, db.get_trashed(shown["prompt_id"]))
 
     assert db.get_generation(frame["prompt_id"]) is None
     assert not Path(json.loads(frame["output_files"])[0]["path"]).exists()
@@ -317,7 +317,7 @@ def test_a_starting_frame_a_video_here_was_made_from_outlives_its_video_deleted_
     _made_here_from(db, frame)
     _deleted(db, shown)
 
-    recovery.purge(db, db.get_deletion(shown["prompt_id"]))
+    trash_collection.purge(db, db.get_trashed(shown["prompt_id"]))
 
     assert db.get_generation(frame["prompt_id"]) is not None
     assert Path(json.loads(frame["output_files"])[0]["path"]).exists()

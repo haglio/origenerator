@@ -270,7 +270,7 @@ def test_a_sharded_download_is_not_a_selectable_model(tmp_path):
 
 def test_reads_a_gguf_index_past_its_metadata(tmp_path):
     # The quantized Flux models are GGUF, whose tensor names sit after a
-    # variable-length metadata block — so reaching them means stepping over
+    # variable-length metadata — so reaching them means stepping over
     # every typed value in that block, not seeking a fixed offset.
     def kv(key, text):
         return (struct.pack("<Q", len(key)) + key + struct.pack("<I", 8)

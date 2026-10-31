@@ -18,7 +18,7 @@ from origenerator.gallery import (
     fold_enhancement,
     is_enhanced_row,
 )
-from origenerator.generation_metadata import basic_section, file_item
+from origenerator.generation_metadata import basic_facts, file_item
 from origenerator.generation_state import GenerationSource
 from origenerator.output_places import OutputPlaces
 
@@ -380,7 +380,7 @@ def test_each_version_carries_its_own_file_row(tmp_path):
         ("Enhancement 1/1", "image/image_enhance_00001_.png"),
         ("Original", "image/sdxl_t2i_src.png"),
     ]
-    assert basic_section(row) is None
+    assert basic_facts(row) is None
 
 
 # --- an enhancement the production app never recorded, arriving as a bare file -----

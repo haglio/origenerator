@@ -27,9 +27,9 @@ from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_MEDIUM, GAP_
 
 from origenerator.generation_metadata import (
     BASIC_TITLE,
-    MetaItem,
-    MetaSection,
-    basic_section,
+    BasicFacts,
+    BasicItem,
+    basic_facts,
 )
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
@@ -43,7 +43,7 @@ def _h(color) -> str:
     return color.name()
 
 
-class MetadataBlock(QWidget):
+class BasicSection(QWidget):
     """A compact, read-only view of one generation's metadata sections.
 
     ``show_row`` rebuilds the block from the section model. It carries no scroll of
@@ -55,7 +55,7 @@ class MetadataBlock(QWidget):
         super().__init__(parent)
         self._go_to_folder = go_to_folder
         self._shown: tuple[dict, Path | None, str] | None = None
-        self._section: MetaSection | None = None
+        self._section: BasicFacts | None = None
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._block: CollapsibleSection | None = None
@@ -68,7 +68,7 @@ class MetadataBlock(QWidget):
         — and so are a video's once Evolver has upscaled it — so what is left
         here can be as little as the way to the folder, or nothing at all."""
         self._shown = (row, upscale, name)
-        self._section = basic_section(row, upscale, name=name)
+        self._section = basic_facts(row, upscale, name=name)
         self._render(self._section)
         return self.has_content()
 
@@ -84,7 +84,7 @@ class MetadataBlock(QWidget):
         return self._section is not None or (
             self._go_to_folder is not None and self._go_to_folder.isVisible())
 
-    def _render(self, section: MetaSection | None):
+    def _render(self, section: BasicFacts | None):
         if self._block is not None:
             # setParent(None) drops it from this block's children at once (so a
             # rebuild's findChildren/layout sees only the new rows); deleteLater
@@ -109,7 +109,7 @@ class MetadataBlock(QWidget):
             self._block.set_collapsed(folded)
 
 
-def _build_section(section: MetaSection | None, go_to_folder: QAction | None = None,
+def _build_section(section: BasicFacts | None, go_to_folder: QAction | None = None,
                    *, collapsed: bool = False) -> CollapsibleSection:
     """One titled block, folding like every other section in the pane.
 
@@ -127,23 +127,23 @@ def _build_section(section: MetaSection | None, go_to_folder: QAction | None = N
         layout.addWidget(_folder_button(go_to_folder), 0, Qt.AlignmentFlag.AlignLeft)
     label_width = label_column_width(items)
     for item in items:
-        layout.addWidget(meta_row(item, label_width))
+        layout.addWidget(basic_row(item, label_width))
     block.content_form().addRow(rows)
     return block
 
 
-def label_column_width(items: list[MetaItem]) -> int:
+def label_column_width(items: list[BasicItem]) -> int:
     metrics = QFontMetrics(QApplication.font())
     return max((metrics.horizontalAdvance(item.label) for item in items if item.label), default=0)
 
 
-def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
+def basic_cells(item: BasicItem, label_width: int = 0) -> tuple:
     """One item's four cells — ``(label, value, copy, reveal)`` — the last two
     ``None`` unless the item declares copyable text or a path to reveal.
 
     Public as cells rather than only as a finished row because the version list
     lays these into a grid of its own: a version's File line carries the same
-    copy and Show-in-Explorer buttons as one in a metadata block because it is
+    copy and Show-in-Explorer buttons as one in a Basic section because it is
     built from the same widgets, and a grid puts nothing between them and the
     row, which is one thing to click.
     """
@@ -155,7 +155,7 @@ def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
     )
 
 
-def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
+def basic_row(item: BasicItem, label_width: int = 0) -> QWidget:
     """A ``label: value`` row, gaining a copy-to-clipboard button when the item
     declares copyable text. ``label_width`` aligns keys within the section."""
     row = QWidget()
@@ -163,7 +163,7 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(GAP_MEDIUM)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    label, value, *buttons = meta_cells(item, label_width)
+    label, value, *buttons = basic_cells(item, label_width)
     layout.addWidget(label)
     layout.addWidget(value, 1)
     for button in buttons:
@@ -231,7 +231,7 @@ def _label_widget(text: str, width: int) -> QLabel:
     return label
 
 
-def _value_widget(item: MetaItem) -> QLabel:
+def _value_widget(item: BasicItem) -> QLabel:
     """The value cell — a plain selectable label. A long, space-less value (a
     path, a filename) may wrap rather than force a scrollbar."""
     value = QLabel(wrappable(item.value))

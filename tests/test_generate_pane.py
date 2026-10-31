@@ -263,7 +263,7 @@ def test_a_name_given_to_an_item_after_its_tab_showed_it_reaches_the_tab_and_nam
     tabs.reread_names()
 
     name = f"{folder_id(settings_folder_key(row))} 000"
-    block = tabs.current_generate_tab()._metadata_block
+    block = tabs.current_generate_tab()._basic_section
     on_the_block = [label.text() for label in block.findChildren(QLabel)]
     assert (tabs.tabText(0), name in on_the_block, block.isHidden()) == (name, True, False)
 
@@ -831,7 +831,7 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
 
     assert tab._param_form.get_values()["positive_prompt"] == "cat"
     assert tab.displayed_row() is None
-    assert tab._metadata_block.isHidden()
+    assert tab._basic_section.isHidden()
     tab._preview.clear.assert_called()
     assert not tab.is_blank()
 

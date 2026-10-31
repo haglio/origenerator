@@ -4,7 +4,7 @@ import json
 
 from origenerator import config
 from origenerator.config import OUTPUT_PLACES
-from origenerator.generation_metadata import basic_section, created_item, file_item
+from origenerator.generation_metadata import basic_facts, created_item, file_item
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 
@@ -40,13 +40,13 @@ def _image_row(**overrides):
 # --- section layout --------------------------------------------------------
 
 def test_an_items_name_leads_the_block_and_is_what_its_copy_button_copies():
-    items = basic_section(_row(), name="AB12CD34 007").items
+    items = basic_facts(_row(), name="AB12CD34 007").items
     assert [(item.label, item.value, item.copy) for item in items[:2]] == [
         ("Name", "AB12CD34 007", "AB12CD34 007"), ("File", "video/clip.mp4", "clip.mp4")]
 
 
 def test_the_output_file_comes_before_its_date():
-    items = basic_section(_row(created_at="2026-07-01")).items
+    items = basic_facts(_row(created_at="2026-07-01")).items
     assert items[0].label == "File"
     assert items[0].value == "video/clip.mp4"
     assert items[1].label == "Created"
@@ -57,7 +57,7 @@ def test_file_shows_the_subfolder_path_but_copies_just_the_filename():
     row = _row(output_files=json.dumps(
         [{"filename": "clip_00001.mp4", "subfolder": "video"}]
     ))
-    file_item = basic_section(row).items[0]
+    file_item = basic_facts(row).items[0]
     assert file_item.value == "video/clip_00001.mp4"
     assert file_item.copy == "clip_00001.mp4"
 
@@ -66,13 +66,13 @@ def test_every_output_file_gets_its_own_row():
     row = _row(output_files=json.dumps([
         {"filename": "a.mp4", "subfolder": ""}, {"filename": "b.mp4", "subfolder": ""},
     ]))
-    files = [i.value for i in basic_section(row).items
+    files = [i.value for i in basic_facts(row).items
              if i.label == "File"]
     assert files == ["a.mp4", "b.mp4"]
 
 
 def test_a_video_evolver_upscaled_lists_its_file_with_its_versions_instead(tmp_path):
-    assert basic_section(_row(), upscale=tmp_path / "clip_topaz.mp4") is None
+    assert basic_facts(_row(), upscale=tmp_path / "clip_topaz.mp4") is None
 
 
 def test_file_item_reveals_the_absolute_output_path():
@@ -81,7 +81,7 @@ def test_file_item_reveals_the_absolute_output_path():
     # displayed path.
 
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video"}]))
-    file_item = basic_section(row).items[0]
+    file_item = basic_facts(row).items[0]
     assert file_item.reveal == str(OUTPUT_PLACES.folder("video") / "clip.mp4")
 
 
@@ -90,36 +90,36 @@ def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
     # to follow them there, or it points at a folder the file left.
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video",
                                          "path": r"C:\state\trash\abc\0_clip.mp4"}]))
-    file_item = basic_section(row).items[0]
+    file_item = basic_facts(row).items[0]
     assert file_item.reveal == r"C:\state\trash\abc\0_clip.mp4"
 
 
 # --- a deleted item's file line says how long it has been in the trash -------
 
 def test_a_deleted_items_file_line_leads_with_its_days_in_the_trash():
-    file_item = basic_section(_row(days_in_trash=3)).items[0]
+    file_item = basic_facts(_row(days_in_trash=3)).items[0]
     assert file_item.value == "(3 days in trash) video/clip.mp4"
     assert file_item.copy == "clip.mp4"  # the copy button still hands over the name
 
 
 def test_one_day_in_the_trash_reads_as_one_day():
-    file_item = basic_section(_row(days_in_trash=1)).items[0]
+    file_item = basic_facts(_row(days_in_trash=1)).items[0]
     assert file_item.value.startswith("(1 day in trash)")
 
 
 def test_an_item_trashed_today_says_so_rather_than_counting_zero():
-    file_item = basic_section(_row(days_in_trash=0)).items[0]
+    file_item = basic_facts(_row(days_in_trash=0)).items[0]
     assert file_item.value == "(deleted today) video/clip.mp4"
 
 
 def test_a_live_items_file_line_says_nothing_about_the_trash():
-    file_item = basic_section(_row()).items[0]
+    file_item = basic_facts(_row()).items[0]
     assert file_item.value == "video/clip.mp4"
 
 
 def test_created_row_carries_no_reveal_path():
     # Only the output file is a real thing on disk; the date has nothing to reveal.
-    created = basic_section(_row()).items[1]
+    created = basic_facts(_row()).items[1]
     assert created.label == "Created"
     assert created.reveal is None
 
@@ -131,7 +131,7 @@ def _stamped(workflow="wan22_i2v", version="v007", basis="recorded", **block):
 
 
 def test_the_block_ends_with_the_workflow_version_and_the_app_build_that_ran_it():
-    item = basic_section(_row(provenance=_stamped())).items[-1]
+    item = basic_facts(_row(provenance=_stamped())).items[-1]
 
     assert (item.label, item.value) == ("Workflow version", "v007 (app build 1a2b3c4)")
 
@@ -139,7 +139,7 @@ def test_the_block_ends_with_the_workflow_version_and_the_app_build_that_ran_it(
 def test_an_image_with_a_stamp_shows_a_block_of_just_its_workflow_version():
     row = _image_row(provenance=_stamped(workflow="sdxl_t2i", version="v004"))
 
-    assert [(item.label, item.value) for item in basic_section(row).items] == [
+    assert [(item.label, item.value) for item in basic_facts(row).items] == [
         ("Workflow version", "v004 (app build 1a2b3c4)")]
 
 
@@ -147,40 +147,40 @@ def test_a_version_worked_out_from_the_files_date_says_so():
     row = _row(provenance=_stamped(version="v004", app_commit=None, app_dirty=None,
                                    basis="file_date"))
 
-    assert basic_section(row).items[-1].value == "v004 (going by the file's date)"
+    assert basic_facts(row).items[-1].value == "v004 (going by the file's date)"
 
 
 def test_a_block_that_could_not_work_out_a_version_says_unknown():
     row = _row(provenance=_stamped(version=None, app_commit=None, app_dirty=None,
                                    basis=None))
 
-    assert basic_section(row).items[-1].value == "unknown"
+    assert basic_facts(row).items[-1].value == "unknown"
 
 
 def test_a_version_recorded_before_builds_were_noted_shows_just_the_version():
     row = _row(provenance=_stamped(version="v002", app_commit=None, app_dirty=None))
 
-    assert basic_section(row).items[-1].value == "v002"
+    assert basic_facts(row).items[-1].value == "v002"
 
 
 def test_a_build_that_carried_uncommitted_edits_says_so():
     row = _row(provenance=_stamped(app_dirty=True))
 
-    assert basic_section(row).items[-1].value == (
+    assert basic_facts(row).items[-1].value == (
         "v007 (app build 1a2b3c4, plus uncommitted edits)")
 
 
 def test_an_item_from_a_workflow_the_app_no_longer_has_names_no_workflow_version():
     row = _row(workflow_name="wan21_ati_i2v", provenance=_stamped(workflow="wan21_ati_i2v"))
 
-    assert [item.label for item in basic_section(row).items] == ["File", "Created"]
+    assert [item.label for item in basic_facts(row).items] == ["File", "Created"]
 
 
 def test_a_passthrough_param_does_not_grow_a_second_block():
     # Params — editable or read-only passthrough — now live in the form itself, so
     # this block stays the output file and its date whatever a row carries.
     row = _row(params_json=json.dumps({"vae": "x.safetensors"}))
-    section = basic_section(row)
+    section = basic_facts(row)
     assert section.title == "Basic"
     assert [item.label for item in section.items] == ["File", "Created"]
 
@@ -191,7 +191,7 @@ def test_an_images_block_leaves_its_file_to_the_version_list():
     # Its one file is its Original — listed down in the version list, beside the
     # enhancement (none, yet) that made it. Repeating it here under a second
     # label is exactly what moving it was for.
-    section = basic_section(_image_row(), name="AB12CD34 007")
+    section = basic_facts(_image_row(), name="AB12CD34 007")
     assert [item.label for item in section.items] == ["Name"]
 
 
@@ -204,7 +204,7 @@ def test_a_batch_still_lists_the_siblings_no_version_claims():
         {"filename": "b.png", "subfolder": ""},
         {"filename": "c.png", "subfolder": ""},
     ]))
-    files = [i.value for i in basic_section(row).items
+    files = [i.value for i in basic_facts(row).items
              if i.label == "File"]
     assert files == ["b.png", "c.png"]
 

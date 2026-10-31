@@ -644,7 +644,7 @@
     },
     {
       "id": "cell",
-      "thing": "one square of a grid: a thumbnail's place on a Job Queue row, a lit square on the nav map, a label and its value in the Basic block",
+      "thing": "one square of a grid: a thumbnail's place on a Job Queue row, a lit square on the nav map, a label and its value in the Basic section",
       "screen": null,
       "his_word": "cell (2026-10-24, 2026-10-25, of grid cells)",
       "code_today": [
@@ -1081,19 +1081,27 @@
       ]
     },
     {
-      "id": "basic",
+      "id": "basic_section",
       "thing": "the block of facts at the top of a tab: Name, Created, File, Workflow version",
       "screen": [
         "Basic"
       ],
       "his_word": "Basic section (2026-10-30); 'the basic section' (2026-10-29)",
       "code_today": [
-        "metadata block",
-        "meta"
+        "basic section"
       ],
       "code_word": "basic section",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "metadata block",
+        "meta item",
+        "meta section",
+        "meta cells"
+      ],
+      "keep": [
+        "meta.items()"
+      ]
     },
     {
       "id": "section",

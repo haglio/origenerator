@@ -146,7 +146,7 @@ class PreviewWidget(QWidget):
         self._player.setVideoOutput(self._video.video_sink())
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
-        # Until a clip's resolution arrives, media_rect can only answer "the whole
+        # Until a video's resolution arrives, media_rect can only answer "the whole
         # pane"; the corners have to move to the real item once it can.
         self._player.metaDataChanged.connect(self._place_controls)
         self._stack.addWidget(self._video)
@@ -207,7 +207,7 @@ class PreviewWidget(QWidget):
         anything that is not a file on disk).
 
         The two switches are the deliberate exceptions, one caller each.
-        ``stop_player`` — a clip does not stop the player it is about to hand a
+        ``stop_player`` — a video does not stop the player it is about to hand a
         new source to. ``enhancing`` — frames of an enhancement of the item
         on screen are the coming state of that item, so its notice and its
         corners are as true of them and stay.
@@ -252,7 +252,7 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._video)
         self._player.play()
         if omnipause.frozen():
-            self._player.pause()  # a clip loaded into a frozen room opens held
+            self._player.pause()  # a video loaded into a frozen room opens held
         self._show_timeline(path)
 
     def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
@@ -281,7 +281,7 @@ class PreviewWidget(QWidget):
 
     def show_combination(self, combination) -> None:
         """Show a combination waiting to be run: the frame on the left, a plus,
-        and the gray looping clip whose settings go with it
+        and the gray looping video whose settings go with it
         (:class:`~origenerator.gui.combination_view.CombinationView`).
 
         What "Edit…" leaves a tab holding. Nothing has been generated
@@ -602,7 +602,7 @@ class PreviewWidget(QWidget):
         if Python drops the wrapper before the next paint.
 
         Every ``show_*`` passes through here, so it is also where the other pages
-        are put down — a combination's clip would otherwise keep looping under
+        are put down — a combination's video would otherwise keep looping under
         whatever replaced it, and a folder's wall would hold every one of its
         items in memory. Both :meth:`show_combination` and
         :meth:`show_folder` call this before laying their own out, so neither

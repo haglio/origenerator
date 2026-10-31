@@ -83,7 +83,7 @@ class InFlightItem:
     # gray beside the start frame: it lends the settings, not the result, and a row
     # showing it alone reads as a job that is that video. Empty where an act was
     # picked instead: :attr:`act` already says what was chosen, and
-    # the clip its settings were mined out of was never the user's pick.
+    # the video its settings were mined out of was never the user's pick.
     source_video_thumbnail: str | None = None
     prompt_edited: bool = False
     # Up to four thumbnail files from the folder this job will land in — what a

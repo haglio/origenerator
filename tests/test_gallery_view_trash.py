@@ -534,7 +534,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
 
 def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     # End to end through the real delete: what the collection hands the preview is the
-    # clip where it now sits, not the folder it was taken out of.
+    # video where it now sits, not the folder it was taken out of.
     db = Database(tmp_path / "test.db")
     out = tmp_path / "out" / "video"
     out.mkdir(parents=True)

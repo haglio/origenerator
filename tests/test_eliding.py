@@ -54,7 +54,7 @@ def test_it_asks_for_its_whole_label_when_there_is_room(qtbot):
     assert button.sizeHint() == stock.sizeHint()
 
 
-def test_a_squeezed_label_elides_rather_than_clips(qtbot):
+def test_a_squeezed_label_elides_rather_than_cuts_off(qtbot):
     button = ElidingButton(_LONG)
     qtbot.addWidget(button)
     whole = button.fontMetrics().horizontalAdvance(_LONG)

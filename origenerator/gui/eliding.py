@@ -1,6 +1,6 @@
 """Widgets that shorten their text rather than hold a pane open.
 
-Qt sizes a button or a label to its whole text and, squeezed below that, clips it
+Qt sizes a button or a label to its whole text and, squeezed below that, cuts it off
 — so either one sets a floor under everything beside it, and the scroll it sits in
 grows a horizontal bar rather than let the column shrink. These ask for a couple of
 characters at their narrowest and elide to whatever width they are given: "Show in

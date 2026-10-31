@@ -91,7 +91,7 @@ def scene_speech(params: dict) -> list[SceneSpeech | None]:
     """What each scene says, or ``None`` for a scene with no line.
 
     The scenes are ``scene_frames``, one length each; a lone scene is the whole
-    clip and runs for ``frame_count`` -- the same reading of the settings the graph's
+    video and runs for ``frame_count`` -- the same reading of the settings the graph's
     scene plan makes, so line and segment agree on the seconds. Settings with
     no ``scene_lines`` at all is a workflow that cannot speak: no scenes.
     """

@@ -1,7 +1,7 @@
 """The upscale Evolver makes of a video sent to it, found where Evolver files it.
 
-Evolver writes it to ``<orientation>/<source>/<name>_topaz.mp4`` under
-``upscaled_by_orientation`` (Evolver's ``util/sidecar.upscaled_video_path``).
+Evolver writes it to ``<shape>/<source>/<name>_topaz.mp4`` under
+``upscaled_by_shape`` (Evolver's ``util/sidecar.upscaled_video_path``).
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from origenerator.media import MediaType, media_type_from_filename
 
 UPSCALE_SUFFIX = "_topaz"
-ORIENTATIONS = ("landscape", "portrait")
+SHAPES = ("landscape", "portrait")
 
 
 @dataclass(frozen=True)
@@ -35,8 +35,8 @@ class EvolverUpscales:
 
 def filed_upscales(upscaled_dir) -> list[tuple[str, Path]]:
     filed = []
-    for orientation in ORIENTATIONS:
-        folder = Path(upscaled_dir) / orientation
+    for shape in SHAPES:
+        folder = Path(upscaled_dir) / shape
         sources = sorted(p for p in folder.iterdir() if p.is_dir()) if folder.is_dir() else []
         for source in sources:
             filed.extend((source.name, path) for path in _filed_in(source))
@@ -62,7 +62,7 @@ def _filed_in(source: Path) -> list[Path]:
 
 def original_stem(path) -> str | None:
     path = Path(path)
-    if path.parent.parent.name not in ORIENTATIONS or not path.stem.endswith(UPSCALE_SUFFIX):
+    if path.parent.parent.name not in SHAPES or not path.stem.endswith(UPSCALE_SUFFIX):
         return None
     return path.stem.removesuffix(UPSCALE_SUFFIX)
 

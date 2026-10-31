@@ -21,7 +21,7 @@ from origenerator import gallery
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY
-from origenerator.gallery.sides import SEPARATE, TOGETHER
+from origenerator.gallery.shapes import SEPARATE, TOGETHER
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generate_tab import GenerateTab
@@ -51,7 +51,7 @@ from tests.slideshow_hud_support import (
     engine_of,
     funestra_of,
     hud_button_names,
-    open_both_sides,
+    open_both_shapes,
     speaker_on_screen,
 )
 
@@ -444,7 +444,7 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     # in the Funestras' HUD, as a real SlideshowView answers.
     stub.set_audio_muted = lambda muted: None
     stub.slideshow = SimpleNamespace(set_paused=lambda paused: None)
-    stub.wear_the_hud = lambda side, **how: None  # told whose HUD it wears, and where
+    stub.wear_the_hud = lambda shape, **how: None  # told whose HUD it wears, and where
     view._slideshows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 
@@ -853,7 +853,7 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
                                      if key == "__all__::portrait" else []))
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    open_both_sides(view)
+    open_both_shapes(view)
 
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow.shown)
@@ -878,7 +878,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
                                      if key == "__all__::portrait" else []))
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    open_both_sides(view)          # asked for too early: nothing to play yet
+    open_both_shapes(view)          # asked for too early: nothing to play yet
     assert view.region_slideshow("portrait") is None
 
     library["rows"] = base
@@ -919,7 +919,7 @@ def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkey
 
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two slideshows run and NEITHER is the active
-    window, so the side word is the only thing that says which image."""
+    window, so the shape word is the only thing that says which image."""
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
@@ -1076,7 +1076,7 @@ def _a_library_of_each_shape(view, tmp_path, monkeypatch) -> dict:
 def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         qtbot, tmp_path, monkeypatch):
     """The base state of origenerator mode: each region shuffling every item of
-    its own orientation, the way each Satellite Funestra shuffles the whole
+    its own shape, the way each Satellite Funestra shuffles the whole
     library of its own.
 
     It opened on the Latest collection before this — a recent slice rather than the
@@ -1085,15 +1085,15 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
     view = _fun_time_view(qtbot)
     library = _a_library_of_each_shape(view, tmp_path, monkeypatch)
 
-    open_both_sides(view)
+    open_both_shapes(view)
 
-    for side in ("portrait", "landscape"):
-        slideshow = view.region_slideshow(side)
+    for shape in ("portrait", "landscape"):
+        slideshow = view.region_slideshow(shape)
         assert slideshow is not None
         assert slideshow.shown.isVisible()
         assert slideshow.hud_order_label == "Shuffle"
         assert [str(item.path) for item in slideshow._set.playlist.items] == \
-            [library[f"__all__::{side}"][0]["thumbnail_path"]]
+            [library[f"__all__::{shape}"][0]["thumbnail_path"]]
         qtbot.addWidget(slideshow.shown)
     # And each remembers WHERE it plays from, so what lands in the library
     # reaches a region sitting in its base state.
@@ -1107,9 +1107,9 @@ def test_a_video_asked_for_in_origenerator_mode_is_made_while_both_regions_play(
     view = GalleryView(Database(tmp_path / "test.db"), fun_time=_session(), client=client)
     qtbot.addWidget(view)
     _a_library_of_each_shape(view, tmp_path, monkeypatch)
-    open_both_sides(view)
-    for side in ("portrait", "landscape"):
-        qtbot.addWidget(view.region_slideshow(side).shown)
+    open_both_shapes(view)
+    for shape in ("portrait", "landscape"):
+        qtbot.addWidget(view.region_slideshow(shape).shown)
 
     i2v = WORKFLOW_REGISTRY["wan22_i2v"]
     video = view._jobs.start_prepared("k", i2v, i2v.default_params())
@@ -1146,7 +1146,7 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
 def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
         qtbot, tmp_path, monkeypatch):
     """Reset means on a slideshow what it means on a Funestra: the narrowing comes off
-    and the side goes back to browsing its whole library.  A slideshow started on
+    and the shape goes back to browsing its whole library.  A slideshow started on
     one folder therefore leaves that folder — restarting it would be the one
     thing reset is not."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
@@ -1276,7 +1276,7 @@ def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     slideshow = view._slideshows._live_slideshows[0][0]
     qtbot.addWidget(slideshow.shown)
-    monkeypatch.setattr(view, "region_slideshow", lambda side: None)
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: None)
 
     view.set_room_paused(True)
 
@@ -1513,10 +1513,10 @@ def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot
     view._tree.together_button.click()
 
     view.become_hosted(_session())
-    hosted = view._tree.sides
+    hosted = view._tree.shapes
     view.become_standalone()
 
-    assert (hosted, view._tree.sides) == (SEPARATE, TOGETHER)
+    assert (hosted, view._tree.shapes) == (SEPARATE, TOGETHER)
 
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):
@@ -1618,7 +1618,7 @@ def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
-    open_both_sides(view._slideshows)
+    open_both_shapes(view._slideshows)
 
     carried = view.region_slideshow("portrait")
     assert carried is not None
@@ -1639,7 +1639,7 @@ def test_a_slideshow_moved_onto_a_set_of_the_other_shape_goes_on_as_that_set_in_
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
-    open_both_sides(view._slideshows)
+    open_both_shapes(view._slideshows)
 
     carried = view.region_slideshow("portrait")
     assert carried is not None
@@ -1671,9 +1671,9 @@ def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satelli
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
-    open_both_sides(view._slideshows)
+    open_both_shapes(view._slideshows)
 
-    carried = {side: view.region_slideshow(side) for side in ("portrait", "landscape")}
+    carried = {shape: view.region_slideshow(shape) for shape in ("portrait", "landscape")}
     for slideshow in carried.values():
         qtbot.addWidget(slideshow.shown)
     assert [slide.prompt_id for slide in carried["portrait"].whole_set()] == [
@@ -1829,7 +1829,7 @@ def _hud_label_for(view):
     worn = {}
 
     class _Slideshow:
-        def wear_the_hud(self, side, **furnishings):
+        def wear_the_hud(self, shape, **furnishings):
             worn.update(furnishings)
 
     view._slideshows._wear_the_hud(_Slideshow(), "landscape")
@@ -1909,7 +1909,7 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
 
 
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
-    """Reset puts the side back how it started, and the new switch is one more
+    """Reset puts the shape back how it started, and the new switch is one more
     thing it drops — a reset that left the slideshow narrowed would not be one."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)

@@ -29,7 +29,7 @@ from origenerator.db import Database
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
-from origenerator.gallery.sides import BOTH, SEPARATE
+from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts
 from origenerator.gui.core import Core
@@ -38,8 +38,8 @@ from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.window_monitor import the_window_on
+from origenerator.item_shape import shaped_key
 from origenerator.media import MediaType
-from origenerator.orientation import oriented_key
 from origenerator.run_toast import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
@@ -1285,7 +1285,7 @@ def test_the_toc_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._tree.sides == (BOTH,)
+    assert reopened._gallery_view._tree.shapes == (BOTH,)
 
 
 def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp_path):
@@ -1294,7 +1294,7 @@ def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()
     first._gallery_view._tree.together_button.click()
-    folder = oriented_key("image/sdxl_t2i", BOTH)
+    folder = shaped_key("image/sdxl_t2i", BOTH)
     first._gallery_view._tree.setCurrentItem(first._gallery_view._tree_item_for(folder))
     first.close()
 
@@ -1310,7 +1310,7 @@ def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot
     first = _window(qtbot, tmp_path, AppState(path))
     view = first._gallery_view
     view.refresh()
-    latest = oriented_key(FolderCollection(LATEST_KEY, MediaType.VIDEO).key, SEPARATE[1])
+    latest = shaped_key(FolderCollection(LATEST_KEY, MediaType.VIDEO).key, SEPARATE[1])
     view._tree.setCurrentItem(view._tree_item_for(latest))
     first.close()
 
@@ -1327,7 +1327,7 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()
     first._gallery_view._tree.together_button.click()
-    folder = oriented_key("image/sdxl_t2i", BOTH)
+    folder = shaped_key("image/sdxl_t2i", BOTH)
     first._gallery_view._tree_item_for(folder).setExpanded(True)
     first.close()
 
@@ -1999,22 +1999,22 @@ def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_n
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     state = AppState(path)
-    state.set("toc_sides", [BOTH])
+    state.set("toc_shapes", [BOTH])
     state.save()
 
     win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
-    assert win._gallery_view._tree.sides == SEPARATE
+    assert win._gallery_view._tree.shapes == SEPARATE
     win.close()
 
-    assert AppState(path).get("toc_sides") == [BOTH]
+    assert AppState(path).get("toc_shapes") == [BOTH]
 
 
 def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
-    folder = oriented_key("image/sdxl_t2i", BOTH)
+    folder = shaped_key("image/sdxl_t2i", BOTH)
     state = AppState(path)
-    state.set("toc_sides", [BOTH])
+    state.set("toc_shapes", [BOTH])
     state.set("open_folders", [folder])
     state.save()
 

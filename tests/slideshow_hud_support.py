@@ -6,12 +6,12 @@ from funestra.timeline import TIMELINE_HEIGHT
 from funestra.volume import CHIP_H, chip_xy
 from PyQt6.QtCore import QPoint
 
-from origenerator.fun_time_mode import SIDES
+from origenerator.fun_time_mode import SHAPES
 
 
-def open_both_sides(gallery_or_director) -> None:
-    for side in SIDES:
-        gallery_or_director.fill_the_region(side)
+def open_both_shapes(gallery_or_director) -> None:
+    for shape in SHAPES:
+        gallery_or_director.fill_the_region(shape)
 
 
 def funestra_of(slideshow):
@@ -38,7 +38,7 @@ def hud_targets(slideshow):
 
 def hud_button_names(slideshow) -> list[str]:
     """The buttons on that HUD, by their own names."""
-    return [button.command.removeprefix(f"{slideshow.hud_side}_")
+    return [button.command.removeprefix(f"{slideshow.hud_shape}_")
             for _rect, button in hud_targets(slideshow).buttons]
 
 

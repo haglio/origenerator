@@ -70,7 +70,7 @@ def _slideshow(qtbot, tmp_path, items=_ITEMS, **fields) -> FunestraSlideshow:
     Its poll timer is stopped and :meth:`FunestraSlideshow.tick` called by hand, so a
     test says when the Funestra is next read rather than racing it.
     """
-    slideshow = FunestraSlideshow(items, side="portrait", channel=_channel(tmp_path),
+    slideshow = FunestraSlideshow(items, shape="portrait", channel=_channel(tmp_path),
                       frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
     slideshow._timer.stop()
     return slideshow
@@ -2027,7 +2027,7 @@ def test_a_ready_opening_hands_over_its_scripts_without_looking_on_disk(
     monkeypatch.setattr(slideshow_pass, "funscript_of", looked)
 
     slideshow = FunestraSlideshow(
-        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
         opening=_ready_opening(items, scripts={"clip.mp4": script, "other.mp4": None}))
     slideshow._timer.stop()
 
@@ -2039,7 +2039,7 @@ def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
         qtbot, tmp_path, monkeypatch):
     items = [("clip.mp4", "video", "id-1")]
     slideshow = FunestraSlideshow(
-        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
         opening=_ready_opening(items, scripts={"clip.mp4": None}))
     slideshow._timer.stop()
     scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
@@ -2058,7 +2058,7 @@ def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tm
         raise AssertionError("walked the library for the first slide's map")
 
     slideshow = FunestraSlideshow(
-        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
         actions=SlideshowActions(neighbors=walked),
         opening=_ready_opening(items, lead=1, lead_neighbors=neighbors))
     slideshow._timer.stop()

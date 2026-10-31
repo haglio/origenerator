@@ -19,7 +19,7 @@ from app_support import haglio_settings
 from origenerator import config, evolver_agreement, evolver_export
 
 AGREED_INBOX = "videos/videos/2D/AI/0_inbox"
-AGREED_UPSCALED = "videos/videos/2D/AI/2_outbox/upscaled_by_orientation"
+AGREED_UPSCALED = "videos/videos/2D/AI/2_outbox/upscaled_by_shape"
 AGREED_MARKER = ".partial."
 
 

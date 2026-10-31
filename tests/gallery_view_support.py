@@ -843,7 +843,7 @@ class _FakeRerollJob:
         self.state = "canceled"
 
 
-def _open_recents(view):
+def _open_latest(view):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
 

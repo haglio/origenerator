@@ -43,7 +43,7 @@
       "id": "toc",
       "thing": "the list of folders down the left of Core, one section per shape under a standing label",
       "screen": null,
-      "his_word": "TOC (2026-10-17, 2026-08-14)",
+      "his_word": "TOC, for tree of contents (2026-10-30; table of contents from 2026-10-17 until then)",
       "code_today": [
         "toc",
         "tree",
@@ -54,7 +54,7 @@
       ],
       "code_word": "toc",
       "status": "ruled",
-      "ruled": "2026-10-17, his words; CLAUDE.md, One word per thing"
+      "ruled": "2026-10-17 and 2026-10-30, his words; CLAUDE.md, One word per thing"
     },
     {
       "id": "caret",

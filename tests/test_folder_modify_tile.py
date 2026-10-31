@@ -1,13 +1,13 @@
-"""The card that opens a folder's prompt for a rewrite."""
+"""The tile that opens a folder's prompt for a rewrite."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
-from origenerator.gui import grid_card
+from origenerator.gui import tile_shape
 from origenerator.gui.folder_modify_tile import FolderModifyTile
-from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.new_tile import NewTile
 
 
 def _click(tile):
@@ -18,34 +18,34 @@ def _click(tile):
     ))
 
 
-def test_the_card_says_what_it_keeps_and_what_it_changes(qtbot):
+def test_the_tile_says_what_it_keeps_and_what_it_changes(qtbot):
     tile = FolderModifyTile()
     qtbot.addWidget(tile)
-    # The re-roll card next door changes the seed; this one keeps it, and the
+    # The New tile next door changes the seed; this one keeps it, and the
     # caption is the only place that difference is stated.
     assert tile._caption.text() == "Modify (all seeds)"
     assert "seed" in tile.toolTip()
 
 
-def test_the_card_wears_the_familys_pencil(qtbot):
+def test_the_tile_wears_the_familys_pencil(qtbot):
     tile = FolderModifyTile()
     qtbot.addWidget(tile)
 
     assert tile._glyph.mark == "pencil"
 
 
-def test_clicking_the_card_asks_for_the_rewrite(qtbot):
+def test_clicking_the_tile_asks_for_the_rewrite(qtbot):
     tile = FolderModifyTile()
     qtbot.addWidget(tile)
     with qtbot.waitSignal(tile.clicked):
         _click(tile)
 
 
-def test_the_card_is_the_same_size_as_the_one_beside_it(qtbot):
+def test_the_tile_is_the_same_size_as_the_one_beside_it(qtbot):
     # They stand shoulder to shoulder in the same flow as the thumbnails, so a
-    # card of its own size would break the row.
-    request, reroll = FolderModifyTile(), RerollTile()
+    # tile of its own size would break the row.
+    request, reroll = FolderModifyTile(), NewTile()
     qtbot.addWidget(request)
     qtbot.addWidget(reroll)
     assert request.size() == reroll.size()
-    assert (request.width(), request.height()) == grid_card.card_size()
+    assert (request.width(), request.height()) == tile_shape.tile_size()

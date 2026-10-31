@@ -27,9 +27,9 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.notice_overlay import ERROR, FAVORITE, HEARD_MARK, WARNING, NoticeOverlay
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -667,10 +667,10 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
 
 def _around(prompt_id):
     if prompt_id != "id-a":
-        return MapNeighbors()
+        return NavMapNeighbors()
     other_act = Slide("c.png", "image", "id-c")
-    return MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
-                        column=(MapRow(other_act, "dawn"),), label="fox",
+    return NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
+                        column=(NavMapRow(other_act, "dawn"),), label="fox",
                         group=(other_act,))
 
 
@@ -881,9 +881,9 @@ def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
 
 def _a_column_of_two(prompt_id):
     if prompt_id != "id-a":
-        return MapNeighbors()
+        return NavMapNeighbors()
     dawn, dusk = Slide("c.png", "image", "id-c"), Slide("d.png", "image", "id-d")
-    return MapNeighbors(column=(MapRow(dawn, "dawn"), MapRow(dusk, "dusk")), label="fox",
+    return NavMapNeighbors(column=(NavMapRow(dawn, "dawn"), NavMapRow(dusk, "dusk")), label="fox",
                         group=(dawn, dusk))
 
 
@@ -931,8 +931,8 @@ def test_a_folder_played_as_a_slideshow_opens_with_its_seed_loop_lit(qtbot):
 def _seeds_only(prompt_id):
     """A folder's row and nothing else made of it — so the loop key's next stop
     is off rather than the act column."""
-    return (MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
-            if prompt_id == "id-a" else MapNeighbors())
+    return (NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
+            if prompt_id == "id-a" else NavMapNeighbors())
 
 
 def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library(qtbot):
@@ -2568,8 +2568,8 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     """The other half of the column: its rows are gone to and looped, where an
     act's row narrows the slideshow instead."""
     a_configuration = Slide("c.png", "image", "id-c")
-    around = lambda pid: MapNeighbors(  # noqa: E731
-        column=(MapRow(a_configuration, "E629425B", configuration=True),)
+    around = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=(NavMapRow(a_configuration, "E629425B", configuration=True),)
         if pid == "id-a" else (),
         seeds=(Slide("d.png", "image", "id-d"),) if pid == "id-c" else ())
     view = _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=around, acts=_acts))

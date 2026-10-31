@@ -16,7 +16,7 @@ re-renders; a Funestra is handed a new playlist), so it arrives as
 ``on_pass_change(kept)``: whether the slide that was on screen survived into
 the new pass.
 
-The map is the Funestras' own (:mod:`origenerator.gui.slideshow_map`): the slide's
+The map is the Funestras' own (:mod:`origenerator.gui.hud_nav_map`): the slide's
 act under other seeds runs right, what else was made of its image runs
 down, and a
 loop along either axis deals THAT row or column as the pass, the way a
@@ -32,13 +32,13 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
 from funestra.satellite_hud import label_is_filtered
 
-from origenerator.gui.slideshow_map import (
+from origenerator.gui.hud_nav_map import (
     NO_NEIGHBORS,
     Loop,
-    MapNeighbors,
-    SlideshowMap,
+    NavMap,
+    NavMapNeighbors,
     acts_posted,
-    build_map,
+    build_nav_map,
     step_in_ring,
 )
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -80,7 +80,7 @@ class SlideshowSet:
         # slide alone.
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen
-        self._known: dict[str, MapNeighbors] = {}
+        self._known: dict[str, NavMapNeighbors] = {}
         # What each generation's map row is named for, by id -- the acts an
         # act filter matches it on.  None for a slideshow with no library under it.
         self._acts_of = actions.acts
@@ -351,7 +351,7 @@ class SlideshowSet:
         self._known.clear()
         self._named.clear()
 
-    def neighbors(self, prompt_id) -> MapNeighbors:
+    def neighbors(self, prompt_id) -> NavMapNeighbors:
         """What the library says about *prompt_id*, asked once per item: the
         answer costs a walk of the library, and the map asks on every beat."""
         if prompt_id is None or self._neighbors_of is None:
@@ -361,12 +361,12 @@ class SlideshowSet:
             found = self._known[prompt_id] = self._neighbors_of(prompt_id)
         return found
 
-    def map(self) -> SlideshowMap | None:
-        """The gamma around the slide on screen, or ``None`` with nothing on it."""
+    def map(self) -> NavMap | None:
+        """The nav map around the slide on screen, or ``None`` with nothing on it."""
         current = self.playlist.current()
         if current is None:
             return None
-        return build_map(current, self.loop, self.neighbors)
+        return build_nav_map(current, self.loop, self.neighbors)
 
     def loop_pool(self, axis: str) -> list[Slide]:
         """The slides a loop along *axis* would play, the slide on screen first."""

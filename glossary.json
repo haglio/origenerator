@@ -667,14 +667,16 @@
       "screen": null,
       "his_word": "nav map (2026-09-20, 2026-09-21, 2026-09-22)",
       "code_today": [
-        "slideshow map",
         "nav map",
-        "map",
-        "gamma"
+        "map"
       ],
       "code_word": "nav map",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "slideshow map",
+        "gamma"
+      ]
     },
     {
       "id": "message",

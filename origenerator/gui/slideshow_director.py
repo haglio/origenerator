@@ -61,10 +61,10 @@ from origenerator.gallery.sides import side_holds, the_one_shape_on, the_side_of
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.level_stepper import Version
 from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -819,7 +819,7 @@ class SlideshowDirector:
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))
 
-    def neighbors_of(self, prompt_id: str, *, side: str) -> MapNeighbors:
+    def neighbors_of(self, prompt_id: str, *, side: str) -> NavMapNeighbors:
         """What the library says about one generation, for the map a slideshow on
         *side* draws around it: its act under other seeds along the row, and
         down the column the same seed under other configurations, then what
@@ -831,7 +831,7 @@ class SlideshowDirector:
         assembled without ids."""
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
-            return MapNeighbors()
+            return NavMapNeighbors()
         around = surroundings(row, self._library_of(side),
                               image_index=self._host.image_config_index())
         named = [(generation, self._folder_name(generation), True)
@@ -839,9 +839,9 @@ class SlideshowDirector:
         named += [(generation, label, False) for generation, label in around.actions]
         # A generation with no file to play drops out of the column whole,
         # so its name can never end up on another row's cell.
-        return MapNeighbors(
+        return NavMapNeighbors(
             seeds=self._slides_of(around.seeds),
-            column=tuple(MapRow(slide, label, configuration)
+            column=tuple(NavMapRow(slide, label, configuration)
                          for generation, label, configuration in named
                          for slide in self._slides_of([generation])),
             label=around.label or self._folder_name(row),

@@ -54,7 +54,7 @@ class SlideshowActions:
     ``neighbors`` and ``widen`` take a prompt_id and answer for the library
     the slideshow cannot see: what shows that generation's act under other seeds
     and what else was made of its image (the map's two axes, as
-    :class:`~origenerator.gui.slideshow_map.MapNeighbors`), and what lies just
+    :class:`~origenerator.gui.hud_nav_map.NavMapNeighbors`), and what lies just
     beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
     prompt_ids and answers what each one's map row is named for, which is
     what an act filter matches it on, and ``slides`` the slides they play as,

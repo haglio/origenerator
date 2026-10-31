@@ -1,7 +1,7 @@
 """What a slideshow tells the Funestras' HUD to draw, and which presses it answers itself.
 
 Every slideshow wears the Funestras' own HUD: the set and its map
-(:mod:`origenerator.gui.slideshow_map`), the device where this app's window drives
+(:mod:`origenerator.gui.hud_nav_map`), the device where this app's window drives
 one (:class:`~origenerator.gui.console.SlideshowDevice`), and at its foot the
 Job Queue (:mod:`origenerator.gui.hud_queue`).  A slideshow on a session's
 Funestra publishes the model for the session to draw; a slideshow on this app's own

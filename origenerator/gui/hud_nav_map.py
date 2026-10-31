@@ -1,9 +1,9 @@
-"""The map a slideshow's HUD draws around the slide on screen, and the loop that
-holds it still.
+"""The nav map a slideshow's HUD draws around the slide on screen, and the loop
+that holds it still.
 
-The Funestras' map is a gamma: the video on screen in the corner, its seed row
+The Funestras' nav map: the video on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
-slideshow draws the same gamma over its own generations — the seed row is the same
+slideshow draws the same nav map over its own generations — the seed row is the same
 act under other seeds, the column what else was made of the same image
 (:mod:`origenerator.nav_map` says which is which) — and the
 map hangs on whatever is on screen until a loop is started along one of its
@@ -27,7 +27,7 @@ Cell = tuple[str, int]  # ("corner", 0) | ("seed", i) | ("action", i)
 CORNER: Cell = ("corner", 0)
 
 
-class MapRow(NamedTuple):
+class NavMapRow(NamedTuple):
     """One row down the column: the slide it draws, the name in its gutter, and
     whether that name is a configuration's folder rather than an act.
 
@@ -42,7 +42,7 @@ class MapRow(NamedTuple):
 
 
 @dataclass(frozen=True)
-class MapNeighbors:
+class NavMapNeighbors:
     """What the library says about one generation: the slides showing its act
     under other seeds (the seed row), the column of rows under it — the same
     seed under other configurations, then what else was made of its image —
@@ -50,12 +50,12 @@ class MapNeighbors:
     group, which is what a loop down the column plays."""
 
     seeds: tuple[Slide, ...] = ()
-    column: tuple[MapRow, ...] = ()
+    column: tuple[NavMapRow, ...] = ()
     label: str = ""
     group: tuple[Slide, ...] = ()
 
 
-NO_NEIGHBORS = MapNeighbors()
+NO_NEIGHBORS = NavMapNeighbors()
 
 
 @dataclass(frozen=True)
@@ -76,13 +76,13 @@ class Loop:
 
 
 @dataclass(frozen=True)
-class SlideshowMap:
-    """The gamma the HUD draws: the corner, the row, the column, the lit cell,
+class NavMap:
+    """The nav map the HUD draws: the corner, the row, the column, the lit cell,
     the loop lighting one axis, and the words in the gutter."""
 
     corner: Slide
     seeds: tuple[Slide, ...]
-    column: tuple[MapRow, ...]
+    column: tuple[NavMapRow, ...]
     playing: Cell
     loop: str
     label: str
@@ -96,8 +96,8 @@ class SlideshowMap:
         return (self.corner, *self.seeds, *self.actions)
 
 
-def build_map(current: Slide, loop: Loop | None,
-              neighbors_of: Callable[[str | None], MapNeighbors]) -> SlideshowMap:
+def build_nav_map(current: Slide, loop: Loop | None,
+              neighbors_of: Callable[[str | None], NavMapNeighbors]) -> NavMap:
     """The map around *current* — held on it, or on the slide *loop* began on.
 
     A running loop keeps the map where it started and walks the lit cell along
@@ -108,20 +108,20 @@ def build_map(current: Slide, loop: Loop | None,
     at = loop.position_of(current) if loop is not None else None
     if loop is None or at is None:
         around = neighbors_of(current.prompt_id)
-        return SlideshowMap(current, around.seeds, around.column, CORNER, "",
+        return NavMap(current, around.seeds, around.column, CORNER, "",
                             around.label)
     anchor = loop.pool[0]
     playing = CORNER if at == 0 else (loop.axis, at - 1)
     at_anchor = neighbors_of(anchor.prompt_id)
     if loop.axis == SEED:
         lit = neighbors_of(current.prompt_id)
-        return SlideshowMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
+        return NavMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
                             at_anchor.label)
     # A loop down the column plays the whole group, twins of an act included,
     # so every slide in it is a row of its own, named as the library names it.
-    column = tuple(MapRow(slide, neighbors_of(slide.prompt_id).label)
+    column = tuple(NavMapRow(slide, neighbors_of(slide.prompt_id).label)
                    for slide in loop.pool[1:])
-    return SlideshowMap(anchor, at_anchor.seeds, column, playing, loop.axis,
+    return NavMap(anchor, at_anchor.seeds, column, playing, loop.axis,
                         at_anchor.label)
 
 

@@ -6,7 +6,7 @@ plays, the verbs it takes, the status it reads back -- which a session's Funestr
 answers on its files (:class:`~origenerator.fun_time_mode.FunestraChannel`) and
 the window's in this process (:class:`~origenerator.gui.funestra_pane.PaneChannel`).
 The Funestra owns what is on screen from there: it holds an image for the pace,
-plays a clip to its end and rolls onto the next, repeats the one it is locked
+plays a video to its end and rolls onto the next, repeats the one it is locked
 onto, and freezes with the room.  What differs is only where the slideshow is
 seen -- *shown*: the HUD, the lines it says and the room's pause go to the
 session's Funestra and the gallery's caption, or to the window.
@@ -351,7 +351,7 @@ class FunestraSlideshow(QObject):
     def _follow(self, video: str) -> None:
         """Stand the pass on the item the Funestra just moved to.
 
-        The Funestra walks the list by itself — an image's pace runs out, a clip
+        The Funestra walks the list by itself — an image's pace runs out, a video
         ends — so this is how the map, the star and every word about "this one"
         find out which item that is.
         """
@@ -585,7 +585,7 @@ class FunestraSlideshow(QObject):
     def _lock_instead_of_looping(self) -> None:
         """Tell the Funestra to lock what it is showing: the answer a loop asked
         of a row of one gets on a Funestra of its own, where the loop button of a
-        group holding one clip locks that clip.  A row that size is the item
+        group holding one video locks that video.  A row that size is the item
         itself, so the press means "this one" rather than nothing; and a lock is
         not a loop, so a loop that was running is dropped."""
         self._set.end_loop()
@@ -810,19 +810,19 @@ class FunestraSlideshow(QObject):
         self._publish()
 
     def osr2_drive_target(self):
-        """What the one device switch follows here: the clip on screen, where this
+        """What the one device switch follows here: the video on screen, where this
         app drives the OSR2 -- its own window -- and nothing on a session's
         Funestra, where the OSR2 is the Main Funestra's alone."""
         player = self.shown.player
-        return None if player is None else drive_target_for(self._clip_on_screen(), player)
+        return None if player is None else drive_target_for(self._video_on_screen(), player)
 
     def video_on_screen(self) -> str | None:
-        """The clip on screen, by id, where this app plays it."""
-        if self.shown.player is None or self._clip_on_screen() is None:
+        """The video on screen, by id, where this app plays it."""
+        if self.shown.player is None or self._video_on_screen() is None:
             return None
         return self._set.current_prompt_id()
 
-    def _clip_on_screen(self) -> str | None:
+    def _video_on_screen(self) -> str | None:
         current = self._set.playlist.current()
         if current is None or current.is_live or self._frame_on_funestra is not None:
             return None

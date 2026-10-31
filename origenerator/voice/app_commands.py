@@ -1,6 +1,6 @@
 """What a bare spoken word asks of the app — a collection, a button, the image.
 
-Fun Time's Funestras answer single words: "weird" condemns the clip, "lock" holds
+Fun Time's Funestras answer single words: "weird" condemns the video, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
 the toolbar does and the names of the collections that lead the tree — so
 "experiments" stands you in the Experiments collection exactly as clicking its row
@@ -170,7 +170,7 @@ for _collection, _names in _COLLECTION_NAMES.items():
 _say(AppCommand.BACK, "back", "go back", "previous", "previous slide")
 _say(AppCommand.FORWARD, "forward", "go forward", "next", "next slide", "skip")
 
-# What you do to what is in front of you. "weird" is Fun Time's word for a clip
+# What you do to what is in front of you. "weird" is Fun Time's word for a video
 # that has to go, and it means the same here; "delete" says it plainly for
 # anyone who never learned the other one.
 _say(AppCommand.CULL, "weird", "delete", "delete it")

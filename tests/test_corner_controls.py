@@ -56,7 +56,7 @@ def _enhanced_row(settings):
 
 def test_a_video_has_no_enhance_corner_at_all():
     # The enhancer refines a still; there is no reading of the corner that would
-    # be true of a clip, so it grows no plus rather than a dead one.
+    # be true of a video, so it grows no plus rather than a dead one.
     video = _image_row(workflow_name="wan22_i2v", output_files=json.dumps(
         [{"filename": "wan22_i2v_00001_.mp4", "subfolder": "video",
           "type": "output"}]))

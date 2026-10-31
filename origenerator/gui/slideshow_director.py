@@ -812,7 +812,7 @@ class SlideshowDirector:
     def _library_of(self, side: str) -> list[dict]:
         """The generations a slideshow on *side* is mapped against: the whole
         library of that side's shape — what the Satellite Funestras map their
-        clips against too, each over its own sources."""
+        videos against too, each over its own sources."""
         return self._library.get(side, lambda: filter_rows(
             [row for row in self._db.list_generations() if in_sight(row)], side))
 

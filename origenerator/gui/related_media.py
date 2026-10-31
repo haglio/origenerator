@@ -247,10 +247,10 @@ class RelatedMedia(QWidget):
 
     def _built_from(self, row: dict, start_image_of):
         """``(the row this was built from, what to head the tile, its kind)``:
-        the clip a cut was cut out of, else a video's start frame."""
-        clip = self._item(row["trimmed_from"]) if row.get("trimmed_from") else None
-        if clip is not None:
-            return clip, "Trimmed from", MediaType.VIDEO
+        the video a cut was cut out of, else a video's start frame."""
+        video = self._item(row["trimmed_from"]) if row.get("trimmed_from") else None
+        if video is not None:
+            return video, "Trimmed from", MediaType.VIDEO
         frame = start_image_of(row)
         if frame is not None and was_made_from(row, frame):
             return frame, None, MediaType.IMAGE

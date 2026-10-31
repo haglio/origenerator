@@ -142,15 +142,18 @@
       ],
       "his_word": "video",
       "code_today": [
-        "video",
-        "clip"
+        "video"
       ],
       "code_word": "video",
       "status": "ruled",
       "ruled": "2026-09-26, CLAUDE.md, One word per thing: the code's word is the one the app shows; CLIP the text model, the clipboard and clipRect keep their letters",
+      "retired": [
+        "clip"
+      ],
       "keep": [
         "clipboard",
         "clipRect",
+        "setClip",
         "clip_name",
         "clip_vision",
         "clip_skip",
@@ -159,7 +162,37 @@
         "clipl",
         "clipg",
         "CLIPLoader",
-        "CLIPTextEncode"
+        "CLIPTextEncode",
+        "clip_ref",
+        "clip_prompt_nodes",
+        "strength_clip",
+        "clip_seconds",
+        "Clip seconds",
+        "Clip saved",
+        "Leave each clip longer",
+        "\"clip\":",
+        "(\"clip\", \"i2v\"",
+        "\"clip\", \"footage\"",
+        "noun=\"clip\"",
+        "a video and a clip",
+        "this clip down the Genau lane",
+        "this clip from the folder Genau plays from",
+        "this clip is down for deletion",
+        "sent clip may arrive",
+        "That clip's workflow",
+        "this clip's file is missing",
+        "so the clip is the scenes end to end",
+        "How long the clip runs",
+        "so the clip runs",
+        "for a looping clip",
+        "A longer clip is made in pieces",
+        "Preparing the clip",
+        "CLIP_PIECE",
+        "CLIP_PHRASE_TOO_SHORT_TO_SPLIT",
+        "CLIP_WORDS",
+        "CLIP = \"clip\"",
+        "(\"text_encoders\", \"clip\")",
+        "clip_tokenizer"
       ]
     },
     {

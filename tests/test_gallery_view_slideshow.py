@@ -1489,7 +1489,7 @@ def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
 
 
 def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
-    # Most video folders here hold a single clip, so skipping the arming for a
+    # Most video folders here hold a single video, so skipping the arming for a
     # lone item is what made "fullscreen on a video" look like a different mode.
     rows = [_i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))

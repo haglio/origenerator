@@ -318,7 +318,7 @@ class EnhanceController:
 
         Two things are dropped. Videos, because there is no video enhancer — the
         workflow under all of this refines a still — and they are picked from
-        the same flow and look no different picked, so a picked clip is nothing
+        the same flow and look no different picked, so a picked video is nothing
         to run rather than a run that fails.
 
         And an image that already holds a version made at exactly the settings

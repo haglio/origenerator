@@ -181,7 +181,7 @@ class InFlightItems:
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, lending the settings
                 # rather than the result. Never both. An act names what the video
-                # will do, which is the whole of what was chosen; the clip its
+                # will do, which is the whole of what was chosen; the video its
                 # settings were mined out of is an answer to a question the user
                 # never asked, and a thumbnail of a video they did not pick reads
                 # as a job that is that video. A dropped video *is* the choice,

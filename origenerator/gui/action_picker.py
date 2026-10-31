@@ -9,7 +9,9 @@ from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.gallery import media_type_of_row
 from origenerator.gui.eliding import ElidingLabel, open_the_list_in_full
+from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.warning_mark import WarningMark
 from origenerator.media import MediaType
 from origenerator.own_window import show_or_say
 from origenerator.sort_images import the_sorting_window
@@ -34,14 +36,13 @@ class ActionPicker(QWidget):
 
     chosen = pyqtSignal(str, str)  # prompt_id, what it shows ("" once taken back)
 
-    def __init__(self, states, acts, parent=None):
-        super().__init__(parent)
+    def __init__(self, states, acts, form: LabelForm):
+        super().__init__()
         self._prompt_id = ""
         self._states, self._acts = tuple(states), tuple(acts)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
-        row.addWidget(ElidingLabel(ACTION_LABEL))
         self._combo = NoWheelComboBox()
         self._offer(self._states)
         self._combo.setToolTip(_IMAGES_TIP)
@@ -53,8 +54,9 @@ class ActionPicker(QWidget):
                               "has answered for, one press apiece")
         self._sort.clicked.connect(self._on_sort)
         row.addWidget(self._sort)
-        self.hide()
-
+        self._form = form
+        form.addRow(LabelCell(WarningMark(), ElidingLabel(ACTION_LABEL), form.label_column), self)
+        form.setRowVisible(self, False)
 
     def offered(self) -> list[str]:
         return [self._combo.itemData(i) for i in range(self._combo.count())]
@@ -80,7 +82,7 @@ class ActionPicker(QWidget):
         self._sort.setVisible(is_image)
         self._combo.setToolTip(_IMAGES_TIP if is_image else _VIDEOS_TIP)
         self._prompt_id = row.get("prompt_id") or ""
-        self.show()
+        self._form.setRowVisible(self, True)
 
     def _offer(self, names: tuple[str, ...]) -> None:
         self._combo.clear()
@@ -91,7 +93,7 @@ class ActionPicker(QWidget):
 
     def clear(self) -> None:
         self._prompt_id = ""
-        self.hide()
+        self._form.setRowVisible(self, False)
 
     def _on_sort(self) -> None:
         if self._sorting is not None and self._sorting.isVisible():

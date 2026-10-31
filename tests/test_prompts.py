@@ -59,3 +59,16 @@ def test_config_imports_nothing_from_prompts():
     assert not [node for node in ast.walk(tree)
                 if isinstance(node, ast.ImportFrom) and node.module == "origenerator.prompts"]
 
+
+def _request_prompt() -> str:
+    return _assigned_strings("prompts.py")["REQUEST_SYSTEM_PROMPT"]
+
+
+def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_make_it_stronger():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("didn't appear"):]
+
+    assert "never remove" in rule.lower()
+    assert "weight" in rule.lower()
+    example = prompt[prompt.rindex("didn't appear"):]
+    assert ":1." in example.split("->")[1].split("negative")[0]

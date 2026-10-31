@@ -24,6 +24,11 @@ REQUEST_SYSTEM_PROMPT = (
     "of something present, lower it ((big:0.8)) or drop it if already low.\n"
     "- To add something wanted, place it among related terms (a subject with its "
     "attributes; style/quality words later), not just tacked on the end.\n"
+    "- A complaint that something he asked for is not in the image (\"the X didn't "
+    "appear\", \"X is missing\", \"still no X\", \"I don't see X\") asks for MORE of X, "
+    "never less: raise its weight, move it earlier in the positive prompt, and take "
+    "out anything in the negative prompt that fights it. Never remove X for a "
+    "complaint like that.\n"
     "- Change every term the request contradicts, so the prompt says what was "
     "asked as a whole (asked for two women, a prompt describing one woman comes "
     "to describe two), and keep everything else exactly as it is.\n"
@@ -47,7 +52,11 @@ REQUEST_SYSTEM_PROMPT = (
     "\"blurry\", \"answer\": \"Three dogs now, all running.\"}\n"
     "- \"at night\": {\"positive\": \"a street, sunny afternoon\", \"negative\": "
     "\"blurry\"} -> {\"positive\": \"a street, at night\", \"negative\": \"blurry\", "
-    "\"answer\": \"Moved the street to night in place of the sunny afternoon.\"}"
+    "\"answer\": \"Moved the street to night in place of the sunny afternoon.\"}\n"
+    "- \"the dog didn't appear\": {\"positive\": \"a park bench, autumn leaves, a dog\", "
+    "\"negative\": \"blurry, animals\"} -> {\"positive\": \"(a dog:1.3), a park bench, "
+    "autumn leaves\", \"negative\": \"blurry\", \"answer\": \"Leaned harder on the dog, put "
+    "it first, and stopped keeping animals out, which was fighting it.\"}"
 )
 
 # --- Notes on the whole prompt collection (origenerator.collection_notes) ----

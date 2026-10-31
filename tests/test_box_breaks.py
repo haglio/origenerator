@@ -12,9 +12,9 @@ from origenerator.box_breaks import (
     prompt_boxes,
     unboxed,
 )
+from origenerator.comfy_graph import texts_read
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import prompt_conditioning
-from tests.graph_reading import read_in_order as _read_in_order
 
 _CLIP = ["1", 1]
 
@@ -44,7 +44,7 @@ def test_an_unboxed_prompt_is_encoded_exactly_as_it_always_was():
 def test_each_box_is_encoded_on_its_own_and_joined_in_order_under_the_graphs_node():
     nodes = prompt_conditioning("2", _CLIP, f"one {BOX_BREAK}two {BOX_BREAK}three")
 
-    assert _read_in_order(nodes, "2") == ["one ", "two ", "three"]
+    assert texts_read(nodes, nodes["2"]) == ["one ", "two ", "three"]
     assert all(node["inputs"]["clip"] == _CLIP for node in nodes.values()
                if node["class_type"] == "CLIPTextEncode")
 
@@ -57,26 +57,26 @@ def test_a_fixs_words_go_ahead_of_an_unboxed_prompt_as_they_always_did():
 def test_a_fixs_words_are_their_own_piece_ahead_of_a_boxed_prompts_boxes():
     nodes = prompt_conditioning("fix0_positive", _CLIP, f"one {BOX_BREAK}two", ahead="sharp hands")
 
-    assert _read_in_order(nodes, "fix0_positive") == ["sharp hands", "one ", "two"]
+    assert texts_read(nodes, nodes["fix0_positive"]) == ["sharp hands", "one ", "two"]
 
 
 def test_each_of_a_fixs_boxes_is_its_own_piece_ahead_of_a_boxed_prompts_boxes():
     nodes = prompt_conditioning("fix0_positive", _CLIP, f"one {BOX_BREAK}two",
                                 ahead=f"open {BOX_BREAK}palms")
 
-    assert _read_in_order(nodes, "fix0_positive") == ["open ", "palms", "one ", "two"]
+    assert texts_read(nodes, nodes["fix0_positive"]) == ["open ", "palms", "one ", "two"]
 
 
 def test_a_fixs_boxes_go_each_its_own_piece_ahead_of_a_prompt_made_before_the_boxes():
     nodes = prompt_conditioning("fix0_positive", _CLIP, "a harbor", ahead=f"open {BOX_BREAK}palms")
 
-    assert _read_in_order(nodes, "fix0_positive") == ["open ", "palms", "a harbor"]
+    assert texts_read(nodes, nodes["fix0_positive"]) == ["open ", "palms", "a harbor"]
 
 
 def test_an_empty_box_is_never_read():
     nodes = prompt_conditioning("2", _CLIP, f"one {BOX_BREAK} {BOX_BREAK}two")
 
-    assert _read_in_order(nodes, "2") == ["one ", "two"]
+    assert texts_read(nodes, nodes["2"]) == ["one ", "two"]
 
 
 @pytest.mark.parametrize("name", sorted(name for name, workflow in WORKFLOW_REGISTRY.items()

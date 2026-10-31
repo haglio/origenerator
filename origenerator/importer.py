@@ -14,6 +14,7 @@ from app_support.subprocess_utils import hidden_subprocess_kwargs
 from PIL import Image
 from shared_ui.orientation import orientation_of_size
 
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
@@ -24,6 +25,7 @@ from origenerator.comfy_graph import (
     guidance_params,
     input_image_name,
     sound_params,
+    texts_read,
 )
 from origenerator.db import Database
 from origenerator.gallery import (
@@ -481,9 +483,8 @@ def _prompt_texts(graph: dict) -> tuple[str | None, str | None]:
     """The positive and negative prompt a graph was run with, or ``None`` each
     (located by :func:`origenerator.comfy_graph.clip_prompt_nodes`)."""
     def text_of(node):
-        if node and isinstance(node.get("inputs", {}).get("text"), str):
-            return node["inputs"]["text"]
-        return None
+        texts = texts_read(graph, node)
+        return BOX_BREAK.join(texts) if texts else None
 
     positive, negative = clip_prompt_nodes(graph)
     return text_of(positive), text_of(negative)

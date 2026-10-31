@@ -11,6 +11,7 @@ from typing import NamedTuple
 
 _COND_NODES = ("WanImageToVideo", "WanFirstLastFrameToVideo")
 _LORA_LOADERS = ("LoraLoaderModelOnly", "LoraLoader")
+_JOINED_PROMPTS = "ConditioningConcat"
 
 
 class ModelChain(NamedTuple):
@@ -220,12 +221,31 @@ def _titled_prompt_nodes(graph: dict):
     return positive, negative
 
 
+def texts_read(graph: dict, node: dict | None) -> list[str]:
+    texts: list[str] = []
+    seen: set[int] = set()
+
+    def read(source: dict | None) -> None:
+        if source is None or id(source) in seen:
+            return
+        seen.add(id(source))
+        inputs = source.get("inputs", {})
+        if source.get("class_type") == _JOINED_PROMPTS:
+            read(follow(graph, inputs.get("conditioning_to")))
+            read(follow(graph, inputs.get("conditioning_from")))
+        elif isinstance(inputs.get("text"), str):
+            texts.append(inputs["text"])
+
+    read(node)
+    return texts
+
+
 def _encoder_feeding(graph: dict, side: str) -> dict | None:
     for node in graph.values():
         source = follow(graph, node.get("inputs", {}).get(side))
         seen: set[int] = set()
         while source is not None and id(source) not in seen:
-            if source.get("class_type") == "CLIPTextEncode":
+            if source.get("class_type") in ("CLIPTextEncode", _JOINED_PROMPTS):
                 return source
             seen.add(id(source))
             inputs = source.get("inputs", {})

@@ -4224,13 +4224,15 @@ def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
     assert field.toolTip() == label.toolTip() == STRENGTH_ONE_HELP
 
 
-def _drawn_in(field) -> set[str]:
-    colors, cursor = set(), QTextCursor(field.document())
-    for position in range(1, len(field.toPlainText()) + 1):
-        cursor.setPosition(position)
-        own = cursor.charFormat().foreground()
-        colors.add((own.color() if own.style() != Qt.BrushStyle.NoBrush
-                    else field.palette().color(QPalette.ColorRole.Text)).name())
+def _drawn_in(prompt) -> set[str]:
+    colors = set()
+    for field in prompt.boxes():
+        cursor = QTextCursor(field.document())
+        for position in range(1, len(field.toPlainText()) + 1):
+            cursor.setPosition(position)
+            own = cursor.charFormat().foreground()
+            colors.add((own.color() if own.style() != Qt.BrushStyle.NoBrush
+                        else field.palette().color(QPalette.ColorRole.Text)).name())
     return colors
 
 

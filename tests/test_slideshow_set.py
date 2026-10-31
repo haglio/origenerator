@@ -13,7 +13,7 @@ import pytest
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED
 
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
@@ -293,8 +293,8 @@ _ACTIONS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
 
 def _neighbors(prompt_id):
     actions = _ACTIONS.get(prompt_id, ())
-    return MapNeighbors(seeds=_SEEDS.get(prompt_id, ()),
-                        column=tuple(MapRow(slide, "dawn") for slide in actions),
+    return NavMapNeighbors(seeds=_SEEDS.get(prompt_id, ()),
+                        column=tuple(NavMapRow(slide, "dawn") for slide in actions),
                         label="fox", group=actions)
 
 
@@ -418,8 +418,8 @@ def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
     """The column steps between acts, so twins of one act share a row; the
     loop is the image and every video of it, and its map is the loop."""
     twin = Slide("one-y.png", "image", "id-1y")
-    whole = lambda pid: MapNeighbors(  # noqa: E731
-        column=tuple(MapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
+    whole = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=tuple(NavMapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
         group=(*_ACTIONS.get(pid, ()), twin) if pid == "id-1" else ())
     slideshow_set, _dealt = _set(neighbors=whole)
 
@@ -430,7 +430,7 @@ def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
 
 
 def test_an_axis_with_nothing_to_loop_is_stepped_over():
-    seeds_only = lambda pid: MapNeighbors(seeds=_SEEDS.get(pid, ()))  # noqa: E731
+    seeds_only = lambda pid: NavMapNeighbors(seeds=_SEEDS.get(pid, ()))  # noqa: E731
     slideshow_set, _dealt = _set(neighbors=seeds_only)
 
     assert slideshow_set.step_loop(locked=True) == SEED
@@ -560,7 +560,7 @@ _ROW = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b"),
 def _row_mates(prompt_id):
     """Every slide of the one row is every other's seed, as a folder's images are."""
     in_the_row = any(item[2] == prompt_id for item in _ROW)
-    return MapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
+    return NavMapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
                                     if in_the_row and item[2] != prompt_id), label="fox")
 
 
@@ -816,9 +816,9 @@ def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
     to be guessed from the words in its gutter."""
     a_configuration = Slide("one-x.png", "image", "id-1x")
     an_act = Slide("one-y.png", "image", "id-1y")
-    both = lambda pid: MapNeighbors(  # noqa: E731
-        column=(MapRow(a_configuration, "E629425B", configuration=True),
-                MapRow(an_act, "alpha")) if pid == "id-1" else ())
+    both = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=(NavMapRow(a_configuration, "E629425B", configuration=True),
+                NavMapRow(an_act, "alpha")) if pid == "id-1" else ())
     slideshow_set, _dealt = _set(neighbors=both)
 
     assert slideshow_set.configuration_row("e629425b") is a_configuration

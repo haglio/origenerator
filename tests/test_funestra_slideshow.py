@@ -24,10 +24,10 @@ from origenerator.funscript import funscript_path_for
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
 from origenerator.gui.notice_overlay import HEARD_MARK
 from origenerator.gui.region_openings import RegionOpening
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -1123,10 +1123,10 @@ def _around(prompt_id):
     """A library in which the first item has one seed sibling and one other
     act down its column, and the rest have nobody."""
     if prompt_id != "id-1":
-        return MapNeighbors()
+        return NavMapNeighbors()
     other_act = Slide("one-x.png", "image", "id-1x")
-    return MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
-                        column=(MapRow(other_act, "dawn"),), label="fox",
+    return NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
+                        column=(NavMapRow(other_act, "dawn"),), label="fox",
                         group=(other_act,))
 
 
@@ -1295,8 +1295,8 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
     seeds round and round, rather than narrowing the slideshow to an act."""
     said = []
     a_configuration = Slide("one-x.png", "image", "id-1x")
-    around = lambda pid: MapNeighbors(  # noqa: E731
-        column=(MapRow(a_configuration, "E629425B", configuration=True),)
+    around = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=(NavMapRow(a_configuration, "E629425B", configuration=True),)
         if pid == "id-1" else (),
         seeds=(Slide("one-y.png", "image", "id-1y"),) if pid == "id-1x" else ())
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=around, acts=_acts),
@@ -1934,8 +1934,8 @@ def test_a_run_that_lands_after_the_funestra_moved_on_is_the_funestras_next_item
 def _row_only(prompt_id):
     """A library holding one folder's row and nothing made of it, so the loop
     key's stop after the seeds is off."""
-    return (MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
-            if prompt_id == "id-1" else MapNeighbors())
+    return (NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
+            if prompt_id == "id-1" else NavMapNeighbors())
 
 
 def test_taking_the_loop_off_a_folder_on_a_funestra_asks_for_the_regions_library(
@@ -2052,7 +2052,7 @@ def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
 
 def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tmp_path):
     items = [("one.png", "image", "id-1"), ("two.png", "image", "id-2")]
-    neighbors = MapNeighbors()
+    neighbors = NavMapNeighbors()
 
     def walked(_prompt_id):
         raise AssertionError("walked the library for the first slide's map")

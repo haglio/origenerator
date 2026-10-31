@@ -223,7 +223,7 @@ class GenerateTab(DropZones):
     title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
     form_edited = pyqtSignal()          # any field changed — every keystroke
     # A field changed because someone changed it — the workflow dropdown included,
-    # and never the seeding a load does. What tells the tab strip this tab is
+    # and never the seeding a load does. What tells the tab row this tab is
     # being worked in rather than looked at (see _loading_config).
     user_edited = pyqtSignal()
     prompt_fields_changed = pyqtSignal()  # a new form, or a prompt gained or lost a box
@@ -1816,7 +1816,7 @@ class GenerateTab(DropZones):
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         """Reveal the info and actions for the generation on display: the
         read-only metadata block for every selection, the source tile + the lane
-        button for a video, and the animations strip for an image. ``preview`` is the
+        button for a video, and the Animations for an image. ``preview`` is the
         resolved ``(path, media_type)`` (or ``None``), so the lane button keys off the
         same lookup.
         """

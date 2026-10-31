@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 from shared_ui.colors import AMBER, RED
@@ -14,7 +16,6 @@ from origenerator.box_breaks import (
     unboxed,
 )
 from origenerator.gui import diff_text, tracked_prompt
-from origenerator.gui.prompt_field import PromptField, PromptHeights
 from origenerator.gui.unread_words import gray_past
 from origenerator.prompt_tokens import READ_IN_PIECES, PromptReading
 
@@ -47,10 +48,9 @@ class PromptBoxes(QWidget):
     textChanged = pyqtSignal()
     boxes_changed = pyqtSignal()
 
-    def __init__(self, key: str, parent=None, *, heights: PromptHeights | None = None):
+    def __init__(self, make_box: Callable[[], QPlainTextEdit], parent=None):
         super().__init__(parent)
-        self._key = key
-        self._heights = heights
+        self._make_box = make_box
         self._reading: PromptReading | None = None
         self._texts: list[str] = []
         self._cut_from: str | None = None
@@ -59,12 +59,12 @@ class PromptBoxes(QWidget):
         self._in_use: tuple[bool, str] | None = None
         self._writing = False
         self._flow_from: int | None = None
-        self._boxes: list[PromptField] = []
+        self._boxes: list[QPlainTextEdit] = []
         self._countdowns: list[Countdown] = []
         self._column = QVBoxLayout(self)
         self._column.setContentsMargins(0, 0, 0, 0)
         self._column.setSpacing(GAP_SMALL)
-        self._column.addStretch(1)
+        self._column.addStretch()
         self._history = tracked_prompt.UndoHistory(self, self.value, self._restore)
         self._burst = QTimer(self)
         self._burst.setSingleShot(True)
@@ -75,7 +75,7 @@ class PromptBoxes(QWidget):
         self._show([""])
         self.setFocusProxy(self._boxes[0])
 
-    def boxes(self) -> list[PromptField]:
+    def boxes(self) -> list[QPlainTextEdit]:
         return list(self._boxes)
 
     def value(self) -> str:
@@ -162,12 +162,12 @@ class PromptBoxes(QWidget):
             self.boxes_changed.emit()
 
     def _add_box(self) -> None:
-        box = PromptField(self._key, heights=self._heights)
+        box = self._make_box()
         box.setUndoRedoEnabled(False)
         self._history.watch(box)
         box.textChanged.connect(lambda box=box: self._edited(box))
         countdown = Countdown()
-        self._column.insertWidget(self._column.count() - 1, box)
+        self._column.insertWidget(self._column.count() - 1, box, 1)
         self._column.insertWidget(self._column.count() - 1, countdown)
         self._boxes.append(box)
         self._countdowns.append(countdown)
@@ -185,7 +185,7 @@ class PromptBoxes(QWidget):
             widget.setParent(None)
             widget.deleteLater()
 
-    def _edited(self, box: PromptField) -> None:
+    def _edited(self, box: QPlainTextEdit) -> None:
         if self._writing or box not in self._boxes:
             return
         texts = [diff_text.live_text(each) for each in self._boxes]
@@ -258,7 +258,7 @@ class PromptBoxes(QWidget):
             count_down(countdown, box, self._reading)
 
 
-def _put(box: PromptField, text: str, share: str | None) -> None:
+def _put(box: QPlainTextEdit, text: str, share: str | None) -> None:
     tracked_prompt.untrack(box)
     box.setPlainText(text)
     if share is not None:

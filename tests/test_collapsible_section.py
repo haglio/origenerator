@@ -106,7 +106,7 @@ def test_a_long_title_does_not_hold_the_form_open(qtbot):
     # A header names the rows below it; it has no business deciding how narrow the
     # pane can be squeezed. Its title elides instead — without this, "Enhancement
     # levels" alone was enough to put a horizontal scroll bar under the form.
-    title = "Enhancement levels"
+    title = "Enhancement Levels"
     section = CollapsibleSection(title, collapsed=True)
     qtbot.addWidget(section)
 
@@ -188,7 +188,7 @@ def test_pressing_the_warning_neither_folds_nor_unfolds_the_section(qtbot):
 
 
 def test_a_squeezed_header_cuts_its_title_short_and_keeps_its_mark_whole(qtbot):
-    section = _shown_section(qtbot, "Enhancement levels", width=300)
+    section = _shown_section(qtbot, "Enhancement Levels", width=300)
     section.set_mark(_solid_mark(), "Portrait")
     section.resize(section.minimumSizeHint().width(), section.height())
     qtbot.wait(10)

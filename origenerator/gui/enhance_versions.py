@@ -486,7 +486,7 @@ class EnhanceVersions(QWidget):
         # A foldable section like the form's above it: this pane is one column
         # of collapsible groups, and a heading that cannot fold reads as the one
         # thing you are not allowed to put away.
-        self._section = CollapsibleSection("Enhancement levels")
+        self._section = CollapsibleSection("Enhancement Levels")
         column.addWidget(self._section)
         self._host = QWidget()
         QVBoxLayout(self._host)

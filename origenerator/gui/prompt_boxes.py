@@ -170,7 +170,7 @@ class PromptBoxes(QWidget):
                 self._remove_last_box()
             shares = (baselines_for(self._baseline, texts, self._cut_from)
                       if self._baseline is not None else [None] * len(texts))
-            for index, (box, text, share) in enumerate(zip(self._boxes, texts, shares)):
+            for index, (box, text, share) in enumerate(zip(self._boxes, texts, shares, strict=True)):
                 if (diff_text.live_text(box), self._shares[index]) != (text, share):
                     _put(box, text, share)
                     self._shares[index] = share
@@ -273,10 +273,10 @@ class PromptBoxes(QWidget):
         in_use = self._in_use is None or self._in_use[0]
         if self._cut_from is not None:
             for countdown, (_start, tokens) in zip(self._countdowns,
-                                                   self._reading.pieces(self._cut_from)):
+                                                   self._reading.pieces(self._cut_from), strict=True):
                 countdown.show_left(self._reading.reads_well - tokens if in_use else None)
             return
-        for box, countdown in zip(self._boxes, self._countdowns):
+        for box, countdown in zip(self._boxes, self._countdowns, strict=True):
             count_down(countdown, box, self._reading, in_use=in_use)
 
 

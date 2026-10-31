@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from itertools import pairwise
 
 from origenerator.prompt_diff import REMOVED, SAME, diff_spans
 
@@ -43,7 +44,7 @@ def flowed(boxes: list[str], tokens: Callable[[str], int], *, limit: int, start:
 def cut_into_boxes(text: str, starts: list[int]) -> list[str]:
     bounds = [*starts[1:], len(text)]
     return [text[:bounds[0]].rstrip()] + [text[start:end].strip()
-                                          for start, end in zip(bounds, bounds[1:])]
+                                          for start, end in pairwise(bounds)]
 
 
 def baselines_for(baseline: str, texts: list[str], whole: str | None = None) -> list[str]:

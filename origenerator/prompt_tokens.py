@@ -6,6 +6,7 @@ import re
 import struct
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path, PureWindowsPath
 from typing import NamedTuple
 
@@ -71,7 +72,7 @@ class PromptReading:
                     group = group[room:]
                 starts.append(_opening_brackets_before(text, group[0]))
                 counts.append(0)
-        return list(zip(starts, counts))
+        return list(zip(starts, counts, strict=True))
 
     def flow(self, texts: list[str], *, start: int = 0, caret: tuple[int, int] | None = None
              ) -> tuple[list[str], tuple[int, int] | None]:
@@ -202,7 +203,7 @@ def _unescaped(segment: str, start: int) -> tuple[str, list[int]]:
 
 def _words(plain: str) -> list[tuple[str, int]]:
     bounds = [0, *(found.start() for found in _AN_EMBEDDING.finditer(plain)), len(plain)]
-    return [(plain[at:end], at) for at, end in zip(bounds, bounds[1:])
+    return [(plain[at:end], at) for at, end in pairwise(bounds)
             if plain[at:end] and not plain[at:end].startswith(_EMBEDDING)]
 
 

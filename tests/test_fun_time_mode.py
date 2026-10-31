@@ -209,7 +209,7 @@ def test_a_tie_between_the_shapes_goes_to_landscape_the_roomier_region(tmp_path)
 
 def test_region_for_items_routes_a_running_slideshows_own_slides(tmp_path):
     # A slideshow already playing asks again when its region has to be re-decided,
-    # and what it holds are slides rather than the tuples the browser built.
+    # and what it holds are slides rather than the tuples the Gallery pane built.
     tall = _png(tmp_path / "tall.png", 100, 200)
     assert region_for_items([Slide(str(tall), "image", "a", str(tall))]) == "portrait"
 

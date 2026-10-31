@@ -424,7 +424,7 @@ def test_selecting_the_reroll_highlights_its_tile_and_drops_thumbnail_picks(qtbo
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)
-    view._browser.apply_selection("orig", _NO_MOD)  # a thumbnail is picked while it runs
+    view._gallery_pane.apply_selection("orig", _NO_MOD)  # a thumbnail is picked while it runs
     assert view.selected_prompt_ids() == ["orig"]
 
     _generating_tile(view).selected.emit()
@@ -917,7 +917,7 @@ def test_i2v_reroll_regenerates_its_input_image_enhances_it_then_makes_the_video
 
 
 def _tooltips(view, prompt_id):
-    return [b.toolTip() for b in view._browser._thumb_widgets[prompt_id]._corner_buttons]
+    return [b.toolTip() for b in view._gallery_pane._thumb_widgets[prompt_id]._corner_buttons]
 
 
 def test_i2v_folder_item_carries_both_seed_reroll_hovers(qtbot, tmp_path):
@@ -980,7 +980,7 @@ def test_video_seed_hover_rerolls_only_the_item_video_seed(qtbot, tmp_path):
     _select_leaf_of(view, "vid")
     view._jobs.reroll_video_seed = MagicMock()
 
-    view._browser._thumb_widgets["vid"]._corner_buttons[0].click()  # "Randomize video seed"
+    view._gallery_pane._thumb_widgets["vid"]._corner_buttons[0].click()  # "Randomize video seed"
 
     view._jobs.reroll_video_seed.assert_called_once()
     _key, row = view._jobs.reroll_video_seed.call_args.args
@@ -994,7 +994,7 @@ def test_image_seed_hover_rerolls_only_the_item_image_seed(qtbot, tmp_path):
     _select_leaf_of(view, "vid")
     view._jobs.reroll_image_seed = MagicMock()
 
-    view._browser._thumb_widgets["vid"]._corner_buttons[1].click()  # "Randomize image seed"
+    view._gallery_pane._thumb_widgets["vid"]._corner_buttons[1].click()  # "Randomize image seed"
 
     view._jobs.reroll_image_seed.assert_called_once()
     _key, row, _image_rows = view._jobs.reroll_image_seed.call_args.args
@@ -1083,7 +1083,7 @@ def test_latest_shows_an_inflight_tile_above_finished_items(qtbot):
     view.refresh()
     _open_latest(view)
 
-    assert "gen1" in view._browser._inflight_cards
+    assert "gen1" in view._gallery_pane._inflight_tiles
     assert view.listed_prompt_ids() == ["done"]          # tiles aren't finished items
 
 
@@ -1101,10 +1101,10 @@ def test_latest_shows_a_live_reroll_as_an_inflight_tile(qtbot):
     )]
     _open_latest(view)
 
-    assert "rr1" in view._browser._inflight_cards
-    assert not view._browser._inflight_cards["rr1"]._image.pixmap().isNull()  # the job's live frame
+    assert "rr1" in view._gallery_pane._inflight_tiles
+    assert not view._gallery_pane._inflight_tiles["rr1"]._image.pixmap().isNull()  # the job's live frame
     # Clicking the New tile opens the folder it runs in (its tile shows there).
-    view._browser._on_inflight_clicked("rr1")
+    view._gallery_pane._on_inflight_clicked("rr1")
     assert _selected_folder(view) == folder_key
 
 
@@ -1119,10 +1119,10 @@ def test_right_clicking_an_inflight_tile_offers_to_cancel_the_run(
     _key, job = _running_reroll(view)
     view.refresh()          # the launch's running row is in the DB now
     _open_latest(view)
-    assert job.prompt_id in view._browser._inflight_cards
-    labels = _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
+    assert job.prompt_id in view._gallery_pane._inflight_tiles
+    labels = _menu_offering(monkeypatch, "gallery_pane", pick="Cancel")
 
-    view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
+    view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
     assert labels == [["Cancel"]]
     assert view._jobs.all_jobs == []      # the run really stopped
@@ -1143,9 +1143,9 @@ def test_an_auto_generating_folders_tile_offers_a_cancel_and_a_real_stop(
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_latest(view)
-    labels = _menu_offering(monkeypatch, "browser_pane")
+    labels = _menu_offering(monkeypatch, "gallery_pane")
 
-    view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
+    view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
     assert labels == [["Cancel", "Cancel and stop auto-generating"]]
 
@@ -1164,9 +1164,9 @@ def test_canceling_from_an_auto_generating_folders_tile_ends_auto_generate_too(
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_latest(view)
-    _menu_offering(monkeypatch, "browser_pane", pick="Cancel and stop")
+    _menu_offering(monkeypatch, "gallery_pane", pick="Cancel and stop")
 
-    view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
+    view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
     assert not view._auto.is_active(key)     # Auto-Generate is off...
     assert view._jobs.all_jobs == []       # ...and nothing was launched in its place
@@ -1182,10 +1182,10 @@ def test_a_tile_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_latest(view)
-    assert "gen1" in view._browser._inflight_cards      # the card is there...
-    labels = _menu_offering(monkeypatch, "browser_pane")
+    assert "gen1" in view._gallery_pane._inflight_tiles      # the tile is there...
+    labels = _menu_offering(monkeypatch, "gallery_pane")
 
-    view._browser._inflight_context_menu("gen1", QPoint(0, 0))
+    view._gallery_pane._inflight_context_menu("gen1", QPoint(0, 0))
 
     assert labels == []                        # ...but it offers nothing
 
@@ -1244,7 +1244,7 @@ def test_open_folder_shows_a_running_generation_on_its_generating_tile(qtbot, tm
     _key, job = _running_reroll(view)                 # a real re-roll running in the folder
 
     assert _generating_tile(view) is not None        # the running generation IS the tile
-    assert job.prompt_id not in view._browser._inflight_cards  # not a separate in-flight card
+    assert job.prompt_id not in view._gallery_pane._inflight_tiles  # not a separate in-flight tile
     assert job.prompt_id not in view.listed_prompt_ids()  # nor an output-less static tile
     assert view.listed_prompt_ids() == ["orig"]     # only the finished item is a thumbnail
 
@@ -1261,7 +1261,7 @@ def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
 
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
-    assert "run1" in view._browser._inflight_cards           # in_flight, and shown as in_flight
+    assert "run1" in view._gallery_pane._inflight_tiles           # in_flight, and shown as in_flight
     assert view.listed_prompt_ids() == ["i1"]      # run1 isn't a static thumbnail
 
 
@@ -1276,7 +1276,7 @@ def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path
     view._rerender_current_leaf()               # redraw the open folder with its live tile
 
     assert _generating_tile(view) is not None   # the GeneratingTile shows it...
-    assert job.prompt_id not in view._browser._inflight_cards  # ...and no duplicate in-flight card
+    assert job.prompt_id not in view._gallery_pane._inflight_tiles  # ...and no duplicate in-flight tile
 
 
 def test_a_reroll_finishing_drops_its_inflight_tile(qtbot):
@@ -1291,14 +1291,14 @@ def test_a_reroll_finishing_drops_its_inflight_tile(qtbot):
     view._jobs._jobs[folder_key] = [
         _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
     _open_latest(view)
-    assert "rr1" in view._browser._inflight_cards
+    assert "rr1" in view._gallery_pane._inflight_tiles
 
     # The re-roll finishes: its row becomes a completed generation, its job drops.
     view._live_jobs.pop(folder_key)
     db.delete_generation("rr1")
     db.add(_row("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, "rr1.png"))
     view._poll()
-    assert "rr1" not in view._browser._inflight_cards
+    assert "rr1" not in view._gallery_pane._inflight_tiles
 
 
 def test_inflight_tile_frame_updates_in_place_without_a_rerender(qtbot):
@@ -1313,11 +1313,11 @@ def test_inflight_tile_frame_updates_in_place_without_a_rerender(qtbot):
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
     view._jobs._jobs[folder_key] = [job]
     _open_latest(view)
-    card = view._browser._inflight_cards["rr1"]
+    tile = view._gallery_pane._inflight_tiles["rr1"]
 
     job.last_preview = _png_bytes()  # a live frame arrives on the tracked re-roll
     view._poll()
-    assert view._browser._inflight_cards["rr1"] is card       # same card object — no re-render
+    assert view._gallery_pane._inflight_tiles["rr1"] is tile       # same tile object — no re-render
     assert not tile._image.pixmap().isNull()          # now showing the frame
 
 
@@ -1330,7 +1330,7 @@ def test_latest_collection_appears_for_a_running_generation(qtbot):
 
     assert "Latest" in _alls(view._tree)
     _open_latest(view)
-    assert "gen1" in view._browser._inflight_cards
+    assert "gen1" in view._gallery_pane._inflight_tiles
 
 
 def test_inflight_running_tiles_sort_before_queued(qtbot):
@@ -1532,7 +1532,7 @@ def test_clicking_an_enhancements_row_in_the_queue_goes_to_its_image(qtbot, tmp_
     qtbot.mouseClick(row, Qt.MouseButton.LeftButton)
 
     assert view.selected_prompt_ids() == ["g1"]
-    assert view._browser._thumb_widgets["g1"]._selected
+    assert view._gallery_pane._thumb_widgets["g1"]._selected
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == "g1"
 
 
@@ -1808,15 +1808,15 @@ def test_generate_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_
     (pid,) = [job.prompt_id for job in gv._live_jobs.values()]
 
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert pid in gv._browser._inflight_cards
+    assert pid in gv._gallery_pane._inflight_tiles
 
     folder = _at(_image_workflow(gv._tree), 0, 0)
     gv._tree.setCurrentItem(folder)              # navigate away
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))    # and back
-    assert pid in gv._browser._inflight_cards, "card vanished after navigating away and back"
+    assert pid in gv._gallery_pane._inflight_tiles, "card vanished after navigating away and back"
 
     gv._poll()
-    assert pid in gv._browser._inflight_cards, "card vanished after a poll"
+    assert pid in gv._gallery_pane._inflight_tiles, "card vanished after a poll"
 
 
 def test_reroll_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_path):
@@ -1833,14 +1833,14 @@ def test_reroll_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_pa
     rr_pid = gv._live_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert rr_pid in gv._browser._inflight_cards
+    assert rr_pid in gv._gallery_pane._inflight_tiles
 
     gv._tree.setCurrentItem(gv._tree_item_for(folder_key))  # into the re-roll's folder
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))             # and back
-    assert rr_pid in gv._browser._inflight_cards, "re-roll card vanished after navigation"
+    assert rr_pid in gv._gallery_pane._inflight_tiles, "re-roll card vanished after navigation"
 
     gv._poll()
-    assert rr_pid in gv._browser._inflight_cards, "re-roll card vanished after a poll"
+    assert rr_pid in gv._gallery_pane._inflight_tiles, "re-roll card vanished after a poll"
 
 
 def test_i2v_reroll_inflight_tile_follows_the_image_to_video_handoff(qtbot, tmp_path):
@@ -1857,18 +1857,18 @@ def test_i2v_reroll_inflight_tile_follows_the_image_to_video_handoff(qtbot, tmp_
     img_job = view._live_jobs[key]
 
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
-    assert img_job.prompt_id in view._browser._inflight_cards
+    assert img_job.prompt_id in view._gallery_pane._inflight_tiles
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image -> video
     vid_job = view._live_jobs[key]
     assert vid_job.prompt_id != img_job.prompt_id
 
     view._poll()
-    assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after handoff"
+    assert vid_job.prompt_id in view._gallery_pane._inflight_tiles, "video-stage card missing after handoff"
 
     view._tree.setCurrentItem(view._tree_item_for(key))   # away
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))        # and back
-    assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after navigation"
+    assert vid_job.prompt_id in view._gallery_pane._inflight_tiles, "video-stage card missing after navigation"
 
 
 def test_latest_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
@@ -1887,7 +1887,7 @@ def test_latest_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     gv.refresh()
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
 
-    assert "rr_running" in gv._browser._inflight_cards
+    assert "rr_running" in gv._gallery_pane._inflight_tiles
 
 
 # --- cancel the front tab's run, and remember an accepted random-seed choice ---
@@ -2050,7 +2050,7 @@ def test_a_tabs_cancel_stops_its_run_and_hands_the_folder_back(qtbot, tmp_path):
 
 
 def test_cancel_works_on_a_run_launched_from_a_clicked_image(qtbot, tmp_path):
-    # The path the user actually takes: click an image in the browser, Generate,
+    # The path the user actually takes: click an image in the Gallery pane, Generate,
     # then Cancel. The tab is the one the click loaded, not one prefilled by hand.
     db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
     view = GalleryView(db, client=_reroll_client())

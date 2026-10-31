@@ -6,10 +6,10 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator.gui.browser_pane import BrowserScrollArea
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.drop_target import DropTarget
+from origenerator.gui.gallery_pane import GalleryPaneScrollArea
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.drop_style_seen import worn
@@ -20,7 +20,7 @@ def _pane(qtbot, landing=lambda _mime, _source: ("taken",)):
     A drag a test leaves held over it is let go of before the pane closes:
     Qt sends every later drag event to the last widget that took one, even
     once that widget is gone."""
-    pane = BrowserScrollArea()
+    pane = GalleryPaneScrollArea()
     pane.setWidgetResizable(True)
     pane.setWidget(QWidget())
     pane.setStyleSheet(build_stylesheet())

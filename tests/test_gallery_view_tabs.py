@@ -341,7 +341,7 @@ def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
     view._on_thumbnail_clicked("p1")
     assert view._info_tabs._preview_panel is view._info_tabs.current_config_panel()
 
-    view._browser._thumbnail_double_clicked("p1")
+    view._gallery_pane._thumbnail_double_clicked("p1")
 
     panel = view._info_tabs.current_config_panel()
     assert panel.displayed_row()["prompt_id"] == "p1"
@@ -378,7 +378,7 @@ def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
     view = GalleryView(db)
     qtbot.addWidget(view)
 
-    view._browser._thumbnail_double_clicked("p1")
+    view._gallery_pane._thumbnail_double_clicked("p1")
     view._on_thumbnail_clicked("p2")
 
     assert view._info_tabs.count() == 2
@@ -397,7 +397,7 @@ def test_double_clicking_an_unregistered_thumbnail_still_pins_its_tab(qtbot, tmp
     view = GalleryView(db)
     qtbot.addWidget(view)
 
-    view._browser._thumbnail_double_clicked("unreg")
+    view._gallery_pane._thumbnail_double_clicked("unreg")
 
     assert view._info_tabs._preview_panel is None
 

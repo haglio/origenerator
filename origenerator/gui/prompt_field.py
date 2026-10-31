@@ -3,7 +3,7 @@
 A prompt here runs to hundreds of words through a field a hundred pixels tall, so
 most of what you wrote has scrolled away while you are still writing it. The
 lower edge of the field is a drag handle: grab it and it grows, the way a
-browser's textarea does.
+web browser's textarea does.
 
 The height belongs to the *param*, app-wide — every Positive Prompt is as tall
 as the last one you dragged, in every tab and every workflow, and it comes back

@@ -633,7 +633,7 @@ A change a Fun Time session could show differently gets its hosted half judged
 too. A session draws this same window at its own smaller scale, reaches it with
 its own keys and spoken commands, and runs code only a hosted window runs, so a
 change to a size, to a key or a command, or to hosted-only code owes a Fun Time
-launcher beside the standalone one: bigger toolbar marks handed over in a
+launcher beside the standalone one: bigger Gallery pane button icons handed over in a
 standalone preview alone were sent back for exactly that. A change that looks
 and works the same at any size and in either host, such as taking the dim off a
 image under the not-yet-generated line, goes out with the standalone preview

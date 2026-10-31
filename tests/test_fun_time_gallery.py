@@ -95,8 +95,8 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     switch for either would be a switch over something this window does not
     hold."""
     view = _fun_time_view(qtbot)
-    assert view._bank.radio is None
-    assert view._bank.mic is None
+    assert view._buttons.radio is None
+    assert view._buttons.mic is None
     view.set_radio_enabled(True)   # a stale standalone session key must not crash
     assert view.radio_enabled() is False
 
@@ -132,9 +132,9 @@ def test_fun_time_gallery_carries_the_standalone_osr2_state_through(qtbot):
     assert view.osr2_state() == OSR2_RETRACTED
 
 
-def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):
+def test_fun_time_gallery_stacks_the_generate_tabs_over_the_gallery_pane(qtbot):
     # The RFB rect is an upright column, so the side-by-side panes fold into one
-    # vertical stack: generate tabs on top, the tree-and-browser row under them,
+    # vertical stack: generate tabs on top, the tree-and-Gallery-pane row under them,
     # the queue across the foot.
     view = _fun_time_view(qtbot)
     stack = view._arrangement.stack
@@ -143,7 +143,7 @@ def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):
     assert stack.count() == 3
     # Top floor: the info-pane wrapper (tabs + the find bar).
     assert stack.widget(0).findChild(type(view._info_tabs)) is view._info_tabs
-    # Middle floor: the tree beside the browser.
+    # Middle floor: the tree beside the Gallery pane.
     assert stack.widget(1) is view._arrangement.panes
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
@@ -203,7 +203,7 @@ def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
     # The second pane is the info-pane wrapper (tabs + the find bar).
     assert view._arrangement.panes.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
-    assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
+    assert view._arrangement.folder_panes.count() == 2  # the tree, then the Gallery pane
 
 
 def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
@@ -214,7 +214,7 @@ def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
 
     assert view._arrangement.stack is None, "the headset got the upright fold"
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
-    assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
+    assert view._arrangement.folder_panes.count() == 2  # the tree, then the Gallery pane
 
 
 def _row_of(item) -> dict:
@@ -716,14 +716,14 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
 
 def test_a_hosted_slideshow_keeps_up_with_its_own_folder(qtbot, tmp_path, monkeypatch):
     """A slideshow plays on a satellite region while Core goes on being
-    used, so by the time an auto-generated item lands the browser is usually
+    used, so by the time an auto-generated item lands the Gallery pane is usually
     elsewhere — and both regions may be playing different folders.  Each slideshow
     is fed from the location IT opened at, not from the view on screen."""
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     portrait = view.region_slideshow("portrait")
     qtbot.addWidget(portrait.shown)
-    # The slideshow opened from a folder; the browser has since moved off it.
+    # The slideshow opened from a folder; the Gallery pane has since moved off it.
     view._slideshows._live_slideshows = [(portrait, "folder-a")]
     landed = {"prompt_id": "new-1"}
     monkeypatch.setattr(view._slideshows, "rows_at",
@@ -765,13 +765,13 @@ def test_a_landing_reaches_only_the_slideshow_playing_its_folder(qtbot, tmp_path
 def test_a_spoken_side_and_collection_plays_it_on_that_region(qtbot, tmp_path, monkeypatch):
     """"landscape latest": that collection's landscape items, on the landscape
     region — a slideshow STARTED by voice, with nothing up beforehand and the
-    browser left wherever it was.  Latest plays newest-first, and its HUD says
+    Gallery pane left wherever it was.  Latest plays newest-first, and its HUD says
     so, exactly as the collection's own slideshow button opens it."""
     view = _fun_time_view(qtbot)
     still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(still)
     rows = [{"prompt_id": "new-1", "thumbnail_path": str(still)}]
-    monkeypatch.setattr(view._browser, "rows_for_collection",
+    monkeypatch.setattr(view._gallery_pane, "rows_for_collection",
                         lambda key: rows if key == "__recents__::landscape" else [])
     monkeypatch.setattr(view._slideshows, "items_of",
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))
@@ -976,7 +976,7 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     # The item held, not a sibling of it: every seed of one set of settings shares a
     # settings folder, so a tab picked by folder came up on the wrong image.
     assert opened == ["id-tall-0"]
-    assert navigated == ["id-tall-0"]  # and the browser went there too
+    assert navigated == ["id-tall-0"]  # and the Gallery pane went there too
 
     slideshow.slideshow_toggle_lock()  # release: no second tab
     assert len(opened) == 1
@@ -1414,7 +1414,7 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     view.become_hosted(_session())
 
     built = _fun_time_view(qtbot)
-    assert (view._bank.radio, view._bank.mic) == (None, None)
+    assert (view._buttons.radio, view._buttons.mic) == (None, None)
     assert (view._osr2_motion, view._osr2_driver, view._motion_panel) == (None, None, None)
     assert not view.osr2_control.isEnabled()
     assert not built.osr2_control.isEnabled()
@@ -1542,7 +1542,7 @@ def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_ag
     view.become_standalone()
     view._voice.on_command(AppCommand.RADIO_ON)
 
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
     assert radio.starts == 1
 
 
@@ -1580,9 +1580,9 @@ def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qt
     radio, motion = _FakeRadio(), _SignalMotion()
     view = GalleryView(FakeDB([]), radio=radio, osr2_motion=motion)
     qtbot.addWidget(view)
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
     view.osr2_control.setChecked(True)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     listener = view._voice.listener
     assert motion.active
     assert listener.commands_on
@@ -1837,7 +1837,7 @@ def _hud_label_for(view):
 
 
 def test_the_slideshows_hud_names_the_item_the_way_this_app_does(qtbot):
-    """By the name its tile in the browser and its tab both wear, never the
+    """By the name its tile in the Gallery pane and its tab both wear, never the
     disk's "image / ComfyUI_00123_", a media type and a counter that appear
     nowhere in this UI."""
     row = _image("p1", "a cat", 50, 1)

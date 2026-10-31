@@ -99,7 +99,7 @@ def test_the_slideshow_begins_on_whichever_item_is_picked_in_the_folder(qtbot, m
     _open_leaf(view)
 
     for picked in view.listed_prompt_ids():
-        view._browser.apply_selection(picked, _NO_MOD)
+        view._gallery_pane.apply_selection(picked, _NO_MOD)
         view._slideshows.start()
         slideshow = view._slideshows.showing
         qtbot.addWidget(slideshow.shown)
@@ -114,15 +114,15 @@ def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_beg
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
     minimized = view._slideshows.showing
     qtbot.addWidget(minimized.shown)
     minimized.shown.showMinimized()
     picked = next(pid for pid in view.listed_prompt_ids()
                   if pid != minimized._set.playlist.current().prompt_id)
-    view._browser.apply_selection(picked, _NO_MOD)
+    view._gallery_pane.apply_selection(picked, _NO_MOD)
 
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
     assert view._slideshows.showing._set.playlist.current().prompt_id == picked
     view._slideshows.showing.close()
@@ -141,8 +141,8 @@ def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_cl
     closed_on = last._set.playlist.current().prompt_id
     last.close()
     elsewhere = [pid for pid in view.listed_prompt_ids() if pid != closed_on]
-    view._browser.apply_selection(elsewhere[0], _NO_MOD)
-    view._browser.apply_selection(elsewhere[1], _CTRL)
+    view._gallery_pane.apply_selection(elsewhere[0], _NO_MOD)
+    view._gallery_pane.apply_selection(elsewhere[1], _CTRL)
 
     view._slideshows.start()
 
@@ -239,7 +239,7 @@ def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_
     slideshow.shown.showMinimized()   # from the taskbar, which still minimizes any window
     assert slideshow.shown.isMinimized()
 
-    gestures.click(view._bank.slideshow, view._bank.slideshow.rect().center())
+    gestures.click(view._buttons.slideshow, view._buttons.slideshow.rect().center())
 
     assert view._slideshows.showing is slideshow
     assert not slideshow.shown.isMinimized()
@@ -322,7 +322,7 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    assert view._bank.slideshow.isHidden()
+    assert view._buttons.slideshow.isHidden()
 
 
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
@@ -333,20 +333,20 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._bank.slideshow.isHidden()          # a folder with media offers it
-    assert "this folder" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()          # a folder with media offers it
+    assert "this folder" in view._buttons.slideshow.toolTip()
 
     # The collections hold media too, so each plays as a folder does...
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
-    assert not view._bank.slideshow.isHidden()
-    assert "Latest" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()
+    assert "Latest" in view._buttons.slideshow.toolTip()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
-    assert not view._bank.slideshow.isHidden()
-    assert "Favorites" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()
+    assert "Favorites" in view._buttons.slideshow.toolTip()
 
     # ...while a collection holding nothing at all doesn't offer one.
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert view._bank.slideshow.isHidden()
+    assert view._buttons.slideshow.isHidden()
 
 
 def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_favorites(qtbot,
@@ -411,7 +411,7 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     closed_on = last._set.playlist.current().prompt_id
     last.close()
     picked = next(pid for pid in view.listed_prompt_ids() if pid != closed_on)
-    view._browser.apply_selection(picked, _NO_MOD)
+    view._gallery_pane.apply_selection(picked, _NO_MOD)
 
     view._slideshows.start()
 
@@ -457,7 +457,7 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     view.refresh()
     _open_latest(view)
     newest, older = view.listed_prompt_ids()
-    view._browser.apply_selection(older, _NO_MOD)
+    view._gallery_pane.apply_selection(older, _NO_MOD)
 
     view._slideshows.start()
 
@@ -619,7 +619,7 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
     assert "needs a slideshow" in words(view._voice.status)
-    assert not view._bank.slideshow.isHidden()   # everything is still there to play
+    assert not view._buttons.slideshow.isHidden()   # everything is still there to play
 
 
 def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
@@ -650,8 +650,8 @@ def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert not view._bank.slideshow.isHidden()
-    assert "Experiments" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()
+    assert "Experiments" in view._buttons.slideshow.toolTip()
 
     view._slideshows.start()
 
@@ -711,7 +711,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
 
     assert view._slideshows.showing is None               # out of the slideshow...
     assert view._tree.currentItem() is _collection(view, LATEST_KEY)  # ...still in the collection
-    assert view._browser.selected_ids == {shown}     # with that image picked
+    assert view._gallery_pane.selected_ids == {shown}     # with that image picked
     # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
@@ -736,7 +736,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
 
     assert view._slideshows.showing is None
     assert held in view.listed_prompt_ids()       # its own folder in the pane...
-    assert view._browser.selected_ids == {held}    # ...with it picked...
+    assert view._gallery_pane.selected_ids == {held}    # ...with it picked...
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
 
 
@@ -758,7 +758,7 @@ def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played
     slideshow.close()
 
     assert view._tree.currentItem() is _alls(view._tree)["Latest"]
-    assert view._browser.selected_ids == {shown}
+    assert view._gallery_pane.selected_ids == {shown}
 
 
 def _laid_out_folder(qtbot, count=60):
@@ -792,7 +792,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
     slideshow.close()
     qtbot.wait(1)
 
-    assert view._browser.selected_ids == {shown}
+    assert view._gallery_pane.selected_ids == {shown}
     assert _in_view(view, shown)
 
 
@@ -829,7 +829,7 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
     slideshow.close()
 
     assert view._tree.currentItem() is all_row
-    assert view._browser.selected_ids == set()
+    assert view._gallery_pane.selected_ids == set()
     picked = [tile.key for tile in _folder_squares(view) if tile._selected]
     assert picked == [_folder_square_holding(view, shown)]
 
@@ -878,14 +878,14 @@ def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_li
     view.refresh()
     qtbot.wait(1)
 
-    assert view._browser._thumb_widgets[far]._selected
+    assert view._gallery_pane._thumb_widgets[far]._selected
     assert _in_view(view, far)
 
 
 def test_a_picked_image_holds_its_place_as_new_ones_land_above_it(qtbot):
     view, db = _laid_out_folder(qtbot)
     far = view.listed_prompt_ids()[-3]
-    view._browser.reveal_tile(far)
+    view._gallery_pane.reveal_tile(far)
     qtbot.wait(1)
     assert _in_view(view, far)
 
@@ -918,13 +918,13 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     qtbot.wait(1)
     far = view.listed_prompt_ids()[-3]
-    view._browser.reveal_tile(far)
+    view._gallery_pane.reveal_tile(far)
     qtbot.wait(1)
 
     view.set_items_favorite([view.listed_prompt_ids()[0]], False)
     qtbot.wait(1)
 
-    assert view._browser._thumb_widgets[far]._selected
+    assert view._gallery_pane._thumb_widgets[far]._selected
     assert _in_view(view, far)
 
 
@@ -1005,7 +1005,7 @@ def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
     _keys_are_the_gallerys(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id[image])
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
@@ -1041,12 +1041,12 @@ def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
 
 def _left_by_enter_then_the_slideshow_button(view, slideshow):
     _press_enter(slideshow)
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
 
 def _minimized_then_the_slideshow_button(view, slideshow):
     slideshow.shown.showMinimized()
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
 
 _LEFT_AND_COME_BACK_TO = pytest.mark.parametrize(
@@ -1098,7 +1098,7 @@ def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_l
 
     _press_enter(slideshow)
     view._tree.setCurrentItem(view._leaf_by_id["q1"])
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
     reopened = view._slideshows.showing
     qtbot.addWidget(reopened.shown)
@@ -1119,7 +1119,7 @@ def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on
     _press_enter(slideshow)
 
     assert view.selected_folder_key() == folder_of_the_video
-    assert view._browser.selected_ids == {"v1"}
+    assert view._gallery_pane.selected_ids == {"v1"}
 
 
 def test_giving_the_slideshows_back_as_the_window_closes_moves_the_gallery_nowhere(
@@ -1462,7 +1462,7 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
     slideshow = _double_click_slideshow(view, qtbot, media=None)
 
     assert [item[2] for item in slideshow._set.playlist._items] == \
-        view._browser.listed_prompt_ids()
+        view._gallery_pane.listed_prompt_ids()
     assert slideshow._set.playlist.index == 0
     slideshow.close()
 

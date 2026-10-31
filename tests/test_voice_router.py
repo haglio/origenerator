@@ -1,9 +1,9 @@
 """What is spoken, driven with no gallery around it.
 
 Every path an utterance takes used to be reachable only by building a 7,000-line
-widget: the caption's one promise and what takes it down, the bank button a word
+widget: the caption's one promise and what takes it down, the Gallery pane buttons button a word
 presses and what it answers with, the collection a name stands you in, the bar a
-number puts where it says, and a request said over three breaths. Here the bank
+number puts where it says, and a request said over three breaths. Here the Gallery pane buttons
 is a handful of recorders and the host a handful of recorded calls.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
@@ -295,14 +295,14 @@ def starting(qtbot):
 @pytest.fixture
 def router(qtbot, monkeypatch, starting):
     """A router under a parent this fixture keeps alive: a QObject whose parent is
-    collected takes its timers down with it. Its listener, bank and motion are
+    collected takes its timers down with it. Its listener, buttons and motion are
     all recorders."""
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
     monkeypatch.setattr(module, "QThreadPool", FakePool())
     built = []
 
     def build(host=None, *, slideshows=None, db=None, client=_A_CLIENT, motion=None,
-              bank=None, mic_on=True):
+              buttons=None, mic_on=True):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
@@ -310,8 +310,8 @@ def router(qtbot, monkeypatch, starting):
         router = VoiceRouter(host, parent=parent, db=db or FakeDB(), slideshows=slideshows,
                              client=client, motion=motion, starting=starting)
         built.append((parent, router))
-        buttons = dict(bank or {})
-        router.bind_the_bank(
+        buttons = dict(buttons or {})
+        router.bind_the_buttons(
             auto=buttons.get("auto", FakeButton(tip="Auto-generate")),
             radio=buttons.get("radio", FakeButton(tip="Origenerator Radio")),
             drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
@@ -350,7 +350,7 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
     voice.sync()
 
     assert voice.listener.commands_on is False
-    voice.bind_the_bank(auto=None, radio=None, drive=None,
+    voice.bind_the_buttons(auto=None, radio=None, drive=None,
                         mic=FakeButton(checked=True), enhance=None, actions={})
     voice.sync()
     assert voice.listener.commands_on is True
@@ -469,10 +469,10 @@ def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(router):
-    # A spoken switch is the same event as a clicked one, so the bank lights the
+    # A spoken switch is the same event as a clicked one, so the Gallery pane buttons lights the
     # same way and nothing has to be kept in step.
     radio = FakeButton(tip="Origenerator Radio")
-    voice, _host, slideshows = router(bank={"radio": radio})
+    voice, _host, slideshows = router(buttons={"radio": radio})
 
     voice.on_command(AppCommand.RADIO_ON)
 
@@ -481,7 +481,7 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(router):
 
 
 def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
-    voice, _host, slideshows = router(bank={"radio": None})
+    voice, _host, slideshows = router(buttons={"radio": None})
 
     voice.on_command(AppCommand.RADIO)
 
@@ -491,7 +491,7 @@ def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
 
 def test_a_switch_that_cannot_be_flipped_here_says_so(router):
     voice, _host, slideshows = router(
-        bank={"drive": FakeButton(tip="Drive", enabled=False)})
+        buttons={"drive": FakeButton(tip="Drive", enabled=False)})
 
     voice.on_command(AppCommand.DRIVE_ON)
 
@@ -536,7 +536,7 @@ def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
 def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again(router):
     motion = FakeMotion()
     radio = FakeButton(tip="Origenerator Radio")
-    voice, _host, _slideshows = router(motion=motion, bank={"radio": radio})
+    voice, _host, _slideshows = router(motion=motion, buttons={"radio": radio})
     voice.become_hosted()
 
     voice.become_standalone(motion, radio=radio, drive=FakeButton(), mic=FakeButton(checked=True))
@@ -549,11 +549,11 @@ def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again
 
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
     # Its tip already says what it will do to what is in front of you, which is
-    # what a speaker who is not looking at the bank needs told back.
+    # what a speaker who is not looking at the Gallery pane buttons needs told back.
     pressed = []
     undo = FakeButton(tip="Undo: delete of 2 items")
     voice, _host, slideshows = router(
-        bank={"actions": {AppCommand.UNDO: (undo, lambda: pressed.append(1))}})
+        buttons={"actions": {AppCommand.UNDO: (undo, lambda: pressed.append(1))}})
 
     voice.on_command(AppCommand.UNDO)
 
@@ -564,7 +564,7 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
 
 def test_a_bank_word_whose_button_is_dead_says_why(router):
     voice, _host, slideshows = router(
-        bank={"actions": {AppCommand.GROUP: (FakeButton(tip="Group", enabled=False),
+        buttons={"actions": {AppCommand.GROUP: (FakeButton(tip="Group", enabled=False),
                                              lambda: None)}})
 
     voice.on_command(AppCommand.GROUP)
@@ -603,7 +603,7 @@ def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
     pressed = []
     voice, _host, slideshows = router(
         slideshows=FakeSlideshows(showing=FakeSlideshow()),
-        bank={"actions": {AppCommand.UNDO: (FakeButton(tip="Undo"),
+        buttons={"actions": {AppCommand.UNDO: (FakeButton(tip="Undo"),
                                             lambda: pressed.append(1))}})
 
     voice.on_command(AppCommand.UNDO)
@@ -667,7 +667,7 @@ def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(rout
     # to do.
     pressed = []
     voice, host, slideshows = router(
-        bank={"enhance": (FakeButton(tip="Enhance 2 images"),
+        buttons={"enhance": (FakeButton(tip="Enhance 2 images"),
                           lambda: pressed.append(1))})
 
     voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND, None))

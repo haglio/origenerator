@@ -11,7 +11,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.content import load_content
 from origenerator.db_connection import SqliteFile
-from origenerator.db_deletions import DeletionStore
+from origenerator.db_trash import TrashStore
 from origenerator.output_places import OutputPlaces
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -137,7 +137,7 @@ OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=C
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, places=OUTPUT_PLACES, temp=COMFYUI_TEMP_DIR,
-                               trashed=DeletionStore(SqliteFile(DB_PATH)).trashed_file)
+                               trashed=TrashStore(SqliteFile(DB_PATH)).trashed_file)
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
 # the "Prompt executed in N seconds" lines feed duration backfill.
 COMFYUI_LOG_DIR = COMFYUI_DIR / "user"

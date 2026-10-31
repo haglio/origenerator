@@ -1,4 +1,4 @@
-"""The recovery bin — deleted generations held until you say otherwise.
+"""The Trash — deleted generations held until you say otherwise.
 
 Deleting a generation moves its files into the trash and drops its row (see
 :class:`~origenerator.gallery_actions.GalleryActions`), which the session's undo
@@ -8,10 +8,10 @@ batch its files went into. The gallery's Trash
 collection lists those records, puts one back, or ends one for good — and ending one
 by hand is the only thing that ends one. :func:`reclaim_orphans` is all that is
 left for launch to do: clear the batch folders no record names, and leave
-everything the bin holds exactly where it is.
+everything the Trash holds exactly where it is.
 
 A record is the whole story of one delete — ``{"prompt_id", "row", "batch",
-"deleted_at"}``, as :meth:`origenerator.db.Database.list_deletions` returns it —
+"deleted_at"}``, as :meth:`origenerator.db.Database.list_trashed` returns it —
 so nothing about a deleted item has to be reconstructed from the disk. This
 module is pure data over the database and the trash, with no Qt dependency, so
 what the collection shows can be unit-tested directly.
@@ -31,7 +31,7 @@ _SECONDS_PER_DAY = 86400
 
 
 def _now() -> datetime:
-    """Now in the frame sqlite stamps a deletion in: UTC, without a timezone."""
+    """Now in the frame sqlite stamps a trashed item in: UTC, without a timezone."""
     return datetime.now(UTC).replace(tzinfo=None)
 
 
@@ -47,7 +47,7 @@ def _deleted_at(record: dict) -> datetime | None:
 def days_held(record: dict, now: datetime | None = None) -> int:
     """Whole days ``record`` has been sitting in the trash, rounded down.
 
-    Read as "how long ago did I bin this", which is why it rounds down: an item
+    Read as "how long ago did I trash this", which is why it rounds down: an item
     deleted an hour ago has been there no days rather than a whole one. It is a
     fact about the item, not a countdown — nothing acts on it, and a record
     whose stamp won't parse simply reads as freshly deleted.
@@ -59,8 +59,8 @@ def days_held(record: dict, now: datetime | None = None) -> int:
     return max(0, int(elapsed // _SECONDS_PER_DAY))
 
 
-def bin_items(records, now: datetime | None = None) -> list[dict]:
-    """The held deletions as gallery rows the Trash collection can draw, newest first.
+def trash_items(records, now: datetime | None = None) -> list[dict]:
+    """The trashed items as gallery rows the Trash collection can draw, newest first.
 
     Each is the row exactly as it was deleted — so its media type, its star and
     its caption read the way they did in the gallery — with its files re-pointed
@@ -68,7 +68,7 @@ def bin_items(records, now: datetime | None = None) -> list[dict]:
     how long it has been there.
 
     Re-pointing the *output* files, not only the thumbnail, is what makes a
-    deleted item as watchable as any other. A bin row is fed to the same preview,
+    deleted item as watchable as any other. A Trash row is fed to the same preview,
     slideshow and fullscreen machinery every live row goes through, and all of
     that resolves files through
     :func:`~origenerator.gallery.output.output_file_path` — which follows the
@@ -77,10 +77,10 @@ def bin_items(records, now: datetime | None = None) -> list[dict]:
     no video to play, nothing to open full size.
     """
     now = now or _now()
-    return [_bin_item(record, now) for record in records]
+    return [_trash_item(record, now) for record in records]
 
 
-def _bin_item(record: dict, now: datetime) -> dict:
+def _trash_item(record: dict, now: datetime) -> dict:
     row = dict(record.get("row") or {})
     row["prompt_id"] = record["prompt_id"]
     thumbnail = row.get("thumbnail_path")
@@ -118,38 +118,38 @@ def _trashed_path(record: dict, original: str) -> str:
 
 
 def restore(db, record: dict) -> str:
-    """Put one held deletion back: its files return to the paths they were taken
+    """Put one trashed item back: its files return to the paths they were taken
     from, or beside them under a new number where that name is taken, and its
     row rejoins the gallery naming them. Returns the restored prompt_id, so a
     caller can navigate to what it brought back."""
     renamed = TrashedBatch.from_record(record.get("batch") or {}).restore()
     db.restore_generation(with_files_renamed(record["row"], renamed))
-    db.forget_deletion(record["prompt_id"])
+    db.forget_trashed(record["prompt_id"])
     return record["prompt_id"]
 
 
 def purge(db, record: dict) -> None:
-    """End one held deletion now: its files are removed and the bin forgets it.
+    """End one trashed item now: its files are removed and the Trash forgets it.
 
     Irreversible, and there is nothing left to undo it with — the row went when
     the item was deleted, and this takes the only copies of its files.
     """
     TrashedBatch.from_record(record.get("batch") or {}).purge()
-    db.forget_deletion(record["prompt_id"])
+    db.forget_trashed(record["prompt_id"])
     leave_out_for_good(db, record["row"])
 
 
 def reclaim_orphans(db, trash) -> int:
     """Clear the trash folders nothing can reach, and say how many went.
 
-    Launch's one piece of housekeeping, and it never takes anything the bin is
+    Launch's one piece of housekeeping, and it never takes anything the Trash is
     holding: every held record's batch folder is named as one to spare, so what
     is removed is only what no record points at — a rejected experiment's batch
-    that fell off the undo stack, a batch from before the bin existed, or a
+    that fell off the undo stack, a batch from before the Trash existed, or a
     folder left by a crash between the move and the record. Nothing here
-    reads a clock. A held deletion stays until the user restores it or ends it
+    reads a clock. A trashed item stays until the user restores it or ends it
     from the Trash collection, however long that takes.
     """
     return trash.purge_orphans([
-        (record.get("batch") or {}).get("subdir") for record in db.list_deletions()
+        (record.get("batch") or {}).get("subdir") for record in db.list_trashed()
     ])

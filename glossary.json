@@ -789,7 +789,8 @@
       "status": "ruled",
       "ruled": "2026-10-30, his words on the glossary's list",
       "retired": [
-        "bookmark"
+        "bookmark",
+        "bookmarked"
       ],
       "keep": [
         "Restoring folder bookmarks",
@@ -808,13 +809,17 @@
       ],
       "his_word": "trash; delete",
       "code_today": [
-        "trash",
-        "recovery bin",
-        "deletion"
+        "trash"
       ],
       "code_word": "trash",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list",
+      "retired": [
+        "recovery bin",
+        "recovery",
+        "bin",
+        "deletion store"
+      ]
     },
     {
       "id": "collection",

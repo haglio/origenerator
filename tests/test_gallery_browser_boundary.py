@@ -149,7 +149,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     whole gallery and is told in place, as an item's always was, so re-counting
     the Favorites collection and drawing it again where it is open is one method both
     of them ask. And the pane 75 -> 77: it marks a folder's square in place, and
-    reads the bookmarked folders off each side's folders when it needs them
+    reads the favorited folders off each side's folders when it needs them
     rather than keeping a list a star would leave stale. 267 -> 268: a Fun Time
     session names the video its Genau has locked on by the video's file, and
     landing on the generation that file copies is `go_to_file` -- the gallery's

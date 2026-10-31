@@ -2006,7 +2006,7 @@ def test_flux_t2i_upscaled_extract_output_info():
 def test_every_enhance_capable_workflow_keeps_its_base_render():
     # A workflow whose tail re-samples its own render must save that render too,
     # or the row lands with one file and no "before" — enhanced pixels with
-    # nothing to compare them against, and the only recovery a full re-render at
+    # nothing to compare them against, and the only trash_collection a full re-render at
     # the recorded seed. 147 rows in this library needed exactly that repair.
     # Asserted across the registry so a new enhance-capable workflow inherits the
     # rule rather than a later reader having to know it.

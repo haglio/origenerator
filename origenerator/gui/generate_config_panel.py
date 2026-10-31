@@ -237,7 +237,7 @@ class GenerateConfigPanel(DropZone):
     how_many_chosen = pyqtSignal(int)
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
-    levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
+    levels_delete_requested = pyqtSignal(str, list)  # trash these versions of this image (prompt_id, filenames)
     train_requested = pyqtSignal(str)        # a LoRA row's Train was pressed (the row's key)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
@@ -387,7 +387,7 @@ class GenerateConfigPanel(DropZone):
         newest matching result otherwise."""
         self._preview = PreviewWidget(show_timeline=True)
         # Its corners and its right-click go to the gallery, which owns the
-        # favorite, the bin and the enhance queue — the same route the browser
+        # favorite, the Trash and the enhance queue — the same route the browser
         # pane's thumbnails take, so an act means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)
@@ -1915,7 +1915,7 @@ class GenerateConfigPanel(DropZone):
         version — so the list leads with that level and offers the rest below
         it, under the ``+ Enhance`` row. A video has no row to press — the
         enhancer takes images — and lists versions only once Evolver has
-        upscaled it, none of them binned from here.
+        upscaled it, none of them trashed from here.
         """
         row = self._displayed_row
         if row is None:

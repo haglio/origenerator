@@ -366,7 +366,7 @@ def test_a_star_on_images_stays_on_the_folder_the_images_are_in(tmp_path):
     assert db.folder_meta_map()["image"]["starred"] is True
 
 
-def test_reconcile_merges_when_the_target_folder_is_already_bookmarked(tmp_path):
+def test_reconcile_merges_when_the_target_folder_is_already_favorited(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -605,7 +605,7 @@ def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path,
 
 
 def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
-    """Nothing bookmarked is the common case on a fresh install, and building
+    """Nothing favorited is the common case on a fresh install, and building
     the tree to discover that would read every row for nothing."""
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a harbor"}, filename="a.png")

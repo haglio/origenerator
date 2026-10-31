@@ -4,16 +4,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import cached_property
 
-from origenerator import gallery, recovery
+from origenerator import gallery, trash_collection
 from origenerator.media import MediaType
 
 
 class LibrarySnapshot:
     """The library as it stood at one moment, and what is read off all of it."""
 
-    def __init__(self, rows: list[dict], deletions: Callable[[], list[dict]] = list):
+    def __init__(self, rows: list[dict], trashed: Callable[[], list[dict]] = list):
         self.rows = rows
-        self._deletions = deletions
+        self._trashed = trashed
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
 
     @cached_property
@@ -26,7 +26,7 @@ class LibrarySnapshot:
 
     @cached_property
     def held_rows(self) -> list[dict]:
-        return recovery.bin_items(self._deletions())
+        return trash_collection.trash_items(self._trashed())
 
     @cached_property
     def image_config_index(self) -> dict:
@@ -60,5 +60,5 @@ class LibraryViews:
         if self._snapshot is None or version != self._version:
             self._version = version
             self._snapshot = LibrarySnapshot(self._db.list_generations(),
-                                             lambda: self._db.list_deletions())
+                                             lambda: self._db.list_trashed())
         return self._snapshot

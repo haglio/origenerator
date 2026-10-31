@@ -340,7 +340,7 @@ def _recover_generation_times(library: Library):
 
 def _record_workflow_versions(library: Library):
     """Stamp every row that has no provenance yet: the rows from before launches
-    were stamped, a row the bin gives back, and whatever this launch imported."""
+    were stamped, a row the Trash gives back, and whatever this launch imported."""
     from origenerator.provenance import stamp_unstamped
 
     return stamp_unstamped(library.db)
@@ -515,16 +515,16 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
 
 
 def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
-    """Reclaim any trash folder no held deletion names (see origenerator.recovery).
+    """Reclaim any trash folder no trashed item names (see origenerator.trash_collection).
 
-    Nothing the recovery bin is holding is touched: a deletion stays until the
+    Nothing the Trash is holding is touched: a trashed item stays until the
     user restores it or ends it from the Trash collection. This clears only what
     nothing can reach.
     """
-    from origenerator import recovery
+    from origenerator import trash_collection
     from origenerator.trash import Trash
     try:
-        reclaimed = recovery.reclaim_orphans(db, Trash(trash_dir))
+        reclaimed = trash_collection.reclaim_orphans(db, Trash(trash_dir))
         if reclaimed:
             logger.info("Trash: reclaimed %d unreachable batch folder(s)", reclaimed)
     except Exception as e:

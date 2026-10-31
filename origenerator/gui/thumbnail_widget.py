@@ -141,10 +141,10 @@ class ThumbnailWidget(QWidget):
             MediaBadge(media_type, self)
 
         # Star, trash and plus in the tile's other three corners: what the item is
-        # (bookmarked, enhanced) and what can be done to it, as one mark each, all
+        # (favorited, enhanced) and what can be done to it, as one mark each, all
         # of them up whenever there is an item under them. A Trash-collection tile
         # passes controls=False — its item is already deleted, so there is nothing
-        # here to favorite, bin or enhance, and its own restore/purge controls are
+        # here to favorite, trash or enhance, and its own restore/purge controls are
         # the two acts left.
         layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
         self._controls = CornerControls(self) if controls else None

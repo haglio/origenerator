@@ -155,7 +155,7 @@ def _corner_image(icon):
 
 def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
-    # the value its HUD paints), so one color means "bookmarked" in both apps —
+    # the value its HUD paints), so one color means "favorited" in both apps —
     # which leaves the enhanced image's plus this palette's yellow, since the
     # two can sit on one tile and blue is genau's across this family. Both marks
     # are solid at their center, so the middle pixel is the color.
@@ -376,8 +376,8 @@ def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
     white = QColor(255, 255, 255)
     for icon, name in ((icons.experiment_verdict_icon("up"), "check"),
                        (icons.experiment_verdict_icon("down"), "cross"),
-                       (icons.recovery_action_icon("restore"), "undo_arrow"),
-                       (icons.recovery_action_icon("purge"), "trash")):
+                       (icons.trash_action_icon("restore"), "undo_arrow"),
+                       (icons.trash_action_icon("purge"), "trash")):
         drawn = icon.pixmap(QSize(48, 48)).toImage()
         assert drawn == glyph_pixmap(name, 48, white).toImage(), name
 

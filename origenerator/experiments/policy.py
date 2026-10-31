@@ -312,7 +312,7 @@ class ExperimentPolicy:
 
     @staticmethod
     def _bucket(value, pd):
-        """The verdict-tally key for a value: numerics pool into coarse bins
+        """The verdict-tally key for a value: numerics pool into coarse ranges
         across their range (individual floats would never repeat), everything
         else tallies exactly."""
         if pd is not None and pd.type in (ParamType.INT, ParamType.FLOAT):

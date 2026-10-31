@@ -209,9 +209,9 @@ CREATE TABLE IF NOT EXISTS requests (
     asked            TEXT
 );
 
--- A deleted generation the recovery bin is still holding: the whole row the
+-- A deleted generation the Trash is still holding: the whole row the
 -- delete dropped, and where in the trash its files went, so the Trash collection can
--- list it, put both back, or end it for good (see origenerator.recovery). The
+-- list it, put both back, or end it for good (see origenerator.trash_collection). The
 -- record goes away when the item is restored or purged, and not otherwise --
 -- nothing ages out; the generations row itself is gone the moment it is deleted,
 -- which is why the row travels here rather than staying gated by a flag.
@@ -377,7 +377,7 @@ def migrate(conn) -> None:
             if column not in existing:
                 conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
-    # What each worktree's copied database had bookmarked, kept for adoption at
+    # What each worktree's copied database had favorited, kept for adoption at
     # the next live launch; a branch session runs on this database now.
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     give_old_seed_uses_their_kind(conn)

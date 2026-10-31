@@ -1,7 +1,7 @@
-"""The recovery bin: what a delete is still holding, until it is not.
+"""The Trash: what a delete is still holding, until it is not.
 
 One of the six tables `Database` used to hold all of. Its readers are
-`origenerator.recovery` and `origenerator.gallery_actions`, and neither has any
+`origenerator.trash_collection` and `origenerator.gallery_actions`, and neither has any
 business with `generations` or the custom folders.
 
 A deleted generation's whole row travels here, plus where in the trash its files
@@ -22,14 +22,14 @@ from origenerator.generation_state import GenerationSource, source_of
 from origenerator.trash import TrashedBatch
 
 
-class DeletionStore(Store):
+class TrashStore(Store):
     """The queries over the `deletions` table."""
 
-    def record_deletion(self, prompt_id: str, row: dict, batch: dict):
-        """Hold a just-deleted ``row`` and its trash ``batch`` for recovery.
+    def record_trashed(self, prompt_id: str, row: dict, batch: dict):
+        """Hold a just-deleted ``row`` and its trash ``batch`` for the Trash.
 
         Replaces any earlier record for the same generation, so an item deleted,
-        restored, and deleted again reads as binned on the date of the *latest*
+        restored, and deleted again reads as trashed on the date of the *latest*
         delete rather than the first one's.
         """
         with self._connect() as conn:
@@ -39,8 +39,8 @@ class DeletionStore(Store):
                 (prompt_id, json.dumps(row, default=str), json.dumps(batch)),
             )
 
-    def list_deletions(self) -> list[dict]:
-        """Every held deletion, newest first — what the Trash collection lists.
+    def list_trashed(self) -> list[dict]:
+        """Every trashed item, newest first — what the Trash collection lists.
 
         The stamp only has second resolution, so a batch deleted together ties;
         the rowid breaks it, and an ``INSERT OR REPLACE`` takes a fresh one, so
@@ -51,17 +51,17 @@ class DeletionStore(Store):
                 "SELECT prompt_id, row_json, batch_json, deleted_at FROM deletions"
                 " ORDER BY deleted_at DESC, rowid DESC"
             ).fetchall()
-            return [deletion for r in rows if _of_a_known_source(deletion := _deletion(r))]
+            return [trashed for r in rows if _of_a_known_source(trashed := _trashed_record(r))]
 
-    def get_deletion(self, prompt_id: str) -> dict | None:
+    def get_trashed(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
             record = conn.execute(
                 "SELECT prompt_id, row_json, batch_json, deleted_at FROM deletions"
                 " WHERE prompt_id = ?",
                 (prompt_id,),
             ).fetchone()
-            deletion = _deletion(record) if record else None
-            return deletion if deletion is not None and _of_a_known_source(deletion) else None
+            trashed = _trashed_record(record) if record else None
+            return trashed if trashed is not None and _of_a_known_source(trashed) else None
 
     def trashed_file(self, original: Path) -> Path | None:
         with self._connect() as conn:
@@ -70,24 +70,24 @@ class DeletionStore(Store):
         held = (TrashedBatch.from_record(json.loads(batch[0])).holding(original) for batch in batches)
         return next((file for file in held if file is not None and file.is_file()), None)
 
-    def binned_library_paths(self) -> set[str]:
+    def trashed_library_paths(self) -> set[str]:
         with self._connect() as conn:
             held = conn.execute("SELECT row_json FROM deletions"
                                 " WHERE row_json LIKE '%library_path%'").fetchall()
         return {path for record in held
                 for path in library_paths_in(json.loads(record[0]).get("output_files"))}
 
-    def forget_deletion(self, prompt_id: str):
-        """Drop a held deletion — the item was restored or purged."""
+    def forget_trashed(self, prompt_id: str):
+        """Drop a trashed item — the item was restored or purged."""
         with self._connect() as conn:
             conn.execute("DELETE FROM deletions WHERE prompt_id = ?", (prompt_id,))
 
 
-def _of_a_known_source(deletion: dict) -> bool:
-    return source_of(deletion["row"]) in GenerationSource
+def _of_a_known_source(trashed: dict) -> bool:
+    return source_of(trashed["row"]) in GenerationSource
 
 
-def _deletion(record) -> dict:
+def _trashed_record(record) -> dict:
     """One ``deletions`` row with its JSON columns parsed back into data."""
     return {
         "prompt_id": record["prompt_id"],

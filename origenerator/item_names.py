@@ -6,7 +6,7 @@ from collections import defaultdict
 from origenerator import gallery
 from origenerator.gallery.item_numbers import item_name, number_items
 from origenerator.gallery.tree import rows_with_a_folder
-from origenerator.recovery import bin_items
+from origenerator.trash_collection import trash_items
 
 
 class ItemNames:
@@ -20,7 +20,7 @@ class ItemNames:
     def from_library(cls, db) -> ItemNames:
         rows = db.list_generations()
         names = cls(db)
-        names.take(rows, bin_items(db.list_deletions()), gallery.start_frame_index(rows))
+        names.take(rows, trash_items(db.list_trashed()), gallery.start_frame_index(rows))
         return names
 
     def take(self, rows: list[dict], held_rows: list[dict], image_index: dict) -> None:

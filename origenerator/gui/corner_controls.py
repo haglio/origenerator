@@ -2,7 +2,7 @@
 
 A thumbnail in the browser pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
-favorite it (top right), bin it (lower left), enhance it (lower right). Learn
+favorite it (top right), trash it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
 Top-LEFT is not one of them: the media-type badge has always lived there, and a
 control that landed on it would be a control that moves depending on which collection
@@ -208,7 +208,7 @@ class CornerControls(QObject):
         Always, not on hover: a corner that comes and goes with the cursor is a
         corner you have to go looking for, and two of these are reporting state
         as well as offering an act — a wall of thumbnails has to say which of
-        them are bookmarked without being swept. The plus is the one that can be
+        them are favorited without being swept. The plus is the one that can be
         absent, and only where there is no such act at all: a video, which the
         enhancer cannot take.
         """

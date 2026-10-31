@@ -357,22 +357,22 @@ class FakeDB:
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
 
-    # --- the recovery bin (deletions held for the Trash collection) --------
+    # --- the Trash (deletions held for the Trash collection) --------
 
-    def record_deletion(self, prompt_id, row, batch):
+    def record_trashed(self, prompt_id, row, batch):
         self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
         self._deletions[prompt_id] = {
             "prompt_id": prompt_id, "row": row, "batch": batch,
             "deleted_at": "2026-08-15 03:00:00",
         }
 
-    def list_deletions(self):
+    def list_trashed(self):
         return list(reversed(self._deletions.values()))  # newest first
 
-    def get_deletion(self, prompt_id):
+    def get_trashed(self, prompt_id):
         return self._deletions.get(prompt_id)
 
-    def forget_deletion(self, prompt_id):
+    def forget_trashed(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
     # --- spoken requests, and the folder-wide one typed on a tab -----------
@@ -1127,7 +1127,7 @@ def _both_kinds_in_every_collection():
     experiment of each kind, and one of each deleted."""
     image, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
     image["starred"] = video["starred"] = 1
-    return _bin_db(rows=[image, video,
+    return _trash_db(rows=[image, video,
                          {**_image("ie", "a dog", 50, 2), "source": "experiment"},
                          {**_i2v_video("ve", "styleB"), "source": "experiment"}],
                    held=[("di", _image("di", "a bird", 50, 3)),
@@ -1264,7 +1264,7 @@ def _collection_row(folder, label):
 
 
 def test_a_folders_collection_row_counts_what_that_folder_holds(qtbot):
-    view = GalleryView(_bin_db(rows=[_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")],
+    view = GalleryView(_trash_db(rows=[_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")],
                                held=[("d1", _image("d1", "a cat", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1318,9 +1318,9 @@ def test_starring_another_sources_video_tells_fun_time_through_the_journal(qtbot
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
-    # A deleted row is out of the gallery's own list and lives only in the bin,
-    # so a Trash search finds nothing at all unless the bin is indexed too.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    # A deleted row is out of the gallery's own list and lives only in the Trash,
+    # so a Trash search finds nothing at all unless the Trash is indexed too.
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1332,9 +1332,9 @@ def test_the_trash_collection_searches_what_it_is_holding(qtbot):
 
 
 def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
-    # The bin shares the index so its collection can be searched; it must not leak
+    # The Trash shares the index so its collection can be searched; it must not leak
     # into a search of the gallery, where those items are gone.
-    view = GalleryView(_bin_db(rows=[_image("i1", "a dog", 50, 3)],
+    view = GalleryView(_trash_db(rows=[_image("i1", "a dog", 50, 3)],
                                held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2441,10 +2441,10 @@ def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypat
     assert "production app" not in view._browser._experiments_empty_hint()
 
 
-# --- the Trash collection: deleted items, still recoverable -----------------
+# --- the Trash collection: deleted items, still in the Trash -----------------
 
 
-def _bin_db(rows=(), held=(), inherited=()):
+def _trash_db(rows=(), held=(), inherited=()):
     """A gallery whose bin already holds ``held`` — ``(prompt_id, row)`` pairs,
     oldest first — the way a previous session's deletes would have left it.
 
@@ -2453,9 +2453,9 @@ def _bin_db(rows=(), held=(), inherited=()):
     """
     db = FakeDB(list(rows))
     for prompt_id, row in held:
-        db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+        db.record_trashed(prompt_id, row, {"moves": [], "subdir": None})
     for prompt_id, row in inherited:
-        db.record_deletion(prompt_id, row, {
+        db.record_trashed(prompt_id, row, {
             "moves": [[f"out/{prompt_id}.png", f"trash/{prompt_id}/0_{prompt_id}.png"]],
             "subdir": f"trash/{prompt_id}",
         })
@@ -2463,7 +2463,7 @@ def _bin_db(rows=(), held=(), inherited=()):
 
 
 def test_the_trash_collection_is_always_reachable(qtbot):
-    # A bin you can only find once you have something to recover is no use: the
+    # A Trash you can only find once you have something to recover is no use: the
     # point is knowing, before you delete, that deleting is not the end.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
@@ -2474,7 +2474,7 @@ def test_the_trash_collection_is_always_reachable(qtbot):
 
 
 def test_the_trash_collection_label_counts_what_it_holds(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2483,7 +2483,7 @@ def test_the_trash_collection_label_counts_what_it_holds(qtbot):
 
 
 def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
-    view = GalleryView(_bin_db(held=[("old", _image("old", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("old", _image("old", "a cat", 50, 1)),
                                      ("new", _image("new", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2493,7 +2493,7 @@ def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
 
 
 def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2523,7 +2523,7 @@ def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, t
 
 
 def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2537,7 +2537,7 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
     # Nothing counts down any more, so the caption has no deadline to carry and
     # says only what the item is.
     held = _image("d1", "a cat", 50, 1)
-    view = GalleryView(_bin_db(held=[("d1", held)]))
+    view = GalleryView(_trash_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2548,7 +2548,7 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
 
 def test_an_old_version_the_backfill_sent_to_the_trash_says_so_on_its_tile(qtbot):
     held = {**_image("d1", "a cat", 50, 1), "old_version_of": "the video it was made again as"}
-    view = GalleryView(_bin_db(held=[("d1", held)]))
+    view = GalleryView(_trash_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2558,7 +2558,7 @@ def test_an_old_version_the_backfill_sent_to_the_trash_says_so_on_its_tile(qtbot
 
 
 def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2578,7 +2578,7 @@ def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
 
 def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -2607,13 +2607,13 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     assert "SDXL T2I" in _workflow_rows(view._tree)      # back in the tree...
     assert view.listed_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
-    assert view._db.list_deletions() == []
+    assert view._db.list_trashed() == []
 
 
 def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     # The one gallery action with no undo and no second copy under it.
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -2656,7 +2656,7 @@ def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
     """The Trash collection open over the deletions given as ``(prompt_id, prompt)``,
     with the first of them picked."""
     view = GalleryView(
-        _bin_db(held=[(pid, _image(pid, prompt, 50, n))
+        _trash_db(held=[(pid, _image(pid, prompt, 50, n))
                       for n, (pid, prompt) in enumerate(held, start=1)]),
         actions=actions,
     )
@@ -2782,7 +2782,7 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
     # The picked items are already deleted, so the button's one remaining
     # meaning is "for good" — rather than a live-looking control doing nothing.
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -2798,7 +2798,7 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
 
 
 def test_the_delete_button_is_dark_on_an_unpicked_trash_collection(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2824,11 +2824,11 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view.listed_prompt_ids() == []
-    assert db.list_deletions() == []
+    assert db.list_trashed() == []
 
 
 def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
-    view = GalleryView(_bin_db([_image("i1", "a cat", 50, 1)],
+    view = GalleryView(_trash_db([_image("i1", "a cat", 50, 1)],
                                held=[("d1", _image("d1", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2840,11 +2840,11 @@ def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
     assert view._tree.currentItem() is _collection(view, TRASH_KEY)
 
 
-def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypatch):
+def test_a_preview_offers_every_trashed_item_like_the_live_app(qtbot, monkeypatch):
     # One library, one trash: what any instance deleted, any instance can put
     # back, so the collection holds the same items whichever app is looking at it.
     monkeypatch.setenv(ENV_FLAG, "1")
-    db = _bin_db(held=[("mine", _image("mine", "a dog", 50, 2))],
+    db = _trash_db(held=[("mine", _image("mine", "a dog", 50, 2))],
                  inherited=[("live", _image("live", "a cat", 50, 1))])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -2857,17 +2857,17 @@ def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypat
     view.restore_from_trash(["mine"])
 
     assert db.get_generation("mine") is not None
-    assert db.get_deletion("live") is not None  # still offered, untouched
+    assert db.get_trashed("live") is not None  # still offered, untouched
 
 
 # --- a deleted item is still a generation you can look at -------------------
 
 
 def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
-    # Its row left the gallery, but the bin kept it whole and its files are all
+    # Its row left the gallery, but the Trash kept it whole and its files are all
     # in the trash — so it fills a config tab with the settings that made it,
     # which is the whole point of being able to look before you decide.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
@@ -2882,7 +2882,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
 def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
     # The gesture a folder's tiles carry, since the one a collection's carry — jump to
     # its folder — is the single thing a deleted item hasn't got.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
@@ -2895,10 +2895,10 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
 
 
 def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
-    # Deciding what to keep out of a bin of sixty days' deletions is exactly what
+    # Deciding what to keep out of a Trash of sixty days' deletions is exactly what
     # a slideshow is for — one at a time, full size, rather than a grid of stamps.
     _resolve_by_id(monkeypatch)
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2916,7 +2916,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
     # Left/Right work here for the same reason they work in a folder: the collection's
     # items resolve to real files, so there is a set to step through.
     _resolve_by_id(monkeypatch)
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -8413,7 +8413,7 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
-    # The item, plus what the bookmarked folder's tile stands for.
+    # The item, plus what the favorited folder's tile stands for.
     assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"i1", "i2"}
     view._slideshows.showing.close()
 
@@ -8556,7 +8556,7 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
     assert picked == [_folder_square_holding(view, shown)]
 
 
-def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_came_from(
+def test_leaving_a_favorites_slideshow_picks_the_favorited_folder_its_slide_came_from(
         qtbot, monkeypatch):
     # A star on a folder puts the folder in the Favorites collection, not the images
     # inside it, so a slide that came out of one has no image of its own there.
@@ -8564,8 +8564,8 @@ def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_cam
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     _on_screen(qtbot, view, 1800, 1300)
     lora = _at(_image_workflow(view._tree), 0, 0)
-    bookmarked = _key(_at(lora, 0))
-    view._toggle_favorite(bookmarked)
+    favorited = _key(_at(lora, 0))
+    view._toggle_favorite(favorited)
     collection = _collection(view, FAVORITES_KEY)
     view._tree.setCurrentItem(collection)
     view._slideshows.start()
@@ -8578,7 +8578,7 @@ def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_cam
 
     assert view._tree.currentItem() is collection
     picked = [tile.key for tile in _folder_squares(view) if tile._selected]
-    assert picked == [bookmarked]
+    assert picked == [favorited]
 
 
 def _in_view(view, prompt_id) -> bool:
@@ -13259,7 +13259,7 @@ def _enhanced_in_place(db, pid="g0"):
     return db.get_generation(pid)
 
 
-def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp_path):
+def test_the_version_lists_delete_trashes_that_level_and_keeps_the_image(qtbot, tmp_path):
     # A level is a file, not a generation: the image keeps its row, its folder
     # and its other versions, and the delete lands on the same undo stack as
     # every other delete in the gallery.
@@ -13282,7 +13282,7 @@ def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp
     assert not view._bank.undo.isHidden()
 
 
-def test_pressing_a_versions_trash_can_bins_that_level_and_the_last_one_has_none(qtbot,
+def test_pressing_a_versions_trash_can_trashes_that_level_and_the_last_one_has_none(qtbot,
                                                                                 tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -13487,7 +13487,7 @@ def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot,
 
 def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
     # The lane decides which acts are answerable, and what could be answered when
-    # the session closed may not be now — a video binned, or the lane itself
+    # the session closed may not be now — a video trashed, or the lane itself
     # changed. A greyed act must not come back selected: the buttons would be
     # live on a pick that can only report "no past video yet".
     view = _combine_view(qtbot, tmp_path)
@@ -17647,7 +17647,7 @@ def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_
     monkeypatch.setattr(
         gallery, "animated_preview_if_made",
         lambda row, places, thumb_dir: asked.append((places, thumb_dir)))
-    view = GalleryView(_bin_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path / "output"),
+    view = GalleryView(_trash_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path / "output"),
                                                  thumb_dir=tmp_path / "thumbs"))
     qtbot.addWidget(view)
 

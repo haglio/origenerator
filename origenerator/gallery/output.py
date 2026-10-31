@@ -120,10 +120,10 @@ def output_file_path(file: dict, places: OutputPlaces) -> Path:
 
     Normally in the place its subfolder names, under the name it was filed
     under. A file with a place of its own carries it whole: a ``path`` where the
-    recovery bin re-pointed it into the trash, or where a starting frame is kept,
+    Trash re-pointed it into its folder, or where a starting frame is kept,
     and a ``library_path`` for another source's video, which this app shows and
     never moves -- so every surface that shows a generation finds its file
-    without knowing which of those it is (see :func:`origenerator.recovery.bin_items`).
+    without knowing which of those it is (see :func:`origenerator.trash_collection.trash_items`).
     """
     placed = place_of_its_own(file)
     if placed:

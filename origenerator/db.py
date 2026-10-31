@@ -1,13 +1,13 @@
 """The app's database: every table of it, under one object.
 
 `Database` is a facade. Each table's queries live in their own module —
-:mod:`origenerator.db_generations`, :mod:`~origenerator.db_deletions`,
+:mod:`origenerator.db_generations`, :mod:`~origenerator.db_trash`,
 :mod:`~origenerator.db_requests`, :mod:`~origenerator.db_folder_meta`,
 :mod:`~origenerator.db_custom_folders` — and this holds one of each, forwarding the method names ~700 call sites across
 this package, the gui package and the suite already spell.
 
 **Hand a unit the store it needs, not this.** Every consumer here uses a
-disjoint slice: recovery and gallery_actions touch only `deletions`, reconcile
+disjoint slice: trash_collection and gallery_actions touch only `deletions`, reconcile
 only `folder_meta` and `custom_folder_items`. A store is whole on its own, so a unit that
 takes one can be given a narrow fake and a change to one table stops being a
 change to the file 24 modules import.
@@ -24,7 +24,6 @@ from pathlib import Path
 from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile
 from origenerator.db_custom_folders import CustomFolderStore
-from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_item_numbers import ItemNumberStore
@@ -32,6 +31,7 @@ from origenerator.db_requests import RequestStore
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import SCHEMA, create
 from origenerator.db_seed_uses import SeedUseStore
+from origenerator.db_trash import TrashStore
 from origenerator.generation_state import GenerationSource
 
 
@@ -46,7 +46,7 @@ class Database:
         with file.connect() as conn:
             create(conn)
         self.generations = GenerationStore(file)
-        self.deletions = DeletionStore(file)
+        self.deletions = TrashStore(file)
         self.requests = RequestStore(file)
         self.seed_uses = SeedUseStore(file)
         self.combine_video_uses = CombineVideoUseStore(file)
@@ -204,25 +204,25 @@ class Database:
     def list_combine_video_uses(self) -> list[dict]:
         return self.combine_video_uses.list_combine_video_uses()
 
-    # --- the recovery bin (see origenerator.db_deletions) --------------------
+    # --- the Trash (see origenerator.db_trash) --------------------
 
-    def record_deletion(self, prompt_id: str, row: dict, batch: dict):
-        return self.deletions.record_deletion(prompt_id, row, batch)
+    def record_trashed(self, prompt_id: str, row: dict, batch: dict):
+        return self.deletions.record_trashed(prompt_id, row, batch)
 
-    def list_deletions(self) -> list[dict]:
-        return self.deletions.list_deletions()
+    def list_trashed(self) -> list[dict]:
+        return self.deletions.list_trashed()
 
-    def get_deletion(self, prompt_id: str) -> dict | None:
-        return self.deletions.get_deletion(prompt_id)
+    def get_trashed(self, prompt_id: str) -> dict | None:
+        return self.deletions.get_trashed(prompt_id)
 
-    def forget_deletion(self, prompt_id: str):
-        return self.deletions.forget_deletion(prompt_id)
+    def forget_trashed(self, prompt_id: str):
+        return self.deletions.forget_trashed(prompt_id)
 
     def trashed_file(self, original: Path) -> Path | None:
         return self.deletions.trashed_file(original)
 
-    def binned_library_paths(self) -> set[str]:
-        return self.deletions.binned_library_paths()
+    def trashed_library_paths(self) -> set[str]:
+        return self.deletions.trashed_library_paths()
 
     # --- item numbers (see origenerator.db_item_numbers) ---------------------
 

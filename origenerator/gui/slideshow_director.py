@@ -1616,7 +1616,7 @@ class SlideshowDirector:
         on the current item, and the favorites narrowing — the same concepts the
         Funestras' HUD wears, over the same items the Favorites collection lists.
 
-        Those items, and not merely the marked rows: a folder bookmarked
+        Those items, and not merely the marked rows: a folder favorited
         there stands for everything under it, so a slideshow narrowed to the
         favorites keeps what the collection would have shown.
         """

@@ -94,7 +94,7 @@ _CHIP_GLYPH = 44
 _CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
 
 # A favorited item's star, in the green Fun Time paints its favorite ★ with: one
-# color means "bookmarked" across both apps, so a star learned in one reads in
+# color means "favorited" across both apps, so a star learned in one reads in
 # the other. Worn by every star that says something IS favorited — the tile's
 # corner badge and a favorited folder's row alike. The plus marking an enhanced
 # tile is yellow (AMBER, this palette's yellow): green is spoken for and the two
@@ -288,10 +288,10 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 
 
 @cache
-def recovery_action_icon(action: str) -> QIcon:
+def trash_action_icon(action: str) -> QIcon:
     """A Trash-collection tile's review hover-buttons: a circular arrow back
     ("restore" — the item and its files return to where they were) or a trash can
-    ("purge" — end it for good; nothing else empties the bin). White line art on
+    ("purge" — end it for good; nothing else empties the Trash). White line art on
     the buttons' own translucent chip, like the experiment verdict controls."""
     name = "undo_arrow" if action == "restore" else "trash"
     return QIcon(glyph_pixmap(name, _SIZE, _REROLL_GLYPH))
@@ -366,7 +366,7 @@ def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
     """The star in an item's top-left corner: favorite it, or take the
     favorite away.
 
-    Filled and green once it is bookmarked — the green Fun Time paints its
+    Filled and green once it is favorited — the green Fun Time paints its
     favorite ★ with, so one color means one thing across both apps — and a
     hollow outline while it is not. The mark is therefore the state and the
     button at once, which is why a favorited item keeps it up with nothing

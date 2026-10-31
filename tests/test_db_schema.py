@@ -437,7 +437,7 @@ def test_a_seed_picked_after_a_press_whose_item_is_in_the_trash_is_forgotten_too
 
 
 def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):
-    # The table recorded what each worktree's copied database had bookmarked,
+    # The table recorded what each worktree's copied database had favorited,
     # for adoption at the next live launch; there are no copies now, so it is
     # dropped on open rather than left as a fossil in every library.
 

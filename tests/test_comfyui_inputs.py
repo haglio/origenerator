@@ -160,9 +160,9 @@ def test_the_app_finds_an_image_gone_from_its_place_in_the_librarys_trash(tmp_pa
     db = Database(config.DB_PATH)
     original = config.OUTPUT_PLACES.file("image/alpha_t2i_00007_.png")
     held = _image(tmp_path / "1_alpha_t2i_00007_.png")
-    db.record_deletion("held-for-this-test", {"prompt_id": "held-for-this-test"},
+    db.record_trashed("held-for-this-test", {"prompt_id": "held-for-this-test"},
                        {"moves": [[str(original), str(held)]], "subdir": str(tmp_path)})
     try:
         assert config.COMFYUI_FOLDERS.trashed(original) == held
     finally:
-        db.forget_deletion("held-for-this-test")
+        db.forget_trashed("held-for-this-test")

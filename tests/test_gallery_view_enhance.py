@@ -22,7 +22,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gui import gallery_view as gallery_view_module
@@ -41,7 +41,7 @@ from tests.gallery_view_support import (
     _enhanced_in_place,
     _image_workflow,
     _menu_offering,
-    _open_recents,
+    _open_latest,
     _png_bytes,
     _reroll_client,
     _select_first_leaf,
@@ -296,7 +296,7 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     _select_first_leaf(view)
     assert not view._enhance.panel.isHidden()
 
-    for item in (_image_workflow(view._tree), _collection(view, RECENTS_KEY),
+    for item in (_image_workflow(view._tree), _collection(view, LATEST_KEY),
                  _collection(view, FAVORITES_KEY), _collection(view, EXPERIMENTS_KEY),
                  _collection(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
@@ -576,14 +576,14 @@ def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     view.refresh()          # the launch's transient row is in the DB now
-    _open_recents(view)
+    _open_latest(view)
 
     assert job.prompt_id not in view._browser._inflight_cards
     assert view._browser._thumb_widgets["g0"]._enhancing is not None
     assert view._queue.keys() == [job.prompt_id]
 
 
-def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path):
+def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path):
     # With no card of its own, the run shows only on the tile of the image it is
     # upgrading — and that image can have been made a thousand tiles ago, where
     # nobody would find it. What is being done to an image is the newest thing
@@ -593,7 +593,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     assert view.listed_prompt_ids() == ["g2", "g1", "g0"]  # newest generated first
 
     view.enhance_items(["g0"])

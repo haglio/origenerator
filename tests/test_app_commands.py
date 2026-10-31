@@ -22,7 +22,7 @@ from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 @pytest.mark.parametrize("said, wanted", [
     ("experiments", AppCommand.EXPERIMENTS),
-    ("recents", AppCommand.RECENTS),
+    ("recents", AppCommand.LATEST),
     ("trash", AppCommand.TRASH),
 ])
 def test_a_collection_answers_to_its_own_bare_name(said, wanted):

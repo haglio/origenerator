@@ -79,7 +79,7 @@ class CombineHost(Protocol):
 
     def reveal_launch(self, key: str) -> None:
         """Show a just-launched combine — its folder if the tree has one, else
-        the Recents collection its card will appear on."""
+        the Latest collection its card will appear on."""
 
     def follow_link(self, prompt_id: str) -> None:
         """Go to a generation a slot is holding."""

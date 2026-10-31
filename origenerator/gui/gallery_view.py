@@ -50,7 +50,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
-    RECENTS_KEY as _RECENTS_KEY,
+    LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
@@ -1530,7 +1530,7 @@ class GalleryView(QWidget):
             else:
                 # No DB change, but the in-flight cards still need each running
                 # re-roll's live frame pushed in — it advances between rebuilds.
-                # Wherever they were drawn: the Recents collection, or a folder with
+                # Wherever they were drawn: the Latest collection, or a folder with
                 # a batch of them in flight.
                 self._browser.refresh_inflight(rows=rows, requests=requests)
             # The Job Queue is always on screen, so refresh it every tick —
@@ -1722,7 +1722,7 @@ class GalleryView(QWidget):
             side=side,
             tree_model=trees[side],
             custom_folders=gallery.outermost(self._custom_folders_by_side[side]),
-            show_recents=bool(trees[side]),
+            show_latest=bool(trees[side]),
             collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
 
@@ -1890,7 +1890,7 @@ class GalleryView(QWidget):
         """What the search covers: the path it is scoped to, and what is under it.
 
         The tree's selection is the scope, whatever kind of row it is. A collection
-        counts: Recents, Favorites, Experiments and Trash are each a set of
+        counts: Latest, Favorites, Experiments and Trash are each a set of
         generations, and standing in one and searching it is the obvious thing to
         try. The All row is what covers the library entire, since every other
         folder narrows the answer before the query does.
@@ -2237,13 +2237,13 @@ class GalleryView(QWidget):
     @property
     def _live_jobs(self) -> dict:
         """The live re-roll jobs, keyed by settings-folder key. Owned by the
-        controller; surfaced here for the Recents collection and the info pane."""
+        controller; surfaced here for the Latest collection and the info pane."""
         return self._jobs.jobs
 
     @property
     def _selected(self) -> dict | None:
         """The saved generation on display in the info pane, or ``None`` — read
-        here for navigation, delete, and the Recents "containing folder" jump. Set
+        here for navigation, delete, and the Latest "containing folder" jump. Set
         by :meth:`_on_thumbnail_clicked`, cleared when a re-roll or nothing is
         showing."""
         return self._selected_row
@@ -2703,7 +2703,7 @@ class GalleryView(QWidget):
 
     def stand_in_collection(self, key: str, side: str | None) -> bool:
         """Select a collection's row, exactly as clicking it does, and say whether the
-        tree had one — Recents and Favorites appear only once there is one."""
+        tree had one — Latest and Favorites appear only once there is one."""
         item = self._tree_item_for(oriented_key(key, side) if side else key)
         if item is None:
             return False
@@ -3119,20 +3119,20 @@ class GalleryView(QWidget):
     def reveal_launch(self, key: str):
         """Show a just-launched combine. If its (image × settings) folder already
         exists, open it and mirror the live tile; otherwise it's a brand-new
-        combination with no folder yet, so park on Recents — where its in-flight
+        combination with no folder yet, so park on Latest — where its in-flight
         card shows — and remember the key for :meth:`_on_reroll_finished` to drill
         into once the finished row gives the folder a node."""
         if self._stand_on_the_run_in(key):
             return  # an existing folder: watch the live tile there
-        if (recents := self._collection_item(_RECENTS_KEY, self._launched_side(key))) is not None:
+        if (latest := self._collection_item(_LATEST_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
-            self._tree.setCurrentItem(recents)
+            self._tree.setCurrentItem(latest)
 
     def _launched_side(self, key: str) -> str:
         """Which side a job just launched in folder ``key`` will land on.
 
         Read off the size it asked for, since it has no result to measure yet —
-        the same thing that puts its in-flight card in one Recents collection rather
+        the same thing that puts its in-flight card in one Latest collection rather
         than the other. With no job to ask, the side being browsed.
         """
         job = self._jobs.job_for(key)
@@ -3375,7 +3375,7 @@ class GalleryView(QWidget):
             # back.
             self._info_tabs.refresh_displayed(finished_row, self._image_rows)
         self._show_landed_to_watchers(key, finished_row, launcher)
-        # A combine whose brand-new folder we parked off (on Recents) now has a
+        # A combine whose brand-new folder we parked off (on Latest) now has a
         # finished row, so the rebuild above gave that folder a node: drill in.
         if key == self._pending_combine_key:
             self._pending_combine_key = None
@@ -4128,7 +4128,7 @@ class GalleryView(QWidget):
     def animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` once one is made — until then
         ``None``, and the tile shows its still while one is made off the window's
-        thread and starts playing it when it is. Feeds the grid tiles, the Recents
+        thread and starts playing it when it is. Feeds the grid tiles, the Latest
         collection and Combine's slots; the info pane's strip asks the same maker."""
         return self._moving_previews.of(row)
 

@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 from origenerator import gallery
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.sides import SEPARATE, TOGETHER
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
@@ -670,13 +670,13 @@ def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monke
     assert slideshow.locked
 
 
-def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypatch):
-    """Recents is the Funestras' Latest: the collection lists newest first and its
+def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, monkeypatch):
+    """Latest is the Funestras' Latest: the collection lists newest first and its
     slideshow plays that order, where every other set shuffles — and the
     slideshow's HUD title says which."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_current_collection_key", lambda: RECENTS_KEY)
+    monkeypatch.setattr(view, "_current_collection_key", lambda: LATEST_KEY)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)

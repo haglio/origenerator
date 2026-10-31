@@ -195,7 +195,7 @@ def test_media_badge_appears_only_when_a_type_is_given(qtbot):
     plain = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(plain)
     assert plain.findChildren(MediaBadge) == []
-    # ...but a Recents tile, which mixes kinds, is told its type and shows a badge.
+    # ...but a Latest tile, which mixes kinds, is told its type and shows a badge.
     badged = ThumbnailWidget("p2", None, "label", media_type=MediaType.VIDEO)
     qtbot.addWidget(badged)
     assert len(badged.findChildren(MediaBadge)) == 1

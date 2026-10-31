@@ -34,7 +34,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
     FolderCollection,
     folder_collection,
@@ -55,7 +55,7 @@ from origenerator.orientation import key_holds, oriented_key, side_of, split_key
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 
 _COLLECTION_TIPS = {
-    RECENTS_KEY: "Recently generated",
+    LATEST_KEY: "Recently generated",
     FAVORITES_KEY: "Your favorite folders and items — drop a folder here to add it",
     ENHANCED_KEY: "Your enhanced images",
     EXPERIMENTS_KEY: "Background experiments awaiting your review",
@@ -96,8 +96,8 @@ def _inside(group, inside: tuple) -> tuple:
 
 def _shown_collections(side, folder_key: str) -> list[str]:
     left_off = set()
-    if not side.show_recents:
-        left_off.add(RECENTS_KEY)
+    if not side.show_latest:
+        left_off.add(LATEST_KEY)
     if not side.tree_model:
         left_off |= {FAVORITES_KEY, ENHANCED_KEY}
     if key_holds(MediaType.VIDEO, folder_key):
@@ -112,7 +112,7 @@ class SideModel:
     side: str
     tree_model: list                       # the media roots this side holds
     custom_folders: list = field(default_factory=list)
-    show_recents: bool = False             # anything at all to list yet
+    show_latest: bool = False             # anything at all to list yet
     collection_counts: dict[str, int] = field(default_factory=dict)
 
 

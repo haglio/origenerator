@@ -375,7 +375,7 @@ def test_removing_an_enhancement_leaves_the_others(tmp_path):
     assert [lvl.label for lvl in enhance_levels(after)] == ["Enhancement 1/1", "Original"]
     # The surviving level keeps its own settings, its own run id and its own
     # finish — they ride with the level they belong to, so binning the newer
-    # enhancement takes the place in the Recents collection it had lifted the image
+    # enhancement takes the place in the Latest collection it had lifted the image
     # to along with it.
     older = json.loads(row["enhance_history"])[1]
     assert older["filename"] == "image_enhance_00001_.png"

@@ -20,7 +20,7 @@ from origenerator import (
 )
 from origenerator.db import Database
 from origenerator.gallery.collection import (
-    RECENTS_KEY,
+    LATEST_KEY,
 )
 from origenerator.gui import (
     combine_controller,
@@ -763,7 +763,7 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
     assert shown                              # but tell the user why
 
 
-def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_path):
+def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_path):
     db = _combine_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -1044,7 +1044,7 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, 
 def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         qtbot, tmp_path, monkeypatch):
     view = _combine_view(qtbot, tmp_path)
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     tile = view._browser._thumb_widgets["vid"]
     slot = view._combine.panel.video_slot._label
     in_flight = {}

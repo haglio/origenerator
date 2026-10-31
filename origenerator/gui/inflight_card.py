@@ -1,4 +1,4 @@
-"""A card for one in-flight generation, on the gallery's Recents collection.
+"""A card for one in-flight generation, on the gallery's Latest collection.
 
 The collection leads with a card per generation currently queued or running — from a
 Generate tab or a gallery re-roll — so all in-flight work is visible in one

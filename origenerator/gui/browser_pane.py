@@ -1,7 +1,7 @@
 """The gallery's browser pane — the middle column showing a folder's contents.
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
-settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Favorites /
+settings leaf's thumbnail grid (with its re-roll tile), or the Latest / Favorites /
 Enhanced / Experiments / Trash collection overviews. Owns the thumbnail multi-selection
 and the live in-flight cards.
 
@@ -43,7 +43,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
     FolderCollection,
     folder_collection,
@@ -426,9 +426,9 @@ class BrowserPane(QObject):
         # named: a renamed renderer is an AttributeError at construction instead
         # of a collection that quietly draws nothing.
         self._collections = {
-            RECENTS_KEY: PaneCollection(
+            LATEST_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._recent_rows, side, folder),
-                render=self._render_recents),
+                render=self._render_latest),
             FAVORITES_KEY: PaneCollection(
                 rows=self._combined_favorite_rows,
                 render=lambda: self._show_gathered(
@@ -794,7 +794,7 @@ class BrowserPane(QObject):
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the collections: Recents / Favorites / Enhanced / Experiments / Trash ---
+    # --- the collections: Latest / Favorites / Enhanced / Experiments / Trash ---
 
     def show_collection(self, key: str, side: str | None = None):
         collection = folder_collection(key)
@@ -804,8 +804,8 @@ class BrowserPane(QObject):
         self._collection_folder = collection.folder
         self._collections[collection.which].render()
 
-    def _render_recents(self):
-        """The Recents collection: a card for every in-flight generation (queued or
+    def _render_latest(self):
+        """The Latest collection: a card for every in-flight generation (queued or
         running, from a Generate tab or a gallery re-roll) atop the recently
         finished items. Clicking an in-flight card reveals where its job runs; a
         finished one previews in the info pane, right here in the collection, the way
@@ -816,7 +816,7 @@ class BrowserPane(QObject):
         finished thumbnails; a hint when there is neither.
         """
         container, flow = self._new_tile_pane()
-        rows = self._open_collection_rows(RECENTS_KEY)
+        rows = self._open_collection_rows(LATEST_KEY)
         items = self._latest_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
@@ -832,7 +832,7 @@ class BrowserPane(QObject):
                        draw_leading=draw_leading)
         # An empty collection teaches how to fill it rather than showing a blank pane.
         if not (items or rows):
-            self.show_widget(self._empty_state(self._recents_empty_hint()))
+            self.show_widget(self._empty_state(self._latest_empty_hint()))
             return
         self._show_paged(container, _between_headings(
             flow, rows, headings, lambda row: self._add_collection_thumbnail(flow, row)))
@@ -865,7 +865,7 @@ class BrowserPane(QObject):
         return self._scroll.verticalScrollBar()
 
     def _add_collection_thumbnail(self, flow, row, corner_actions=None):
-        """Build one finished-item tile for a collection (Recents/Favorites/Experiments):
+        """Build one finished-item tile for a collection (Latest/Favorites/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
         to a combine slot, and right-click it for the same star / enhance / delete
         menu a tile inside a folder offers; ``corner_actions`` become the tile's
@@ -932,7 +932,7 @@ class BrowserPane(QObject):
             self._collection_side, self._collection_folder)}
         return _back_of_the_line_first(self._card_items(rows, requests), held)
 
-    def _recents_empty_hint(self) -> str:
+    def _latest_empty_hint(self) -> str:
         """The teaching hint for an empty collection, worded for the kind its
         folder holds."""
         noun = next((label.lower() for kind, label in gallery.MEDIA_LABELS.items()
@@ -940,29 +940,29 @@ class BrowserPane(QObject):
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
                 "gallery re-roll — collect here, newest first.")
 
-    def showing_recents(self) -> bool:
-        return base_of(self._tree.selected_folder_key()) == RECENTS_KEY
+    def showing_latest(self) -> bool:
+        return base_of(self._tree.selected_folder_key()) == LATEST_KEY
 
     def refresh_inflight(self, rows=None, requests=None):
         """Between rebuilds, keep the in-flight cards live: push each tracked
         re-roll's latest frame into its card. The poll passes the listing it
         already read (``rows``/``requests``); left off, they are read here.
 
-        Whichever pane drew them — the Recents collection, or a settings folder with
+        Whichever pane drew them — the Latest collection, or a settings folder with
         a batch in flight. Only the collection re-renders on a change to the
         *set* of jobs (a defensive guard — a started or finished re-roll
         normally moves the DB fingerprint and forces a full rebuild anyway); a
         folder is rebuilt by that same fingerprint and must not be redrawn as
         the collection. A pane holding no cards asks the database nothing.
         """
-        if not self._inflight_cards and not self.showing_recents():
+        if not self._inflight_cards and not self.showing_latest():
             return
-        items = (self._latest_inflight_items(rows, requests) if self.showing_recents()
+        items = (self._latest_inflight_items(rows, requests) if self.showing_latest()
                  else self._card_items(rows, requests))
-        if (self.showing_recents()
+        if (self.showing_latest()
                 and _inflight_signature(items) != self._inflight_signature):
             place = self.place()
-            self._render_recents()
+            self._render_latest()
             self.return_to(place)
             return
         for item in items:
@@ -1183,7 +1183,7 @@ class BrowserPane(QObject):
         """Every generation the open collection gathers, in collection order — or ``None``
         outside the collections, where a folder is what's on screen instead.
 
-        The slideshow plays these, so they have to match the tiles: Recents is its
+        The slideshow plays these, so they have to match the tiles: Latest is its
         listed items, Favorites is its favorited items plus everything under each
         bookmarked folder, since a folder tile there stands for its whole folder,
         Enhanced is its enhanced images, Experiments is its unreviewed queue, and

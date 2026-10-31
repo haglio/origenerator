@@ -33,7 +33,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.gallery.collection import (
-    RECENTS_KEY,
+    LATEST_KEY,
 )
 from origenerator.gui import (
     corner_controls,
@@ -411,7 +411,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
     assert button.toolTip() == "Go to the folder this item is in"
 
 
-def test_right_click_delete_on_the_recents_collection_removes_the_item(qtbot, monkeypatch):
+def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=actions)
@@ -444,7 +444,7 @@ def test_right_click_favorite_on_the_recents_collection_bookmarks_the_item(qtbot
     assert view._browser._thumb_widgets["i1"]._favorite is True    # the tile takes the star at once
 
 
-def test_right_click_enhance_on_the_recents_collection_queues_the_image(qtbot, tmp_path, monkeypatch):
+def test_right_click_enhance_on_the_latest_collection_queues_the_image(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -458,7 +458,7 @@ def test_right_click_enhance_on_the_recents_collection_queues_the_image(qtbot, t
     assert job.workflow.name == "image_enhance"
 
 
-def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, monkeypatch):
+def test_latest_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, monkeypatch):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     rows = [
         _image("i1", "a cat", 50, 1),
@@ -667,7 +667,7 @@ def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))   # a collection is nobody's folder
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))   # a collection is nobody's folder
     assert not view._bank.favorite.isEnabled()
     assert view._bank.favorite.toolTip() == "Nothing here to favorite"
 

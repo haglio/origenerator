@@ -127,11 +127,11 @@ from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
+from origenerator.gui.message import ERROR, HEARD_MARK, INFO
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.new_tile import NewTile
-from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
@@ -283,10 +283,10 @@ def _is_deletable_folder(group) -> bool:
 
 
 class GalleryView(QWidget):
-    # A run ended, as one :class:`~origenerator.run_notice.RunOutcome`. The view
+    # A run ended, as one :class:`~origenerator.run_toast.RunOutcome`. The view
     # has nowhere left to draw that news — the run's tile went with it — so it
     # passes it out to the window, which owns the tray icon Windows' own
-    # notifications come from (:mod:`origenerator.gui.desktop_notices`).
+    # toasts come from (:mod:`origenerator.gui.toasts`).
     run_ended = pyqtSignal(object)
 
     def __init__(self, db: Database, parent=None, *,
@@ -2939,7 +2939,7 @@ class GalleryView(QWidget):
             new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
         )
         self.refresh()  # the queue marks the job as a request the moment it is spoken
-        return "Request submitted", NOTICE
+        return "Request submitted", INFO
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Trash some of one image's versions, from the info pane's version list.

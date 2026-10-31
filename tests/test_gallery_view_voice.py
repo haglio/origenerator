@@ -39,7 +39,7 @@ from origenerator.gui import (
 )
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.commands import match_voice_command as match
@@ -260,7 +260,7 @@ class _VoiceSurface:
     def note_enhancing(self, statuses, frames=None):
         self.enhancing = statuses
 
-    def note_voice_command(self, message, *, kind=NOTICE):
+    def note_voice_command(self, message, *, kind=INFO):
         self.said = message
 
     def slideshow_step(self, delta):
@@ -581,7 +581,7 @@ def _speak_request(view, qtbot, *utterances):
     which only that request's own answer does.  It used to wait for the words
     "working out" to leave the corner, inside a budget that was exactly the
     note's own flash time -- which told answered from timed out only because
-    a hidden notice happens not to clear its text (bug 44).
+    a hidden message happens not to clear its text (bug 44).
     """
     for text in utterances:
         view._voice.listener.speak(text)
@@ -858,7 +858,7 @@ def test_a_spoken_loop_takes_the_one_act_the_sorted_image_leaves(qtbot, tmp_path
 
     assert prompt_id == "img_act"
     assert "alpha" in message
-    assert kind == NOTICE
+    assert kind == INFO
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_act.png [output]"
@@ -1019,7 +1019,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
     # Answered in the slideshow's own corner: the speaker is looking at the image.
-    assert surface.noted == ("g0", "enhancing…", NOTICE)
+    assert surface.noted == ("g0", "enhancing…", INFO)
 
 
 def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):

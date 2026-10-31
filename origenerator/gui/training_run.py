@@ -7,7 +7,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from origenerator import lora_training
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
-from origenerator.run_notice import RunOutcome
+from origenerator.run_toast import RunOutcome
 
 logger = logging.getLogger(__name__)
 

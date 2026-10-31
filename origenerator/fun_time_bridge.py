@@ -82,7 +82,7 @@ def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
     """Ask the room to show this app — the mode its own HUD button asks for.
 
     The session parks this window under the players in video mode, so anything
-    that has to be seen here (a clicked notification, arriving from outside the
+    that has to be seen here (a clicked toast, arriving from outside the
     room entirely) has to ask for the mode before it shows anything. An older
     session names no channel to ask on, and there the asking is simply skipped.
     """

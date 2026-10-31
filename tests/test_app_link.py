@@ -1,4 +1,4 @@
-"""The link a clicked notification follows, and what following one does.
+"""The link a clicked toast follows, and what following one does.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
@@ -63,7 +63,7 @@ def test_what_windows_runs_on_a_click_names_the_checkouts_handler_and_its_launch
 
     assert command == (
         r'"C:\workspace\origenerator\.venv\Scripts\pythonw.exe" '
-        r'"C:\workspace\origenerator\tools\open_from_notification.py" '
+        r'"C:\workspace\origenerator\tools\open_from_toast.py" '
         r'"launch_origenerator.vbs" "%1"')
 
 
@@ -159,7 +159,7 @@ def test_an_app_too_busy_to_take_a_click_is_not_started_a_second_time(monkeypatc
 
 
 def test_a_click_while_another_click_is_starting_the_app_starts_nothing(monkeypatch, tmp_path):
-    # Notices clicked one after another faster than the app comes up: the copy
+    # Toasts clicked one after another faster than the app comes up: the copy
     # the first click started is still on its loading screen, nobody is
     # listening yet, and a second copy started over it could only say that
     # another copy is running.

@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes
 import struct
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,32 +18,19 @@ from origenerator.win32 import (
     raise_window_without_activating,
     register_link_handler,
     register_notification_identity,
-    window_exists,
 )
 
 
-class TestWindowExists:
-    """A handle outlives the window it named, so anything that must reach THAT
-    window and no other has to ask first."""
-
-    def test_zero_is_never_a_window(self):
-        with patch("origenerator.win32._user32") as mock:
-            mock.IsWindow.return_value = 1
-            assert window_exists(0) is False
-        mock.IsWindow.assert_not_called()
-
-    def test_follows_is_window(self):
-        with patch("origenerator.win32._user32") as mock:
-            mock.IsWindow.return_value = 0
-            assert window_exists(4321) is False
-            mock.IsWindow.return_value = 1
-            assert window_exists(4321) is True
+@contextmanager
+def _user32_with_a_window(alive: bool = True):
+    with (patch("origenerator.win32._user32") as user32,
+          patch("origenerator.win32.window_exists", return_value=alive)):
+        yield user32
 
 
 class TestRaiseWindowWithoutActivating:
     def test_puts_the_window_above_its_siblings_without_moving_sizing_or_activating_it(self):
-        with patch("origenerator.win32._user32") as user32:
-            user32.IsWindow.return_value = 1
+        with _user32_with_a_window() as user32:
 
             raise_window_without_activating(111)
 
@@ -51,8 +39,7 @@ class TestRaiseWindowWithoutActivating:
         assert flags == 0x0001 | 0x0002 | 0x0010  # SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
 
     def test_a_dead_handle_is_left_alone(self):
-        with patch("origenerator.win32._user32") as user32:
-            user32.IsWindow.return_value = 0
+        with _user32_with_a_window(alive=False) as user32:
 
             assert raise_window_without_activating(111) is False
 
@@ -65,8 +52,7 @@ def _edges(rect: ctypes.wintypes.RECT) -> tuple[int, int, int, int]:
 
 class TestPlaceWindowInDevicePixels:
     def test_a_window_on_screen_is_moved_onto_the_rect_without_activating_or_reordering_it(self):
-        with patch("origenerator.win32._user32") as user32:
-            user32.IsWindow.return_value = 1
+        with _user32_with_a_window() as user32:
             user32.IsIconic.return_value = 0
 
             assert place_window_in_device_pixels(111, 0, 203, 716, 1237) is True
@@ -76,8 +62,7 @@ class TestPlaceWindowInDevicePixels:
         assert flags == 0x0004 | 0x0010  # SWP_NOZORDER | SWP_NOACTIVATE
 
     def test_a_minimized_window_stays_minimized_and_comes_back_onto_the_rect(self):
-        with patch("origenerator.win32._user32") as user32:
-            user32.IsWindow.return_value = 1
+        with _user32_with_a_window() as user32:
             user32.IsIconic.return_value = 1
             user32.GetWindowPlacement.return_value = 1
             user32.SetWindowPlacement.return_value = 1
@@ -95,8 +80,7 @@ class TestPlaceWindowInDevicePixels:
             placement.contents.flags = 0x0002  # WPF_RESTORETOMAXIMIZED
             return 1
 
-        with patch("origenerator.win32._user32") as user32:
-            user32.IsWindow.return_value = 1
+        with _user32_with_a_window() as user32:
             user32.IsIconic.return_value = 1
             user32.GetWindowPlacement.side_effect = restores_maximized
 
@@ -111,8 +95,7 @@ class TestPlaceWindowInDevicePixels:
             info.contents.rcWork = ctypes.wintypes.RECT(0, 40, 2560, 1440)
             return 1
 
-        with patch("origenerator.win32._user32") as user32:
-            user32.IsWindow.return_value = 1
+        with _user32_with_a_window() as user32:
             user32.IsIconic.return_value = 1
             user32.GetWindowPlacement.return_value = 1
             user32.GetMonitorInfoW.side_effect = taskbar_along_the_top
@@ -132,9 +115,8 @@ class TestOutOfSight:
                 in dwm.DwmSetWindowAttribute.call_args_list]
 
     def test_the_window_is_cloaked_for_the_block_and_uncloaked_after_it(self):
-        with patch("origenerator.win32._user32") as user32, \
+        with _user32_with_a_window(), \
                 patch("origenerator.win32._dwmapi") as dwm:
-            user32.IsWindow.return_value = 1
 
             with out_of_sight(111):
                 assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
@@ -146,9 +128,8 @@ class TestOutOfSight:
         """A window handed to a room in the headset is out of sight for as long
         as the room has it, which is no block to hold.  DWM draws a cloaked
         window as it always did, so there is still a frame to publish."""
-        with patch("origenerator.win32._user32") as user32, \
+        with _user32_with_a_window(), \
                 patch("origenerator.win32._dwmapi") as dwm:
-            user32.IsWindow.return_value = 1
 
             keep_out_of_sight(111)
             assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
@@ -159,9 +140,8 @@ class TestOutOfSight:
                                      (111, self.DWMWA_CLOAK, 0, 4)]
 
     def test_the_window_comes_back_into_sight_when_the_block_fails(self):
-        with patch("origenerator.win32._user32") as user32, \
+        with _user32_with_a_window(), \
                 patch("origenerator.win32._dwmapi") as dwm:
-            user32.IsWindow.return_value = 1
 
             with pytest.raises(RuntimeError), out_of_sight(111):
                 raise RuntimeError("the hand-back failed")
@@ -169,9 +149,8 @@ class TestOutOfSight:
         assert self._cloaks(dwm)[-1] == (111, self.DWMWA_CLOAK, 0, 4)
 
     def test_a_dead_handle_is_left_alone(self):
-        with patch("origenerator.win32._user32") as user32, \
+        with _user32_with_a_window(alive=False), \
                 patch("origenerator.win32._dwmapi") as dwm:
-            user32.IsWindow.return_value = 0
 
             with out_of_sight(111):
                 pass

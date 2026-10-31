@@ -78,7 +78,7 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
         for record in records
     ]
     folders = index_folders(tree) | {group.key: group for group in built}
-    for group, record in zip(built, records):
+    for group, record in zip(built, records, strict=True):
         group.children.extend(folders[key] for key in record["folders"]
                               if key in folders and not holds(folders[key], group))
     return built

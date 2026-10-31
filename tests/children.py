@@ -18,11 +18,11 @@ LOG_LINES_SHOWN = 100
 
 
 def run_python(args: list[str], *, timeout: float = HANG_AFTER_S, logs: Iterable[Path] = (),
-               **kwargs) -> subprocess.CompletedProcess:
+               check: bool = False, **kwargs) -> subprocess.CompletedProcess:
     try:
         return subprocess.run([sys.executable, *args], cwd=REPO_ROOT, timeout=timeout,
                               capture_output=True, encoding="utf-8", errors="replace",
-                              **hidden_subprocess_kwargs(), **kwargs)
+                              check=check, **hidden_subprocess_kwargs(), **kwargs)
     except subprocess.TimeoutExpired as timed_out:
         raise AssertionError("\n".join([
             f"the child was still running {timeout:g} s after it started",

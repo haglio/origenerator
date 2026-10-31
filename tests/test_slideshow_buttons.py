@@ -35,7 +35,7 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
     """A run of evenly spaced squares reads as one undifferentiated strip; the
     wider gap opens at the seams the Funestras' own band opens them at."""
-    assert [name for name, button in zip(_names(_band()), _band()) if button.group_break] == [
+    assert [name for name, button in zip(_names(_band()), _band(), strict=True) if button.group_break] == [
         "lock", "enhanced", "shuffle", "cycle_version"]
 
 
@@ -44,21 +44,21 @@ def test_the_switches_light_and_the_things_done_never_do():
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
     image's own amber; a step, the bin and reset are things done."""
     band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
-                    _band(locked=True, favorites_filter=True, enhanced=True)))
+                    _band(locked=True, favorites_filter=True, enhanced=True), strict=True))
 
     assert band["lock"].lit and band["lock"].favorite
     assert band["fmode"].lit and band["fmode"].favorite
     assert band["enhanced"].lit and band["enhanced"].enhanced
     assert band["trash"].danger
     assert not any(band[name].lit for name in ("prev", "next", "trash", "reset"))
-    at_rest = dict(zip(_names(_band()), _band()))
+    at_rest = dict(zip(_names(_band()), _band(), strict=True))
     assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
 
 
 def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
     for order, lit in ((SHUFFLE_LABEL, ["shuffle"]), (LATEST_LABEL, ["latest"]), ("", [])):
         band = _band(order=order)
-        assert [name for name, button in zip(_names(band), band)
+        assert [name for name, button in zip(_names(band), band, strict=True)
                 if name in ("shuffle", "latest") and button.lit] == lit, order
 
 
@@ -183,9 +183,9 @@ def test_filter_said_of_a_side_narrows_to_the_act_on_screen():
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():
     """An image nobody enhanced, a video Evolver never upscaled: there is
     nothing to step to, so the button is drawn faded rather than offered."""
-    assert dict(zip(_names(_band()), _band()))["cycle_version"].dim
+    assert dict(zip(_names(_band()), _band(), strict=True))["cycle_version"].dim
     lively = _band(has_other_versions=True)
-    assert not dict(zip(_names(lively), lively))["cycle_version"].dim
+    assert not dict(zip(_names(lively), lively, strict=True))["cycle_version"].dim
 
 
 def test_every_declared_button_is_answered_by_the_slideshow():

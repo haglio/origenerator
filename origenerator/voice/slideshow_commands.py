@@ -13,6 +13,7 @@ slideshow named both ways.
 from __future__ import annotations
 
 from enum import Enum
+from itertools import pairwise
 
 from origenerator.voice.text import words
 
@@ -47,7 +48,7 @@ def _names_the_slideshow(words: list) -> bool:
     whisper splits it into about as often."""
     return "slideshow" in words or any(
         first == "slide" and second == "show"
-        for first, second in zip(words, words[1:])
+        for first, second in pairwise(words)
     )
 
 

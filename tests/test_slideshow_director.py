@@ -1278,7 +1278,7 @@ def test_an_order_with_nothing_to_play_says_so_and_leaves_the_slideshow_alone(sl
     director.reorder_slideshow(made[0], True)
 
     assert made[0].reordered is None
-    assert list(zip(made[0].said, made[0].said_kinds)) == [
+    assert list(zip(made[0].said, made[0].said_kinds, strict=True)) == [
         ("Nothing there to play", WARNING)]
     assert director._live_slideshows == [(made[0], "workflow/a")]
 

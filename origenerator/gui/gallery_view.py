@@ -2477,7 +2477,7 @@ class GalleryView(QWidget):
         batch = [{**params, **{k: was[k] for k in seed_keys if k in was}} for _, was in olds]
         launched = 0
         for (row, was), run, prompt_id in zip(olds, batch,
-                                              self._jobs.start_batch(key, wf, batch)):
+                                              self._jobs.start_batch(key, wf, batch), strict=True):
             if not prompt_id:
                 continue  # the submit failed; the rest of the folder still goes
             launched += 1

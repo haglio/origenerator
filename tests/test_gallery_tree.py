@@ -287,10 +287,10 @@ def test_every_row_inside_a_folder_of_your_own_has_a_key_of_its_own_naming_its_f
     keys = [row.data(0, TREE_KEY_ROLE) for row in rows]
 
     assert len(set(keys)) == len(keys)
-    assert all(tree.item_by_key[key] is row for key, row in zip(keys, rows))
+    assert all(tree.item_by_key[key] is row for key, row in zip(keys, rows, strict=True))
     assert all(side_of(key) == LANDSCAPE for key in keys)
     assert all(base_of(key) == row.data(0, GROUP_ROLE).key
-               for key, row in zip(keys, rows) if row.data(0, GROUP_ROLE) is not None)
+               for key, row in zip(keys, rows, strict=True) if row.data(0, GROUP_ROLE) is not None)
 
 
 def test_an_item_belongs_to_its_folder_in_its_own_place_not_to_a_copy_of_it(qtbot):

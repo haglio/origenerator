@@ -768,7 +768,7 @@ class ParamForm(QWidget):
         if self._size_deriver is None or self._dimensions_unlocked():
             return
         size = self._size_deriver(self.get_values())
-        for key, value in zip(("width", "height"), size or (0, 0)):
+        for key, value in zip(("width", "height"), size or (0, 0), strict=True):
             spinner = self._widgets[key]
             blocked = spinner.blockSignals(True)  # a display refresh isn't a user edit
             spinner.setValue(value)

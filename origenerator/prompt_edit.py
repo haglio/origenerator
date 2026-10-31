@@ -354,7 +354,7 @@ def apply_request(positive: str, negative: str, request: str,
         return _revised(positive, negative, request, parsed, match, rewrite)
     each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
     revisions = [_revised(scene, scene_negative, request, parsed, match, rewrite)
-                 for scene, scene_negative in zip(scenes, each_negative)]
+                 for scene, scene_negative in zip(scenes, each_negative, strict=True)]
     polarity, term = parsed
     return PromptRevision(positive, negative,
                           story_of([revision.positive for revision in revisions]),
@@ -386,7 +386,7 @@ def _revised(positive: str, negative: str, request: str, parsed: tuple,
         try:
             new_positive, new_negative = (
                 _said(old, _without_nothing_weighted(new))
-                for old, new in zip((positive, negative), rewrite(positive, negative, request)))
+                for old, new in zip((positive, negative), rewrite(positive, negative, request), strict=True))
         except Exception as exc:  # model down / unreadable: the rules' own edit stands
             logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
                            type(exc).__name__)

@@ -65,7 +65,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
          "--output-format", "concise",
          "--select", "F401,F811,F841",
          *(str(target) for target in SCANNED)],
-        capture_output=True, text=True, cwd=str(ROOT),
+        capture_output=True, text=True, cwd=str(ROOT), check=False,
     )
 
     assert result.returncode == 0, result.stdout + result.stderr

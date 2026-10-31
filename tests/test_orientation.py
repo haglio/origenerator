@@ -493,7 +493,7 @@ def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp
     qtbot.addWidget(view)
     view.refresh()
 
-    for section, side in zip(_sections(view), ("portrait", "landscape")):
+    for section, side in zip(_sections(view), ("portrait", "landscape"), strict=True):
         heading = _heading(section)
         assert side in heading.toolTip()
         # Neither child claims one of its own, which is what lets the frame's
@@ -736,7 +736,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     drawn = view._tree_view.keys_for_folder("image/sdxl_t2i")  # the workflow folder
     assert drawn == [oriented_key("image/sdxl_t2i", "portrait"),
                      oriented_key("image/sdxl_t2i", "landscape")]
-    for key, expected in zip(drawn, (["t1"], ["w1"])):
+    for key, expected in zip(drawn, (["t1"], ["w1"]), strict=True):
         assert [row["prompt_id"] for row in view._slideshows.rows_at(key)] == expected
         assert view.group_for_key(key).key == "image/sdxl_t2i"  # its identity is unsplit
 

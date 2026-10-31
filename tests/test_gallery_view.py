@@ -6,6 +6,7 @@ import threading
 import time
 from functools import partial
 from io import BytesIO
+from itertools import pairwise
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -769,7 +770,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     assert all(len(xs) == 1 for xs in starts.values()), starts
     # ...and each level sits exactly one indentation right of the one above.
     at = [next(iter(starts[d])) for d in sorted(starts)]
-    assert [b - a for a, b in zip(at, at[1:])] == [step] * (len(at) - 1)
+    assert [b - a for a, b in pairwise(at)] == [step] * (len(at) - 1)
 
 
 def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
@@ -11494,7 +11495,7 @@ def _two_image_db(tmp_path, prompts=("the first one", "a completely different on
     """Two completed images. Same prompt for both puts them in one settings folder;
     different prompts put them in two."""
     db = Database(tmp_path / "t.db")
-    for (pid, prompt), seed in zip(zip(("a", "b"), prompts), (7, 8)):
+    for (pid, prompt), seed in zip(zip(("a", "b"), prompts, strict=True), (7, 8), strict=True):
         params = dict(_SDXL.default_params(), seed=seed, positive_prompt=prompt)
         db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i",
                              workflow_version=_SDXL.version, positive_prompt=prompt,

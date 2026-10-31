@@ -1759,7 +1759,7 @@ def _finished(row, asked, finished):
 def test_recent_generations_places_an_enhanced_image_by_when_its_enhancement_finished():
     enhanced, slow, later = (_finished(row, asked, finished) for row, asked, finished in zip(
         _collection(("enhanced", 1), ("slow", 2), ("later", 4)),
-        ("19:00:00", "19:05:00", "19:50:00"), ("19:00:09", "19:30:00", "19:50:09")))
+        ("19:00:00", "19:05:00", "19:50:00"), ("19:00:09", "19:30:00", "19:50:09"), strict=True))
     enhanced["enhance_history"] = json.dumps([{
         "filename": "image_enhance_e1.png", "params": {}, "run_id": 3,
         "finished_at": "2026-09-12T19:40:00+00:00"}])
@@ -1769,7 +1769,7 @@ def test_recent_generations_places_an_enhanced_image_by_when_its_enhancement_fin
 
 def test_recent_generations_leads_with_an_image_being_enhanced_over_a_run_that_finished_before_it_was_asked():
     old, slow = (_finished(row, asked, finished) for row, asked, finished in zip(
-        _collection(("old", 1), ("slow", 2)), ("08:00:00", "19:05:00"), ("08:00:09", "19:30:00")))
+        _collection(("old", 1), ("slow", 2)), ("08:00:00", "19:05:00"), ("08:00:09", "19:30:00"), strict=True))
     running = {**_enhance_run("e1", "sdxl_t2i_old.png", 3), "created_at": "2026-09-12 19:45:00"}
     assert [r["prompt_id"] for r in recent_generations([running, slow, old])] == ["old", "slow"]
 
@@ -1777,7 +1777,7 @@ def test_recent_generations_leads_with_an_image_being_enhanced_over_a_run_that_f
 def test_recent_generations_seats_an_enhancement_folded_before_finishes_were_recorded_under_the_next_thing_asked_for():
     old, before, after = (_finished(row, asked, finished) for row, asked, finished in zip(
         _collection(("old", 1), ("before", 2), ("after", 4)),
-        ("08:00:00", "19:05:00", "19:50:00"), ("08:00:09", "19:05:09", "19:50:09")))
+        ("08:00:00", "19:05:00", "19:50:00"), ("08:00:09", "19:05:09", "19:50:09"), strict=True))
     old["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 3}])
     assert [r["prompt_id"] for r in recent_generations([after, before, old])] \

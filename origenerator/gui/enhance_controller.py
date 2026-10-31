@@ -72,7 +72,7 @@ def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.
     for key, entries in by_folder.items():
         batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
         for (row, params), prompt_id in zip(entries, jobs.start_batch(key, workflow, batch,
-                                                                      source=source)):
+                                                                      source=source), strict=True):
             if prompt_id:
                 # Which image the run is of, by id: the params name only the file
                 # it reads, and a file name can belong to more than one row.

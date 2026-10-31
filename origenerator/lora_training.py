@@ -81,7 +81,7 @@ class Trainer:
     def stop(self) -> None:
         if self.running():
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.pid)],
-                           capture_output=True, creationflags=_NO_WINDOW)
+                           capture_output=True, creationflags=_NO_WINDOW, check=False)
 
 
 def start(job: dict, python: Path, trainer: Path, **for_the_program) -> Trainer:

@@ -527,7 +527,7 @@ class GallerySearch:
                 continue
             entry = self._entries[prompt_id]
             scores = [_term_score(term, entry) for term in terms]
-            for term, score in zip(terms, scores):
+            for term, score in zip(terms, scores, strict=True):
                 if score:
                     reached.add(term.text)
             if all(scores):

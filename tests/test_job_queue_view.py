@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from itertools import pairwise
 
 import pytest
 from PIL import Image
@@ -108,7 +109,7 @@ def _on_screen(queue):
 
 def _drawn(image, points, color) -> bool:
     """Whether every pixel along a run of straight lines wears ``color``."""
-    for start, end in zip(points, points[1:]):
+    for start, end in pairwise(points):
         for x in range(min(start.x(), end.x()), max(start.x(), end.x()) + 1):
             for y in range(min(start.y(), end.y()), max(start.y(), end.y()) + 1):
                 if image.pixelColor(x, y).name() != color.name():

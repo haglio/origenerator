@@ -7,7 +7,7 @@ import pytest
 
 from origenerator.gallery import (
     ALL_KEY,
-    CustomGroup,
+    CustomCollection,
     LoraGroup,
     MediaGroup,
     ModelGroup,
@@ -1577,7 +1577,7 @@ def test_a_folder_the_user_composed_names_what_it_gathers():
     cat_leaf = _workflows(tree)[0].children[0].children[0].children[0]
 
     names = folder_names_by_row(
-        tree, {}, [CustomGroup("__custom__/1", "Beach trip", [cat_leaf])])
+        tree, {}, [CustomCollection("__custom__/1", "Beach trip", [cat_leaf])])
 
     assert "Beach trip" in names["i1"]
     assert "Beach trip" not in names["i2"]

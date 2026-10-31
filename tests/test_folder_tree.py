@@ -354,7 +354,7 @@ def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
 
 
 def _folder_of_your_own(tree):
-    """A row that holds a folder and collects as well, as a custom folder's does."""
+    """A row that holds a folder and collects as well, as a custom collection's does."""
     own = _folder_row("Mine", "__custom__/1")
     own.setData(0, DROP_KEY_ROLE, "__custom__/1")
     tree.addTopLevelItem(own)
@@ -362,7 +362,7 @@ def _folder_of_your_own(tree):
 
 
 def test_a_folder_of_your_own_drags_like_any_folder(qtbot, monkeypatch):
-    # Another folder of your own can take it, so its row is picked up as any row is.
+    # Another collection of your own can take it, so its row is picked up as any row is.
     tree, collection, _a, _b = _collecting_tree(qtbot)
     own = _folder_of_your_own(tree)
     started = _started_drags(monkeypatch)
@@ -635,7 +635,7 @@ def _held_at(spot, mime):
 
 
 def test_a_drag_held_at_the_top_edge_jumps_the_tree_to_its_top(qtbot):
-    # Where the folders of your own are, and almost always where the drag is going.
+    # Where the collections of your own are, and almost always where the drag is going.
     tree, bar = _too_long_for_its_height(qtbot)
     bar.setValue(bar.maximum())
     mime = generation_mime("p1")
@@ -811,7 +811,7 @@ def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     own = _folder_row("Keepers", "__custom__/1")
-    own.setIcon(0, icons.custom_folder_icon())
+    own.setIcon(0, icons.custom_collection_icon())
     own.setData(0, DROP_KEY_ROLE, "__custom__/1")
     tree.addTopLevelItem(own)
     tree.show()

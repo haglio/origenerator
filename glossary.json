@@ -990,20 +990,32 @@
       ]
     },
     {
-      "id": "custom_folder",
+      "id": "custom_collection",
       "thing": "a folder he gathered by hand from other folders and items",
       "screen": [
-        "Group the selected folders into a folder of your own",
-        "New folder…"
+        "Group the selected folders into a collection of your own",
+        "New collection…",
+        "Remove collection…",
+        "Add to collection"
       ],
       "his_word": "custom collection (2026-10-30)",
       "code_today": [
-        "custom folder",
-        "custom group"
+        "custom collection"
       ],
       "code_word": "custom collection",
       "status": "ruled",
-      "ruled": "2026-10-30, his words on the glossary's list; the screen's \"folder of your own\", \"New folder…\" and \"Remove folder…\" say collection"
+      "ruled": "2026-10-30, his words on the glossary's list; the screen's \"folder of your own\", \"New folder…\", \"Remove folder…\" and \"Add to folder\" say collection; the stored tables keep their names",
+      "retired": [
+        "custom folder",
+        "custom group"
+      ],
+      "keep": [
+        "custom_folders",
+        "custom_folder_items",
+        "custom_folder_generations",
+        "custom_folder_id",
+        "open_custom, group"
+      ]
     },
     {
       "id": "shape",

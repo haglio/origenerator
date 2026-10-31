@@ -772,7 +772,7 @@ def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_pa
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._browser.showing_recents()  # brand-new folder: watch it cook in the collection
+    assert view._gallery_pane.showing_latest()  # brand-new folder: watch it cook in the collection
     prompt_id = next(iter(view._live_jobs.values())).prompt_id
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)

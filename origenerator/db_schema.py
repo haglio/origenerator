@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS custom_folder_items (
     folder_key    TEXT    NOT NULL,
     level         TEXT,
     ref_prompt_id TEXT,
-    -- The order they were added, so a custom folder lists what it holds that way.
+    -- The order they were added, so a custom collection lists what it holds that way.
     position      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (folder_id, folder_key)
 );
@@ -304,7 +304,7 @@ ADDED_COLUMNS = {
 # Tables under a name this app has stopped using, and the name they carry now.
 # History, like FIRST_SHIPPED in tests/test_db_schema.py: an entry stays here
 # for as long as a database written before the rename might still be opened.
-RENAMED_TABLES = {"custom_folder_members": "custom_folder_items"}
+RENAMED_TABLES = {"custom_collection_members": "custom_folder_items"}
 
 # Every column of the generations table, in declaration order. Used to restore a
 # previously-captured row verbatim (see ``restore_generation``).
@@ -354,7 +354,7 @@ def rename_tables(conn) -> None:
 
     Before the schema script, not after: CREATE TABLE IF NOT EXISTS would
     otherwise stand an empty table up beside the user's populated one, and every
-    row in it -- every custom folder they have ever composed -- would read as
+    row in it -- every custom collection they have ever composed -- would read as
     gone while still sitting in the file.
     """
     have = {row[0] for row in conn.execute(

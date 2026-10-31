@@ -669,7 +669,7 @@ def test_a_folder_the_user_made_takes_no_favorite(qtbot):
     # A favorite of a favorite collection gathers nothing, so its menu offers no
     # Favorite — and the star its row shows on hover must not leave one either.
     view, cat, _dog = _two_leaf_view(qtbot)
-    made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
+    made = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
 
     view._toggle_favorite(made)
 

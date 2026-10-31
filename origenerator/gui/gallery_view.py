@@ -240,15 +240,15 @@ def _row_under(row, folder_key: str):
 
 def _folder_of_your_own_above(rows):
     parent = rows[0].parent()
-    return _saved_custom_folder(parent.data(0, _GROUP_ROLE)) if parent is not None else None
+    return _saved_custom_collection(parent.data(0, _GROUP_ROLE)) if parent is not None else None
 
 
-def _saved_custom_folder(group):
-    return group if isinstance(group, gallery.CustomGroup) and group.folder_id is not None else None
+def _saved_custom_collection(group):
+    return group if isinstance(group, gallery.CustomCollection) and group.folder_id is not None else None
 
 
 def _takes_a_favorite(group) -> bool:
-    return group is not None and not isinstance(group, gallery.CustomGroup)
+    return group is not None and not isinstance(group, gallery.CustomCollection)
 
 
 def _offer_copy_names_above_a_line(menu: QMenu, names: list[str]) -> None:
@@ -271,10 +271,10 @@ def _is_deletable_folder(group) -> bool:
 
     Model, LoRA, source-image, and settings folders live within a workflow folder
     and are fair game; a whole workflow or media folder is off-limits, so a
-    workflow's entire history can never be wiped in one action. A custom folder is
+    workflow's entire history can never be wiped in one action. A custom collection is
     off-limits too, and for a stronger reason: deleting one must remove the
     grouping, never the generations it gathers, so it has its own path
-    (:meth:`GalleryView._remove_custom_folder`) rather than this one.
+    (:meth:`GalleryView._remove_custom_collection`) rather than this one.
     """
     return isinstance(
         group,
@@ -467,7 +467,7 @@ class GalleryView(QWidget):
         # scroll area is its canvas — built here so it can be handed over, placed
         # into the layout by _build_ui.
         self._scroll = GalleryPaneScrollArea()
-        DropTarget(self._scroll, self._landing_in_the_open_custom_folder, self._on_dropped)
+        DropTarget(self._scroll, self._landing_in_the_open_custom_collection, self._on_dropped)
         self._gallery_pane = GalleryPane(
             self._scroll, db, self._jobs, self._auto,
             TreeNavigation(
@@ -513,10 +513,10 @@ class GalleryView(QWidget):
         self._pending_combine_key: str | None = None
         # The user's own folders, resolved against the live tree on each rebuild,
         # and the throwaway one a multi-selection stands up (None with 0 or 1 row
-        # picked). Both are CustomGroups, so the pane, folder path, and slideshow
+        # picked). Both are CustomCollections, so the pane, folder path, and slideshow
         # treat them exactly as they treat a derived folder.
-        self._custom_folders: list = []
-        self._custom_folders_by_side: dict[str, list] = {}
+        self._custom_collections: list = []
+        self._custom_collections_by_side: dict[str, list] = {}
         self._lists_built_from = None
         self._lists_by_side: dict[str, list] = {}
         self._start_frames: dict = {}
@@ -713,7 +713,7 @@ class GalleryView(QWidget):
         # One tree per side, each under a standing label and each scrolling on
         # its own: the tree of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
-        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_folder_takes,
+        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_collection_takes,
                                      takes_folder=self._collecting_row_takes_folder)
         self._tree.offer_separate_and_together(self._fun_time is None)
         self._tree.sides_changed.connect(self._on_sides_changed)
@@ -1599,9 +1599,9 @@ class GalleryView(QWidget):
         unreviewed = self._review_queue(rows)
         held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_folders_by_side = _custom_folders_by_side(
-            trees, self._db.list_custom_folders())
-        self._custom_folders = [folder for folders in self._custom_folders_by_side.values()
+        self._custom_collections_by_side = _custom_collections_by_side(
+            trees, self._db.list_custom_collections())
+        self._custom_collections = [folder for folders in self._custom_collections_by_side.values()
                                 for folder in folders]
         # Re-index for the search field while the rows are in hand: tokenizing every
         # prompt belongs to the rebuild, so a keystroke costs only lookups. Rows
@@ -1620,7 +1620,7 @@ class GalleryView(QWidget):
         # ids drawn from the live tree (see :meth:`search_scope`).
         self._search.index.update(rows + held, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
-            self._custom_folders), item_name=self._item_names.of)
+            self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()
         bumped = gallery.enhancement_recency(rows)
         self._gallery_pane.set_model(
@@ -1721,7 +1721,7 @@ class GalleryView(QWidget):
         return [SideModel(
             side=side,
             tree_model=trees[side],
-            custom_folders=gallery.outermost(self._custom_folders_by_side[side]),
+            custom_collections=gallery.outermost(self._custom_collections_by_side[side]),
             show_latest=bool(trees[side]),
             collection_counts=self._gallery_pane.collection_counts(side),
         ) for side in self._tree.sides]
@@ -2018,8 +2018,8 @@ class GalleryView(QWidget):
     def _show_group_contents(self, group, item):
         if isinstance(group, gallery.SettingsGroup):
             self._gallery_pane.show_thumbnails(group)
-        elif isinstance(group, gallery.CustomGroup):
-            self._gallery_pane.show_custom_folder(group)
+        elif isinstance(group, gallery.CustomCollection):
+            self._gallery_pane.show_custom_collection(group)
         else:
             self._gallery_pane.show_folder_tiles(gallery.child_groups(group),
                                             collections=self._tree_view.collections_in(item))
@@ -2044,7 +2044,7 @@ class GalleryView(QWidget):
 
     def _on_tree_selection_changed(self):
         """Picking several folders shows them together — the same view a saved
-        custom folder gets, since that selection is exactly an unsaved one. Falling
+        custom collection gets, since that selection is exactly an unsaved one. Falling
         back to a single row hands the panes to :meth:`_on_folder_selected`."""
         groups = self._selected_groups()
         if len(groups) > 1:
@@ -2070,7 +2070,7 @@ class GalleryView(QWidget):
         self._experiments_bar.hide()
         self._folder_path.set_display(group.label)
         self._update_folder_average(group)
-        self._gallery_pane.show_custom_folder(group)
+        self._gallery_pane.show_custom_collection(group)
         self._re_aim()
 
     def _restore_multi_selection(self, keys: list[str]):
@@ -2099,15 +2099,15 @@ class GalleryView(QWidget):
             return
         folders = gallery.child_groups(group)
         name, ok = QInputDialog.getText(
-            self, "New Folder",
+            self, "New Collection",
             f"Name for a folder holding these {len(folders)} folders:",
         )
         if not ok or not name.strip():
             return
-        folder_id = self._actions.custom_folders.create(
+        folder_id = self._actions.custom_collections.create(
             name.strip(), [self._folder_identity(f) for f in folders], self.side_in_view()
         )
-        self._open_custom_folder(folder_id)
+        self._open_custom_collection(folder_id)
 
     def _folder_identity(self, group) -> tuple:
         """A gathered folder as ``(key, level, ref_prompt_id)`` — its key plus the
@@ -2116,20 +2116,20 @@ class GalleryView(QWidget):
         return (group.key, gallery.group_level(group),
                 rows[0]["prompt_id"] if rows else None)
 
-    def _open_custom_folder(self, folder_id: int):
+    def _open_custom_collection(self, folder_id: int):
         """Rebuild so the folder has a row, then land on it — the end of every
         action that makes or fills one."""
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
         self._re_aim()
-        item = self._tree_item_for(gallery.custom_folder_key(folder_id))
+        item = self._tree_item_for(gallery.custom_collection_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
 
     def _on_dropped(self, target_key: str, keys: list, prompt_ids: list = ()):
         """Folders or an item dragged onto a collecting row: Favorites favorites the
-        folders (the drag-and-drop way to favorite), a custom folder gathers them
+        folders (the drag-and-drop way to favorite), a custom collection gathers them
         and takes the item."""
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _FAVORITES_KEY:
@@ -2141,60 +2141,60 @@ class GalleryView(QWidget):
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
             return
-        self._actions.custom_folders.add_to(
+        self._actions.custom_collections.add_to(
             folder_id, [self._folder_identity(g) for g in groups], prompt_ids
         )
-        self._open_custom_folder(folder_id)
+        self._open_custom_collection(folder_id)
 
-    def _custom_folder_takes(self, row_key: str, prompt_id: str) -> bool:
-        """Whether the TOC row ``row_key`` is a folder of your own that an item
+    def _custom_collection_takes(self, row_key: str, prompt_id: str) -> bool:
+        """Whether the TOC row ``row_key`` is a collection of your own that an item
         dragged over it can go in: one the gallery shows, on the row's own side."""
         folder = self.group_for_key(row_key)
         leaf = self._leaf_by_id.get(prompt_id)
-        return (isinstance(folder, gallery.CustomGroup) and leaf is not None
+        return (isinstance(folder, gallery.CustomCollection) and leaf is not None
                 and _side_of(leaf.data(0, _TREE_KEY_ROLE)) == _side_of(row_key))
 
     def _collecting_row_takes_folder(self, row_key: str, folder_key: str) -> bool:
-        """Favorites takes any folder that takes a star, a folder of your own any
+        """Favorites takes any folder that takes a star, a collection of your own any
         folder but one that would end up inside itself."""
         target, dragged = self.group_for_key(row_key), self.group_for_key(folder_key)
         if dragged is None:
             return False
-        if isinstance(target, gallery.CustomGroup):
+        if isinstance(target, gallery.CustomCollection):
             return not gallery.holds(dragged, target)
         return _takes_a_favorite(dragged)
 
-    def _landing_in_the_open_custom_folder(self, mime, source):
-        if _saved_custom_folder(self.current_group()) is None:
+    def _landing_in_the_open_custom_collection(self, mime, source):
+        if _saved_custom_collection(self.current_group()) is None:
             return None
         return self._tree.landing_on(self._tree.currentItem(), mime, source)
 
-    def _new_custom_folder(self, side: str):
+    def _new_custom_collection(self, side: str):
         """Make an empty folder of the user's own — the tree's right-click action,
         for when the folders to fill it with are easier dragged in than picked."""
-        name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+        name, ok = QInputDialog.getText(self, "New Collection", "Collection name:")
         if ok and name.strip():
-            self._open_custom_folder(
-                self._actions.custom_folders.create(name.strip(), [], side))
+            self._open_custom_collection(
+                self._actions.custom_collections.create(name.strip(), [], side))
 
-    def _remove_custom_folder(self, group):
+    def _remove_custom_collection(self, group):
         """Delete a folder the user made. Only the grouping goes — what it gathers
         is untouched — so the confirmation says so rather than reading like the
         delete that trashes files."""
         if not self._confirm(f"Remove the folder “{group.label}”?\n\n{_kept_on_removal(group)}"):
             return
-        self._actions.custom_folders.delete(group.folder_id)
+        self._actions.custom_collections.delete(group.folder_id)
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
         self._re_aim()
 
-    def _remove_from_custom_folder(self, group, folder_keys=(), items=()):
-        """Take gathered folders and items out of the custom folder on screen."""
+    def _remove_from_custom_collection(self, group, folder_keys=(), items=()):
+        """Take gathered folders and items out of the custom collection on screen."""
         folders = [self._folder_identity(gathered)
                    if (gathered := self.group_for_key(key)) is not None else (key, None, None)
                    for key in folder_keys]
-        self._actions.custom_folders.remove_from(group.folder_id, folders, items)
+        self._actions.custom_collections.remove_from(group.folder_id, folders, items)
         self.refresh()
         self._re_aim()
 
@@ -2798,7 +2798,7 @@ class GalleryView(QWidget):
             # Several folders picked ARE the grouping, unsaved; one folder is not
             # a grouping, and the button would only ask what it meant.
             group=Button(visible=self._selection_group is not None,
-                         tip="Group the selected folders into a folder of your own"),
+                         tip="Group the selected folders into a collection of your own"),
             favorite=self._favorite_offer(),
             enhance=Button(enabled=enhance.available, tip=enhance.tip),
             delete=self._delete_offer(),
@@ -3608,7 +3608,7 @@ class GalleryView(QWidget):
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
         it the run had to be hunted down among the Job Queue's rows. It sits
-        beside Enhance, the act that started it. And inside a custom folder, what
+        beside Enhance, the act that started it. And inside a custom collection, what
         it holds on its own can be taken back out of it, as its folders can.
         """
         rows = [row for pid in prompt_ids
@@ -3625,7 +3625,7 @@ class GalleryView(QWidget):
             menu, [self._item_names.of(row["prompt_id"]) for row in rows])
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
-        open_custom = _saved_custom_folder(self.current_group())
+        open_custom = _saved_custom_collection(self.current_group())
         held = {row["prompt_id"] for row in open_custom.rows} if open_custom else set()
         held_here = [row["prompt_id"] for row in rows if row["prompt_id"] in held]
         remove_action = (menu.addAction(f"Remove from “{open_custom.label}”")
@@ -3656,7 +3656,7 @@ class GalleryView(QWidget):
         elif chosen is favorite_action:
             self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
         elif remove_action is not None and chosen is remove_action:
-            self._remove_from_custom_folder(open_custom, items=held_here)
+            self._remove_from_custom_collection(open_custom, items=held_here)
         elif enhance_action is not None and chosen is enhance_action:
             self._enhance.enhance_items(to_enhance)
         elif cancel_action is not None and chosen is cancel_action:
@@ -3955,17 +3955,17 @@ class GalleryView(QWidget):
 
     def _empty_tree_context_menu(self, global_pos: QPoint, side: str):
         """Below the last row there is no folder to act on, so the only thing on
-        offer is starting a new folder of your own."""
+        offer is starting a new collection of your own."""
         menu = QMenu(self)
-        new_action = menu.addAction("New folder…")
+        new_action = menu.addAction("New collection…")
         if menu.exec(global_pos) == new_action:
-            self._new_custom_folder(side)
+            self._new_custom_collection(side)
 
     def _selection_context_menu(self, global_pos: QPoint):
         names = _names_of_the_picked_folders(self._selection_group)
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, names)
-        group_action = menu.addAction(f"Group {len(names)} folders into a new folder…")
+        group_action = menu.addAction(f"Group {len(names)} folders into a new collection…")
         doomed = self._current_deletable_folders()
         delete_action = None
         if doomed:
@@ -3985,9 +3985,9 @@ class GalleryView(QWidget):
         if group is None:
             return
         holder = (_folder_of_your_own_above(toc_rows) if toc_rows
-                  else _saved_custom_folder(self.current_group()))
-        if isinstance(group, gallery.CustomGroup):
-            self._custom_folder_context_menu(group, global_pos, holder, toc_rows)
+                  else _saved_custom_collection(self.current_group()))
+        if isinstance(group, gallery.CustomCollection):
+            self._custom_collection_context_menu(group, global_pos, holder, toc_rows)
             return
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
@@ -4003,7 +4003,7 @@ class GalleryView(QWidget):
         if chosen == favorite_action:
             self._toggle_favorite(key)
         elif remove_action is not None and chosen == remove_action:
-            self._remove_from_custom_folder(holder, [group.key])
+            self._remove_from_custom_collection(holder, [group.key])
         elif chosen in add_menu:
             self._on_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
@@ -4014,27 +4014,27 @@ class GalleryView(QWidget):
     def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
         """An "Add to" sub-menu naming each of the user's folders — the menu route
         to what a drag onto its row does, for when dragging is awkward (a long tree,
-        a folder scrolled out of sight). Returns ``{action: custom folder key}``,
+        a folder scrolled out of sight). Returns ``{action: custom collection key}``,
         empty when there are no folders of the user's own yet."""
         side = _side_of(key) or self.side_in_view()
-        targets = [f for f in self._custom_folders_by_side.get(side, ())
+        targets = [f for f in self._custom_collections_by_side.get(side, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
-        submenu = menu.addMenu("Add to folder")
+        submenu = menu.addMenu("Add to collection")
         return {submenu.addAction(folder.label): folder.key for folder in targets}
 
-    def _custom_folder_context_menu(self, group, global_pos: QPoint, holder, toc_rows):
+    def _custom_collection_context_menu(self, group, global_pos: QPoint, holder, toc_rows):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
         take_out_action = _offer_taking_out(menu, holder, group)
-        remove_action = menu.addAction("Remove folder…")
+        remove_action = menu.addAction("Remove collection…")
         collapse_and_expand = offer_collapse_and_expand(menu, toc_rows)
         chosen = menu.exec(global_pos)
         if take_out_action is not None and chosen == take_out_action:
-            self._remove_from_custom_folder(holder, [group.key])
+            self._remove_from_custom_collection(holder, [group.key])
         elif chosen == remove_action:
-            self._remove_custom_folder(group)
+            self._remove_custom_collection(group)
         elif chosen in collapse_and_expand:
             collapse_and_expand[chosen]()
 
@@ -4235,8 +4235,8 @@ def _side_list(rows, meta, start_frames, side, name_of):
                                       image_index=start_frames, name_of=name_of)
 
 
-def _custom_folders_by_side(trees, records) -> dict[str, list]:
-    return {side: gallery.build_custom_folders(
+def _custom_collections_by_side(trees, records) -> dict[str, list]:
+    return {side: gallery.build_custom_collections(
                 tree, [record for record in records
                        if _side_covers(side, record["side"] or _LANDSCAPE)])
             for side, tree in trees.items()}

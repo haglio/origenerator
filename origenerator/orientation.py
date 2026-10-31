@@ -68,7 +68,7 @@ _measured: OrderedDict[str, str] = OrderedDict()
 
 def oriented_key(base_key: str, side: str, inside: tuple[str, ...] = ()) -> str:
     """The tree key of *base_key*'s row on *side*: in its own place, or drawn
-    again inside the folder of your own that *inside* leads down from."""
+    again inside the collection of your own that *inside* leads down from."""
     return f"{base_key}{_SEPARATOR}{side}" + "".join(_INSIDE + key for key in inside)
 
 
@@ -92,7 +92,7 @@ def split_key(key: str | None) -> tuple[str | None, str | None]:
 
 def base_of(key: str | None) -> str | None:
     """The folder a tree key names, with the side stripped off — what a star, a
-    name and a place in a custom folder are all stored under."""
+    name and a place in a custom collection are all stored under."""
     return split_key(key)[0]
 
 

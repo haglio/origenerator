@@ -76,14 +76,14 @@ def index_folders(db) -> Folders:
 
 
 def reconcile_favorites(db) -> dict:
-    if not db.folder_meta_full() and not db.folders_in_custom_folders():
+    if not db.folder_meta_full() and not db.folders_in_custom_collections():
         return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING),
-                "custom_folder_sides": 0}
+                "custom_collection_sides": 0}
     folders = index_folders(db)
     return {
         "folder_meta": reconcile_folder_meta(db, folders),
-        "custom_folders": reconcile_custom_folders(db, folders),
-        "custom_folder_sides": stamp_custom_folder_sides(db, folders),
+        "custom_folders": reconcile_custom_collections(db, folders),
+        "custom_collection_sides": stamp_custom_collection_sides(db, folders),
     }
 
 
@@ -114,15 +114,15 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
     return summary
 
 
-def reconcile_custom_folders(db, folders: Folders | None = None) -> dict:
+def reconcile_custom_collections(db, folders: Folders | None = None) -> dict:
     """Re-point gathered folders whose folder key no longer matches.
 
-    A custom folder gathers folders by key, so it drifts exactly the way a star
+    A custom collection gathers folders by key, so it drifts exactly the way a star
     does — and a grouping the user built by hand is worth no less than a star.
 
     Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
     """
-    gathered = [held for held in db.folders_in_custom_folders()
+    gathered = [held for held in db.folders_in_custom_collections()
                 if gallery.custom_folder_id(held["folder_key"]) is None]
     if not gathered:
         return dict(_NOTHING)
@@ -130,30 +130,30 @@ def reconcile_custom_folders(db, folders: Folders | None = None) -> dict:
 
     def refresh(held, identity):
         level, ref = identity
-        db.stamp_folder_in_custom_folder(held["folder_id"], held["folder_key"],
+        db.stamp_folder_in_custom_collection(held["folder_id"], held["folder_key"],
                                          level=level, ref_prompt_id=ref)
 
     def repoint(held, target, identity):
         level, ref = identity
-        db.repoint_folder_in_custom_folder(held["folder_id"], held["folder_key"],
+        db.repoint_folder_in_custom_collection(held["folder_id"], held["folder_key"],
                                            target, level=level, ref_prompt_id=ref)
 
     summary = _reconcile_keys(gathered, folders, refresh, repoint)
-    logger.info("Reconciled custom folders: %(refreshed)d refreshed, "
+    logger.info("Reconciled custom collections: %(refreshed)d refreshed, "
                 "%(repointed)d re-pointed, %(orphaned)d orphaned", summary)
     return summary
 
 
-def stamp_custom_folder_sides(db, folders: Folders | None = None) -> int:
-    unsided = [record for record in db.list_custom_folders() if record["side"] is None]
+def stamp_custom_collection_sides(db, folders: Folders | None = None) -> int:
+    unsided = [record for record in db.list_custom_collections() if record["side"] is None]
     if not unsided:
         return 0
     folders = index_folders(db) if folders is None else folders
-    for folder in gallery.build_custom_folders(folders.tree, unsided):
+    for folder in gallery.build_custom_collections(folders.tree, unsided):
         shapes = Counter(row_orientation(row) for row in gallery.rows_under(folder))
-        db.set_custom_folder_side(
+        db.set_custom_collection_side(
             folder.folder_id, PORTRAIT if shapes[PORTRAIT] > shapes[LANDSCAPE] else LANDSCAPE)
-    logger.info("Put %d custom folder(s) on a side", len(unsided))
+    logger.info("Put %d custom collection(s) on a side", len(unsided))
     return len(unsided)
 
 

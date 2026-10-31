@@ -8,10 +8,10 @@ from PIL import Image
 from origenerator import favorite_reconcile, gallery
 from origenerator.db import Database
 from origenerator.favorite_reconcile import (
-    reconcile_custom_folders,
+    reconcile_custom_collections,
     reconcile_favorites,
     reconcile_folder_meta,
-    stamp_custom_folder_sides,
+    stamp_custom_collection_sides,
 )
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
@@ -399,11 +399,11 @@ def test_reconcile_with_no_favorites_is_a_noop(tmp_path):
     assert reconcile_folder_meta(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 
-# --- reconciling what a custom folder holds ----------------------------------
+# --- reconciling what a custom collection holds ----------------------------------
 
 def _folder_holding(db, *folders):
-    folder_id = db.create_custom_folder("Favorites")
-    db.add_folders_to_custom_folder(folder_id, list(folders))
+    folder_id = db.create_custom_collection("Favorites")
+    db.add_folders_to_custom_collection(folder_id, list(folders))
     return folder_id
 
 
@@ -416,9 +416,9 @@ def test_reconcile_repoints_a_gathered_folder_orphaned_by_a_formula_change(tmp_p
     current_key = gallery.settings_folder_key(row)
     folder_id = _folder_holding(db, (legacy_key, None, None))
 
-    summary = reconcile_custom_folders(db)
+    summary = reconcile_custom_collections(db)
 
-    (record,) = db.list_custom_folders()
+    (record,) = db.list_custom_collections()
     assert record["folders"] == [current_key]  # the grouping followed the folder
     assert record["id"] == folder_id
     assert summary["repointed"] == 1
@@ -430,9 +430,9 @@ def test_reconcile_backfills_identity_onto_a_live_gathered_folder(tmp_path):
                          filename="sdxl_t2i_p1.png")
     _folder_holding(db, (gallery.settings_folder_key(row), None, None))
 
-    summary = reconcile_custom_folders(db)
+    summary = reconcile_custom_collections(db)
 
-    (held,) = db.folders_in_custom_folders()
+    (held,) = db.folders_in_custom_collections()
     assert (held["level"], held["ref_prompt_id"]) == ("settings", "p1")
     assert summary["refreshed"] == 1
 
@@ -451,9 +451,9 @@ def test_reconcile_remaps_a_gathered_folder_through_its_stored_identity(tmp_path
     new_key = gallery.settings_folder_key(row)
     assert new_key != key
 
-    summary = reconcile_custom_folders(db)
+    summary = reconcile_custom_collections(db)
 
-    assert db.list_custom_folders()[0]["folders"] == [new_key]
+    assert db.list_custom_collections()[0]["folders"] == [new_key]
     assert summary["repointed"] == 1
 
 
@@ -466,9 +466,9 @@ def test_reconcile_keeps_a_gathered_folder_that_is_simply_gone(tmp_path):
     dead = "image/sdxl_t2i/000000000000"
     _folder_holding(db, (dead, None, None))
 
-    summary = reconcile_custom_folders(db)
+    summary = reconcile_custom_collections(db)
 
-    assert db.list_custom_folders()[0]["folders"] == [dead]
+    assert db.list_custom_collections()[0]["folders"] == [dead]
     assert summary["orphaned"] == 1
 
 
@@ -477,12 +477,12 @@ def test_reconcile_leaves_a_custom_folder_inside_another_as_it_is(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
-    inner = gallery.custom_folder_key(db.create_custom_folder("Inner"))
+    inner = gallery.custom_collection_key(db.create_custom_collection("Inner"))
     _folder_holding(db, (inner, "custom", "p1"))
 
-    summary = reconcile_custom_folders(db)
+    summary = reconcile_custom_collections(db)
 
-    assert db.list_custom_folders()[1]["folders"] == [inner]
+    assert db.list_custom_collections()[1]["folders"] == [inner]
     assert summary == {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 
@@ -490,10 +490,10 @@ def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
-    assert reconcile_custom_folders(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
+    assert reconcile_custom_collections(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 
-# --- the side a custom folder saved before folders had one is put on ----------
+# --- the side a custom collection saved before folders had one is put on ----------
 
 def _shaped(db, pid, width, height):
     return _add_completed(db, pid, params={"positive_prompt": "a cat", "steps": 30, "seed": 1,
@@ -507,11 +507,11 @@ def test_a_folder_saved_before_folders_had_a_side_is_put_where_most_of_what_it_g
     rows = [_shaped(db, "t1", 100, 200), _shaped(db, "t2", 100, 200), _shaped(db, "w1", 200, 100)]
     gathering = _folder_holding(db, *{(gallery.settings_folder_key(row), None, None)
                                       for row in rows})
-    empty = db.create_custom_folder("Later")
+    empty = db.create_custom_collection("Later")
 
     reconcile_favorites(db)
 
-    assert {record["id"]: record["side"] for record in db.list_custom_folders()} == {
+    assert {record["id"]: record["side"] for record in db.list_custom_collections()} == {
         gathering: PORTRAIT, empty: LANDSCAPE}
 
 
@@ -523,18 +523,18 @@ def test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_a
 
     reconcile_favorites(db)
 
-    assert db.list_custom_folders()[0]["side"] == PORTRAIT
+    assert db.list_custom_collections()[0]["side"] == PORTRAIT
 
 
 def test_a_folder_that_has_a_side_keeps_it_whatever_it_gathers(tmp_path):
     db = Database(tmp_path / "t.db")
     tall = _shaped(db, "t1", 100, 200)
-    folder_id = db.create_custom_folder("Mine", side=LANDSCAPE)
-    db.add_folders_to_custom_folder(folder_id, [(gallery.settings_folder_key(tall), None, None)])
+    folder_id = db.create_custom_collection("Mine", side=LANDSCAPE)
+    db.add_folders_to_custom_collection(folder_id, [(gallery.settings_folder_key(tall), None, None)])
 
     reconcile_favorites(db)
 
-    assert db.list_custom_folders()[0]["side"] == LANDSCAPE
+    assert db.list_custom_collections()[0]["side"] == LANDSCAPE
 
 
 # --- one reading of the tree, for both passes ---------------------------------
@@ -548,8 +548,8 @@ def _a_library_with_both_kinds_of_favorite(tmp_path):
                          filename="sdxl_t2i_p1.png")
     legacy_key = gallery.legacy_settings_folder_key(row)
     db.set_folder_favorite(legacy_key, True)
-    folder_id = db.create_custom_folder("Scene One")
-    db.add_folders_to_custom_folder(folder_id, [(legacy_key, None, None)])
+    folder_id = db.create_custom_collection("Scene One")
+    db.add_folders_to_custom_collection(folder_id, [(legacy_key, None, None)])
     return db, row, legacy_key
 
 
@@ -576,12 +576,12 @@ def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_p
 
     together = favorite_reconcile.reconcile_favorites(shared_db)
     apart = {"folder_meta": reconcile_folder_meta(apart_db),
-             "custom_folders": reconcile_custom_folders(apart_db),
-             "custom_folder_sides": stamp_custom_folder_sides(apart_db)}
+             "custom_folders": reconcile_custom_collections(apart_db),
+             "custom_collection_sides": stamp_custom_collection_sides(apart_db)}
 
     assert together == apart
     assert shared_db.folder_meta_map() == apart_db.folder_meta_map()
-    assert shared_db.list_custom_folders() == apart_db.list_custom_folders()
+    assert shared_db.list_custom_collections() == apart_db.list_custom_collections()
 
 
 def test_neither_favorite_pass_touches_a_generation(tmp_path):
@@ -598,17 +598,17 @@ def test_neither_favorite_pass_touches_a_generation(tmp_path):
 
 def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path, monkeypatch):
     """The order the boot ran them in, kept now that one call runs both. A
-    custom folder gathers the same keys a star sits on, so the star's move is
+    custom collection gathers the same keys a star sits on, so the star's move is
     the one that has to be settled first."""
     db, _row, _legacy = _a_library_with_both_kinds_of_favorite(tmp_path)
     ran = []
-    for name in ("reconcile_folder_meta", "reconcile_custom_folders"):
-        monkeypatch.setattr(bookmark_reconcile, name,
-                            _recording(ran, name, getattr(bookmark_reconcile, name)))
+    for name in ("reconcile_folder_meta", "reconcile_custom_collections"):
+        monkeypatch.setattr(favorite_reconcile, name,
+                            _recording(ran, name, getattr(favorite_reconcile, name)))
 
     favorite_reconcile.reconcile_favorites(db)
 
-    assert ran == ["reconcile_folder_meta", "reconcile_custom_folders"]
+    assert ran == ["reconcile_folder_meta", "reconcile_custom_collections"]
 
 
 def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
@@ -625,4 +625,4 @@ def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
     assert builds == []
     assert summaries == {"folder_meta": {"refreshed": 0, "repointed": 0, "orphaned": 0},
                          "custom_folders": {"refreshed": 0, "repointed": 0, "orphaned": 0},
-                         "custom_folder_sides": 0}
+                         "custom_collection_sides": 0}

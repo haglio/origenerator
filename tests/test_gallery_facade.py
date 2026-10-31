@@ -20,18 +20,18 @@ _PACKAGE = ROOT / "origenerator" / "gallery"
 # the GUI reaches most of these as gallery.X and nothing else records what the
 # facade owes its callers.
 PUBLISHED = {
-    "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomGroup",
+    "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomCollection",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
     "EnhanceVersion", "EnhanceSettings", "GENERATION_SEED_KEYS",
     "JobKind", "LoraGroup",
     "MATCH_SOURCE_MODEL", "MEDIA_LABELS", "MediaGroup", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_if_made",
-    "build_custom_folders", "build_gallery_tree", "build_image_config_index",
+    "build_custom_collections", "build_gallery_tree", "build_image_config_index",
     "child_groups", "combined_params", "command_phrases", "config_folder_key",
     "config_folder_name",
     "generate_tab_title", "custom_folder_id",
-    "custom_folder_key", "default_enhance_params", "describe_enhance_params",
+    "custom_collection_key", "default_enhance_params", "describe_enhance_params",
     "disown_foreign_runs",
     "displayed_versions", "enhancement_versions", "enhance_params_for",
     "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",

@@ -43,8 +43,8 @@ def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> N
                                   custom_name=folder_meta.get("custom_name"),
                                   favorite=bool(folder_meta.get("starred")),
                                   level=folder_meta.get("level"), ref_prompt_id=stays)
-    db.repoint_item_in_custom_folders(gone, stays)
-    for held in db.folders_in_custom_folders():
+    db.repoint_item_in_custom_collections(gone, stays)
+    for held in db.folders_in_custom_collections():
         if held.get("ref_prompt_id") == gone:
-            db.stamp_folder_in_custom_folder(held["folder_id"], held["folder_key"],
+            db.stamp_folder_in_custom_collection(held["folder_id"], held["folder_key"],
                                              level=held.get("level"), ref_prompt_id=stays)

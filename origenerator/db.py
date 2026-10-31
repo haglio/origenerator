@@ -3,7 +3,7 @@
 `Database` is a facade. Each table's queries live in their own module —
 :mod:`origenerator.db_generations`, :mod:`~origenerator.db_trash`,
 :mod:`~origenerator.db_requests`, :mod:`~origenerator.db_folder_meta`,
-:mod:`~origenerator.db_custom_folders` — and this holds one of each, forwarding the method names ~700 call sites across
+:mod:`~origenerator.db_custom_collections` — and this holds one of each, forwarding the method names ~700 call sites across
 this package, the gui package and the suite already spell.
 
 **Hand a unit the store it needs, not this.** Every consumer here uses a
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile
-from origenerator.db_custom_folders import CustomFolderStore
+from origenerator.db_custom_collections import CustomCollectionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_item_numbers import ItemNumberStore
@@ -51,7 +51,7 @@ class Database:
         self.seed_uses = SeedUseStore(file)
         self.combine_video_uses = CombineVideoUseStore(file)
         self.folder_meta = FolderMetaStore(file)
-        self.custom_folders = CustomFolderStore(file)
+        self.custom_collections = CustomCollectionStore(file)
         self.item_numbers = ItemNumberStore(file)
 
     # --- generations (see origenerator.db_generations) -----------------------
@@ -279,45 +279,45 @@ class Database:
         return self.folder_meta.delete_folder_meta(folder_key)
 
 
-    # --- custom folders (see origenerator.db_custom_folders) ----------------
+    # --- custom collections (see origenerator.db_custom_collections) ----------------
 
-    def create_custom_folder(self, name: str, folder_id: int | None = None,
+    def create_custom_collection(self, name: str, folder_id: int | None = None,
                              side: str | None = None) -> int:
-        return self.custom_folders.create_custom_folder(name, folder_id, side)
+        return self.custom_collections.create_custom_collection(name, folder_id, side)
 
-    def set_custom_folder_side(self, folder_id: int, side: str):
-        return self.custom_folders.set_custom_folder_side(folder_id, side)
+    def set_custom_collection_side(self, folder_id: int, side: str):
+        return self.custom_collections.set_custom_collection_side(folder_id, side)
 
-    def delete_custom_folder(self, folder_id: int):
-        return self.custom_folders.delete_custom_folder(folder_id)
+    def delete_custom_collection(self, folder_id: int):
+        return self.custom_collections.delete_custom_collection(folder_id)
 
-    def add_folders_to_custom_folder(self, folder_id: int, folders: list[tuple]):
-        return self.custom_folders.add_folders_to_custom_folder(folder_id, folders)
+    def add_folders_to_custom_collection(self, folder_id: int, folders: list[tuple]):
+        return self.custom_collections.add_folders_to_custom_collection(folder_id, folders)
 
-    def add_items_to_custom_folder(self, folder_id: int, prompt_ids: list[str]):
-        return self.custom_folders.add_items_to_custom_folder(folder_id, prompt_ids)
+    def add_items_to_custom_collection(self, folder_id: int, prompt_ids: list[str]):
+        return self.custom_collections.add_items_to_custom_collection(folder_id, prompt_ids)
 
-    def remove_items_from_custom_folder(self, folder_id: int, prompt_ids: list[str]):
-        return self.custom_folders.remove_items_from_custom_folder(folder_id, prompt_ids)
+    def remove_items_from_custom_collection(self, folder_id: int, prompt_ids: list[str]):
+        return self.custom_collections.remove_items_from_custom_collection(folder_id, prompt_ids)
 
-    def repoint_item_in_custom_folders(self, old_prompt_id: str, new_prompt_id: str):
-        return self.custom_folders.repoint_item_in_custom_folders(old_prompt_id, new_prompt_id)
+    def repoint_item_in_custom_collections(self, old_prompt_id: str, new_prompt_id: str):
+        return self.custom_collections.repoint_item_in_custom_collections(old_prompt_id, new_prompt_id)
 
-    def remove_folder_from_custom_folder(self, folder_id: int, folder_key: str):
-        return self.custom_folders.remove_folder_from_custom_folder(folder_id, folder_key)
+    def remove_folder_from_custom_collection(self, folder_id: int, folder_key: str):
+        return self.custom_collections.remove_folder_from_custom_collection(folder_id, folder_key)
 
-    def list_custom_folders(self) -> list[dict]:
-        return self.custom_folders.list_custom_folders()
+    def list_custom_collections(self) -> list[dict]:
+        return self.custom_collections.list_custom_collections()
 
-    def folders_in_custom_folders(self) -> list[dict]:
-        return self.custom_folders.folders_in_custom_folders()
+    def folders_in_custom_collections(self) -> list[dict]:
+        return self.custom_collections.folders_in_custom_collections()
 
-    def repoint_folder_in_custom_folder(self, folder_id: int, old_key: str, new_key: str,
+    def repoint_folder_in_custom_collection(self, folder_id: int, old_key: str, new_key: str,
                                         *, level: str | None, ref_prompt_id: str | None):
-        return self.custom_folders.repoint_folder_in_custom_folder(
+        return self.custom_collections.repoint_folder_in_custom_collection(
             folder_id, old_key, new_key, level=level, ref_prompt_id=ref_prompt_id)
 
-    def stamp_folder_in_custom_folder(self, folder_id: int, folder_key: str,
+    def stamp_folder_in_custom_collection(self, folder_id: int, folder_key: str,
                                       *, level: str | None, ref_prompt_id: str | None):
-        return self.custom_folders.stamp_folder_in_custom_folder(
+        return self.custom_collections.stamp_folder_in_custom_collection(
             folder_id, folder_key, level=level, ref_prompt_id=ref_prompt_id)

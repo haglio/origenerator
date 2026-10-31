@@ -628,8 +628,8 @@ class GalleryPane(QObject):
 
     # --- a folder the user composed: what it gathers, wherever that lives ---
 
-    def show_custom_folder(self, group):
-        """Render a custom folder (saved, or the live multi-selection) the way
+    def show_custom_collection(self, group):
+        """Render a custom collection (saved, or the live multi-selection) the way
         Favorites shows what it gathers."""
         self._show_gathered(group.rows, gallery.child_groups(group), show_favorites=True,
                             empty=f"“{group.label}” is empty.\n\nDrag folders from the list, "

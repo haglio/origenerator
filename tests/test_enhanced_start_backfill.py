@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from origenerator import downtime, gallery, recovery
+from origenerator import downtime, gallery, trash_collection
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -388,12 +388,12 @@ def _thumbnails(tmp_path):
 def _fold(db, tmp_path):
     trash = GalleryActions(db, _places(tmp_path), Trash(tmp_path / "trash")).delete_rows
     folded = fold_completed_backfill(db, _places(tmp_path), _thumbnails(tmp_path), trash=trash)
-    return folded, [record["prompt_id"] for record in db.list_deletions()
+    return folded, [record["prompt_id"] for record in db.list_trashed()
                     if not record["row"].get("old_version_of")]
 
 
 def _old_versions_in_trash(db, tmp_path):
-    return [row for row in recovery.bin_items(db.list_deletions()) if row.get("old_version_of")]
+    return [row for row in trash_collection.trash_items(db.list_trashed()) if row.get("old_version_of")]
 
 
 def test_a_finished_backfill_run_becomes_its_old_video_which_keeps_its_star_and_sends(

@@ -98,10 +98,10 @@ def test_a_file_that_is_simply_gone_keeps_saying_where_it_was(tmp_path):
     assert _files(db, "a")[0]["subfolder"] == "image"
 
 
-def test_a_file_the_recovery_bin_holds_is_not_followed(tmp_path):
-    """A binned file carries an absolute ``path`` of its own — its place inside
+def test_a_file_the_trash_holds_is_not_followed(tmp_path):
+    """A trashed file carries an absolute ``path`` of its own — its place inside
     the trash. A copy left over in the output tree must not pull the row back
-    out of the bin."""
+    out of the Trash."""
     trashed = tmp_path / "trash" / "held.png"
     trashed.parent.mkdir()
     trashed.write_bytes(b"png")

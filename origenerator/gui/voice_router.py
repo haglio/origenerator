@@ -741,7 +741,7 @@ class VoiceRouter(QObject):
         QThreadPool.globalInstance().start(ReviseTask(
             self._revision, (row, workflow, params, spoken, side),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
-            spoken.text,
+            spoken.text, in_scenes=workflow.tells_a_story(),
         ))
 
     def _on_revised(self, context, revision) -> None:

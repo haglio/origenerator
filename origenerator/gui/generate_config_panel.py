@@ -1756,7 +1756,8 @@ class GenerateConfigPanel(DropZone):
             self._param_form.request_field().done()
             return
         QThreadPool.globalInstance().start(ReviseTask(
-            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words))
+            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words,
+            in_scenes=self._param_form.tells_a_story()))
 
     def _on_rewritten(self, context, revision) -> None:
         asked, prompt_id = context

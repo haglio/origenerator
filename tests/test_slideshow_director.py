@@ -145,6 +145,7 @@ class FakeSlideshow:
         self.hud = hud
         self.levels = levels
         self.played.append(list(items))
+        self.played_with = kwargs
 
     def set_levels(self, levels):
         self.levels = levels
@@ -442,6 +443,7 @@ class FakeHost:
         self.core = object()
         self.visible = [row["prompt_id"] for row in self.rows]
         self.picked = []
+        self.holding = None
 
     def slideshow_location(self):
         return self.location
@@ -473,6 +475,12 @@ class FakeHost:
 
     def queue_now(self):
         return self.queue
+
+    def off_thread(self, work, done):
+        if self.holding is None:
+            done(work())
+        else:
+            self.holding.append(lambda: done(work()))
 
     def window(self):
         return self.core
@@ -654,6 +662,23 @@ def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(sli
 
     (slideshow,) = made
     assert slideshow.hud.order_label == LATEST_LABEL
+
+
+def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_folder_is_ready(
+        slideshows):
+    # Worked out whole before anything showed, a folder of thousands held its
+    # slideshow back for a second or more.
+    host = FakeHost(rows=[_row("a3"), _row("a2"), _row("a1")])
+    host.holding = []
+    director, _host, made = slideshows(host)
+
+    director.open_on_preview(("a2.png", "image"), "a2")
+
+    assert [item[2] for item in made[0].items] == ["a2"]
+    (fill_in,) = host.holding
+    fill_in()
+    assert [item[2] for item in made[0].items] == ["a3", "a2", "a1"]
+    assert made[0].played_with["start"] == 1
 
 
 def test_a_double_clicked_item_plays_the_rows_the_browser_listed_without_reading_each_again(

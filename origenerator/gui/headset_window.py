@@ -17,13 +17,13 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+from app_support.frame_channel import FrameWriter
 from funestra.file_channel import consume_command_file
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
 from PyQt6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator.frame_channel import FrameWriter
 from origenerator.fun_time_mode import (
     HEADSET_DRAG,
     HEADSET_HOVER,

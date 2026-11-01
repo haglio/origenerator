@@ -14,7 +14,7 @@ from PyQt6.QtCore import (
 )
 
 from origenerator import (
-    act_settings,
+    action_settings,
     config,
     gallery,
     motion_engine,
@@ -845,18 +845,18 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
 # --- "animate as go now", spoken over a fullscreen image -------------------
 
 
-_SPOKEN_LOOP = AnimateRequest(act_settings.GENAU, "")
+_SPOKEN_LOOP = AnimateRequest(action_settings.GENAU, "")
 
 
 def test_a_spoken_loop_takes_the_one_act_the_sorted_image_leaves(qtbot, tmp_path,
                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    # "img_act" is sorted, and its state leaves the Genau lane one act, so the
+    # "img_action" is sorted, and its state leaves the Genau lane one act, so the
     # command needs none said.
-    prompt_id, message, kind = view.animate_it("img_act", _SPOKEN_LOOP)
+    prompt_id, message, kind = view.animate_it("img_action", _SPOKEN_LOOP)
 
-    assert prompt_id == "img_act"
+    assert prompt_id == "img_action"
     assert "alpha" in message
     assert kind == INFO
     job = next(iter(view._live_jobs.values()))
@@ -881,7 +881,7 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
 def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    # A sorted image of a state whose act the gallery holds no looping clip of.
+    # A sorted image of a state whose act the gallery holds no looping video of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="another image", seed=3,
@@ -920,14 +920,14 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
                                                                 monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    surface = _VoiceSurface("img_act")
+    surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     # Answered in the surface's own corner, not in a dialog over it — the speaker
     # is looking at the image, not at this pane.
-    assert surface.noted[0] == "img_act"
+    assert surface.noted[0] == "img_action"
     assert "alpha" in surface.noted[1]
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
@@ -943,7 +943,7 @@ def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, mo
     # and the image on screen doesn't change. Two identical runs would spend
     # minutes of the one GPU making a video that is already coming.
     view = _genau_view(qtbot, tmp_path)
-    surface = _VoiceSurface("img_act")
+    surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
@@ -960,7 +960,7 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
     # A video that has arrived is still a video of this image — asking again
     # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path)
-    surface = _VoiceSurface("img_act")
+    surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
@@ -979,7 +979,7 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     # Asking again is the only way to get a video after a failure, so a row that
     # produced nothing must not read as this image having been Genau'd.
     view = _genau_view(qtbot, tmp_path)
-    view._slideshows._slideshow = _VoiceSurface("img_act")
+    view._slideshows._slideshow = _VoiceSurface("img_action")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     (failed,) = _spoken_genau_rows(view)
@@ -995,8 +995,8 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path)
-    view._combine.generate_category("img_act", "alpha", act_settings.GENAU)
-    view._slideshows._slideshow = _VoiceSurface("img_act")
+    view._combine.generate_category("img_action", "alpha", action_settings.GENAU)
+    view._slideshows._slideshow = _VoiceSurface("img_action")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 

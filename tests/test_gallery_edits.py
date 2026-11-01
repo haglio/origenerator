@@ -5,7 +5,7 @@ from pathlib import Path
 
 from origenerator.db import Database
 from origenerator.gallery import enhancement_versions, is_enhanced_row
-from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
+from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 
@@ -40,7 +40,7 @@ def _actions(tmp_path, limit=50, release_files=None, cancel_enhancements=None):
     trash = Trash(tmp_path / "trash")
     environment = GalleryEnvironment(release_files=release_files,
                                      cancel_enhancements=cancel_enhancements)
-    return GalleryActions(db, OutputPlaces.in_one_folder(output_dir), trash, limit=limit,
+    return GalleryEdits(db, OutputPlaces.in_one_folder(output_dir), trash, limit=limit,
                           environment=environment), db, output_dir
 
 
@@ -637,12 +637,12 @@ class TestTheFoldersItWasGiven:
 
     def test_the_output_places_are_the_ones_it_was_built_with(self, tmp_path):
         places = OutputPlaces.in_one_folder(tmp_path / "output")
-        actions = GalleryActions(Database(tmp_path / "test.db"), places, Trash(tmp_path / "trash"))
+        actions = GalleryEdits(Database(tmp_path / "test.db"), places, Trash(tmp_path / "trash"))
 
         assert actions.places == places
 
     def test_the_thumbnail_folder_comes_from_the_environment_it_was_given(self, tmp_path):
-        actions = GalleryActions(
+        actions = GalleryEdits(
             Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(tmp_path / "output"),
             Trash(tmp_path / "trash"),
             environment=GalleryEnvironment(thumb_dir=tmp_path / "thumbs"))
@@ -652,6 +652,6 @@ class TestTheFoldersItWasGiven:
     def test_no_thumbnail_folder_is_answered_rather_than_raised(self, tmp_path):
         """Every part of the environment is optional, and each absence costs
         something rather than failing -- see GalleryEnvironment."""
-        actions = GalleryActions(Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(tmp_path / "output"), Trash(tmp_path / "trash"))
+        actions = GalleryEdits(Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(tmp_path / "output"), Trash(tmp_path / "trash"))
 
         assert actions.thumb_dir is None

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.act_settings import lane_of
+from origenerator.action_settings import lane_of
 
 
 def video_history(videos, intent: str, combinations=(), uses=()) -> list[dict]:

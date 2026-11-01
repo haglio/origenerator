@@ -68,7 +68,7 @@ def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
     # and an enhancing thumbnail say theirs.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Waiting…"
+    assert tile._status_scrim.text() == "Waiting…"
     assert not tile._cancel.isHidden()
     assert tile._cancel.text() == "Cancel"
 
@@ -155,7 +155,7 @@ def test_started_signal_switches_the_scrim_to_generating(qtbot):
     qtbot.addWidget(tile)
     job._state = "running"
     job.started.emit()
-    assert tile._scrim.text() == "Generating…"
+    assert tile._status_scrim.text() == "Generating…"
 
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
@@ -270,7 +270,7 @@ def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
     tile = GeneratingTile(job)
     qtbot.addWidget(tile)
     assert _has_image(tile)
-    assert tile._scrim.text() == "Generating…"
+    assert tile._status_scrim.text() == "Generating…"
     assert tile._bar.caption().startswith("50% · ")
 
 

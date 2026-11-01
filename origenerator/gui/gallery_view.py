@@ -1461,6 +1461,7 @@ class GalleryView(QWidget):
         self._fingerprint = fingerprint
         if moved or not only_if_moved:
             self._rebuild(rows, meta)
+            self._slideshows.library_moved()
         # The tree a rebuild makes is what the base state is read from, and
         # the session's open can land before the first one (its launch races
         # this app's boot).  Filling here costs nothing when the regions are

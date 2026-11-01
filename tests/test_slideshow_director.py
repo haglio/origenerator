@@ -2708,3 +2708,65 @@ def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_follow
     assert made[0].items == [("a.png", "image", "g1", None)]
     assert made[0].generating == [("g-run", b"frame")]
     assert (made[0].follows, made[0].leads) == (1, 0)
+
+
+def _a_session_side_with_its_opening_ready(slideshows, qtbot, browser):
+    director, host, made = slideshows(browser=browser,
+                                      fun_time=FakeSession(funestras={PORTRAIT: object()}))
+    director.make_the_openings_ready()
+    qtbot.waitUntil(lambda: director._openings.of(PORTRAIT) is not None)
+    return director, host, made
+
+
+def test_a_side_with_its_opening_ready_opens_without_walking_the_library(
+        slideshows, qtbot, monkeypatch):
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4"), _row("g5")]})
+    director, _host, made = _a_session_side_with_its_opening_ready(slideshows, qtbot, browser)
+
+    def walked(_rows):
+        raise AssertionError("walked the library on the press")
+
+    monkeypatch.setattr(director, "items_of", walked)
+    monkeypatch.setattr(director, "versions_of", walked)
+
+    director.fill_the_region(PORTRAIT)
+
+    assert [item[2] for item in made[-1].items] == ["g4", "g5"]
+
+
+def test_the_library_moving_leaves_no_opening_from_before_it(slideshows, qtbot):
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, made = _a_session_side_with_its_opening_ready(slideshows, qtbot, browser)
+
+    browser.collections[ALL_PORTRAIT] = [_row("g4"), _row("g5")]
+    director.library_moved()
+    director.fill_the_region(PORTRAIT)
+
+    assert [item[2] for item in made[-1].items] == ["g4", "g5"]
+
+
+def test_a_side_let_go_gets_its_next_opening_ready(slideshows, monkeypatch):
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, _made = slideshows(browser=browser,
+                                        fun_time=FakeSession(funestras={PORTRAIT: object()}))
+    director.fill_the_region(PORTRAIT)
+    asked = []
+    monkeypatch.setattr(director._openings, "make_ready", asked.append)
+
+    director.close_the_slideshow(PORTRAIT)
+
+    assert asked == [PORTRAIT]
+
+
+def test_nothing_is_made_ready_for_a_side_with_a_slideshow_up_or_no_funestra(
+        slideshows, monkeypatch):
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, _made = slideshows(browser=browser,
+                                        fun_time=FakeSession(funestras={PORTRAIT: object()}))
+    director.fill_the_region(PORTRAIT)
+    asked = []
+    monkeypatch.setattr(director._openings, "make_ready", asked.append)
+
+    director.make_the_openings_ready()
+
+    assert asked == []

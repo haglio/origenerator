@@ -22,13 +22,14 @@ import logging
 import time
 from dataclasses import asdict, dataclass, replace
 from functools import partial
+from random import randrange
 from typing import Protocol
 
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.modes import read_mode
 from funestra.volume import VolumeHud
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QWidget
 from shared_ui.orientation import orientation_of_size
 
@@ -42,6 +43,7 @@ from origenerator.config import (
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
 from origenerator.fun_time_mode import majority_shape, region_for_items
+from origenerator.funscript import funscript_of
 from origenerator.gallery.collection import (
     ENHANCED_KEY as _ENHANCED_KEY,
 )
@@ -61,6 +63,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.level_stepper import Version
 from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -98,6 +101,8 @@ from origenerator.workflows.detail_parts import parts_framed_together
 logger = logging.getLogger(__name__)
 
 _ABOUT_THE_SLIDE_SAID_OVER = frozenset({AppCommand.CULL, AppCommand.FAVORITE, AppCommand.LOCK})
+
+_OPENINGS_KEPT_FRESH_MS = 10 * 60 * 1000
 
 _REGION_CAPTIONS = {"portrait": "Origenerator Portrait", "landscape": "Origenerator Landscape"}
 _SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
@@ -313,6 +318,11 @@ class SlideshowDirector:
         # each back: a region it wants is never left empty -- what covers it
         # may end, but the base state comes back under it.
         self._regions_wanted: set[str] = set()
+        self._openings = RegionOpenings(self._rows_of_the_base_state, self._opening_of,
+                                        self._with_its_lead_on_the_map)
+        self._openings_kept_fresh = QTimer()
+        self._openings_kept_fresh.setInterval(_OPENINGS_KEPT_FRESH_MS)
+        self._openings_kept_fresh.timeout.connect(self.make_the_openings_ready)
         # Slideshows asked for on a side the session has not handed over yet.
         self._asked_for: dict[str, partial] = {}
         # Inside Fun Time, what occupies each satellite region — a slideshow per
@@ -345,6 +355,7 @@ class SlideshowDirector:
         self._motion = None
         self._region_slideshows = dict.fromkeys(_ORIENTATIONS)
         self._region_paces = {}
+        self.make_the_openings_ready()
 
     def become_standalone(self, motion) -> None:
         self._taken_into_the_session = {}
@@ -574,8 +585,10 @@ class SlideshowDirector:
             items, kwargs["start"] = folder_items or [], None
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
+        opening = kwargs.pop("opening", None)
         hud = replace(kwargs.pop("hud", HudFacts()),
-                      enhanced_ids=self._enhanced_ids_of(rows),
+                      enhanced_ids=(self._enhanced_ids_of(rows) if opening is None
+                                    else opening.enhanced_ids),
                       enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
@@ -584,7 +597,7 @@ class SlideshowDirector:
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
             slideshow = self._hand_to_the_funestra(items, where, channel, actions=actions,
-                                            hud=hud, levels=levels, **kwargs)
+                                            hud=hud, levels=levels, opening=opening, **kwargs)
         else:
             shape = (_shape_it_opens_on(where, rows, items,
                                         _item_opened_on(items, kwargs.get("start"), resume))
@@ -695,7 +708,7 @@ class SlideshowDirector:
             self.pause_or_play_the_room()
 
     def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
-                            levels, **kwargs):
+                            levels, opening=None, **kwargs):
         """A slideshow on one of the session's Funestras: the set goes to the Funestra
         and the HUD this app publishes goes with it — no window of ours."""
         occupant = self.region_slideshow(side)
@@ -705,7 +718,7 @@ class SlideshowDirector:
         slideshow = FunestraSlideshow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace_on(side), hud=hud,
-                          levels=levels, say=self._host.say, **kwargs)
+                          levels=levels, say=self._host.say, opening=opening, **kwargs)
         self._region_slideshows[side] = slideshow
         # A slideshow opened while the hosting session is frozen opens frozen, the
         # way a window one does.
@@ -1131,6 +1144,7 @@ class SlideshowDirector:
         slideshow = self.region_slideshow(side)
         if slideshow is not None:
             slideshow.close()
+        self._make_ready_what_opens_next(side)
 
     def _pick_where_it_played(self, prompt_id: str):
         """A slideshow handed its slide over on the way out: pick that item where
@@ -1200,17 +1214,47 @@ class SlideshowDirector:
         library has grown.
         """
         began = time.perf_counter()
-        key = self.base_location(side)
-        rows = self.rows_at(key)
-        items = self.items_of(rows)
-        if not items:
+        opening = self._openings.of(side) or self._opening_of(self._rows_of_the_base_state(side))
+        if not opening.items:
             return False
-        self.open(items, rows=rows, location=key, side=side,
-                  hud=HudFacts(favorite_ids=self._favorite_prompt_ids()))
+        self.open(opening.items, rows=opening.rows, location=self.base_location(side), side=side,
+                  hud=HudFacts(favorite_ids=self._favorite_prompt_ids()),
+                  levels=opening.levels, opening=opening)
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
-                    side, len(items), (time.perf_counter() - began) * 1000)
+                    side, len(opening.items), (time.perf_counter() - began) * 1000)
         return True
+
+    def _rows_of_the_base_state(self, side: str) -> list[dict]:
+        return self.rows_at(self.base_location(side))
+
+    @looking_once
+    def _opening_of(self, rows: list[dict]) -> RegionOpening:
+        items = self.items_of(rows)
+        return RegionOpening(
+            rows=rows, items=items, levels=self.versions_of(rows),
+            enhanced_ids=self._enhanced_ids_of(rows),
+            scripts={str(path): funscript_of(path, places=OUTPUT_PLACES)
+                     for path, media_type, *_rest in items if media_type == MediaType.VIDEO},
+            lead=randrange(len(items)) if items else 0)
+
+    def _with_its_lead_on_the_map(self, opening: RegionOpening, side: str) -> RegionOpening:
+        return replace(opening, lead_neighbors=self.neighbors_of(
+            opening.items[opening.lead][2], side=side))
+
+    def library_moved(self) -> None:
+        self._openings.library_moved()
+        self.make_the_openings_ready()
+        self._openings_kept_fresh.start()
+
+    def make_the_openings_ready(self) -> None:
+        for side in _ORIENTATIONS:
+            self._make_ready_what_opens_next(side)
+
+    def _make_ready_what_opens_next(self, side: str) -> None:
+        if (self._fun_time is not None and self._fun_time.funestra(side) is not None
+                and self.region_slideshow(side) is None):
+            self._openings.make_ready(side)
 
     def _refill_region(self, side: str) -> None:
         """Put *side* back on its base state, if the mode still wants it there.

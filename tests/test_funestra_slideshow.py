@@ -26,6 +26,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import OPEN
 from origenerator.gui.notice_overlay import HEARD_MARK
+from origenerator.gui.region_openings import RegionOpening
 from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -2008,3 +2009,58 @@ def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
     slideshow.slideshow_step_version(1)
 
     assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one-v1.png\t\t0,0,0.5,0.5"]
+
+
+def _ready_opening(items, *, scripts=None, lead=0, lead_neighbors=None) -> RegionOpening:
+    return RegionOpening(rows=[], items=items, levels={}, enhanced_ids=set(),
+                         scripts=scripts or {}, lead=lead, lead_neighbors=lead_neighbors)
+
+
+def test_a_ready_opening_hands_over_its_scripts_without_looking_on_disk(
+        qtbot, tmp_path, monkeypatch):
+    items = [("clip.mp4", "video", "id-1"), ("other.mp4", "video", "id-2")]
+    script = tmp_path / "clip.funscript"
+
+    def looked(*_args, **_kwargs):
+        raise AssertionError("looked on disk on the press")
+
+    monkeypatch.setattr(slideshow_pass, "funscript_of", looked)
+
+    slideshow = FunestraSlideshow(
+        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        opening=_ready_opening(items, scripts={"clip.mp4": script, "other.mp4": None}))
+    slideshow._timer.stop()
+
+    assert {item.path.name: item.funscript for item in read_playlist(slideshow.channel.playlist)} == {
+        "clip.mp4": script, "other.mp4": None}
+
+
+def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
+        qtbot, tmp_path, monkeypatch):
+    items = [("clip.mp4", "video", "id-1")]
+    slideshow = FunestraSlideshow(
+        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        opening=_ready_opening(items, scripts={"clip.mp4": None}))
+    slideshow._timer.stop()
+    scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
+
+    qtbot.waitUntil(lambda: not slideshow._scripts_on_opening)
+    slideshow.play(items)
+
+    assert read_playlist(slideshow.channel.playlist)[0].funscript == scripts["clip.mp4"]
+
+
+def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tmp_path):
+    items = [("one.png", "image", "id-1"), ("two.png", "image", "id-2")]
+    neighbors = MapNeighbors()
+
+    def walked(_prompt_id):
+        raise AssertionError("walked the library for the first slide's map")
+
+    slideshow = FunestraSlideshow(
+        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        actions=SlideshowActions(neighbors=walked),
+        opening=_ready_opening(items, lead=1, lead_neighbors=neighbors))
+    slideshow._timer.stop()
+
+    assert read_playlist(slideshow.channel.playlist)[0].path.name == "two.png"

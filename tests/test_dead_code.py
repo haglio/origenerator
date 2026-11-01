@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCANNED = (ROOT / "origenerator", ROOT / "tools")
 
 
-MAX_PROSE_LINES = 15971
+MAX_PROSE_LINES = 15970
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

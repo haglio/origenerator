@@ -14,6 +14,7 @@ from origenerator import config
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.gui import diff_text
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.param_help import MORE_THAN_ONE_BOX
 from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
 from origenerator.gui.prompt_field import PromptField, PromptHeights
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
@@ -439,6 +440,18 @@ def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):
 
     assert [(box.property("inert"), box.isReadOnly(), box.toolTip())
             for box in prompt.boxes()] == [(True, True, "not used")] * 2
+
+
+def test_a_prompt_of_more_than_one_box_says_in_every_box_what_a_second_box_means(qtbot):
+    form = _form_with_a_prompt(qtbot)
+    prompt = form._widgets["positive_prompt"]
+    set_in_use(prompt, form._labels["positive_prompt"], None, "help")
+
+    form.set_values({"positive_prompt": f"a b c{BOX_BREAK}d"})
+    assert [box.toolTip() for box in prompt.boxes()] == [f"help\n\n{MORE_THAN_ONE_BOX}"] * 2
+
+    form.set_values({"positive_prompt": "a b"})
+    assert [box.toolTip() for box in prompt.boxes()] == ["help"]
 
 
 @pytest.fixture

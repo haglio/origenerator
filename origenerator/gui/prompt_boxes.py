@@ -16,6 +16,7 @@ from origenerator.box_breaks import (
     unboxed,
 )
 from origenerator.gui import diff_text, tracked_prompt
+from origenerator.gui.param_help import MORE_THAN_ONE_BOX
 from origenerator.gui.past_the_limit import mark_past_the_limit
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
@@ -139,9 +140,17 @@ class PromptBoxes(QWidget):
     def set_in_use(self, in_use: bool, tip: str) -> None:
         self._in_use = (in_use, tip)
         self.setToolTip(tip)
+        self._mark_boxes_in_use()
+        self._count_down()
+
+    def _mark_boxes_in_use(self) -> None:
+        if self._in_use is None:
+            return
+        in_use, tip = self._in_use
+        if in_use and len(self._boxes) > 1:
+            tip = f"{tip}\n\n{MORE_THAN_ONE_BOX}"
         for box in self._boxes:
             _mark_in_use(box, in_use, tip)
-        self._count_down()
 
     def _flows(self) -> bool:
         return self._reading is not None and self._reading.past_it == READ_IN_PIECES
@@ -180,6 +189,7 @@ class PromptBoxes(QWidget):
         self._texts = list(texts)
         self._count_down()
         if len(self._boxes) != count:
+            self._mark_boxes_in_use()
             self.boxes_changed.emit()
 
     def _add_box(self) -> None:
@@ -193,8 +203,6 @@ class PromptBoxes(QWidget):
         self._boxes.append(box)
         self._countdowns.append(countdown)
         self._shares.append(None)
-        if self._in_use is not None:
-            _mark_in_use(box, *self._in_use)
 
     def _remove_last_box(self) -> None:
         box, countdown = self._boxes.pop(), self._countdowns.pop()

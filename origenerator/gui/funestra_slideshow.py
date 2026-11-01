@@ -83,7 +83,7 @@ class FunestraSlideshow(QObject):
 
     def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
                  hud=None, pace=None, start=None, shuffle=None, levels=None,
-                 say=None, shown=None, clock=None, parent=None):
+                 say=None, shown=None, clock=None, opening=None, parent=None):
         super().__init__(parent)
         self._clock = clock or time.monotonic
         self._on_screen = OnScreenHistory()
@@ -95,12 +95,13 @@ class FunestraSlideshow(QObject):
         self.shown = shown if shown is not None else OnASessionsFunestra(
             self, side, channel, say, actions=self._actions)
         self._frames = frames
+        self._scripts_on_opening = opening.scripts if opening is not None else {}
         self._request_holds_it = False
         self._held_short = False
         self._frame_on_funestra: Path | None = None
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
-        self._take_set(items, start=start, shuffle=shuffle, hud=hud)
+        self._take_set(items, start=start, shuffle=shuffle, hud=hud, opening=opening)
         self._open = True
         # What the Funestra last said it was showing: a slide that has moved on
         # by itself is news that arrives this way and no other.
@@ -118,18 +119,22 @@ class FunestraSlideshow(QObject):
             self._showing = self._funestra_status().video
         self._publish()
         self._hand_over(land=opened_on_a_slide)
+        QTimer.singleShot(0, self._look_for_scripts_from_now_on)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self.tick)
         self._timer.start()
         self.tick()
 
+    def _look_for_scripts_from_now_on(self) -> None:
+        self._scripts_on_opening = {}
+
     # --- handing the Funestra what to play ------------------------------------
 
-    def _take_set(self, items, *, start, shuffle, hud) -> None:
+    def _take_set(self, items, *, start, shuffle, hud, opening=None) -> None:
         self._following = None
         self._set = SlideshowSet(items, actions=self._actions,
-                                 shuffle=shuffle, start=start, hud=hud,
+                                 shuffle=shuffle, start=start, hud=hud, opening=opening,
                                  on_pass_change=self._pass_changed)
 
     def play(self, items, *, start=None, shuffle=None, hud=None, actions=None,
@@ -188,7 +193,8 @@ class FunestraSlideshow(QObject):
     def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(Path(self._file_of(slide)))
-        return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)))
+        return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)),
+                          scripts=self._scripts_on_opening)
 
     def _send(self, verb: str) -> None:
         if not self.channel.send(verb):

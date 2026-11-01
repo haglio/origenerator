@@ -66,6 +66,7 @@ class SlideshowSet:
 
     def __init__(self, items, *, actions: SlideshowActions,
                  shuffle=None, start=None, hud: HudFacts | None = None,
+                 opening=None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
         # Kept so a re-dealt pass is laid out the way this slideshow's was: a
         # double-clicked item's slideshow reads its folder in order, and a filter
@@ -95,7 +96,9 @@ class SlideshowSet:
         # it; the pass is dealt from what survives them (:meth:`set_filters`).
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
-        self.playlist = self._deal(items, start=start)
+        if opening is not None and opening.lead_neighbors is not None:
+            self._known[opening.items[opening.lead][2]] = opening.lead_neighbors
+        self.playlist = self._deal(items, start=opening.lead if opening is not None else start)
         if start is None:
             self.lead_with_what_is_being_made()
         self._a_row_played_whole_is_its_loop()

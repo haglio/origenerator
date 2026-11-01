@@ -2,7 +2,9 @@
 turned so the slide on screen leads."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 from funestra.playlist import PlaylistItem
 
@@ -11,15 +13,19 @@ from origenerator.funscript import funscript_of
 from origenerator.media import MediaType
 
 
-def playlist_item(path, media_type: str, points_of_interest: tuple = ()) -> PlaylistItem:
+def playlist_item(path, media_type: str, points_of_interest: tuple = (), *,
+                  scripts: Mapping = MappingProxyType({})) -> PlaylistItem:
     path = Path(str(path))
     if media_type != MediaType.VIDEO:
         return PlaylistItem(path, points_of_interest=points_of_interest)
+    if str(path) in scripts:
+        return PlaylistItem(path, scripts[str(path)])
     return PlaylistItem(path, funscript_of(path, places=OUTPUT_PLACES))
 
 
-def slide_item(slide, points_of_interest: tuple = ()) -> PlaylistItem:
-    return playlist_item(slide.path, slide.media_type, points_of_interest)
+def slide_item(slide, points_of_interest: tuple = (), *,
+               scripts: Mapping = MappingProxyType({})) -> PlaylistItem:
+    return playlist_item(slide.path, slide.media_type, points_of_interest, scripts=scripts)
 
 
 def rotated_onto(items: list, current) -> list:

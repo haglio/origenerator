@@ -18,15 +18,24 @@ def test_a_video_put_in_the_slot_is_listed_under_the_lane_it_went_in_under(tmp_p
                          db.list_combine_video_uses()) == ["vid-1"]
 
 
-def _made_from(video, prompt_id="gen-1", created_at="2026-10-01 00:00:00"):
-    return {"prompt_id": prompt_id, "source_video": video, "created_at": created_at}
+def _made_from(video, prompt_id="gen-1", created_at="2026-10-01 00:00:00",
+               workflow_name="wan22_i2v"):
+    return {"prompt_id": prompt_id, "source_video": video, "created_at": created_at,
+            "workflow_name": workflow_name}
 
 
-def test_a_video_generated_from_before_lanes_were_noted_is_listed_under_both_lanes():
+def test_a_generation_with_no_lane_noted_lists_its_video_under_kino_when_it_does_not_loop():
     made = [_made_from("vid-1")]
 
     assert video_history(made, VIDEO) == ["vid-1"]
+    assert video_history(made, GENAU) == []
+
+
+def test_a_generation_with_no_lane_noted_lists_its_video_under_genau_when_it_loops():
+    made = [_made_from("vid-1", workflow_name="wan22_flf2v_loop")]
+
     assert video_history(made, GENAU) == ["vid-1"]
+    assert video_history(made, VIDEO) == []
 
 
 def _use(intent, video, created_at, generation=None):

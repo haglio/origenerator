@@ -85,6 +85,7 @@ def test_a_folder_of_upscales_unchanged_since_its_last_reading_is_not_listed_aga
     # Listed afresh at every look, Evolver's folder of upscales was read three to
     # eight times over before a double-clicked slideshow could open.
     filed_in = _upscale(tmp_path).parent
+    os.utime(filed_in, _LONG_AGO)
     _upscales(tmp_path)
     listed = []
     iterdir = Path.iterdir
@@ -102,5 +103,21 @@ def test_an_upscale_filed_since_the_last_reading_is_found(tmp_path):
     _upscales(tmp_path)
 
     upscale = _upscale(tmp_path)
+
+    assert _upscales(tmp_path).upscale_of(video) == upscale
+
+
+def test_an_upscale_filed_in_the_same_clock_tick_as_the_last_reading_is_found(tmp_path):
+    # Windows stamps a folder from a clock that moves in steps of about 16 ms,
+    # so a file filed just after a reading can leave the folder's time as it was.
+    video = _video(tmp_path)
+    os.utime(video, _LONG_AGO)
+    folder = _file(tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
+                   / "other_topaz.mp4").parent
+    read_at = folder.stat().st_mtime_ns
+    _upscales(tmp_path)
+
+    upscale = _upscale(tmp_path)
+    os.utime(folder, ns=(read_at, read_at))
 
     assert _upscales(tmp_path).upscale_of(video) == upscale

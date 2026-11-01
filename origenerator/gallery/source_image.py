@@ -121,10 +121,10 @@ def image_lent_by(prompt_id: str, row_of: Callable[[str], dict | None],
 
 def landing_for(prompt_id: str, rows: list[dict], image_index: dict) -> str:
     row = next((r for r in rows if r.get("prompt_id") == prompt_id), None)
-    if row is None or source_of(row) != GenerationSource.STARTING_FRAME:
+    if row is None:
         return prompt_id
     return next((video["prompt_id"] for video in rows
-                 if source_of(video) == GenerationSource.OUTSIDE
+                 if was_taken_from(row, video)
                  and source_image_id_in(video, image_index) == prompt_id), prompt_id)
 
 
@@ -164,3 +164,8 @@ def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[di
 
 def was_made_from(video: dict, image: dict) -> bool:
     return made_here(video) or in_sight(image)
+
+
+def was_taken_from(frame: dict, video: dict) -> bool:
+    return (source_of(frame) == GenerationSource.STARTING_FRAME
+            and source_of(video) == GenerationSource.OUTSIDE)

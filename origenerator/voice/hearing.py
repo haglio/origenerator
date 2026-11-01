@@ -17,6 +17,7 @@ from voice_core.listener import (
     ListenerEvents,
     ListenerSettings,
     engines_for,
+    reason_for,
 )
 from voice_core.listening import Heard
 from voice_core.listening_thread import ListeningThread
@@ -45,7 +46,7 @@ class Hearing(QObject):
                                    said_in=said_in)
         self._engines = engines
         self._thread = ListeningThread(
-            self._listener, failed=lambda exc: self.failed.emit(str(exc) or type(exc).__name__))
+            self._listener, failed=lambda exc: self.failed.emit(reason_for(exc)))
 
     def start(self) -> None:
         self._thread.start()

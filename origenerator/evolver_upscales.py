@@ -1,7 +1,7 @@
 """The upscale Evolver makes of a video sent to it, found where Evolver files it.
 
 Evolver writes it to ``<shape>/<source>/<name>_topaz.mp4`` under
-``upscaled_by_shape`` (Evolver's ``util/sidecar.upscaled_video_path``).
+``upscaled_by_orientation`` (Evolver's ``util/sidecar.upscaled_video_path``).
 """
 from __future__ import annotations
 

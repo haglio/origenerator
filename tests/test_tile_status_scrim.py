@@ -4,7 +4,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.gui.stage_scrim import StageScrim
+from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def _thumbnail(host):
 
 def test_the_scrim_lies_over_the_thumbnail_it_is_about(host):
     thumbnail = _thumbnail(host)
-    scrim = StageScrim(host)
+    scrim = TileStatusScrim(host)
 
     scrim.cover(thumbnail, "Generating…")
 
@@ -35,7 +35,7 @@ def test_an_inset_holds_it_off_a_border_the_thumbnail_draws_itself(host):
     # An in-flight tile's blue "being made" edge says something; the scrim has no
     # business painting over it.
     thumbnail = _thumbnail(host)
-    scrim = StageScrim(host)
+    scrim = TileStatusScrim(host)
 
     scrim.cover(thumbnail, "Generating…", inset=2)
 
@@ -44,7 +44,7 @@ def test_an_inset_holds_it_off_a_border_the_thumbnail_draws_itself(host):
 
 def test_no_message_takes_the_scrim_away(host):
     thumbnail = _thumbnail(host)
-    scrim = StageScrim(host)
+    scrim = TileStatusScrim(host)
     scrim.cover(thumbnail, "Enhancing…")
 
     scrim.cover(thumbnail, None)
@@ -53,16 +53,16 @@ def test_no_message_takes_the_scrim_away(host):
 
 
 def test_a_scrim_starts_out_of_the_way(host):
-    assert StageScrim(host).isHidden()
+    assert TileStatusScrim(host).isHidden()
 
 
 def test_clicks_fall_through_to_the_tile_underneath(host):
     # It is a caption over the thumbnail, not a lid on it: the tile still selects,
     # opens and drags with the scrim up.
-    scrim = StageScrim(host)
+    scrim = TileStatusScrim(host)
     assert scrim.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
 
 def test_the_message_wraps_rather_than_running_off_the_thumbnail(host):
     # "Waiting on 2 jobs from another app" is a sentence, not a word.
-    assert StageScrim(host).wordWrap()
+    assert TileStatusScrim(host).wordWrap()

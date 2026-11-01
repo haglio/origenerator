@@ -45,7 +45,6 @@ from origenerator.gui.folder_tree import _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.new_tile import NewTile
-from origenerator.gui.request_worker import RevisionWorker
 from origenerator.item_shape import base_of, shaped_key
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
@@ -184,6 +183,13 @@ class FakeDB:
 
     def get_generation(self, prompt_id):
         return self._by_id.get(prompt_id)
+
+    @property
+    def requests(self):
+        return self
+
+    def exchange_of(self, prompt_id):
+        return []
 
     def recent_durations(self, workflow_name, limit=10):
         return [
@@ -1074,11 +1080,10 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
                         lambda row, places: ("orig.png", "image"))
     view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
     qtbot.addWidget(view)
-    view._voice._revision = RevisionWorker(
-        lambda positive, negative, request, *, in_scenes:
-            request_applier(in_scenes)(positive, negative, request),
-        parent=view)
-    view._voice._revision.revised.connect(view._voice._on_revised)
+    view._voice.requests._work_out = (
+        lambda positive, negative, words, *, in_scenes=False, **_:
+            request_applier(in_scenes)(positive, negative, words))
+    view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._buttons.mic.setChecked(True)
     view.refresh()
     _select_first_leaf(view)

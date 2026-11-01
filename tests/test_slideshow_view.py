@@ -2807,3 +2807,14 @@ def test_a_name_that_cannot_be_worked_out_leaves_the_item_line_blank(qtbot):
     view._label_for = cannot_name
 
     assert view.item_label() == ""
+
+
+def test_a_requests_line_stays_up_long_enough_to_be_read(qtbot):
+    view = _view(qtbot)
+
+    view.request_line("Request submitted")
+    assert view._note_timer.interval() == 3000
+
+    view.request_line("Moved her to a tropical beach at golden hour, the way your beach "
+                      "prompts usually have it, and kept the pose and the lighting as they were.")
+    assert view._note_timer.interval() > 3000

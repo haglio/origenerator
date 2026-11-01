@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from funestra.testing import FakeEngine
-from PyQt6.QtCore import QRunnable
 from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
 
-from origenerator.gui import voice_router
 from origenerator.gui.message import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from tests.gallery_view_support import _requesting_view
@@ -25,14 +23,9 @@ def _view(qtbot):
     return view
 
 
-class _NeverAnswers(QRunnable):
-    def run(self):
-        pass
-
-
 def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
-    monkeypatch.setattr(voice_router, "ReviseTask", lambda *a, **kw: _NeverAnswers())
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    monkeypatch.setattr(view._voice.requests, "ask", lambda *a, **kw: None)
     if not showing:
         view._slideshows.showing.close()
         view.select_generation("orig")

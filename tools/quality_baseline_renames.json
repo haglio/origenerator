@@ -13,5 +13,8 @@
   "tests/test_notice_toast.py": "tests/test_toast_raising.py",
   "tests/test_preset_combo.py": "tests/test_preset_dropdown.py",
   "tests/test_sides.py": "tests/test_shapes.py",
-  "tests/test_video_timeline.py": "tests/test_scrubber.py"
+  "tests/test_video_timeline.py": "tests/test_scrubber.py",
+  "origenerator/gui/request_field.py": "origenerator/gui/request_exchange.py",
+  "origenerator/gui/request_worker.py": "origenerator/gui/request_answering.py",
+  "tools/card_claim.py": "origenerator/card_claim.py"
 }

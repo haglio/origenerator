@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint, Qt, QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -28,7 +28,7 @@ from origenerator import (
     gallery,
     look_training,
     outside_videos,
-    prompt_edit,
+    request_settings,
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
@@ -93,7 +93,7 @@ from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowTraits
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
-from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.viewport import Viewport
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneFolders, ZoneItems
@@ -118,7 +118,6 @@ from origenerator.setting_advice import (
     trigger_word_advice,
 )
 from origenerator.timing import estimate_label
-from origenerator.voice.dictation import words_of
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, workflow_named
 from origenerator.workflows.model_files import NO_LORA
 
@@ -143,10 +142,8 @@ _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 @dataclass(frozen=True)
 class _RequestAim:
     prompt_id: str
-    words: str
-    asked_of: tuple[str, str]
     shown: tuple[str, str]
-    source_prompt_id: str
+    turns: list = field(default_factory=list)
 
 
 def _nothing_to_start_from(missing_inputs: list[str]) -> str:
@@ -240,8 +237,7 @@ class GenerateTab(DropZones):
         self._autoshow_held = False
         self._request_aim: _RequestAim | None = None
         self._asked = 0
-        self._rewriter = RevisionWorker(prompt_edit.work_out, parent=self)
-        self._rewriter.revised.connect(self._on_rewritten)
+        self._requests = views.requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
         self._go_to_folder.setVisible(False)
@@ -633,8 +629,8 @@ class GenerateTab(DropZones):
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
         self._param_form.item_activated.connect(self.link_clicked)
-        if form.request_field() is not None:
-            form.request_field().asked.connect(self._on_request_asked)
+        if form.request_exchange() is not None:
+            form.request_exchange().asked.connect(self._on_request_asked)
         self._param_form.train_requested.connect(self.train_requested)
         self._param_form.changed.connect(self._offer_trainings)
         self._offered_loras = {}
@@ -1224,72 +1220,66 @@ class GenerateTab(DropZones):
             return pressed[-1]
         if self._folder_modify is not None:
             return self._folder_modify.opened_on.params
-        aim = self._request_aim
-        requested = aim is not None and bool(aim.words)
-        if self._displayed_config is None and not requested:
-            return None
-        if not requested:
-            return self._settings_shown().params
-        return {**self._settings_shown().params, "positive_prompt": aim.asked_of[0],
-                "negative_prompt": aim.asked_of[1]}
+        return None if self._displayed_config is None else self._settings_shown().params
 
     def _settings_shown(self) -> ConfigSnapshot:
         return self._displayed_config or self._item_config()
 
     def _aim_the_request(self, row: dict | None) -> None:
-        field = self._param_form.request_field()
-        if field is None:
+        exchange = self._param_form.request_exchange()
+        if exchange is None:
             self._request_aim = None
             return
         if row is None:
             self._request_aim = None
-            field.set_available(False)
+            exchange.set_available(False)
             return
         params = self._settings_shown().params
-        shown = (params.get("positive_prompt") or "", params.get("negative_prompt") or "")
-        record = self._db.get_request(row["prompt_id"])
-        words = words_of(record)
         self._request_aim = _RequestAim(
-            prompt_id=row["prompt_id"], words=words,
-            asked_of=((record.get("old_positive") or "", record.get("old_negative") or "")
-                      if words else shown),
-            shown=shown,
-            source_prompt_id=record["source_prompt_id"] if words else row["prompt_id"])
-        field.set_available(self._displayed_config is not None)
-        field.show_words(words)
+            prompt_id=row["prompt_id"],
+            shown=(params.get("positive_prompt") or "", params.get("negative_prompt") or ""))
+        exchange.set_available(self._displayed_config is not None)
+        exchange.show_exchange(self._db.requests.exchange_of(row["prompt_id"]))
 
     def asked(self) -> dict | None:
-        field = self._param_form.request_field() if self._param_form is not None else None
         aim = self._request_aim
-        if field is None or aim is None or not field.words():
+        if aim is None or not aim.turns:
             return None
-        return {"asked": field.words(), "source_prompt_id": aim.source_prompt_id,
-                "old_positive": aim.asked_of[0], "old_negative": aim.asked_of[1]}
+        return {"asked": aim.turns[-1].said, "source_prompt_id": aim.prompt_id,
+                "old_positive": aim.shown[0], "old_negative": aim.shown[1],
+                "turns": list(aim.turns)}
 
     def _on_request_asked(self, words: str) -> None:
         aim = self._request_aim
-        if aim is None:
+        if aim is None or not words:
             return
         self._asked += 1
-        if words == aim.words or not words:
-            self._param_form.set_prompts(*(aim.shown if words == aim.words else aim.asked_of))
-            self._param_form.request_field().done()
-            return
-        QThreadPool.globalInstance().start(ReviseTask(
-            self._rewriter, (self._asked, aim.prompt_id), *aim.asked_of, words,
-            in_scenes=self._param_form.tells_a_story()))
+        self._param_form.request_exchange().add_turn(words)
+        params = self.current_config().params
+        self._requests.ask(
+            aim.prompt_id, (params.get("positive_prompt") or "", params.get("negative_prompt") or ""),
+            words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
+            in_scenes=self._param_form.tells_a_story(),
+            owner=self,
+            then=lambda revision, context=(self._asked, aim.prompt_id): self._on_rewritten(
+                context, revision))
 
     def _on_rewritten(self, context, revision) -> None:
         asked, prompt_id = context
         aim = self._request_aim
         if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
             return
-        field = self._param_form.request_field()
+        exchange = self._param_form.request_exchange()
         if revision is None:
-            field.failed()
+            exchange.failed()
             return
-        self._param_form.set_prompts(revision.positive, revision.negative, typed=True)
-        field.done()
+        if revision.settings:
+            self._param_form.set_values({**self._param_form.get_values(), **dict(revision.settings)})
+        if revision.changed:
+            self._param_form.set_prompts(revision.positive, revision.negative, typed=True)
+        turn = revision.turn(exchange.turns()[-1][0])
+        aim.turns.append(turn)
+        exchange.answered(turn)
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
         current = self.current_config()

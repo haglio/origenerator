@@ -17,6 +17,14 @@ def pane() -> tuple[QWidget, QVBoxLayout]:
     return widget, column
 
 
+def pane_following(status: QWidget) -> QWidget:
+    holder, column = pane()
+    column.addWidget(status)
+    if status.isHidden():
+        holder.hide()
+    return holder
+
+
 def border_as_a_set(frame: QFrame, layout: QLayout) -> None:
     frame.setObjectName(BORDERED_SET)
     layout.setContentsMargins(MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD, MARGIN_STANDARD)

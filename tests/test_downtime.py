@@ -5,7 +5,7 @@ import types
 from dataclasses import dataclass, field
 from unittest.mock import MagicMock, patch
 
-from origenerator import downtime, gallery
+from origenerator import collection_notes, downtime, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
@@ -21,6 +21,8 @@ _HANDS = types.SimpleNamespace(name="hands")
 @dataclass
 class _Machine:
     app_open: bool = False
+    notes_due: bool = False
+    noted: int = 0
     training: bool = False
     comfyui_busy: bool = False
     batches_due: bool = False
@@ -34,8 +36,13 @@ class _Machine:
         return downtime.take_a_turn(downtime.Machine(
             app_open=lambda: self.app_open, training_running=lambda: self.training,
             comfyui_busy=lambda: self.comfyui_busy, batches_due=lambda: self.batches_due,
-            queue_batches=self._queue, queue_more_backfill=self._backfill,
+            queue_batches=self._queue, notes_due=lambda: self.notes_due,
+            take_notes=self._take_notes, queue_more_backfill=self._backfill,
             fix_to_train=lambda: self.fix, train=self._train))
+
+    def _take_notes(self) -> None:
+        self.noted += 1
+        self.notes_due = False
 
     def _queue(self) -> None:
         self.queued += 1
@@ -78,6 +85,24 @@ def test_while_origenerator_stays_closed_comfyui_gets_the_backfills_next_batch_o
     assert machine.backfilled == 2
     assert turns[:2] == ["handed ComfyUI the next videos the backfill remakes"] * 2
     assert machine.trained == [_HANDS]
+
+
+def test_notes_on_the_collection_are_taken_once_comfyui_is_idle_before_the_backfill_goes_on():
+    machine = _Machine(notes_due=True, backfill_batches=1, fix=_HANDS)
+
+    first, second = machine.turn(), machine.turn()
+
+    assert (first.did, machine.noted) == ("took notes on the collection", 1)
+    assert first.holds_the_graphics_card is False
+    assert (second.did, machine.backfilled) == ("handed ComfyUI the next videos the backfill remakes", 1)
+
+
+def test_the_work_origenerator_left_as_it_closed_is_handed_over_before_any_notes():
+    machine = _Machine(batches_due=True, notes_due=True)
+
+    machine.turn()
+
+    assert (machine.queued, machine.noted) == (1, 0)
 
 
 def test_once_comfyui_has_nothing_left_a_fix_whose_photos_changed_is_trained():
@@ -138,15 +163,33 @@ def test_the_work_left_tries_experiments_from_the_policy_handed_in_only_while_th
     assert jobs.job_for(gallery.settings_folder_key(tried, {})).prompt_id == tried["prompt_id"]
 
 
-def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_tile(
-        monkeypatch, tmp_path, capsys):
+def _the_command_on_a_scratch_library(monkeypatch, tmp_path):
     for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
                        ("UI_STATE_PATH", tmp_path / "ui_state.json"),
                        ("FIX_TRAINING_DIR", tmp_path / "fix training")):
         monkeypatch.setattr(downtime.config, name, path)
     monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
-    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
-        one_holds_the_library=lambda: True, one_is_closing=lambda: False))
+
+
+@dataclass(frozen=True)
+class _Copies:
+    open_now: bool
+
+    def one_holds_the_library(self):
+        return self.open_now
+
+    def one_is_closing(self):
+        return False
+
+
+def _the_app_is(monkeypatch, *, open_now):
+    monkeypatch.setattr(downtime, "Copies", lambda path: _Copies(open_now))
+
+
+def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_tile(
+        monkeypatch, tmp_path, capsys):
+    _the_command_on_a_scratch_library(monkeypatch, tmp_path)
+    _the_app_is(monkeypatch, open_now=True)
 
     assert downtime.main() == 0
 
@@ -156,14 +199,9 @@ def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_tile
 
 def test_the_command_evolver_runs_hands_comfyui_more_of_the_backfill_while_closed_and_idle(
         monkeypatch, tmp_path, capsys):
-    for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
-                       ("UI_STATE_PATH", tmp_path / "ui_state.json"),
-                       ("FIX_TRAINING_DIR", tmp_path / "fix training")):
-        monkeypatch.setattr(downtime.config, name, path)
-    monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
+    _the_command_on_a_scratch_library(monkeypatch, tmp_path)
     monkeypatch.setattr(downtime, "announce_trainings_that_ended", lambda announce: None)
-    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
-        one_holds_the_library=lambda: False, one_is_closing=lambda: False))
+    _the_app_is(monkeypatch, open_now=False)
     monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
     handed = []
     monkeypatch.setattr(downtime, "hand_comfyui_more_of_the_backfill",
@@ -195,8 +233,7 @@ def test_the_command_evolver_runs_hands_comfyui_each_file_a_run_reads_as_a_copy_
                         ("COMFYUI_FOLDERS", folders)):
         monkeypatch.setattr(downtime.config, name, value)
     monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
-    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
-        one_holds_the_library=lambda: False, one_is_closing=lambda: False))
+    _the_app_is(monkeypatch, open_now=False)
     handed = []
     monkeypatch.setattr(downtime, "hand_comfyui_the_work_left",
                         lambda db, client, ui: handed.append(client))
@@ -243,15 +280,28 @@ def test_a_training_evolver_started_is_announced_once_when_it_ends_unless_alread
 
 
 def test_the_command_evolver_runs_holds_the_tile_while_a_look_lora_trains(monkeypatch, tmp_path, capsys):
-    for name, path in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
-                       ("UI_STATE_PATH", tmp_path / "ui_state.json"),
-                       ("FIX_TRAINING_DIR", tmp_path / "fix training")):
-        monkeypatch.setattr(downtime.config, name, path)
-    monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
-    monkeypatch.setattr(downtime, "Copies", lambda path: types.SimpleNamespace(
-        one_holds_the_library=lambda: True, one_is_closing=lambda: False))
+    _the_command_on_a_scratch_library(monkeypatch, tmp_path)
+    _the_app_is(monkeypatch, open_now=True)
     monkeypatch.setattr(downtime, "running_trainings", lambda: [{"base": "Example Look"}])
 
     assert downtime.main() == 0
 
     assert json.loads(capsys.readouterr().out)["holds_the_graphics_card"] is True
+
+
+def test_the_command_evolver_runs_takes_notes_on_the_collection_while_closed_and_idle(
+        monkeypatch, tmp_path, capsys):
+    _the_command_on_a_scratch_library(monkeypatch, tmp_path)
+    monkeypatch.setattr(downtime, "announce_trainings_that_ended", lambda announce: None)
+    _the_app_is(monkeypatch, open_now=False)
+    monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
+    monkeypatch.setattr(collection_notes, "are_due", lambda db, path: True)
+    taken = []
+    monkeypatch.setattr(collection_notes, "take_a_sitting",
+                        lambda db, client, path: taken.append(db.path))
+
+    assert downtime.main() == 0
+
+    assert taken == [tmp_path / "origenerator.db"]
+    assert json.loads(capsys.readouterr().out) == {
+        "did": "took notes on the collection", "holds_the_graphics_card": False}

@@ -199,6 +199,22 @@ CREATE TABLE IF NOT EXISTS requests (
     asked            TEXT
 );
 
+-- The exchange that led to the item `prompt_id`, a turn per row: a Request's
+-- words and what the model answered. A spoken Request is one turn; typed ones
+-- are as many as were typed before Generate was pressed.
+CREATE TABLE IF NOT EXISTS request_turns (
+    id           INTEGER PRIMARY KEY,
+    prompt_id    TEXT NOT NULL,
+    said         TEXT NOT NULL,
+    answered     TEXT NOT NULL DEFAULT '',
+    old_positive TEXT NOT NULL DEFAULT '',
+    old_negative TEXT NOT NULL DEFAULT '',
+    new_positive TEXT NOT NULL DEFAULT '',
+    new_negative TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    settings_json TEXT NOT NULL DEFAULT ''
+);
+
 -- A deleted generation the Trash is still holding: the whole row the
 -- delete dropped, and where in the trash its files went, so the Trash collection can
 -- list it, put both back, or end it for good (see origenerator.trash_collection). The
@@ -275,6 +291,9 @@ ADDED_COLUMNS = {
     },
     "custom_folders": {
         "side": "TEXT",
+    },
+    "request_turns": {
+        "settings_json": "TEXT NOT NULL DEFAULT ''",
     },
     "seed_uses": {
         "media_type": "TEXT",

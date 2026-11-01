@@ -33,6 +33,10 @@ def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
     label.setText(icon_then_text(mark, text, color=color, size=label.fontMetrics().height()))
 
 
+def time_to_read_ms(text: str) -> int:
+    return max(3000, 1500 + 250 * len(text.split()))
+
+
 class Message(QLabel):
     def __init__(self, host: QWidget):
         super().__init__(host)

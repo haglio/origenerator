@@ -80,6 +80,7 @@ LOOK_TRAINING_DIR = LIBRARY_STATE_DIR / "lora training"
 MODEL_TITLES_PATH = _LIBRARY_FILES_DIR / "model_titles.json"
 TRIGGER_WORDS_PATH = _LIBRARY_FILES_DIR / "trigger_words.json"
 BASE_MODELS_PATH = _LIBRARY_FILES_DIR / "base_models.json"
+COLLECTION_NOTES_PATH = _LIBRARY_FILES_DIR / "collection_notes.json"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 
 
@@ -116,5 +117,5 @@ MOTION_DEFAULT_HZ = bpm_for_speed(MOTION_DEFAULT_SPEED) / 60
 VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time listens with; cached under ~/.cache/vosk
 # Windows has made a dead headset microphone the default input before.
 VOICE_DEVICE_NAME = "Brio"
-LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
-LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"  # Ollama model: uncensored, since a censored one refuses explicit edits
+LOCAL_LLM_BASE_URL = "http://localhost:11434"
+LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"

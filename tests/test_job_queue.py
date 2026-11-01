@@ -2230,3 +2230,29 @@ def test_cancelling_the_enhancement_a_video_waits_on_cancels_the_video_too(qtbot
     assert [call.args[1] for call in client.submit_job.call_args_list] == [enhance.prompt_id]
     assert db.get_generation(video.prompt_id) is None
     assert queue.all_jobs == []
+
+
+def test_a_queue_held_for_the_model_hands_comfyui_nothing_until_the_model_lets_go(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    queue.model_hold.hold()
+
+    held = _launch_video(queue, "v1", seed=1)
+    assert client.submit_job.call_count == 0
+
+    queue.model_hold.let_go()
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [held.prompt_id]
+
+
+def test_two_requests_out_at_once_hold_the_line_until_both_have_let_go(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    queue.model_hold.hold()
+    queue.model_hold.hold()
+    _launch_video(queue, "v1", seed=1)
+
+    queue.model_hold.let_go()
+    assert client.submit_job.call_count == 0
+
+    queue.model_hold.let_go()
+    assert client.submit_job.call_count == 1

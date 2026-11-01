@@ -245,6 +245,17 @@ class FakeHost:
         return "queued it", INFO
 
 
+class FakeAnswerer:
+
+    def __init__(self):
+        self.asked = []
+        self.then = None
+
+    def ask(self, about, pair, words, *, owner, then, **told):
+        self.asked.append((about, *pair, words))
+        self.then = then
+
+
 class Spoken:
     def __init__(self, text="no hat", *, listening=False, state=COMPLETED,
                  heard="Request, no hat, over.", opened_at=None):
@@ -255,17 +266,6 @@ class Spoken:
         self.opened_at = opened_at
 
 
-class FakePool:
-    def __init__(self):
-        self.tasks = []
-
-    def globalInstance(self):
-        return self
-
-    def start(self, task):
-        self.tasks.append(task)
-
-
 @pytest.fixture
 def starting(qtbot):
     return StartingRows()
@@ -274,18 +274,18 @@ def starting(qtbot):
 @pytest.fixture
 def router(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
-    monkeypatch.setattr(module, "QThreadPool", FakePool())
     built = []
 
-    def build(host=None, *, slideshows=None, db=None, motion=None, buttons=None):
+    def build(host=None, *, slideshows=None, db=None, buttons=None, **parts):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
         qtbot.addWidget(parent)
         router = VoiceRouter(
-            host, VoiceSources(db=db or FakeDB(), slideshows=slideshows, client=_A_CLIENT,
-                               starting=starting),
-            parent=parent, motion=motion)
+            host, VoiceSources(db=db or FakeDB(), slideshows=slideshows,
+                               client=parts.get("client", _A_CLIENT), starting=starting,
+                               requests=parts.get("requests") or FakeAnswerer()),
+            parent=parent, motion=parts.get("motion"))
         built.append((parent, router))
         buttons = dict(buttons or {})
         router.bind_the_buttons(
@@ -770,10 +770,22 @@ def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starti
     assert starting.rows() == []
 
 
+def test_a_finished_request_is_asked_of_the_model_about_the_image_it_was_said_over(router):
+    requests = FakeAnswerer()
+    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]), requests=requests)
+
+    voice._begin_request("g1", Spoken("no hat"))
+
+    ((about, _positive, _negative, asked),) = requests.asked
+    assert (about, asked) == ("g1", "no hat")
+    assert "working out" in words(voice.status)
+
+
 def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
     class Revision:
         changed = False
         term = "hat"
+        answer = ""
 
     voice, host, _slideshows = router()
 
@@ -781,6 +793,20 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
 
     assert host.queued == []
     assert words(voice.status) == "“hat” is already how you asked for it"
+
+
+def test_a_revision_that_changed_nothing_but_was_answered_says_the_models_sentence(router):
+    class Revision:
+        changed = False
+        term = "freckles"
+        answer = "The freckles are already there."
+
+    voice, host, _slideshows = router()
+
+    voice._on_revised((_row("g1"), object(), {}, Spoken("more freckles"), None, None), Revision())
+
+    assert host.queued == []
+    assert words(voice.status) == "The freckles are already there."
 
 
 def test_a_revision_nobody_could_read_says_so(router):
@@ -871,3 +897,15 @@ def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(
         assert voice.run_spoken_command("put the kettle on") is False
 
     assert caplog.messages == ["Voice (from the session): a 4-word utterance matched no command"]
+
+
+def test_a_requests_answer_on_the_caption_stays_up_long_enough_to_be_read(router):
+    voice, _host, _slideshows = router()
+    long_answer = ("Moved her to a tropical beach at golden hour, the way your beach prompts "
+                   "usually have it, and kept the pose and the lighting as they were.")
+
+    voice._answer_request(None, "Request submitted", Spoken("no hat"))
+    short = voice._flash_timer.interval()
+    voice._answer_request(None, long_answer, Spoken("a beach"))
+
+    assert voice._flash_timer.interval() > short

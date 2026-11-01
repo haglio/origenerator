@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools import card_claim
+from origenerator import card_claim
 
 _TOTAL_PHOTO_SIGHTINGS = 150
 

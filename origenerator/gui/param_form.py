@@ -52,7 +52,7 @@ from origenerator.gui.param_help import (
 )
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
-from origenerator.gui.request_field import RequestField
+from origenerator.gui.request_exchange import RequestExchange
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
@@ -160,7 +160,7 @@ class ParamForm(QWidget):
         self._swap_dimensions_btn: QPushButton | None = None
         self._passthrough: dict = {}
         self._sections: dict[str, CollapsibleSection] = {}
-        self._request_field: RequestField | None = None
+        self._request_exchange: RequestExchange | None = None
         self._present_keys: dict[str, list[str]] = {}
         self._shut_down: dict[str, str] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
@@ -267,12 +267,12 @@ class ParamForm(QWidget):
 
     def _build_request_section(self) -> CollapsibleSection:
         section = CollapsibleSection("Request")
-        self._request_field = RequestField()
-        section.content_form().addRow(self._request_field)
+        self._request_exchange = RequestExchange()
+        section.content_form().addRow(self._request_exchange)
         return section
 
-    def request_field(self) -> RequestField | None:
-        return self._request_field
+    def request_exchange(self) -> RequestExchange | None:
+        return self._request_exchange
 
     def tells_a_story(self) -> bool:
         return self._scenes is not None

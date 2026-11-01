@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tools import card_claim
+from origenerator import card_claim
+from tools import card_claim as command
 
 
 def test_a_free_tile_is_taken_with_who_holds_it_and_since_when(tmp_path):
@@ -76,3 +77,10 @@ def test_a_shell_script_takes_holds_and_lets_go_of_the_claim_through_the_module_
     assert json.loads(Path(claim).read_text(encoding="utf-8"))["holder"] == "hand training"
     assert card_claim.main(["release", str(another_program.pid), claim]) == 0
     assert not Path(claim).exists()
+
+
+def test_the_command_in_tools_is_the_claims_own(tmp_path):
+    claim = str(tmp_path / "claim.json")
+
+    assert command.main(["take", "hand training", "4242", claim]) == 0
+    assert command.main(["release", "4242", claim]) == 0

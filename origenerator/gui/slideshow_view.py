@@ -21,7 +21,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneChannel, PaneSound
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_queue import QueueFoot
-from origenerator.gui.message import HEARD_MARK, INFO, Message
+from origenerator.gui.message import HEARD_MARK, INFO, Message, time_to_read_ms
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.osr2_controls_state import (
     REPAINT_MS,
@@ -323,7 +323,7 @@ class SlideshowView(QWidget):
             return
         if request is self._working_request:
             self._working_note, self._working_request = "", None
-        self.flash(message, ms=3000, kind=kind, mark=HEARD_MARK)
+        self.flash(message, ms=time_to_read_ms(message), kind=kind, mark=HEARD_MARK)
 
     def _refresh_note(self):
         if self._request_note:

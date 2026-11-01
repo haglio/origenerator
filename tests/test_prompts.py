@@ -8,9 +8,9 @@ import pytest
 PACKAGE = Path(__file__).resolve().parents[1] / "origenerator"
 
 SYSTEM_PROMPTS = (
-    "REQUEST_REWRITE_SYSTEM_PROMPT",
+    "REQUEST_SYSTEM_PROMPT",
     "SEARCH_EXPANSION_SYSTEM_PROMPT",
-    "VOICE_REQUEST_MATCH_SYSTEM_PROMPT",
+    "COLLECTION_NOTES_SYSTEM_PROMPT",
 )
 
 _PROSE = 200
@@ -47,3 +47,34 @@ def test_config_imports_nothing_from_prompts():
     assert not [node for node in ast.walk(tree)
                 if isinstance(node, ast.ImportFrom) and node.module == "origenerator.prompts"]
 
+
+def _request_prompt() -> str:
+    return _assigned_strings("prompts.py")["REQUEST_SYSTEM_PROMPT"]
+
+
+def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_make_it_stronger():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("didn't appear"):]
+
+    assert "never remove" in rule.lower()
+    assert "weight" in rule.lower()
+    example = prompt[prompt.rindex("didn't appear"):]
+    assert ":1." in example.split("->")[1].split("negative")[0]
+
+
+def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_asks():
+    rule = _request_prompt()[_request_prompt().index("PROMPTS OF HIS"):].split("\n")[0]
+
+    assert "the way those prompts" in rule.lower() or "the way they" in rule.lower()
+    assert "never" in rule.lower()
+    assert "end" in rule.lower()
+
+
+def test_a_request_about_a_setting_is_taught_to_change_the_setting_and_leave_the_prompts():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("SETTINGS HE MAY ALSO CHANGE"):].split("\n")[0].lower()
+
+    assert '"settings"' in rule
+    assert "leave" in rule
+    assert "prompts" in rule
+    assert '"settings": {}' in prompt

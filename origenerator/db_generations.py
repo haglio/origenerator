@@ -24,7 +24,7 @@ SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
-_MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
+MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
 _LISTED = f"source NOT IN ({', '.join('?' * len(UNLISTED))})"
 
 
@@ -253,7 +253,7 @@ class GenerationStore(Store):
                      AND duration_seconds IS NULL
                      AND completed_at IS NOT NULL
                      AND {_OF_A_KNOWN_SOURCE}
-                     AND {_MADE_HERE}
+                     AND {MADE_HERE}
                    ORDER BY id""",
                 (GenerationStatus.COMPLETED, *_KNOWN_SOURCES, *MADE_ELSEWHERE),
             ).fetchall()

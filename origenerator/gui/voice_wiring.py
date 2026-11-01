@@ -13,6 +13,8 @@ class VoiceSources:
     slideshows: object
     client: object
     starting: StartingRows
+    jobs: object = None
+    requests: object = None
 
 
 @dataclass(frozen=True)

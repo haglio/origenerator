@@ -34,7 +34,6 @@ from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from shared_ui import palette
 from shared_ui.colors import (
-    AMBER,
     BG_PRIMARY,
     BLUE,
     GREEN,
@@ -44,6 +43,7 @@ from shared_ui.colors import (
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     WHITE,
+    YELLOW,
 )
 from shared_ui.icons import CANVAS, draw_icon, icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_ICON
@@ -74,7 +74,7 @@ LEVEL_LABELS = {
     "source_image": "Source Image",
 }
 _LEVEL_BADGES = {
-    "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", AMBER),
+    "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", YELLOW),
     "source_image": ("I", GREEN),
 }
 
@@ -97,7 +97,7 @@ _CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
 # color means "bookmarked" across both apps, so a star learned in one reads in
 # the other. Worn by every star that says something IS favorited — the tile's
 # corner badge and a favorited folder's row alike. The plus marking an enhanced
-# tile is yellow (AMBER, this palette's yellow): green is spoken for and the two
+# tile is yellow (YELLOW, this palette's yellow): green is spoken for and the two
 # badges can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
 _REROLL_GLYPH = WHITE
@@ -156,7 +156,7 @@ def enhance_icon() -> QIcon:
     (:func:`corner_enhance_icon`), so the button and the mark it leaves are
     one symbol in one color — and so it can't be read as a star, which is what
     green means across this family (:data:`_STAR_GLYPH`)."""
-    return qt_icon("plus", color=AMBER, size=_SIZE)
+    return qt_icon("plus", color=YELLOW, size=_SIZE)
 
 
 def mic_icon() -> QIcon:
@@ -405,15 +405,15 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     chip the button paints under it.
     """
     if state == ENHANCE_HELD:
-        return _corner_icon("plus", AMBER, armed=False)
+        return _corner_icon("plus", YELLOW, armed=False)
     ink = _CORNER_ARMED if armed else _CORNER_REST
     shifted = _CORNER_MARK_AT + _ENHANCE_SHADOW
 
     def draw(painter: QPainter):
         if state == ENHANCE_MORE:
-            draw_icon(painter, "plus", AMBER, size=_CORNER_MARK, x=shifted, y=shifted)
+            draw_icon(painter, "plus", YELLOW, size=_CORNER_MARK, x=shifted, y=shifted)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-            _mark(painter, "plus", AMBER)  # the color is spent: a clear ignores it
+            _mark(painter, "plus", YELLOW)  # the color is spent: a clear ignores it
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         _mark(painter, "plus_outline", ink)
 

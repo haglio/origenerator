@@ -102,8 +102,8 @@ def test_the_radio_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(bank)
     assert lit_in(switch) == "yellow"
 
 
-def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_amber(bank):
-    """The family's amber is light, so a mark on it takes the dark ink a lit amber
+def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow(bank):
+    """The family's yellow is light, so a mark on it takes the dark ink a lit yellow
     control on a HUD does."""
     switch = bank().radio
     omnipause.freeze(True)

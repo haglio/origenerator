@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QSplitterHandle,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import GAP_MEDIUM
 
@@ -2513,7 +2513,7 @@ def test_the_note_under_the_workflow_dropdown_leads_with_the_familys_warning(sav
     panel.show_saved_generation(video, [])
 
     note = panel._cannot_remake_note
-    assert note.text().startswith(inline_icon("warning", color=AMBER, size=note.fontMetrics().height()))
+    assert note.text().startswith(inline_icon("warning", color=YELLOW, size=note.fontMetrics().height()))
 
 
 def test_a_retired_workflows_video_leaves_no_settings_from_before(saved_panel):
@@ -2631,7 +2631,7 @@ def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
     assert note_foot <= typical_time_top
 
 
-def test_the_note_wears_the_amber_of_a_warning(app_chrome, installed_models, saved_panel):
+def test_the_note_wears_the_yellow_of_a_warning(app_chrome, installed_models, saved_panel):
     panel, db = saved_panel
     image = _image_made_with(db, "retired_checkpoint.safetensors")
     panel.show_saved_generation(image, [image])
@@ -2639,7 +2639,7 @@ def test_the_note_wears_the_amber_of_a_warning(app_chrome, installed_models, sav
 
     note.ensurePolished()
 
-    assert note.palette().color(note.foregroundRole()).name() == AMBER.name()
+    assert note.palette().color(note.foregroundRole()).name() == YELLOW.name()
 
 
 def test_a_long_model_name_in_the_note_wraps_rather_than_scrolling_sideways(

@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_PRIMARY
+from shared_ui.colors import BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import CANVAS
 from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.toggle_switch import ToggleSwitch
@@ -314,12 +314,12 @@ def test_the_enhance_button_is_yellow_with_dark_words_until_it_goes_dark(qtbot):
     (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
     image = button.grab().toImage()
 
-    assert _share_painted(image, AMBER) > 0.5
+    assert _share_painted(image, YELLOW) > 0.5
     assert not any(min(image.pixelColor(x, y).getRgb()[:3]) > 200
                    for y in range(image.height()) for x in range(image.width()))
 
     panel.show_offer(False, "Nothing here to enhance")
-    assert _share_painted(button.grab().toImage(), AMBER) == 0
+    assert _share_painted(button.grab().toImage(), YELLOW) == 0
 
 
 def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_do(qtbot):
@@ -1406,8 +1406,8 @@ def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtb
                         image.height())
 
     assert card._thumbnail.size() == versions._rows[0]._thumbnail.size()
-    assert _share_painted(image.copy(tile), AMBER) > 0.5
-    assert _share_painted(beside, AMBER) == 0
+    assert _share_painted(image.copy(tile), YELLOW) > 0.5
+    assert _share_painted(beside, YELLOW) == 0
 
 
 def test_the_add_cards_plus_is_drawn_big_in_its_tile(qtbot):

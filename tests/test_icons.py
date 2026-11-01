@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon
-from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import GREEN, RED, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.icon_geometry import icon_names
 from shared_ui.icons import icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_FILLING_ICON
@@ -53,7 +53,7 @@ def test_level_badge_icons_render_for_each_level(qtbot):
 
 def test_a_lora_folder_wears_an_l(qtbot):
     drawn = icons.level_badge_icon("lora").pixmap(48, 48).toImage()
-    assert drawn == QIcon(icons._render_badge("L", AMBER)).pixmap(48, 48).toImage()
+    assert drawn == QIcon(icons._render_badge("L", YELLOW)).pixmap(48, 48).toImage()
 
 
 def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
@@ -162,7 +162,7 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     star = _corner_image(icons.corner_star_icon(favorite=True, armed=False))
     plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False))
     assert star.pixelColor(24, 25) == GREEN
-    assert plus.pixelColor(24, 24) == AMBER
+    assert plus.pixelColor(24, 24) == YELLOW
 
 
 def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
@@ -178,18 +178,18 @@ def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
 
 def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
     # A hollow plus with the one it already holds as a yellow shadow under it:
-    # the middle stays empty like the plain hollow one, and the amber shows out
+    # the middle stays empty like the plain hollow one, and the yellow shows out
     # from under it down and to the right.
     more = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_MORE, armed=False))
     assert more.pixelColor(24, 24).alpha() < 32          # still hollow
-    ambers = [
+    yellows = [
         (x, y)
         for y in range(48) for x in range(48)
-        if more.pixelColor(x, y) == AMBER
+        if more.pixelColor(x, y) == YELLOW
     ]
-    assert ambers, "the enhancement it already holds never showed"
-    assert max(x for x, _y in ambers) > 24 + 12          # …out to the right
-    assert max(y for _x, y in ambers) > 24 + 12          # …and below
+    assert yellows, "the enhancement it already holds never showed"
+    assert max(x for x, _y in yellows) > 24 + 12          # …out to the right
+    assert max(y for _x, y in yellows) > 24 + 12          # …and below
 
 
 def test_arming_a_corner_control_changes_its_mark(qtbot):
@@ -306,7 +306,7 @@ def test_the_bank_colors_its_act_on_this_trio(qtbot):
     # a dead button never reads as a dimmer shade of its color.
     size = QSize(48, 48)
     for icon, color in ((icons.star_icon(filled=True), GREEN),
-                        (icons.enhance_icon(), AMBER),
+                        (icons.enhance_icon(), YELLOW),
                         (icons.delete_icon(), RED)):
         assert _dominant_color(icon.pixmap(size, QIcon.Mode.Normal)) == color.rgb()
         muted = _dominant_color(icon.pixmap(size, QIcon.Mode.Disabled))
@@ -352,7 +352,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.auto_generate_icon(), "bolt", TEXT_PRIMARY),
         (icons.shield_icon(), "shield", TEXT_PRIMARY),
         (icons.slideshow_icon(), "slideshow", TEXT_PRIMARY),
-        (icons.enhance_icon(), "plus", AMBER),
+        (icons.enhance_icon(), "plus", YELLOW),
         (icons.mic_icon(), "mic", TEXT_PRIMARY),
         (icons.radio_icon(), "speaker", TEXT_PRIMARY),
         (icons.trash_icon(), "trash", TEXT_PRIMARY),

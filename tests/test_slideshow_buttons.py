@@ -42,7 +42,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
 def test_the_switches_light_and_the_things_done_never_do():
     """The lock and the two filters are states the slideshow sits in — the lock and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
-    image's own amber; a step, the bin and reset are things done."""
+    image's own yellow; a step, the bin and reset are things done."""
     band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
                     _band(locked=True, favorites_filter=True, enhanced=True), strict=True))
 

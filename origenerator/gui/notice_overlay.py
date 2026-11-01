@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
-from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
+from shared_ui.colors import BG_SECONDARY, GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.fonts import FONT_UI, make_font
 from shared_ui.icons import icon_then_text
 from shared_ui.notice_shape import (
@@ -39,7 +39,7 @@ NOTICE = "notice"
 WARNING = "warning"
 ERROR = "error"
 FAVORITE = "favorite"
-_INK = {NOTICE: TEXT_PRIMARY, WARNING: AMBER, ERROR: RED, FAVORITE: GREEN}
+_INK = {NOTICE: TEXT_PRIMARY, WARNING: YELLOW, ERROR: RED, FAVORITE: GREEN}
 
 HEARD_MARK = "mic"
 

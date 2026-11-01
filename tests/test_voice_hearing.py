@@ -6,14 +6,11 @@ which of its two roads an utterance takes, and what arrives at the end of each.
 from __future__ import annotations
 
 import array
-import json
-from contextlib import contextmanager
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from voice_core.listener import Engines
 from voice_core.speech import HearsSpeech
+from voice_core.testing import said, scripted_engines
 from voice_core.whisper_reader import WhisperReader
 
 from origenerator.voice.dictation import request_bias
@@ -25,56 +22,15 @@ ONE_UTTERANCE = [QUIET] * 15 + [LOUD] * 8 + [QUIET] * 20
 PATIENCE_MS = 10_000
 
 
-class _Recognizer:
-    def __init__(self, readings):
-        self._readings = readings
-
-    def SetWords(self, enable):  # noqa: N802 - vosk's own name
-        pass
-
-    def SetMaxAlternatives(self, count):  # noqa: N802 - vosk's own name
-        pass
-
-    def AcceptWaveform(self, _frame):  # noqa: N802 - vosk's own name
-        return False
-
-    def Reset(self):  # noqa: N802 - vosk's own name
-        pass
-
-    def PartialResult(self):  # noqa: N802 - vosk's own name
-        return json.dumps({"partial": ""})
-
-    def FinalResult(self):  # noqa: N802 - vosk's own name
-        return json.dumps({"alternatives": [
-            {"text": reading, "confidence": 1.0} for reading in self._readings]})
-
-
-def _engines(readings, *, frames=None, **more):
-    """Fake vosk and sounddevice: a microphone that delivers one utterance (or *frames*),
-    which the recognizer reads as *readings*, best first."""
-    devices = [{"name": "Desk mic", "max_input_channels": 1, "hostapi": 0}]
-
-    @contextmanager
-    def stream(**kwargs):
-        for frame in frames or ONE_UTTERANCE:
-            kwargs["callback"](frame, len(frame) // 2, None, None)
-        yield
-
-    return Engines(
-        vosk=SimpleNamespace(Model=lambda model_name: model_name,
-                             KaldiRecognizer=lambda *args: _Recognizer(readings)),
-        sounddevice=SimpleNamespace(
-            default=SimpleNamespace(device=(0, 0)),
-            query_devices=lambda index=None: devices if index is None else devices[index],
-            RawInputStream=stream),
-        **more)
+def _engines(readings, **more):
+    return scripted_engines([said(*readings)], frames=ONE_UTTERANCE, **more)
 
 
 def _said(qtbot, hearing):
-    with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as said:
+    with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as arrived:
         hearing.start()
     hearing.stop()
-    return said.args[0]
+    return arrived.args[0]
 
 
 def test_a_command_said_outright_arrives_as_its_own_words(qtbot):
@@ -86,11 +42,11 @@ def test_a_command_said_outright_arrives_as_its_own_words(qtbot):
 def test_a_word_arrives_with_the_time_it_began_to_be_said(qtbot):
     hearing = Hearing({"undo", "star it"}, engines=_engines(["star it"], clock=lambda: 50.0))
 
-    with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as said:
+    with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as arrived:
         hearing.start()
     hearing.stop()
 
-    assert said.args[1] == pytest.approx(50.0, abs=2.0)
+    assert arrived.args[1] == pytest.approx(50.0, abs=2.0)
 
 
 def test_a_sentence_arrives_as_the_words_it_was_taken_down_as(qtbot):
@@ -122,8 +78,8 @@ def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
     # The pause detector hears far quieter sounds than this app's own did, which is what
     # lets a quiet word through; a quiet nothing is a chair, not something to answer.
     faint = array.array("h", [400, -400] * 240).tobytes()
-    engines = _engines([""], take_down=lambda audio, hint: " . . . ",
-                       frames=[QUIET] * 15 + [faint] * 8 + [QUIET] * 20 + ONE_UTTERANCE[15:])
+    engines = scripted_engines([said(""), said("")], take_down=lambda audio, hint: " . . . ",
+                               frames=[QUIET] * 15 + [faint] * 8 + [QUIET] * 20 + ONE_UTTERANCE[15:])
     hearing = Hearing({"undo"}, engines=engines)
     arrived = []
     hearing.said.connect(arrived.append)

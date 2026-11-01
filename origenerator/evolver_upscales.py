@@ -5,6 +5,7 @@ Evolver writes it to ``<orientation>/<source>/<name>_topaz.mp4`` under
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -43,14 +44,20 @@ def filed_upscales(upscaled_dir) -> list[tuple[str, Path]]:
 
 
 _READINGS: dict[Path, tuple[int, list[Path]]] = {}
+# A folder's time comes from a clock that moves in steps of about 16 ms on
+# Windows, so a reading is kept only once its folder's time is safely past.
+_A_CLOCK_TICK_NS = 1_000_000_000
 
 
 def _filed_in(source: Path) -> list[Path]:
     written = source.stat().st_mtime_ns
     reading = _READINGS.get(source)
-    if reading is None or reading[0] != written:
-        reading = _READINGS[source] = (written, sorted(source.iterdir()))
-    return reading[1]
+    if reading is not None and reading[0] == written:
+        return reading[1]
+    filed = sorted(source.iterdir())
+    if time.time_ns() - written > _A_CLOCK_TICK_NS:
+        _READINGS[source] = (written, filed)
+    return filed
 
 
 def original_stem(path) -> str | None:

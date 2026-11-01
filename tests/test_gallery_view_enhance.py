@@ -526,7 +526,7 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     assert "Cancel 1 enhancement" in labels[0]
     assert view._jobs.all_jobs == []                     # the run stopped
     assert db.get_generation("g0") is not None             # the image is untouched
-    assert view._browser._thumb_widgets["g0"]._enhancing is None  # and the scrim is off
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is None  # and the scrim is off
 
 
 def test_canceling_one_enhancement_leaves_the_others_alone(

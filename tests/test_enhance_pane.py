@@ -1916,7 +1916,7 @@ def test_a_fixs_prompts_offer_its_lora_and_strength_and_ok_keeps_them(qtbot, mon
 def test_a_fixs_prompts_offer_only_the_loras_the_enhance_model_can_run(qtbot, installed_models):
     installed_models.add("loras", "an_xl_fix.safetensors", arch="sdxl", lora=True)
     installed_models.add("loras", "a_15_fix.safetensors", arch="sd15", lora=True)
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
     pane._fix_prompt_buttons["hands"].click()
     lora = pane._fix_prompt_windows["hands"].lora
 
@@ -1930,7 +1930,7 @@ def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, instal
     for name in ("an_xl_look.safetensors", hands,
                  os.path.join("fixes", "faces 2026-10-20 0910.safetensors")):
         installed_models.add("loras", name, arch="sdxl", lora=True)
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
     pane._fix_prompt_buttons["hands"].click()
     lora = pane._fix_prompt_windows["hands"].lora
 
@@ -1965,7 +1965,7 @@ def hands_trained_on(qtbot, monkeypatch, tmp_path, installed_models):
 
 
 def test_a_ticked_fixs_lora_trained_on_another_model_warns_beside_the_model(hands_trained_on):
-    panel, _edits = hands_trained_on({"hands": 0.45})
+    pane, _edits = hands_trained_on({"hands": 0.45})
 
     assert (pane._model_warning.isHidden(), pane._model_warning.toolTip()) == (
         False, _TRAINED_ON_SAID)
@@ -1995,7 +1995,7 @@ def _made_by(model: str, *, file: str = "one.png") -> dict:
 
 def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_the_fixs_model(
         hands_trained_on):
-    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    pane, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
     pane.show_images_in_front([_made_by("trained_on.safetensors"),
                                 _made_by("picked.safetensors", file="two.mp4")])
@@ -2005,7 +2005,7 @@ def test_matching_the_source_warns_not_while_the_images_in_front_were_made_by_th
 
 def test_matching_the_source_warns_while_a_picked_image_is_made_by_another_model(
         hands_trained_on):
-    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    pane, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
     pane.show_images_in_front([_made_by("trained_on.safetensors"),
                                 _made_by("picked.safetensors", file="two.png")])
@@ -2024,7 +2024,7 @@ def _folder(*rows) -> SettingsGroup:
     (_folder(_made_by("picked.safetensors")), False)])
 def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
         hands_trained_on, folder, hidden):
-    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    pane, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
     pane.show_images_in_front([], folder)
 
@@ -2041,7 +2041,7 @@ _NO_GUARANTEE_SAID = ("There's no guarantee the images here were made by trained
     None])
 def test_matching_the_source_in_a_folder_of_several_models_or_a_collection_says_there_is_no_guarantee(
         hands_trained_on, folder):
-    panel, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
+    pane, _edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
 
     pane.show_images_in_front([], folder)
 
@@ -2069,7 +2069,7 @@ def _caption_lefts(pane) -> dict[str, int]:
 
 def test_the_models_warning_sits_left_of_its_caption_with_the_captions_in_line(
         hands_trained_on):
-    panel, _edits = hands_trained_on({"hands": 0.45})
+    pane, _edits = hands_trained_on({"hands": 0.45})
     _laid_out_at(pane, 2000)
 
     lefts = _caption_lefts(pane)
@@ -2081,7 +2081,7 @@ def test_the_models_warning_sits_left_of_its_caption_with_the_captions_in_line(
 
 
 def test_the_captions_stay_where_they_are_while_the_models_warning_is_hidden(hands_trained_on):
-    panel, _edits = hands_trained_on({"hands": 0.45})
+    pane, _edits = hands_trained_on({"hands": 0.45})
     _laid_out_at(pane, 2000)
     warned = _caption_lefts(pane)
 
@@ -2093,7 +2093,7 @@ def test_the_captions_stay_where_they_are_while_the_models_warning_is_hidden(han
 
 
 def test_a_caption_moved_onto_a_line_of_its_own_keeps_in_line_with_the_others(hands_trained_on):
-    panel, _edits = hands_trained_on({"hands": 0.45})
+    pane, _edits = hands_trained_on({"hands": 0.45})
 
     _laid_out_at(pane, pane.minimumSizeHint().width())
 
@@ -2110,7 +2110,7 @@ def worded_fix(qtbot, monkeypatch, worded_loras, titled_models):
                         lambda fallback, **terms: ["None", "example_style.safetensors"])
     worded_loras({"example_style": ["exmplstyle"]})
     titled_models({"example_style": "Example Style 1.0"})
-    panel, _edits = _panel(qtbot)
+    pane, _edits = _panel(qtbot)
     pane._fix_prompt_buttons["hands"].click()
     window = pane._fix_prompt_windows["hands"]
     window.positive.boxes()[0].setPlainText("a close-up")

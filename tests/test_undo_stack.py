@@ -1,6 +1,6 @@
 """The undo/redo machinery, on its own.
 
-It lived inside `GalleryActions`, mixed with deletion, thumbnails, enhancement
+It lived inside `GalleryEdits`, mixed with deletion, thumbnails, enhancement
 versions, experiment verdicts, folder renaming and the whole CRUD of
 hand-composed folders — and it is the part every one of those methods has to
 remember to use correctly. It is also entirely generic: nothing here knows what

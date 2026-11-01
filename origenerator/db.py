@@ -7,7 +7,7 @@
 this package, the gui package and the suite already spell.
 
 **Hand a unit the store it needs, not this.** Every consumer here uses a
-disjoint slice: trash_collection and gallery_actions touch only `deletions`, reconcile
+disjoint slice: trash_collection and gallery_edits touch only `deletions`, reconcile
 only `folder_meta` and `custom_folder_items`. A store is whole on its own, so a unit that
 takes one can be given a narrow fake and a change to one table stops being a
 change to the file 24 modules import.
@@ -105,8 +105,8 @@ class Database:
     def set_image_state(self, prompt_id: str, state: str | None):
         return self.generations.set_image_state(prompt_id, state)
 
-    def set_act(self, prompt_id: str, act: str | None):
-        return self.generations.set_act(prompt_id, act)
+    def set_action(self, prompt_id: str, act: str | None):
+        return self.generations.set_action(prompt_id, act)
 
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)

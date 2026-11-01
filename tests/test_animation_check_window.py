@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionButton,
 )
 
-from origenerator.act_settings import VIDEO
+from origenerator.action_settings import VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
 from origenerator.gui.animation_check_window import (
     ACCEPT,
@@ -26,7 +26,7 @@ from origenerator.gui.animation_check_window import (
     BLANK,
     COUNTED,
     FORWARD,
-    FROM_THE_ACTS_OWN,
+    FROM_THE_ACTIONS_OWN,
     HEADING,
     IMAGE,
     NEGATIVE,
@@ -314,7 +314,7 @@ def test_an_animation_nobody_kept_a_video_of_starts_from_the_acts_own_prompts(wi
 
     assert _box(made, POSITIVE).toPlainText() == "the act's own"
     assert _box(made, NEGATIVE).toPlainText() == "its flaws"
-    assert made.findChild(QLabel, BLANK).text() == FROM_THE_ACTS_OWN
+    assert made.findChild(QLabel, BLANK).text() == FROM_THE_ACTIONS_OWN
 
 
 def test_an_animation_with_neither_says_there_is_nothing_to_go_by(window):

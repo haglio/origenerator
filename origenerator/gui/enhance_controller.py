@@ -712,7 +712,7 @@ class EnhanceController:
         """Stop every standalone enhance still being made of ``rows`` — the items
         a delete is about to take.
 
-        Wired into :class:`GalleryActions` beside the media release, so it runs
+        Wired into :class:`GalleryEdits` beside the media release, so it runs
         for every delete there is: a picked tile, a whole folder, a rejected
         experiment, a slideshow's Up key.
 

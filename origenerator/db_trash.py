@@ -1,7 +1,7 @@
 """The Trash: what a delete is still holding, until it is not.
 
 One of the six tables `Database` used to hold all of. Its readers are
-`origenerator.trash_collection` and `origenerator.gallery_actions`, and neither has any
+`origenerator.trash_collection` and `origenerator.gallery_edits`, and neither has any
 business with `generations` or the custom collections.
 
 A deleted generation's whole row travels here, plus where in the trash its files

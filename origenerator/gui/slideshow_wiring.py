@@ -57,7 +57,7 @@ class SlideshowActions:
     :class:`~origenerator.gui.hud_nav_map.NavMapNeighbors`), and what lies just
     beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
     prompt_ids and answers what each one's map row is named for, which is
-    what an act filter matches it on, and ``slides`` the slides they play as,
+    what an action filter matches it on, and ``slides`` the slides they play as,
     which a loop picked back up plays whatever set it reopened on.
 
     ``volume_moved`` takes the volume the viewer moved the slideshow's

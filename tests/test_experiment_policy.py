@@ -333,3 +333,41 @@ def test_an_experiment_never_turns_the_strength_of_a_lora_left_on_none():
     assert any("lora_strength" in p.mutated_keys for p in proposals)
     assert all(p.params["lora_2"] != "None" for p in proposals
                if "lora_strength_2" in p.mutated_keys)
+
+
+class FakeFollowingLoraWorkflow(FakeWorkflow):
+    name = "fake_following_lora_t2i"
+    lora_keys = ("lora",)
+
+    def default_params(self) -> dict:
+        return {**super().default_params(), "unet": "raw_model.safetensors", "lora": "None",
+                "lora_strength": 1.0}
+
+    def param_definitions(self) -> list:
+        return super().param_definitions() + [
+            ParamDef("unet", "Model", "combo", "raw_model.safetensors",
+                     options=["raw_model.safetensors", "turbo_model.safetensors"]),
+            ParamDef("lora", "LoRA", "combo", "None", beside_model="unet",
+                     options=["None", "speed_up.safetensors", "a_look.safetensors"]),
+            ParamDef("lora_strength", "LoRA Strength", "float", 1.0,
+                     min_val=0.0, max_val=2.0, step=0.05),
+        ]
+
+
+def test_an_experiment_never_pairs_a_lora_with_a_model_it_is_filed_apart_from(
+        recorded_base_models):
+    recorded_base_models({"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo",
+                          "speed_up": "Krea 2 Raw"})
+    workflow = FakeFollowingLoraWorkflow()
+    bases = [make_row("on-raw", workflow_name=workflow.name,
+                      params={"unet": "raw_model.safetensors", "lora": "speed_up.safetensors"}),
+             make_row("on-turbo", workflow_name=workflow.name,
+                      params={"unet": "turbo_model.safetensors", "lora": "None"})]
+    policy = ExperimentPolicy(registry={workflow.name: workflow}, rng=random.Random(4))
+
+    proposals = [policy.propose(bases) for _ in range(300)]
+
+    assert any("unet" in p.mutated_keys for p in proposals)
+    assert any("lora" in p.mutated_keys for p in proposals)
+    assert not [p for p in proposals if (p.params["unet"], p.params["lora"]) == (
+        "turbo_model.safetensors", "speed_up.safetensors")]

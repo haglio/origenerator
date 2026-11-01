@@ -8,7 +8,7 @@ import pytest
 
 from origenerator import config
 from origenerator.workflows import model_files
-from origenerator.workflows.model_arch import FLUX, SD15, SDXL, WAN
+from origenerator.workflows.model_arch import FLUX, SD15, SDXL, WAN, WAN_T2V
 from origenerator.workflows.model_files import (
     ANY,
     NO_LORA,
@@ -212,6 +212,29 @@ def test_a_model_picker_and_a_lora_picker_do_not_offer_each_other(installed_mode
         "real_model.safetensors",
     ]
     assert list_lora_files(["fb"], accepts=(WAN,)) == [NO_LORA, "real_lora.safetensors"]
+
+
+def test_a_wan_lora_civitai_files_under_text_to_video_is_a_text_to_video_lora(
+        installed_models, recorded_base_models):
+    for stem in ("made_for_t2v", "made_for_i2v", "not_on_civitai"):
+        installed_models.add("loras", f"{stem}.safetensors", arch=WAN, lora=True)
+    recorded_base_models({"made_for_t2v": "Wan Video 2.2 T2V-A14B",
+                          "made_for_i2v": "Wan Video 14B i2v 480p"})
+
+    assert list_lora_files([], accepts=(WAN,)) == [
+        NO_LORA, "made_for_i2v.safetensors", "not_on_civitai.safetensors"]
+    assert list_lora_files([], accepts=(WAN_T2V,)) == [NO_LORA, "made_for_t2v.safetensors"]
+
+
+def test_a_fixs_lora_is_offered_only_by_the_picker_of_that_fix(installed_models):
+    mouth = os.path.join("fixes", "mouth 2026-10-19 1444.safetensors")
+    for name in ("a_look.safetensors", mouth, os.path.join("fixes", "faces 2026-10-20 0910.safetensors"),
+                 os.path.join("fixes", "named_by_hand.safetensors")):
+        installed_models.add("loras", name, arch=SDXL, lora=True)
+
+    assert list_lora_files([], accepts=(SDXL,)) == [NO_LORA, "a_look.safetensors"]
+    assert list_lora_files([], accepts=(SDXL,), fix="mouth") == [
+        NO_LORA, "a_look.safetensors", mouth]
 
 
 def test_a_picker_drops_the_parts_of_a_sharded_download(installed_models):

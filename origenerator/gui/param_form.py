@@ -21,6 +21,8 @@ from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
+from origenerator.base_models import loras_offered_beside
+from origenerator.box_breaks import unboxed
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.gallery.sides import SIDE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
@@ -31,7 +33,7 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
-from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach
+from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach, offer_only
 from origenerator.gui.param_help import (
     advice_help,
     definition_help,
@@ -40,7 +42,7 @@ from origenerator.gui.param_help import (
     with_training_date,
 )
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_field import set_in_use
+from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
 from origenerator.gui.request_field import RequestField
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
@@ -49,8 +51,9 @@ from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.lora_training import TrainingOffer
+from origenerator.prompt_tokens import PromptReading
 from origenerator.seed_history import SeedHistory
-from origenerator.setting_advice import Advice
+from origenerator.setting_advice import Advice, MissingTriggerWords
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -142,6 +145,7 @@ class ParamForm(QWidget):
 
     changed = pyqtSignal()          # any field's value changed
     train_requested = pyqtSignal(str)  # a LoRA row's Train was pressed (its key)
+    text_fields_changed = pyqtSignal()
     seed_drawn = pyqtSignal(str, object)
     item_activated = pyqtSignal(str)  # a zone's held gallery item was clicked (prompt_id)
 
@@ -202,7 +206,7 @@ class ParamForm(QWidget):
         # into this editable form.
         self._copy_buttons: dict[str, CopyButton] = {}
         self._warning_marks: dict[str, WarningMark] = {}
-        self._advice: dict[str, Advice] = {}
+        self._advice: dict[str, Advice | MissingTriggerWords] = {}
         self._labels: dict[str, ElidingLabel] = {}
         self._recommendations: dict[str, str] = {}
         # A single swap-width-and-height button, built only when the workflow has
@@ -266,6 +270,10 @@ class ParamForm(QWidget):
         for row in self._widgets:
             if lora_key_of(row) in values:
                 self._set_row_visible(row, not strength_without_its_lora(row, values))
+        for pd in self._param_defs:
+            if pd.beside_model in values:
+                offer_only(pd, self._widgets[pd.key],
+                           loras_offered_beside(values[pd.beside_model], pd.options))
         for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue
@@ -337,13 +345,20 @@ class ParamForm(QWidget):
     def request_field(self) -> RequestField | None:
         return self._request_field
 
-    def set_prompts(self, positive: str, negative: str) -> None:
+    def tells_a_story(self) -> bool:
+        return self._scenes is not None
+
+    def set_prompts(self, positive: str, negative: str, *, typed: bool = False) -> None:
         """Write a prompt pair into its fields, as typing it in would."""
         for pd in self._param_defs:
-            if pd.key == "positive_prompt":
-                self._write_field(pd, positive)
-            elif pd.key == "negative_prompt":
-                self._write_field(pd, negative)
+            if pd.key not in ("positive_prompt", "negative_prompt"):
+                continue
+            said = positive if pd.key == "positive_prompt" else negative
+            widget = self._widgets[pd.key]
+            if typed and isinstance(widget, PromptBoxes):
+                widget.edit(said)
+            else:
+                self._write_field(pd, said)
 
     def _announce_every_edit(self):
         for pd in self._param_defs:
@@ -381,7 +396,7 @@ class ParamForm(QWidget):
 
     def _explain(self, key: str) -> None:
         help_text, label, widget = self._help(key), self._labels[key], self._widgets.get(key)
-        if key in _IN_USE_WHILE:
+        if isinstance(widget, PromptBoxes):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
             return
         label.setToolTip(help_text or label.text())
@@ -405,6 +420,13 @@ class ParamForm(QWidget):
             definition_help(pd, self._recommendations.get(key, "")),
             *(advice_help(other, self._recommendations.get(other.key, ""))
               for other in warned_here)]))
+
+    def show_readings(self, readings: dict[str, PromptReading | None]) -> None:
+        for key, widget in self._widgets.items():
+            if isinstance(widget, PromptBoxes):
+                widget.set_reading(readings.get(key))
+        if self._scenes is not None:
+            self._scenes.show_readings(readings)
 
     def explain(self, recommendations: dict[str, str]) -> None:
         self._recommendations = dict(recommendations)
@@ -438,7 +460,7 @@ class ParamForm(QWidget):
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
         cell.addWidget(field, 1)
-        multiline = isinstance(field, QPlainTextEdit)
+        multiline = isinstance(field, PromptBoxes)
         for extra in extras:
             if isinstance(extra, CopyButton) and multiline:
                 cell.addWidget(extra, 0, Qt.AlignmentFlag.AlignTop)
@@ -451,7 +473,7 @@ class ParamForm(QWidget):
         kind = self._kind(pd)
         extras: list[QWidget] = []
         if kind.copyable:
-            copy = CopyButton(lambda pd=pd: str(self._read_field(pd)))
+            copy = CopyButton(lambda pd=pd: unboxed(str(self._read_field(pd))))
             self._copy_buttons[pd.key] = copy
             extras.append(copy)
         if kind.randomizable:
@@ -487,15 +509,22 @@ class ParamForm(QWidget):
         self._warning_marks[key] = mark
         return LabelCell(mark, label, column)
 
-    def _resolve_warnings(self, keys: list[str]) -> None:
-        for key in keys:
-            found = self._advice.get(key)
-            if found is None:
-                continue
-            if key == self._scenes_row:
-                self._scenes.set_total_frames(found.fix)
-            else:
-                self._write_field(self._defs[key], found.fix)
+    def _resolve_warnings(self, rows: list[str]) -> None:
+        for row in rows:
+            for key, found in self._advised_at([row]):
+                self._take_advice(key, found)
+
+    def _take_advice(self, key: str, found: Advice | MissingTriggerWords) -> None:
+        written = found.writes or key
+        widget = self._widgets.get(written)
+        if isinstance(widget, PromptBoxes):
+            widget.rewrite(found.fixed)
+            return
+        fixed = found.fixed(self._read_field(self._defs[written]))
+        if written == "frame_count" and self._scenes is not None:
+            self._scenes.set_total_frames(fixed)
+        else:
+            self._write_field(self._defs[written], fixed)
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():
@@ -511,15 +540,24 @@ class ParamForm(QWidget):
                                          if recommended else help_text or None,
                                          Qt.ItemDataRole.ToolTipRole)
 
-    def set_warnings(self, advice: dict[str, Advice]) -> None:
-        self._advice = {self._row_of(key): found for key, found in advice.items()}
-        for key, mark in self._warning_marks.items():
-            mark.warn(self._warning(key))
+    def set_warnings(self, advice: dict[str, Advice | MissingTriggerWords]) -> None:
+        self._advice = {key: found for key, found in advice.items()
+                        if self._row_of(key) in self._labels}
+        for row, mark in self._warning_marks.items():
+            mark.warn(self._warning(row))
         for title, section in self._sections.items():
             section.warning.warn(self._warnings_about(self._present_keys[title]))
 
     def _row_of(self, key: str) -> str:
         return self._scenes_row if self._scenes is not None and key in _SCENE_KEYS else key
+
+    def _advised_at(self, rows) -> list[tuple[str, Advice | MissingTriggerWords]]:
+        advised = {key: found for row in rows for key, found in self._advice.items()
+                   if row in self._rows_warning(key, found)}
+        return list(advised.items())
+
+    def _rows_warning(self, key: str, found: Advice | MissingTriggerWords) -> set[str]:
+        return {self._row_of(shown) for shown in (key, found.writes) if shown}
 
     def every_warning(self) -> str:
         return self._warnings_about(self._keys_in_order())
@@ -530,14 +568,12 @@ class ParamForm(QWidget):
     def _keys_in_order(self) -> list[str]:
         return [key for keys in self._present_keys.values() for key in keys]
 
-    def _warning(self, key: str) -> str:
-        found = self._advice.get(key)
-        return f"{found.text} Click to use {found.fix_shown}." if found else ""
+    def _warning(self, row: str) -> str:
+        return "\n".join(found.said for _key, found in self._advised_at([row]))
 
-    def _warnings_about(self, keys: list[str]) -> str:
-        return "\n".join(f"{self._labels[key].text()}: {self._advice[key].value_shown}. "
-                         f"{self._warning(key)}"
-                         for key in keys if key in self._advice)
+    def _warnings_about(self, rows: list[str]) -> str:
+        return "\n".join(f"{self._labels[self._row_of(key)].text()}: {found.value_shown}. "
+                         f"{found.said}" for key, found in self._advised_at(rows))
 
     def track_prompt_rewrites(self, made_with: dict | None = None) -> None:
         """Mark every prompt on the form as a rewrite of ``made_with``'s text for
@@ -551,16 +587,21 @@ class ParamForm(QWidget):
         made_with = made_with or {}
         scenes = (self._scenes.fields_beside_their_texts(made_with)
                   if self._scenes is not None else [])
-        others = [(widget, made_with.get(key)) for key, widget in self._widgets.items()
-                  if isinstance(widget, QPlainTextEdit)]
-        for widget, was in scenes + others:
+        for widget, was in scenes:
             tracked_prompt.track(
                 widget, was if isinstance(was, str) else diff_text.live_text(widget))
+        for key, widget in self._widgets.items():
+            if isinstance(widget, PromptBoxes):
+                was = made_with.get(key)
+                widget.track(was if isinstance(was, str) else widget.value())
 
     def clear_prompt_rewrites(self) -> None:
         """Stop tracking every field, leaving each an ordinary prompt input."""
-        for widget in self.text_fields():
-            tracked_prompt.untrack(widget)
+        for field in self._scenes.text_fields() if self._scenes is not None else []:
+            tracked_prompt.untrack(field)
+        for widget in self._widgets.values():
+            if isinstance(widget, PromptBoxes):
+                widget.untrack()
 
     def text_fields(self) -> list[QPlainTextEdit]:
         """The form's multiline text inputs — its prompts — in the order they lay
@@ -572,7 +613,8 @@ class ParamForm(QWidget):
         prompt is searchable the day it lands. What Ctrl+F searches.
         """
         scenes = self._scenes.text_fields() if self._scenes is not None else []
-        return scenes + [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
+        return scenes + [box for widget in self._widgets.values()
+                         if isinstance(widget, PromptBoxes) for box in widget.boxes()]
 
     def drop_slots(self) -> tuple[DropSlot, ...]:
         return tuple(w for w in self._widgets.values() if isinstance(w, DropSlot))
@@ -832,6 +874,8 @@ class ParamForm(QWidget):
         widget = self._kind(pd).make(pd)
         if isinstance(widget, DropSlot):
             widget.activated.connect(self.item_activated)
+        if isinstance(widget, PromptBoxes):
+            widget.boxes_changed.connect(self.text_fields_changed)
         return widget
 
     def definitions(self) -> list[ParamDef]:
@@ -928,7 +972,7 @@ class ParamForm(QWidget):
             return w.story(pd.key)
         return self._kind(pd).read(pd, w)
 
-    def _write_field(self, pd: ParamDef, value) -> None:
+    def _write_field(self, pd: ParamDef, value, *, carried: bool = False) -> None:
         w = self._widgets[pd.key]
         if w is self._scenes:
             if pd.key == "scene_frames":
@@ -937,6 +981,9 @@ class ParamForm(QWidget):
                 w.set_lines(value)
             elif pd.key != "frame_count":
                 w.set_story(pd.key, value)
+            return
+        if carried and isinstance(w, PromptBoxes):
+            w.carry(str(value))
             return
         self._kind(pd).write(pd, w, value)
         tick = self._randomize_checks.get(pd.key)
@@ -964,7 +1011,7 @@ class ParamForm(QWidget):
     def replace_values(self, params: dict):
         self.set_values({**{pd.key: pd.default for pd in self._param_defs}, **params})
 
-    def set_values(self, params: dict):
+    def set_values(self, params: dict, *, carried: bool = False):
         # Retain any params without a field so they survive the read-back; the rest
         # are applied to their widgets. A hidden key is dropped entirely — never
         # absorbed — so the form keeps emitting the workflow's default for it.
@@ -981,7 +1028,7 @@ class ParamForm(QWidget):
         # per-scene value is laid over the scenes it made.
         for pd in sorted(self._param_defs, key=lambda d: d.key != "positive_prompt"):
             if pd.key in params:
-                self._write_field(pd, params[pd.key])
+                self._write_field(pd, params[pd.key], carried=carried)
         for pd in self._seed_defs():
             if pd.key in params and self._randomize_checks[pd.key].isChecked():
                 self._draw(pd)

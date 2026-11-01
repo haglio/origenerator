@@ -9,6 +9,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 import origenerator.importer as imp
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
 from origenerator.importer import (
@@ -1022,6 +1023,19 @@ def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
     assert meta["positive_prompt"] == "a portrait"
     assert meta["seed"] == 355448440510534
     assert meta["params"]["unet"] == "ultrarealFineTune_v4_fp16.gguf"
+
+
+def test_an_sdxl_image_whose_prompts_were_read_in_boxes_re_imports_in_its_boxes(tmp_path):
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    graph = wf.payload_for_comfyui(dict(wf.default_params(),
+                                        positive_prompt=f"a harbor{BOX_BREAK}at dawn",
+                                        negative_prompt=f"blurry{BOX_BREAK}dim"))
+    _make_png_with_metadata(tmp_path / "renamed.png", graph)
+
+    meta = imp._extract_metadata(tmp_path / "renamed.png", ".png")
+
+    assert (meta["positive_prompt"], meta["negative_prompt"]) == (
+        f"a harbor{BOX_BREAK}at dawn", f"blurry{BOX_BREAK}dim")
 
 
 def test_a_krea2_images_own_graph_re_imports_as_krea2(tmp_path):

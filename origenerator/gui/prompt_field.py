@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QPainter, QPen
-from PyQt6.QtWidgets import QLabel, QPlainTextEdit
+from PyQt6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import BORDER_SUBTLE
 
 # What an undragged prompt field has always been.
@@ -190,18 +190,3 @@ class PromptField(QPlainTextEdit):
             painter.drawLine(middle - _MARK_WIDTH // 2, y, middle + _MARK_WIDTH // 2, y)
         painter.end()
 
-
-def set_in_use(field: QPlainTextEdit, label: QLabel, unused_because: str | None,
-               help_text: str) -> None:
-    for widget in (field, label):
-        _mark_inert(widget, bool(unused_because))
-        widget.setToolTip(unused_because or help_text)
-    field.setReadOnly(bool(unused_because))
-
-
-def _mark_inert(widget, inert: bool) -> None:
-    if widget.property("inert") == inert:
-        return
-    widget.setProperty("inert", inert)
-    widget.style().unpolish(widget)
-    widget.style().polish(widget)

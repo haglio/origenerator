@@ -66,6 +66,8 @@ from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
     full_settings,
+    models_matching_a_folders_sources,
+    models_matching_the_sources,
 )
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
@@ -79,21 +81,27 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
+from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.training_controls import TrainingControls
+from origenerator.gui.warning_mark import WarningMark
+from origenerator.prompt_tokens import prompt_reading
+from origenerator.setting_advice import fix_lora_model_advice, trigger_word_advice
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
     detail_fixes_of,
     detector_folder,
     detector_for_part,
+    fix_prompts,
     fix_prompts_of,
     part_named,
     part_table,
 )
+from origenerator.workflows.image_enhance import ENHANCE_MODEL_FAMILIES
 from origenerator.workflows.lora_rows import lora_strength
-from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import NO_LORA, list_lora_files
 
+_NOT_READ = object()
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "
     "below. The original is kept, so an enhancement can always be compared "
@@ -193,17 +201,19 @@ def _narrowest(widget: QWidget) -> int:
 
 
 class _FieldGrid(QGridLayout):
-    """Fields beside one column of captions: a picker to a line, and the numbers
-    sharing a line while each keeps its width, a line each when they cannot.
+    """Fields beside one column of captions, its warning marks in a column left of
+    it: a picker to a line, and the numbers sharing a line while each keeps its
+    width, a line each when they cannot.
 
     A layout rather than a widget, because Qt asks a widget's layout for its
     height at a width and never the widget itself."""
 
     def __init__(self, pickers: list[tuple[QLabel, QWidget]],
-                 numbers: list[tuple[QLabel, QWidget]]):
+                 numbers: list[tuple[QLabel, QWidget]], marks: dict[QLabel, WarningMark]):
         super().__init__()
         self._pickers = pickers
         self._numbers = numbers
+        self._marks = marks
         self.setContentsMargins(0, 0, 0, 0)
         self.setSpacing(GAP_SMALL)
         self._stacked: bool | None = None
@@ -228,7 +238,8 @@ class _FieldGrid(QGridLayout):
 
     def minimumSize(self) -> QSize:
         pairs = self._pickers + self._numbers
-        narrowest = (max(label.sizeHint().width() for label, _field in pairs)
+        narrowest = (self._mark_column()
+                     + max(label.sizeHint().width() for label, _field in pairs)
                      + self.horizontalSpacing()
                      + max(_narrowest(field) for _label, field in pairs))
         return QSize(narrowest, self.heightForWidth(self._one_line_width()))
@@ -237,10 +248,14 @@ class _FieldGrid(QGridLayout):
         self._arrange(stacked=rect.width() < self._one_line_width())
         super().setGeometry(rect)
 
+    def _mark_column(self) -> int:
+        return (max(mark.sizeHint().width() for mark in self._marks.values())
+                + self.horizontalSpacing())
+
     def _one_line_width(self) -> int:
         captions = max(label.sizeHint().width()
                        for label, _field in self._pickers + self._numbers[:1])
-        return (captions
+        return (self._mark_column() + captions
                 + sum(label.sizeHint().width() for label, _field in self._numbers[1:])
                 + sum(_narrowest(field) for _label, field in self._numbers)
                 + self.horizontalSpacing() * (2 * len(self._numbers) - 1))
@@ -252,11 +267,13 @@ class _FieldGrid(QGridLayout):
             self.setColumnStretch(column, 0)
         span = 1 if stacked else 2 * len(self._numbers) - 1
         for row, (label, field) in enumerate(self._pickers):
-            self.addWidget(label, row, 0)
-            self.addWidget(field, row, 1, 1, span)
+            if label in self._marks:
+                self.addWidget(self._marks[label], row, 0)
+            self.addWidget(label, row, 1)
+            self.addWidget(field, row, 2, 1, span)
         below = len(self._pickers)
         for index, (label, field) in enumerate(self._numbers):
-            row, column = (below + index, 0) if stacked else (below, 2 * index)
+            row, column = (below + index, 1) if stacked else (below, 1 + 2 * index)
             self.addWidget(label, row, column)
             self.addWidget(field, row, column + 1)
             self.setColumnStretch(column + 1, 1)
@@ -317,6 +334,9 @@ class EnhancePanel(QWidget):
         super().__init__(parent)
         self._on_change = on_change
         self._fix_training: dict[str, str] = {}
+        self._picked: list[dict] = []
+        self._folder = None
+        self._source_models: frozenset[str] | object | None = _NOT_READ
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
@@ -358,6 +378,8 @@ class EnhancePanel(QWidget):
             "it, so it stays in its own style; pick one to pin it instead."
         )
         self._widgets["checkpoint"] = self._model
+        self._model_warning = WarningMark()
+        self._model_warning.pressed.connect(self._use_the_model_a_fixs_lora_was_trained_on)
 
         self._upscaler = NoWheelComboBox()
         offer_options(self._upscaler, self._options("upscale_model"))
@@ -368,13 +390,14 @@ class EnhancePanel(QWidget):
         self._scale = self._number("enhance_scale", NoWheelDoubleSpinBox())
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
+        model_caption = self._labeled("Model", self._model)
         settings_column.addLayout(_FieldGrid(
-            pickers=[(self._labeled(label, widget), widget)
-                     for label, widget in (("Model", self._model),
-                                           ("Upscaler", self._upscaler))],
+            pickers=[(model_caption, self._model),
+                     (self._labeled("Upscaler", self._upscaler), self._upscaler)],
             numbers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Scale", self._scale), ("Steps", self._steps),
                                            ("Redraw Amount", self._denoise))],
+            marks={model_caption: self._model_warning},
         ))
 
         # The detail pass: a tick and a number per part it can be aimed at, the
@@ -497,7 +520,7 @@ class EnhancePanel(QWidget):
             open_already.activateWindow()
             return
         current = fix_prompts_of(part, self._fix_prompts.get(part.name))
-        loras = list_lora_files([NO_LORA], accepts=(SDXL, SD15))
+        loras = list_lora_files([NO_LORA], accepts=ENHANCE_MODEL_FAMILIES, fix=part.name)
         window = FixPromptsDialog(self, part, current, loras)
         window.accepted.connect(lambda: self._keep_fix_prompts(part.name, window.prompts()))
         window.finished.connect(lambda _result: self._fix_prompt_windows.pop(part.name, None))
@@ -694,6 +717,38 @@ class EnhancePanel(QWidget):
         finally:
             self._loading = False
         self._show_the_preset_held()
+        self._warn_of_a_fixs_lora_trained_on_another_model()
+
+    def show_images_in_front(self, picked, folder=None) -> None:
+        self._picked, self._folder, self._source_models = list(picked), folder, _NOT_READ
+        self._warn_of_a_fixs_lora_trained_on_another_model()
+
+    def _model_advice(self):
+        params = self.settings().params
+        trained = {name: model for name, own in fix_prompts(params).items() if own["lora"]
+                   if (model := fix_training.trained_on(own["lora"]))}
+        if not trained:
+            return None
+        held = params.get("checkpoint")
+        return fix_lora_model_advice(held, self._models_it_runs(held), trained,
+                                     self._options("checkpoint")).get("checkpoint")
+
+    def _models_it_runs(self, held) -> frozenset[str] | None:
+        if held != MATCH_SOURCE_MODEL:
+            return frozenset({held})
+        if self._source_models is _NOT_READ:
+            self._source_models = (models_matching_the_sources(self._picked) if self._picked
+                                   else models_matching_a_folders_sources(self._folder))
+        return self._source_models
+
+    def _warn_of_a_fixs_lora_trained_on_another_model(self) -> None:
+        found = self._model_advice()
+        self._model_warning.warn(found.said if found is not None else "")
+
+    def _use_the_model_a_fixs_lora_was_trained_on(self) -> None:
+        found = self._model_advice()
+        if found is not None:
+            _fill(self._model, found.fixed(self._model.currentData()))
 
     def settings(self) -> EnhanceSettings:
         """What the panel currently reads as."""
@@ -715,11 +770,19 @@ class EnhancePanel(QWidget):
     def _emit(self, *_args):
         if not self._loading:
             self._show_the_preset_held()
+            self._warn_of_a_fixs_lora_trained_on_another_model()
             self._on_change(self.settings())
 
     def _take_settings(self, params: dict) -> None:
         self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=full_settings(params)))
         self._emit()
+
+
+def _prompt_boxes(key: str, text: str) -> PromptBoxes:
+    boxes = PromptBoxes(QPlainTextEdit)
+    boxes.set_reading(prompt_reading(ENHANCE_WORKFLOW, {}, key))
+    boxes.set_value(text)
+    return boxes
 
 
 def _side_by_side(*widgets) -> QWidget:
@@ -745,13 +808,14 @@ class FixPromptsDialog(QDialog):
         heading = QLabel(self.windowTitle())
         heading.setStyleSheet("font-weight: bold;")
         layout.addWidget(heading)
-        self.positive = QPlainTextEdit(current["prompt"])
-        self.negative = QPlainTextEdit(current["avoid"])
+        self.positive = _prompt_boxes("positive_prompt", current["prompt"])
+        self.negative = _prompt_boxes("negative_prompt", current["avoid"])
+        self.prompt_warning, self.lora_warning = WarningMark(), WarningMark()
         side_by_side = QHBoxLayout()
-        for caption, field in (("Positive Prompt", self.positive),
-                               ("Negative Prompt", self.negative)):
+        for caption, field in (((self.prompt_warning, QLabel("Positive Prompt")), self.positive),
+                               ((QLabel("Negative Prompt"),), self.negative)):
             column = QVBoxLayout()
-            column.addWidget(QLabel(caption))
+            column.addWidget(_side_by_side(*caption), 0, Qt.AlignmentFlag.AlignLeft)
             column.addWidget(field, 1)
             side_by_side.addLayout(column)
         layout.addLayout(side_by_side, 1)
@@ -774,11 +838,31 @@ class FixPromptsDialog(QDialog):
         self._running: str | None = None
         self._offer_training()
         foot = FlowLayout(spacing=GAP_SMALL)
-        for together in ((QLabel("LoRA"), self.lora), (QLabel("LoRA Strength"), self.strength)):
+        for together in ((self.lora_warning, QLabel("LoRA"), self.lora),
+                         (QLabel("LoRA Strength"), self.strength)):
             foot.addWidget(_side_by_side(*together))
         foot.addWidget(self.training)
         foot.add_trailing(buttons)
         layout.addLayout(foot)
+        self.positive.textChanged.connect(self._warn_of_a_missing_trigger_word)
+        self.lora.currentIndexChanged.connect(self._warn_of_a_missing_trigger_word)
+        for mark in (self.prompt_warning, self.lora_warning):
+            mark.pressed.connect(self._add_the_missing_trigger_word)
+        self._warn_of_a_missing_trigger_word()
+
+    def _missing_trigger_word(self):
+        return trigger_word_advice({"positive_prompt": self.positive.value(),
+                                    "lora": self.lora.currentData()}, ("lora",)).get("lora")
+
+    def _warn_of_a_missing_trigger_word(self) -> None:
+        missing = self._missing_trigger_word()
+        for mark in (self.prompt_warning, self.lora_warning):
+            mark.warn(missing.said if missing is not None else "")
+
+    def _add_the_missing_trigger_word(self) -> None:
+        missing = self._missing_trigger_word()
+        if missing is not None:
+            self.positive.rewrite(missing.fixed)
 
     def show_training(self, text: str | None) -> None:
         self._running = text
@@ -800,7 +884,7 @@ class FixPromptsDialog(QDialog):
 
     def prompts(self) -> dict:
         return fix_prompts_of(self._part, {
-            "prompt": self.positive.toPlainText(), "avoid": self.negative.toPlainText(),
+            "prompt": self.positive.value(), "avoid": self.negative.value(),
             "lora": self.lora.currentData(), "strength": self.strength.value()})
 
     def show_over_parent(self) -> None:

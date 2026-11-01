@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import AMBER
 
 from origenerator import (
+    config,
     search,
 )
 from origenerator.gallery.collection import (
@@ -51,6 +52,7 @@ from tests.gallery_view_support import (
     _top_level,
     _video_workflow,
 )
+from tests.text_readers import clip_reader
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
@@ -772,6 +774,24 @@ def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, mo
 
     assert _find_count(view) == "1 of 2"
     assert positive.textCursor().position() == positive.toPlainText().find("sparrows")
+
+
+def test_an_open_find_follows_a_prompt_as_it_gains_and_loses_boxes(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    prompt = _tab_with_prompts(view)._param_form._widgets["positive_prompt"]
+    _press_ctrl_f(view, monkeypatch)
+    _find_query(view).setText("dog")
+    first = prompt.boxes()[0]
+
+    first.setPlainText(" ".join(["cat"] * 75) + " dog")
+    qtbot.waitUntil(lambda: len(prompt.boxes()) == 2, timeout=5000)
+    assert _find_count(view) == "1 of 1"
+
+    first.setPlainText("cat")
+    qtbot.waitUntil(lambda: len(prompt.boxes()) == 1, timeout=5000)
+    assert _find_count(view) == "1 of 1"
 
 
 def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypatch):

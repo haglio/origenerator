@@ -2834,7 +2834,7 @@ def test_showing_the_image_a_tab_already_shows_still_marks_what_is_typed(saved_p
 
     panel.show_saved_generation(image, [image])
 
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
     field.setPlainText("a dog on a couch")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
 
@@ -2843,7 +2843,7 @@ def test_generate_takes_the_red_and_green_off_its_prompts(saved_panel, qtbot):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
     field.setPlainText("a dog on a couch")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
 
@@ -2857,7 +2857,7 @@ def test_what_is_typed_after_generate_is_marked_against_what_it_made(saved_panel
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
     field.setPlainText("a dog on a couch")
     panel._on_generate()
 
@@ -2870,7 +2870,7 @@ def test_undo_after_generate_takes_back_what_was_typed_before_it(saved_panel, qt
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
     panel.show_saved_generation(image, [image])
-    field = panel._param_form._widgets["positive_prompt"]
+    field = _positive_field(panel)
     field.moveCursor(QTextCursor.MoveOperation.End)
     qtbot.keyClicks(field, "s")
     panel._on_generate()
@@ -3177,7 +3177,7 @@ def test_generate_on_a_request_leaves_what_the_request_changed_marked(saved_pane
     image = _image_row(db, "img1", prompt="a cat")
     _request_made(db, "img1")
     panel.show_saved_generation(image, [image])
-    positive = panel._param_form._widgets["positive_prompt"]
+    positive = _positive_field(panel)
     qtbot.waitUntil(lambda: "hat" in _struck_and_lit(positive)[0], timeout=5000)
 
     panel._on_generate()

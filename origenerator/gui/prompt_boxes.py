@@ -129,8 +129,9 @@ class PromptBoxes(QWidget):
                    else self._reading.boxes_of(value))
 
     def track(self, baseline: str) -> None:
+        if self._baseline is None:
+            self._history.clear()
         self._baseline = baseline
-        self._history.clear()
         self._show(self._texts)
 
     def untrack(self) -> None:

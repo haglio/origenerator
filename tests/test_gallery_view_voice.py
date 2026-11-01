@@ -15,10 +15,12 @@ from PyQt6.QtCore import (
 
 from origenerator import (
     act_settings,
+    config,
     gallery,
     motion_engine,
 )
 from origenerator.animate_command import AnimateRequest
+from origenerator.box_breaks import BOX_BREAK
 from origenerator.config import (
     EVOLVER_INBOX_DIR,
     GENAU_SOURCE,
@@ -65,6 +67,7 @@ from tests.gallery_view_support import (
     _will_move_on,
 )
 from tests.marked_words import words
+from tests.text_readers import clip_reader
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
@@ -622,6 +625,36 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
     assert job.params["seed"] == 7
     assert job.params["positive_prompt"] == "a woman, soft light"
     assert job.params["negative_prompt"] == "blurry"
+
+
+def test_a_request_rewritten_past_a_boxs_end_queues_in_boxes_of_whole_words(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=f"a hat, {cats[0]}")
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    assert job.params["positive_prompt"] == f"{cats[1]}{BOX_BREAK}{cats[2]}"
+
+
+def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    clip_reader(tmp_path / "ComfyUI")
+    cats = [" ".join(["cat"] * count) for count in (75, 5)]
+    stored = f"a hat,{BOX_BREAK}{cats[0]}{BOX_BREAK}{cats[1]}"
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=stored)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._live_jobs.values()
+    record = view._db.get_request(job.prompt_id)
+    assert (record["old_positive"], record["new_positive"]) == (
+        stored, f"{cats[0]}{BOX_BREAK}{cats[1]}")
+    assert record["new_positive"] == job.params["positive_prompt"]
 
 
 def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):

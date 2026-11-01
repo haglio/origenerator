@@ -465,7 +465,7 @@ def test_recent_lists_each_lanes_videos_out_of_the_library(combine):
     controller.panel.video_used.emit(act_settings.VIDEO, "clip")
 
     assert controller.panel.history(act_settings.VIDEO) == ["clip", "older"]
-    assert controller.panel.history(act_settings.GENAU) == ["older"]
+    assert controller.panel.history(act_settings.GENAU) == []
 
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):

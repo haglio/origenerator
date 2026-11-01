@@ -402,7 +402,6 @@ def test_settings_from_a_dropped_video_name_that_video(qtbot, tmp_path):
 
 
 def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, tmp_path):
-    # Nothing noted which lane those were for, so both lanes list them.
     db = _combine_db(tmp_path)
     db.insert_generation(prompt_id="made", workflow_name="wan22_i2v",
                          workflow_version=_WAN_I2V.version, params_json="{}", workflow_json="{}")
@@ -414,7 +413,7 @@ def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, 
 
     assert _listed_under_recent(panel) == ["vid"]
     panel.set_intent(act_settings.GENAU)
-    assert _listed_under_recent(panel) == ["vid"]
+    assert _listed_under_recent(panel) == []
 
 
 def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):

@@ -686,7 +686,7 @@ def test_the_trash_collection_splits_too(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._actions.delete_rows([tall, wide])
+    view._edits.delete_rows([tall, wide])
     view.refresh()
 
     assert sorted(held["prompt_id"] for held in view._held_rows) == ["t1", "w1"]

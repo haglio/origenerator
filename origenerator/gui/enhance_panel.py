@@ -46,11 +46,11 @@ from PyQt6.QtWidgets import (
 from shared_ui import palette
 from shared_ui.chrome import control_ground
 from shared_ui.colors import (
-    AMBER,
     BG_PRIMARY,
     BG_SECONDARY,
     BORDER_SUBTLE,
     TEXT_MUTED,
+    YELLOW,
 )
 from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.icons import qt_icon
@@ -147,9 +147,9 @@ _DISABLED_CSS = f"""
 _ENHANCE_BUTTON_CSS = f"""
     #enhancePanel QPushButton#enhanceButton {{
         color: {BG_PRIMARY.name()};
-        border: 1px solid {AMBER.name()};
+        border: 1px solid {YELLOW.name()};
         font-weight: bold;
-    }}{control_ground(palette.AMBER, "#enhancePanel QPushButton#enhanceButton")}
+    }}{control_ground(palette.YELLOW, "#enhancePanel QPushButton#enhanceButton")}
     #enhancePanel QPushButton#enhanceButton:disabled {{
         background-color: {BG_SECONDARY.name()};
         color: {TEXT_MUTED.name()};

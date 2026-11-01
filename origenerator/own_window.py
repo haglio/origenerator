@@ -21,7 +21,7 @@ def taskbar_identity(title: str, preview) -> str:
 
 
 def taskbar_app(title: str, launcher: str, preview):
-    """Its name, the icon this copy wears -- amber for a preview, as the app's
+    """Its name, the icon this copy wears -- yellow for a preview, as the app's
     own window is -- and the launcher that opens it again."""
     from app_support.win32 import TaskbarApp
     from shared_ui.preview_icon_pil import icon_file

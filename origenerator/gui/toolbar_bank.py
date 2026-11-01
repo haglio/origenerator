@@ -25,7 +25,7 @@ from typing import NamedTuple
 from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.colors import BG_PRIMARY
 from shared_ui.icon_button import fill_square_with_icon
-from shared_ui.palette import AMBER, BLUE, as_hex
+from shared_ui.palette import BLUE, YELLOW, as_hex
 from shared_ui.spacing import (
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
@@ -47,7 +47,7 @@ def _lit(color: str) -> str:
 
 # A lit background while a switch is on.
 _LIT = _lit(as_hex(BLUE))
-_LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(AMBER))
+_LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(YELLOW))
 
 # What the Auto switch's clickable tip says while the Auto-Generate it would stop is
 # running in some other folder. Naming that folder is no use when a name is a

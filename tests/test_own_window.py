@@ -103,7 +103,7 @@ def test_each_window_names_itself_to_windows_under_the_apps_own_name():
 
 
 def test_a_window_out_of_a_branch_is_shown_as_a_preview():
-    """Amber instead of magenta, and a taskbar group of its own, the way every
+    """Yellow instead of magenta, and a taskbar group of its own, the way every
     preview in the family shows -- the production app's windows keep both."""
     preview = Preview(feature="a branch")
 

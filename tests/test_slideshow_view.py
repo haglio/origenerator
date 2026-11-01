@@ -18,7 +18,7 @@ from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QIcon, QKeyEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QWidget
-from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
+from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.notice_shape import NOTICE_TOP_MARGIN
 
@@ -1131,7 +1131,7 @@ def test_the_notice_wears_the_color_of_what_it_says(qtbot):
     notice.say("a plain line")
     assert TEXT_PRIMARY.name() in notice.styleSheet()
     notice.say("nothing to do", kind=WARNING)
-    assert AMBER.name() in notice.styleSheet()
+    assert YELLOW.name() in notice.styleSheet()
     notice.say("it broke", kind=ERROR)
     assert RED.name() in notice.styleSheet()
     notice.say("starred", kind=FAVORITE)

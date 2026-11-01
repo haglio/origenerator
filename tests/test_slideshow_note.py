@@ -9,7 +9,7 @@ no HUD is indistinguishable from the request having been dropped.
 from __future__ import annotations
 
 from PyQt6.QtCore import QRunnable
-from shared_ui.colors import AMBER, RED, TEXT_PRIMARY
+from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
 
 from origenerator.gui import voice_router
 from origenerator.gui.notice_overlay import ERROR, WARNING
@@ -129,12 +129,12 @@ def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
     view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
     view.slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
-    assert AMBER.name() in view._note.styleSheet()
+    assert YELLOW.name() in view._note.styleSheet()
     view.slideshow.note_voice_run(None, "couldn't launch the enhance — see the log", kind=ERROR)
     assert RED.name() in view._note.styleSheet()
     view.slideshow.note_request("didn't catch what to change in “no beard”", _ASKED_AGAIN,
                       kind=WARNING)
-    assert AMBER.name() in view._note.styleSheet()
+    assert YELLOW.name() in view._note.styleSheet()
     _fade(view)
 
     assert _corner(view) == _WORKING

@@ -52,7 +52,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY, TEXT_PRIMARY
+from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
@@ -95,7 +95,7 @@ _SELECTED_ROW_CSS = (
     + _ROW_CSS
 )
 _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
-_ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: {BUTTON_RADIUS}px;"
+_ADD_TILE_CSS = f"background-color: {YELLOW.name()}; border-radius: {BUTTON_RADIUS}px;"
 _ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
                 Qt.Key.Key_Down: 1, Qt.Key.Key_Right: 1}
 _ENHANCE_ROW = -1  # where the arrows stand on the row above the top level

@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QToolButton,
 )
-from shared_ui.colors import AMBER
+from shared_ui.colors import YELLOW
 
 from origenerator import (
     search,
@@ -55,11 +55,11 @@ from tests.gallery_view_support import (
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
-def _amber_matches(field) -> int:
-    """How many of ``field``'s find highlights are the current-match amber. The
+def _yellow_matches(field) -> int:
+    """How many of ``field``'s find highlights are the current-match yellow. The
     find re-lays every field's highlights on each step, so across the fields
-    exactly one of them is ever amber."""
-    return sum(sel.format.background().color() == AMBER
+    exactly one of them is ever yellow."""
+    return sum(sel.format.background().color() == YELLOW
                for sel in field.extraSelections())
 
 
@@ -785,12 +785,12 @@ def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypa
 
     _find_next(view)
     assert _find_count(view) == "2 of 2"
-    # The amber highlight moved with it, on into the next field.
-    assert _amber_matches(negative) == 1 and _amber_matches(positive) == 0
+    # The yellow highlight moved with it, on into the next field.
+    assert _yellow_matches(negative) == 1 and _yellow_matches(positive) == 0
 
     _find_next(view)
     assert _find_count(view) == "1 of 2"           # and around again
-    assert _amber_matches(positive) == 1 and _amber_matches(negative) == 0
+    assert _yellow_matches(positive) == 1 and _yellow_matches(negative) == 0
 
 
 def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypatch):

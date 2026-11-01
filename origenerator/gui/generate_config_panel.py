@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, TEXT_PRIMARY
+from shared_ui.colors import TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text, qt_icon
 from shared_ui.orientation import orientation_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
@@ -626,7 +626,7 @@ class GenerateConfigPanel(DropZone):
             self._generate_btn.setToolTip(blocked)
         note = self._why_the_item_cannot_be_remade()
         set_marked_text(self._cannot_remake_note, wrappable(note or ""), mark="warning" if note else "",
-                        color=AMBER)
+                        color=YELLOW)
         self._cannot_remake_note.setVisible(note is not None)
 
     def _why_generate_is_blocked(self) -> str | None:

@@ -160,7 +160,7 @@ def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monk
     assert tmp_path in named["icon"].parents
 
 
-def test_a_previews_notices_are_headed_by_the_feature_it_demos_beside_the_amber_letter(
+def test_a_previews_notices_are_headed_by_the_feature_it_demos_beside_the_yellow_letter(
         qapp, monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     registered = []

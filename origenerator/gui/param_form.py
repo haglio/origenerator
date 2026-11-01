@@ -396,7 +396,7 @@ class ParamForm(QWidget):
 
     def _explain(self, key: str) -> None:
         help_text, label, widget = self._help(key), self._labels[key], self._widgets.get(key)
-        if key in _IN_USE_WHILE:
+        if isinstance(widget, PromptBoxes):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
             return
         label.setToolTip(help_text or label.text())

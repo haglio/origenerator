@@ -445,13 +445,22 @@ def test_a_prompt_not_in_use_grays_every_box_and_every_box_it_gains(qtbot):
 def test_a_prompt_of_more_than_one_box_says_in_every_box_what_a_second_box_means(qtbot):
     form = _form_with_a_prompt(qtbot)
     prompt = form._widgets["positive_prompt"]
-    set_in_use(prompt, form._labels["positive_prompt"], None, "help")
+    usual_help = form._labels["positive_prompt"].toolTip()
 
     form.set_values({"positive_prompt": f"a b c{BOX_BREAK}d"})
-    assert [box.toolTip() for box in prompt.boxes()] == [f"help\n\n{MORE_THAN_ONE_BOX}"] * 2
+    assert [box.toolTip() for box in prompt.boxes()] == [f"{usual_help}\n\n{MORE_THAN_ONE_BOX}"] * 2
 
     form.set_values({"positive_prompt": "a b"})
-    assert [box.toolTip() for box in prompt.boxes()] == ["help"]
+    assert [box.toolTip() for box in prompt.boxes()] == [usual_help]
+
+
+def test_a_prompt_with_no_help_of_its_own_still_says_what_a_second_box_means(qtbot):
+    prompt = _prompt_fields("enhance_positive_prompt")
+    qtbot.addWidget(prompt)
+
+    prompt.set_value(f"a b c{BOX_BREAK}d")
+
+    assert [box.toolTip() for box in prompt.boxes()] == [MORE_THAN_ONE_BOX] * 2
 
 
 @pytest.fixture

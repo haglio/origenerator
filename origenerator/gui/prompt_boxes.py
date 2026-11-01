@@ -62,7 +62,8 @@ class PromptBoxes(QWidget):
         self._cut_from: str | None = None
         self._baseline: str | None = None
         self._shares: list[str | None] = []
-        self._in_use: tuple[bool, str] | None = None
+        self._in_use = True
+        self._tip = ""
         self._writing = False
         self._flow_from: int | None = None
         self._boxes: list[QPlainTextEdit] = []
@@ -139,19 +140,17 @@ class PromptBoxes(QWidget):
         self._show(self._texts)
 
     def set_in_use(self, in_use: bool, tip: str) -> None:
-        self._in_use = (in_use, tip)
+        self._in_use, self._tip = in_use, tip
         self.setToolTip(tip)
         self._mark_boxes_in_use()
         self._count_down()
 
     def _mark_boxes_in_use(self) -> None:
-        if self._in_use is None:
-            return
-        in_use, tip = self._in_use
-        if in_use and len(self._boxes) > 1:
-            tip = f"{tip}\n\n{MORE_THAN_ONE_BOX}"
+        tip = self._tip
+        if self._in_use and len(self._boxes) > 1:
+            tip = "\n\n".join(filter(None, [tip, MORE_THAN_ONE_BOX]))
         for box in self._boxes:
-            _mark_in_use(box, in_use, tip)
+            _mark_in_use(box, self._in_use, tip)
 
     def _flows(self) -> bool:
         return self._reading is not None and self._reading.past_it == READ_IN_PIECES
@@ -280,14 +279,13 @@ class PromptBoxes(QWidget):
         self.textChanged.emit()
 
     def _count_down(self) -> None:
-        in_use = self._in_use is None or self._in_use[0]
         if self._cut_from is not None:
             for countdown, (_start, tokens) in zip(self._countdowns,
                                                    self._reading.pieces(self._cut_from), strict=True):
-                countdown.show_left(self._reading.reads_well - tokens if in_use else None)
+                countdown.show_left(self._reading.reads_well - tokens if self._in_use else None)
             return
         for box, countdown in zip(self._boxes, self._countdowns, strict=True):
-            count_down(countdown, box, self._reading, in_use=in_use)
+            count_down(countdown, box, self._reading, in_use=self._in_use)
 
 
 def _put(box: QPlainTextEdit, text: str, share: str | None) -> None:

@@ -1,4 +1,4 @@
-"""act_settings: pick the one best set of settings for a dropdown act from the gallery.
+"""action_settings: pick the one best set of settings for a dropdown act from the gallery.
 
 Each act maps to one set of settings — the most-used model+params among the user's
 videos of that act — resolved fresh from the gallery rows. Which act a video is
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from origenerator import act_settings
+from origenerator import action_settings
 
 
 def _video(pid, act, created, **params):
@@ -43,19 +43,19 @@ def test_most_used_video_picks_the_most_used_settings_for_the_act():
         _video("h1", "beta", "2026-01-09", lora_high="Z", steps=20),   # a different act
     ]
     # settings X (used twice) beat settings Y (once); its most-recent row represents it.
-    assert act_settings.most_used_video("alpha", rows) == "a2"
+    assert action_settings.most_used_video("alpha", rows) == "a2"
 
 
 def test_an_act_no_video_does_has_no_most_used_video():
     rows = [_video("h1", "beta", "2026-01-01", lora_high="Z")]
-    assert act_settings.most_used_video("alpha", rows) is None
+    assert action_settings.most_used_video("alpha", rows) is None
 
 
 def test_a_video_launched_as_no_act_counts_toward_none():
     rows = [{**_video("n1", "", "2026-01-01", lora_high="X")},
             _video("a1", "alpha", "2026-01-02", lora_high="X")]
-    assert act_settings.most_used_video("alpha", rows) == "a1"
-    assert act_settings.available_categories(rows) == {"alpha", "gamma"}
+    assert action_settings.most_used_video("alpha", rows) == "a1"
+    assert action_settings.available_categories(rows) == {"alpha", "gamma"}
 
 
 def test_available_categories_are_those_with_a_video_to_mine_or_pinned_settings():
@@ -66,33 +66,33 @@ def test_available_categories_are_those_with_a_video_to_mine_or_pinned_settings(
     # The acts the gallery can mine settings for, plus "gamma" — the example
     # overlay pins settings for it, so it needs no past video. The rest have
     # nothing to answer with, so Combine greys them out.
-    assert act_settings.available_categories(rows) == {"beta", "epsilon", "gamma"}
+    assert action_settings.available_categories(rows) == {"beta", "epsilon", "gamma"}
 
 
 def test_available_categories_offers_only_curated_acts_without_any_video():
     # An empty gallery leaves nothing to mine — only the overlay-curated act stands.
-    assert act_settings.available_categories([]) == {"gamma"}
+    assert action_settings.available_categories([]) == {"gamma"}
 
 
 # --- pinned_settings: the overlay's hand-tuned act settings --------------------
 
 
 def test_a_curated_act_takes_the_settings_the_overlay_names():
-    spec = act_settings.pinned_settings("gamma")  # curated in the example overlay
+    spec = action_settings.pinned_settings("gamma")  # curated in the example overlay
     assert spec["workflow"] == "wan22_i2v"
     assert spec["params"]["lora_high"] == "example-act-high.safetensors"
 
 
 def test_pinned_settings_are_none_for_an_unpinned_act():
-    assert act_settings.pinned_settings("beta") is None
+    assert action_settings.pinned_settings("beta") is None
 
 
 def test_pinned_settings_are_none_for_a_malformed_entry(monkeypatch):
     # A bad entry must send the caller to mining, never fail the act outright.
-    monkeypatch.setitem(act_settings._CURATED_BY_INTENT, act_settings.VIDEO,
+    monkeypatch.setitem(action_settings._CURATED_BY_INTENT, action_settings.VIDEO,
                         {"beta": "not a dict", "epsilon": {"params": {}}})
-    assert act_settings.pinned_settings("beta") is None      # not a dict
-    assert act_settings.pinned_settings("epsilon") is None   # names no workflow
+    assert action_settings.pinned_settings("beta") is None      # not a dict
+    assert action_settings.pinned_settings("epsilon") is None   # names no workflow
 
 
 def test_most_used_video_groups_ignoring_prompt_seed_and_input_image():
@@ -102,7 +102,7 @@ def test_most_used_video_groups_ignoring_prompt_seed_and_input_image():
         _video("b1", "alpha", "2026-01-03", lora_high="Y", seed=3, input_image="i3.png"),
     ]
     # a1 and a2 differ only in prompt/seed/frame — one set of settings, used twice — so it wins.
-    assert act_settings.most_used_video("alpha", rows) == "a2"
+    assert action_settings.most_used_video("alpha", rows) == "a2"
 
 
 def test_settings_grouping_ignores_derived_size_and_length_params():
@@ -118,7 +118,7 @@ def test_settings_grouping_ignores_derived_size_and_length_params():
     # a1 and a2 are one set of settings (used twice) despite differing size/length → it wins,
     # represented by the most recent (a2). Without the exclusions they'd each be a
     # singleton and the newest overall (b1) would win instead.
-    assert act_settings.most_used_video("alpha", rows) == "a2"
+    assert action_settings.most_used_video("alpha", rows) == "a2"
 
 
 def test_most_used_video_breaks_count_ties_by_recency():
@@ -126,7 +126,7 @@ def test_most_used_video_breaks_count_ties_by_recency():
         _video("a1", "alpha", "2026-01-01", lora_high="X"),  # settings used once, older
         _video("b1", "alpha", "2026-01-05", lora_high="Y"),  # settings used once, newer
     ]
-    assert act_settings.most_used_video("alpha", rows) == "b1"
+    assert action_settings.most_used_video("alpha", rows) == "b1"
 
 
 def test_most_used_video_keeps_each_act_to_the_videos_launched_as_it():
@@ -135,10 +135,10 @@ def test_most_used_video_keeps_each_act_to_the_videos_launched_as_it():
         _video("c1", "epsilon", "2026-01-02", lora_high="Y"),
         _video("d1", "dancing", "2026-01-03", lora_high="Z"),
     ]
-    assert act_settings.most_used_video("delta", rows) == "f1"
-    assert act_settings.most_used_video("epsilon", rows) == "c1"
-    assert act_settings.most_used_video("dancing", rows) == "d1"
-    assert act_settings.most_used_video("beta", rows) is None  # nothing was made as this act
+    assert action_settings.most_used_video("delta", rows) == "f1"
+    assert action_settings.most_used_video("epsilon", rows) == "c1"
+    assert action_settings.most_used_video("dancing", rows) == "d1"
+    assert action_settings.most_used_video("beta", rows) is None  # nothing was made as this act
 
 
 # --- the two lanes: a full-length video, or one looping cycle ----------------
@@ -151,12 +151,12 @@ def test_genau_mines_only_looping_videos():
     ]
     # The video lane sees both and prefers the newer of the one shared set of settings;
     # the Genau lane can only use the loop, whatever else the act has under it.
-    assert act_settings.most_used_video("beta", rows) == "l1"
-    assert act_settings.most_used_video("beta", rows, act_settings.GENAU) == "l1"
+    assert action_settings.most_used_video("beta", rows) == "l1"
+    assert action_settings.most_used_video("beta", rows, action_settings.GENAU) == "l1"
 
     long_form_only = [_video("v1", "beta", "2026-01-01", lora_high="Z")]
-    assert act_settings.most_used_video("beta", long_form_only) == "v1"
-    assert act_settings.most_used_video("beta", long_form_only, act_settings.GENAU) is None
+    assert action_settings.most_used_video("beta", long_form_only) == "v1"
+    assert action_settings.most_used_video("beta", long_form_only, action_settings.GENAU) is None
 
 
 def test_genau_available_categories_need_a_loop_or_pinned_settings():
@@ -166,46 +166,46 @@ def test_genau_available_categories_need_a_loop_or_pinned_settings():
     ]
     # epsilon has a video but no loop, so the Genau lane cannot answer it; delta can
     # be mined from the loop; beta is pinned in the example overlay's pinned_genau_settings.
-    assert act_settings.available_categories(rows, act_settings.GENAU) == {"delta", "beta"}
+    assert action_settings.available_categories(rows, action_settings.GENAU) == {"delta", "beta"}
     # The video lane is unchanged by any of it — a loop is still a video there.
-    assert act_settings.available_categories(rows) == {"epsilon", "delta", "gamma"}
+    assert action_settings.available_categories(rows) == {"epsilon", "delta", "gamma"}
 
 
 def test_the_two_curated_tables_are_independent():
     # The same act can be pinned in one lane and mined in the other: one table keyed
     # by act alone could never hold both.
-    assert act_settings.pinned_settings("gamma")["workflow"] == "wan22_i2v"
-    assert act_settings.pinned_settings("gamma", act_settings.GENAU) is None
-    assert act_settings.pinned_settings("beta", act_settings.GENAU)["workflow"] == "wan22_flf2v_loop"
-    assert act_settings.pinned_settings("beta") is None
+    assert action_settings.pinned_settings("gamma")["workflow"] == "wan22_i2v"
+    assert action_settings.pinned_settings("gamma", action_settings.GENAU) is None
+    assert action_settings.pinned_settings("beta", action_settings.GENAU)["workflow"] == "wan22_flf2v_loop"
+    assert action_settings.pinned_settings("beta") is None
 
 
-# --- act_of: what a generation shows -------------------------------------------
+# --- action_of: what a generation shows -------------------------------------------
 
 
 def test_a_generation_shows_the_act_picked_for_it_in_combine():
     row = {"act": "beta", "positive_prompt": "she is dancing on a table"}
 
-    assert act_settings.act_of(row) == "beta"
+    assert action_settings.action_of(row) == "beta"
 
 
 def test_an_image_shows_the_action_it_was_sorted_as():
-    assert act_settings.act_of({"image_state": "state two"}) == "state two"
+    assert action_settings.action_of({"image_state": "state two"}) == "state two"
 
 
 def test_a_generation_nobody_has_said_an_act_for_shows_none():
-    assert act_settings.act_of({"positive_prompt": "a beta form, slowly"}) == ""
-    assert act_settings.act_of({}) == ""
+    assert action_settings.action_of({"positive_prompt": "a beta form, slowly"}) == ""
+    assert action_settings.action_of({}) == ""
 
 
 def test_an_act_with_no_past_video_says_so_in_its_lanes_own_words(monkeypatch):
-    monkeypatch.setattr(act_settings, "genau_flick_word", lambda: "flick")
+    monkeypatch.setattr(action_settings, "genau_flick_word", lambda: "flick")
 
-    assert act_settings.no_past_video("alpha", act_settings.VIDEO) == (
+    assert action_settings.no_past_video("alpha", action_settings.VIDEO) == (
         "no past “alpha” video to take settings from yet")
-    assert act_settings.no_past_video("alpha", act_settings.GENAU) == (
+    assert action_settings.no_past_video("alpha", action_settings.GENAU) == (
         "no past looping “alpha” flick to take settings from yet")
 
 
 def test_a_line_that_opens_a_sentence_capitalizes_its_first_letter_alone():
-    assert act_settings.as_sentence("no past “Alpha” video") == "No past “Alpha” video"
+    assert action_settings.as_sentence("no past “Alpha” video") == "No past “Alpha” video"

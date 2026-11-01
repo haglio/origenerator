@@ -21,7 +21,7 @@ from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.preview import Preview
 
-from origenerator import act_settings, app_link, downtime, gallery, toast_raising, ui_scale
+from origenerator import action_settings, app_link, downtime, gallery, toast_raising, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -1151,7 +1151,7 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
 
     saved = AppState(path).get("gallery_combine")
     assert saved["image"] == "img"
-    assert saved["videos"] == {act_settings.VIDEO: "vid"}
+    assert saved["videos"] == {action_settings.VIDEO: "vid"}
 
 
 def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
@@ -1354,7 +1354,7 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     combine = reopened._gallery_view._combine.widget
     assert combine.image_zone.current_id() == "img"
-    assert combine.selected_intent() == act_settings.GENAU
+    assert combine.selected_intent() == action_settings.GENAU
     assert combine.video_zone.current_id() is None
     combine._video_radio.setChecked(True)
     assert combine.video_zone.current_id() == "vid"

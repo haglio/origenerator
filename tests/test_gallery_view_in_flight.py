@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator import (
-    act_settings,
+    action_settings,
     fix_training,
     gallery,
     look_training,
@@ -2226,12 +2226,12 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     view.refresh()
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
 
-    view._combine._on_generate_category("img", "dancing", act_settings.VIDEO)
+    view._combine._on_generate_category("img", "dancing", action_settings.VIDEO)
 
     item = view._queue._items[0]
     assert item.act == "dancing"
     assert item.source_image == "sdxl_pick.png [output]"  # the frame being animated
-    assert item.source_video_thumbnail is None  # an act names itself; no clip to show
+    assert item.source_video_thumbnail is None  # an act names itself; no video to show
     assert item.cancel is None            # nothing on the server to stop yet
 
 
@@ -2260,7 +2260,7 @@ def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, m
     view.refresh()
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
 
-    view._combine._on_generate_category("img", "epsilon", act_settings.VIDEO)
+    view._combine._on_generate_category("img", "epsilon", action_settings.VIDEO)
 
     assert view._queue.rows() == []
     assert view._live_jobs == {}
@@ -2272,7 +2272,7 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._on_generate_category("missing", "dancing", act_settings.VIDEO)
+    view._combine._on_generate_category("missing", "dancing", action_settings.VIDEO)
 
     assert view._queue.rows() == []
 

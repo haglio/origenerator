@@ -2236,7 +2236,7 @@ def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named
             _animation("v1", frame="g1.png", act="alpha", tmp_path=tmp_path)]
     director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
 
-    assert director.acts_of(["g1", "v1", "nobody"], shape="portrait") == {
+    assert director.actions_of(["g1", "v1", "nobody"], shape="portrait") == {
         "g1": "Source image", "v1": "alpha"}
 
 

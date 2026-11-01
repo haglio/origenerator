@@ -101,7 +101,7 @@ def test_every_store_is_one(file):
 
 
 class TestTrashStore:
-    """trash_collection.py and gallery_actions.py are its only readers, and neither has
+    """trash_collection.py and gallery_edits.py are its only readers, and neither has
     any business with `generations` or the custom collections."""
 
     def test_what_it_records_it_can_read_back(self, file):

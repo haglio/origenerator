@@ -87,7 +87,7 @@ def test_an_act_picked_here_is_a_line_evolver_writes_into_the_videos_record(tmp_
     video, row = _another_sources_video(promise)
     places = _journaling_into(tmp_path, beside=video)
 
-    outside_videos.pick_act(MagicMock(), places, row, "Wave")
+    outside_videos.pick_action(MagicMock(), places, row, "Wave")
 
     [line] = _journaled(places)
     assert set(journals["fields"]) <= set(line)

@@ -625,7 +625,7 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-# --- the bank's act-on-this trio: star and enhance aim where delete aims ------
+# --- the Gallery pane buttons' act-on-this trio: star and enhance aim where delete aims ------
 
 
 def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):

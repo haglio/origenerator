@@ -24,7 +24,7 @@ class CustomCollectionStore(Store):
 
         ``folder_id`` re-creates one at the id it had, so an undone removal comes
         back under the very key the session was saved with (see
-        :meth:`GalleryActions.delete_custom_collection`)."""
+        :meth:`GalleryEdits.delete_custom_collection`)."""
         with self._connect() as conn:
             cur = conn.execute("INSERT INTO custom_folders (id, name, side) VALUES (?, ?, ?)",
                                (folder_id, name, side))

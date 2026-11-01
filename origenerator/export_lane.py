@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from origenerator.act_settings import loops
+from origenerator.action_settings import loops
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.funscript import funscript_of

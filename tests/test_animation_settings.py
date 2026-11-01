@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from origenerator import animation_settings
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 
 
 @pytest.fixture

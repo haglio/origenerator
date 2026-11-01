@@ -57,7 +57,7 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
     favorites_filter = slideshow.hud_favorites_filter
     enhanced = slideshow.hud_enhanced_mode
     order_label = slideshow.hud_order_label
-    act_filter = slideshow.hud_act_filter
+    action_filter = slideshow.hud_action_filter
     return HudModel(
         funestra=shape,
         locked=locked,
@@ -71,7 +71,7 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
         title=hud_title(playing_set=looping_label(shown.loop) if shown.loop else "",
                         locked=locked, order=order_label,
                         f_mode=favorites_filter, enhanced=enhanced,
-                        filters=(act_filter,)),
+                        filters=(action_filter,)),
         # The Funestras' favorite star, over the same items the Favorites
         # collection lists: it lights when the item on screen is a favorite.
         is_favorite=slideshow.hud_is_favorite,
@@ -102,7 +102,7 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
         # lifts it, exactly as on a satellite.  With no filter on, a seed
         # loop lights the row it is playing, which is what the button on
         # that row says about it.
-        filter_query=act_filter or (shown.label if shown.loop == SEED else ""),
+        filter_query=action_filter or (shown.label if shown.loop == SEED else ""),
         seed_count=len(shown.seeds) + 1,
         action_count=len(shown.column) + 1,
         playing=shown.playing,

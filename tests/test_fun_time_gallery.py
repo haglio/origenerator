@@ -590,9 +590,9 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
 
     assert model.corner.path == "g1.png"
     assert [cell.path for cell in model.seeds] == ["g2.png"]
-    a_configuration, an_act = model.actions
-    assert (a_configuration.path, an_act.path) == ("g3.png", "v1.png")
-    assert an_act.label == "alpha"
+    a_configuration, an_action = model.actions
+    assert (a_configuration.path, an_action.path) == ("g3.png", "v1.png")
+    assert an_action.label == "alpha"
     assert a_configuration.label
     assert a_configuration.label != "alpha"
     assert model.current_action == "Source image"

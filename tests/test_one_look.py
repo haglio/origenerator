@@ -63,6 +63,7 @@ def test_a_look_taken_inside_another_lists_nothing_again(tmp_path, monkeypatch):
         return is_file(tmp_path / "scene.png")
 
     with one_look.one_look():
-        assert is_file(tmp_path / "scene.png") and asked_again()
+        assert is_file(tmp_path / "scene.png")
+        assert asked_again()
 
     assert listed == [str(tmp_path)]

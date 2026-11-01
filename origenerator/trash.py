@@ -162,7 +162,7 @@ def _move(src: Path, dest: Path) -> None:
     would fail where a second or two of retries succeeds. What retrying can't
     outlast is a pane still *showing* the file: that handle never goes away on
     its own, which is why the release runs first (see
-    ``GalleryActions._trash_files``).
+    ``GalleryEdits._trash_files``).
     """
     retried_while_held(lambda: shutil.move(str(src), str(dest)),
                        attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)

@@ -14,7 +14,7 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED
 
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
-from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
+from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_action_on_screen
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests.slideshow_support import slides_named
@@ -534,7 +534,7 @@ def test_a_set_with_nothing_in_it_has_nothing_to_map_loop_widen_or_walk():
     assert slideshow_set.map() is None
     assert slideshow_set.step_loop(locked=False) == LOCK
     assert slideshow_set.more_seeds() is False
-    assert slideshow_set.set_act_filter("fox") is False
+    assert slideshow_set.set_action_filter("fox") is False
     assert slideshow_set.nav_target("right") is None
     assert dealt == []
 
@@ -738,7 +738,7 @@ def _filterable(**fields):
 def test_an_act_filter_narrows_the_pass_to_what_is_named_for_that_act():
     slideshow_set, dealt = _filterable()
 
-    assert slideshow_set.set_act_filter("alpha") is True
+    assert slideshow_set.set_action_filter("alpha") is True
 
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
     assert slideshow_set.filters.act == "alpha"
@@ -750,7 +750,7 @@ def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
     on, and the row's button stays dark."""
     slideshow_set, dealt = _filterable()
 
-    assert slideshow_set.set_act_filter("gamma") is False
+    assert slideshow_set.set_action_filter("gamma") is False
 
     assert (slideshow_set.filters.act, dealt, len(slideshow_set.playlist)) == ("", [], 3)
 
@@ -760,7 +760,7 @@ def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
     carrying both answers it — the rule the HUD lights its rows by."""
     slideshow_set, _dealt = _filterable()
 
-    assert slideshow_set.set_act_filter("source image, alpha") is True
+    assert slideshow_set.set_action_filter("source image, alpha") is True
 
     assert _ids(slideshow_set.playlist.items) == ["id-1"]
 
@@ -771,7 +771,7 @@ def test_filtering_to_the_act_on_screen_narrows_to_what_its_row_is_named_for():
     slideshow_set, _dealt = _filterable()
     slideshow_set.playlist.jump_to(2)
 
-    assert narrow_to_the_act_on_screen(slideshow_set) == ("Filter: 'alpha' (2)", True)
+    assert narrow_to_the_action_on_screen(slideshow_set) == ("Filter: 'alpha' (2)", True)
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
 
 
@@ -780,7 +780,7 @@ def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
     button means."""
     slideshow_set, _dealt = _set(acts=lambda ids: dict.fromkeys(ids, ""))
 
-    said, narrowed = narrow_to_the_act_on_screen(slideshow_set)
+    said, narrowed = narrow_to_the_action_on_screen(slideshow_set)
 
     assert (said, narrowed) == ("No act for this one", False)
     assert (slideshow_set.filters.act, len(slideshow_set.playlist)) == ("", 3)
@@ -788,7 +788,7 @@ def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
 
 def test_a_reset_drops_the_act_filter_with_the_other_switches():
     slideshow_set, dealt = _filterable()
-    slideshow_set.set_act_filter("beta")
+    slideshow_set.set_action_filter("beta")
     dealt.clear()
 
     assert slideshow_set.drop_the_filters() is True
@@ -801,7 +801,7 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
     before it landed is not what a filter may go on matching by."""
     named_for = dict(_NAMED_FOR)
     slideshow_set, _dealt = _set(acts=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
-    slideshow_set.set_act_filter("alpha")
+    slideshow_set.set_action_filter("alpha")
     assert slideshow_set.passes(Slide("two.png", "image", "id-2")) is False
 
     named_for["id-2"] = "Source image, alpha"
@@ -815,10 +815,10 @@ def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
     pressed differently — so the map says which a row is rather than leaving it
     to be guessed from the words in its margin."""
     a_configuration = Slide("one-x.png", "image", "id-1x")
-    an_act = Slide("one-y.png", "image", "id-1y")
+    an_action = Slide("one-y.png", "image", "id-1y")
     both = lambda pid: NavMapNeighbors(  # noqa: E731
         column=(NavMapRow(a_configuration, "E629425B", configuration=True),
-                NavMapRow(an_act, "alpha")) if pid == "id-1" else ())
+                NavMapRow(an_action, "alpha")) if pid == "id-1" else ())
     slideshow_set, _dealt = _set(neighbors=both)
 
     assert slideshow_set.configuration_row("e629425b") is a_configuration

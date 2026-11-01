@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.preview import Preview
 
 from origenerator import (
-    act_settings,
+    action_settings,
     animation_settings,
     branch_session,
     check_animations,
@@ -83,7 +83,7 @@ def test_an_animation_with_no_sample_starts_from_the_acts_own_settings(
         a_library_of_its_own, monkeypatch):
     """His ask: the per-act settings are the starting position where nothing
     kept was ever made this way."""
-    monkeypatch.setattr(act_settings, "pinned_settings",
+    monkeypatch.setattr(action_settings, "pinned_settings",
                         lambda act, lane: {"workflow": "wan22_i2v",
                                            "params": {"positive_prompt": "the act's own"}})
 

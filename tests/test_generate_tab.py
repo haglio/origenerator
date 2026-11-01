@@ -32,7 +32,7 @@ import origenerator.workflows.derived_size as ds
 import origenerator.workflows.model_dropdowns as model_dropdowns_module
 from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
 from origenerator import export_lane as export_lane_module
-from origenerator.act_settings import CATEGORIES
+from origenerator.action_settings import CATEGORIES
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE

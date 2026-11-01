@@ -1060,15 +1060,25 @@
       ],
       "his_word": "action (2026-10-30, 2026-10-14, 2026-10-23, 2026-10-26)",
       "code_today": [
-        "act",
-        "action"
+        "action",
+        "act"
       ],
       "code_word": "action",
       "status": "ruled",
       "keep": [
-        "recipe_category"
+        "recipe_category",
+        "\"act\"",
+        "action_settings",
+        "action_of",
+        "action_filter"
       ],
-      "ruled": "2026-10-30, his words on the glossary's list"
+      "ruled": "2026-10-30, his words on the glossary's list; the names say action, and the row key \"act\" and the locals named act are still to go",
+      "retired": [
+        "act settings",
+        "act of",
+        "act filter",
+        "gallery actions"
+      ]
     },
     {
       "id": "version",

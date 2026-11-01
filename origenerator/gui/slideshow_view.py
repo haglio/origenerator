@@ -240,7 +240,7 @@ class SlideshowView(QWidget):
             self._pane.channel.send(_RATE_STEPS[action])
             return True
         if self._dashboard_cmd_file is None:
-            return self._act_here(action)
+            return self._action_here(action)
         allowed = ("satellites_kino_activate", "origenerator_activate",
                    *(spelled_for(self._hud_shape, verb)
                      for verb in ("prev", "next", "lock", "trash")))
@@ -258,7 +258,7 @@ class SlideshowView(QWidget):
         elif self._collapse is not None:
             self._collapse(COLLAPSES[action])
 
-    def _act_here(self, action: str) -> bool:
+    def _action_here(self, action: str) -> bool:
         """A press with no session under it: the slideshow answers it itself,
         through the same answers a session's round trip would have ended at."""
         if answer(self.slideshow, action):

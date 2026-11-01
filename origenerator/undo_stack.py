@@ -3,7 +3,7 @@
 Session-scoped, bounded, and generic: a step is a label, a way to reverse it,
 and optionally a way to run it again. What it reverses — a delete, a folder
 gathered by hand — is entirely the caller's business (see
-:mod:`origenerator.gallery_actions`, which holds one).
+:mod:`origenerator.gallery_edits`, which holds one).
 
 Two things about it are unusual and deliberate. **A redo re-runs the original
 mutation** rather than inverting the undo: the same call with the same

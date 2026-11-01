@@ -1225,7 +1225,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
     video.parent.mkdir()
     video.write_bytes(b"video")
     os.utime(video, (1_000_000, 1_000_000))  # made well before its upscale
-    library = tmp_path / "upscaled_by_shape"
+    library = tmp_path / "upscaled_by_orientation"
     upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")

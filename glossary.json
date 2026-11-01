@@ -1052,7 +1052,8 @@
         "\"orientation\"",
         "Qt.Orientation",
         "orientation: Qt.Orientation",
-        "super().__init__(orientation)"
+        "super().__init__(orientation)",
+        "upscaled_by_orientation"
       ]
     },
     {

@@ -93,4 +93,4 @@ class TestTheValuesAnotherAppHoldsToo:
         # Mirrors evolver's own OUT_UPSCALED_DIR.
         assert config.EVOLVER_UPSCALED_DIR == (
             config.LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            / "upscaled_by_shape")
+            / "upscaled_by_orientation")

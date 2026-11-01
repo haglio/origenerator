@@ -455,7 +455,7 @@ def test_fullscreen_opens_over_the_wait_before_the_first_frame(live_preview):
 
 
 def _slideshow_on_a_sessions_funestra(tmp_path):
-    slideshow = FunestraSlideshow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
+    slideshow = FunestraSlideshow([(str(tmp_path / "a.png"), "image", "id-a")], shape="landscape",
                       channel=FunestraChannel(
                           playlist=tmp_path / "landscape.tsv",
                           command_file=tmp_path / "landscape_cmd.txt",

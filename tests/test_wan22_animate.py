@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import origenerator.workflows.model_pickers as pickers
 import origenerator.workflows.wan22_animate as animate
 from origenerator import config
 from origenerator.funscript import write_funscript
@@ -268,7 +269,7 @@ def test_the_form_offers_only_models_this_graph_can_run(monkeypatch):
         asked["loras"] = accepts
         return [NO_LORA, *fallback]
 
-    monkeypatch.setattr(animate, "list_model_files", models)
+    monkeypatch.setattr(pickers, "list_model_files", models)
     monkeypatch.setattr("origenerator.workflows.lora_rows.list_lora_files", loras)
     by_key = {pd.key: pd for pd in Wan22AnimateWorkflow().param_definitions()}
 

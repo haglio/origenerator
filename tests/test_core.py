@@ -515,7 +515,7 @@ def test_restores_the_dragged_prompt_heights_from_app_state(
 
     assert forget_prompt_heights.height("positive_prompt") == 260
     panel = win._gallery_view._info_tabs.widget(0)
-    assert panel._param_form._widgets["positive_prompt"].height() == 260
+    assert panel._param_form._widgets["positive_prompt"].boxes()[0].height() == 260
 
 
 def test_persists_the_dragged_prompt_heights_on_close(

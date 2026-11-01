@@ -168,7 +168,7 @@ def test_a_forms_loras_come_right_after_its_model(name):
 
 
 _FAMILIES_A_GRAPH_RUNS = {
-    "sdxl_t2i": ("sd15", "sdxl"), "sdxl_pose_transfer": ("sd15", "sdxl"),
+    "sdxl_t2i": ("sdxl",), "sdxl_pose_transfer": ("sdxl",),
     "krea2_t2i": ("krea2",), "flux_t2i_upscaled": ("flux",), "wan22_animate": ("wan",),
 }
 

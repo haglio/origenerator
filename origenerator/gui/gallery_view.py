@@ -169,6 +169,7 @@ from origenerator.orientation import (
 )
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
+from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.radio import OrigeneratorRadio
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
@@ -991,7 +992,7 @@ class GalleryView(QWidget):
         panel.set_enhance_settings(self._enhance.settings)
         panel.set_fullscreen_factory(self._slideshows.open_on_preview)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
-        panel.form_replaced.connect(self._retarget_find)
+        panel.prompt_fields_changed.connect(self._retarget_find)
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.
         panel.form_edited.connect(self._find_bar.refresh)
@@ -1792,7 +1793,11 @@ class GalleryView(QWidget):
         return panel.prompt_fields() if panel is not None else []
 
     def _retarget_find(self):
+        typing = QApplication.focusWidget()
+        caret = typing.textCursor() if isinstance(typing, QPlainTextEdit) else None
         self._find_bar.retarget(self._prompt_fields())
+        if caret is not None:
+            typing.setTextCursor(caret)
 
     # --- searching the gallery (the field over the tree) ------------------------
 
@@ -2915,10 +2920,11 @@ class GalleryView(QWidget):
         *the same seed* — "the same image but without X" means the image, so
         the one thing deliberately not re-rolled is the seed that draws it.
         """
-        params = {**params, "positive_prompt": revision.positive,
-                  "negative_prompt": revision.negative}
-        key = self.folder_key_for(row.get("workflow_name") or "", params)
-        if not self._jobs.start_prepared(key, workflow, params):
+        name = row.get("workflow_name") or ""
+        revised = {**params, **{key: boxed_as_typed(name, params, key, said) for key, said in (
+            ("positive_prompt", revision.positive), ("negative_prompt", revision.negative))}}
+        key = self.folder_key_for(name, revised)
+        if not self._jobs.start_prepared(key, workflow, revised):
             return "couldn't queue the request — see the log", ERROR
         job = self._jobs.newest_job_for(key)
         logger.info("Request on %s: term %s, queued as %s", row.get("prompt_id"),
@@ -2926,10 +2932,10 @@ class GalleryView(QWidget):
         self._db.record_request(
             prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
             heard=spoken.heard, asked=spoken.text, term=revision.term,
-            polarity=revision.polarity,
-            action=revision.action, old_positive=revision.old_positive,
-            old_negative=revision.old_negative, new_positive=revision.positive,
-            new_negative=revision.negative,
+            polarity=revision.polarity, action=revision.action,
+            old_positive=params.get("positive_prompt", ""),
+            old_negative=params.get("negative_prompt", ""),
+            new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
         )
         self.refresh()  # the queue marks the job as a request the moment it is spoken
         return "Request submitted", NOTICE

@@ -18,10 +18,12 @@ prevent. :data:`ANY` is the way to say a category genuinely takes anything.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 from origenerator import config
-from origenerator.model_titles import model_title
+from origenerator.base_models import made_for_text_to_video
+from origenerator.model_titles import fix_of, is_a_fixs_lora, model_title
 from origenerator.workflows import model_arch
 
 # The suffixes ComfyUI loads as models — LoRAs and checkpoints alike live under
@@ -95,10 +97,16 @@ def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
     return not (expert and described.expert and described.expert != expert)
 
 
+def _as_civitai_files_it(name: str, described: model_arch.ModelFile) -> model_arch.ModelFile:
+    if described.is_lora and described.arch == model_arch.WAN and made_for_text_to_video(name):
+        return replace(described, arch=model_arch.WAN_T2V)
+    return described
+
+
 def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> list[str]:
     directory = config.COMFYUI_DIR / "models" / category
     found = sorted((name for name, described in _catalogue(directory)
-                    if _offer(described, accepts, expert, want_lora)),
+                    if _offer(_as_civitai_files_it(name, described), accepts, expert, want_lora)),
                    key=lambda name: (model_title(name).casefold(), name))
     return found or list(fallback)
 
@@ -124,7 +132,7 @@ def list_model_files(
 
 
 def list_lora_files(
-    fallback: list[str], *, accepts, expert: str | None = None,
+    fallback: list[str], *, accepts, expert: str | None = None, fix: str | None = "",
 ) -> list[str]:
     """The LoRA picker's options: the "None" sentinel first, then the installed
     LoRAs this picker can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
@@ -135,7 +143,8 @@ def list_lora_files(
     checkpoint that ends up filed under ``loras``, which no LoraLoader can take.
     """
     listing = _listing("loras", fallback, accepts, expert, want_lora=True)
-    return [NO_LORA, *(name for name in listing if not is_no_lora(name))]
+    return [NO_LORA, *(name for name in listing if not is_no_lora(name)
+                       and (fix is None or not is_a_fixs_lora(name) or fix_of(name) == fix))]
 
 
 def list_detector_files() -> list[str]:
@@ -156,6 +165,10 @@ def list_detector_files() -> list[str]:
 
 def list_outline_detector_files() -> list[str]:
     return list_model_files(_OUTLINE_DETECTOR_CATEGORY, [], accepts=ANY)
+
+
+def is_installed(folder: str, value) -> bool:
+    return bool(folder) and (config.COMFYUI_DIR / "models" / folder / str(value)).is_file()
 
 
 def is_no_lora(value) -> bool:

@@ -4,7 +4,8 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import KREA2
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.prompt_readers import QWEN3VL
 
 
 def _negative_conditioning(negative_prompt: str) -> dict:
@@ -26,6 +27,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
     lora_keys = LORA_KEYS
+    text_reader = QWEN3VL
     loras_keyed_only_when_named = LORA_KEYS[1:]
     extra_enhance_keys = ("upscale_model",)
     output_node_id = "10"
@@ -57,12 +59,12 @@ class Krea2T2iWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        unets = list_model_files("diffusion_models", [defaults["unet"]], accepts=(KREA2,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
-            *lora_rows(defaults, LORA_KEYS, accepts=(KREA2,)),
+            model_picker("unet", "Model", defaults["unet"], "diffusion_models",
+                         accepts=(KREA2,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(KREA2,), beside_model="unet"),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=512, max_val=2048, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=512, max_val=2048, step=16),

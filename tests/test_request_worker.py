@@ -15,7 +15,7 @@ from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 
 
 def test_the_revision_comes_back_with_the_callers_context(qtbot):
-    worker = RevisionWorker(lambda pos, neg, req: f"{pos}|{neg}|{req}")
+    worker = RevisionWorker(lambda pos, neg, req, **_told: f"{pos}|{neg}|{req}")
     seen = []
     worker.revised.connect(lambda ctx, rev: seen.append((ctx, rev)))
 
@@ -27,7 +27,7 @@ def test_the_revision_comes_back_with_the_callers_context(qtbot):
 def test_a_failure_answers_with_nothing_rather_than_raising(qtbot):
     # A model that is down is the ordinary case here, not an error: the request
     # is still applied, just by the words alone.
-    def boom(pos, neg, req):
+    def boom(pos, neg, req, **_told):
         raise RuntimeError("no LLM server")
 
     worker = RevisionWorker(boom)
@@ -40,7 +40,7 @@ def test_a_failure_answers_with_nothing_rather_than_raising(qtbot):
 
 
 def test_a_failure_is_logged_without_the_request_or_either_prompt(qtbot, caplog):
-    def boom(pos, neg, req):
+    def boom(pos, neg, req, **_told):
         raise ValueError(f"cannot read {pos!r} or {neg!r} for {req!r}")
 
     worker = RevisionWorker(boom)
@@ -53,13 +53,23 @@ def test_a_failure_is_logged_without_the_request_or_either_prompt(qtbot, caplog)
 
 
 def test_the_task_runs_one_revision(qtbot):
-    worker = RevisionWorker(lambda pos, neg, req: req.upper())
+    worker = RevisionWorker(lambda pos, neg, req, **_told: req.upper())
     seen = []
     worker.revised.connect(lambda ctx, rev: seen.append(rev))
 
-    ReviseTask(worker, "ctx", "a woman", "", "no hat").run()
+    ReviseTask(worker, "ctx", "a woman", "", "no hat", in_scenes=False).run()
 
     assert seen == ["NO HAT"]
+
+
+def test_the_task_tells_the_revision_whether_the_prompt_tells_a_story(qtbot):
+    worker = RevisionWorker(lambda pos, neg, req, *, in_scenes: in_scenes)
+    seen = []
+    worker.revised.connect(lambda ctx, rev: seen.append(rev))
+
+    ReviseTask(worker, "ctx", "a woman", "", "no hat", in_scenes=True).run()
+
+    assert seen == [True]
 
 
 def test_a_window_closed_mid_request_takes_its_answer_with_it(qtbot):
@@ -72,8 +82,8 @@ def test_a_window_closed_mid_request_takes_its_answer_with_it(qtbot):
     which is how one abandoned request failed an unrelated test three files
     later."""
     parent = QWidget()
-    worker = RevisionWorker(lambda pos, neg, req: req.upper(), parent=parent)
-    task = ReviseTask(worker, "ctx", "a woman", "", "no hat")
+    worker = RevisionWorker(lambda pos, neg, req, **_told: req.upper(), parent=parent)
+    task = ReviseTask(worker, "ctx", "a woman", "", "no hat", in_scenes=False)
     parent.deleteLater()
     sip.delete(parent)  # the window goes, and its worker with it
 

@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from origenerator import local_llm
+from origenerator.box_breaks import unboxed
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.prompts import REQUEST_REWRITE_SYSTEM_PROMPT, VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
@@ -326,7 +327,7 @@ class PromptRevision:
 
 
 def apply_request(positive: str, negative: str, request: str,
-                  match=None, rewrite=None) -> PromptRevision | None:
+                  match=None, rewrite=None, *, in_scenes: bool = False) -> PromptRevision | None:
     """Apply a ``request`` to a prompt pair, by the policy up top.
 
     ``match(terms, term)`` is how a positive prompt that doesn't say the words
@@ -348,9 +349,9 @@ def apply_request(positive: str, negative: str, request: str,
     parsed = parse_request(request)
     if parsed is None:
         return None
-    positive, negative = positive or "", negative or ""
+    positive, negative = unboxed(positive or ""), unboxed(negative or "")
     scenes, negatives = scene_prompts(positive), scene_prompts(negative)
-    if len(scenes) == 1:
+    if not in_scenes or len(scenes) == 1:
         return _revised(positive, negative, request, parsed, match, rewrite)
     each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
     revisions = [_revised(scene, scene_negative, request, parsed, match, rewrite)
@@ -416,12 +417,13 @@ def _revised(positive: str, negative: str, request: str, parsed: tuple,
     return rewritten() or made(_plus(positive, term), negative, ADDED)
 
 
-def work_out(positive: str, negative: str, request: str) -> PromptRevision | None:
+def work_out(positive: str, negative: str, request: str, *,
+             in_scenes: bool = False) -> PromptRevision | None:
     """``request`` applied as every request is, spoken or typed: the local LLM
     finding a term the prompt names in its own words, and rewriting the pair for
     one in neither prompt."""
     return apply_request(
-        positive, negative, request,
+        positive, negative, request, in_scenes=in_scenes,
         match=partial(smart_match, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
                       system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
         rewrite=partial(rewrite_prompt, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,

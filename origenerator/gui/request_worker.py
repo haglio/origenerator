@@ -29,8 +29,9 @@ class RevisionWorker(QObject):
         super().__init__(parent)
         self._apply = apply_fn
 
-    @pyqtSlot(object, str, str, str)
-    def revise(self, context, positive: str, negative: str, request: str) -> None:
+    @pyqtSlot(object, str, str, str, bool)
+    def revise(self, context, positive: str, negative: str, request: str,
+               in_scenes: bool = False) -> None:
         """Work out what ``request`` does to the prompt pair and emit it.
 
         Never raises: a model that is down or answers nonsense is the ordinary
@@ -39,7 +40,7 @@ class RevisionWorker(QObject):
         act on, which the caller says out loud.
         """
         try:
-            revision = self._apply(positive, negative, request)
+            revision = self._apply(positive, negative, request, in_scenes=in_scenes)
         except Exception as exc:
             logger.warning("Could not work out a request (%s)", type(exc).__name__)
             revision = None
@@ -51,13 +52,14 @@ class ReviseTask(QRunnable):
     carries the result back to the thread that owns it."""
 
     def __init__(self, worker: RevisionWorker, context, positive: str,
-                 negative: str, request: str):
+                 negative: str, request: str, *, in_scenes: bool):
         super().__init__()
         self._worker = worker
         self._context = context
         self._positive = positive
         self._negative = negative
         self._request = request
+        self._in_scenes = in_scenes
 
     def run(self):
         """Work the revision out, and let go of an answer nobody is left to hear.
@@ -71,6 +73,6 @@ class ReviseTask(QRunnable):
         """
         try:
             self._worker.revise(self._context, self._positive, self._negative,
-                                self._request)
+                                self._request, self._in_scenes)
         except RuntimeError:
             logger.info("The request's window closed before its answer came back")

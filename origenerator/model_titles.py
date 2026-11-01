@@ -55,6 +55,17 @@ def is_a_fixs_lora(value) -> bool:
     return PurePosixPath(str(value).replace("\\", "/")).parent.name == FIX_LORA_FOLDER
 
 
+def fix_of(value) -> str | None:
+    if not is_a_fixs_lora(value):
+        return None
+    stem = model_stem(value)
+    by_version = versioned(stem)
+    if by_version is not None:
+        return by_version[0]
+    fix = _FIX_LORA.match(stem)
+    return None if fix is None else fix["part"]
+
+
 def _fix_title(value, stem: str) -> str | None:
     if not is_a_fixs_lora(value):
         return None

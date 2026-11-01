@@ -12,6 +12,7 @@ from origenerator.workflows.base import (
 )
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import picked_loras
+from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
 from origenerator.workflows.wan_experts import (
     FIRST_PASS_LORA_KEYS,
@@ -48,6 +49,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")
     lora_keys = LORA_KEYS_OF_BOTH_PASSES
+    text_reader = UMT5
     loras_keyed_only_when_named = LORAS_KEYED_ONLY_WHEN_NAMED
     output_node_id = "16"
 

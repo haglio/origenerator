@@ -3432,8 +3432,11 @@ class GalleryView(QWidget):
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
         app's — the pair the Job Queue and a slideshow's corner plate both draw."""
-        return (self._inflight_items(rows=self._listed_rows, requests=self._listed_requests),
-                self._foreign_queue.total)
+        listed = self._listed_rows
+        holds_every_job = {row["prompt_id"] for row in listed} >= set(self._jobs.queue_order)
+        items = (self._inflight_items(rows=listed, requests=self._listed_requests)
+                 if holds_every_job else self._inflight_items())
+        return items, self._foreign_queue.total
 
     def _inflight_items(self, rows=None, requests=None) -> list:
         return self._starting.placed_among(

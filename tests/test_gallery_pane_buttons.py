@@ -333,3 +333,10 @@ def test_every_mark_on_the_row_stays_inside_the_familys_inset(buttons):
         room = button.rect().adjusted(BUTTON_ICON_INSET, BUTTON_ICON_INSET,
                                       -BUTTON_ICON_INSET, -BUTTON_ICON_INSET)
         assert room.contains(_where_the_mark_lands(button)), button.toolTip()
+
+
+def test_the_group_button_offers_a_collection_of_his_own(buttons):
+    # A folder he gathers himself is a custom collection (2026-10-30), and the
+    # button that makes one says collection where it used to say folder.
+    made = buttons()
+    assert made.group.toolTip() == "Group the selected folders into a collection of your own"

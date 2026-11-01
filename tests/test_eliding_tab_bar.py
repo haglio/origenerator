@@ -418,3 +418,10 @@ def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
     rect = tabs.tabBar().tabRect(0)
     assert columns[0] - rect.left() == EDGE
     assert columns[-1] - columns[0] + 1 == MARK
+
+
+def test_the_close_button_says_it_closes_this_tab(qtbot):
+    # His word for one of these is a tab (2026-10-30), so the button over its
+    # corner says so, where it used to offer to close "this configuration".
+    bar = _closable_bar(qtbot)
+    assert _close_button(bar, 0).toolTip() == "Close this tab"

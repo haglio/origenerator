@@ -32,6 +32,9 @@ STORES = {
 }
 
 
+ASKED_OF_THE_REQUESTS_STORE = {"record_turns", "exchange_of", "distinct_positive_prompts"}
+
+
 @pytest.fixture
 def file(tmp_path) -> SqliteFile:
     path = tmp_path / "origenerator.db"
@@ -61,7 +64,7 @@ def test_the_facade_holds_one_of_each(file, attribute):
 def test_the_facade_forwards_exactly_what_the_stores_offer():
     offered = set().union(*(_public_methods(store) for store, _ in STORES.values()))
 
-    assert _public_methods(Database) == offered
+    assert _public_methods(Database) == offered - ASKED_OF_THE_REQUESTS_STORE
 
 
 def test_every_store_is_one(file):

@@ -110,6 +110,18 @@ SCHEMA = {
         ("created_at", "TEXT", 1, "datetime('now')", 0),
         ("asked", "TEXT", 0, None, 0),
     ),
+    "request_turns": (
+        ("id", "INTEGER", 0, None, 1),
+        ("prompt_id", "TEXT", 1, None, 0),
+        ("said", "TEXT", 1, None, 0),
+        ("answered", "TEXT", 1, "''", 0),
+        ("old_positive", "TEXT", 1, "''", 0),
+        ("old_negative", "TEXT", 1, "''", 0),
+        ("new_positive", "TEXT", 1, "''", 0),
+        ("new_negative", "TEXT", 1, "''", 0),
+        ("created_at", "TEXT", 1, "datetime('now')", 0),
+        ("settings_json", "TEXT", 1, "''", 0),
+    ),
     "seed_uses": (
         ("id", "INTEGER", 0, None, 1),
         ("kind", "TEXT", 1, None, 0),
@@ -239,6 +251,8 @@ COLUMNS_AS_FIRST_SHIPPED_AND_NEVER_EDITED = {
         "prompt_id", "source_prompt_id", "heard", "term", "polarity", "action",
         "old_positive", "old_negative", "new_positive", "new_negative",
         "created_at"},
+    "request_turns": {"id", "prompt_id", "said", "answered", "old_positive", "old_negative",
+                      "new_positive", "new_negative", "created_at"},
     "seed_uses": {
         "id", "kind", "seed_key", "seed", "width", "height", "thumbnail_path",
         "created_at"},

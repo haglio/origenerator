@@ -26,6 +26,7 @@ from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.new_tile import NewTile
 from origenerator.item_shape import base_of
+from origenerator.prompt_edit import work_out
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
@@ -886,7 +887,13 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     view.refresh()
     view._on_thumbnail_clicked("orig")
     tab = view._generate_pane.current_generate_tab()
-    tab._param_form.request_field()._words.setText("two cats")
+    view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
+    view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words, ask=lambda p, n, r, known: ("two cats", n, "Two cats."))
+    exchange = tab._param_form.request_exchange()
+    qtbot.keyClicks(exchange._line, "two cats")
+    qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", "Two cats.")], timeout=5000)
 
     view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
 
@@ -894,6 +901,9 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     record = db.get_request(job.prompt_id)
     assert (record["asked"], record["heard"], record["source_prompt_id"]) == ("two cats", "", "orig")
     assert (record["old_positive"], record["new_positive"]) == ("a cat", "two cats")
+    (turn,) = db.requests.exchange_of(job.prompt_id)
+    assert (turn.said, turn.answered, turn.old_positive, turn.new_positive) == (
+        "two cats", "Two cats.", "a cat", "two cats")
 
 
 def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):

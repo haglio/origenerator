@@ -11,7 +11,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from tools import card_claim, fix_lora_trainer
+from origenerator import card_claim
+from tools import fix_lora_trainer
 
 
 @pytest.fixture(autouse=True)

@@ -61,3 +61,19 @@ def wait_before_starting(job, seconds_since_an_image: float | None) -> float:
     if seconds_since_an_image is None or not is_video(job):
         return 0.0
     return max(0.0, VIDEOS_WAIT_AFTER_AN_IMAGE_S - seconds_since_an_image)
+
+
+class ModelHold:
+    def __init__(self, on_let_go) -> None:
+        self._holds = 0
+        self._on_let_go = on_let_go
+
+    def __bool__(self) -> bool:
+        return self._holds > 0
+
+    def hold(self) -> None:
+        self._holds += 1
+
+    def let_go(self) -> None:
+        self._holds = max(0, self._holds - 1)
+        self._on_let_go()

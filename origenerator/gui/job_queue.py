@@ -126,6 +126,7 @@ class JobQueue(QObject):
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
         self._training = None
+        self.model_hold = queue_line.ModelHold(self._pump)
         self._enhance = None
         self._closed = False
 
@@ -345,12 +346,13 @@ class JobQueue(QObject):
 
     def _free_for_the_next_job(self) -> bool:
         return not (self._on_server or self._in_flight is not None
-                    or self._training_holds_the_line() or self._awaiting_comfyui)
+                    or self._training_holds_the_line() or self.model_hold
+                    or self._awaiting_comfyui)
 
     def _wait_at_the_front(self) -> float:
-        since = (None if self._image_asked_at is None
-                 else self._clock() - self._image_asked_at)
-        return queue_line.wait_before_starting(self._waiting[0], since)
+        return queue_line.wait_before_starting(
+            self._waiting[0],
+            None if self._image_asked_at is None else self._clock() - self._image_asked_at)
 
     def _hand_over(self, job: GenerationJob) -> bool:
         key = self._key_of(job)

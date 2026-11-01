@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import dataclass
 from functools import partial
-from typing import NamedTuple
 
-from origenerator import local_llm
+from origenerator import local_llm, request_settings
 from origenerator.box_breaks import unboxed
+from origenerator.collection_notes import CollectionNotes
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
-from origenerator.prompts import REQUEST_REWRITE_SYSTEM_PROMPT, VOICE_REQUEST_MATCH_SYSTEM_PROMPT
+from origenerator.db_requests import Turn
+from origenerator.prompts import REQUEST_SYSTEM_PROMPT
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,10 @@ RAISED = "raised"
 ADDED = "added"
 ALLOWED = "allowed"
 REWRITTEN = "rewritten"
+
+REQUEST_WINDOW_TOKENS = 32768
+_ASK_TIMEOUT_S = 180.0
+
 
 def _both_spellings(words: set) -> frozenset:
     # Whisper punctuates contractions either way (don't, dont)
@@ -158,13 +162,8 @@ def literal_match(terms: list[str], term: str) -> int | None:
     return None
 
 
-def _index_of(prompt: str, term: str, match) -> int | None:
-    terms = bare_terms(prompt)
-    found = literal_match(terms, term)
-    if found is not None or match is None:
-        return found
-    found = match(terms, term)
-    return found if found is not None and 0 <= found < len(terms) else None
+def _index_of(prompt: str, term: str) -> int | None:
+    return literal_match(bare_terms(prompt), term)
 
 
 def _tidy(prompt: str) -> str:
@@ -197,7 +196,7 @@ def _without_nothing_weighted(prompt: str) -> str:
     return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
 
 
-_ELLIPSIS = re.compile(r"\.\.\.|\u2026")
+_ELLIPSIS = re.compile(r"\.\.\.|…")
 
 
 def _said(old: str, new: str) -> str:
@@ -222,39 +221,56 @@ class PromptRevision:
     term: str
     polarity: str
     action: str
+    answer: str = ""
+    settings: tuple = ()
+    setting_changes: tuple = ()
 
     @property
     def changed(self) -> bool:
         return (self.positive != self.old_positive
-                or self.negative != self.old_negative)
+                or self.negative != self.old_negative
+                or bool(self.settings))
+
+    def turn(self, said: str) -> Turn:
+        return Turn(said, self.answer, self.old_positive, self.old_negative, self.positive,
+                    self.negative, request_settings.recorded(self.setting_changes))
 
 
-def apply_request(positive: str, negative: str, request: str,
-                  match=None, rewrite=None) -> PromptRevision | None:
+def _scenes_of(positive: str, negative: str) -> tuple[list[str], list[str]]:
+    scenes = scene_prompts(positive)
+    negatives = scene_prompts(negative)
+    return scenes, [scene_text(negatives, index) for index in range(len(scenes))]
+
+
+def _joined(positive: str, negative: str, each_negative: list[str], parsed: tuple,
+            revisions: list[PromptRevision]) -> PromptRevision:
+    polarity, term = parsed
+    if len(revisions) == 1:
+        return revisions[0]
+    return PromptRevision(
+        positive, negative, story_of([revision.positive for revision in revisions]),
+        _negative_story(negative, each_negative, [revision.negative for revision in revisions]),
+        term, polarity, ", ".join(dict.fromkeys(revision.action for revision in revisions)),
+        " ".join(dict.fromkeys(revision.answer for revision in revisions if revision.answer)),
+        revisions[0].settings, revisions[0].setting_changes)
+
+
+def apply_request(positive: str, negative: str, request: str) -> PromptRevision | None:
     parsed = parse_request(request)
     if parsed is None:
         return None
-    return _revised((unboxed(positive or ""), unboxed(negative or "")), request, parsed,
-                    match, rewrite)
+    return _revised(unboxed(positive or ""), unboxed(negative or ""), parsed)
 
 
-def apply_request_to_each_scene(positive: str, negative: str, request: str,
-                                match=None, rewrite=None) -> PromptRevision | None:
-    positive, negative = unboxed(positive or ""), unboxed(negative or "")
-    scenes, negatives = scene_prompts(positive), scene_prompts(negative)
-    if len(scenes) == 1:
-        return apply_request(positive, negative, request, match, rewrite)
-    each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
-    revisions = [apply_request(scene, scene_negative, request, match, rewrite)
-                 for scene, scene_negative in zip(scenes, each_negative, strict=True)]
-    if revisions[0] is None:
+def apply_request_to_each_scene(positive: str, negative: str, request: str) -> PromptRevision | None:
+    parsed = parse_request(request)
+    if parsed is None:
         return None
-    return PromptRevision(positive, negative,
-                          story_of([revision.positive for revision in revisions]),
-                          _negative_story(negative, each_negative,
-                                          [revision.negative for revision in revisions]),
-                          revisions[0].term, revisions[0].polarity,
-                          ", ".join(dict.fromkeys(revision.action for revision in revisions)))
+    positive, negative = unboxed(positive or ""), unboxed(negative or "")
+    scenes, each_negative = _scenes_of(positive, negative)
+    revisions = [_revised(scene, scene_negative, parsed)
+                 for scene, scene_negative in zip(scenes, each_negative, strict=True)]
+    return _joined(positive, negative, each_negative, parsed, revisions)
 
 
 def request_applier(in_scenes: bool):
@@ -269,131 +285,168 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     return story_of(after)
 
 
-def _revised(prompts: tuple[str, str], request: str, parsed: tuple, match, rewrite) -> PromptRevision:
-    positive, negative = prompts
+def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
     polarity, term = parsed
 
     def made(new_positive, new_negative, action) -> PromptRevision:
         return PromptRevision(positive, negative, new_positive, new_negative,
                               term, polarity, action)
 
-    def rewritten() -> PromptRevision | None:
-        if rewrite is None:
-            return None
-        try:
-            new_positive, new_negative = (
-                _said(old, _without_nothing_weighted(new))
-                for old, new in zip((positive, negative), rewrite(positive, negative, request), strict=True))
-        except Exception as exc:
-            logger.warning("prompt_edit: could not rewrite the prompts for a request (%s)",
-                           type(exc).__name__)
-            return None
-        if (new_positive, new_negative) == (positive, negative):
-            return None
-        if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
-            return None
-        return made(new_positive, new_negative, REWRITTEN)
-
     if polarity == REMOVE:
-        index = _index_of(positive, term, match)
+        index = _index_of(positive, term)
         if index is not None:
-            within = bare_terms(positive)[index].lower() != term.lower()
-            return ((within and rewritten())
-                    or made(_without(positive, index), negative, DROPPED))
-        index = _index_of(negative, term, None)
+            return made(_without(positive, index), negative, DROPPED)
+        index = _index_of(negative, term)
         if index is not None:
             return made(positive, _reweighted(negative, index, WEIGHT_STEP), PUSHED)
         return made(positive, _plus(negative, term), EXCLUDED)
-    index = _index_of(negative, term, None)
+    index = _index_of(negative, term)
     if index is not None:
         return made(positive, _without(negative, index), ALLOWED)
-    index = _index_of(positive, term, None)
+    index = _index_of(positive, term)
     if index is not None:
         return made(_reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
-    return rewritten() or made(_plus(positive, term), negative, ADDED)
+    return made(_plus(positive, term), negative, ADDED)
 
 
-class Asking(NamedTuple):
-    base_url: str
-    model: str
-    system_prompt: str
+@dataclass(frozen=True)
+class WhatIsKnown:
+    exchange: tuple = ()
+    notes: CollectionNotes | None = None
+    examples: tuple = ()
+    settings: tuple = ()
 
 
-def work_out(positive: str, negative: str, request: str, *,
-             in_scenes: bool = False) -> PromptRevision | None:
-    return request_applier(in_scenes)(
-        positive, negative, request,
-        match=partial(smart_match, asking=Asking(LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL,
-                                                 VOICE_REQUEST_MATCH_SYSTEM_PROMPT)),
-        rewrite=partial(rewrite_prompt, asking=Asking(LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL,
-                                                      REQUEST_REWRITE_SYSTEM_PROMPT)))
+def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = False, ask=None,
+             **known) -> PromptRevision | None:
+    parsed = parse_request(request)
+    if parsed is None:
+        return None
+    positive, negative = unboxed(positive or ""), unboxed(negative or "")
+    scenes, each_negative = (_scenes_of(positive, negative) if in_scenes
+                             else ([positive], [negative]))
+    told = WhatIsKnown(**known)
+    revisions = []
+    for scene, scene_negative in zip(scenes, each_negative, strict=True):
+        revision = _answered(scene, scene_negative, parsed,
+                             partial(ask or ask_the_model, scene, scene_negative, request, told),
+                             told.settings)
+        if revision is None:
+            return request_applier(in_scenes)(positive, negative, request)
+        revisions.append(revision)
+    return _joined(positive, negative, each_negative, parsed, revisions)
 
 
-
-def build_match_messages(terms: list[str], term: str, system_prompt: str) -> list[dict]:
-    listing = "\n".join(f"{i}. {text}" for i, text in enumerate(terms))
-    user = (
-        f"Terms already in the prompt:\n{listing}\n\n"
-        f"The speaker asked about: {term}\n\n"
-        'Reply with only JSON: {"choice": n}'
-    )
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user},
-    ]
-
-
-def parse_match(data: dict, count: int) -> int | None:
+def _answered(positive: str, negative: str, parsed: tuple, asking,
+              settings) -> PromptRevision | None:
+    polarity, term = parsed
     try:
-        obj = local_llm.answer_of(data)
-    except json.JSONDecodeError:
+        new_positive, new_negative, answer, *more = asking()
+    except Exception as exc:  # noqa: BLE001 -- model down or unreadable: the rules' own edit stands
+        logger.warning("prompt_edit: the model could not answer the request (%s)",
+                       type(exc).__name__)
         return None
-    choice = obj.get("choice")
-    if not isinstance(choice, int) or not 0 <= choice < count:
+    new_positive = _said(positive, _without_nothing_weighted(new_positive))
+    new_negative = _said(negative, _without_nothing_weighted(new_negative))
+    if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
         return None
-    return choice
+    changes = request_settings.changes_asked(more[0] if more else None, settings)
+    if (new_positive, new_negative) == (positive, negative) and not answer and not changes:
+        return None
+    return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
+                          REWRITTEN, answer, tuple(changes.items()),
+                          tuple(request_settings.described(changes, settings)))
 
 
-def smart_match(terms: list[str], term: str, asking: Asking, *,
-                timeout: float = 20.0) -> int | None:
-    if not terms:
-        return None
-    try:
-        chosen = parse_match(local_llm.ask_json(
-            build_match_messages(terms, term, asking.system_prompt),
-            base_url=asking.base_url, model=asking.model, temperature=0.1, timeout=timeout),
-            len(terms))
-    except Exception as exc:
-        logger.warning("prompt_edit: could not match the request against the "
-                       "prompt's %d terms (%s)", len(terms), exc)
-        return None
-    if chosen is not None:
-        logger.info("prompt_edit: the request matched index %d of the prompt's %d terms",
-                    chosen, len(terms))
+_SHORTEST_ROOT = 3
+_NAMING_NOTHING = _FILLER | _ADD_WORDS | _REMOVE_WORDS | _TRAILING | _both_spellings({
+    "she", "he", "him", "they", "in", "into", "at", "for", "from", "by", "to", "is", "are",
+    "was", "isn't", "wasn't", "aren't", "did", "didn't", "does", "do", "doing", "get", "gets",
+    "getting", "gives", "giving", "gave", "appear", "appears", "appeared", "show", "shows",
+    "showed", "showing", "up", "still", "see", "missing", "again", "one", "same", "other",
+})
+
+
+def _roots(word: str) -> set[str]:
+    roots = {word}
+    for ending in ("s", "es", "ing", "ed"):
+        if word.endswith(ending) and len(word) - len(ending) >= _SHORTEST_ROOT:
+            root = word[:-len(ending)]
+            roots |= {root, root + "e"}
+    return roots
+
+
+def _forms(word: str) -> set[str]:
+    forms = set()
+    for root in _roots(word):
+        stem = root.removesuffix("e")
+        forms |= {root, root + "s", root + "es", root + "d", stem + "ing", stem + "ed",
+                  stem + stem[-1] + "ing", stem + stem[-1] + "ed"}
+    return forms
+
+
+def _asked_about(request: str) -> list[set[str]]:
+    words = dict.fromkeys(word for word, *_ in _tokens(request))
+    return [_forms(word) for word in words
+            if len(word) >= _SHORTEST_ROOT and word not in _NAMING_NOTHING]
+
+
+def _touches(asked: list[set[str]], prompt: str) -> int:
+    words = {word for word, *_ in _tokens(prompt)}
+    return sum(1 for forms in asked if forms & words)
+
+
+def prompts_touching(request: str, prompts, *, limit: int = 8,
+                     limit_chars: int = 6000) -> list[str]:
+    asked = _asked_about(request)
+    scored = sorted((-_touches(asked, prompt), position, prompt)
+                    for position, prompt in enumerate(prompts))
+    chosen, used = [], 0
+    for score, _position, prompt in scored:
+        if score == 0 or len(chosen) == limit:
+            break
+        if used + len(prompt) <= limit_chars:
+            chosen.append(prompt)
+            used += len(prompt)
     return chosen
 
 
 
-def build_rewrite_messages(positive: str, negative: str, instruction: str,
+
+def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,
                            system_prompt: str) -> list[dict]:
-    user = (
-        f"Positive prompt:\n{positive}\n\n"
-        f"Negative prompt:\n{negative}\n\n"
-        f"Spoken instruction:\n{instruction}\n\n"
-        'Reply with only a JSON object with two keys: "positive", holding the whole '
-        'rewritten positive prompt, and "negative", holding the whole rewritten negative prompt.'
-    )
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user},
-    ]
+    parts = []
+    if known.notes is not None and known.notes.complete:
+        parts.append(known.notes.as_told())
+    if known.exchange:
+        turns = "\n".join(f"Artist: {turn[0]}\nYou: {turn[1]}" for turn in known.exchange)
+        parts.append(f"THE EXCHANGE SO FAR about this image, oldest first:\n{turns}")
+    if known.examples:
+        numbered = "\n".join(f"{number}. {prompt}" for number, prompt in enumerate(known.examples, 1))
+        parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
+                     f"carry over the details that go with them):\n{numbered}")
+    if known.settings:
+        parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
+                     + request_settings.as_told(known.settings))
+    parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
+    parts.append(f"THE ARTIST NOW ASKS:\n{request}")
+    parts.append(
+        'Reply with only a JSON object with four keys: "positive", holding the whole '
+        'rewritten positive prompt; "negative", holding the whole rewritten negative '
+        'prompt; "answer", one or two plain sentences to the artist on what you '
+        'changed and what in his collection you drew on; and "settings", the settings '
+        "to change by their [key], {} when none.")
+    return [{"role": "system", "content": system_prompt},
+            {"role": "user", "content": "\n\n".join(parts)}]
 
 
-def rewrite_prompt(positive: str, negative: str, instruction: str, asking: Asking, *,
-                   timeout: float = 30.0):
-    obj = local_llm.answer_of(local_llm.ask_json(
-        build_rewrite_messages(positive, negative, instruction, asking.system_prompt),
-        base_url=asking.base_url, model=asking.model, temperature=0.4, timeout=timeout))
-    new_positive = str(obj["positive"]).strip() if "positive" in obj else positive
-    new_negative = str(obj["negative"]).strip() if "negative" in obj else negative
-    return new_positive, new_negative
+def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown, *,
+                  llm=None) -> tuple:
+    obj = local_llm.answer_of((llm or local_llm.ask)(
+        build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT),
+        base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
+        timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
+        stays_loaded="0"))
+    return (str(obj["positive"]).strip() if "positive" in obj else positive,
+            str(obj["negative"]).strip() if "negative" in obj else negative,
+            str(obj.get("answer") or "").strip(), obj.get("settings"))

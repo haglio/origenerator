@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+from dataclasses import dataclass
+
+from origenerator import card_claim, graphics_card
+
+
+class _Clock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+class _ComfyUI:
+    def __init__(self, queues, *, fails=False):
+        self.queues = list(queues)
+        self.fails = fails
+        self.let_go = 0
+
+    def fetch_queue(self):
+        if self.fails:
+            raise OSError("not running")
+        return self.queues.pop(0) if len(self.queues) > 1 else self.queues[0]
+
+    def free_memory(self):
+        self.let_go += 1
+
+
+def _wait(comfyui, tmp_path, *, memory=lambda: (14000, 16303), deadline_s=600.0):
+    clock = _Clock()
+    got_it = graphics_card.wait_for_the_graphics_card(comfyui, "Origenerator's Request", memory=memory,
+                                             clock=clock, sleep=clock.sleep, deadline_s=deadline_s,
+                                             claim_path=tmp_path / "claim.json")
+    return got_it, clock
+
+
+def test_comfyui_is_waited_for_then_asked_to_let_go_of_its_models(tmp_path):
+    comfyui = _ComfyUI([{"a"}, {"a"}, set()])
+
+    got_it, clock = _wait(comfyui, tmp_path)
+
+    assert got_it is True
+    assert comfyui.let_go == 1
+    assert clock.now > 0
+
+
+def test_a_comfyui_that_never_finishes_within_the_deadline_is_given_up_on(tmp_path):
+    comfyui = _ComfyUI([{"a"}])
+
+    got_it, clock = _wait(comfyui, tmp_path, deadline_s=60.0)
+
+    assert got_it is False
+    assert comfyui.let_go == 0
+    assert clock.now >= 60.0
+    assert not (tmp_path / "claim.json").exists()
+
+
+def test_a_comfyui_that_cannot_be_asked_counts_as_idle_and_is_not_asked_to_let_go(tmp_path):
+    comfyui = _ComfyUI([set()], fails=True)
+
+    got_it, _ = _wait(comfyui, tmp_path)
+
+    assert got_it is True
+    assert comfyui.let_go == 0
+
+
+def test_the_wait_goes_on_until_the_card_has_room_for_the_model(tmp_path):
+    readings = [(6000, 16303), (6500, 16303), (12000, 16303)]
+    got_it, _ = _wait(_ComfyUI([set()]), tmp_path, memory=lambda: readings.pop(0))
+
+    assert got_it is True
+    assert readings == []
+
+
+def test_a_card_that_never_makes_room_is_still_tried(tmp_path):
+    got_it, _ = _wait(_ComfyUI([set()]), tmp_path, memory=lambda: (6000, 16303))
+
+    assert got_it is True
+
+
+def test_without_nvidia_smi_the_card_is_taken_on_trust(tmp_path):
+    got_it, _ = _wait(_ComfyUI([set()]), tmp_path, memory=lambda: None)
+
+    assert got_it is True
+
+
+def test_the_model_takes_the_one_claim_on_the_card_and_lets_go_of_it_after(tmp_path):
+    claim = tmp_path / "claim.json"
+
+    got_it, _ = _wait(_ComfyUI([set()]), tmp_path)
+
+    assert got_it is True
+    written = json.loads(claim.read_text(encoding="utf-8"))
+    assert (written["holder"], written["pid"]) == ("Origenerator's Request", os.getpid())
+
+    graphics_card.let_go_of_the_graphics_card(claim)
+
+    assert not claim.exists()
+
+
+def test_a_card_a_trainer_holds_is_waited_for_until_the_trainer_lets_go(tmp_path, another_program):
+    claim = tmp_path / "claim.json"
+    assert card_claim.take("Example Look 1.1 training", another_program.pid, claim)
+
+    got_it, _ = _wait(_ComfyUI([set()]), tmp_path, deadline_s=30.0)
+    assert got_it is False
+    assert json.loads(claim.read_text(encoding="utf-8"))["pid"] == another_program.pid
+
+    another_program.kill()
+    another_program.wait()
+    got_it, _ = _wait(_ComfyUI([set()]), tmp_path)
+
+    assert got_it is True
+    assert json.loads(claim.read_text(encoding="utf-8"))["pid"] == os.getpid()
+
+
+@dataclass(frozen=True)
+class _Done:
+    stdout: str
+
+
+def test_the_cards_free_and_total_memory_are_read_from_nvidia_smi():
+    given = {}
+
+    def run(command, **settings):
+        given.update(settings)
+        return _Done("14842, 16303\n")
+
+    assert graphics_card.graphics_card_memory_mib(run=run) == (14842, 16303)
+    assert given["creationflags"] == subprocess.CREATE_NO_WINDOW
+
+
+def test_a_missing_nvidia_smi_reads_as_no_reading():
+    def run(command, **settings):
+        raise OSError("no such program")
+
+    assert graphics_card.graphics_card_memory_mib(run=run) is None
+
+
+class _ComfyUIThatWillNotLetGo(_ComfyUI):
+    def free_memory(self):
+        raise OSError("not answering")
+
+
+def test_a_comfyui_that_will_not_let_go_leaves_the_model_to_load_with_what_room_there_is(tmp_path):
+    got_it, _ = _wait(_ComfyUIThatWillNotLetGo([set()]), tmp_path)
+
+    assert got_it is True

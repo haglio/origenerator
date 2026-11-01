@@ -23,9 +23,11 @@ from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
 
 from origenerator import (
+    card_claim,
     config,
     enhance_presets,
     gallery,
+    graphics_card,
     osr2_driver,
     osr2_motion_driver,
     running_ahead,
@@ -44,6 +46,9 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
 
 pytest_plugins = ("shared_ui.testing",)
+
+graphics_card.NVIDIA_SMI = ("nvidia-smi-the-suite-never-runs",)
+card_claim.CLAIM = Path(os.environ["ORIGENERATOR_STATE_DIR"]) / "graphics_card_claim.json"
 
 
 @pytest.fixture(autouse=True)

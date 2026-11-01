@@ -1930,7 +1930,7 @@ def test_canceling_a_generate_brings_back_how_the_prompt_differs_from_the_item_s
     assert _struck_and_lit(field) == ("cat", "dog")
 
 
-def test_a_generate_with_words_in_the_request_stays_marked_against_what_they_asked_of(
+def test_a_generate_on_an_image_a_request_made_leaves_its_prompt_plain(
         qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     db.record_request(NewRequest(prompt_id="orig", source_prompt_id="src", heard="", asked="no bird",
@@ -1943,12 +1943,12 @@ def test_a_generate_with_words_in_the_request_stays_marked_against_what_they_ask
     row = db.get_generation("orig")
     panel.show_saved_generation(row, [row])
     field = panel._param_form._widgets["positive_prompt"].boxes()[0]
-    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("bird", "cat"), timeout=5000)
+    assert _struck_and_lit(field) == ("", "")
 
     panel._on_generate()
 
     assert panel.launched_runs()
-    assert _struck_and_lit(field) == ("bird", "cat")
+    assert _struck_and_lit(field) == ("", "")
 
 
 def test_a_generate_that_lands_leaves_the_prompt_plain_under_what_it_made(qtbot, tmp_path):

@@ -10,7 +10,14 @@ from pathlib import Path
 from app_support.logging_utils import configure_logging, install_exception_logging
 from shared_ui.preview import taskbar_identity
 
-from origenerator import config, fix_training, gallery, lora_training, places_backfill
+from origenerator import (
+    collection_notes,
+    config,
+    fix_training,
+    gallery,
+    lora_training,
+    places_backfill,
+)
 from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
@@ -21,7 +28,6 @@ from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
 from origenerator.inflight import reconcile_the_backfill
 from origenerator.landed_while_away import THIS_LIBRARY, running_trainings, training_toast
-from origenerator.media import MediaType
 from origenerator.single_instance import Copies
 from origenerator.toast_raising import raise_toast
 from origenerator.win32 import APP_USER_MODEL_ID
@@ -43,6 +49,8 @@ class Machine:
     comfyui_busy: Callable[[], bool]
     batches_due: Callable[[], bool]
     queue_batches: Callable[[], None]
+    notes_due: Callable[[], bool]
+    take_notes: Callable[[], None]
     queue_more_backfill: Callable[[], int]
     fix_to_train: Callable[[], object]
     train: Callable[[object], None]
@@ -64,6 +72,9 @@ def take_a_turn(machine: Machine) -> Turn:
     if machine.batches_due():
         machine.queue_batches()
         return Turn("handed ComfyUI the work Origenerator left as it closed", machine.training_running())
+    if machine.notes_due():
+        machine.take_notes()
+        return Turn("took notes on the collection", machine.training_running())
     if machine.queue_more_backfill():
         return Turn("handed ComfyUI the next videos the backfill remakes", machine.training_running())
     if (fix := machine.fix_to_train()) is not None:
@@ -91,8 +102,7 @@ def work_left() -> bool:
 def queue_the_work_left(jobs, rows: list[dict], *, experiments_on: bool, policy) -> int:
     queued = 0
     if experiments_on:
-        index = gallery.build_image_config_index(
-            [row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE])
+        index = gallery.image_config_index_of(rows)
         queued += queue_experiments(rows, policy, lambda proposal: jobs.start_prepared(
             gallery.folder_key_for(proposal.workflow.name, proposal.params, index),
             proposal.workflow, proposal.params, source=GenerationSource.EXPERIMENT))
@@ -132,8 +142,7 @@ def queue_the_backfill(jobs, db, rows: list[dict], *, enhance_settings) -> int:
     def enhance(images: list[dict]) -> int:
         asks = [(image, params) for image in images
                 if (params := gallery.enhance_params_for(image, enhance_settings)) is not None]
-        index = gallery.build_image_config_index(
-            [row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE])
+        index = gallery.image_config_index_of(rows)
         return sum(1 for *_launch, prompt_id in launch_enhancements(
             jobs, db, asks, index, source=GenerationSource.BACKFILL) if prompt_id)
 
@@ -219,6 +228,8 @@ def main() -> int:
         training_running=lambda: bool(running_trainings()),
         comfyui_busy=lambda: _comfyui_busy(client), batches_due=work_left,
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
+        notes_due=lambda: collection_notes.are_due(db, config.COLLECTION_NOTES_PATH),
+        take_notes=lambda: collection_notes.take_a_sitting(db, client, config.COLLECTION_NOTES_PATH),
         queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client, ui),
         fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui)))
     print(json.dumps({"did": turn.did, "holds_the_graphics_card": turn.holds_the_graphics_card}))

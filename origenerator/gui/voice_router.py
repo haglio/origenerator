@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui import colors
 from shared_ui.palette import BG_PRIMARY, WHITE, as_hex, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS, MARGIN_STANDARD
 
-from origenerator import gallery, prompt_edit
+from origenerator import gallery, request_settings
 from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
@@ -23,8 +23,15 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
-from origenerator.gui.message import ERROR, HEARD_MARK, INFO, WARNING, set_marked_text
-from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.message import (
+    ERROR,
+    HEARD_MARK,
+    INFO,
+    WARNING,
+    set_marked_text,
+    time_to_read_ms,
+)
+from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.voice_wiring import VoiceSources, VoiceSwitches
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
@@ -140,8 +147,8 @@ class VoiceRouter(QObject):
         self.listener.heard.connect(self._on_heard)
         self.listener.error.connect(self._on_error)
         self.listener.request.connect(self.on_spoken_request)
-        self._revision = RevisionWorker(prompt_edit.work_out, parent=self)
-        self._revision.revised.connect(self._on_revised)
+        self.requests = sources.requests or RequestAnswerer(
+            sources.db, sources.jobs, sources.client, parent=self)
         self._request_target: str | None = None
         self.status = QLabel()
         self.status.setObjectName("voiceStatus")
@@ -216,10 +223,11 @@ class VoiceRouter(QObject):
             self.status.show()
         self.caption_shown.emit(text is not None)
 
-    def _show(self, text: str, *, transient: bool, mark: str = HEARD_MARK) -> None:
+    def _show(self, text: str, *, transient: bool, mark: str = HEARD_MARK,
+              ms: int = _FLASH_MS) -> None:
         self._set_caption(text, mark)
         if transient:
-            self._flash_timer.start(_FLASH_MS)
+            self._flash_timer.start(ms)
         else:
             self._flash_timer.stop()
 
@@ -414,7 +422,7 @@ class VoiceRouter(QObject):
         if slideshow is not None:
             slideshow.note_request(message, spoken, working=working, kind=kind)
         else:
-            self._show(message, transient=not working)
+            self._show(message, transient=not working, ms=time_to_read_ms(message))
 
     def _begin_request(self, prompt_id: str | None, spoken,
                        shape: str | None = None) -> None:
@@ -434,11 +442,14 @@ class VoiceRouter(QObject):
         self._answer_request(slideshow, f"working out “{spoken.text}”…", spoken,
                              working=True)
         standing = self._starting.show(**requested_of(row, workflow, params))
-        QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken, shape, standing),
-            params.get("positive_prompt", ""), params.get("negative_prompt", ""),
-            spoken.text, in_scenes=workflow.tells_a_story(),
-        ))
+        self.requests.ask(
+            row["prompt_id"], (params.get("positive_prompt", ""), params.get("negative_prompt", "")),
+            spoken.text,
+            settings=request_settings.settings_to_tell(workflow.param_definitions(), params),
+            in_scenes=workflow.tells_a_story(),
+            owner=self,
+            then=lambda revision, context=(row, workflow, params, spoken, shape, standing):
+                self._on_revised(context, revision))
 
     def _on_revised(self, context, revision) -> None:
         row, workflow, params, spoken, shape, standing = context
@@ -456,8 +467,8 @@ class VoiceRouter(QObject):
             return
         if not revision.changed:
             self._answer_request(
-                slideshow, f"“{revision.term}” is already how you asked for it", spoken,
-                kind=WARNING)
+                slideshow, revision.answer or f"“{revision.term}” is already how you asked for it",
+                spoken, kind=INFO if revision.answer else WARNING)
             return
         message, kind = self._host.queue_request(*asked, spoken, revision)
         self._answer_request(slideshow, message, spoken, kind=kind)

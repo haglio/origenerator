@@ -147,7 +147,13 @@ from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.pane_arrangement import PaneArrangement
-from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
+from origenerator.gui.panes import (
+    FootSplitter,
+    PaneSplitter,
+    hold_the_borders_still,
+    pane,
+    pane_following,
+)
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.slideshow_director import (
     DirectorSources,
@@ -435,7 +441,7 @@ class GalleryView(QWidget):
             self._jobs, info_tabs_of=lambda: self._generate_pane, parent=self)
         self._voice = VoiceRouter(
             self, VoiceSources(db=db, slideshows=self._slideshows, client=client,
-                               starting=self._starting),
+                               starting=self._starting, jobs=self._jobs),
             parent=self, motion=self._osr2_motion)
         self._folder_history: list[str] = []
 
@@ -535,10 +541,7 @@ class GalleryView(QWidget):
         self._tree.favorite_clicked.connect(self._toggle_favorite)
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.dropped.connect(self._on_dropped)
-        listening, listening_column = pane()
-        listening_column.addWidget(self._voice.status)
-        if self._voice.status.isHidden():
-            listening.hide()
+        listening = pane_following(self._voice.status)
         self._voice.caption_shown.connect(listening.setVisible)
         finding, toc_column = pane()
         toc_column.addWidget(self._search.field)
@@ -625,7 +628,8 @@ class GalleryView(QWidget):
         self._generate_pane = GeneratePane(
             self._client, self._db, fun_time=self._fun_time,
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
-                           animated_preview=self.animated_preview))
+                           animated_preview=self.animated_preview,
+                           requests=self._voice.requests))
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
         if self._osr2_driver is not None:
             omnipause.holds(self._osr2_driver)
@@ -936,7 +940,7 @@ class GalleryView(QWidget):
                         prompt_id=prompt_id, heard="",
                         new_positive=batch[0].get("positive_prompt", ""),
                         new_negative=batch[0].get("negative_prompt", ""), **asked))
-                launching.note_launched(prompt_id, made_of=None if asked else batch[0])
+                launching.note_launched(prompt_id, made_of=batch[0])
         self._stand_on_the_run_in(key, rebuild=True)
 
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
@@ -1882,8 +1886,9 @@ class GalleryView(QWidget):
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
         name = row.get("workflow_name") or ""
-        revised = {**params, **{key: boxed_as_typed(name, params, key, said) for key, said in (
-            ("positive_prompt", revision.positive), ("negative_prompt", revision.negative))}}
+        revised = {**params, **dict(revision.settings),
+                   **{key: boxed_as_typed(name, params, key, said) for key, said in (
+                       ("positive_prompt", revision.positive), ("negative_prompt", revision.negative))}}
         key = self.folder_key_for(name, revised)
         if not self._jobs.start_prepared(key, workflow, revised):
             return "couldn't queue the request — see the log", ERROR
@@ -1897,9 +1902,10 @@ class GalleryView(QWidget):
             old_positive=params.get("positive_prompt", ""),
             old_negative=params.get("negative_prompt", ""),
             new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
+            turns=(revision.turn(spoken.text),),
         ))
         self.refresh()
-        return "Request submitted", INFO
+        return revision.answer or "Request submitted", INFO
 
     def delete_enhance_versions(self, prompt_id: str, filenames: list):
         row = self._db.get_generation(prompt_id)

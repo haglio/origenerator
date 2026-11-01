@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from PyQt6 import sip
 from PyQt6.QtCore import (
     QPoint,
     Qt,
@@ -152,6 +153,23 @@ def test_a_look_loras_training_left_running_is_taken_up_without_holding_the_line
     assert view._jobs.training is not None
     assert not view._jobs.training_holds_the_machine()
     client.submit_job.assert_called_once()
+
+
+@pytest.mark.parametrize("kind", [fix_training, look_training])
+def test_a_training_being_watched_stops_with_the_gallery_that_watches_it(
+        qtbot, tmp_path, monkeypatch, kind):
+    trainer = SimpleNamespace(running=lambda: True, began=0.0)
+    job = {"part": "hands", "base": "Example Look", "display_name": "Example 1.0",
+           "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
+    monkeypatch.setattr(kind, "trainings", lambda: [job])
+    monkeypatch.setattr(lora_training, "trainer_of", lambda kept: trainer)
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    view.reconnect_running_jobs()
+    run = view._jobs.training
+
+    sip.delete(view)
+
+    assert sip.isdeleted(run)
 
 
 def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):

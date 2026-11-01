@@ -197,7 +197,8 @@ class EnhanceController:
     def _watch(self, job: dict) -> TrainingRun:
         name = job["part"]
         self._training = TrainingRun(job, self._jobs, fix_training,
-                                     reveal=lambda: self.panel.open_fix_prompts(name))
+                                     reveal=lambda: self.panel.open_fix_prompts(name),
+                                     parent=self.panel)
         self._training.progress.connect(lambda text: self.panel.show_fix_training(name, text))
         self._training.finished.connect(lambda lora: self._training_ended(job, lora))
         self._training.failed.connect(lambda why: self._training_ended(job, None, why))

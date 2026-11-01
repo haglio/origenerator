@@ -70,7 +70,7 @@ from origenerator.gallery.shapes import (
 from origenerator.gallery.shapes import (
     shape_holding as _shape_holding,
 )
-from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
+from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
     randomize_seeds,
@@ -291,7 +291,7 @@ class GalleryView(QWidget):
 
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
-                 actions: GalleryActions | None = None,
+                 actions: GalleryEdits | None = None,
                  osr2_motion: Osr2MotionDriver | None = None,
                  radio: OrigeneratorRadio | None = None,
                  search_expander: SearchExpander | None = None,
@@ -341,15 +341,15 @@ class GalleryView(QWidget):
         # stopping the motion is something it does, not something it reacts to.
         self._reconciling_osr2 = False
         self._build_the_queue_of_runs(db, client)
-        self._actions = actions or GalleryActions(
+        self._edits = actions or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
             ),
         )
-        self._moving_previews = MovingPreviews(self._actions.places,
-                                               self._actions.thumb_dir, parent=self)
+        self._moving_previews = MovingPreviews(self._edits.places,
+                                               self._edits.thumb_dir, parent=self)
         self._moving_previews.made.connect(
             lambda prompt_id, path: play_once_made(self._gallery_pane, prompt_id, path))
         self._forget_the_listing()
@@ -1210,7 +1210,7 @@ class GalleryView(QWidget):
         else:
             row = self._db.get_generation(prompt_id)
             if row is not None:
-                self._actions.reject_experiment(row)
+                self._edits.reject_experiment(row)
             self._re_aim()
         self.refresh()
 
@@ -1587,7 +1587,7 @@ class GalleryView(QWidget):
         self._pending_selection = None
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
-        self._combine.offer_the_acts(rows)
+        self._combine.offer_the_actions(rows)
         self._listed_rows = rows
         self._held_rows = trash_collection.trash_items(self._trash_records())
         # Built once here off the whole library and handed to every tree below —
@@ -2104,7 +2104,7 @@ class GalleryView(QWidget):
         )
         if not ok or not name.strip():
             return
-        folder_id = self._actions.custom_collections.create(
+        folder_id = self._edits.custom_collections.create(
             name.strip(), [self._folder_identity(f) for f in folders], self.shape_in_view()
         )
         self._open_custom_collection(folder_id)
@@ -2141,7 +2141,7 @@ class GalleryView(QWidget):
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
             return
-        self._actions.custom_collections.add_to(
+        self._edits.custom_collections.add_to(
             folder_id, [self._folder_identity(g) for g in groups], prompt_ids
         )
         self._open_custom_collection(folder_id)
@@ -2175,7 +2175,7 @@ class GalleryView(QWidget):
         name, ok = QInputDialog.getText(self, "New Collection", "Collection name:")
         if ok and name.strip():
             self._open_custom_collection(
-                self._actions.custom_collections.create(name.strip(), [], shape))
+                self._edits.custom_collections.create(name.strip(), [], shape))
 
     def _remove_custom_collection(self, group):
         """Delete a folder the user made. Only the grouping goes — what it gathers
@@ -2183,7 +2183,7 @@ class GalleryView(QWidget):
         delete that trashes files."""
         if not self._confirm(f"Remove the folder “{group.label}”?\n\n{_kept_on_removal(group)}"):
             return
-        self._actions.custom_collections.delete(group.folder_id)
+        self._edits.custom_collections.delete(group.folder_id)
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
@@ -2194,7 +2194,7 @@ class GalleryView(QWidget):
         folders = [self._folder_identity(gathered)
                    if (gathered := self.group_for_key(key)) is not None else (key, None, None)
                    for key in folder_keys]
-        self._actions.custom_collections.remove_from(group.folder_id, folders, items)
+        self._edits.custom_collections.remove_from(group.folder_id, folders, items)
         self.refresh()
         self._re_aim()
 
@@ -2780,8 +2780,8 @@ class GalleryView(QWidget):
         a test and the buttons written from it with no gallery at all.
         """
         can_go_back, can_go_forward = self._trail
-        undo_label = self._actions.undo_label()
-        redo_label = self._actions.redo_label()
+        undo_label = self._edits.undo_label()
+        redo_label = self._edits.redo_label()
         auto_generate_folder = self._auto.active_key()
         group = self.current_group()
         can_auto_generate = (isinstance(group, gallery.SettingsGroup)
@@ -2791,9 +2791,9 @@ class GalleryView(QWidget):
         return ButtonStates(
             back=Button(enabled=can_go_back, tip="Back"),
             forward=Button(enabled=can_go_forward, tip="Forward"),
-            undo=Button(enabled=self._actions.can_undo(),
+            undo=Button(enabled=self._edits.can_undo(),
                         tip=f"Undo: {undo_label}" if undo_label else "Nothing to undo"),
-            redo=Button(enabled=self._actions.can_redo(),
+            redo=Button(enabled=self._edits.can_redo(),
                         tip=f"Redo: {redo_label}" if redo_label else "Nothing to redo"),
             # Several folders picked ARE the grouping, unsaved; one folder is not
             # a grouping, and the button would only ask what it meant.
@@ -2950,7 +2950,7 @@ class GalleryView(QWidget):
         version means a new thumbnail and, once the last enhancement goes, no more
         yellow plus."""
         row = self._db.get_generation(prompt_id)
-        if row is None or not self._actions.delete_enhance_versions(row, filenames):
+        if row is None or not self._edits.delete_enhance_versions(row, filenames):
             return
         self._re_aim()
         self.refresh()
@@ -3029,10 +3029,10 @@ class GalleryView(QWidget):
         if row is None:
             return
         if gallery.unreviewed_experiments([row]):
-            self._actions.reject_experiment(row)
+            self._edits.reject_experiment(row)
             self._re_aim()
         else:
-            self._actions.delete_rows([row])
+            self._edits.delete_rows([row])
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         """Re-roll one i2v item, randomizing a single seed (its top-left hover
@@ -3782,7 +3782,7 @@ class GalleryView(QWidget):
         if not prompt_ids:
             return
         try:
-            restored = self._actions.restore_deleted(prompt_ids)
+            restored = self._edits.restore_deleted(prompt_ids)
         except Exception as e:
             logger.exception("Failed to restore %d deleted item(s)", len(prompt_ids))
             QMessageBox.warning(
@@ -3808,7 +3808,7 @@ class GalleryView(QWidget):
         ):
             return
         try:
-            self._actions.purge_deleted(prompt_ids)
+            self._edits.purge_deleted(prompt_ids)
         except Exception as e:
             logger.exception("Failed to permanently delete %d item(s)", count)
             QMessageBox.warning(
@@ -3879,7 +3879,7 @@ class GalleryView(QWidget):
         """Drop every on-screen view of ``paths`` — the files a delete is about to
         move — so nothing in this app is still holding one open.
 
-        Wired into :class:`GalleryActions` itself, so it runs for every delete
+        Wired into :class:`GalleryEdits` itself, so it runs for every delete
         there is: a picked tile, a whole folder, a rejected experiment, a
         slideshow's Up key. Windows won't move a file while any handle on it is
         open, and a video preview holds one for as long as it's loaded — so an
@@ -3893,7 +3893,7 @@ class GalleryView(QWidget):
         if not rows:
             return
         try:
-            self._actions.delete_rows(rows)
+            self._edits.delete_rows(rows)
         except Exception as e:
             # A delete that throws (a locked file, a vanished path) must not fail
             # silently — show what went wrong rather than appearing to do nothing.
@@ -3908,9 +3908,9 @@ class GalleryView(QWidget):
         self._re_aim()
 
     def _undo(self):
-        if not self._actions.can_undo():
+        if not self._edits.can_undo():
             return
-        focus = self._actions.undo()  # a restored generation to return to, if any
+        focus = self._edits.undo()  # a restored generation to return to, if any
         self._gallery_pane.clear_selection()
         self.refresh()
         # After undoing a delete, go back to the folder it emptied (now restored),
@@ -3922,9 +3922,9 @@ class GalleryView(QWidget):
     def _redo(self):
         """Re-apply what Undo took back. There is nothing to navigate to — a redo
         takes something away rather than restoring it — so this only rebuilds."""
-        if not self._actions.can_redo():
+        if not self._edits.can_redo():
             return
-        self._actions.redo()
+        self._edits.redo()
         self._gallery_pane.clear_selection()
         self.refresh()
         self._re_aim()

@@ -79,7 +79,7 @@ from origenerator.item_shape import (
 )
 from origenerator.media import MediaType
 from origenerator.nav_map import (
-    act_labels,
+    action_labels,
     beyond_the_row,
     one_per_stretch,
     surroundings,
@@ -664,7 +664,7 @@ class SlideshowDirector:
             omnipause=self._ask_the_room_to_pause(),
             neighbors=partial(self.neighbors_of, shape=shape),
             widen=partial(self.beyond_the_row_of, shape=shape),
-            acts=partial(self.acts_of, shape=shape),
+            acts=partial(self.actions_of, shape=shape),
             slides=self.slides_for,
             move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,
@@ -857,11 +857,11 @@ class SlideshowDirector:
         return self._slides_of(beyond_the_row(
             row, self._library_of(shape), image_index=self._host.image_config_index()))
 
-    def acts_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
+    def actions_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
         """What the map names each of *prompt_ids* for, among the library of
-        *shape*'s shape — what an act filter matches a generation on.  One the
+        *shape*'s shape — what an action filter matches a generation on.  One the
         library does not hold is left out, and answers to no act."""
-        named_for = act_labels(self._library_of(shape),
+        named_for = action_labels(self._library_of(shape),
                                image_index=self._host.image_config_index())
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
                 if prompt_id in named_for}
@@ -1639,7 +1639,7 @@ class SlideshowDirector:
         once. Said even when the switch was already that way — a word that did
         nothing and said nothing reads as a mic that missed it.
 
-        Turning it off takes F-mode and the act filter with it: said to a
+        Turning it off takes F-mode and the action filter with it: said to a
         slideshow, "clear filter" is the way out of ALL of the narrowing.
         """
         slideshow = self.surface_for(shape)

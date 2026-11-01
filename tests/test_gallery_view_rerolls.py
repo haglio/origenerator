@@ -11,7 +11,7 @@ from PyQt6.QtCore import (
 )
 
 from origenerator import (
-    act_settings,
+    action_settings,
     evolver_export,
 )
 from origenerator.db import Database
@@ -1086,7 +1086,7 @@ def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_pat
 def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    view._combine.generate_category("img", "alpha", act_settings.GENAU)
+    view._combine.generate_category("img", "alpha", action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     # The act has a long-form video too; the Genau lane can only use the loop.
@@ -1098,16 +1098,16 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
     view = _genau_view(qtbot, tmp_path)
     asked = []
 
-    def spy(category, candidates, intent=act_settings.VIDEO):
+    def spy(category, candidates, intent=action_settings.VIDEO):
         asked.append(intent)
         return "vid"
 
-    monkeypatch.setattr(combine_controller.act_settings, "most_used_video", spy)
+    monkeypatch.setattr(combine_controller.action_settings, "most_used_video", spy)
 
     view._combine.generate_category("img", "dancing")
-    view._combine.generate_category("img", "dancing", act_settings.GENAU)
+    view._combine.generate_category("img", "dancing", action_settings.GENAU)
 
-    assert asked == [act_settings.VIDEO, act_settings.GENAU]
+    assert asked == [action_settings.VIDEO, action_settings.GENAU]
 
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
@@ -1120,7 +1120,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
 
-    view._combine.generate_category("img", "alpha", act_settings.GENAU)
+    view._combine.generate_category("img", "alpha", action_settings.GENAU)
     job = next(iter(view._live_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 

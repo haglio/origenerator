@@ -29,7 +29,7 @@ from origenerator.enhanced_start_backfill import (
 from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import EXPORT_LANES, KINO
 from origenerator.funscript import funscript_path_for
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
@@ -386,7 +386,7 @@ def _thumbnails(tmp_path):
 
 
 def _fold(db, tmp_path):
-    trash = GalleryActions(db, _places(tmp_path), Trash(tmp_path / "trash")).delete_rows
+    trash = GalleryEdits(db, _places(tmp_path), Trash(tmp_path / "trash")).delete_rows
     folded = fold_completed_backfill(db, _places(tmp_path), _thumbnails(tmp_path), trash=trash)
     return folded, [record["prompt_id"] for record in db.list_trashed()
                     if not record["row"].get("old_version_of")]

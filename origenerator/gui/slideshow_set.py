@@ -37,7 +37,7 @@ from origenerator.gui.hud_nav_map import (
     Loop,
     NavMap,
     NavMapNeighbors,
-    acts_posted,
+    actions_posted,
     build_nav_map,
     step_in_ring,
 )
@@ -52,7 +52,7 @@ from origenerator.slideshow import (
     in_order,
 )
 
-NO_ACT_ON_SCREEN = "No act for this one"
+NO_ACTION_ON_SCREEN = "No act for this one"
 ENHANCEMENT_RUNNING = "running"
 ENHANCEMENT_QUEUED = "queued"
 _ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
@@ -82,8 +82,8 @@ class SlideshowSet:
         self._widen = actions.widen
         self._known: dict[str, NavMapNeighbors] = {}
         # What each generation's map row is named for, by id -- the acts an
-        # act filter matches it on.  None for a slideshow with no library under it.
-        self._acts_of = actions.acts
+        # action filter matches it on.  None for a slideshow with no library under it.
+        self._actions_of = actions.acts
         self._named: dict[str, str] = {}
         self._slides_of = actions.slides
         self._on_filters_change = actions.filters_changed
@@ -204,7 +204,7 @@ class SlideshowSet:
         if self._on_filters_change is not None:
             self._on_filters_change(self.filters)
 
-    def set_act_filter(self, query: str) -> bool:
+    def set_action_filter(self, query: str) -> bool:
         return self.set_filters(replace(self.filters, act=query))
 
     def drop_the_filters(self) -> bool:
@@ -264,12 +264,12 @@ class SlideshowSet:
         """The act(s) *prompt_id*'s map row is named for.  The whole set is
         asked about at once, the first time anything is: the answer costs a
         walk of the library, and a filter asks it of every item."""
-        if prompt_id is None or self._acts_of is None:
+        if prompt_id is None or self._actions_of is None:
             return ""
         if prompt_id not in self._named:
             asked = [prompt_id, *(item.prompt_id for item in self.all_items
                                   if item.prompt_id is not None)]
-            self._named = {**dict.fromkeys(asked, ""), **self._acts_of(asked)}
+            self._named = {**dict.fromkeys(asked, ""), **self._actions_of(asked)}
         return self._named[prompt_id]
 
     # --- keeping the whole set current -------------------------------------
@@ -471,7 +471,7 @@ class SlideshowSet:
         if shown is None:
             return None
         return next((row.slide for row in shown.column
-                     if row.configuration and acts_posted(row.label) == acts_posted(query)),
+                     if row.configuration and actions_posted(row.label) == actions_posted(query)),
                     None)
 
     def slide_for_path(self, path) -> Slide | None:
@@ -582,7 +582,7 @@ class SlideshowSet:
         item = self.playlist.current()
         return item.prompt_id if item is not None else None
 
-    def act_on_screen(self) -> str:
+    def action_on_screen(self) -> str:
         return self._named_for(self.current_prompt_id())
 
     @property
@@ -604,23 +604,23 @@ class SlideshowSet:
         return True
 
 
-def narrow_to_acts(slideshow_set: SlideshowSet, posted: str) -> tuple[str, bool]:
+def narrow_to_actions(slideshow_set: SlideshowSet, posted: str) -> tuple[str, bool]:
     """Narrow *slideshow_set* to the act(s) a row's button or a spoken act *posted*
     — or lift the filter, for nothing posted — and answer with what a slideshow
     says about it, the way a satellite says it, and whether that is a dead
     end: an act nothing here is named for leaves the pass alone."""
-    acts = acts_posted(posted)
-    if not (slideshow_set.set_act_filter(acts) or acts == slideshow_set.filters.act):
+    acts = actions_posted(posted)
+    if not (slideshow_set.set_action_filter(acts) or acts == slideshow_set.filters.act):
         return f"Filter: no matches for '{acts}'", False
     summary = f"'{acts}'" if acts else "cleared"
     return f"Filter: {summary} ({len(slideshow_set.playlist)})", True
 
 
-def narrow_to_the_act_on_screen(slideshow_set: SlideshowSet) -> tuple[str, bool]:
-    act = slideshow_set.act_on_screen()
+def narrow_to_the_action_on_screen(slideshow_set: SlideshowSet) -> tuple[str, bool]:
+    act = slideshow_set.action_on_screen()
     if not act:
-        return NO_ACT_ON_SCREEN, False
-    return narrow_to_acts(slideshow_set, act)
+        return NO_ACTION_ON_SCREEN, False
+    return narrow_to_actions(slideshow_set, act)
 def item_note(slideshow_set: SlideshowSet, *, versions, version_index: int) -> str:
     if slideshow_set.playlist.current_is_live():
         return GENERATING

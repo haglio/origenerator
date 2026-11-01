@@ -43,7 +43,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     corner_buttons,
@@ -2003,7 +2003,7 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
                              workflow_json="{}")
         db.update_generation(pid, status="completed",
                              output_files=json.dumps([{"filename": f"{pid}.png", "subfolder": ""}]))
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()

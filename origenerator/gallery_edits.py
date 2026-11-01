@@ -18,7 +18,7 @@ Falling off that stack no longer ends anything, though: a delete also files the
 row and its trashed files in the Trash, which holds them for weeks (see
 :mod:`origenerator.trash_collection`). So the stack is the quick "that was a mistake",
 and the Trash — restored or ended from the gallery's Trash collection, through
-:meth:`GalleryActions.restore_deleted` and :meth:`GalleryActions.purge_deleted` —
+:meth:`GalleryEdits.restore_deleted` and :meth:`GalleryEdits.purge_deleted` —
 is the slow one.
 """
 from __future__ import annotations
@@ -55,7 +55,7 @@ class GalleryEnvironment:
     thumb_dir: Path | None = None
 
 
-class GalleryActions:
+class GalleryEdits:
     def __init__(self, db, places: OutputPlaces, trash, limit: int = 50,
                  environment: GalleryEnvironment | None = None):
         self._db = db

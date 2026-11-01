@@ -257,7 +257,7 @@ class GenerationStore(Store):
         the sorting back, which puts it among the ones still to be looked at."""
         self._set(prompt_id, "picture_state", state or None)
 
-    def set_act(self, prompt_id: str, act: str | None):
+    def set_action(self, prompt_id: str, act: str | None):
         self._set(prompt_id, "recipe_category", act or None)
 
     def set_shielded(self, prompt_id: str, shielded: bool):

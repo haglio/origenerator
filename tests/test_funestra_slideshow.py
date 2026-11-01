@@ -1124,10 +1124,10 @@ def _around(prompt_id):
     act down its column, and the rest have nobody."""
     if prompt_id != "id-1":
         return NavMapNeighbors()
-    other_act = Slide("one-x.png", "image", "id-1x")
+    other_action = Slide("one-x.png", "image", "id-1x")
     return NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
-                        column=(NavMapRow(other_act, "dawn"),), label="fox",
-                        group=(other_act,))
+                        column=(NavMapRow(other_action, "dawn"),), label="fox",
+                        group=(other_action,))
 
 
 def test_the_hud_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
@@ -1263,7 +1263,7 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
 
-    slideshow.slideshow_filter_to_the_act_on_screen()
+    slideshow.slideshow_filter_to_the_action_on_screen()
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert (played, said) == (["one.png"], ["Filter: 'source image, alpha' (1)"])
@@ -1273,7 +1273,7 @@ def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
-    slideshow.slideshow_filter_to_the_act_on_screen()
+    slideshow.slideshow_filter_to_the_action_on_screen()
 
     assert said == ["No act for this one"]
 
@@ -1306,7 +1306,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
     slideshow.slideshow_filter("e629425b")
 
     assert slideshow.hud_prompt_id == "id-1x"
-    assert slideshow.hud_act_filter == ""            # a jump, not a narrowing
+    assert slideshow.hud_action_filter == ""            # a jump, not a narrowing
     assert said == ["Looping seeds: 2"]
 
 

@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
 )
 
 from origenerator import (
-    act_settings,
+    action_settings,
     gallery,
 )
 from origenerator.db import Database
@@ -82,7 +82,7 @@ def test_the_genau_lane_asks_for_settings_one_cycle_long(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._generate_combination("img", "loop", intent=act_settings.GENAU)
+    view._combine._generate_combination("img", "loop", intent=action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     assert job.params["frame_count"] == gallery.CYCLE_FRAMES   # the length that closes
@@ -108,7 +108,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
 
     gallery_view_module.gallery.cycle_shaped = spy
     try:
-        view._combine._generate_combination("img", "loop", intent=act_settings.GENAU,
+        view._combine._generate_combination("img", "loop", intent=action_settings.GENAU,
                                             category="beta")
     finally:
         gallery_view_module.gallery.cycle_shaped = real
@@ -228,7 +228,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a[1:]))
 
-    view._combine._open_category("img", "alpha", act_settings.GENAU)
+    view._combine._open_category("img", "alpha", action_settings.GENAU)
 
     assert view._live_jobs == {}
     view._client.submit_job.assert_not_called()
@@ -330,7 +330,7 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
 
 
 def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
-    # The combine DB's one "dance" clip is the "dancing" act's most-used video.
+    # The combine DB's one "dance" video is the "dancing" act's most-used video.
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -366,7 +366,7 @@ def test_category_prefers_the_overlays_pinned_settings_over_mining(qtbot, tmp_pa
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
+    monkeypatch.setattr(combine_controller.action_settings, "most_used_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
 
     view._combine.generate_category("img", "gamma")
@@ -413,7 +413,7 @@ def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, 
     combine = view._combine.widget
 
     assert _listed_under_recent(combine) == ["vid"]
-    panel.set_intent(act_settings.GENAU)
+    combine.set_intent(action_settings.GENAU)
     assert _listed_under_recent(combine) == ["vid"]
 
 
@@ -450,7 +450,7 @@ def test_open_in_generator_marks_the_tab_with_where_the_settings_came_from(qtbot
 
     view._combine._open_combination("img", "vid")
 
-    assert _front_panel(view).settings_source() == ("", "vid", act_settings.VIDEO)
+    assert _front_panel(view).settings_source() == ("", "vid", action_settings.VIDEO)
 
 
 def test_a_generate_from_an_opened_combination_still_names_its_video(qtbot, tmp_path):
@@ -474,13 +474,13 @@ def test_a_generate_from_an_opened_dropped_video_notes_the_lane_it_was_opened_un
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._combine._open_combination("img", "vid", intent=act_settings.GENAU)
+    view._combine._open_combination("img", "vid", intent=action_settings.GENAU)
 
     _front_panel(view)._on_generate()
 
     noted = [(use["intent"], use["video_prompt_id"], use["generation_prompt_id"])
              for use in view._db.list_combine_video_uses()]
-    assert noted == [(act_settings.GENAU, "vid", _launched_row(view)["prompt_id"])]
+    assert noted == [(action_settings.GENAU, "vid", _launched_row(view)["prompt_id"])]
 
 
 def test_a_tab_pointed_at_another_generation_drops_the_settings_source(qtbot, tmp_path):
@@ -577,7 +577,7 @@ def _combine_view_with_a_looping_video(qtbot, tmp_path):
     return view
 
 
-def _opened_combination(qtbot, tmp_path, intent=act_settings.VIDEO):
+def _opened_combination(qtbot, tmp_path, intent=action_settings.VIDEO):
     view = _combine_view_with_a_looping_video(qtbot, tmp_path)
     view._combine._open_combination("img", "vid", intent=intent)
     return view, _front_panel(view)
@@ -585,7 +585,7 @@ def _opened_combination(qtbot, tmp_path, intent=act_settings.VIDEO):
 
 def test_a_combination_opened_for_genau_has_its_source_video_in_parentheses_before_any_edit(
         qtbot, tmp_path):
-    _view, panel = _opened_combination(qtbot, tmp_path, intent=act_settings.GENAU)
+    _view, tab = _opened_combination(qtbot, tmp_path, intent=action_settings.GENAU)
 
     assert not tab._preview._combination.open_paren_label.isHidden()
 
@@ -625,14 +625,14 @@ def test_a_genau_run_straight_from_the_combine_waits_with_its_source_video_in_pa
         qtbot, tmp_path):
     view = _combine_view_with_a_looping_video(qtbot, tmp_path)
 
-    view._combine._generate_combination("img", "vid", intent=act_settings.GENAU)
+    view._combine._generate_combination("img", "vid", intent=action_settings.GENAU)
     view._select_reroll(next(iter(view._live_jobs)))  # its tile in the collection, clicked
 
     assert _front_panel(view)._live_source.prompt_edited
 
 
-@pytest.mark.parametrize(("lane", "stands_apart"), [(act_settings.VIDEO, False),
-                                                    (act_settings.GENAU, True)])
+@pytest.mark.parametrize(("lane", "stands_apart"), [(action_settings.VIDEO, False),
+                                                    (action_settings.GENAU, True)])
 def test_a_pressed_combine_stands_in_line_with_its_source_video_marked_as_its_run_will_be(
         qtbot, tmp_path, monkeypatch, lane, stands_apart):
     view = _combine_view(qtbot, tmp_path)
@@ -686,7 +686,7 @@ def test_combines_drop_zones_name_what_was_dropped_on_them(qtbot, tmp_path):
 def test_what_a_launch_puts_back_in_combine_is_named_once_the_gallery_draws(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    view.restore_combine_selection({"image": "img", "videos": {act_settings.VIDEO: "vid"}})
+    view.restore_combine_selection({"image": "img", "videos": {action_settings.VIDEO: "vid"}})
 
     view.refresh()
 
@@ -733,7 +733,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(combine_controller.act_settings, "most_used_video",
+    monkeypatch.setattr(combine_controller.action_settings, "most_used_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
     opened = []
     monkeypatch.setattr(view._generate_pane, "open_config",
@@ -836,15 +836,15 @@ def _combine_view(qtbot, tmp_path):
     return view
 
 
-def _pick_act(panel, act):
-    """Choose an act in the combine panel's dropdown, as a click on its row would."""
-    index = panel._category.findText(act)
+def _pick_action(tab, act):
+    """Choose an act in the Combine's dropdown, as a click on its row would."""
+    index = tab._category.findText(act)
     tab._category.setCurrentIndex(index if index >= 1 else 0)
 
 
 def _pick_lane(tab, intent):
     """Click the Combine's lane radio; the group releases the other."""
-    radio = (panel._genau_radio if intent == act_settings.GENAU
+    radio = (tab._genau_radio if intent == action_settings.GENAU
              else tab._video_radio)
     radio.setChecked(True)
 
@@ -855,8 +855,8 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
     view._combine.widget.video_zone.set_item("vid")
 
     assert view.combine_selection() == {
-        "image": "img", "videos": {act_settings.VIDEO: "vid"},
-        "intent": act_settings.VIDEO, "category": "",
+        "image": "img", "videos": {action_settings.VIDEO: "vid"},
+        "intent": action_settings.VIDEO, "category": "",
     }
 
 
@@ -865,12 +865,12 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     # others: an act says nothing about which lane answers it.
     view = _combine_view(qtbot, tmp_path)
     view._combine.widget.image_zone.set_item("img")
-    _pick_lane(view._combine.panel, act_settings.GENAU)
-    _pick_act(view._combine.panel, "beta")
+    _pick_lane(view._combine.widget, action_settings.GENAU)
+    _pick_action(view._combine.widget, "beta")
 
     assert view.combine_selection() == {
         "image": "img", "videos": {},
-        "intent": act_settings.GENAU, "category": "beta",
+        "intent": action_settings.GENAU, "category": "beta",
     }
 
 
@@ -887,7 +887,7 @@ def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_
     first = _combine_view(qtbot, tmp_path)
     _looping_video(first._db)
     first._combine.widget.video_zone.set_item("vid")
-    _pick_lane(first._combine.panel, act_settings.GENAU)
+    _pick_lane(first._combine.widget, action_settings.GENAU)
     first._combine.widget.video_zone.set_item("loop")
     saved = first.combine_selection()
 
@@ -897,7 +897,7 @@ def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_
     restored.restore_combine_selection(saved)
 
     assert restored._combine.widget.video_zone.current_id() == "loop"
-    _pick_lane(restored._combine.panel, act_settings.VIDEO)
+    _pick_lane(restored._combine.widget, action_settings.VIDEO)
     assert restored._combine.widget.video_zone.current_id() == "vid"
 
 
@@ -905,20 +905,20 @@ def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(
-        {"image": "img", "intent": act_settings.GENAU, "category": "beta"})
+        {"image": "img", "intent": action_settings.GENAU, "category": "beta"})
 
-    assert view._combine.panel.selected_intent() == act_settings.GENAU
+    assert view._combine.widget.selected_intent() == action_settings.GENAU
     assert view._combine.widget.selected_category() == "beta"
     assert view._combine.widget._generate_btn.isEnabled()  # an image and settings: ready
 
 
 def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
-    _pick_lane(view._combine.panel, act_settings.GENAU)
+    _pick_lane(view._combine.widget, action_settings.GENAU)
 
     view.restore_combine_selection({"image": "img", "intent": "players"})
 
-    assert view._combine.panel.selected_intent() == act_settings.VIDEO
+    assert view._combine.widget.selected_intent() == action_settings.VIDEO
 
 
 def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
@@ -929,9 +929,9 @@ def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(
-        {"image": "img", "intent": act_settings.GENAU, "category": "dancing"})
+        {"image": "img", "intent": action_settings.GENAU, "category": "dancing"})
 
-    assert view._combine.panel.selected_intent() == act_settings.GENAU
+    assert view._combine.widget.selected_intent() == action_settings.GENAU
     assert view._combine.widget.selected_category() == ""
 
 
@@ -963,7 +963,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": None, "videos": {},
-        "intent": act_settings.VIDEO, "category": "",
+        "intent": action_settings.VIDEO, "category": "",
     }
 
 

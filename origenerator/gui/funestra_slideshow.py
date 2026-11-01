@@ -51,8 +51,8 @@ from origenerator.gui.slideshow_set import (
     SlideshowSet,
     item_note,
     looping_note,
-    narrow_to_acts,
-    narrow_to_the_act_on_screen,
+    narrow_to_actions,
+    narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.gui.version_stepper import VersionStepper
@@ -627,11 +627,11 @@ class FunestraSlideshow(QObject):
                 self._jump_to(row)
             self.slideshow_loop(SEED)
             return
-        said, narrowed = narrow_to_acts(self._set, query)
+        said, narrowed = narrow_to_actions(self._set, query)
         self._flash(said, kind=INFO if narrowed else WARNING)
 
-    def slideshow_filter_to_the_act_on_screen(self) -> None:
-        said, narrowed = narrow_to_the_act_on_screen(self._set)
+    def slideshow_filter_to_the_action_on_screen(self) -> None:
+        said, narrowed = narrow_to_the_action_on_screen(self._set)
         self._flash(said, kind=INFO if narrowed else WARNING)
 
     def slideshow_nav(self, direction: str) -> None:
@@ -666,7 +666,7 @@ class FunestraSlideshow(QObject):
         return self._set.filters.enhanced
 
     @property
-    def hud_act_filter(self) -> str:
+    def hud_action_filter(self) -> str:
         return self._set.filters.act
 
     @property

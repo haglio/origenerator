@@ -55,7 +55,7 @@ QT_FREE = (
     "origenerator.content",
     "origenerator.config",
     "origenerator.undo_stack",
-    "origenerator.gallery_actions",
+    "origenerator.gallery_edits",
     "origenerator.run_toast",
     # Out of the widget package with the rest of the app's machinery, and
     # needing no Qt once there: the orientation key scheme, the spin-arrow

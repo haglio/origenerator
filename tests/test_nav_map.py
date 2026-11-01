@@ -10,7 +10,7 @@ import json
 
 from origenerator import gallery
 from origenerator.nav_map import (
-    act_labels,
+    action_labels,
     beyond_the_row,
     one_per_stretch,
     seed_family,
@@ -144,12 +144,12 @@ def test_a_source_image_carries_the_act_it_shows_beside_being_a_source():
 
 
 def test_an_image_nothing_was_animated_from_is_no_source_and_names_only_its_act():
-    shows_an_act = _image("i1", "a fox", seed=1, shows="beta")
+    shows_an_action = _image("i1", "a fox", seed=1, shows="beta")
     shows_none = _image("i2", "a fox", seed=2)
-    index = gallery.build_image_config_index([shows_an_act, shows_none])
-    library = [shows_an_act, shows_none]
+    index = gallery.build_image_config_index([shows_an_action, shows_none])
+    library = [shows_an_action, shows_none]
 
-    assert surroundings(shows_an_act, library, image_index=index).label == "beta"
+    assert surroundings(shows_an_action, library, image_index=index).label == "beta"
     assert surroundings(shows_none, library, image_index=index).label == ""
 
 
@@ -163,11 +163,11 @@ def test_a_videos_seed_row_is_its_act_animated_from_its_images_other_seeds():
     index = gallery.build_image_config_index([one, two, another_config])
     current = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
     same_act = _video("v2", "the fox runs", noise_seed=9, frame="i2.png", act="alpha")
-    other_act = _video("v3", "the fox sleeps", noise_seed=5, frame="i2.png", act="beta")
+    other_action = _video("v3", "the fox sleeps", noise_seed=5, frame="i2.png", act="beta")
     other_family = _video("v4", "the hare runs", noise_seed=5, frame="i3.png", act="alpha")
 
     around = surroundings(
-        current, [one, two, another_config, current, same_act, other_act, other_family],
+        current, [one, two, another_config, current, same_act, other_action, other_family],
         image_index=index)
 
     assert _ids(around.seeds) == ["v2"]
@@ -214,7 +214,7 @@ def test_the_whole_library_says_what_each_generation_is_named_for():
     index = gallery.build_image_config_index([source, plain])
     runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
 
-    assert act_labels([source, plain, runs], image_index=index) == {
+    assert action_labels([source, plain, runs], image_index=index) == {
         "i1": "Source image, beta", "i2": "", "v1": "alpha"}
 
 

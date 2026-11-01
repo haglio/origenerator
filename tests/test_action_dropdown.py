@@ -19,7 +19,7 @@ from origenerator.gui.action_dropdown import (
 from origenerator.gui.label_cells import LabelForm
 
 _STATES = ("state one", "state two", "state three")
-_ACTS = ("act one", "act two")
+_ACTIONS_OFFERED = ("act one", "act two")
 
 
 def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
@@ -36,7 +36,7 @@ def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
 def dropdown(qtbot):
     host = QWidget()
     qtbot.addWidget(host)
-    return ActionDropdown(_STATES, _ACTS, LabelForm(host))
+    return ActionDropdown(_STATES, _ACTIONS_OFFERED, LabelForm(host))
 
 
 def test_an_image_offers_every_state_and_opens_on_the_one_it_was_sorted_as(dropdown):
@@ -103,21 +103,21 @@ def test_a_video_offers_every_act_and_opens_on_the_one_it_shows(dropdown):
 
     assert not dropdown.isHidden()
     assert dropdown.picked() == "act two"
-    assert dropdown.offered() == ["", *_ACTS]
+    assert dropdown.offered() == ["", *_ACTIONS_OFFERED]
 
 
 def test_an_act_the_list_lacks_shows_as_itself_at_its_foot(dropdown):
     dropdown.show_row(_row(filename="scene_00001_.mp4", act="an act from elsewhere"))
 
     assert dropdown.picked() == "an act from elsewhere"
-    assert dropdown.offered() == ["", *_ACTS, "an act from elsewhere"]
+    assert dropdown.offered() == ["", *_ACTIONS_OFFERED, "an act from elsewhere"]
 
 
 def test_an_act_spelled_like_one_on_the_list_but_for_case_and_spacing_is_that_act(dropdown):
     dropdown.show_row(_row(filename="scene_00001_.mp4", act="  ACT   two "))
 
     assert dropdown.picked() == "act two"
-    assert dropdown.offered() == ["", *_ACTS]
+    assert dropdown.offered() == ["", *_ACTIONS_OFFERED]
 
 
 def test_only_an_image_offers_the_button_that_sorts_images(dropdown):

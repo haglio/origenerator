@@ -751,7 +751,7 @@ def test_the_version_lists_delete_trashes_that_level_and_keeps_the_image(qtbot, 
         {"filename": "sdxl_t2i_g0.png", "subfolder": "image"}
     ]
     assert not gallery.is_enhanced_row(updated)   # the plus goes with the level
-    assert view._actions.can_undo()
+    assert view._edits.can_undo()
     assert not view._buttons.undo.isHidden()
 
 
@@ -772,7 +772,7 @@ def test_pressing_a_versions_trash_can_trashes_that_level_and_the_last_one_has_n
     assert json.loads(updated["output_files"]) == [
         {"filename": "sdxl_t2i_g0.png", "subfolder": "image"}
     ]
-    assert view._actions.can_undo()
+    assert view._edits.can_undo()
     (original,) = tab._versions._host.findChildren(_VersionRow)
     assert original.findChild(QPushButton, "deleteButton") is None
 

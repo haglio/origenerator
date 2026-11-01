@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from origenerator import gallery
-from origenerator.act_settings import act_of
+from origenerator.action_settings import action_of
 from origenerator.media import MediaType
 from origenerator.search import content_stems
 
@@ -81,7 +81,7 @@ def _likeness(one: frozenset[str], other: frozenset[str]) -> float:
 class Surroundings:
     """What the library holds around one generation: the act its own row is
     named for, the same act under other seeds along the row, down the column
-    one generation for each other act of the same image with the act it
+    one generation for each other action of the same image with the act it
     shows, and the rest of that image's whole group — what a loop down the
     column plays, twins of an act included."""
 
@@ -125,7 +125,7 @@ class _Animations:
         """The act(s) *row*'s map row is named for: what it shows, and — for an
         image something was animated from — that it is their source."""
         source = SOURCE_IMAGE if self.videos_of(row) else ""
-        return ", ".join(act for act in (source, act_of(row)) if act)
+        return ", ".join(act for act in (source, action_of(row)) if act)
 
     def group_of(self, row: dict) -> list[dict]:
         """The image *row* is or was animated from, then every video animated
@@ -134,7 +134,7 @@ class _Animations:
         return [image, *self.videos_of(image)]
 
 
-def _one_per_act(labeled) -> tuple[tuple[dict, str], ...]:
+def _one_per_action(labeled) -> tuple[tuple[dict, str], ...]:
     """The first generation showing each act, in the order they came: the
     column steps between acts, so twins of one act share its row."""
     first: dict[str, dict] = {}
@@ -143,8 +143,8 @@ def _one_per_act(labeled) -> tuple[tuple[dict, str], ...]:
     return tuple((row, label) for label, row in first.items())
 
 
-def act_labels(rows, *, image_index) -> dict[str, str]:
-    """What each of *rows* is named for on the map, by id — what an act filter
+def action_labels(rows, *, image_index) -> dict[str, str]:
+    """What each of *rows* is named for on the map, by id — what an action filter
     matches a generation on."""
     animations = _Animations(rows, image_index)
     return {row["prompt_id"]: animations.label_of(row) for row in rows}
@@ -174,7 +174,7 @@ def surroundings(current: dict, rows, *, image_index) -> Surroundings:
         # that image, which the acts below already are.
         configs=() if image is not None else tuple(
             config_family(current, rows, image_index=image_index)[1:]),
-        actions=_one_per_act(
+        actions=_one_per_action(
             (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
             if label != own),
         group=tuple(group),

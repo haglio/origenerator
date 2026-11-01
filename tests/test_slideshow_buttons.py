@@ -150,7 +150,7 @@ class _Host:
     def slideshow_filter(self, query):
         self.calls.append(("filter", query))
 
-    def slideshow_filter_to_the_act_on_screen(self):
+    def slideshow_filter_to_the_action_on_screen(self):
         self.calls.append("filter to the act on screen")
 
     def slideshow_step_version(self, delta):

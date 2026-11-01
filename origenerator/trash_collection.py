@@ -1,7 +1,7 @@
 """The Trash — deleted generations held until you say otherwise.
 
 Deleting a generation moves its files into the trash and drops its row (see
-:class:`~origenerator.gallery_actions.GalleryActions`), which the session's undo
+:class:`~origenerator.gallery_edits.GalleryEdits`), which the session's undo
 stack can reverse. That hold does not end on its own at all -- not at the next
 launch, not ever -- because the delete also records the row it dropped and the
 batch its files went into. The gallery's Trash

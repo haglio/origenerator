@@ -17,7 +17,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.voice_commands import said_in

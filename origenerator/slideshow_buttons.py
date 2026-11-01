@@ -155,7 +155,7 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "loop": lambda host: host.slideshow_loop_cycle(),
     "more_seeds": lambda host: host.slideshow_more_seeds(),
     "no_filter": lambda host: host.clear_modes(),
-    "lock_action": lambda host: host.slideshow_filter_to_the_act_on_screen(),
+    "lock_action": lambda host: host.slideshow_filter_to_the_action_on_screen(),
     "nav_left": lambda host: host.slideshow_nav("left"),
     "nav_right": lambda host: host.slideshow_nav("right"),
     "nav_up": lambda host: host.slideshow_nav("up"),

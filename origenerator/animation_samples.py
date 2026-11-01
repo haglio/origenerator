@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from origenerator import animation_paths, gallery
-from origenerator.act_settings import GENAU, VIDEO, act_of, loops
+from origenerator.action_settings import GENAU, VIDEO, action_of, loops
 from origenerator.db_generations import was_kept
 from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
@@ -43,7 +43,7 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
     states = _states_by_image(rows)
     found: dict[Path, list[dict]] = defaultdict(list)
     for video in sorted(_kept_videos(rows), key=_made, reverse=True):
-        act = act_of(video)
+        act = action_of(video)
         state = states.get(frame_name(
             gallery.parse_params(video.get("params_json")).get("input_image")), "")
         if not act or not state:

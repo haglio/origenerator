@@ -22,7 +22,7 @@ from shared_ui.icons import icon_then_text, qt_icon
 from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from origenerator import act_settings, evolver_export, look_training, outside_videos, prompt_edit
+from origenerator import action_settings, evolver_export, look_training, outside_videos, prompt_edit
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -448,7 +448,7 @@ class GenerateTab(DropZones):
         self._basic_section = BasicSection(go_to_folder=self._go_to_folder)
         self._basic_section.hide()
         body.addWidget(self._basic_section)
-        self._action = ActionDropdown(state_names(), act_settings.CATEGORIES, header)
+        self._action = ActionDropdown(state_names(), action_settings.CATEGORIES, header)
         self._action.chosen.connect(self._on_action_chosen)
 
     def _on_action_chosen(self, prompt_id: str, said: str) -> None:
@@ -458,9 +458,9 @@ class GenerateTab(DropZones):
         if media_type_of_row(row) != MediaType.VIDEO:
             self._db.set_image_state(prompt_id, said or None)
         elif source_of(row) == GenerationSource.OUTSIDE and (places := outside_videos.places_here()):
-            outside_videos.pick_act(self._db, places, row, said)
+            outside_videos.pick_action(self._db, places, row, said)
         else:
-            self._db.set_act(prompt_id, said or None)
+            self._db.set_action(prompt_id, said or None)
 
     def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
         """The editable half: the workflow dropdown, its typical-time estimate, and

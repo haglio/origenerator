@@ -37,7 +37,7 @@ BLANK = "animation.blank"
 
 NO_SAMPLE = ("No video made this way has been favorited "
               "or sent to Genau or Evolver.")
-FROM_THE_ACTS_OWN = (
+FROM_THE_ACTIONS_OWN = (
     "No video made this way has been favorited or sent to Genau or Evolver. "
     "The prompts below are this act's own settings, to start from.")
 ALL_DONE = "Every animation has been through."
@@ -190,7 +190,7 @@ class AnimationCheckWindow(QWidget):
         from_here = self._session.starting_point
         self._shown.setCurrentWidget(self._blank if sample is None else
                                      self._shown.widget(0))
-        self._blank.setText(NO_SAMPLE if from_here is None else FROM_THE_ACTS_OWN)
+        self._blank.setText(NO_SAMPLE if from_here is None else FROM_THE_ACTIONS_OWN)
         self._press(REJECT).setEnabled(self._session.another_sample)
         self._write_the_prompts(sample, from_here)
         self._only_offer_a_new_sample_once_edited()

@@ -24,7 +24,7 @@ from typing import Protocol
 from PyQt6.QtCore import QObject
 
 from origenerator import (
-    act_settings,
+    action_settings,
     animation_paths,
     animation_settings,
     evolver_export,
@@ -247,7 +247,7 @@ class CombineController(QObject):
         image_id = saved.get("image")
         if image_id and self._accepts_image(image_id):
             self.widget.image_zone.set_item(image_id)
-        self.widget.set_intent(saved.get("intent") or act_settings.VIDEO)
+        self.widget.set_intent(saved.get("intent") or action_settings.VIDEO)
         videos = saved.get("videos")
         if not isinstance(videos, dict):
             videos = {self.widget.selected_intent(): saved.get("video")}
@@ -262,17 +262,17 @@ class CombineController(QObject):
                 if row.get("status") == GenerationStatus.COMPLETED
                 and self._rebuildable_video_row(row)]
 
-    def offer_the_acts(self, rows: list[dict]) -> None:
+    def offer_the_actions(self, rows: list[dict]) -> None:
         """Gray out the acts this press could not answer: those with no video to
         mine settings from, and -- once an image is in the drop zone -- those
         :mod:`origenerator.animation_paths` says it cannot start from. An image
         nobody has sorted yet narrows nothing."""
         lane = self.widget.selected_intent()
-        offered = act_settings.available_categories(
+        offered = action_settings.available_categories(
             self.rebuildable_videos(rows), lane)
         state = self._state_of(self.widget.image_zone.current_id())
         if state:
-            offered &= set(animation_paths.acts_for(state, lane))
+            offered &= set(animation_paths.actions_for(state, lane))
         self.widget.set_available_categories(offered)
 
     def _state_of(self, image_id: str | None) -> str:
@@ -283,12 +283,12 @@ class CombineController(QObject):
 
     def image_dropped(self) -> None:
         """The image in the drop zone changed: re-ask which acts it can start from."""
-        self.offer_the_acts(self._db.list_generations())
+        self.offer_the_actions(self._db.list_generations())
         self.reconcile_generating()
 
     def _on_intent_changed(self, _intent: str) -> None:
         """Re-gray the act list for the lane just chosen."""
-        self.offer_the_acts(self._db.list_generations())
+        self.offer_the_actions(self._db.list_generations())
         self.reconcile_generating()
 
     def reconcile_generating(self) -> None:
@@ -355,7 +355,7 @@ class CombineController(QObject):
 
     def _show_starting(self, image_id: str, *, category: str = "",
                         video_id: str | None = None,
-                        intent: str = act_settings.VIDEO) -> str:
+                        intent: str = action_settings.VIDEO) -> str:
         """Put a stand-in row in the line for a Generate just pressed, and return
         its key. It carries everything already known about the run, so the row
         that replaces it is the same row with its price filled in."""
@@ -381,7 +381,7 @@ class CombineController(QObject):
     # --- building and launching a combination --------------------------------
 
     def _combined_params(self, image_id: str, video_id: str,
-                         intent: str = act_settings.VIDEO, category: str = ""):
+                         intent: str = action_settings.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s settings on ``image_id`` — the video's workflow and params,
         fresh seeds, and the dropped image as the input image; ``image_row``
@@ -409,12 +409,12 @@ class CombineController(QObject):
         params = gallery.combined_params(video_row, self._image_reference(image_id), workflow)
         if params is None:
             return None  # no image file to seed from
-        if intent == act_settings.GENAU:
+        if intent == action_settings.GENAU:
             params = gallery.cycle_shaped(params, workflow, category)
         return workflow, params, video_row, image_row
 
     def _open_combination(self, image_id: str, video_id: str,
-                          intent: str = act_settings.VIDEO) -> None:
+                          intent: str = action_settings.VIDEO) -> None:
         """Open a dropped image + video's settings as an editable generate tab instead
         of running it — the Combine's "Edit individual…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
@@ -455,7 +455,7 @@ class CombineController(QObject):
 
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
                               category: str = "",
-                              intent: str = act_settings.VIDEO) -> None:
+                              intent: str = action_settings.VIDEO) -> None:
         """Generate a new video from a dropped image + a dropped video's settings,
         landing it in the folder for that (image × settings) combination.
 
@@ -506,7 +506,7 @@ class CombineController(QObject):
         with a hint on screen so a press never silently does nothing."""
         if self._image_reference(image_id) is None:
             return None
-        video_id = act_settings.most_used_video(category, self._category_candidates(), intent)
+        video_id = action_settings.most_used_video(category, self._category_candidates(), intent)
         logger.info("combine: category=%s intent=%s image=%s -> settings from %s",
                     category, intent, image_id, video_id)
         if video_id is None:
@@ -518,18 +518,18 @@ class CombineController(QObject):
         fullscreen surface being spoken to when one is up, and in a dialog
         otherwise. A dialog thrown over an image someone is looking at is the one
         place this must never appear."""
-        said = act_settings.no_past_video(category, intent)
+        said = action_settings.no_past_video(category, intent)
         if self._slideshows.showing is not None:
             self._slideshows.note_voice_run(None, said, kind=WARNING)
             return
-        self._host.tell(NO_PAST_VIDEO, f"{act_settings.as_sentence(said)} — make one first, "
+        self._host.tell(NO_PAST_VIDEO, f"{action_settings.as_sentence(said)} — make one first, "
                                        "or drop a specific video instead.")
 
     def _curated_combination(self, image_id: str, category: str,
-                             intent: str = act_settings.VIDEO):
+                             intent: str = action_settings.VIDEO):
         """The ``(workflow, params)`` for ``category``'s ``intent`` settings on the
         dropped image: those assigned for it, else the overlay's pin
-        (:func:`act_settings.pinned_settings`), with fresh seeds and, in the
+        (:func:`action_settings.pinned_settings`), with fresh seeds and, in the
         Genau lane, re-cut to one cycle.
 
         ``None`` when neither is there, the one there names an unknown or
@@ -540,10 +540,10 @@ class CombineController(QObject):
         if reference is None:
             return None
         settings = (animation_settings.settings_for(intent, category, self._state_of(image_id))
-                    or act_settings.pinned_settings(category, intent))
-        built = (self._readied(act_settings.in_its_lane(settings, intent), reference)
+                    or action_settings.pinned_settings(category, intent))
+        built = (self._readied(action_settings.in_its_lane(settings, intent), reference)
                  if settings is not None else None)
-        if built is None or intent != act_settings.GENAU:
+        if built is None or intent != action_settings.GENAU:
             return built
         workflow, params = built
         return workflow, gallery.cycle_shaped(params, workflow, category)
@@ -590,7 +590,7 @@ class CombineController(QObject):
             self._db.mark_genau_requested(prompt_id)
 
     def generate_category(self, image_id: str, category: str,
-                          intent: str = act_settings.VIDEO, send: bool = False,
+                          intent: str = action_settings.VIDEO, send: bool = False,
                           starting: str | None = None) -> None:
         """Run the settings that fit ``category`` on the dropped image: the
         settings assigned for it, else the act's most-used past video. ``intent``
@@ -609,7 +609,7 @@ class CombineController(QObject):
             self._starting.drop(starting)
 
     def _open_category(self, image_id: str, category: str,
-                       intent: str = act_settings.VIDEO) -> None:
+                       intent: str = action_settings.VIDEO) -> None:
         """Open the settings assigned for ``category`` from this image as an
         editable generate tab: "Edit individual…". With nothing assigned it opens
         the lane's own workflow as it starts, never a past video's settings.
@@ -622,7 +622,7 @@ class CombineController(QObject):
         if reference is None:
             return
         built = (self._curated_combination(image_id, category, intent)
-                 or self._readied(act_settings.starting_settings(intent), reference))
+                 or self._readied(action_settings.starting_settings(intent), reference))
         if built is not None:
             workflow, params = built
             self._open_prepared(workflow, params, self._image_still(image_id), None,
@@ -684,17 +684,17 @@ class CombineController(QObject):
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
             return None, NOT_AN_IMAGE, WARNING
-        loop = asked.lane == act_settings.GENAU
+        loop = asked.lane == action_settings.GENAU
         if loop and self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
         answer = what_to_animate(asked, row.get("image_state") or "")
         if answer.act is None:
             return None, answer.said, ERROR if answer.unsupported else WARNING
         act = answer.act
-        available = act_settings.available_categories(
+        available = action_settings.available_categories(
             self.rebuildable_videos(self._db.list_generations()), asked.lane)
         if act not in available:
-            return None, act_settings.no_past_video(act, asked.lane), WARNING
+            return None, action_settings.no_past_video(act, asked.lane), WARNING
         logger.info("animate as: image=%s lane=%s -> act=%s", image_id, asked.lane, act)
         self.generate_category(image_id, act, asked.lane, send=loop)
         return image_id, f"animating as “{act}”", INFO

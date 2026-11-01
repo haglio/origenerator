@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
 
 from origenerator import animation_paths
-from origenerator.act_settings import GENAU, VIDEO, as_sentence, no_past_video
+from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.content import genau_flick_word
 from origenerator.gui.action_dropdown import ACTION_LABEL
 from origenerator.gui.drop_zone import DROP_A_VIDEO, DROP_AN_IMAGE, DropZone, DropZones
@@ -57,7 +57,7 @@ from origenerator.media import MediaType
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
-_NEEDS_ACT_OR_VIDEO = "Pick an act or drop a video first"
+_NEEDS_ACTION_OR_VIDEO = "Pick an act or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
@@ -143,7 +143,7 @@ class Combine(QWidget):
         # video for you. A neutral "(custom)" leads the list (index 0, the default) so
         # no act is forced; picking it again clears an act.
         self._category = QComboBox()
-        self._list_the_acts(VIDEO)
+        self._list_the_actions(VIDEO)
         open_the_list_in_full(self._category)
         self._category.setToolTip(
             "Pick an act and Generate — the app reuses a fitting past video's settings "
@@ -260,14 +260,14 @@ class Combine(QWidget):
         on edge is passed along.
         """
         if checked:
-            self._list_the_acts(self.selected_intent())
+            self._list_the_actions(self.selected_intent())
             if not self.selected_category():
                 self._show_dropped()
             self.intent_changed.emit(self.selected_intent())
 
     # --- category ---------------------------------------------------------
 
-    def _list_the_acts(self, lane: str) -> None:
+    def _list_the_actions(self, lane: str) -> None:
         picked = self.selected_category() if self._category.count() else ""
         self._category.clear()
         self._category.addItem(_NEUTRAL_LABEL)
@@ -380,7 +380,7 @@ class Combine(QWidget):
         self._generate_btn.set_caption(
             RANDOM_SEED_CAPTION if can_run and remakes_its_own else DEFAULT_CAPTION)
         self._open_btn.setEnabled(ready)
-        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_ACT_OR_VIDEO
+        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_ACTION_OR_VIDEO
         self._generate_btn.setToolTip(
             missing or (ALREADY_MAKING_ONE_TIP if self._folder_generating else ""))
         self._open_btn.setToolTip(missing or _EDIT_TIP)

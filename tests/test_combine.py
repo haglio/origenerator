@@ -9,7 +9,7 @@ from shared_ui.colors import BG_SECONDARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
-from origenerator import act_settings, animation_paths
+from origenerator import action_settings, animation_paths
 from origenerator.gui.action_dropdown import ACTION_LABEL
 from origenerator.gui.combine import Combine, CombineRequest, _text_inset
 from origenerator.gui.drags import under_way
@@ -73,7 +73,7 @@ def _under_the_drag(zone) -> bool:
     return zone._label.property("dropTarget")
 
 
-def _pick_act(combine, act):
+def _pick_action(combine, act):
     """Choose an act in the dropdown, as a click on its row would; "" is the
     neutral "(custom)" and so is an act the list does not carry."""
     index = combine._category.findText(act)
@@ -82,7 +82,7 @@ def _pick_act(combine, act):
 
 def _pick_lane(combine, intent):
     """Click the lane's radio; the group's exclusivity releases the other."""
-    radio = (combine._genau_radio if intent == act_settings.GENAU
+    radio = (combine._genau_radio if intent == action_settings.GENAU
              else combine._video_radio)
     radio.setChecked(True)
 
@@ -122,25 +122,25 @@ def test_the_action_list_carries_the_acts_that_lane_has_a_row_for(qtbot):
 
     assert _acts(combine) == ["alpha", "beta", "gamma", "delta", "epsilon", "dancing"]
 
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
 
     assert _acts(combine) == ["alpha", "beta", "gamma"]
 
 
 def test_an_act_the_new_lane_has_no_row_for_is_not_left_picked(qtbot):
     combine = _panel(qtbot)
-    _pick_act(combine, "delta")
+    _pick_action(combine, "delta")
 
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
 
     assert combine.selected_category() == ""
 
 
 def test_an_act_both_lanes_carry_stays_picked_across_the_switch(qtbot):
     combine = _panel(qtbot)
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
 
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
 
     assert combine.selected_category() == "alpha"
 
@@ -172,8 +172,8 @@ def test_grayed_generate_and_edit_say_what_they_still_need(qtbot):
 
     combine.image_zone.set_item("img1")
 
-    needs_act_or_video = "Pick an act or drop a video first"
-    assert (combine._generate_btn.toolTip(), combine._open_btn.toolTip()) == (needs_act_or_video, needs_act_or_video)
+    needs_action_or_video = "Pick an act or drop a video first"
+    assert (combine._generate_btn.toolTip(), combine._open_btn.toolTip()) == (needs_action_or_video, needs_action_or_video)
 
 
 def test_once_ready_generate_drops_its_reason_and_edit_says_what_it_does(qtbot):
@@ -197,7 +197,7 @@ def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
     combine._generate_btn.click()
 
     assert got == [CombineRequest(image_id="img1", video_id="vid1",
-                                  intent=act_settings.VIDEO)]
+                                  intent=action_settings.VIDEO)]
 
 
 def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
@@ -308,20 +308,20 @@ def test_clicking_open_emits_the_dropped_video_for_the_generator(qtbot):
 
     # The same pair Generate would ask for, marked as bound for the generator.
     assert opened == [CombineRequest(image_id="img1", video_id="vid1",
-                                     intent=act_settings.VIDEO, edit_first=True)]
+                                     intent=action_settings.VIDEO, edit_first=True)]
 
 
 def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_act(combine, "delta")
+    _pick_action(combine, "delta")
     opened = []
     combine.combine_requested.connect(opened.append)
 
     combine._open_btn.click()
 
     assert opened == [CombineRequest(image_id="img1", category="delta",
-                                     intent=act_settings.VIDEO, edit_first=True)]
+                                     intent=action_settings.VIDEO, edit_first=True)]
 
 
 def test_a_drag_under_way_lights_only_the_drop_zone_it_fits(qtbot):
@@ -418,7 +418,7 @@ def test_what_lends_neither_drop_zone_anything_cannot_be_let_go_between_them(qtb
 def test_with_an_act_picked_the_room_between_reaches_only_the_image_drop_zone(qtbot):
     # The video drop zone is hidden under an act, so nothing shows it as a target.
     combine = _panel(qtbot, start_images={"vid1": "img1"})
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
 
     _let_go_over(combine._between, "vid1")
 
@@ -445,7 +445,7 @@ def test_the_neutral_option_is_custom_leading_the_acts(qtbot):
     assert combine.selected_category() == ""  # neutral by default
     items = [combine._category.itemText(i) for i in range(combine._category.count())]
     assert items[0] == "(custom)"
-    assert items[1:] == list(animation_paths.acts(act_settings.VIDEO))
+    assert items[1:] == list(animation_paths.acts(action_settings.VIDEO))
 
 
 def _enabled(combine, text) -> bool:
@@ -509,10 +509,10 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     combine.image_zone.set_item("img1")
     assert not combine._generate_btn.isEnabled()  # image alone, no settings chosen yet
 
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
     assert combine._generate_btn.isEnabled()      # a category is settings enough — no video needed
 
-    _pick_act(combine, "")                       # back to neutral
+    _pick_action(combine, "")                       # back to neutral
     assert not combine._generate_btn.isEnabled()
 
 
@@ -521,7 +521,7 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     combine.video_zone.set_item("vid1")
     height = combine._video_part.sizeHint().height()
 
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
 
     assert combine.video_zone.current_id() is None  # the act supersedes it, so the video is dropped
     assert combine._video_part.sizeHint().height() == height  # hidden, but its room stays put
@@ -530,9 +530,9 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
 def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
     combine = _panel(qtbot)
     combine.video_zone.set_item("vid1")
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
 
-    _pick_act(combine, "")
+    _pick_action(combine, "")
 
     assert combine.video_zone.current_id() == "vid1"
 
@@ -541,10 +541,10 @@ def test_a_remembered_video_that_no_longer_fits_its_drop_zone_is_not_brought_bac
     fitting = {"vid1"}
     combine = _panel(qtbot, fitting=fitting)
     combine.video_zone.set_item("vid1")
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
     fitting.clear()  # trashed while the act was picked
 
-    _pick_act(combine, "")
+    _pick_action(combine, "")
 
     assert combine.video_zone.current_id() is None
 
@@ -554,12 +554,12 @@ def test_a_trashed_video_leaves_the_drop_zone_empty_rather_than_bringing_back_an
     combine = _panel(qtbot, fitting=fitting)
     combine.video_zone.set_item("vid1")
     combine.video_zone.set_item("vid2")
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
     fitting.discard("vid2")  # trashed while the act was picked
 
-    _pick_act(combine, "")
-    _pick_lane(combine, act_settings.GENAU)
-    _pick_lane(combine, act_settings.VIDEO)
+    _pick_action(combine, "")
+    _pick_lane(combine, action_settings.GENAU)
+    _pick_lane(combine, action_settings.VIDEO)
 
     assert combine.video_zone.current_id() is None
     assert _listed_under_recent(combine) == ["vid1"]
@@ -568,14 +568,14 @@ def test_a_trashed_video_leaves_the_drop_zone_empty_rather_than_bringing_back_an
 def test_each_lane_keeps_its_own_dropped_video(qtbot):
     combine = _panel(qtbot)
     combine.video_zone.set_item("vid1")
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
     assert combine.video_zone.current_id() is None
     combine.video_zone.set_item("vid2")
 
-    _pick_lane(combine, act_settings.VIDEO)
+    _pick_lane(combine, action_settings.VIDEO)
     assert combine.video_zone.current_id() == "vid1"
 
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
     assert combine.video_zone.current_id() == "vid2"
 
 
@@ -605,11 +605,11 @@ def test_recent_lists_the_newest_first_and_each_video_once(qtbot):
 def test_each_lane_lists_the_videos_it_had(qtbot):
     combine = _panel(qtbot)
     combine.video_zone.set_item("vid1")
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
     combine.video_zone.set_item("vid2")
 
     assert _listed_under_recent(combine) == ["vid2"]
-    _pick_lane(combine, act_settings.VIDEO)
+    _pick_lane(combine, action_settings.VIDEO)
     assert _listed_under_recent(combine) == ["vid1"]
 
 
@@ -660,10 +660,10 @@ def test_recent_shows_only_while_custom_is_picked(qtbot):
     combine = _panel(qtbot)
     assert not combine._recent_videos.isHidden()
 
-    _pick_act(combine, "gamma")
+    _pick_action(combine, "gamma")
     assert combine._recent_videos.isHidden()
 
-    _pick_act(combine, "")
+    _pick_action(combine, "")
     assert not combine._recent_videos.isHidden()
 
 
@@ -672,21 +672,21 @@ def test_picking_an_act_keeps_the_room_recent_takes(qtbot):
     column = combine._action_part
     height = column.sizeHint().height()
 
-    _pick_act(combine, "alpha")
+    _pick_action(combine, "alpha")
 
     assert column.sizeHint().height() == height
 
 
 def test_recent_lists_what_the_lane_was_given_before_this_session(qtbot):
     uses = _Uses()
-    uses.record(act_settings.VIDEO, "vid1")
-    uses.record(act_settings.VIDEO, "vid2")
-    uses.record(act_settings.GENAU, "vid3")
+    uses.record(action_settings.VIDEO, "vid1")
+    uses.record(action_settings.VIDEO, "vid2")
+    uses.record(action_settings.GENAU, "vid3")
 
     combine = _panel(qtbot, uses=uses)
 
     assert _listed_under_recent(combine) == ["vid2", "vid1"]
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
     assert _listed_under_recent(combine) == ["vid3"]
 
 
@@ -694,7 +694,7 @@ def test_recent_lists_the_video_in_the_drop_zone_first_whatever_came_since(qtbot
     uses = _Uses()
     combine = _panel(qtbot, uses=uses)
     combine.video_zone.set_item("vid1")
-    uses.record(act_settings.VIDEO, "vid2")  # given the drop zone in another copy of the app
+    uses.record(action_settings.VIDEO, "vid2")  # given the drop zone in another copy of the app
 
     assert _listed_under_recent(combine) == ["vid1", "vid2"]
 
@@ -702,24 +702,24 @@ def test_recent_lists_the_video_in_the_drop_zone_first_whatever_came_since(qtbot
 def test_a_video_put_in_the_drop_zone_is_said_with_the_lane_it_went_in_under(qtbot):
     uses = _Uses()
     combine = _panel(qtbot, uses=uses)
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
 
     combine.video_zone.set_item("vid1")
 
-    assert uses.said == [(act_settings.GENAU, "vid1")]
+    assert uses.said == [(action_settings.GENAU, "vid1")]
 
 
 def test_a_lanes_video_shown_again_is_not_said_again(qtbot):
     uses = _Uses()
     combine = _panel(qtbot, uses=uses)
     combine.video_zone.set_item("vid1")
-    _pick_lane(combine, act_settings.GENAU)
-    _pick_lane(combine, act_settings.VIDEO)
-    _pick_act(combine, "alpha")
-    _pick_act(combine, "")
-    combine.set_dropped_videos({act_settings.VIDEO: "vid1"})
+    _pick_lane(combine, action_settings.GENAU)
+    _pick_lane(combine, action_settings.VIDEO)
+    _pick_action(combine, "alpha")
+    _pick_action(combine, "")
+    combine.set_dropped_videos({action_settings.VIDEO: "vid1"})
 
-    assert uses.said == [(act_settings.VIDEO, "vid1")]
+    assert uses.said == [(action_settings.VIDEO, "vid1")]
 
 
 def test_recent_reads_its_videos_only_when_it_opens(qtbot):
@@ -728,7 +728,7 @@ def test_recent_reads_its_videos_only_when_it_opens(qtbot):
 
     for n in range(5):
         combine.video_zone.set_item(f"vid{n}")
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
 
     assert asked == [f"vid{n}" for n in range(5)]
 
@@ -737,7 +737,7 @@ def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
     combine = _panel(qtbot)
     combine.video_zone.set_item("vid1")
 
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
 
     assert _listed_under_recent(combine) == []
     assert combine._recent_videos.isEnabled()
@@ -745,7 +745,7 @@ def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
 
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     combine = _panel(qtbot)
-    _pick_act(combine, "delta")
+    _pick_action(combine, "delta")
 
     combine.video_zone.set_item("vid1")
 
@@ -757,24 +757,24 @@ def test_the_video_drop_zone_shows_only_while_custom_is_picked(qtbot):
     combine = _panel(qtbot)
     assert not combine.video_zone.isHidden()
 
-    _pick_act(combine, "gamma")
+    _pick_action(combine, "gamma")
     assert combine.video_zone.isHidden()
 
-    _pick_act(combine, "")
+    _pick_action(combine, "")
     assert not combine.video_zone.isHidden()
 
 
 def test_generate_emits_the_picked_act(qtbot):
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_act(combine, "delta")
+    _pick_action(combine, "delta")
     cats = []
     combine.combine_requested.connect(cats.append)
 
     combine._generate_btn.click()
 
     assert cats == [CombineRequest(image_id="img1", category="delta",
-                                   intent=act_settings.VIDEO)]
+                                   intent=action_settings.VIDEO)]
 
 
 # --- the Kino/Genau radio: what the result is for -----------------------------
@@ -784,7 +784,7 @@ def test_the_lane_defaults_to_kino(qtbot):
     # The long-standing behavior of this combine, and by far the more common ask, so
     # the Genau flick is the deliberate detour rather than the default.
     combine = _panel(qtbot)
-    assert combine.selected_intent() == act_settings.VIDEO
+    assert combine.selected_intent() == action_settings.VIDEO
     assert combine._video_radio.text() == "Kino"
     assert combine._video_radio.isChecked()
     assert not combine._genau_radio.isChecked()
@@ -808,15 +808,15 @@ def test_the_radio_sits_below_the_dropdown_it_changes(qtbot):
 def test_generate_carries_the_chosen_lane(qtbot):
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_act(combine, "alpha")  # one both lanes have a row for, so the pick stands
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_action(combine, "alpha")  # one both lanes have a row for, so the pick stands
+    _pick_lane(combine, action_settings.GENAU)
     cats = []
     combine.combine_requested.connect(cats.append)
 
     combine._generate_btn.click()
 
     assert cats == [CombineRequest(image_id="img1", category="alpha",
-                                   intent=act_settings.GENAU)]
+                                   intent=action_settings.GENAU)]
 
 
 def test_switching_the_lane_announces_it_once(qtbot):
@@ -826,16 +826,16 @@ def test_switching_the_lane_announces_it_once(qtbot):
     heard = []
     combine.intent_changed.connect(heard.append)
 
-    _pick_lane(combine, act_settings.GENAU)
-    assert heard == [act_settings.GENAU]
+    _pick_lane(combine, action_settings.GENAU)
+    assert heard == [action_settings.GENAU]
 
-    _pick_lane(combine, act_settings.VIDEO)
-    assert heard == [act_settings.GENAU, act_settings.VIDEO]
+    _pick_lane(combine, action_settings.VIDEO)
+    assert heard == [action_settings.GENAU, action_settings.VIDEO]
 
 
 def test_a_grayed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     combine = _panel(qtbot)
-    _pick_lane(combine, act_settings.GENAU)
+    _pick_lane(combine, action_settings.GENAU)
     combine.set_available_categories({"beta"})
 
     reason = combine._category.itemData(combine._category.findText("gamma"), TOOLTIP)
@@ -856,7 +856,7 @@ def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
     # click can only end in "no past video yet".
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_act(combine, "gamma")
+    _pick_action(combine, "gamma")
     assert combine._generate_btn.isEnabled()
 
     combine.set_available_categories({"beta"})  # gamma just went unanswerable

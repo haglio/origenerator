@@ -125,7 +125,7 @@ def build_nav_map(current: Slide, loop: Loop | None,
                         at_anchor.label)
 
 
-def acts_posted(query: str) -> str:
+def actions_posted(query: str) -> str:
     """The act(s) a row's filter button posted, put back into words: the
     Funestras' HUD lower-cases the row's label and writes its spaces as
     underscores, and a spoken act arrives the same way."""

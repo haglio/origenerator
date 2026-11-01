@@ -106,12 +106,12 @@ def _created(row) -> str:
     return row.get("created_at") or ""
 
 
-def _act_settings_groups(category: str, video_rows, *, loop_only: bool = False) -> dict:
+def _action_settings_groups(category: str, video_rows, *, loop_only: bool = False) -> dict:
     """The act's videos grouped by settings signature; ``loop_only`` keeps just the
     ones a looping workflow made (see :func:`loops`)."""
     groups = defaultdict(list)
     for row in video_rows:
-        if act_of(row) != category:
+        if action_of(row) != category:
             continue
         if loop_only and not loops(row):
             continue
@@ -119,7 +119,7 @@ def _act_settings_groups(category: str, video_rows, *, loop_only: bool = False) 
     return groups
 
 
-def act_of(row: dict) -> str:
+def action_of(row: dict) -> str:
     """The act ``row`` shows, because somebody said so: a video's is the act it was
     launched as, an image's the action it was sorted as, and "" means nobody has
     said. Never read off the prompt."""
@@ -148,7 +148,7 @@ def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
     loop_only = intent == GENAU
     return {c for c in CATEGORIES
             if pinned_settings(c, intent) is not None
-            or any(act_of(row) == c and (not loop_only or loops(row))
+            or any(action_of(row) == c and (not loop_only or loops(row))
                    for row in video_rows)}
 
 
@@ -156,7 +156,7 @@ def most_used_video(category: str, video_rows, intent: str = VIDEO) -> str | Non
     """The prompt_id of the exemplar for ``category``'s most-used settings, or
     ``None`` when the gallery holds no video of the act. Most used is the settings under the most
     of the user's videos of it, ties to the more recent, shown by its newest."""
-    groups = _act_settings_groups(category, video_rows, loop_only=intent == GENAU)
+    groups = _action_settings_groups(category, video_rows, loop_only=intent == GENAU)
     if not groups:
         return None
     best = max(groups.values(), key=lambda g: (len(g), max(_created(r) for r in g)))

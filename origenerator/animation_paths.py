@@ -2,7 +2,7 @@
 lane, an act and a starting state, from the content overlay."""
 from __future__ import annotations
 
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 from origenerator.content import load_content
 
 LANES = (VIDEO, GENAU)
@@ -35,7 +35,7 @@ def acts(lane: str = VIDEO, *, content: dict | None = None) -> tuple[str, ...]:
     return tuple(_table(content).get(lane, {}))
 
 
-def acts_for(state: str, lane: str = VIDEO, *, content: dict | None = None
+def actions_for(state: str, lane: str = VIDEO, *, content: dict | None = None
              ) -> tuple[str, ...]:
     """The acts ``lane`` can animate an image already in ``state`` as, in the
     table's own order, and empty for a state the table says nothing about."""

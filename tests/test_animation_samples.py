@@ -10,7 +10,7 @@ import json
 import pytest
 
 from origenerator import animation_samples
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 
 _PATHS = {
     "animation_paths": {

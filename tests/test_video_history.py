@@ -4,7 +4,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 from origenerator.db import Database
 from origenerator.video_history import video_history
 

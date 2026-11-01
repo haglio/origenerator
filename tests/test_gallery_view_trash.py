@@ -31,7 +31,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
 )
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.output_places import OutputPlaces
@@ -120,14 +120,14 @@ def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
 
 
 def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, tmp_path):
-    # End to end through the real GalleryActions: delete a tile, and the item is
+    # End to end through the real GalleryEdits: delete a tile, and the item is
     # standing in the Trash collection rather than gone.
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -212,7 +212,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
                          params_json=json.dumps({"steps": 20}), workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -415,7 +415,7 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -543,7 +543,7 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("v1", status="completed", output_files=json.dumps(
         [{"filename": "clip.mp4", "subfolder": "video"}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -900,7 +900,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
             pid, status="completed",
             output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
         )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -933,7 +933,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
             pid, status="completed",
             output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
         )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -1089,7 +1089,7 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -1112,7 +1112,7 @@ def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
     # experiment, a slideshow's Up key.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    assert view._actions._environment.release_files == view._release_held_media
+    assert view._edits._environment.release_files == view._release_held_media
 
 
 def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_path):
@@ -1171,7 +1171,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     win = QMainWindow()
     win.setCentralWidget(view)

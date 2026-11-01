@@ -12,7 +12,7 @@ import pytest
 from PIL import Image
 
 from origenerator import outside_videos
-from origenerator.act_settings import CATEGORIES
+from origenerator.action_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.generate_pane import parse_tabs_state
@@ -186,7 +186,7 @@ def test_picking_an_act_on_an_ai_videos_tab_goes_where_its_star_goes(library, mo
     tab, _db, video, image = library
     places, picks = object(), []
     monkeypatch.setattr(outside_videos, "places_here", lambda: places)
-    monkeypatch.setattr(outside_videos, "pick_act",
+    monkeypatch.setattr(outside_videos, "pick_action",
                         lambda db, where, row, act: picks.append((where, row["prompt_id"], act)))
     tab.show_saved_generation(video, [image])
 

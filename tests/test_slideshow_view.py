@@ -668,10 +668,10 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
 def _around(prompt_id):
     if prompt_id != "id-a":
         return NavMapNeighbors()
-    other_act = Slide("c.png", "image", "id-c")
+    other_action = Slide("c.png", "image", "id-c")
     return NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
-                        column=(NavMapRow(other_act, "dawn"),), label="fox",
-                        group=(other_act,))
+                        column=(NavMapRow(other_action, "dawn"),), label="fox",
+                        group=(other_action,))
 
 
 def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot):
@@ -810,7 +810,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_act_without_redrawing_what_
     view.slideshow.slideshow_filter("source_image,_alpha")
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
     assert shown == []
     assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
@@ -832,27 +832,27 @@ def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
     view.slideshow.slideshow_filter("gamma")
     _settle(view)
 
-    assert (shown, view.slideshow.hud_act_filter) == ([], "")
+    assert (shown, view.slideshow.hud_action_filter) == ([], "")
     assert words(view._note) == "Filter: no matches for 'gamma'"
 
 
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
 
-    view.slideshow.slideshow_filter_to_the_act_on_screen()
+    view.slideshow.slideshow_filter_to_the_action_on_screen()
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
     assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
 
 def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot):
     view = _view(qtbot, _KEYED)
 
-    view.slideshow.slideshow_filter_to_the_act_on_screen()
+    view.slideshow.slideshow_filter_to_the_action_on_screen()
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, words(view._note)) == ("", "No act for this one")
+    assert (view.slideshow.hud_action_filter, words(view._note)) == ("", "No act for this one")
 
 
 def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
@@ -862,7 +862,7 @@ def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
 
     assert view.slideshow.clear_modes() is True
 
-    assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("", 2)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("", 2)
 
 
 def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
@@ -2579,7 +2579,7 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     _settle(view)
 
     assert shown == ["id-c"]
-    assert (view.slideshow.hud_act_filter, view.slideshow.hud_map().loop) == ("", "seed")
+    assert (view.slideshow.hud_action_filter, view.slideshow.hud_map().loop) == ("", "seed")
 
 
 class TestMovingTheSlideshowsHud:

@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
 
 _ORDER = [

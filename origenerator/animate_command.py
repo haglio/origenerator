@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from origenerator import animation_paths
-from origenerator.act_settings import CATEGORIES, GENAU, VIDEO
+from origenerator.action_settings import CATEGORIES, GENAU, VIDEO
 from origenerator.voice.text import sounds_like, words
 
 # The verb as whisper renders it, and every rendering of the loop lane's sound.
@@ -63,7 +63,7 @@ def _lane_of(rest: list[str]) -> tuple[str, list[str]]:
     return VIDEO, rest
 
 
-def _act_of(rest: list[str], acts) -> str | None:
+def _action_of(rest: list[str], acts) -> str | None:
     """The act ``rest`` names, ``""`` for an utterance that names none, and
     ``None`` for words that are no act -- which is no command at all."""
     if not rest:
@@ -80,7 +80,7 @@ def match_animate_command(text: str, acts=CATEGORIES) -> AnimateRequest | None:
     if rest is None:
         return None
     lane, named = _lane_of(rest)
-    act = _act_of(named, acts)
+    act = _action_of(named, acts)
     return None if act is None else AnimateRequest(lane, act)
 
 
@@ -106,7 +106,7 @@ def what_to_animate(asked: AnimateRequest, state: str, *, content: dict | None =
             return Answer(asked.act)
         return Answer(None, f"a “{state}” image can't be animated as "
                             f"“{asked.act}”", unsupported=True)
-    offered = animation_paths.acts_for(state, asked.lane, content=content)
+    offered = animation_paths.actions_for(state, asked.lane, content=content)
     if not offered:
         return Answer(None, f"nothing can be animated from a “{state}” image "
                             "in this lane", unsupported=True)

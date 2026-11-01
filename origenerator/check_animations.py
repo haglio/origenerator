@@ -56,7 +56,7 @@ def _launcher(db, client, enhance_settings):
 
 
 def the_animation_window():
-    from origenerator import act_settings, animation_samples, gallery
+    from origenerator import action_settings, animation_samples, gallery
     from origenerator.animation_check_session import AnimationCheckSession
     from origenerator.animation_settings import AcceptedSettings
     from origenerator.app_state import AppState
@@ -92,7 +92,7 @@ def the_animation_window():
             list(animation_samples.paths_in_order(rows)),
             animation_samples.samples_by_path(rows),
             AcceptedSettings(),
-            pinned=act_settings.pinned_settings),
+            pinned=action_settings.pinned_settings),
         look,
         _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS),
                   gallery.EnhanceSettings.parse(AppState(UI_STATE_PATH).get("enhance_settings"))),

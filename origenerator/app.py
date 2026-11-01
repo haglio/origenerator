@@ -304,10 +304,10 @@ def _fold_enhancements(library: Library):
 
 def _scrap(library: Library, rows: list[dict]) -> int:
     from origenerator import config
-    from origenerator.gallery_actions import GalleryActions
+    from origenerator.gallery_edits import GalleryEdits
     from origenerator.trash import Trash
 
-    GalleryActions(library.db, library.places, Trash(config.TRASH_DIR)).delete_rows(rows)
+    GalleryEdits(library.db, library.places, Trash(config.TRASH_DIR)).delete_rows(rows)
     return len(rows)
 
 

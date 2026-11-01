@@ -250,10 +250,10 @@ then leaves as it is.
 
 Two columns answer it and nothing else does: an image's `image_state`, set in
 the sorting window or the Action list on a Generate tab, and a video's
-`act`, the act picked when it was launched. `act_settings.act_of`
+`act`, the act picked when it was launched. `action_settings.action_of`
 reads those two and returns "" for a row nobody has said one for, which a
 slideshow's map draws as a row with no act name, in its gutter and on its filter
-button (`nav_map.act_of`).
+button (`nav_map.action_of`).
 
 It used to be worked out from the prompt, by matching each act's keywords in
 `acts` against the stored text. That answer named every map row and

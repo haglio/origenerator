@@ -55,7 +55,7 @@ _.normalizer  # origenerator/prompt_tokens.py:193, origenerator/prompt_tokens.py
 _.pre_tokenizer  # origenerator/prompt_tokens.py:195, origenerator/prompt_tokens.py:206, origenerator/prompt_tokens.py:240
 
 # --- style-option fields written for Qt's painter to read, never read back here ---
-_.textVisible  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
+_.textVisible  # origenerator/gui/progress_bar.py:127, the QStyleOptionProgressBar handed to drawControl
 _.features  # origenerator/gui/thumbnail_dropdown.py:144, the QStyleOptionViewItem the item delegate paints from
 _.decorationSize  # origenerator/gui/thumbnail_dropdown.py:145, the same option
 _.showDecorationSelected  # origenerator/gui/thumbnail_dropdown.py:185, the option a row's ground is drawn from

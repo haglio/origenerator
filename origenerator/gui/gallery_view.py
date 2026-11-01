@@ -2100,7 +2100,7 @@ class GalleryView(QWidget):
         folders = gallery.child_groups(group)
         name, ok = QInputDialog.getText(
             self, "New Collection",
-            f"Name for a folder holding these {len(folders)} folders:",
+            f"Name for a collection holding these {len(folders)} folders:",
         )
         if not ok or not name.strip():
             return

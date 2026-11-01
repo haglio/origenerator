@@ -5,7 +5,7 @@ hold all of them. What lives here is an enhancement's whole life -- the settings
 pane and the app-wide settings it holds, which images the Enhance button would
 act on and why a particular one is passed over, the launch of a batch under the
 folder its settings shape, and the run's appearance on every surface that shows
-the image it improves: the tile's scrim, the version list's live row, a tab's
+the image it improves: the tile's status scrim, the version list's live row, a tab's
 streaming preview, and an open slideshow's corner.
 
 The spoken words that ask for one are here too -- "enhance" over an image, and

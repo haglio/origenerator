@@ -136,6 +136,50 @@ def test_a_video_made_here_from_a_hidden_starting_frame_points_back_at_the_frame
     assert related._source_tile._prompt_id == "frame1"
 
 
+def _taken_out_of(prompt_id="vid1"):
+    return {**_video_row(prompt_id, input_image="frame1.jpg"), "source": GenerationSource.OUTSIDE}
+
+
+def test_a_video_lists_what_its_starting_frame_was_animated_into(make_related):
+    video = _taken_out_of()
+    related = make_related(video, _video_row("vid2", input_image="frame1.jpg"))
+
+    related.show_row(video, [_hidden_frame()])
+
+    assert _animated(related) == ["vid2"]
+    assert related._animated_strip._heading.text() == "Starting frame animated in"
+
+
+def test_a_video_animated_from_another_videos_starting_frame_points_at_that_video(make_related):
+    made_here = _video_row("vid2", input_image="frame1.jpg")
+    related = make_related(_taken_out_of(), made_here)
+
+    related.show_row(made_here, [_hidden_frame()])
+
+    tile = related._source_tile
+    assert (tile._prompt_id, tile._heading.text(), tile._badge.media_type) == (
+        "vid1", "From starting frame of", "video")
+
+
+def test_two_videos_animated_from_one_starting_frame_are_not_listed_on_each_other(make_related):
+    made_here = _video_row("vid2", input_image="frame1.jpg")
+    related = make_related(_taken_out_of(), made_here, _video_row("vid3", input_image="frame1.jpg"))
+
+    related.show_row(made_here, [_hidden_frame()])
+
+    assert related._animations_section.isHidden()
+
+
+def test_an_image_keeps_its_own_heading_after_a_videos_starting_frame_was_shown(make_related):
+    video, image = _taken_out_of(), _image_row()
+    related = make_related(video, _video_row("vid2", input_image="frame1.jpg"), _video_row("vid3"))
+    related.show_row(video, [_hidden_frame(), image])
+
+    related.show_row(image, [_hidden_frame(), image])
+
+    assert related._animated_strip._heading.text() == "Animated in"
+
+
 def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combine(make_related):
     related = make_related(_combined_row("made1"), _combined_row("made2"))
 
@@ -199,14 +243,17 @@ def test_every_link_is_drawn_on_both_of_the_items_it_ties(make_related):
     requested = _image_row("img2", "sdxl_t2i_img2.png")
     modified = _image_row("img3", "sdxl_t2i_img3.png")
     asked_of_trash = _image_row("img4", "sdxl_t2i_img4.png")
-    related = make_related(kept, cut, combined, rows=[image, twin, requested, asked_of_trash],
+    taken_out_of = _taken_out_of("vid3")
+    from_its_frame = _video_row("vid4", input_image="frame1.jpg")
+    related = make_related(kept, cut, combined, taken_out_of, from_its_frame,
+                           rows=[image, twin, requested, asked_of_trash],
                            held=[trashed, combined_in_trash, modified],
                            requests=[_request("img2", "img1", asked="two dogs"),
                                      _request("img3", "img1"),
                                      _request("img4", "img3", asked="two cats")])
     items = [image, twin, kept, trashed, cut, combined, combined_in_trash, requested,
-             modified, asked_of_trash]
-    image_rows = [image, twin, requested, asked_of_trash]
+             modified, asked_of_trash, taken_out_of, from_its_frame]
+    image_rows = [image, twin, requested, asked_of_trash, _hidden_frame()]
 
     drawn = {item["prompt_id"]: _drawn_links(related, item, image_rows) for item in items}
 
@@ -215,7 +262,7 @@ def test_every_link_is_drawn_on_both_of_the_items_it_ties(make_related):
                  if (made_from, made_into) not in drawn[made_into if made_from == shown
                                                           else made_from]]
     assert one_ended == []
-    assert sum(map(len, drawn.values())) == 2 * 10
+    assert sum(map(len, drawn.values())) == 2 * 11
 
 
 def test_an_image_lists_the_videos_in_the_trash_it_was_animated_into(make_related):

@@ -59,6 +59,9 @@ class AnimatedVideoStrip(QWidget):
         self._column = column
         self.hide()
 
+    def set_heading(self, heading: str) -> None:
+        self._heading.setText(heading)
+
     def show_videos(self, items: list[tuple[str, object, object]]):
         # Rebuild the tile host wholesale — deleting it stops and frees the old
         # tiles' movies, the same replace-the-widget idiom the gallery uses.

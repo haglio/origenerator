@@ -26,6 +26,7 @@ from origenerator.gallery import (
     start_images_among,
     videos_from_source_image,
     was_made_from,
+    was_taken_from,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -146,7 +147,7 @@ class RelatedMedia(QWidget):
         """
         start_image_of = start_images_among([*image_rows, *self._held_of_kind(MediaType.IMAGE)])
         videos = [*self._video_rows(), *self._held_of_kind(MediaType.VIDEO)]
-        self._show_source_tile(row, start_image_of)
+        self._show_source_tile(row, start_image_of, videos)
         self._show_source_video_tile(row)
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
@@ -155,6 +156,9 @@ class RelatedMedia(QWidget):
         self._shown = (row, start_image_of, videos)
         items = self._animated_items(row, start_image_of, videos)
         self._in_strip = {item[0] for item in items}
+        self._animated_strip.set_heading("Starting frame animated in"
+                                         if media_type_of_row(row) == MediaType.VIDEO
+                                         else "Animated in")
         self._animated_strip.show_videos(items)
         self._animations_section.setVisible(not self._animated_strip.isHidden())
         self._show_videos_made_from(row.get("prompt_id"), videos)
@@ -185,7 +189,7 @@ class RelatedMedia(QWidget):
         self._show_videos_made_from(None, [])
         self._follow_the_sections()
 
-    def _show_source_tile(self, row: dict, start_image_of):
+    def _show_source_tile(self, row: dict, start_image_of, videos: list[dict]):
         """Reveal the source tile for whatever this row was built from, else hide
         it. The tile shows that item's thumbnail and name and names it on
         click, for the owner to navigate to.
@@ -194,6 +198,10 @@ class RelatedMedia(QWidget):
         if not source_row:
             self._source_tile.clear()
             return
+        taken_from = next((video for video in videos if was_taken_from(source_row, video)
+                           and start_image_of(video) == source_row), None)
+        if taken_from is not None:
+            source_row, heading, media_type = taken_from, "From starting frame of", MediaType.VIDEO
         self._source_tile.show_source(
             source_row["prompt_id"], source_row.get("thumbnail_path"),
             self._name_of(source_row["prompt_id"]),
@@ -257,14 +265,17 @@ class RelatedMedia(QWidget):
 
     def _animated_items(self, row: dict, start_image_of, videos: list[dict]) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video whose own
-        link names this image — empty for anything but an image with animations."""
+        link names this image, or the starting frame taken from this video."""
+        image = row
         if media_type_of_row(row) != MediaType.IMAGE:
-            return []
-        could_name_it = videos_from_source_image(row, videos)
+            image = start_image_of(row)
+            if image is None or not was_taken_from(image, row):
+                return []
+        could_name_it = videos_from_source_image(image, videos)
         return [(video["prompt_id"], self._previews.of(video), video.get("thumbnail_path"))
                 for video in could_name_it
                 if (self._built_from(video, start_image_of)[0] or {}).get("prompt_id")
-                == row["prompt_id"]]
+                == image["prompt_id"]]
 
     def _show_made_preview(self, prompt_id: str, _path: str) -> None:
         if prompt_id in self._in_strip:

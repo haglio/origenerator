@@ -65,7 +65,7 @@ PUBLISHED = {
     "enhanced_generations", "favorite_folders", "favorite_generations", "start_frame_index",
     "cycle_shaped",
     "unreviewed_experiments",
-    "video_file_of", "videos_from_source_image", "was_made_from", "workflow_output_type",
+    "video_file_of", "videos_from_source_image", "was_made_from", "was_taken_from", "workflow_output_type",
     "written_params",
 }
 

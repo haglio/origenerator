@@ -151,6 +151,7 @@ from origenerator.gallery.source_image import (
     start_images_among,
     videos_from_source_image,
     was_made_from,
+    was_taken_from,
 )
 from origenerator.gallery.time_sections import new_work_opens_a_section, section_headings
 from origenerator.gallery.tree import (
@@ -314,6 +315,7 @@ __all__ = [
     "video_file_of",
     "videos_from_source_image",
     "was_made_from",
+    "was_taken_from",
     "workflow_output_type",
     "written_params",
 ]

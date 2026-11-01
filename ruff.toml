@@ -6,7 +6,7 @@ select = ["F", "E", "W", "I", "UP", "B", "C4", "SIM", "RUF", "PL", "PT", "DTZ", 
 ignore = ["E501", "BLE001", "S110",
     # This repo's ratchet: each rule the family config still finds here, and its places today.
     "E402",  # 30
-    "PLR0913",  # 130
+    "PLR0913",  # 132
     "RUF001",  # 117
     "PLW0108",  # 28
     "RUF059",  # 57

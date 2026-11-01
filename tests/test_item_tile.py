@@ -481,7 +481,7 @@ def test_a_resting_tile_wears_neither_overlay(qtbot):
     tw = ItemTile("p1", None, "label")
     qtbot.addWidget(tw)
     assert tw._enhancing is None
-    assert tw._enhancing_overlay.isHidden()
+    assert tw._status_scrim.isHidden()
     assert tw._enhancing_bar.isHidden()
 
 
@@ -494,7 +494,7 @@ def test_an_enhancing_tile_says_so_over_the_thumbnail_and_on_a_bar(qtbot):
     qtbot.addWidget(tw)
 
     assert tw._enhancing is not None
-    assert tw._enhancing_overlay.text() == "Enhancing…"
+    assert tw._status_scrim.text() == "Enhancing…"
     assert tw._enhancing_bar.caption() == "50% · ~6:02 left"
     assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (10, 20)
 
@@ -553,7 +553,7 @@ def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
 
     order = tw.children()
     for corner in _corners(tw):
-        assert order.index(corner) > order.index(tw._enhancing_overlay)
+        assert order.index(corner) > order.index(tw._status_scrim)
 
 
 def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
@@ -600,7 +600,7 @@ def test_a_streamed_frame_paints_the_thumbnail_under_the_overlays(qtbot):
     tw.set_enhancing(_run(frame=_png_bytes()))
 
     assert not tw._image_label.pixmap().isNull()
-    assert tw._enhancing_overlay.text() == "Enhancing…"  # still not the finished file
+    assert tw._status_scrim.text() == "Enhancing…"  # still not the finished file
     assert not tw._enhancing_bar.isHidden()
 
 
@@ -611,6 +611,6 @@ def test_the_run_ending_takes_both_overlays_away(qtbot):
     tw.set_enhancing(None)
 
     assert tw._enhancing is None
-    assert tw._enhancing_overlay.isHidden()
+    assert tw._status_scrim.isHidden()
     assert tw._enhancing_bar.isHidden()
     assert not tw._enhancing_tick.isActive()

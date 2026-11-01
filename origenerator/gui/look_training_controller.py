@@ -48,7 +48,8 @@ class LookTrainingController:
     def _watch(self, job: dict, panel=None, key: str | None = None) -> TrainingRun:
         self._training = TrainingRun(
             job, self._jobs, look_training,
-            reveal=lambda: self._show_panel(panel) if panel is not None else None)
+            reveal=lambda: self._show_panel(panel) if panel is not None else None,
+            parent=self._parent)
         self._training.progress.connect(lambda text: self._show(job["base"], text))
         self._training.finished.connect(lambda lora: self._ended(job, lora, panel, key))
         self._training.failed.connect(lambda why: self._ended(job, None, panel, key, why))

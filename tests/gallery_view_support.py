@@ -37,7 +37,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
 )
 from origenerator.gallery.shapes import LANDSCAPE
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.folder_tree import _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
@@ -800,7 +800,7 @@ def _shown_view_with_one_image(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):
@@ -1251,7 +1251,7 @@ def _finish_reroll(view, job):
 
 
 def _genau_db(tmp_path):
-    """The combine DB plus a looping clip launched as the "alpha" act to mine.
+    """The combine DB plus a looping video launched as the "alpha" act to mine.
 
     The long-form video the fixture already carries was launched as the same act,
     so this also pins that the Genau lane picks the loop over it. "state two" is
@@ -1275,16 +1275,16 @@ def _genau_db(tmp_path):
     # A second image, sorted, so a spoken animation has a state to go by. The
     # fixture's original "img" has not been sorted at all.
     db.insert_generation(
-        prompt_id="img_act", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        prompt_id="img_action", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="an image by the window", seed=2,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=2,
                                     positive_prompt="an image by the window")),
         workflow_json="{}",
     )
-    db.update_generation("img_act", status="completed", output_files=json.dumps(
+    db.update_generation("img_action", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_act.png", "subfolder": ""},
          {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))
-    db.set_image_state("img_act", "state two")
+    db.set_image_state("img_action", "state two")
     return db
 
 

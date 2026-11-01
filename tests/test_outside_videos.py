@@ -44,7 +44,7 @@ from origenerator.outside_videos import (
     Record,
     journal_favorites,
     outside_videos,
-    pick_act,
+    pick_action,
     places_here,
     record_of,
     rows_bringing_in,
@@ -460,14 +460,14 @@ def test_picking_an_act_for_a_video_from_another_source_tells_evolver_through_th
     [shown] = _videos(db)
     places = _places(tmp_path)
 
-    pick_act(db, places, shown, "Bow", now=lambda: 1_700_000_000.5)
+    pick_action(db, places, shown, "Bow", now=lambda: 1_700_000_000.5)
 
     [line] = places.journal.read_text(encoding="utf-8").splitlines()
     assert json.loads(line) == {"t": 1_700_000_000_500, "event": "action", "action": "Bow",
                                 "path": "videos/videos/outbox/portrait/a-site/c1_topaz.mp4"}
 
 
-def _two_word_made_videos_one_act_apart(tmp_path) -> tuple[Database, dict]:
+def _two_word_made_videos_one_action_apart(tmp_path) -> tuple[Database, dict]:
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "12", act="Bow")})
@@ -478,18 +478,18 @@ def _two_word_made_videos_one_act_apart(tmp_path) -> tuple[Database, dict]:
 
 
 def test_picking_another_act_for_a_word_made_video_leaves_it_where_it_is(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     named = ItemNames.from_library(db).of(picked["prompt_id"])
 
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
 
     assert db.get_generation(picked["prompt_id"])["act"] == "Bow"
     assert ItemNames.from_library(db).of(picked["prompt_id"]) == named
 
 
 def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
 
     scan(db, _places(tmp_path), grab=_still)
 
@@ -498,8 +498,8 @@ def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(
 
 
 def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
     video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
     _record(tmp_path, video, _made_from_words("a slow walk on the shore", "11", act="Kneel"))
 
@@ -509,8 +509,8 @@ def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
 
 
 def test_a_pick_does_not_keep_a_video_from_taking_its_star_from_the_record(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
     video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
     _record(tmp_path, video, {**_made_from_words("a slow walk on the shore", "11", act="Bow"),
                               "favorite": True})

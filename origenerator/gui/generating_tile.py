@@ -3,7 +3,7 @@ folder's ``+`` rather than in its place.
 
 It shows the run the way every other in-flight surface does: ComfyUI's preview —
 or, until there is one, what the run is made from
-(:func:`~origenerator.gui.combination_view.combination_pixmap`) — under a scrim
+(:func:`~origenerator.gui.combination_view.combination_pixmap`) — under a tile status scrim
 naming the stage, a bar along the thumbnail's foot reading
 :func:`origenerator.timing.progress_status_label`, and a Cancel that throws the
 run away.
@@ -22,7 +22,7 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import CANCEL_TEXT, TICK_MS, RunReading, cancel_tooltip
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
-from origenerator.gui.stage_scrim import StageScrim
+from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 _RESTING_FRAME_CSS = tile_shape.idle_css("generatingTile")
 _SELECTED_FRAME_CSS = tile_shape.selected_css("generatingTile")
@@ -72,7 +72,7 @@ class GeneratingTile(QFrame):
 
         # Both ride over the thumbnail rather than taking a row of their own, so the
         # tile is the same size and shape as every tile beside it.
-        self._scrim = StageScrim(self)
+        self._status_scrim = TileStatusScrim(self)
         self._bar = ProgressBar(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._place_bar()
@@ -113,7 +113,7 @@ class GeneratingTile(QFrame):
         # The numbers are read back off the job rather than taken from a signal:
         # the tile's own clock re-renders on a tick that carries none, and both
         # paths must draw the same line.
-        self._scrim.cover(
+        self._status_scrim.cover(
             self._image,
             "Generating…" if self._reading().rendering else "Waiting…",
         )

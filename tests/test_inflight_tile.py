@@ -30,7 +30,7 @@ def _item(**kw):
 def test_tile_says_queued_over_the_frame(qtbot):
     tile = InFlightTile(_item(status="queued"))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Queued…"
+    assert tile._status_scrim.text() == "Queued…"
     assert tile._caption.text() == "SDXL › a cat"
 
 
@@ -39,13 +39,13 @@ def test_tile_says_the_lines_are_being_spoken_before_the_job_is_sent(qtbot):
     # voice is done nothing is on the server: the tile says what the wait is.
     tile = InFlightTile(_item(status="speaking"))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Speaking her lines…"
+    assert tile._status_scrim.text() == "Speaking her lines…"
 
 
 def test_tile_says_generating_when_running(qtbot):
     tile = InFlightTile(_item(status="running"))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Generating…"
+    assert tile._status_scrim.text() == "Generating…"
 
 
 def test_tile_shows_the_live_frame_when_one_is_present(qtbot):
@@ -61,8 +61,8 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
     qtbot.addWidget(tile)
 
     assert not tile._image.pixmap().isNull()   # the thumbnail is still there
-    assert tile._scrim.text() == "Generating…"  # and the stage is on top of it
-    assert tile._scrim.geometry().intersects(tile._image.geometry())
+    assert tile._status_scrim.text() == "Generating…"  # and the stage is on top of it
+    assert tile._status_scrim.geometry().intersects(tile._image.geometry())
 
 
 def test_item_type_icon_shows_only_when_the_item_names_a_type(qtbot):
@@ -87,11 +87,11 @@ def test_clicking_the_tile_emits_its_key(qtbot):
 def test_update_item_refreshes_caption_frame_and_stage_in_place(qtbot):
     tile = InFlightTile(_item(status="queued"))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Queued…"
+    assert tile._status_scrim.text() == "Queued…"
 
     tile.update_item(_item(caption="new caption", status="running", frame=_png_bytes()))
     assert tile._caption.text() == "new caption"
-    assert tile._scrim.text() == "Generating…"
+    assert tile._status_scrim.text() == "Generating…"
     assert not tile._image.pixmap().isNull()
 
 
@@ -100,14 +100,14 @@ def test_tile_names_another_apps_hold_instead_of_a_bare_queued(qtbot):
     # the part nothing else in this app can explain.
     tile = InFlightTile(_item(status="queued", foreign_ahead=2))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Waiting on 2 jobs from another app"
+    assert tile._status_scrim.text() == "Waiting on 2 jobs from another app"
 
 
 def test_a_video_waiting_out_the_minute_after_an_image_counts_down_to_its_start(qtbot):
     # The half-second keeps the count a clear half-second off a rollover.
     tile = InFlightTile(_item(status="queued", starts_at=time.monotonic() + 42.5))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Starts in 0:43"
+    assert tile._status_scrim.text() == "Starts in 0:43"
 
 
 def test_the_countdown_advances_between_polls(qtbot):
@@ -116,7 +116,7 @@ def test_the_countdown_advances_between_polls(qtbot):
 
     tile._item.starts_at -= 3  # as if three seconds had gone by
     tile._tick.timeout.emit()
-    assert tile._scrim.text() == "Starts in 0:40"
+    assert tile._status_scrim.text() == "Starts in 0:40"
     assert tile._tick.isActive()
 
 
@@ -125,7 +125,7 @@ def test_a_queue_of_the_users_own_jobs_says_nothing_extra(qtbot):
     # asked for — so the tile says what it always said.
     tile = InFlightTile(_item(status="queued", foreign_ahead=0))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Queued…"
+    assert tile._status_scrim.text() == "Queued…"
 
 
 # --- how far along, and how long it has taken --------------------------------

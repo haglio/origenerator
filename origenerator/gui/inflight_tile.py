@@ -7,7 +7,7 @@ opens the gallery folder the job is running in and selects its live tile.
 
 Two things are read over that frame rather than in place of it. The stage —
 "Generating…", "Queued…", or what another app is holding the server for — sits
-on a dimming scrim (:class:`origenerator.gui.stage_scrim.StageScrim`), the same
+on a tile status scrim (:class:`origenerator.gui.tile_status_scrim.TileStatusScrim`), the same
 one a finished thumbnail wears while its enhancement cooks; and along the frame's
 foot a bar carries how far along the run is and how long that has taken
 (:func:`origenerator.timing.progress_status_label`), in the same words the Job Queue uses for the same job. A stage message that *replaced* the thumbnail
@@ -31,7 +31,7 @@ from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import TICK_MS, InFlightItem, queue_wait_text
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
-from origenerator.gui.stage_scrim import StageScrim
+from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 _IMAGE_SIZE = tile_shape.THUMBNAIL_SIZE  # the family shape, so tiles flow with tiles
 _BORDER_PX = 2
@@ -85,7 +85,7 @@ class InFlightTile(QWidget):
 
         # Both ride over the frame rather than taking a row of their own, so the
         # thumbnail keeps the height a finished tile's has.
-        self._scrim = StageScrim(self)
+        self._status_scrim = TileStatusScrim(self)
         self._bar = ProgressBar(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
@@ -159,7 +159,7 @@ class InFlightTile(QWidget):
         so the bar stays indeterminate with nothing written on it: its wait is the
         queue's to explain, not a zero counting up over a bar that has not moved.
         """
-        self._scrim.cover(self._image, self._stage_message(self._item), inset=_BORDER_PX)
+        self._status_scrim.cover(self._image, self._stage_message(self._item), inset=_BORDER_PX)
         self._bar.raise_()  # the scrim it sits on was just raised over everything
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being

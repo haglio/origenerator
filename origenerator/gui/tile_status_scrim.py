@@ -1,11 +1,11 @@
-"""The dimming banner a tile wears while something is being made of it.
+"""The tile status scrim: the dimmed cover a tile wears, with one line across it, while something is being made of it.
 
 Three surfaces say the same thing about an item that isn't finished — the
 Latest collection's in-flight tiles, a folder's generating tile, and a finished
 thumbnail whose enhancement is in flight — and they say it the same way: the
 message sits *over* the thumbnail, dimmed, rather than replacing it.
 
-That is the whole point of the scrim. Whatever is under it is worth looking at
+That is the whole point of the tile status scrim. Whatever is under it is worth looking at
 — a live frame off ComfyUI, or the base render an enhancement is being made
 from — and a stage message that took the thumbnail's place hid the one thing the
 user opened the pane for. The dimming is what keeps the message readable over
@@ -21,26 +21,26 @@ from shared_ui.spacing import BUTTON_RADIUS
 # Dark enough to read white letters against any frame, light enough to leave the
 # frame itself visible — which is the reason the scrim exists rather than a
 # placeholder that replaces the thumbnail.
-_SCRIM_CSS = (
+_TILE_STATUS_SCRIM_CSS = (
     f"background-color: {as_rgba(BLACK, 0.45)}; color: {as_hex(WHITE)};"
     f" font-weight: bold; border-radius: {BUTTON_RADIUS}px;"
 )
 
 
-class StageScrim(QLabel):
+class TileStatusScrim(QLabel):
     """A dimming overlay carrying one line about what is being made."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setWordWrap(True)  # the queue-wait line is a sentence, not a word
-        self.setStyleSheet(_SCRIM_CSS)
+        self.setStyleSheet(_TILE_STATUS_SCRIM_CSS)
         # Clicks belong to the tile underneath — the scrim is a caption, not a lid.
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.hide()
 
     def cover(self, widget: QLabel, message: str | None, *, inset: int = 0):
-        """Lay the scrim over ``widget`` reading ``message``, or take it away.
+        """Lay the tile status scrim over ``widget`` reading ``message``, or take it away.
 
         Re-read from the covered widget every time rather than positioned once:
         the thumbnail it covers is laid out after the tile is built, and a scrim

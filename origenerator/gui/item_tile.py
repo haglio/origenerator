@@ -24,7 +24,7 @@ from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
-from origenerator.gui.stage_scrim import StageScrim
+from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()  # the thumbnail area, inside the family tile
 _BORDER_PX = 2
@@ -158,11 +158,11 @@ class ItemTile(QWidget):
 
         # While an enhancement of this image is in flight, the tile wears the same
         # two overlays an in-flight tile does, so work in progress reads the same
-        # whichever kind of work it is: a scrim naming the stage, and a bar along
+        # whichever kind of work it is: a tile status scrim naming the stage, and a bar along
         # the thumbnail's foot saying how far along the run is. The scrim dims the
         # thumbnail rather than replacing it — the base render is out and worth
         # looking at, which is the point of generating it first.
-        self._enhancing_overlay = StageScrim(self)
+        self._status_scrim = TileStatusScrim(self)
         self._enhancing_bar = ProgressBar(self)
         self._enhancing_bar.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -267,7 +267,7 @@ class ItemTile(QWidget):
         thumbnail where it was, but a tile built before its layout ran has none yet.
         """
         run = self._enhancing
-        self._enhancing_overlay.cover(
+        self._status_scrim.cover(
             self._image_label, "Enhancing…" if run is not None else None,
             inset=_BORDER_PX)
         if self._controls is not None:

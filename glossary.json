@@ -578,17 +578,21 @@
       ]
     },
     {
-      "id": "scrim",
+      "id": "tile_status_scrim",
       "thing": "the dark band with one line of words over a thumbnail while something is being made: \"Generating…\" or \"Queued…\" over an image or video still being made, on Latest and at the front of its folder, and \"Enhancing…\" over an image while its enhancement runs",
       "screen": null,
-      "his_word": "none yet: he could not place it from two descriptions (2026-10-30)",
+      "his_word": "tile status scrim (2026-10-30: 'scrim is fine, but of course it's the \"tile status scrim\"')",
       "code_today": [
-        "stage scrim",
-        "scrim",
-        "banner"
+        "tile status scrim",
+        "scrim"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "tile status scrim",
+      "status": "ruled",
+      "ruled": "2026-10-30, his words",
+      "retired": [
+        "stage scrim",
+        "banner"
+      ]
     },
     {
       "id": "plate",

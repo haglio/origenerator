@@ -58,7 +58,7 @@ from origenerator.fun_time_mode import (
 from origenerator.osr2_controls_commands import shape_press, shape_spoken_to, spelled_for
 from origenerator.radio import deal_to_the_funestras
 from origenerator.slideshow_buttons import (
-    HUD_PLACES,
+    HUD_FACTS,
     ORIGENERATOR_MODE,
     PRESSES_ABOUT_THE_SLIDE,
     answer,
@@ -225,8 +225,8 @@ class FunTimeBridge(QObject):
         if not marker and action in self._shape_verbs:
             self._shape_verbs[action](shape)
             return
-        if action in HUD_PLACES:
-            self._gallery.place_a_hud(shape, action, argument)
+        if action in HUD_FACTS:
+            self._gallery.tell_the_hud(shape, action, argument)
             return
         if action == SAY and marker == ":":
             # The session owns the microphone for the whole room, so a spoken

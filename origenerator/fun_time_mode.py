@@ -40,7 +40,7 @@ from origenerator.media import MediaType
 from origenerator.osr2_controls_commands import spelled_filter, spelled_for
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import (
-    HUD_PLACES,
+    HUD_FACTS,
     PRESSES,
     PRESSES_ABOUT_A_FILE,
     PRESSES_ON_THE_QUEUE,
@@ -196,8 +196,8 @@ def _lines_said_to(shape: str) -> tuple[str, ...]:
         *(spelled_for(shape, press) for press in PRESSES),
         *(f"{spelled_for(shape, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
         *(f"{spelled_for(shape, press)}|{where}" for press, where in PRESSES_ON_THE_QUEUE.items()),
-        *(f"{spelled_for(shape, place)}|{payload}"
-          for place, payload in HUD_PLACES.items()),
+        *(f"{spelled_for(shape, fact)}|{payload}"
+          for fact, payload in HUD_FACTS.items()),
         spelled_filter(shape, "{row}"),
         f"{spelled_for(shape, SAY)}:{{words}}",
     )

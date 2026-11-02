@@ -2998,8 +2998,8 @@ class GalleryView(QWidget):
     def hud_place(self, shape: str) -> tuple:
         return self._slideshows.hud_place(shape)
 
-    def place_a_hud(self, shape: str, action: str, argument: str) -> None:
-        self._slideshows.place_a_hud(shape, action, argument)
+    def tell_the_hud(self, shape: str, action: str, argument: str) -> None:
+        self._slideshows.tell_the_hud(shape, action, argument)
 
     def region_slideshow(self, shape: str):
         """The slideshow occupying satellite region *shape*, or None. The hosting

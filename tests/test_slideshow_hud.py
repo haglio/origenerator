@@ -69,8 +69,7 @@ def _lit_order(model) -> list[str]:
 
 def test_the_hud_lights_the_order_the_slideshow_is_playing_in(qtbot):
     for order_label, lit in (("Latest", ["portrait_latest"]),
-                             ("Shuffle", ["portrait_shuffle"]),
-                             ("", [])):
+                             ("Shuffle", ["portrait_shuffle"])):
         window = _window(qtbot, [("scene one.png", "image")], hud=HudFacts(order_label=order_label))
 
         assert _lit_order(slideshow_hud_model("portrait", window.slideshow)) == lit, order_label
@@ -160,6 +159,21 @@ class TestTheOneHudASlideshowWears:
 
     def test_a_slideshow_that_is_not_driving_the_device_carries_no_max_intensity(self, qtbot):
         assert slideshow_hud_model("portrait", self._window(qtbot).slideshow).max_intensity is None
+
+    def test_the_window_driving_the_device_is_the_funestra_skip_ahead_can_act_on(self, qtbot):
+        """Standalone the OSR2 follows this window, so its Skip ahead grays only
+        for a slide with no funscript; a slideshow driving nothing grays it
+        for the device too."""
+        def skip_ahead(model):
+            return next(button for row in model.rows for button in row
+                        if button.command == "portrait_funscript_jump")
+
+        driving = skip_ahead(self._model(qtbot))
+        idle = skip_ahead(slideshow_hud_model("portrait", self._window(qtbot).slideshow))
+
+        assert driving.tooltip.endswith("(this slide has no funscript)")
+        assert idle.tooltip.endswith(
+            "(this Funestra doesn't have the OSR2 and this slide has no funscript)")
 
     def test_the_pace_rides_with_the_rows_that_step_the_set(self, qtbot):
         """It sets how long an unheld slide stays up, which is about the set."""

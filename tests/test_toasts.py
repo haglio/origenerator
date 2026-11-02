@@ -18,9 +18,9 @@ from origenerator.win32 import APP_USER_MODEL_ID
 
 
 def _outcome(**over):
-    fields = dict(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
-                  ok=True, source=GenerationSource.GENERATED,
-                  generation="7f0c9b2e-1111-4444-8888-aaaabbbbcccc")
+    fields = {"kind": "Video", "display_name": "WAN 2.2 I2V", "seconds": 252.0,
+                  "ok": True, "source": GenerationSource.GENERATED,
+                  "generation": "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"}
     return RunOutcome(**{**fields, **over})
 
 

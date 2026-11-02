@@ -82,12 +82,12 @@ def animate_before_filing(workflow, history_data, places: OutputPlaces, thumb_di
 
 
 def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
-    fields = dict(
-        status=GenerationStatus.COMPLETED,
-        output_files=json.dumps(files),
-        thumbnail_path=thumb_path,
-        completed_at=datetime.now(UTC).isoformat(),
-    )
+    fields = {
+        "status": GenerationStatus.COMPLETED,
+        "output_files": json.dumps(files),
+        "thumbnail_path": thumb_path,
+        "completed_at": datetime.now(UTC).isoformat(),
+    }
     if duration is not None:
         fields["duration_seconds"] = duration
     db.update_generation(prompt_id, **fields)

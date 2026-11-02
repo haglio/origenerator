@@ -3,29 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from origenerator.evolver_export import export_video
 
 from origenerator import config, evolver_export
-from origenerator.evolver_export import export_video
 
 
 def test_export_copies_video_into_the_inbox(tmp_path):
     src = tmp_path / "wan22_i2v_00001_.mp4"
     src.write_bytes(b"video-bytes")
-    inbox = tmp_path / "0_inbox" / "origenerator"  # does not exist yet
+    inbox = tmp_path / "0_inbox" / "origenerator"
 
     dest = export_video(src, inbox)
 
     assert dest == inbox / "wan22_i2v_00001_.mp4"
     assert dest.read_bytes() == b"video-bytes"
-    # A copy, not a move: the gallery keeps its own file on disk.
     assert src.exists()
 
 
 def test_export_writes_a_partial_file_before_finalizing(tmp_path, monkeypatch):
-    """The copy must land under a ``.partial.`` name and only be renamed into
-    place once complete — Evolver ignores ``.partial.`` files, so it can never
-    grab a half-written video. Nothing partial may survive a successful export.
-    """
     src = tmp_path / "clip.mp4"
     src.write_bytes(b"data")
     inbox = tmp_path / "inbox"
@@ -43,15 +38,13 @@ def test_export_writes_a_partial_file_before_finalizing(tmp_path, monkeypatch):
 
     dest = export_video(src, inbox)
 
-    assert ".partial." in seen["copy_dest"].name  # Evolver skips this mid-copy
+    assert ".partial." in seen["copy_dest"].name
     assert seen["final_present_during_copy"] is False
     assert dest.name == "clip.mp4"
-    assert [p.name for p in inbox.iterdir()] == ["clip.mp4"]  # no partial left over
+    assert [p.name for p in inbox.iterdir()] == ["clip.mp4"]
 
 
 def test_export_does_not_clobber_an_already_queued_video(tmp_path):
-    """A second export of a same-named video keeps both — Evolver may not have
-    swept the first out of the inbox yet, and overwriting would lose it."""
     inbox = tmp_path / "inbox"
     src = tmp_path / "clip.mp4"
 
@@ -144,12 +137,6 @@ class TestTheFunscriptThatGoesWithIt:
 
 
 class TestTheInbox:
-    """Where a video is handed over used to be a config constant two Qt widgets
-    reached for in the middle of a send, so the destination was written in no
-    single place and the only way to point a test elsewhere was to patch the
-    module each had imported it from. One of these is built where the app is put
-    together and given to whoever sends."""
-
     def test_a_clip_lands_in_the_folder_the_lane_is_routed_by(self, tmp_path):
         inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
         video = tmp_path / "clip.mp4"
@@ -172,8 +159,6 @@ class TestTheInbox:
 
     def test_a_lane_with_no_folder_is_refused_rather_than_dropped_in_the_root(
             self, tmp_path):
-        """An empty source name would put the video beside every other lane's,
-        where Evolver routes by folder and would read it as none of them."""
         inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
         video = tmp_path / "clip.mp4"
         video.write_bytes(b"video")

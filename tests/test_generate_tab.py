@@ -9,29 +9,10 @@ from itertools import pairwise
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-from PIL import Image
-from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
-from PyQt6.QtGui import QColor, QDropEvent, QPalette, QPixmap, QTextCursor, QTextDocumentFragment
-from PyQt6.QtWidgets import (
-    QApplication,
-    QComboBox,
-    QFormLayout,
-    QLabel,
-    QPushButton,
-    QSplitter,
-    QSplitterHandle,
-    QWidget,
-)
-from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
-from shared_ui.icons import inline_icon
-from shared_ui.spacing import GAP_MEDIUM
-
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.model_dropdowns as model_dropdowns_module
-from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
-from origenerator import export_lane as export_lane_module
+import pytest
 from origenerator.action_settings import CATEGORIES
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
@@ -72,6 +53,26 @@ from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.model_arch import KREA2, WAN
 from origenerator.workflows.model_files import NO_LORA
+from PIL import Image
+from PyQt6 import sip
+from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
+from PyQt6.QtGui import QColor, QDropEvent, QPalette, QPixmap, QTextCursor, QTextDocumentFragment
+from PyQt6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFormLayout,
+    QLabel,
+    QPushButton,
+    QSplitter,
+    QSplitterHandle,
+    QWidget,
+)
+from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
+from shared_ui.icons import inline_icon
+from shared_ui.spacing import GAP_MEDIUM
+
+from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
+from origenerator import export_lane as export_lane_module
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
@@ -639,7 +640,6 @@ def test_the_generate_caption_is_re_read_on_a_timer_not_on_each_cue(tab):
 
 
 def test_the_outgoing_form_is_still_alive_when_the_prompt_fields_change_is_announced(tab):
-    from PyQt6 import sip
     outgoing = tab._param_form
     alive_when_announced = []
     tab.prompt_fields_changed.connect(lambda: alive_when_announced.append(not sip.isdeleted(outgoing)))
@@ -648,7 +648,8 @@ def test_the_outgoing_form_is_still_alive_when_the_prompt_fields_change_is_annou
                  if tab._workflow_dropdown.itemData(i) not in (None, "", "sdxl_t2i"))
     tab._workflow_dropdown.setCurrentIndex(other)
 
-    assert alive_when_announced and all(alive_when_announced)
+    assert alive_when_announced
+    assert all(alive_when_announced)
 
 
 def test_a_made_from_pair_already_on_show_is_not_painted_again(tab):

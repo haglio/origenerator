@@ -1,19 +1,3 @@
-"""Deriving an input-image workflow's output size from that image.
-
-Every workflow that takes an ``input_image`` keeps the image's aspect ratio at
-a fixed pixel budget rather than a hardcoded resolution — 0.4 MP for the video
-workflows, the SDXL budget for the pose-transfer still. The WAN 2.2 pair and
-the pose transfer do this in-graph (``ImageScaleToTotalPixels`` on a /16
-stride, then ``GetImageSize``). This module is the app-side twin of that
-in-graph scaling: it replicates ``ImageScaleToTotalPixels`` exactly, so the
-size it computes for an image equals what the in-graph path produces for the
-same image, and the Generate form shows every deriving workflow's size in a
-locked Dimensions field (measuring the picked image here rather than waiting
-for ComfyUI to do it in-graph).
-
-Kept free of any workflow/Qt import so the form and the workflows share one
-implementation.
-"""
 from __future__ import annotations
 
 import math
@@ -24,24 +8,13 @@ from PIL import Image
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_TEMP_DIR, OUTPUT_PLACES
 from origenerator.file_refs import reference_path
 
-# The default pixel budget (what the video workflows scale to in-graph) and the
-# shared stride, matched here so an image yields the same proportions the graph
-# will produce. A workflow on a different budget (SDXL's ~1 MP) passes its own.
 TARGET_MEGAPIXELS = 0.4
 RESOLUTION_STEPS = 16
 
 def scale_to_total_pixels(
     src_width: int, src_height: int, megapixels: float = TARGET_MEGAPIXELS,
 ) -> tuple[int, int]:
-    """The output size for a ``src_width``×``src_height`` image, replicating
-    ComfyUI's ``ImageScaleToTotalPixels`` (``megapixels``, /16 stride) exactly
-    so the size matches what the in-graph derivation produces for the same image.
-
-    Mirrors the node's ``round(dim * sqrt(total / area) / steps) * steps`` (with
-    Python's banker's rounding, as ComfyUI uses). The only addition is a floor at
-    one stride, so a degenerate aspect ratio can't round a side to zero — a no-op
-    for any realistic image.
-    """
+    """Replicates ComfyUI's ImageScaleToTotalPixels, whose banker's rounding and /16 stride the in-graph size follows, with a floor of one stride."""
     total = megapixels * 1024 * 1024
     scale = math.sqrt(total / (src_width * src_height))
     width = round(src_width * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
@@ -50,12 +23,6 @@ def scale_to_total_pixels(
 
 
 def resolve_input_image_path(input_image: str | None) -> Path | None:
-    """The on-disk file a LoadImage value names, or ``None`` when it's empty or
-    absent — :func:`origenerator.file_refs.reference_path` under this app's
-    ComfyUI directories. A ``"name [output]"`` value lives under the output dir,
-    a ``"[temp]"`` one under the temp dir, and an ``"[input]"`` (or unannotated)
-    one under the input dir, matching how ComfyUI's LoadImage routes the
-    reference. An absolute path is taken as-is."""
     return reference_path(input_image, places=OUTPUT_PLACES,
                           input_dir=COMFYUI_INPUT_DIR, temp_dir=COMFYUI_TEMP_DIR)
 
@@ -70,14 +37,6 @@ def without_an_explicit_size(params: dict, workflow) -> dict:
 
 
 def override_size(params: dict) -> tuple[int, int] | None:
-    """The explicit ``(width, height)`` the user set by unlocking the derived
-    Dimensions field, or ``None`` when the size should be derived — the usual
-    case, where the fields stay locked and ``params`` carry no width/height.
-
-    Both must be present and positive; a lone or non-numeric value is ignored as
-    if absent, so a half-filled or malformed override falls back to derivation
-    rather than feeding a bad size into the graph.
-    """
     try:
         width, height = int(params["width"]), int(params["height"])
     except (KeyError, TypeError, ValueError):
@@ -86,10 +45,6 @@ def override_size(params: dict) -> tuple[int, int] | None:
 
 
 def measure_image_size(input_image: str | None) -> tuple[int, int] | None:
-    """The raw pixel size of the file ``input_image`` names, or ``None`` when
-    it's missing or unreadable. For a workflow whose output tracks the input's
-    own dimensions (the enhance workflow: source x scale) rather than a pixel
-    budget."""
     path = resolve_input_image_path(input_image)
     if path is None:
         return None
@@ -103,11 +58,6 @@ def measure_image_size(input_image: str | None) -> tuple[int, int] | None:
 def measure_derived_size(
     input_image: str | None, megapixels: float = TARGET_MEGAPIXELS,
 ) -> tuple[int, int] | None:
-    """The output size derived from ``input_image``: its file measured and scaled
-    to the ``megapixels`` budget (:func:`scale_to_total_pixels`), or ``None``
-    when the image is missing or unreadable — so the form shows no size rather
-    than crashing.
-    """
     path = resolve_input_image_path(input_image)
     if path is None:
         return None

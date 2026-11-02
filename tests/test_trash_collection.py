@@ -16,6 +16,8 @@ from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
+from origenerator import trash_collection
+
 _NOW = datetime(2026, 8, 15, 3, 0, 0, tzinfo=UTC).replace(tzinfo=None)
 
 

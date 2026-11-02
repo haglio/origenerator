@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import (
     DetailFixPass,

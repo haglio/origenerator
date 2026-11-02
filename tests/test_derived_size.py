@@ -1,7 +1,4 @@
-"""The app-side twin of the i2v in-graph size derivation."""
 from __future__ import annotations
-
-from PIL import Image
 
 import origenerator.workflows.derived_size as ds
 from origenerator.output_places import OutputPlaces
@@ -11,6 +8,7 @@ from origenerator.workflows.derived_size import (
     resolve_input_image_path,
     scale_to_total_pixels,
 )
+from PIL import Image
 
 
 def _write_image(path, size):
@@ -18,24 +16,15 @@ def _write_image(path, size):
 
 
 def test_scale_to_total_pixels_matches_comfyui_rounding():
-    # Replicates ComfyUI's ImageScaleToTotalPixels exactly — round(dim *
-    # sqrt(0.4MP / area) / 16) * 16 — so the size it picks for an image equals
-    # what the in-graph WAN 2.2 workflows produce for it. Values computed straight
-    # from the formula (0.4 MP, /16 stride).
     assert scale_to_total_pixels(1920, 1080) == (864, 480)
     assert scale_to_total_pixels(1080, 1920) == (480, 864)
     assert scale_to_total_pixels(864, 1536) == (480, 864)
     assert scale_to_total_pixels(1024, 1024) == (640, 640)
     assert scale_to_total_pixels(768, 1344) == (496, 864)
-    # A degenerate aspect never yields a zero dimension; the side that would
-    # round to 0 floors at the /16 stride.
     assert scale_to_total_pixels(10000, 1) == (64768, 16)
 
 
 def test_resolve_input_image_routes_by_annotation(tmp_path, monkeypatch):
-    # A LoadImage value resolves to a real file: a plain name (or "[input]") under
-    # the input dir, a "name [output]" under the output dir — the same routing
-    # ComfyUI's LoadImage does. Anything unresolvable is None.
     in_dir, out_dir = tmp_path / "input", tmp_path / "output"
     in_dir.mkdir()
     out_dir.mkdir()
@@ -47,14 +36,13 @@ def test_resolve_input_image_routes_by_annotation(tmp_path, monkeypatch):
     assert resolve_input_image_path("frame.png") == in_dir / "frame.png"
     assert resolve_input_image_path("frame.png [input]") == in_dir / "frame.png"
     assert resolve_input_image_path("gen.png [output]") == out_dir / "gen.png"
-    assert resolve_input_image_path("gen.png") is None       # not in the input dir
+    assert resolve_input_image_path("gen.png") is None
     assert resolve_input_image_path("missing.png") is None
     assert resolve_input_image_path("") is None
     assert resolve_input_image_path(None) is None
 
 
 def test_resolve_input_image_routes_a_temp_reference(tmp_path, monkeypatch):
-    # The third place LoadImage can point: ComfyUI's temp dir (bug 28).
     temp_dir = tmp_path / "temp"
     temp_dir.mkdir()
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path / "input")
@@ -66,9 +54,6 @@ def test_resolve_input_image_routes_a_temp_reference(tmp_path, monkeypatch):
 
 
 def test_resolve_input_image_takes_an_absolute_path_as_is(tmp_path, monkeypatch):
-    # Browse stores a full path verbatim (ComfyUI's LoadImage takes one outside
-    # its input folder unchanged), so the resolver must honor an absolute path
-    # rather than re-root it under the input dir.
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path / "input")
     img = tmp_path / "elsewhere" / "cat.png"
     img.parent.mkdir()
@@ -90,8 +75,6 @@ def test_override_size_reads_an_explicit_width_and_height():
 
 
 def test_override_size_is_none_without_a_complete_valid_pair():
-    # The locked (default) case carries no width/height, and a half-filled or
-    # non-positive/garbage value falls back to derivation rather than a bad size.
     assert override_size({}) is None
     assert override_size({"width": 1024}) is None
     assert override_size({"height": 576}) is None
@@ -101,8 +84,6 @@ def test_override_size_is_none_without_a_complete_valid_pair():
 
 
 def test_measure_derived_size_is_none_when_unmeasurable(tmp_path, monkeypatch):
-    # A missing, unset, or unreadable image yields None so a caller can fall back
-    # rather than crash.
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     (tmp_path / "notanimage.png").write_bytes(b"not really a png")
     assert measure_derived_size("") is None

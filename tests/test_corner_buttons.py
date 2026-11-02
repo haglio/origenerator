@@ -2,11 +2,6 @@ from __future__ import annotations
 
 import json
 
-from PyQt6.QtCore import QEvent, QPointF, QRect
-from PyQt6.QtGui import QEnterEvent
-from PyQt6.QtWidgets import QWidget
-
-from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.corner_buttons import (
     CORNER_SIZE,
@@ -16,6 +11,11 @@ from origenerator.gui.corner_buttons import (
     CornerButtons,
     enhance_state,
 )
+from PyQt6.QtCore import QEvent, QPointF, QRect
+from PyQt6.QtGui import QEnterEvent
+from PyQt6.QtWidgets import QWidget
+
+from origenerator import gallery
 
 
 def _image_row(**extra):

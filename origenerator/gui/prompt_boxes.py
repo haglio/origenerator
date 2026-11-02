@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
-from shared_ui.colors import AMBER, RED
+from shared_ui.colors import RED, YELLOW
 from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.spacing import GAP_SMALL
 
@@ -35,7 +35,7 @@ class Countdown(QLabel):
             self.hide()
             return
         self.setText(f"{left} left" if left >= 0 else f"{-left} over")
-        self.setStyleSheet(f"color: {(AMBER if left >= 0 else RED).name()};")
+        self.setStyleSheet(f"color: {(YELLOW if left >= 0 else RED).name()};")
         self.show()
 
 

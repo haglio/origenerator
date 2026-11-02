@@ -6,7 +6,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QApplication
-from shared_ui.colors import AMBER, BG_PRIMARY, RED, TEXT_MUTED
+from shared_ui.colors import BG_PRIMARY, RED, TEXT_MUTED, YELLOW
 from shared_ui.fonts import FONT_UI, SIZE_BODY
 from shared_ui.spacing import GAP_SMALL
 
@@ -73,10 +73,10 @@ def test_a_box_with_more_than_15_tokens_to_spare_shows_no_countdown(prompt):
 
 def test_a_box_counts_down_its_last_15_tokens_in_yellow(prompt):
     prompt.set_value(_words(60))
-    assert _shown(prompt) == [("15 left", AMBER.name())]
+    assert _shown(prompt) == [("15 left", YELLOW.name())]
 
     prompt.set_value(_words(75))
-    assert _shown(prompt) == [("0 left", AMBER.name())]
+    assert _shown(prompt) == [("0 left", YELLOW.name())]
 
 
 def test_the_countdown_follows_the_typing(prompt):
@@ -92,7 +92,7 @@ def test_a_prompt_read_whole_counts_down_to_what_its_reader_reads_well_then_how_
     prompt.set_reading(word_reading(511, READ_WHOLE))
 
     prompt.set_value(_words(500))
-    assert _shown(prompt) == [("11 left", AMBER.name())]
+    assert _shown(prompt) == [("11 left", YELLOW.name())]
 
     prompt.set_value(_words(514))
     assert _shown(prompt) == [("3 over", RED.name())]
@@ -113,7 +113,7 @@ def test_the_words_past_what_a_prompt_read_whole_reads_well_are_highlighted_in_y
     prompt.set_value("a b c d e")
 
     (box,) = prompt.boxes()
-    assert _past_the_limit(box) == [("d e", AMBER.name(), BG_PRIMARY.name())]
+    assert _past_the_limit(box) == [("d e", YELLOW.name(), BG_PRIMARY.name())]
 
 
 def test_on_a_tab_showing_an_item_only_the_prompts_own_words_past_the_limit_are_yellow(qtbot):
@@ -138,7 +138,7 @@ def test_a_sound_prompt_counts_down_to_where_its_reader_stops_and_grays_past_it_
 
     assert _shown(sound) == [("3 over", RED.name())]
     (box,) = sound.boxes()
-    assert _past_the_limit(box) == [(_words(3), AMBER.name(), TEXT_MUTED.name())]
+    assert _past_the_limit(box) == [(_words(3), YELLOW.name(), TEXT_MUTED.name())]
 
 
 def test_a_prompt_whose_reader_is_not_installed_counts_nothing(prompt):
@@ -175,7 +175,7 @@ def test_each_scene_counts_down_its_own_prompts(qtbot):
     form.set_values({"positive_prompt": story_of([_words(5), _words(500)])})
 
     assert [_shown(scene) for scene in form._scenes._scenes] == [
-        [], [("11 left", AMBER.name())]]
+        [], [("11 left", YELLOW.name())]]
 
 
 @pytest.fixture
@@ -402,7 +402,7 @@ def test_a_prompt_not_in_use_hides_its_countdown_and_shows_it_again_once_used(qt
     assert _shown(prompt) == []
 
     set_in_use(prompt, form._labels["positive_prompt"], None, "")
-    assert _shown(prompt) == [("1 left", AMBER.name())]
+    assert _shown(prompt) == [("1 left", YELLOW.name())]
 
 
 def test_a_prompt_not_in_use_hides_its_yellow_and_shows_it_again_once_used(qtbot):
@@ -416,7 +416,7 @@ def test_a_prompt_not_in_use_hides_its_yellow_and_shows_it_again_once_used(qtbot
     assert _past_the_limit(box) == []
 
     prompt.set_in_use(True, "")
-    assert _past_the_limit(box) == [("d", AMBER.name(), BG_PRIMARY.name())]
+    assert _past_the_limit(box) == [("d", YELLOW.name(), BG_PRIMARY.name())]
 
 
 def test_a_scene_that_speaks_hides_its_prompts_countdowns(qtbot):
@@ -483,7 +483,7 @@ def test_a_prompt_made_before_the_boxes_opens_cut_where_sdxl_cut_it(made_before_
 
     assert _texts(made_before_the_boxes) == [f"{_words(74)} d", "og"]
     assert made_before_the_boxes.value() == _CUT_IN_HALF
-    assert _shown(made_before_the_boxes) == [("0 left", AMBER.name())]
+    assert _shown(made_before_the_boxes) == [("0 left", YELLOW.name())]
 
 
 def test_a_prompt_made_before_the_boxes_is_no_change_to_itself(made_before_the_boxes):

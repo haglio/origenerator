@@ -33,14 +33,9 @@ def _is_tainted(node, names: set[str], holders: set[str]) -> bool:
     return any(_is_tainted(part, names, holders) for part in parts)
 
 
-def _names_handed_to_the_pane_as_its_engine(tree) -> set[str]:
-    handed = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.keyword) and node.arg == "engine_for":
-            for lamb in ast.walk(node.value):
-                if isinstance(lamb, ast.Lambda):
-                    handed |= {name.id for name in ast.walk(lamb.body) if isinstance(name, ast.Name)}
-    return handed
+def _what_is_handed_to_the_pane_as_its_engine(tree) -> list:
+    return [lamb.body for node in ast.walk(tree) if isinstance(node, ast.keyword) and node.arg == "engine_for"
+            for lamb in ast.walk(node.value) if isinstance(lamb, ast.Lambda)]
 
 
 def _assignments(tree):
@@ -78,8 +73,9 @@ def _opens_an_engine(node) -> bool:
 
 def engine_reaches(source: str, measured_holders: set[str]) -> list[int]:
     tree = ast.parse(source)
-    names = _names_handed_to_the_pane_as_its_engine(tree)
-    holders = set(measured_holders)
+    handed = _what_is_handed_to_the_pane_as_its_engine(tree)
+    names = {body.id for body in handed if isinstance(body, ast.Name)}
+    holders = set(measured_holders) | {body.attr for body in handed if isinstance(body, ast.Attribute)}
     _follow_the_aliases(tree, names, holders)
     reaches = []
     for node in ast.walk(tree):
@@ -150,6 +146,7 @@ def test_only_the_pane_reaches_a_funestras_engine(measured_holders):
     "def f(self):\n    if (held := self._pane._engine):\n        held.seek_ms(1)\n",
     "def f(self):\n    getattr(self._pane, '_engine').seek_ms(1)\n",
     "def f(self, player):\n    Pane(engine_for=lambda _id: player)\n    player.seek_ms(1)\n",
+    "def f(self, wiring):\n    Pane(engine_for=lambda _id: wiring.player)\n    wiring.player.seek_ms(1)\n",
     "from funestra.mpv_engine import MpvEngine\n",
 ])
 def test_the_measure_sees_each_way_of_reaching_it(source):
@@ -158,6 +155,7 @@ def test_the_measure_sees_each_way_of_reaching_it(source):
 
 @pytest.mark.parametrize("source", [
     "def f(self, player):\n    Pane(engine_for=lambda _id: player)\n",
+    "def f(self, wiring):\n    Pane(engine_for=lambda _id: wiring.player)\n    wiring.radio.play()\n",
     "from origenerator import motion_engine\n\ndef f(state):\n    return motion_engine.position(state)\n",
     "def f(self):\n    self._pane.close_engine()\n",
 ])

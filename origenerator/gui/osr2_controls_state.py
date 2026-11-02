@@ -70,7 +70,10 @@ class Osr2Situation:
     broker_running: bool = True
 
 
-def osr2_controls_hud(motion, situation: Osr2Situation = Osr2Situation()) -> MainHud:
+USUAL_SITUATION = Osr2Situation()
+
+
+def osr2_controls_hud(motion, situation: Osr2Situation = USUAL_SITUATION) -> MainHud:
     shown = osr2_controls_state(motion, situation)
     return MainHud(
         main_hud_model=MainHudModel(
@@ -94,7 +97,7 @@ class Osr2ControlsState:
     osr2_controls: tuple = ()
 
 
-def osr2_controls_state(motion, situation: Osr2Situation = Osr2Situation()) -> Osr2ControlsState:
+def osr2_controls_state(motion, situation: Osr2Situation = USUAL_SITUATION) -> Osr2ControlsState:
     device, trouble, control = situation.device, situation.trouble, situation.control
     script, broker_running = situation.script, situation.broker_running
     on = device is not Osr2Mode.OFF

@@ -1,10 +1,3 @@
-"""The OSR2 motion's shared key cluster.
-
-Every surface that can drive the device answers these keys through one helper, so
-the muscle memory carries from genau — and so a slip here is a slip on all of
-them at once. Nothing exercised it: giving J the speed-up L has left 184 tests
-green across the five files that reach it.
-"""
 from __future__ import annotations
 
 import pytest
@@ -14,20 +7,15 @@ from origenerator.gui.motion_hud import apply_motion_key
 
 
 class _Motion:
-    """Records what a keystroke asked of the driver, in the driver's own words."""
-
     def __init__(self):
         self.asked = []
 
     def __getattr__(self, name):
         if name.startswith("_"):
-            raise AttributeError(name)  # not a request, just Python looking around
+            raise AttributeError(name)
         return lambda *args: self.asked.append((name, *args))
 
 
-# Each key and the one move it makes. The signs are the point: J and L are the
-# same call in opposite directions, as are 7/9 and U/O, and a pair that agreed
-# would leave one of the two keys doing nothing a user could see.
 _KEYS = [
     (Qt.Key.Key_Space, ("toggle",)),
     (Qt.Key.Key_J, ("adjust_speed", -5)),
@@ -54,8 +42,6 @@ def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
 @pytest.mark.parametrize("key", [Qt.Key.Key_K, Qt.Key.Key_Slash],
                          ids=lambda v: getattr(v, "name", None))
 def test_a_key_the_cluster_does_not_answer_falls_through_untouched(key):
-    # False is how the caller learns the key is still its own to handle — a
-    # surface's own shortcuts live on the other side of this return.
     motion = _Motion()
 
     assert apply_motion_key(motion, key) is False
@@ -63,15 +49,10 @@ def test_a_key_the_cluster_does_not_answer_falls_through_untouched(key):
 
 
 def test_no_driver_means_every_key_falls_through():
-    # Inside a Fun Time session the OSR2 is the Main Funestra's alone and this app
-    # holds no driver at all, so none of these keys may be swallowed here.
     assert apply_motion_key(None, Qt.Key.Key_Space) is False
 
 
 def test_space_reaches_the_switch_it_is_given_rather_than_the_motions_own():
-    # Driving is one switch — the gallery's — which picks the funscript or the
-    # motion by what is playing. Space starting a second source alongside a
-    # script already streaming is the failure this argument exists to prevent.
     motion = _Motion()
     pressed = []
 

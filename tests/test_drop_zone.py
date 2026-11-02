@@ -1,4 +1,3 @@
-"""DropZone: a kind-gated drop target for a dragged gallery generation."""
 from __future__ import annotations
 
 import pytest
@@ -35,8 +34,7 @@ def _images_only(pid):
 
 
 def _drop(zone, pid):
-    # Hold the QMimeData in a local: the event stores only a C++ pointer to it, so
-    # a temporary would be GC'd before dropEvent reads it (a dangling-pointer crash).
+    # The event stores only a C++ pointer to the QMimeData: keep it alive in a local.
     mime = generation_mime(pid)
     ev = QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                     Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
@@ -85,7 +83,7 @@ def test_dropping_a_disallowed_id_is_ignored(qtbot):
 
     _drop(zone, "vid9")
 
-    assert zone.current_id() is None  # it lends this zone nothing
+    assert zone.current_id() is None
 
 
 def test_drag_enter_accepts_only_allowed_ids(qtbot):
@@ -114,7 +112,7 @@ def test_clear_on_an_empty_zone_does_not_notify(qtbot):
 
     zone.clear()
 
-    assert seen == []  # idempotent: nothing to clear, no spurious change
+    assert seen == []
 
 
 def test_a_filled_zone_names_its_item_under_its_image(qtbot):
@@ -184,7 +182,7 @@ def test_a_video_preview_animates(qtbot, tmp_path):
 
     movie = zone._label.movie()
     assert isinstance(movie, QMovie)
-    assert movie.state() == QMovie.MovieState.Running  # looping, not a still
+    assert movie.state() == QMovie.MovieState.Running
 
 
 def test_emptying_a_zone_stops_the_clip_it_was_looping(qtbot, tmp_path):
@@ -200,22 +198,18 @@ def test_emptying_a_zone_stops_the_clip_it_was_looping(qtbot, tmp_path):
 
 
 def test_a_grayscale_zone_drains_the_clip_it_holds(qtbot, tmp_path):
-    # The video zone holds a source video, not a result: in color it reads as a second
-    # subject beside the image it will animate.
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     zone = _zone(qtbot, kind="video", preview=lambda pid: (None, webp), grayscale=True)
 
     _drop(zone, "vid1")
 
-    assert zone._label.movie() is None  # frames come across as pixmaps, drained
+    assert zone._label.movie() is None
     color = zone._label.pixmap().toImage().pixelColor(2, 2)
     assert color.red() == color.green() == color.blue()
-    assert zone._movie.state() == QMovie.MovieState.Running  # still looping
+    assert zone._movie.state() == QMovie.MovieState.Running
 
 
 def test_a_grayscale_zone_drains_a_still_too(qtbot, tmp_path):
-    # An i2v video with no animated preview shows its stored frame; it is held
-    # for the same reason and reads the same way.
     still = tmp_path / "thumb.png"
     Image.new("RGB", (40, 30), (200, 30, 30)).save(still)
     zone = _zone(qtbot, kind="video", preview=lambda pid: (str(still), None),
@@ -270,7 +264,6 @@ def test_a_drag_the_zone_would_turn_away_does_not_light_it(qtbot):
 
 
 def test_a_drag_carrying_no_gallery_item_is_turned_away(qtbot):
-    # A file dragged in from outside the app, say.
     zone = _zone(qtbot)
     mime = QMimeData()
     mime.setText("elsewhere.png")
@@ -334,14 +327,14 @@ def test_accepts_delegates_to_the_predicate(qtbot):
 def test_the_item_type_icon_appears_only_once_filled(qtbot, kind):
     zone = _zone(qtbot, kind=kind)
     icon = zone.findChild(ItemTypeIcon)
-    assert icon.media_type == kind      # an item type icon, so you know what goes here
-    assert icon.isHidden()               # nothing dropped yet (isHidden works offscreen)
+    assert icon.media_type == kind
+    assert icon.isHidden()
 
     _drop(zone, "x1")
     assert not icon.isHidden()
 
     zone.clear()
-    assert icon.isHidden()               # back to a bare drop zone
+    assert icon.isHidden()
 
 
 def _actions(zone) -> dict:

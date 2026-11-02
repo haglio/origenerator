@@ -113,6 +113,7 @@ class FunestraSlideshow(QObject):
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._status = FunestraStatus()
+        self._has_funscript = False
         self._has_osr2 = False
         self._funestra_locked = False
         self._locked = False
@@ -251,6 +252,7 @@ class FunestraSlideshow(QObject):
     def _follow_the_funestra(self, fields: dict) -> None:
         status = parse_status(fields)
         self._status = status
+        self._has_funscript = fields.get("has_funscript") == "1"
         self._funestra_locked = status.locked
         self._on_screen.observe(status.video, now=self._clock())
         if status.video and status.video != self._showing:
@@ -425,7 +427,7 @@ class FunestraSlideshow(QObject):
 
     @property
     def has_funscript(self) -> bool:
-        return self._status.has_funscript
+        return self._has_funscript
 
     @property
     def has_osr2(self) -> bool:

@@ -1419,6 +1419,9 @@ class SpyDB:
     def __init__(self, durations=None):
         self._durations = durations or []
 
+    def list_trashed(self):
+        return []
+
     def recent_durations(self, workflow_name, limit=10):
         return list(self._durations)
 

@@ -1,15 +1,3 @@
-"""The other trailing tile in a settings folder: ask for the same thing, said
-differently.
-
-The New tile beside it keeps the words and changes the seed. This one is its
-mirror — it keeps the seeds and changes the words, running the folder again with
-the prompt rewritten, so what comes back is the same set of images said another
-way rather than a new set of images.
-
-Pressing it launches nothing: it opens a Generate tab where the folder's own
-prompt is there to be edited by hand, the folder's images filling the preview
-above it.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -19,8 +7,6 @@ from origenerator.gui import tile_shape
 
 _IDLE_FRAME_CSS = tile_shape.idle_css("folderModifyTile")
 
-# A pencil rather than a plus: the tile next door makes another one of these, and
-# this one writes on them.
 _MARK_PX = 48
 
 _CAPTION = "Modify (all seeds)"
@@ -31,8 +17,6 @@ _TOOLTIP = (
 
 
 class FolderModifyTile(QFrame):
-    """A tile that opens this folder's prompt for a rewrite."""
-
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -53,7 +37,7 @@ class FolderModifyTile(QFrame):
         self._caption = QLabel(_CAPTION)
         self._caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._caption.setWordWrap(True)
-        tile_shape.style_caption(self._caption)  # the grid's shared caption size
+        tile_shape.style_caption(self._caption)
         layout.addWidget(self._caption)
 
     def mousePressEvent(self, event):

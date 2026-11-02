@@ -54,8 +54,6 @@ def _images(job) -> list[Path]:
     return sorted(Path(job["work"], "images").glob("*.jpg"))
 
 
-# --- prepare ---------------------------------------------------------------------
-
 def test_every_usable_picture_is_copied_in_as_a_jpeg_no_wider_than_the_trainer_wants(
         tmp_path, capsys):
     job = _job(tmp_path, {"qzx wide.png": _picture((3000, 1500)),
@@ -118,8 +116,6 @@ def test_a_folder_with_no_usable_picture_stops_the_training_and_says_where_to_pu
     assert "qzx" not in str(stopped.value)
 
 
-# --- describe ---------------------------------------------------------------------
-
 def test_every_copy_without_a_description_gets_one_and_none_is_ever_printed(tmp_path, capsys):
     job = _job(tmp_path, {"one.png": _picture(), "two.png": _picture(color=(0, 0, 200))})
     look_lora_trainer.prepare(job)
@@ -154,8 +150,6 @@ def test_describing_waits_for_the_graphics_card_before_it_loads_its_model(tmp_pa
     assert order == ["waited", "described"]
 
 
-# --- dataset ---------------------------------------------------------------------
-
 def test_the_dataset_puts_the_trigger_words_before_every_description(tmp_path):
     job = _job(tmp_path, {"one.png": _picture()})
     look_lora_trainer.prepare(job)
@@ -187,8 +181,6 @@ def test_a_lora_trained_on_no_word_gets_the_bare_descriptions(tmp_path):
 
     assert copy.with_suffix(".txt").read_text(encoding="utf-8") == "a fabricated description"
 
-
-# --- cache ------------------------------------------------------------------------
 
 def test_caching_runs_musubis_two_cache_programs_on_the_dataset_while_the_tile_is_idle(
         tmp_path, monkeypatch):
@@ -224,8 +216,6 @@ def test_a_cache_program_that_fails_stops_the_training_and_names_the_log(tmp_pat
 
     assert job["log"] in str(stopped.value)
 
-
-# --- waiting for the graphics card ------------------------------------------------
 
 class _Machine:
     def __init__(self, waiting=(), memory=(), held=(False,), claims=(True,)):
@@ -295,8 +285,6 @@ def test_a_tile_another_trainer_took_first_is_waited_for_again(tmp_path):
     assert machine.claimed == 2
 
 
-# --- training ---------------------------------------------------------------------
-
 def _fake_trainer(tmp_path, body: str) -> Path:
     script = tmp_path / "fake_trainer.py"
     script.write_text(body, encoding="utf-8")
@@ -314,9 +302,7 @@ _BELOW_NORMAL = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
 
 
 def _popen_the_fake(job):
-    """The fake trainer at the suite's own priority: the real one runs below normal
-    so his generations come first, and on a machine whose cores are full of other
-    sessions' test runs a child at that priority can wait longer than a test may."""
+    """The real trainer runs below normal priority; a fake child at that priority can wait longer than a test may on a machine with full cores."""
     def popen(command, **options):
         options["creationflags"] = options.get("creationflags", 0) & ~_BELOW_NORMAL
         return subprocess.Popen([sys.executable, job["trainer_program"], *command], **options)
@@ -423,8 +409,6 @@ def test_the_training_command_asks_musubi_for_a_krea_2_lora_at_the_settings_his_
     assert "--turbo_lora" not in command
 
 
-# --- install ----------------------------------------------------------------------
-
 def test_the_finished_lora_is_installed_under_its_version_and_the_training_records_what_it_trained_on(tmp_path):
     job = _job(tmp_path, picture_stamps={"pictures/one.png": [10, 20]})
     output = Path(job["work"], "output")
@@ -456,8 +440,6 @@ def test_no_installed_lora_is_ever_overwritten(tmp_path):
 
     assert (Path(job["lora_folder"]) / "Example Look 1.1.safetensors").read_bytes() == b"old"
 
-
-# --- the whole run and its entry point ------------------------------------------------
 
 def test_a_whole_run_takes_the_steps_in_order_and_describes_in_a_program_of_its_own(tmp_path, monkeypatch):
     job = _job(tmp_path)

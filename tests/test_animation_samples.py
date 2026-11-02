@@ -1,8 +1,3 @@
-"""Which finished videos stand as the sample for each animation, and the order
-the 72 are worked through.
-
-Acts and states are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -95,8 +90,6 @@ def test_only_a_looping_clip_is_an_example_for_the_loop_lane(samples):
 
 
 def test_an_animation_the_table_rules_out_gets_no_example_however_it_was_made(samples):
-    # A video of an action its own image cannot start is a video made before the
-    # image was sorted, or sorted since: the table is what decides.
     rows = [_image("pic", "state one"), _video("clip", made_from="pic", action="beta",
                                               starred=1)]
 
@@ -114,8 +107,6 @@ def test_the_newest_kept_clip_leads(samples):
 
     assert [row["prompt_id"] for row in found] == ["newest", "older"]
 
-
-# --- the order the 72 are worked through -------------------------------------
 
 
 def test_the_animations_with_the_most_kept_clips_come_first(samples):
@@ -138,7 +129,7 @@ def test_the_animations_with_nothing_behind_them_fall_to_the_end(samples):
     order = animation_samples.paths_in_order(rows, content=_PATHS)
 
     assert order[0] == (VIDEO, "alpha", "state one")
-    assert len(order) == 4  # every animation the table holds, none dropped
+    assert len(order) == 4
 
 
 def test_animations_nothing_separates_keep_the_tables_own_order(samples):

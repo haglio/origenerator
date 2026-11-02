@@ -1,5 +1,3 @@
-"""Each animation's sample, and the order they are worked through: a video the
-user kept of that action from an image sorted that way, most-kept first."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -11,7 +9,7 @@ from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 
-Path = tuple[str, str, str]  # lane, action, state
+Path = tuple[str, str, str]
 
 
 def _made(row: dict) -> str:
@@ -38,8 +36,6 @@ def _kept_videos(rows: list[dict]) -> list[dict]:
 
 def samples_by_path(rows: list[dict], *, content: dict | None = None
                      ) -> dict[Path, list[dict]]:
-    """Every kept video that stands as a sample, by the animation it is one of,
-    newest first; one serves the loop lane only if a looping workflow made it."""
     states = _states_by_image(rows)
     found: dict[Path, list[dict]] = defaultdict(list)
     for video in sorted(_kept_videos(rows), key=_made, reverse=True):
@@ -56,8 +52,6 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
 
 
 def paths_in_order(rows: list[dict], *, content: dict | None = None) -> list[Path]:
-    """Every animation the table holds, by how many kept videos it has and then by
-    the table's own order, so two runs list them the same way."""
     samples = samples_by_path(rows, content=content)
     listed = animation_paths.every_path(content=content)
     return sorted(listed, key=lambda path: -len(samples.get(path, ())))

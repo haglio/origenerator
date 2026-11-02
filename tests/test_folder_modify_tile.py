@@ -1,4 +1,3 @@
-"""The tile that opens a folder's prompt for a rewrite."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, Qt
@@ -21,8 +20,6 @@ def _click(tile):
 def test_the_tile_says_what_it_keeps_and_what_it_changes(qtbot):
     tile = FolderModifyTile()
     qtbot.addWidget(tile)
-    # The New tile next door changes the seed; this one keeps it, and the
-    # caption is the only place that difference is stated.
     assert tile._caption.text() == "Modify (all seeds)"
     assert "seed" in tile.toolTip()
 
@@ -42,8 +39,6 @@ def test_clicking_the_tile_asks_for_the_rewrite(qtbot):
 
 
 def test_the_tile_is_the_same_size_as_the_one_beside_it(qtbot):
-    # They stand shoulder to shoulder in the same flow as the thumbnails, so a
-    # tile of its own size would break the row.
     request, reroll = FolderModifyTile(), NewTile()
     qtbot.addWidget(request)
     qtbot.addWidget(reroll)

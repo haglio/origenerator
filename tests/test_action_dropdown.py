@@ -1,15 +1,8 @@
-"""The row on a Generate tab saying what the item it is showing shows.
-
-States are the committed example overlay's own (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
 
 import pytest
-from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
-from shared_ui.spacing import GAP_MEDIUM
-
 from origenerator.gui import action_dropdown
 from origenerator.gui.action_dropdown import (
     ACTION_LABEL,
@@ -17,6 +10,8 @@ from origenerator.gui.action_dropdown import (
     ActionDropdown,
 )
 from origenerator.gui.label_cells import LabelForm
+from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
+from shared_ui.spacing import GAP_MEDIUM
 
 _STATES = ("state one", "state two", "state three")
 _ACTIONS_OFFERED = ("action one", "action two")
@@ -169,8 +164,6 @@ def test_the_list_opens_wide_enough_for_the_longest_action(dropdown):
 
 def test_a_button_beside_the_list_opens_the_window_that_answers_for_them_all(
         dropdown, monkeypatch):
-    """The same window its own launcher opens, built in one place, so the two
-    cannot come to show different images."""
     said = []
     monkeypatch.setattr(QMessageBox, "information",
                         lambda parent, title, text: said.append(text))
@@ -202,7 +195,6 @@ def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second
 
 
 def test_the_button_beside_the_list_says_what_pressing_it_sets(dropdown):
-    """His words for what that button does: "set image actions"."""
     button = dropdown.findChild(QPushButton, SORT_BUTTON)
 
     assert (button.text(), button.toolTip()) == (
@@ -212,8 +204,6 @@ def test_the_button_beside_the_list_says_what_pressing_it_sets(dropdown):
 
 
 def test_pressing_it_starts_on_the_image_in_front_of_him(dropdown, monkeypatch):
-    """His words: it "should start with the current image, then go on to the usual
-    queue", so the window is told which image is on display."""
     opened = []
     monkeypatch.setattr(QMessageBox, "information", lambda parent, title, text: None)
     monkeypatch.setattr(action_dropdown, "the_sorting_window",

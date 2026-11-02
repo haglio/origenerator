@@ -1,14 +1,8 @@
-"""A run's toast raised on the desktop, and taken back by the run it is about.
-
-Nothing here raises one: a toast raised by a test is a toast on the
-user's screen. What Windows is handed is caught at its door instead.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
-from origenerator import toast_raising, windows_toast
 from origenerator.run_toast import Toast
+
+from origenerator import toast_raising, windows_toast
 
 _RUN = "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 

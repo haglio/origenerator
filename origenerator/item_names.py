@@ -1,4 +1,3 @@
-"""Every item's name, kept current with the library and the numbers it has handed out."""
 from __future__ import annotations
 
 from collections import defaultdict

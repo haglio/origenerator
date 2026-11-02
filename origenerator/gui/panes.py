@@ -30,9 +30,6 @@ def pane_border() -> QFrame:
 
 
 class PaneSplitter(QSplitter):
-    """Panes parted by the thick handle that is dragged to resize them, none of
-    which can be dragged shut."""
-
     def __init__(self, orientation: Qt.Orientation, remembered_as: str = ""):
         super().__init__(orientation)
         self.remembered_as = remembered_as
@@ -65,9 +62,6 @@ def hold_the_borders_still(within: QWidget, held: bool) -> None:
 
 
 class RememberedBorders:
-    """Where each remembered border of a window was last dragged, kept while the
-    window's panes stand in a shape that is not theirs."""
-
     def __init__(self, window: QWidget):
         self._window = window
         self._sizes: dict[str, list[int]] = {}
@@ -94,9 +88,6 @@ class RememberedBorders:
 
 
 class FootSplitter(PaneSplitter):
-    """Panes stacked over a foot that opens at the foot's own height and follows
-    it as that changes, until its handle is dragged."""
-
     def __init__(self, remembered_as: str = ""):
         super().__init__(Qt.Orientation.Vertical, remembered_as)
 

@@ -1,8 +1,3 @@
-"""Folding one record of a file into the record that stays, with no startup
-pass around it: what the folded record carried goes to the one that stays.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json

@@ -11,8 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class TaskbarIdentity(QObject):
-    """Dresses each window at its Show event, which Qt sends before mapping the
-    window and so before Windows makes its taskbar button from what it wears."""
+    """Qt sends the Show event before mapping the window, so before Windows makes its taskbar button from what the window wears."""
 
     def __init__(self, app: QApplication, own: str, own_app: TaskbarApp | None, *,
                  dress: Callable[[int, str, TaskbarApp | None], None],

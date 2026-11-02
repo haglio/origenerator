@@ -1,5 +1,3 @@
-"""A child process a test waits on: how it runs, how it ends, and what the test
-says when one hangs."""
 from __future__ import annotations
 
 import faulthandler

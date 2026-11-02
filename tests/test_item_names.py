@@ -1,16 +1,12 @@
-"""Every item in the library wears one name: its folder's code and its number there.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
 
 import pytest
-
-from origenerator import gallery
 from origenerator.db import Database
 from origenerator.item_names import ItemNames
+
+from origenerator import gallery
 
 
 def _image(prompt_id: str, id_: int, prompt: str = "a red kite", **extra) -> dict:

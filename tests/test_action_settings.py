@@ -1,13 +1,3 @@
-"""action_settings: pick the one best set of settings for a dropdown action from the gallery.
-
-Each action maps to one set of settings — the most-used model+params among the user's
-videos of that action — resolved fresh from the gallery rows. Which action a video is
-of is the one picked for it when it was launched, never a reading of its prompt.
-Pure and Qt-free, so the grouping and action-matching logic is exercised without a
-database or a widget.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -16,8 +6,6 @@ from origenerator import action_settings
 
 
 def _video(pid, action, created, **params):
-    """A completed i2v row: the action it was launched as, created_at (recency), and
-    the params that define its settings."""
     return {
         "prompt_id": pid,
         "workflow_name": "wan22_i2v",
@@ -30,19 +18,16 @@ def _video(pid, action, created, **params):
 
 
 def _loop(pid, action, created, **params):
-    """The same row from a looping workflow — the only kind Genau settings can
-    come from, since a Genau video has to return to the frame it started on."""
     return {**_video(pid, action, created, **params), "workflow_name": "wan22_flf2v_loop"}
 
 
 def test_most_used_video_picks_the_most_used_settings_for_the_action():
     rows = [
         _video("a1", "alpha", "2026-01-01", lora_high="X", steps=20),
-        _video("a2", "alpha", "2026-01-02", lora_high="X", steps=20),  # same settings as a1
-        _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),  # rarer settings
-        _video("h1", "beta", "2026-01-09", lora_high="Z", steps=20),   # a different action
+        _video("a2", "alpha", "2026-01-02", lora_high="X", steps=20),
+        _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),
+        _video("h1", "beta", "2026-01-09", lora_high="Z", steps=20),
     ]
-    # settings X (used twice) beat settings Y (once); its most-recent row represents it.
     assert action_settings.most_used_video("alpha", rows) == "a2"
 
 
@@ -63,22 +48,16 @@ def test_available_categories_are_those_with_a_video_to_mine_or_pinned_settings(
         _video("h1", "beta", "2026-01-01", lora_high="Z"),
         _video("c1", "epsilon", "2026-01-02", lora_high="Z"),
     ]
-    # The actions the gallery can mine settings for, plus "gamma" — the example
-    # overlay pins settings for it, so it needs no past video. The rest have
-    # nothing to answer with, so Combine greys them out.
     assert action_settings.available_categories(rows) == {"beta", "epsilon", "gamma"}
 
 
 def test_available_categories_offers_only_curated_actions_without_any_video():
-    # An empty gallery leaves nothing to mine — only the overlay-curated action stands.
     assert action_settings.available_categories([]) == {"gamma"}
 
 
-# --- pinned_settings: the overlay's hand-tuned action settings --------------------
-
 
 def test_a_curated_action_takes_the_settings_the_overlay_names():
-    spec = action_settings.pinned_settings("gamma")  # curated in the example overlay
+    spec = action_settings.pinned_settings("gamma")
     assert spec["workflow"] == "wan22_i2v"
     assert spec["params"]["lora_high"] == "example-action-high.safetensors"
 
@@ -88,11 +67,10 @@ def test_pinned_settings_are_none_for_an_unpinned_action():
 
 
 def test_pinned_settings_are_none_for_a_malformed_entry(monkeypatch):
-    # A bad entry must send the caller to mining, never fail the action outright.
     monkeypatch.setitem(action_settings._CURATED_BY_INTENT, action_settings.VIDEO,
                         {"beta": "not a dict", "epsilon": {"params": {}}})
-    assert action_settings.pinned_settings("beta") is None      # not a dict
-    assert action_settings.pinned_settings("epsilon") is None   # names no workflow
+    assert action_settings.pinned_settings("beta") is None
+    assert action_settings.pinned_settings("epsilon") is None
 
 
 def test_most_used_video_groups_ignoring_prompt_seed_and_input_image():
@@ -101,30 +79,24 @@ def test_most_used_video_groups_ignoring_prompt_seed_and_input_image():
         _video("a2", "alpha", "2026-01-02", lora_high="X", seed=2, noise_seed=8, input_image="i2.png"),
         _video("b1", "alpha", "2026-01-03", lora_high="Y", seed=3, input_image="i3.png"),
     ]
-    # a1 and a2 differ only in prompt/seed/frame — one set of settings, used twice — so it wins.
     assert action_settings.most_used_video("alpha", rows) == "a2"
 
 
 def test_settings_grouping_ignores_derived_size_and_length_params():
-    # Same model+LoRA, but different output size (derived from the input image), video
-    # length, and sampler split points — none of which define the settings.
     rows = [
         _video("a1", "alpha", "2026-01-01", lora_high="X", steps=20,
                width=512, height=768, frame_count=81, start_at_step=10, end_at_step=10000, frame_rate=16.0),
         _video("a2", "alpha", "2026-01-02", lora_high="X", steps=20,
                width=1024, height=576, frame_count=121, start_at_step=10, end_at_step=20, frame_rate=24.0),
-        _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),  # a real difference: the LoRA
+        _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),
     ]
-    # a1 and a2 are one set of settings (used twice) despite differing size/length → it wins,
-    # represented by the most recent (a2). Without the exclusions they'd each be a
-    # singleton and the newest overall (b1) would win instead.
     assert action_settings.most_used_video("alpha", rows) == "a2"
 
 
 def test_most_used_video_breaks_count_ties_by_recency():
     rows = [
-        _video("a1", "alpha", "2026-01-01", lora_high="X"),  # settings used once, older
-        _video("b1", "alpha", "2026-01-05", lora_high="Y"),  # settings used once, newer
+        _video("a1", "alpha", "2026-01-01", lora_high="X"),
+        _video("b1", "alpha", "2026-01-05", lora_high="Y"),
     ]
     assert action_settings.most_used_video("alpha", rows) == "b1"
 
@@ -138,19 +110,15 @@ def test_most_used_video_keeps_each_action_to_the_videos_launched_as_it():
     assert action_settings.most_used_video("delta", rows) == "f1"
     assert action_settings.most_used_video("epsilon", rows) == "c1"
     assert action_settings.most_used_video("dancing", rows) == "d1"
-    assert action_settings.most_used_video("beta", rows) is None  # nothing was made as this action
+    assert action_settings.most_used_video("beta", rows) is None
 
-
-# --- the two lanes: a full-length video, or one looping cycle ----------------
 
 
 def test_genau_mines_only_looping_videos():
     rows = [
-        _video("v1", "beta", "2026-01-01", lora_high="Z"),   # long-form: not a loop
+        _video("v1", "beta", "2026-01-01", lora_high="Z"),
         _loop("l1", "beta", "2026-01-02", lora_high="Z"),
     ]
-    # The video lane sees both and prefers the newer of the one shared set of settings;
-    # the Genau lane can only use the loop, whatever else the action has under it.
     assert action_settings.most_used_video("beta", rows) == "l1"
     assert action_settings.most_used_video("beta", rows, action_settings.GENAU) == "l1"
 
@@ -164,23 +132,16 @@ def test_genau_available_categories_need_a_loop_or_pinned_settings():
         _video("v1", "epsilon", "2026-01-01", lora_high="Z"),
         _loop("l1", "delta", "2026-01-02", lora_high="Z"),
     ]
-    # epsilon has a video but no loop, so the Genau lane cannot answer it; delta can
-    # be mined from the loop; beta is pinned in the example overlay's pinned_genau_settings.
     assert action_settings.available_categories(rows, action_settings.GENAU) == {"delta", "beta"}
-    # The video lane is unchanged by any of it — a loop is still a video there.
     assert action_settings.available_categories(rows) == {"epsilon", "delta", "gamma"}
 
 
 def test_the_two_curated_tables_are_independent():
-    # The same action can be pinned in one lane and mined in the other: one table keyed
-    # by action alone could never hold both.
     assert action_settings.pinned_settings("gamma")["workflow"] == "wan22_i2v"
     assert action_settings.pinned_settings("gamma", action_settings.GENAU) is None
     assert action_settings.pinned_settings("beta", action_settings.GENAU)["workflow"] == "wan22_flf2v_loop"
     assert action_settings.pinned_settings("beta") is None
 
-
-# --- action_of: what a generation shows -------------------------------------------
 
 
 def test_a_generation_shows_the_action_picked_for_it_in_combine():

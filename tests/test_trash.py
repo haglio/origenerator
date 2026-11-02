@@ -20,7 +20,7 @@ def test_store_moves_files_off_their_original_paths(tmp_path):
 
     batch = trash.store([src])
 
-    assert not src.exists()  # gone from where the user had it
+    assert not src.exists()
     assert len(batch.moves) == 1
     original, trashed = batch.moves[0]
     assert original == src
@@ -78,7 +78,6 @@ def test_restore_recreates_a_missing_parent_directory(tmp_path):
     src = _file(tmp_path / "out" / "sub" / "a.png")
     trash = Trash(tmp_path / "trash")
     batch = trash.store([src])
-    # The folder emptied out after the move; restore must rebuild the path.
     (tmp_path / "out" / "sub").rmdir()
 
     batch.restore()
@@ -95,7 +94,7 @@ def test_purge_permanently_removes_trashed_files(tmp_path):
     batch.purge()
 
     assert not trashed.exists()
-    assert not src.exists()  # purge is the opposite of restore — nothing comes back
+    assert not src.exists()
 
 
 def test_store_keeps_same_named_files_from_different_folders_apart(tmp_path):
@@ -114,8 +113,8 @@ def test_store_with_no_files_is_a_harmless_noop(tmp_path):
     trash = Trash(tmp_path / "trash")
     batch = trash.store([])
     assert batch.moves == []
-    batch.restore()  # must not raise
-    batch.purge()    # must not raise
+    batch.restore()
+    batch.purge()
 
 
 def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
@@ -126,7 +125,7 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
 
     def flaky_move(s, d):
         attempts["n"] += 1
-        if attempts["n"] == 1:  # the media backend hasn't let go of the file yet
+        if attempts["n"] == 1:
             raise PermissionError("file is open in another process")
         return real_move(s, d)
 
@@ -135,14 +134,12 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
     with no_wait_for_a_held_file():
         batch = trash.store([src])
 
-    assert attempts["n"] == 2  # retried once, then succeeded
+    assert attempts["n"] == 2
     assert not src.exists()
     assert batch.moves[0][1].exists()
 
 
 def test_purge_orphans_clears_only_the_batches_nothing_names(tmp_path):
-    # The Trash names the batches it still holds; everything else in the
-    # trash is unreachable and is what this reclaims.
     trash = Trash(tmp_path / "trash")
     held = trash.store([_file(tmp_path / "out" / "held.png")])
     orphan = trash.store([_file(tmp_path / "out" / "orphan.png")])
@@ -158,8 +155,6 @@ def test_purge_orphans_on_an_untouched_trash_is_a_harmless_noop(tmp_path):
 
 
 def test_a_batch_survives_the_session_that_made_it(tmp_path):
-    # The Trash stores a batch as plain data and re-makes it launches later, so a
-    # delete stays undoable long after the objects that performed it are gone.
     src = _file(tmp_path / "out" / "a.png", b"hello")
     trash = Trash(tmp_path / "trash")
     record = trash.store([src]).record()
@@ -181,8 +176,6 @@ def test_a_re_made_batch_can_purge_what_it_holds(tmp_path):
 
 
 def test_an_empty_batch_re_makes_into_one_that_moves_nothing(tmp_path):
-    # A delete whose files were already gone records no moves: nothing is
-    # restored or purged, and neither call may raise.
     batch = TrashedBatch.from_record({"moves": [], "subdir": None})
     batch.restore()
     batch.purge()

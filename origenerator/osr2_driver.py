@@ -1,11 +1,3 @@
-"""Drive the OSR2 from a playing video's funscript, one device at a time.
-
-The app owns a single :class:`Osr2Driver`, which the gallery's one OSR2 switch
-points at whichever scripted video is in front. It streams T-code toward the next
-action on a timer, following the player's position (wrapping onto the script as
-the preview loops), and parks the device when it lets go.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -28,14 +20,6 @@ _POLL_INTERVAL_MS = 50
 
 
 def drive_target_for(video_path, player):
-    """Bundle a video with the player showing it into the driver's input —
-    ``(video_path, player, actions)`` — or ``None`` when there's nothing to drive:
-    no video, or a video with no funscript to its name.
-
-    The one driver can follow either of two foreground surfaces — the front config
-    tab's preview or an open fullscreen slideshow — so both describe their target through
-    this, keeping the ``(path, player, actions)`` contract in a single place.
-    """
     if video_path is None:
         return None
     actions = read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
@@ -72,18 +56,13 @@ class Osr2Driver(QObject):
         return self._player is not None and self._frozen
 
     def start(self, player, actions: list[dict]) -> None:
-        """Take over the device for ``player``'s video, streaming ``actions``.
-
-        Releases any video already driving first, so only one ever owns the device.
-        A video with no actions is a no-op.
-        """
         self.stop()
         if not actions:
             return
         self._player = player
         self._script = Funscript(sorted((int(a["at"]), int(a["pos"])) for a in actions))
         self._duration_ms = self._script.actions[-1][0]
-        self._streaming = False  # for a one-shot "first T-code sent" log line
+        self._streaming = False
         self._broker.want(not self._frozen)
         self._broker.ask(PARK if self._frozen else RESUME)
         self._running_ahead.enter_context(ahead_while_playing())
@@ -92,7 +71,6 @@ class Osr2Driver(QObject):
                     len(self._script.actions), self._duration_ms)
 
     def stop(self) -> None:
-        """Release the device: stop streaming and park it."""
         if self._player is None:
             return
         self._timer.stop()
@@ -107,18 +85,9 @@ class Osr2Driver(QObject):
 
     @property
     def active(self) -> bool:
-        """Whether a script has the device, sending or held by the room's pause."""
         return self._player is not None
 
     def trace(self, count: int, seconds: float) -> tuple[float, ...]:
-        """The script's line from the playhead forward, as *count* heights 0-1
-        spanning *seconds* -- the motion the device is about to be asked for,
-        which is what the OSR2 controls draw in the Robot Hand's place while a
-        funscript has the device.
-
-        Folded onto the script the same way the stream is (the preview loops),
-        so the drawing and the wire read the same script at the same moment.
-        """
         if self._script is None or self._player is None or count <= 0:
             return ()
         now = int(self._player.position())
@@ -128,21 +97,13 @@ class Osr2Driver(QObject):
                      for i in range(count))
 
     def _folded(self, at_ms: int) -> int:
-        """*at_ms* wrapped onto the script, as the stream wraps the playhead."""
         return at_ms % self._duration_ms if self._duration_ms > 0 else at_ms
 
     def poll(self) -> None:
-        """Advance the device toward the action following the current playhead.
-
-        Driven purely by ``position()`` — the driver doesn't gate on the player's
-        playback state (the Generate pane preview auto-plays with no pause control; the
-        Drive OSR2 button is the on/off). A stalled playhead simply holds the device
-        at the current target.
-        """
         player = self._player
         if player is None or self._frozen:
             return
-        now_ms = self._folded(int(player.position()))  # the preview loops
+        now_ms = self._folded(int(player.position()))
         pos, interval = self._next_target(now_ms)
         self._broker.send_position(pos, interval)
         if not self._streaming:
@@ -151,8 +112,6 @@ class Osr2Driver(QObject):
                         "(playhead %d ms)", pos, interval, now_ms)
 
     def _next_target(self, now_ms: int) -> tuple[int, int]:
-        """The next action strictly after ``now_ms`` and the time until it — or, past
-        the last action, the first action of the next loop."""
         actions = self._script.actions
         for at, _pos in actions:
             if at > now_ms:

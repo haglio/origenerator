@@ -30,12 +30,7 @@ from origenerator.workflows.wan_experts import (
     wan_expert_shift_param,
 )
 
-# A scene with a line renders on WAN 2.2's speech-to-video model: one model in
-# place of the two experts, reading the line as audio and moving her lips to
-# it, under the lightning LoRA Comfy's own S2V template runs it with -- four
-# steps at no guidance, which is what the probe he judged by eye ran
-# (2026-09-06). His LoRAs stay off it: the one tried put artifacts all over
-# the video.
+# WAN 2.2 speech-to-video runs under the lightning LoRA of Comfy's own S2V template: four steps, no guidance
 _SPEECH_LORA = "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
 _SPEECH_STEPS = 4
 _SPEECH_CFG = 1.0
@@ -45,30 +40,6 @@ _SPEECH_SHIFT = 8.0
 
 
 class Wan22I2vWorkflow(WorkflowTemplate):
-    """WAN 2.2 14B I2V, dual-noise (high/low) sampling.
-
-    Reproduces the ``wan22_14b_i2v_dual_noise_template`` ComfyUI graph: a single
-    input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
-    denoised by two ``KSamplerAdvanced`` passes (high-noise model first, low-noise
-    model after), interpolated up to the chosen playback rate
-    (:meth:`~WorkflowTemplate.interpolation_nodes`) and written by the one video
-    writer every video workflow saves with. The stages hand off at ``split_step``
-    (0 = half the steps), and each runs at its own ``cfg_high``/``cfg_low`` —
-    LoRA authors tune these per stage (motion lives in the high pass, texture in
-    the low), so a run can follow their numbers exactly. The output resolution is
-    derived in-graph from the input image (see :meth:`build_api_payload`): it
-    keeps the image's aspect ratio at a fixed pixel budget rather than a
-    hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
-    (:meth:`~WorkflowTemplate.foley_audio_nodes`), whose synced audio the
-    writer muxes into the file.
-
-    A story's scene with a line (``scene_lines``) is spoken instead: that
-    scene's segments render on WAN 2.2's speech-to-video model, hearing the
-    line as audio (made beforehand, see :mod:`origenerator.speech`) and moving
-    her lips to it, and in the file that scene carries her line in place of
-    the foley.
-    """
-
     name = "wan22_i2v"
     version = "v007"
     display_name = "WAN 2.2 I2V"
@@ -149,8 +120,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, defaults["cfg_low"], min_val=0.0, max_val=30.0, step=0.1, good=(3, 4)),
             wan_expert_shift_param(defaults),
             *wan_expert_model_params(defaults),
-            # The speaking model's place takes only the speech model: an expert there
-            # would render deaf, and the experts' places never offer it.
+            # Only the speech model fits here: an expert in this place would render deaf
             model_dropdown("unet_s2v", "Speaking Model", defaults["unet_s2v"], "diffusion_models",
                          accepts=(WAN_S2V,)),
             *wan_expert_lora_params(defaults),
@@ -161,10 +131,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     @staticmethod
     def _stage_strengths(params: dict) -> tuple[float, float]:
-        """Each sampler's prompt strength. Settings stored before the stages had
-        their own carry one ``cfg`` and a zero for each stage; that zero meant
-        "use the shared one", so it still does — reading it as no guidance at all
-        would re-run every such generation as a different video."""
         shared = params.get("cfg")
         if shared is None:
             return params["cfg_high"], params["cfg_low"]
@@ -172,9 +138,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     @staticmethod
     def _speech_nodes(params: dict, spoken) -> dict:
-        """What every speaking segment shares: the speech model under its
-        lightning LoRA, the audio encoder that hears the lines, and each spoken
-        scene's line loaded once (``scene<k>_line``)."""
         nodes = {
             "30": {
                 "class_type": "UNETLoader",
@@ -200,10 +163,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     def _speaking_segment(self, index, scene, start, previous, length, offset,
                           positive_ref, negative_ref, size, params):
-        """One segment of a scene with a line, on the speech model: it hears
-        its stretch of the scene's line, starts on ``start`` as its reference
-        and, past the first segment, carries the motion of the frames before
-        it (the model's ``ref_motion``, which reads the last of them)."""
         prefix = f"s{index}_"
         width_ref, height_ref = size
         heard, heard_ref = self.speech_window_nodes(
@@ -251,22 +210,12 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         cfg_high, cfg_low = self._stage_strengths(params)
         loras_high = self.lora_chain("6", ["4", 0], picked_loras(params, FIRST_PASS_LORA_KEYS))
         loras_low = self.lora_chain("7", ["5", 0], picked_loras(params, SECOND_PASS_LORA_KEYS))
-        # Size the video off the input image: derived in-graph by default, or
-        # scaled to the user's explicit WxH when the derived size was unlocked.
         sized = self.image_size_nodes(["12", 0], params)
         size_nodes, start_ref = sized.nodes, sized.image
         width_ref, height_ref = sized.width, sized.height
 
-        # Each segment reads its own scene of the prompt and of the negative (a
-        # --- line starts the next of each, which is how the scenes editor stores
-        # them); nodes 10 and 11 below encode the first scene's, and any later
-        # scene gets its own.
         scenes = scene_prompts(params["positive_prompt"])
         negatives = scene_prompts(params["negative_prompt"])
-        # A scene with a line is spoken: its segments render on the speech
-        # model, each hearing its own stretch of the scene's line (the offset
-        # a later segment of the same scene starts at, kept here as the plan
-        # is walked in order).
         spoken = scene_speech(params)
         offsets: dict[int, int] = {}
 
@@ -353,17 +302,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             }
             return nodes, [decode_id, 0]
 
-        # A video longer than one segment is chained from each segment's last
-        # frame (WorkflowTemplate.chain_segments); its frames come back joined.
         segments, decoded_ref, total_frames = self.chain_segments(params, start_ref, segment)
-        # Scored for the frames the scenes really add up to, which is what the
-        # stored video length says whenever the form wrote it.
         foley, audio_ref = self.foley_audio_nodes(
             "22", "23", "24", decoded_ref, {**params, "frame_count": total_frames})
-        # Her lines take the writer's track where she speaks: each spoken
-        # scene's file at its place in the video, the foley's own stretch where
-        # a scene says nothing (WorkflowTemplate.speech_track_nodes says why
-        # not both at once). A story with no line keeps the graph it always had.
         speech = {}
         if any(scene is not None for scene in spoken):
             speech = self._speech_nodes(params, spoken)
@@ -372,9 +313,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken, strict=True))],
                 audio_ref)
             speech.update(track)
-        # The decode's frames are the video's motion; the writer's are that motion
-        # shown more often. Foley above watches the former, the writer below
-        # encodes the latter, and at the native rate they are the same frames.
         interpolate, frames_ref = self.interpolation_nodes("25", decoded_ref, params)
         return {
             **foley,

@@ -1,12 +1,3 @@
-"""No test spells out a family color by hand: one that asserts on a color reads
-it from ``shared_ui.palette``, as the app's own code must
-(``tests/test_family_look.py``), because a copy is a thing that drifts.
-
-Only hex literals are checked.  ``(255, 255, 255)`` is white to anything that
-draws, and refusing every triple that happens to equal a token would refuse
-plain white pixels in a test fixture.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -21,13 +12,10 @@ pytestmark = pytest.mark.repo_check
 _ROOT = Path(__file__).resolve().parent.parent
 _TESTS = _ROOT / "tests"
 
-# "#abc" and "#aabbcc" -- how a color reaches a Qt stylesheet or an HTML page
-# when it did not come from a token.
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")
 
 
 def _family_hex() -> dict[str, str]:
-    """Every shared_ui token's ``#rrggbb``, and the names that spell it."""
     named: dict[str, list[str]] = {}
     for name in dir(palette):
         value = getattr(palette, name)
@@ -44,11 +32,6 @@ def _sources() -> list[Path]:
 
 
 def _painted_strings(tree: ast.AST):
-    """Every string constant except a docstring.
-
-    A docstring is prose -- this file's own names the colors it forbids, to
-    explain the rule -- and nothing ever paints with one.
-    """
     documented = set()
     for node in ast.walk(tree):
         if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
@@ -64,8 +47,6 @@ def _painted_strings(tree: ast.AST):
 
 
 def test_no_test_spells_out_a_family_color_by_hand():
-    # Parsed rather than grepped, so a "#" in a comment or a path is not a hit --
-    # only text a test asserts on.
     family = _family_hex()
     offenders = []
     for path in _sources():

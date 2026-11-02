@@ -1,5 +1,3 @@
-"""Which animations an image can be asked for, given what it already shows: a
-lane, an action and a starting state, from the content overlay."""
 from __future__ import annotations
 
 from origenerator.action_settings import GENAU, VIDEO
@@ -9,7 +7,6 @@ LANES = (VIDEO, GENAU)
 
 
 def _table(content: dict | None) -> dict:
-    """The overlay's table as ``{lane: {action: (state, ...)}}``, malformed lines out."""
     if content is None:
         content = load_content()
     listed = content.get("animation_paths")
@@ -37,8 +34,6 @@ def actions(lane: str = VIDEO, *, content: dict | None = None) -> tuple[str, ...
 
 def actions_for(state: str, lane: str = VIDEO, *, content: dict | None = None
              ) -> tuple[str, ...]:
-    """The actions ``lane`` can animate an image already in ``state`` as, in the
-    table's own order, and empty for a state the table says nothing about."""
     return tuple(action for action, states in _table(content).get(lane, {}).items()
                  if state in states)
 
@@ -48,7 +43,6 @@ def allows(lane: str, action: str, state: str, *, content: dict | None = None) -
 
 
 def every_path(*, content: dict | None = None) -> tuple[tuple[str, str, str], ...]:
-    """Every ``(lane, action, state)`` the table holds, lane by lane in its order."""
     table = _table(content)
     return tuple((lane, action, state)
                  for lane in LANES

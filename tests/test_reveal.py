@@ -19,8 +19,6 @@ def test_show_in_explorer_selects_the_file(monkeypatch):
     reveal.show_in_explorer(target)
 
     (cmd,), _ = calls[0]
-    # Explorer selects (not just opens the folder) with /select, and the file's
-    # native path.
     assert cmd == ["explorer", "/select,", str(target)]
 
 

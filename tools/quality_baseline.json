@@ -870,7 +870,7 @@
     "origenerator/gui/job_queue.py": 63,
     "origenerator/gui/job_queue_view.py": 119,
     "origenerator/gui/label_cells.py": 3,
-    "origenerator/gui/link_listener.py": 6,
+    "origenerator/gui/link_listener.py": 3,
     "origenerator/gui/link_tip.py": 34,
     "origenerator/gui/look_training_controller.py": 4,
     "origenerator/gui/looping_preview.py": 2,

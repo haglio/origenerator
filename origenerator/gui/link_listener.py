@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from PyQt6.QtCore import QObject
-from PyQt6.QtNetwork import QLocalServer
+from shared_ui import running_copy
 
 from origenerator import app_link
 
@@ -34,10 +34,10 @@ class LinkListener(QObject):
         # starts would otherwise inherit an instruction meant for this launch.
         self._asked_for(
             (os.environ if environ is None else environ).pop(app_link.CARRIED_IN, ""))
-        self._server = QLocalServer(self)
-        self._server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
-        self._server.newConnection.connect(self._take_a_click)
-        if not self._server.listen(app_link.channel_for(checkout)):
+        self._server = running_copy.listen(
+            app_link.channel_for(checkout),
+            lambda said, _reply: self._asked_for(said.decode("ascii", "replace").strip()))
+        if not self._server.isListening():
             logger.warning("Clicks on this app's toasts cannot be answered here: %s",
                            self._server.errorString())
 
@@ -47,16 +47,6 @@ class LinkListener(QObject):
         waiting, self._waiting = self._waiting, []
         for generation in waiting:
             go_to(generation)
-
-    def _take_a_click(self) -> None:
-        socket = self._server.nextPendingConnection()
-        said = bytearray(bytes(socket.readAll()))
-        socket.readyRead.connect(lambda: said.extend(bytes(socket.readAll())))
-        socket.disconnected.connect(lambda: self._heard(bytes(said), socket))
-
-    def _heard(self, said: bytes, socket) -> None:
-        socket.deleteLater()
-        self._asked_for(said.decode("ascii", "replace").strip())
 
     def _asked_for(self, generation: str) -> None:
         """Answer a click, or hold it until there is a window to answer it in.

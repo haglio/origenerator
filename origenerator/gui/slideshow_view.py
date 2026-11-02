@@ -31,9 +31,9 @@ from origenerator.gui.osr2_controls_state import (
 )
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
-    HudPlacement,
     OPENS_IN,
     THE_SLIDESHOWS_OWN,
+    HudPlacement,
     slideshow_hud_model,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions

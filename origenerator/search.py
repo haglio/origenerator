@@ -1,43 +1,3 @@
-"""Search the gallery by what a generation is of, not by the letters you typed.
-
-A folder is named by a code and a prompt is a paragraph, so a substring filter
-over the tree finds nothing at all and one over the prompts finds a fraction of
-what is actually there: search ``two women`` and the run you had in mind —
-prompted "a pair of dolls on a couch" — never surfaces, and nothing on screen
-tells you it exists. This module is the matching layer that closes that gap, in
-two tiers:
-
-* A **deterministic** pass that runs on every keystroke, off a prebuilt index,
-  with no network anywhere near it. It stems words, folds number words into
-  digits, and widens each term through a synonym table — so ``women`` reaches
-  "woman", ``two`` reaches "2" and "pair", and ``woman`` reaches "doll".
-* An **LLM** pass that widens those same terms further once typing stops, over
-  the local endpoint a spoken request's match already uses. It only ever *adds* words
-  to the first tier's vocabulary, so a model that is down, slow, or talking
-  nonsense leaves the results exactly as the deterministic tier ranked them.
-
-Matching is AND across the query's terms: every term must be reached by
-something in the row. That is what lets ``two women`` find "two tall ladies"
-— a superset of what was asked for — without also dragging in every row that
-merely says "lady". A term that reaches nothing anywhere is reported back in
-:attr:`SearchOutcome.unmatched`, so an empty result can name the word that
-emptied it instead of leaving the user to guess which one to drop.
-
-Precision is the hard half, and every guard here was put in by a measurement
-rather than a hunch — the comments name what each one cost on a real library.
-The negative prompt is not searched, decimals stay whole, bare numbers are
-dropped from the workflow, model and LoRA names, and an item's name or seed
-matches only whole: a search is for what a generation is OF, and the rest of a
-row is either markup or bookkeeping that happens to be spelled like a word.
-
-The table below is plain, publishable English, and it is deliberately
-incomplete: the words describing the library itself — its own vocabulary for
-people, actions and bodies — ride the content overlay's ``search_synonyms``, the
-git-ignored file the action keywords and the detail-fix parts already live in. A
-group named there that shares one word with a group here merges into it, so the
-overlay extends this table rather than standing apart from it.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -53,10 +13,6 @@ from origenerator.generation_state import in_sight
 
 logger = logging.getLogger(__name__)
 
-# The two orders the results pane offers. Recency is the default because the
-# thing you are looking for is usually something you made recently; the Model /
-# LoRA order answers the other question — "which model/LoRA combination was that?" —
-# by putting the rows under headings instead of interleaving them.
 SORT_RECENT = "recent"
 SORT_MODEL_LORA = "model_lora"
 _SORTS_SAVED_BEFORE = {"recipe": SORT_MODEL_LORA}
@@ -65,55 +21,28 @@ _SORTS_SAVED_BEFORE = {"recipe": SORT_MODEL_LORA}
 def saved_sort(mode: str | None) -> str | None:
     return _SORTS_SAVED_BEFORE.get(mode or "", mode)
 
-# A word is a run of letters and digits — but a decimal number is ONE word, not
-# two. Without that, every emphasis weight a prompt carries — ``(term:1.2)`` —
-# contributes a bare "2", and since a query's "two" folds to "2" (below),
-# searching for two of something matched every prompt that had ever weighted a
-# term. Measured against a real library that was 52% of it, which is what made
-# the first cut of this search unusable rather than merely imprecise.
 _WORD_RE = re.compile(r"[a-z0-9]+(?:\.[0-9]+)+|[a-z0-9]+")
 _QUOTED = re.compile(r'["\u201c\u201d]([^"\u201c\u201d]*)(?:["\u201c\u201d]|$)')
 _TAG_BREAK = re.compile(r"[,;:!?|()\[\]{}<>\n]|\.(?!\d)")
 
-# Written numbers fold onto their digits, in both directions: prompts write
-# "two women" as often as "2 women", and the query may say either.
 _NUMBER_WORDS = {
     "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
     "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
 }
 
-# Plurals no suffix rule reaches. Short by design — these are the ones that come
-# up describing people, which is most of what a prompt is about, and each one
-# left out is a synonym group its singular is in that the plural cannot reach:
-# without this, searching "2 women" misses every "two dolls" in the gallery.
 _IRREGULAR_PLURALS = {
     "women": "woman", "men": "man", "people": "person", "persons": "person",
     "children": "child", "feet": "foot", "teeth": "tooth", "wives": "wife",
     "lives": "life", "knives": "knife", "leaves": "leaf", "selves": "self",
 }
 
-# Words that carry no search intent. Dropped from a query, never from a row —
-# a row's stop words cost nothing to index, and dropping a query's keeps
-# "a lamp on the table" from demanding that a row also say "on" and "the".
 _STOP_WORDS = frozenset(
     ["a", "an", "the", "of", "in", "on", "at", "by", "with", "and", "or", "to", "for", "from", "is", "are", "was", "were", "be", "it", "its", "her", "his", "their", "this", "that", "there", "here", "as", "into", "over", "under"]
 )
 
-# Interchangeable words, as groups: any word of a group satisfies a query for
-# any other. Deliberately tight — a loose group ("blonde" ~ "golden") fires on
-# unrelated rows and the user cannot tell why — with the risky widening left to
-# the LLM tier, where it is at least query-specific. Inflections that stemming
-# cannot fold ("-ing", "-y") are listed as words rather than guessed at.
-#
-# The people groups are the ones the overlay is expected to extend: the words
-# this library actually prompts with are not words that belong in a public
-# repository, and each is one ``search_synonyms`` entry naming a word below.
 _SYNONYM_GROUPS = (
     ("woman", "lady", "female", "doll", "babe", "chick", "gal"),
     ("man", "guy", "male", "dude", "boy", "gentleman"),
-    # No "both": it is a function word ("both hands", "both of them"), not a
-    # count of subjects, and it put a sixteenth of a real library into every
-    # search for two of something.
     ("two", "pair", "duo", "couple"),
     ("three", "trio"),
     ("four", "quartet"),
@@ -136,25 +65,10 @@ _SYNONYM_GROUPS = (
     ("bike", "bicycle"),
 )
 
-# How strongly a term is satisfied, by how it was reached. An exact word beats
-# a table synonym beats a word the model volunteered — the ordering that keeps
-# a literal hit ranked above a widened one when both are present.
 _EXACT = 1.0
 _SYNONYM = 0.7
 _RELATED = 0.6
 
-# Where in a row the hit landed. The positive prompt is what a generation is
-# *of*; the model and LoRA names are what made it, so they answer a different
-# kind of question and rank below. A name the user typed onto a folder holding
-# the row ranks with the prompt: it is the most deliberate word in the index,
-# chosen for no reason but to find that folder again.
-#
-# The negative prompt is searched by neither, and that is a deliberate reversal:
-# it was, at a low weight, on the grounds that a word appearing nowhere else
-# should still be findable. But a negative prompt is the list of things a run was
-# told to keep OUT, so every hit it produces is the opposite of what was asked
-# for — three quarters of the results for one real query were rows that had
-# explicitly excluded the searched-for thing.
 _POSITIVE_WEIGHT = 1.0
 _FOLDER_WEIGHT = 1.0
 _MADE_WITH_WEIGHT = 0.7
@@ -163,21 +77,11 @@ _LONGEST_UNSTEMMED = 3
 
 
 def _words(text) -> list[str]:
-    """The lowercase alphanumeric runs in ``text`` — its searchable words."""
     return _WORD_RE.findall(str(text or "").lower())
 
 
 @lru_cache(maxsize=READINGS_KEPT)
 def _stem(word: str) -> str:
-    """A word reduced to what it shares with its other forms.
-
-    Number words become digits, and plurals lose their ending — the regular ones
-    by rule, the handful that have none by name — so "dolls"/"doll",
-    "women"/"woman" and "two"/"2" are one key each. Crude on purpose: a real
-    stemmer would need a dependency, and the cases that matter in a prompt are
-    plurals and counts. Anything it does not recognize is left exactly as
-    typed, which costs a widening rather than a wrong match.
-    """
     word = _IRREGULAR_PLURALS.get(word, word)
     word = _NUMBER_WORDS.get(word, word)
     if len(word) > _LONGEST_UNSTEMMED:
@@ -211,15 +115,6 @@ def _quoted(query: str) -> tuple[tuple[str, ...], ...]:
 
 
 def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
-    """Stem → every stem interchangeable with it, from ``groups`` and the built-in
-    table.
-
-    Groups that share a word merge, so the overlay can extend a built-in group
-    by naming one of its words alongside the new ones. Multi-word entries are
-    dropped: matching is word by word, so a two-word synonym could never be
-    reached, and shredding it into its words would make each of them a synonym
-    for the others ("alpha form" teaching that "form" means "alpha").
-    """
     merged: list[set[str]] = []
     for group in (*_SYNONYM_GROUPS, *groups):
         stems = set()
@@ -228,7 +123,7 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
             if len(words) == 1:
                 stems.add(_stem(words[0]))
         if len(stems) <= 1:
-            continue  # a group of one widens nothing
+            continue
         overlapping = [g for g in merged if g & stems]
         for existing in overlapping:
             stems |= existing
@@ -243,12 +138,6 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
 
 
 def _overlay_groups() -> tuple:
-    """The library's own interchangeable words, from the content overlay.
-
-    Absent from a public checkout's ``content.example.json``, which is the
-    point: the built-in table above is general English, and anything that
-    describes the library itself stays in the git-ignored local overlay.
-    """
     groups = load_content().get("search_synonyms") or ()
     return tuple(tuple(group) for group in groups if isinstance(group, (list, tuple)))
 
@@ -258,13 +147,7 @@ _SYNONYMS = _synonym_index(_overlay_groups())
 
 @dataclass(frozen=True)
 class QueryTerm:
-    """One word of a query, or words quoted together, with what satisfies it.
-
-    ``synonyms`` come from the table, ``related`` from the LLM; they are kept
-    apart rather than merged so a table hit can outrank a volunteered one.
-    """
-
-    text: str                    # the word as typed, for the "nothing matched X" note
+    text: str
     stem: str
     synonyms: frozenset[str] = frozenset()
     related: frozenset[str] = frozenset()
@@ -273,37 +156,22 @@ class QueryTerm:
 
 @dataclass(frozen=True)
 class SearchResult:
-    """One matching generation and how well it answered the query."""
-
     row: dict
     score: float
 
 
 @dataclass(frozen=True)
 class SearchOutcome:
-    """A finished search: its matches, and the query words nothing could reach."""
-
     results: tuple[SearchResult, ...]
     unmatched: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class _Entry:
-    """One indexed generation: its stems, split by where they were found.
-
-    Built once per row and reused across keystrokes — re-tokenizing every
-    prompt in the gallery on each character typed is the one thing that would
-    make this too slow to run while the user types.
-    """
-
     row: dict
     positive: frozenset[str]
     made_with: frozenset[str]
     seeds: frozenset[str]
-    # The names the user gave the folders this row sits in. Unlike the other
-    # fields this one isn't a property of the row, so it is taken fresh on every
-    # re-index rather than carried over with the cached stems — a folder made a
-    # moment ago has to be findable by its name now.
     folders: frozenset[str] = frozenset()
     name: str = ""
     tags: tuple[tuple[str, ...], ...] = ()
@@ -311,9 +179,6 @@ class _Entry:
 
 
 def query_words(query: str) -> tuple[str, ...]:
-    """The words a query actually searches on: its non-stop words, in order,
-    each counted once. A query of nothing but stop words keeps them — better to
-    search for "the" than to answer a typed query with everything."""
     words = _words(without_name_starts(_unquoted(query)))
     kept = [word for word in words if word not in _STOP_WORDS] or words
     seen: set[str] = set()
@@ -326,12 +191,6 @@ def query_words(query: str) -> tuple[str, ...]:
 
 
 def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm]:
-    """``query`` as terms, each carrying the words that satisfy it.
-
-    ``expansions`` is the LLM tier's ``{typed word: [related words]}``; without
-    it the terms carry the table's widening alone, which is exactly the
-    deterministic search that runs while the user types.
-    """
     synonyms = _SYNONYMS if synonyms is None else synonyms
     terms = [QueryTerm(text=start, stem=start.lower())
              for start in dict.fromkeys(name_starts_in(_unquoted(query)))]
@@ -351,7 +210,6 @@ def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm
 
 
 def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
-    """How well ``stems`` satisfies ``term`` — 0.0 if not at all."""
     if term.stem in stems:
         return _EXACT
     if term.synonyms & stems:
@@ -362,7 +220,6 @@ def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
 
 
 def _term_score(term: QueryTerm, entry: _Entry) -> float:
-    """The best any part of ``entry`` satisfies ``term``, field weighting applied."""
     if term.side_by_side:
         return _EXACT if _says(entry, term.side_by_side) else 0.0
     if term.stem in entry.seeds or _starts_the_name(term.stem, entry.name):
@@ -375,7 +232,6 @@ def _term_score(term: QueryTerm, entry: _Entry) -> float:
 
 
 def _made_with_text(row: dict, params: dict) -> str:
-    """The words naming what made a row: its workflow, model and LoRA files."""
     workflow = row.get("workflow_name") or ""
     return " ".join((
         workflow,
@@ -385,27 +241,15 @@ def _made_with_text(row: dict, params: dict) -> str:
 
 
 def _prompt_text(row: dict, params: dict, key: str) -> str:
-    """A row's prompt, from its own column or the params it ran with: the two are
-    written together for a generation this app made, but an imported file recovers
-    its prompt from the graph in the file's metadata and may carry it in only one
-    of them."""
     return str(row.get(key) or params.get(key) or "")
 
 
 def _made_with_stems(row: dict, params: dict) -> set[str]:
-    """The searchable words of what made a row, bare numbers thrown away.
-
-    A model filename is full of them — version parts, dates, step counts,
-    ``000002500`` — and none of them is something anyone searches for, while all
-    of them collide with the digits a query's number words fold to. Names
-    survive whole ("wan22", "sdxl", a LoRA's title); only the pure numbers go.
-    """
     return {stem for stem in _stems(_made_with_text(row, params))
             if not stem.replace(".", "").isdigit()}
 
 
 def _folder_stems(names) -> frozenset[str]:
-    """The searchable words of the folder names holding one row."""
     return frozenset().union(*(_stems(name) for name in names))
 
 
@@ -421,9 +265,6 @@ def _starts_the_name(typed: str, name: str) -> bool:
 
 
 def content_stems(row: dict) -> frozenset[str]:
-    """The words *row*'s prompt is about, stemmed and with the filler out — what
-    two generations' prompts are compared on to say how alike they read
-    (:mod:`origenerator.nav_map`)."""
     params = gallery.parse_params(row.get("params_json"))
     return _stems(_prompt_text(row, params, "positive_prompt")) - _STOP_WORDS
 
@@ -445,35 +286,12 @@ def _build_entry(row: dict) -> _Entry:
 
 
 class GallerySearch:
-    """The searchable index over the gallery's generations.
-
-    Rebuilt from the row list on each gallery rebuild (:meth:`update`) and
-    queried on each keystroke (:meth:`search`). The split is the whole point:
-    tokenizing every prompt is linear in the library and belongs to the rebuild,
-    while a query is set lookups against what that produced.
-    """
-
     def __init__(self, *, synonyms=None):
         self._entries: dict[str, _Entry] = {}
-        self._order: list[str] = []       # prompt_ids, newest first, as given
+        self._order: list[str] = []
         self._synonyms = _SYNONYMS if synonyms is None else synonyms
 
     def update(self, rows, folder_names=None, item_name=None) -> None:
-        """Re-index ``rows`` (newest first), keeping the stems already computed
-        for a generation that was here last time and only swapping in its fresh
-        row dict — a poll rewrites every row object, but not the words in it.
-
-        Only rows that produced an output take part: search is a way of finding
-        something to look at, and a failed or still-running run has nothing. A
-        prompt_id given twice is indexed once, so the caller can hand over
-        several row lists (the gallery's own, and the trash's held rows) without
-        first working out whether they overlap.
-
-        ``folder_names`` is ``{prompt_id: [names]}`` (see
-        :func:`~origenerator.gallery.tree.folder_names_by_row`). It is the one
-        part of an entry that isn't a property of the row, so it is taken fresh
-        every time rather than carried over with the cached stems.
-        """
         entries: dict[str, _Entry] = {}
         order: list[str] = []
         folder_names = folder_names or {}
@@ -502,20 +320,6 @@ class GallerySearch:
         return any(_starts_the_name(word, entry.name) for entry in self._entries.values())
 
     def search(self, query: str, *, expansions=None, within=None) -> SearchOutcome:
-        """Every generation satisfying every word of ``query``, newest first.
-
-        ``within`` narrows the search to a set of prompt_ids — the folder the
-        gallery's tree has selected. ``None`` searches the whole index. The
-        narrowing happens here rather than by filtering afterwards so that
-        :attr:`SearchOutcome.unmatched` is about the folder being searched: a
-        word that exists elsewhere in the library but not here is still a word
-        that reached nothing, and saying so is the useful answer.
-
-        Scored, but not *sorted* by score: the pane offers recency and Model / LoRA,
-        and a relevance order the user did not ask for would shuffle the results
-        under them each time the LLM tier landed. The score decides what is in,
-        not what order.
-        """
         expansions = {word: related for word, related in (expansions or {}).items()
                       if not self._starts_a_name(word)}
         terms = parse_query(query, expansions=expansions, synonyms=self._synonyms)
@@ -540,7 +344,6 @@ class GallerySearch:
 
 
 def model_lora_heading(row: dict) -> str:
-    """The model + LoRA combination a row ran on, as a section heading."""
     params = gallery.parse_params(row.get("params_json"))
     workflow = row.get("workflow_name")
     return (f"{gallery.model_label(workflow, params)}"
@@ -549,45 +352,20 @@ def model_lora_heading(row: dict) -> str:
 
 @dataclass(frozen=True)
 class SearchTile:
-    """One thing a search draws: a folder, or a single generation.
-
-    Several hits in one settings folder are one answer, not eight — they share a
-    prompt and settings and differ only by seed, so drawing each of them fills
-    the pane with near-copies of the same item and buries the other places
-    the query reached. So the view collapses them onto their folder (``group``
-    set, ``rows`` the hits it stands for), and leaves a folder's lone hit as
-    itself (``group`` ``None``).
-
-    ``row`` is the newest hit either way: the tile's thumbnail when it stands
-    alone, and what decides the model + LoRA section it lands in when sorted that
-    way — every row in a settings folder ran the same settings, so any of them
-    answers that.
-    """
-
     row: dict
     group: object | None = None
     rows: list = field(default_factory=list)
 
 
 def group_by_model_lora(results) -> list[tuple[str, list]]:
-    """``results`` split into one section per model + LoRA combination, biggest
-    section first (ties alphabetical) and each section still newest-first.
-
-    Biggest first because the combination you use most is the one you are most
-    likely to be looking through, and because it makes a one-off run read as the
-    outlier it is rather than hiding at the end of a long alphabet.
-    """
     sections: dict[str, list] = {}
     for result in results:
         sections.setdefault(model_lora_heading(result.row), []).append(result)
     return sorted(sections.items(), key=lambda item: (-len(item[1]), item[0]))
 
 
-# --- the LLM tier: widen the query's words once typing stops ----------------
-
 
 def build_expansion_messages(words, system_prompt: str) -> list[dict]:
-    """The chat messages for one widening: the rules, then the words to widen."""
     listing = "\n".join(f"- {word}" for word in words)
     user = (
         "Search words:\n"
@@ -602,12 +380,6 @@ def build_expansion_messages(words, system_prompt: str) -> list[dict]:
 
 
 def parse_expansion(completion: dict, words) -> dict[str, tuple[str, ...]]:
-    """The widened vocabulary from a chat completion: ``{search word: related}``.
-
-    Only the words that were asked about are kept, and only single words out of
-    each list — a model that answers with a phrase, a key of its own invention,
-    or a stray sentence contributes nothing rather than poisoning the match.
-    """
     obj = local_llm.answer_of(completion)
     wanted = {word.lower(): word for word in words}
     expansions: dict[str, tuple[str, ...]] = {}
@@ -627,13 +399,6 @@ def parse_expansion(completion: dict, words) -> dict[str, tuple[str, ...]]:
 
 def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
                  timeout: float = 15.0) -> dict[str, tuple[str, ...]]:
-    """Ask the local LLM which other words a prompt might use for ``query``'s.
-
-    Returns ``{}`` for anything short of a usable answer — no words to widen,
-    the endpoint down, a reply that will not parse. The caller's results are
-    already on screen by then, so an empty answer is a widening that did not
-    happen rather than a search that failed.
-    """
     words = query_words(query)
     if not words:
         return {}
@@ -641,7 +406,7 @@ def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
         expansions = parse_expansion(local_llm.ask_json(
             build_expansion_messages(words, system_prompt),
             base_url=base_url, model=model, temperature=0.2, timeout=timeout), words)
-    except Exception as exc:  # endpoint down / unparseable: the table tier stands
+    except Exception as exc:
         logger.warning("search: widening %r failed (%s)", query, exc)
         return {}
     logger.info("search: widened %d of %d words of %r",

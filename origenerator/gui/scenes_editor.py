@@ -1,32 +1,3 @@
-"""The scenes of a story, one tile each: what it shows, what it keeps out,
-what she says, and how long it runs.
-
-A video longer than one segment is rendered as segments chained from each
-other's last frame (:meth:`~origenerator.workflows.base.WorkflowTemplate.
-chain_segments`), so a story can change what happens as it goes: each scene is
-its own texts, run for its own length, started on the frame before it. This is
-the form's face for that. Underneath, the scenes' prompts are stored as the one
-positive prompt and their negatives as the one negative prompt, each with a
-scene break between the texts (:func:`~origenerator.workflows.base.story_of`),
-so everything that reads, searches or rewrites a prompt keeps working on one
-string; their lengths are ``scene_frames`` and their lines ``scene_lines``, one
-per scene.
-
-The lines are spoken: a scene with one renders on the speech model, her lips
-on the words, in the voice the Audio section sets (see
-:mod:`origenerator.speech`). A workflow that cannot speak -- the loop -- has no
-lines param, and its tiles carry no lines field.
-
-A scene is one thing or the other, and the tile says which. The speech model
-renders a talking performance and nothing else: measured on his own settings, a
-speaking scene moves under half as much as the same scene on the experts, with
-the movement at the head, and driving it with the scene rendered properly
-(control_video, skeletons or frames) lifts that a little without carrying the
-action. So the moment a scene has a line, its two prompts go read-only and
-dim -- a field you can type into that changes nothing is the trap this spent a
-night in. Clearing the line gives them back.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -71,18 +42,12 @@ from origenerator.workflows.base import (
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
 LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under Audio"
-# What a prompt's caption gains, and what it says instead of its own help, while
-# the scene it belongs to has a line.
 SPEAKING_NOTE = " — not used while this scene speaks"
 SPEAKING_HELP = ("A scene with a line renders on the speech model, and all that "
                  "happens in it is her speaking — it will not act a prompt out. "
                  "Clear Her Lines to write this scene instead.")
-# The prompts a line takes over. Its own field is never one of them.
 SPOKEN_OVER = ("positive_prompt", "negative_prompt")
 
-# The texts a scene carries, by the param each is stored as, with the caption
-# over its field. The prompts are stored as stories (see the module above); the
-# lines as a list, one per scene.
 TEXT_CAPTIONS = {
     "positive_prompt": "Positive Prompt",
     "negative_prompt": "Negative Prompt",
@@ -102,11 +67,6 @@ class _Scene(QFrame):
         column = QVBoxLayout(self)
         border_as_a_set(self, column)
         column.setSpacing(GAP_SMALL)
-        # Kept narrow: this row sits beside the form's label column, so it is
-        # the row that would push the pane's floor past its cap (see
-        # GenerateTab.minimumSizeHint). The title gives way first, and
-        # the x is the flat mark the tabs wear rather than a dressed button --
-        # the same press, and a third of the width.
         header = QHBoxLayout()
         self.title = ElidingLabel("")
         self.title.setObjectName("sceneTitle")
@@ -124,8 +84,6 @@ class _Scene(QFrame):
         self.remove.clicked.connect(lambda: self.remove_requested.emit(self))
         header.addWidget(self.remove)
         column.addLayout(header)
-        # Captioned, since three fields in a row say nothing about which is which
-        # once they hold text; each carries its param's own help.
         self.fields: dict[str, PromptField] = {}
         self.captions: dict[str, ElidingLabel] = {}
         self._countdowns: dict[str, Countdown] = {}
@@ -149,8 +107,6 @@ class _Scene(QFrame):
                 TidiesOnLeaving(field, lambda changed, key=key: self._left_a_prompt(key, changed))
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
-            # Every path that fills a line -- typing, loading settings, a voice
-            # edit -- ends in textChanged, so the tile follows all of them.
             self.fields["scene_lines"].textChanged.connect(self.reflect_use)
         self.reflect_use()
         self.length.editTextChanged.connect(self.changed)
@@ -180,7 +136,6 @@ class _Scene(QFrame):
         return not self.speaking() and not self._shut_down.get(key)
 
     def speaking(self) -> bool:
-        """Whether this scene has a line, and so renders as her speaking."""
         field = self.fields.get("scene_lines")
         return field is not None and bool(diff_text.live_text(field).strip())
 
@@ -201,13 +156,10 @@ class _Scene(QFrame):
         self.length.set_value(seconds_for_frames(int(frames), self._pd.rate, self._pd))
 
     def _settle(self) -> None:
-        """Show the length it will run for, once an edit of it has ended."""
         self.set_frames(self.frames())
 
 
 class ScenesEditor(QWidget):
-    """One tile per scene, and a button for the next one."""
-
     changed = pyqtSignal()
 
     def __init__(self, frames_def: ParamDef,
@@ -216,7 +168,6 @@ class ScenesEditor(QWidget):
         super().__init__(parent)
         self._pd = frames_def
         self._prepare_length = prepare_length
-        # Whether the workflow speaks: a tile of one that cannot has no lines field.
         self._lines = lines
         self._shut_down = shut_down
         self._scenes: list[_Scene] = []
@@ -233,12 +184,7 @@ class ScenesEditor(QWidget):
         column.addWidget(self._add, alignment=Qt.AlignmentFlag.AlignLeft)
         self.add_scene()
 
-    # --- the scenes ------------------------------------------------------------
-
     def add_scene(self) -> None:
-        """Another scene after the last, at the workflow's default length. It
-        starts out keeping out what the scene before it keeps out: a negative
-        mostly holds across a story, so blank would mean typing it again."""
         scene = _Scene(self._pd, self._prepare_length, self._shut_down, lines=self._lines)
         scene.show_readings(self._readings)
         if self._scenes:
@@ -262,7 +208,6 @@ class ScenesEditor(QWidget):
             scene.show_readings(self._readings)
 
     def remove_scene(self, which) -> None:
-        """Take a scene out, by index or by tile; the last one stays."""
         scene = self._scenes[which] if isinstance(which, int) else which
         if len(self._scenes) == 1 or scene not in self._scenes:
             return
@@ -282,21 +227,15 @@ class ScenesEditor(QWidget):
                                     else "A story keeps at least one scene")
 
     def _resize_to(self, count: int) -> None:
-        """Exactly ``count`` scenes: extras dropped from the end, missing ones
-        added at the workflow's default length."""
         while len(self._scenes) > max(1, count):
             self.remove_scene(len(self._scenes) - 1)
         while len(self._scenes) < count:
             self.add_scene()
 
-    # --- what the form reads and writes ----------------------------------------
-
     def fields(self, key: str) -> list[PromptField]:
-        """Every scene's field for the text stored as ``key``, in story order."""
         return [scene.fields[key] for scene in self._scenes if key in scene.fields]
 
     def text_fields(self) -> list[PromptField]:
-        """Every field on every tile, in reading order: what a find searches."""
         return [field for scene in self._scenes for field in scene.fields.values()]
 
     def fields_beside_their_texts(self, stored: dict) -> list[tuple[PromptField, str | None]]:
@@ -306,15 +245,9 @@ class ScenesEditor(QWidget):
                 for key, field in scene.fields.items()]
 
     def story(self, key: str) -> str:
-        """The one prompt that stores every scene's ``key`` text."""
         return story_of([diff_text.live_text(field) for field in self.fields(key)])
 
     def set_story(self, key: str, text: str) -> None:
-        """Lay a stored prompt out one scene per text. The positive prompt is
-        the story, so the count of scenes follows it; a negative with fewer
-        texts than scenes carries its last text on through the rest, which is
-        what the graph keeps out of them (WorkflowTemplate.scene_prompt_nodes),
-        so what the tiles show is what renders."""
         texts = scene_prompts(str(text))
         if key == "positive_prompt":
             self._resize_to(len(texts))
@@ -325,8 +258,6 @@ class ScenesEditor(QWidget):
         return [scene.frames() for scene in self._scenes]
 
     def set_scene_frames(self, frames) -> None:
-        """Each scene's length; a list short of the scenes leaves the rest as
-        they are, and one past them is cut to fit."""
         for scene, count in zip(self._scenes, list(frames or []), strict=False):
             scene.set_frames(int(count))
 
@@ -338,8 +269,6 @@ class ScenesEditor(QWidget):
             tracked_prompt.write(field, str(text))
 
     def total_frames(self) -> int:
-        """The video's length: the scenes end to end, each after the first
-        starting on the frame before it."""
         return chained_frames(self.scene_frames())
 
     def set_total_frames(self, frames: int) -> None:

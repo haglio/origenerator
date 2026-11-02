@@ -1,28 +1,3 @@
-"""The whole spoken vocabulary: what an utterance means, if anything.
-
-Three things can be said, and any of them may be led by a shape: a command about
-the image on screen (:mod:`origenerator.gallery.voice_commands`), one of the
-show's own controls (:mod:`origenerator.voice.show_commands`), or a collection's name,
-which plays that collection the way its slideshow button would.
-
-* a command about the image on screen — ``fix <part>``, ``animate as <lane>
-  <action>`` or ``enhance`` (:mod:`origenerator.gallery.voice_commands` owns all
-  three).
-* ``start`` / ``pause`` / ``stop slideshow`` — the slideshow's own controls
-  (:mod:`origenerator.voice.slideshow_commands`).
-* ``<collection>`` — play that collection, the way its slideshow button would.
-
-The shape ("landscape fix teeth", "landscape favorites") is what makes them
-usable inside Fun Time, where two slideshows run at once on the satellite regions
-and NEITHER is the active window — the speaker is looking at one of them while
-Core has the keyboard, so "the slideshow that is up" names nothing and a
-collection command has no region to land on. Standalone there is one slideshow and no
-regions, so a shape is accepted and ignored.
-
-Kept deliberately strict, because the mic hears whole sentences too: a command
-is a few words, and names something real.
-"""
-
 from __future__ import annotations
 
 from typing import NamedTuple
@@ -49,50 +24,31 @@ from origenerator.voice.text import words
 
 SHAPES = (PORTRAIT, LANDSCAPE)
 
-# The collections, addressed by the names they wear in the tree, so a rename
-# carries into the vocabulary rather than leaving it saying the old word.
 COLLECTION_KEYS: dict[str, str] = {
     LATEST_LABEL.lower(): LATEST_KEY,
     FAVORITES_LABEL.lower(): FAVORITES_KEY,
     EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
 }
 
-# A collection command is its name, at most led by a shape: three words is already
-# generous. Anything longer is a sentence that happens to contain the word.
 _MAX_COLLECTION_WORDS = 3
 
 
 class SurfaceCommand(NamedTuple):
-    """A command about the image on screen — a
-    :class:`~origenerator.gallery.detail_parts.DetailPart` to fix, an
-    :class:`~origenerator.animate_command.AnimateRequest` or
-    :data:`~origenerator.gallery.voice_commands.ENHANCE_COMMAND` — aimed at
-    *shape*'s slideshow (``None`` — whichever slideshow is up)."""
     command: object
     shape: str | None = None
 
 
 class CollectionCommand(NamedTuple):
-    """Play the collection *collection_key*, on *shape*'s region (``None`` — wherever the
-    set's own shape routes it)."""
     collection_key: str
     shape: str | None = None
 
 
 class SlideshowControl(NamedTuple):
-    """Start, pause or stop the slideshow — on *shape*'s region when named."""
     command: SlideshowCommand
     shape: str | None = None
 
 
 def match_voice_command(text: str) -> CollectionCommand | SlideshowControl | SurfaceCommand | None:
-    """What *text* asks for, or ``None`` when it is not a command at all.
-
-    Each matcher is strict about its own shape and none can claim another's (a
-    slideshow command names the slideshow, a fix leads with "fix", a Genau command
-    leads with its own phrase, a collection command is nothing but the collection's
-    name), so the order only decides which is asked first.
-    """
     shape, spoken = split_shape(text)
     rest = spoken.split()
     if not rest and shape is None:
@@ -113,18 +69,6 @@ def match_voice_command(text: str) -> CollectionCommand | SlideshowControl | Sur
 
 
 def split_shape(text: str) -> tuple[str | None, str]:
-    """The shape an utterance leads with, and everything after it.
-
-    ``("landscape", "fix teeth")`` for "landscape fix teeth", ``(None, "fix
-    teeth")`` for the same words with no shape named.  Punctuation and case go
-    with it: both are the transcriber's invention rather than the speaker's,
-    and every matcher below works on the bare words.
-
-    Public because a spoken request needs the same split and cannot get it from
-    :func:`match_voice_command` — its words are the speaker's own, so no
-    matcher here claims them, and the dictation that collects them must not be
-    fed the shape word as if it were the first word of the request.
-    """
     heard = words(text, keep_apostrophes=True)
     if heard and heard[0] in SHAPES:
         return heard[0], " ".join(heard[1:])
@@ -132,19 +76,6 @@ def split_shape(text: str) -> tuple[str | None, str]:
 
 
 def shaped_app_command(text: str):
-    """The bare app command *text* is, wrapped with the shape it named.
-
-    The bare vocabulary (:mod:`origenerator.voice.app_commands`) is whole
-    utterances only — "undo", "favorite", "experiments" — which is strict enough to
-    be asked ahead of an opening request.  A shape may still lead one, for the
-    same reason it may lead any other order here: hosted, two slideshows run and
-    neither is the active window, so "landscape lock" is the only way to say
-    which image is meant.  Unsided, it comes back bare, exactly as the
-    standalone app expects it.
-    """
-    # The shape is taken off the RAW words, not off split_shape's letters-only
-    # normalisation: this vocabulary says numbers ("center 30"), and a split
-    # that drops the digits hands the matcher a command with nothing to set.
     words = (text or "").split()
     shape = words[0].lower().strip(".,!?") if words else ""
     if shape in SHAPES:
@@ -158,22 +89,12 @@ def shaped_app_command(text: str):
 
 
 def _collection_named(words: list[str]) -> str | None:
-    """The collection those words name, on their own — ``None`` for anything else.
-
-    The whole utterance has to BE the name: "favorites" is the command, while
-    "put her in my favorites" is a sentence that mentions one.
-    """
     if not words or len(words) > _MAX_COLLECTION_WORDS:
         return None
     return COLLECTION_KEYS.get(" ".join(words))
 
 
 def spoken_phrases() -> frozenset[str]:
-    """The whole vocabulary as a recognizer that listens for words is asked to hear it.
-
-    Unsided: a shape is for a hosting session's two slideshows, and that session hears for
-    itself. One said here still works, by the slower road every sentence takes.
-    """
     return app_command_phrases() | _what_is_said_to_a_surface()
 
 

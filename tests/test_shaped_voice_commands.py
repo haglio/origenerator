@@ -1,15 +1,3 @@
-"""The routing around the spoken commands: which shape, and which collection.
-
-The vocabularies themselves live where they are owned — the image commands
-in :mod:`origenerator.gallery.voice_commands`, the slideshow's in
-:mod:`origenerator.voice.slideshow_commands`.  This is what wraps them: an optional
-leading shape, and the collection names, so an utterance can say WHICH slideshow it means
-when two are running on the satellite regions.
-
-Everything this does NOT match falls through to a prompt rewrite, so the
-misses matter as much as the hits — a sentence mentioning a collection is a prompt
-edit, not an order to play it.
-"""
 from __future__ import annotations
 
 import pytest
@@ -19,6 +7,7 @@ from origenerator.gallery.collection import (
     LATEST_KEY,
 )
 from origenerator.gallery.voice_commands import ENHANCE_COMMAND
+from origenerator.voice.app_commands import AppCommand, BarSetting
 from origenerator.voice.commands import (
     CollectionCommand,
     SlideshowControl,
@@ -37,8 +26,6 @@ from origenerator.voice.slideshow_commands import SlideshowCommand
     ("portrait fix her hands", "portrait"),
 ])
 def test_a_fix_can_name_the_side_it_means(text, shape):
-    """Hosted, two slideshows run and neither is the active window, so the shape word
-    is the only thing that says which image is being looked at."""
     command = match_voice_command(text)
 
     assert isinstance(command, SurfaceCommand)
@@ -57,9 +44,6 @@ def test_a_collection_name_is_an_order_to_play_it(text, key, shape):
 
 
 def test_the_collection_names_are_the_tree_s_own():
-    """Spoken by the label the collection wears, so a rename carries into the
-    vocabulary rather than leaving it answering to the old word — "favorites"
-    is what the collection says, where the key still says favorited."""
     assert match_voice_command("favorites") == CollectionCommand(FAVORITES_KEY, None)
     assert match_voice_command("starred") is None
 
@@ -69,9 +53,9 @@ def test_saying_enhanced_enhances_the_image_on_screen_rather_than_opening_enhanc
 
 
 @pytest.mark.parametrize("text", [
-    "put her in my favorites",       # a prompt edit that mentions one
-    "fix the lighting",              # names no part
-    "she is standing in the trash",  # ditto, at length
+    "put her in my favorites",
+    "fix the lighting",
+    "she is standing in the trash",
     "",
 ])
 def test_anything_else_is_left_to_the_prompt_rewriter(text):
@@ -97,8 +81,6 @@ def test_every_phrase_the_recognizer_is_asked_to_hear_means_something():
     ("portrait stop slideshow", "portrait"),
 ])
 def test_a_slideshow_command_can_name_the_side_it_means(text, shape):
-    """The slideshow's own controls take a shape too, for the same reason: hosted,
-    "stop slideshow" with two up has to say which one."""
     command = match_voice_command(text)
 
     assert isinstance(command, SlideshowControl)
@@ -112,7 +94,6 @@ def test_a_slideshow_command_can_name_the_side_it_means(text, shape):
     ("portrait animate as video alpha", "portrait"),
 ])
 def test_the_other_image_commands_can_name_the_side_they_mean(text, shape):
-    """The other image commands take a shape for the same reason a fix does."""
     command = match_voice_command(text)
 
     assert isinstance(command, SurfaceCommand)
@@ -126,14 +107,20 @@ def test_the_other_image_commands_can_name_the_side_they_mean(text, shape):
     ("", None, ""),
 ])
 def test_the_side_splits_off_from_the_rest_of_what_was_said(text, shape, rest):
-    """The one thing a request needs and cannot get from the matcher: its words
-    are the speaker's own, so nothing here claims them, and the dictation that
-    collects them must not be handed the shape word as the first word of the
-    request itself."""
     assert split_shape(text) == (shape, rest)
 
 
 def test_a_side_word_alone_is_a_side_and_nothing_else():
-    """It names a region without asking it for anything — the caller's other
-    uses get to decide what an empty rest means."""
     assert split_shape("portrait") == ("portrait", "")
+
+
+def test_a_shape_leading_a_bar_setting_leaves_its_number_to_set():
+    assert shaped_app_command("landscape amp 50") == SurfaceCommand(BarSetting("amp", 50), "landscape")
+
+
+def test_a_shape_leading_a_bare_app_command_names_the_side_it_means():
+    assert shaped_app_command("landscape lock") == SurfaceCommand(AppCommand.LOCK, "landscape")
+
+
+def test_a_bare_app_command_with_no_shape_comes_back_bare():
+    assert shaped_app_command("lock") is AppCommand.LOCK

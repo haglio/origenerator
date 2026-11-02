@@ -18,6 +18,7 @@ from origenerator.funscript import (
     write_funscript,
 )
 from origenerator.output_places import OutputPlaces
+from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.frame_rate import NATIVE_FPS
 from tests.media_files import write_mp4
@@ -78,6 +79,26 @@ def test_no_output_yields_no_files_or_thumbnail(tmp_path):
     )
     assert files == []
     assert thumb is None
+
+
+def test_a_completed_video_has_its_thumbnail_ready_to_animate(tmp_path):
+    out = tmp_path / "out"
+    write_mp4(out / "video" / "wan22_i2v_00001_.mp4")
+
+    extract_completion(I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
+                       OutputPlaces.in_one_folder(out), tmp_path / "thumbs", "n1")
+
+    assert animated_thumbnail_path(tmp_path / "thumbs", "n1").exists()
+
+
+def test_a_completed_image_has_no_thumbnail_to_animate(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    Image.new("RGB", (8, 8)).save(out / "a.png")
+
+    extract_completion(SDXL, SDXL_HISTORY, OutputPlaces.in_one_folder(out), tmp_path / "thumbs", "n1")
+
+    assert not animated_thumbnail_path(tmp_path / "thumbs", "n1").exists()
 
 
 def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):

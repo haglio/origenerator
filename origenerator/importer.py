@@ -41,7 +41,7 @@ from origenerator.generation_state import GenerationSource, GenerationStatus, so
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.output_places import OutputPlaces
 from origenerator.record_fold import file_key, fold_record_into, lanes_owed
-from origenerator.thumbnail import generate_thumbnail
+from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import soundless_copies_of
 
@@ -117,8 +117,7 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
             )
         except Exception as e:
             logger.warning("Thumbnail failed for %s: %s", fpath, e)
-
-        mtime = datetime.fromtimestamp(fpath.stat().st_mtime, tz=UTC)
+        animate_if_video(play_path, thumb_dir, name=prompt_id)
 
         db.insert_generation(
             prompt_id=prompt_id,
@@ -136,7 +135,7 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
             status=GenerationStatus.COMPLETED,
             output_files=json.dumps([entry]),
             thumbnail_path=thumb_path,
-            completed_at=mtime.isoformat(),
+            completed_at=datetime.fromtimestamp(fpath.stat().st_mtime, tz=UTC).isoformat(),
         )
         existing.add(_record_key(entry))
         imported += 1

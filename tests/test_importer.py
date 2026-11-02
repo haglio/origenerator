@@ -21,7 +21,9 @@ from origenerator.importer import (
     merge_video_sidecar_rows,
 )
 from origenerator.output_places import OutputPlaces
+from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.media_files import write_mp4
 
 
 def _make_png_with_metadata(path, prompt_data, size=(64, 64)):
@@ -90,6 +92,16 @@ def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
     assert name_by_file["wan22_i2v_842719365028413_00001_.mp4"] == "wan22_i2v"
     assert name_by_file["flf2v_loop_00001.mp4"] == "wan22_flf2v_loop"
     assert name_by_file["mystery_clip_00001.mp4"] == "unknown"
+
+
+def test_an_imported_video_has_its_thumbnail_ready_to_animate(tmp_path):
+    write_mp4(tmp_path / "output" / "video" / "wan22_i2v_00001_.mp4")
+    db = Database(tmp_path / "test.db")
+
+    import_comfyui_output(OutputPlaces.in_one_folder(tmp_path / "output"), db, tmp_path / "thumbs")
+
+    row = db.list_generations()[0]
+    assert animated_thumbnail_path(tmp_path / "thumbs", row["prompt_id"]).exists()
 
 
 def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):

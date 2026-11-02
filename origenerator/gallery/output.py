@@ -200,11 +200,7 @@ def make_animated_preview(row: dict, places: OutputPlaces, thumb_dir: Path) -> s
     video = video_file_of(row, places)
     if video is None:
         return None
-    try:
-        result = generate_animated_thumbnail(video, thumb_dir, name=row["prompt_id"])
-    except Exception as e:
-        logger.warning("Animated preview failed for %s: %s", row.get("prompt_id"), e)
-        return None
+    result = generate_animated_thumbnail(video, thumb_dir, name=row["prompt_id"])
     return str(result) if result is not None else None
 
 

@@ -24,7 +24,7 @@ from origenerator.generation_state import GenerationStatus
 from origenerator.library_filing import file_into_library
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
-from origenerator.thumbnail import generate_thumbnail
+from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,9 @@ def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: 
     """
     files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
     thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
+    source = _first_output_file(files, places)
+    if source is not None:
+        animate_if_video(source, thumb_dir, name=prompt_id)
     _write_video_funscript(workflow, files, places, params)
     try:
         duration = execution_duration_seconds(history_data)
@@ -90,6 +93,14 @@ def _make_thumbnail(workflow, files, places: OutputPlaces, thumb_dir: Path, name
     except Exception as e:
         logger.warning("Thumbnail generation failed for %s: %s", source, e)
         return None
+
+
+def animate_before_filing(workflow, history_data, places: OutputPlaces, thumb_dir: Path,
+                         prompt_id) -> None:
+    files = workflow.extract_output_info(history_data)
+    if files:
+        saved = places.comfyui / (files[0].get("subfolder") or "") / files[0]["filename"]
+        animate_if_video(saved, thumb_dir, name=prompt_id)
 
 
 def mark_generation_completed(db, prompt_id, files, thumb_path, duration):

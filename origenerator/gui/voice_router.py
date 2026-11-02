@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import Protocol
 
 from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
@@ -26,7 +25,7 @@ from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
 from origenerator.gui.message import ERROR, HEARD_MARK, INFO, WARNING, set_marked_text
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
-from origenerator.gui.starting_rows import StartingRows
+from origenerator.gui.voice_wiring import VoiceSources, VoiceSwitches
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
@@ -119,22 +118,6 @@ class VoiceHost(Protocol):
                    asked) -> tuple[str | None, str, str]: ...
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]: ...
-
-
-@dataclass(frozen=True)
-class VoiceSources:
-    db: object
-    slideshows: object
-    client: object
-    starting: StartingRows
-
-
-@dataclass(frozen=True)
-class VoiceSwitches:
-    auto: QWidget | None
-    radio: QWidget | None
-    drive: QWidget | None
-    mic: QWidget | None
 
 
 class VoiceRouter(QObject):

@@ -406,7 +406,7 @@ def pytest_collection_finish(session):
     gc.freeze()
 
 
-_WIDGET_TAIL_ALLOWANCE = 50
+_WIDGET_TAIL_ALLOWANCE_TWICE_THE_26_TO_27_MEASURED = 50
 
 
 class _DeferredDeleteCounter(QObject):
@@ -449,7 +449,7 @@ def _the_live_widget_count_stays_flat():
     _deliver_the_deletions_already_scheduled()
     gc.collect()
     grown = len(QApplication.allWidgets()) - before
-    assert grown <= _WIDGET_TAIL_ALLOWANCE, (
+    assert grown <= _WIDGET_TAIL_ALLOWANCE_TWICE_THE_26_TO_27_MEASURED, (
         f"{grown} more live widgets at session end than at start: the "
         f"per-test reap is no longer keeping the live object count flat"
     )

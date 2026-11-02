@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -238,6 +239,18 @@ def test_write_then_read_round_trips_actions(tmp_path):
     assert read_actions(dest) == actions
 
 
+def test_a_script_handed_no_video_length_records_the_length_of_its_own_span(tmp_path):
+    dest = tmp_path / "clip.funscript"
+    write_funscript(dest, [{"at": 0, "pos": 0}, {"at": 7400, "pos": 100}])
+    assert json.loads(dest.read_text(encoding="utf-8"))["metadata"]["duration"] == 7
+
+
+def test_a_script_handed_the_video_length_records_that_length_not_its_own_span(tmp_path):
+    dest = tmp_path / "clip.funscript"
+    write_funscript(dest, [{"at": 0, "pos": 0}, {"at": 7400, "pos": 100}], duration_seconds=12)
+    assert json.loads(dest.read_text(encoding="utf-8"))["metadata"]["duration"] == 12
+
+
 def test_a_script_that_is_missing_or_will_not_read_holds_no_actions(tmp_path):
     assert read_actions(tmp_path / "nope.funscript") == []
     bad = tmp_path / "bad.funscript"
@@ -320,8 +333,9 @@ def test_a_script_whose_video_will_not_say_how_long_it_is_keeps_the_pace_it_has(
     assert script.read_bytes() == before
 
 
-def test_heatmap_colors_empty_without_actions_or_buckets():
+def test_heatmap_colors_empty_without_actions_or_buckets_or_a_span():
     assert heatmap_colors([], 10) == []
+    assert heatmap_colors([{"at": 0, "pos": 50}], 10) == []
     assert heatmap_colors(synthesize_actions(2.0, hz=1.0), 0) == []
 
 

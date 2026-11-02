@@ -159,8 +159,8 @@ def test_a_running_row_no_live_job_holds_still_gets_a_plain_tile(build):
     items = build([_row("g1", status="running")])
 
     tile, = items
-    assert (tile.reading.frame, tile.reading.progress, tile.cancel, tile.shield) == (
-        None, None, None, None)
+    assert (tile.reading.frame, tile.reading.progress, tile.cancel, tile.shield,
+            tile.stop_auto) == (None, None, None, None, None)
     assert tile.reading.status == "running"
 
 

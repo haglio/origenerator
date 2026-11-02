@@ -1139,6 +1139,22 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
 
 
+_PASS_NAMES = [boot_pass.run.__name__ for boot_pass in MAINTENANCE]
+
+
+@pytest.mark.parametrize(("first", "then"), [
+    ("_follow_moved_files", "_import_new_files"),
+    ("_import_new_files", "_fold_enhancements"),
+    ("_fold_enhancements", "_disown_foreign_runs"),
+])
+def test_a_maintenance_pass_runs_before_the_one_that_reads_what_it_leaves(first, then):
+    assert _PASS_NAMES.index(first) < _PASS_NAMES.index(then)
+
+
+def test_the_folder_reconcile_runs_last_because_every_backfill_can_move_a_folder():
+    assert _PASS_NAMES[-1] == "_reconcile_favorites"
+
+
 def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
     ran = []
     window = MagicMock()
@@ -1434,8 +1450,9 @@ class TestAnOverlayShortOfAKey:
             assert key in said
         assert "content.local.json" in said
         assert "content.example.json" in said
+        assert "can be left empty to switch that feature off" in said
 
-    def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
+    def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp, capsys):
         told = MagicMock()
 
         with _a_faked_boot([], **{
@@ -1446,6 +1463,9 @@ class TestAnOverlayShortOfAKey:
 
         assert code != 0
         told.assert_not_called()
+        printed = capsys.readouterr().err
+        for key in self.SHORT:
+            assert key in printed
 
     def test_a_complete_overlay_says_nothing_and_boots(self, qapp):
         told = MagicMock()
@@ -1505,7 +1525,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         assert "the inbox a send lands in" in said
         window.show.assert_called_once()
 
-    def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
+    def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp, capsys):
         told = MagicMock()
 
         with _a_faked_boot([], **{
@@ -1515,6 +1535,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
             main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
         told.assert_not_called()
+        assert "the inbox a send lands in" in capsys.readouterr().err
 
     def test_agreeing_says_nothing(self, qapp):
         told = MagicMock()

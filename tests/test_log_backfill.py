@@ -86,3 +86,42 @@ def test_backfill_does_not_reuse_one_line_for_two_rows(tmp_path):
         for p in ("batch1", "batch2")
     )
     assert durations == [False, True]
+
+
+def test_backfill_gives_the_one_line_to_the_row_it_sits_closest_to(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _import_row(db, "far", _utc_iso_for_local(2026, 6, 29, 12, 20, 0))
+    _import_row(db, "near", _utc_iso_for_local(2026, 6, 29, 12, 20, 50))
+
+    log = tmp_path / "comfyui.log"
+    log.write_text("[2026-06-29 12:20:52.000] Prompt executed in 15.26 seconds\n")
+
+    assert backfill_durations_from_logs(db, [log]) == 1
+    assert db.get_generation("near")["duration_seconds"] == 15.26
+    assert db.get_generation("far")["duration_seconds"] is None
+
+
+def test_backfill_takes_a_line_up_to_two_minutes_from_the_file_and_no_further(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _import_row(db, "inside", _utc_iso_for_local(2026, 6, 29, 12, 0, 0))
+    _import_row(db, "outside", _utc_iso_for_local(2026, 6, 29, 13, 0, 0))
+
+    log = tmp_path / "comfyui.log"
+    log.write_text("[2026-06-29 12:01:59.000] Prompt executed in 5.00 seconds\n"
+                   "[2026-06-29 13:02:01.000] Prompt executed in 6.00 seconds\n")
+
+    assert backfill_durations_from_logs(db, [log]) == 1
+    assert db.get_generation("inside")["duration_seconds"] == 5.0
+    assert db.get_generation("outside")["duration_seconds"] is None
+
+
+def test_backfill_leaves_a_row_that_already_has_a_duration_as_it_is(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _import_row(db, "timed", _utc_iso_for_local(2026, 6, 29, 12, 0, 0))
+    db.update_generation("timed", duration_seconds=3.0)
+
+    log = tmp_path / "comfyui.log"
+    log.write_text("[2026-06-29 12:00:01.000] Prompt executed in 9.00 seconds\n")
+
+    assert backfill_durations_from_logs(db, [log]) == 0
+    assert db.get_generation("timed")["duration_seconds"] == 3.0

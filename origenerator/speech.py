@@ -26,8 +26,7 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _STDERR_TAIL = 2000
 
 
-class SpeechError(RuntimeError):
-    pass
+class SpeechError(RuntimeError): ...
 
 
 @dataclass(frozen=True)

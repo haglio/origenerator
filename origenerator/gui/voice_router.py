@@ -104,27 +104,20 @@ _ABOUT_THE_SLIDE = frozenset({
 
 
 class VoiceHost(Protocol):
-    def collection_label(self, key: str) -> str:
-        pass
+    def collection_label(self, key: str) -> str: ...
 
-    def stand_in_collection(self, key: str, shape: str | None) -> bool:
-        pass
+    def stand_in_collection(self, key: str, shape: str | None) -> bool: ...
 
-    def selected_generation(self) -> str | None:
-        pass
+    def selected_generation(self) -> str | None: ...
 
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
-        pass
+    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]: ...
 
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
-        pass
+    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]: ...
 
     def animate_it(self, image_id: str | None,
-                   asked) -> tuple[str | None, str, str]:
-        pass
+                   asked) -> tuple[str | None, str, str]: ...
 
-    def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
-        pass
+    def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]: ...
 
 
 class VoiceRouter(QObject):

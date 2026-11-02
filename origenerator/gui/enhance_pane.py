@@ -1,29 +1,3 @@
-"""The app's enhancement settings, at the foot of the Gallery pane.
-
-Enhancement is not one of the settings that decide which folder a generation
-lands in — it is a finish applied to an image afterward — so it is deliberately
-not on the Generate form beside Seed, Dimensions and Output. It lives here
-instead, beside the OSR2 controls, and it is app-wide: whatever is set here is
-what Enhance All runs with, what a single image's Enhance action runs with, and
-— with the checkbox on — what every image the app newly generates receives as it
-lands. It follows you rather than the folder, so it shows in the collections
-(Latest, Favorites, Experiments) exactly as it does on a settings folder.
-
-Editing writes straight back through ``on_change`` — there is no Apply button —
-and the settings persist with the rest of the session state. Auto-enhance is a
-bare switch on the title row rather than a labeled checkbox among the settings: it
-is the pane's power, not one of its settings.
-
-An version dragged in from the Generate pane's version list is absorbed:
-the settings that made that version become the ones on the pane, so "do that
-again" doesn't mean reading its numbers off and typing them back in.
-
-Each part the detail pass can redraw is a tick and a denoise to run it
-at: the checkbox is whether that part is fixed at all, so an unchecked part grays its
-own name and number rather than making zero mean off. A part whose detector
-isn't installed in ComfyUI can't be checked at all, and says why — the
-alternative being a run that fails on submit.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
@@ -114,20 +88,9 @@ _NO_DETECTOR_TOOLTIP = (
     "Subpack node pack, put one whose name says \"{}\" in its "
     "{} folder, and restart it."
 )
-# What a fix field costs around its digits: the padding either side below, its
-# 1px border, and the pixels a spinner keeps for its cursor and its own inner
-# margin. Measured by rendering one and looking, since a field a hair too narrow
-# doesn't complain — it cuts a digit off 0.45, which still reads as a number.
 _FIX_FIELD_PADDING = GAP_SMALL
 _FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
-# The same for a number with its step buttons, measured the same way: at a few
-# pixels less the last digit of 4.00 was cut.
 _NUMBER_FIELD_CHROME = 50
-# Disabling a widget is not the same as it looking disabled: the app's sheet
-# colors every label, dropdown and spinner outright and names no disabled state,
-# so a pane switched off went on reading exactly as live as before. These mute
-# this pane's own fields — set on the pane, so nothing outside it is touched.
-# (The auto switch is the exception: it paints itself, and dims itself.)
 _FIX_FIELD_CSS = f"""
     #enhancePane QDoubleSpinBox#fixField {{
         /* The app sheet holds 18px on the right of every spinner for the step
@@ -167,14 +130,12 @@ _ENHANCE_BUTTON_CSS = f"""
 
 
 def _read(widget):
-    """What one field reads as, in the type its param is stored as."""
     if isinstance(widget, NoWheelDropdown):
         return widget.currentData()
     return widget.value()
 
 
 def _fill(widget, value) -> None:
-    """Put a stored value into one field, coercing what JSON handed back."""
     if isinstance(widget, NoWheelDropdown):
         choose_option(widget, str(value))
     elif isinstance(widget, NoWheelSpinBox):
@@ -184,12 +145,6 @@ def _fill(widget, value) -> None:
 
 
 def _enhancer_param_defs() -> dict:
-    """The standalone enhancer's own setting definitions, keyed by param — so this
-    pane's ranges, steps and option lists can't drift from the workflow's.
-
-    Read once per pane: ``param_definitions`` scans the model directories, and
-    every field here would otherwise pay for that scan again.
-    """
     return {
         pd.key: pd
         for pd in WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].param_definitions()
@@ -205,8 +160,7 @@ class _FieldGrid(QGridLayout):
     it: a dropdown to a line, and the numbers sharing a line while each keeps its
     width, a line each when they cannot.
 
-    A layout rather than a widget, because Qt asks a widget's layout for its
-    height at a width and never the widget itself."""
+    A layout, because Qt asks a widget's layout for its height at a width, never the widget."""
 
     def __init__(self, dropdowns: list[tuple[QLabel, QWidget]],
                  numbers: list[tuple[QLabel, QWidget]], marks: dict[QLabel, WarningMark]):
@@ -289,8 +243,7 @@ class _SettingsScroll(QScrollArea):
     """The settings, scrolling down once the pane is squeezed shorter than they
     are, and sideways once it is squeezed narrower.
 
-    Asks for their whole height at the width it has: Qt's own scroll area asks
-    for their height as though nothing in them had wrapped."""
+    Qt's own scroll area asks for their height as though nothing in them had wrapped."""
 
     def __init__(self, settings: QWidget):
         super().__init__()
@@ -316,15 +269,6 @@ class _SettingsScroll(QScrollArea):
 
 
 class EnhancePane(QWidget):
-    """The Enhance pane: an Auto checkbox over the settings an enhancement runs at.
-
-    ``show_settings`` loads a stored configuration (or the defaults, before
-    anything has been set); every edit calls back with the new
-    :class:`~origenerator.gallery.enhance.EnhanceSettings`. The pane holds no
-    state of its own beyond its fields — the gallery keeps the value and routes
-    it where it's needed — so it stays a plain editor.
-    """
-
     enhance_requested = pyqtSignal()
     fix_training_requested = pyqtSignal(str)
     preset_saved = pyqtSignal(str)
@@ -337,7 +281,7 @@ class EnhancePane(QWidget):
         self._picked: list[dict] = []
         self._folder = None
         self._source_models: frozenset[str] | object | None = _NOT_READ
-        self._loading = False  # suppress the write-back while filling the fields
+        self._loading = False
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
         self.setObjectName("enhancePane")
@@ -346,10 +290,6 @@ class EnhancePane(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
-        # The title row, with the auto switch at its far right — a bare switch,
-        # the way a pane's power is a switch on its corner rather than a line
-        # of prose among its settings. What it does is in its tooltip; the
-        # settings below are what it does it with.
         title_row = QHBoxLayout()
         title_row.setContentsMargins(0, 0, 0, 0)
         heading = QLabel("Enhance")
@@ -367,9 +307,6 @@ class EnhancePane(QWidget):
         settings_column.setContentsMargins(0, 0, 0, 0)
         settings_column.setSpacing(GAP_SMALL)
         self._model = NoWheelDropdown()
-        # The default leaves the refining model to whatever made the image, which
-        # is what keeps an enhanced image in its own style; picking a checkpoint
-        # here overrides that for every enhance this folder runs.
         offer_options(self._model, [MATCH_SOURCE_MODEL, *self._options("checkpoint")])
         self._model.currentIndexChanged.connect(self._emit)
         self._model.setToolTip(
@@ -400,11 +337,6 @@ class EnhancePane(QWidget):
             marks={model_caption: self._model_warning},
         ))
 
-        # The detail pass: a tick and a number per part it can be aimed at, the
-        # number being the denoise that part is redrawn at. Their denoise is
-        # separate from the one above, and from each other's, because it can
-        # afford to be far bolder: nothing outside the regions a detector finds
-        # is touched, and a mouth wants a harder redraw than a face does.
         fix_heading = QLabel("Fixes")
         fix_heading.setToolTip(param_help("enhance_detail_fixes"))
         settings_column.addWidget(fix_heading)
@@ -430,42 +362,12 @@ class EnhancePane(QWidget):
         action_row.addWidget(self._preset_button)
         action_row.addWidget(self._enhance_button)
         column.addLayout(action_row)
-        DropTarget(self, _settings_dragged, self._take_settings)  # a version's, dragged here
+        DropTarget(self, _settings_dragged, self._take_settings)
 
     def _fix_row(self) -> QWidget:
-        """Every fixable part on one line: a tick over its name and the
-        denoise it runs at.
-
-        The checkbox is what turns a part's fix on, so the number underneath is free
-        to sit at the denoise it would run at whether or not it is running —
-        check a part and it fixes at that, uncheck it and the number is still
-        there for next time, grayed along with the name so the line reads at a
-        glance as which parts are on.
-
-        Each number is exactly as wide as its digits need — no floor, no share
-        of the leftover — because the point of the line is reading all the parts
-        at once, and one number stretched to fill a pane costs another part its
-        place. (The three numbers above take the opposite deal, a floor each and
-        the slack between them: there are only three, and they are the
-        enhancement itself rather than a list.)
-
-        Flowed rather than fixed, so a pane too narrow for the line wraps the
-        last parts onto a second one instead of cutting them off — and so the
-        line never widens the window, which tiles into a third of a monitor.
-        Each part's checkbox, name and number travel together, so a wrap can't
-        separate them.
-
-        Every part the app knows is here, installed detector or not: one with
-        nothing to find it can't be checked, and says which file to add — which
-        tells you more than an absent field (nothing at all to see) and far
-        more than a live one that would be rejected on submit.
-        """
         host = QWidget()
         flow = FlowLayout(host, spacing=4)
-        # Without this the form gives the line one row's worth of height however
-        # many it wraps to, and the parts past the first row are simply cut off:
-        # a widget only offers its layout's height-for-width when its policy
-        # says it has one.
+        # Qt offers a layout's height-for-width only when the widget's policy says it has one.
         policy = host.sizePolicy()
         policy.setHeightForWidth(True)
         host.setSizePolicy(policy)
@@ -479,7 +381,6 @@ class EnhancePane(QWidget):
         return host
 
     def _fix_field(self, part) -> QWidget:
-        """One part's column: its checkbox, over its name and its denoise."""
         check = TickControl("")
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
@@ -553,13 +454,10 @@ class EnhancePane(QWidget):
             window.choose_lora(lora)
 
     def _fix_toggled(self, name: str) -> None:
-        """A part switched on or off: gray its name and number to match, and
-        report the settings the pane now reads as."""
         self._show_fix_on(name)
         self._emit()
 
     def _show_fix_on(self, name: str) -> None:
-        """Gray one part's name and number unless it is checked."""
         check = self._fix_checks[name]
         widget = self._fixes[name]
         on = check.isChecked() and check.isEnabled()
@@ -569,14 +467,9 @@ class EnhancePane(QWidget):
             label.setEnabled(on)
 
     def _fix_number(self) -> NoWheelDoubleSpinBox:
-        """One part's denoise spinner, ranged from the enhancer's own ParamDef so a
-        floor of zero — the value that means "leave this part alone" — stays the
-        workflow's answer rather than this pane's.
+        """One part's denoise spinner, ranged from the enhancer's own ParamDef.
 
-        Sized to the digits it shows: Qt's own hint for a spinner is two and a
-        half times ``0.00``, and seven of those hints is the difference between
-        one line of parts and three. Measured off the font rather than typed as
-        a number, so it still fits at another font size.
+        Sized to its digits because Qt's own hint for a spinner is two and a half times 0.00.
         """
         widget = NoWheelDoubleSpinBox()
         pd = self._defs.get("enhance_detail_fixes")
@@ -584,12 +477,7 @@ class EnhancePane(QWidget):
         widget.setMaximum(pd.max_val if pd is not None else 1.0)
         widget.setSingleStep(pd.step if pd is not None and pd.step else 0.05)
         widget.setDecimals(2)
-        # The denoise a fix runs at unless it is given another: the checkbox beside
-        # it is what says whether this part is fixed, so the number never has to
-        # mean off, and a part checked on runs at something sensible untouched.
         widget.setValue(DEFAULT_FIX_DENOISE)
-        # No steppers: seven pairs of arrows cost more width than the numbers
-        # beside them, and a denoise is typed or nudged with the arrow keys.
         widget.setButtonSymbols(NoWheelDoubleSpinBox.ButtonSymbols.NoButtons)
         widget.setObjectName("fixField")
         widget.setFixedWidth(widget.fontMetrics().horizontalAdvance("0.00")
@@ -626,14 +514,6 @@ class EnhancePane(QWidget):
         self._preset_button.setToolTip(tip)
 
     def set_applicable(self, applicable: bool, reason: str = "") -> None:
-        """Switch the whole pane on or off, and look it.
-
-        Off, every field is disabled *and* muted, so the pane reads as what it
-        is where it can't apply — settings for an action that isn't on offer —
-        rather than as live settings that quietly do nothing. Back on, each field
-        returns to whatever it was in its own right: a part stays grayed if
-        ComfyUI still hasn't got a detector that finds it.
-        """
         self.setEnabled(applicable)
         self.setToolTip("" if applicable else reason)
 
@@ -642,12 +522,6 @@ class EnhancePane(QWidget):
         self._enhance_button.setToolTip(tip)
 
     def _label_for(self, widget) -> QLabel | None:
-        """The caption sitting beside one field, or ``None`` before it has one.
-
-        Read off the layout rather than kept in a dict of its own: the caption
-        is put there by :meth:`_labeled`, and two records of the same pairing
-        are one more thing to keep in step.
-        """
         parent = widget.parentWidget()
         layout = parent.layout() if parent is not None else None
         if layout is None:
@@ -660,19 +534,15 @@ class EnhancePane(QWidget):
 
     @staticmethod
     def _labeled(text: str, widget) -> QLabel:
-        """A field's caption, carrying the field's own tooltip — the word is what
-        you are looking at when you wonder what a setting does."""
         label = QLabel(text)
         label.setToolTip(widget.toolTip())
         return label
 
     def _options(self, key: str) -> list:
-        """The installed files a dropdown offers, from the enhancer's own ParamDef."""
         pd = self._defs.get(key)
         return list(pd.options or []) if pd is not None else []
 
     def _number(self, key: str, widget):
-        """One numeric setting, ranged from the enhancer's own ParamDef."""
         pd = self._defs.get(key)
         if pd is not None:
             widget.setMinimum(pd.min_val if pd.min_val is not None else 0)
@@ -692,12 +562,6 @@ class EnhancePane(QWidget):
         return widget
 
     def show_settings(self, settings: EnhanceSettings) -> None:
-        """Fill the pane from one folder's stored settings, writing nothing back.
-
-        A part the settings don't name is a part left alone, so it reads zero —
-        filling only what is named would leave the last folder's fixes standing
-        on a folder that asked for none.
-        """
         self._loading = True
         try:
             self._auto.setChecked(settings.auto)
@@ -708,9 +572,6 @@ class EnhancePane(QWidget):
             self._fix_prompts = dict(settings.params.get("enhance_fix_prompts") or {})
             fixes = detail_fixes_of(settings.params)
             for name, widget in self._fixes.items():
-                # A part these settings don't name is off, its number left at
-                # what a fix runs at rather than at some remembered value from
-                # the folder before this one.
                 widget.setValue(float(fixes.get(name, DEFAULT_FIX_DENOISE)))
                 self._fix_checks[name].setChecked(name in fixes)
                 self._show_fix_on(name)
@@ -751,15 +612,11 @@ class EnhancePane(QWidget):
             _fill(self._model, found.fixed(self._model.currentData()))
 
     def settings(self) -> EnhanceSettings:
-        """What the pane currently reads as."""
         params = {}
         for key in ENHANCE_SETTING_KEYS:
             widget = self._widgets.get(key)
             if widget is not None:
                 params[key] = _read(widget)
-        # Only the parts checked on: an unchecked part is one this enhancement
-        # doesn't touch, and carrying its number anyway would make two settings
-        # that fix the same parts compare as different.
         params["enhance_detail_fixes"] = {
             name: widget.value() for name, widget in self._fixes.items()
             if self._fix_checks[name].isChecked()

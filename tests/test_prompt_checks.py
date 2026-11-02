@@ -8,6 +8,7 @@ from origenerator.prompt_checks import (
     duplicate_things,
     tidied,
     unpaired_parentheses,
+    unread_emphasis,
 )
 
 
@@ -111,3 +112,19 @@ def test_parentheses_that_are_not_a_plain_stack_are_left_alone(left_alone):
 
 def test_stacked_parentheses_stay_where_the_model_reads_no_numbers():
     assert tidied("((a))") == "((a))"
+
+
+@pytest.mark.parametrize(("text", "unread"), [
+    ("(a:1.2), b", ["(a:1.2)"]),
+    ("x, ((a b)), y", ["((a b))"]),
+    ("(((a)))", ["(((a)))"]),
+    ("((a:1.2))", ["((a:1.2))"]),
+    ("((a:1.2) b)", ["(a:1.2)"]),
+])
+def test_emphasis_a_model_reads_as_plain_text_is_found_whole(text, unread):
+    assert _spanned(text, unread_emphasis(text)) == unread
+
+
+@pytest.mark.parametrize("text", ["a, b", "(a), b", "((a) b)", r"\\((a))", "16:9"])
+def test_what_is_no_number_or_stack_of_parentheses_is_not_unread_emphasis(text):
+    assert unread_emphasis(text) == ()

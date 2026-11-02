@@ -164,7 +164,7 @@ class _Scene(QFrame):
     def _count_down(self, key: str) -> None:
         count_down(self._countdowns[key], self.fields[key], self._reading_of(key),
                    in_use=self._in_use(key))
-        mark_problems_in([self.fields[key]], in_use=self._in_use(key))
+        mark_problems_in([self.fields[key]], self._reading_of(key), in_use=self._in_use(key))
 
     def _reading_of(self, key: str) -> PromptReading | None:
         return self._readings.get(key)

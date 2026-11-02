@@ -52,10 +52,17 @@ class GenerateButton(QPushButton):
     def flash_guard(self, message: str):
         """Show a form guard on the button for a moment, then revert to its caption."""
         self.setText(message)
+        self._wear_warning(True)
         self._guard_timer.start(_GUARD_MS)
 
     def _clear_guard(self):
         self.setText(self._caption)
+        self._wear_warning(False)
+
+    def _wear_warning(self, warning: bool) -> None:
+        self.setProperty("warning", warning)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 
 def refused_over_prompts(button: GenerateButton, fields: Iterable[QPlainTextEdit]) -> bool:

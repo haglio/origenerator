@@ -11,9 +11,11 @@ from origenerator.gui.tracked_prompt import prompt_ranges_from
 
 RESOLVE_UNPAIRED_PARENTHESES = "Resolve parentheses first"
 RESOLVE_BAD_WEIGHTS = "Resolve bad numbers first"
+RESOLVE_UNREAD_EMPHASIS = "Resolve unread emphasis first"
 RESOLVE_DUPLICATES = "Resolve duplicates first"
 
-_SAYS = (RESOLVE_UNPAIRED_PARENTHESES, RESOLVE_BAD_WEIGHTS, RESOLVE_DUPLICATES)
+_SAYS = (RESOLVE_UNPAIRED_PARENTHESES, RESOLVE_BAD_WEIGHTS, RESOLVE_UNREAD_EMPHASIS,
+         RESOLVE_DUPLICATES)
 
 Spans = tuple[tuple[int, int], ...]
 
@@ -21,6 +23,7 @@ Spans = tuple[tuple[int, int], ...]
 class PromptProblems(NamedTuple):
     unpaired_parentheses: Spans = ()
     bad_weights: Spans = ()
+    unread_emphasis: Spans = ()
     duplicates: Spans = ()
 
 

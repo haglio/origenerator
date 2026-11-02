@@ -23,6 +23,7 @@ from origenerator.prompt_checks import (
     duplicate_things,
     tidied,
     unpaired_parentheses,
+    unread_emphasis,
 )
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
@@ -55,7 +56,8 @@ def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReadi
                         unread=reading is not None and reading.past_it == CUT_OFF)
 
 
-def mark_problems_in(fields: list[QPlainTextEdit], *, in_use: bool) -> None:
+def mark_problems_in(fields: list[QPlainTextEdit], reading: PromptReading | None,
+                     *, in_use: bool) -> None:
     if not in_use:
         for field in fields:
             mark_problems(field, PromptProblems())
@@ -68,6 +70,7 @@ def mark_problems_in(fields: list[QPlainTextEdit], *, in_use: bool) -> None:
         mark_problems(field, PromptProblems(
             tuple((at, at + 1) for at in unpaired_parentheses(text)),
             bad_weights(text),
+            () if reading is None or reading.weighted else unread_emphasis(text),
             tuple((max(first, start) - start, min(last, end) - start)
                   for first, last in duplicates if first < end and last > start)))
         start = end + 1
@@ -334,7 +337,7 @@ class PromptBoxes(QWidget):
             self.edit(tidy)
 
     def _count_down(self) -> None:
-        mark_problems_in(self._boxes, in_use=self._in_use)
+        mark_problems_in(self._boxes, self._reading, in_use=self._in_use)
         if self._cut_from is not None:
             for countdown, (_start, tokens) in zip(self._countdowns,
                                                    self._reading.pieces(self._cut_from), strict=True):

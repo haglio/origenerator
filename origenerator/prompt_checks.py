@@ -11,6 +11,7 @@ _NO_PARENTHESES = re.compile(r"(?<=[^\W\d_]):[\d.]+(?=[ \t]*(?:,|$))", re.MULTIL
 _A_THING = re.compile(r"[^,]+")
 _STACK = re.compile(r"(?<!\\)(\({2,})([^()]*)(\)+)")
 _ONE_PARENTHESIS_ADDS = 1.1
+_WITH_A_NUMBER = re.compile(r"(?<!\\)\([^()]*:\s*(?:\d+(?:\.\d+)?|\.\d+)\s*\)")
 _ENDS = " ,\n" + BOX_BREAK
 
 
@@ -37,6 +38,13 @@ def bad_weights(text: str) -> tuple[tuple[int, int], ...]:
     spans.update(match.span() for match in _OUTSIDE_ITS_PARENTHESES.finditer(text))
     spans.update(match.span() for match in _NO_PARENTHESES.finditer(text))
     return tuple(sorted(spans))
+
+
+def unread_emphasis(text: str) -> tuple[tuple[int, int], ...]:
+    stacks = {match.span() for match in _STACK.finditer(text) if len(match[1]) == len(match[3])}
+    numbers = {match.span() for match in _WITH_A_NUMBER.finditer(text)
+               if not any(start <= match.start() < end for start, end in stacks)}
+    return tuple(sorted(stacks | numbers))
 
 
 def duplicate_things(text: str) -> tuple[tuple[int, int], ...]:

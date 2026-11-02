@@ -30,6 +30,7 @@ from origenerator.gui.osr2_controls_state import (
 )
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
+    HudPlacement,
     OPENS_IN,
     THE_SLIDESHOWS_OWN,
     slideshow_hud_model,
@@ -154,7 +155,7 @@ class SlideshowView(QWidget):
         self._hud_stale = False
         self._hud_built_at = now
         model = slideshow_hud_model(self._hud_shape, self.slideshow,
-                                    hosted=self._dashboard_cmd_file is not None,
+                                    HudPlacement(hosted=self._dashboard_cmd_file is not None),
                                     device=self.hud_device, foot=self.queue_foot.section())
         if model is not None:
             model = replace(model, hud_corner=self._corner, hud_minimized=self._minimized)

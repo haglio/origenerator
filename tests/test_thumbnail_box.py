@@ -32,7 +32,7 @@ def test_a_source_tile_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_p
     tile = SourceTile()
     qtbot.addWidget(tile)
 
-    tile.show_source("img", path, "a name")
+    tile.show_source({"prompt_id": "img", "thumbnail_path": path}, "a name")
 
     assert tile._thumb.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)
 

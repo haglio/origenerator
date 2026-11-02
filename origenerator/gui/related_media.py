@@ -50,8 +50,7 @@ class _Links(CollapsibleSection):
     def _tile(self, heading: str, row: dict, name_of) -> SourceTile:
         tile = SourceTile()
         tile.activated.connect(self.activated)
-        tile.show_source(row["prompt_id"], row.get("thumbnail_path"),
-                         name_of(row["prompt_id"]), heading=heading,
+        tile.show_source(row, name_of(row["prompt_id"]), heading=heading,
                          media_type=media_type_of_row(row))
         return tile
 
@@ -169,8 +168,7 @@ class RelatedMedia(QWidget):
         if taken_from is not None:
             source_row, heading, media_type = taken_from, "From starting frame of", MediaType.VIDEO
         self._source_tile.show_source(
-            source_row["prompt_id"], source_row.get("thumbnail_path"),
-            self._name_of(source_row["prompt_id"]),
+            source_row, self._name_of(source_row["prompt_id"]),
             heading=heading, media_type=media_type,
         )
 
@@ -206,8 +204,7 @@ class RelatedMedia(QWidget):
             self._source_video_tile.clear()
             return
         self._source_video_tile.show_source(
-            video["prompt_id"], video.get("thumbnail_path"),
-            self._name_of(video["prompt_id"]),
+            video, self._name_of(video["prompt_id"]),
             heading="From source video", media_type=MediaType.VIDEO, gray=True,
         )
 

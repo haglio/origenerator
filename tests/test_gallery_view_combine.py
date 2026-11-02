@@ -562,11 +562,14 @@ def test_an_action_whose_settings_came_from_no_video_links_to_the_image_alone(qt
 
 
 def _combine_view_with_a_looping_video(qtbot, tmp_path):
-    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    video = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
+    class _Showing(GalleryView):
+        def animated_preview(self, row):
+            return video
+
+    view = _Showing(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    video = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
-    view.animated_preview = lambda row: video
     return view
 
 

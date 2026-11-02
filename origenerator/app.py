@@ -438,10 +438,7 @@ def _configure_logging(state_dir: Path):
 
     from app_support.logging_utils import configure_logging, install_exception_logging
 
-    from origenerator.qt_messages import (
-        install_qt_message_logging,
-        silence_the_ffmpeg_format_dump,
-    )
+    from origenerator.qt_messages import install_qt_message_logging
 
     try:
         configure_logging("", state_dir / "origenerator.log", console=True)
@@ -450,7 +447,6 @@ def _configure_logging(state_dir: Path):
         logging.basicConfig(level=logging.INFO,
                             format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     install_qt_message_logging()
-    silence_the_ffmpeg_format_dump()
     logger = logging.getLogger(__name__)
     install_exception_logging(logger)
     return logger

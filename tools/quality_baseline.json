@@ -961,7 +961,7 @@
     "tests/test_training_run.py": 1
   },
   "statements": {
-    "origenerator/app.py": 460,
+    "origenerator/app.py": 459,
     "origenerator/gui/browser_pane.py": 748,
     "origenerator/gui/combine_controller.py": 376,
     "origenerator/gui/enhance_controller.py": 348,

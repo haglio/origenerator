@@ -398,7 +398,7 @@ def test_the_window_is_handed_where_the_next_launchs_loading_screen_meets_it(qap
     with _a_faked_boot([], **{"origenerator.gui.core.Core": window}):
         assert main([]) == 0
 
-    assert window.call_args.kwargs["next_launch"] == place
+    assert window.call_args.kwargs["launch"].next_launch == place
 
 
 def test_a_launch_inside_a_fun_time_session_tells_no_loading_screen_anything(qapp, tmp_path, monkeypatch):
@@ -770,7 +770,7 @@ def test_a_hosted_boot_shows_every_window_under_the_sessions_taskbar_button(qapp
         }):
             assert main(hosted_launch(**{"--taskbar-identity": "FunTime.App.Preview"})) == 0
 
-        taskbar = built.call_args.kwargs["taskbar"]
+        taskbar = built.call_args.kwargs["launch"].taskbar
         window = QWidget()
         try:
             window.show()

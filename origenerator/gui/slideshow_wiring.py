@@ -46,6 +46,16 @@ class HudFacts:
     enhancing: Mapping[str, str] = field(default_factory=dict)
 
 
+def _led_at(opening, start: int | None) -> int | None:
+    return opening.lead if opening is not None else start
+
+
+def _neighbors_known(opening) -> dict:
+    if opening is None or opening.lead_neighbors is None:
+        return {}
+    return {opening.items[opening.lead][2]: opening.lead_neighbors}
+
+
 @dataclass(frozen=True)
 class SetDeal:
     shuffle: object = None
@@ -54,13 +64,10 @@ class SetDeal:
 
     @property
     def led_at(self) -> int | None:
-        return self.opening.lead if self.opening is not None else self.start
+        return _led_at(self.opening, self.start)
 
     def neighbors_known(self) -> dict:
-        opening = self.opening
-        if opening is None or opening.lead_neighbors is None:
-            return {}
-        return {opening.items[opening.lead][2]: opening.lead_neighbors}
+        return _neighbors_known(self.opening)
 
 
 NO_DEAL = SetDeal()

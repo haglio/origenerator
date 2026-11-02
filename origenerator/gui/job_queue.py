@@ -15,18 +15,11 @@ from origenerator.completion import mark_generation_completed
 from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
-from origenerator.gui.generation_job import (
-    GenerationJob,
-    JobPlan,
-    JobSpec,
-    JobState,
-    insert_generation_row,
-    record_unfinished_run,
-)
+from origenerator.gui.generation_job import GenerationJob, JobPlan, JobSpec, JobState
+from origenerator.gui.job_records import insert_generation_row, record_canceled_run, record_failed_run
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.media import MediaType
 from origenerator.run_toast import RunOutcome
-from origenerator.seed_history import SeedUseKind
 from origenerator.timing import elapsed_since
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -232,9 +225,9 @@ class JobQueue(QObject):
         self._reroll_variation(key, row, image_rows, new_image=True, new_video=False)
 
     def regenerate(self, key: str, row: dict) -> str | None:
-        workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
         return self._launch(
-            key, JobPlan(workflow, filled_params(row, workflow)), self._on_finished)
+            key, JobPlan(workflow := WORKFLOW_REGISTRY[row["workflow_name"]], filled_params(row, workflow)),
+            self._on_finished)
 
     def _reroll_variation(self, key, row, image_rows, *, new_image, new_video):
         if self._client is None or not self._launchable(key):
@@ -272,12 +265,11 @@ class JobQueue(QObject):
         return job and job.prompt_id
 
     def _new_job(self, key, plan: JobPlan, on_finished):
-        source = plan.source
         try:
-            job = GenerationJob(self._client, JobSpec(plan.workflow, plan.params, source))
+            job = GenerationJob(self._client, JobSpec(plan.workflow, plan.params, plan.source))
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
-            if _the_users_own(source):
+            if _the_users_own(plan.source):
                 self.failed.emit(key, f"Origenerator could not put the run together: {e!r}")
             return None
         job.origin = plan.origin or job.prompt_id
@@ -703,7 +695,7 @@ class JobQueue(QObject):
         for stopped in [job, *self._videos_waiting_for(job)]:
             self._drop(self._key_of(stopped), stopped)
             stopped.cancel()
-            record_unfinished_run(self._db, stopped, SeedUseKind.CANCELED)
+            record_canceled_run(self._db, stopped)
             self._db.delete_generation(stopped.prompt_id)
         self._pump()
 
@@ -754,7 +746,7 @@ class JobQueue(QObject):
             self._drop(ended_key, ended_job)
         self._pump()
         for ended_key, ended_job, why in ended:
-            record_unfinished_run(self._db, ended_job, SeedUseKind.FAILED)
+            record_failed_run(self._db, ended_job)
             self._db.update_generation(ended_job.prompt_id, status=GenerationStatus.ERROR,
                                        error_message=why)
             logger.warning("Re-roll failed for %s: %s", ended_key, why)

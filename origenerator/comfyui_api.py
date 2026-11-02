@@ -130,7 +130,9 @@ class ComfyUIApi:
         self.port = port
         self.client_id = client_id or str(uuid.uuid4())
         self.folders = folders
-        self._clock = clock or _RealClock()
+        clock = clock or _RealClock()
+        self._clock = clock
+        self._sleep = clock.sleep
 
     @property
     def base_url(self) -> str:
@@ -166,7 +168,7 @@ class ComfyUIApi:
                 return False
             if absent_since is not None and now - absent_since >= _ACCEPTANCE_GRACE_S:
                 return False
-            self._clock.sleep(_ACCEPTANCE_POLL_S)
+            self._sleep(_ACCEPTANCE_POLL_S)
 
     def _lists_prompt(self, prompt_id: str) -> bool:
         data = self._fetch_queue_data(timeout=_ACCEPTANCE_READ_TIMEOUT_S)

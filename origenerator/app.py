@@ -422,10 +422,9 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
 def _build_window(client, db, app_state, boot, next_launch):
     from origenerator.gui.core import Core, Launch
 
-    fun_time = boot.fun_time
-    window = Core(client, db, app_state, fun_time=fun_time,
+    window = Core(client, db, app_state, fun_time=boot.fun_time,
                   launch=Launch(boot.preview, boot.taskbar, next_launch))
-    if fun_time is not None and not fun_time.in_a_headset:
+    if boot.fun_time is not None and not boot.fun_time.in_a_headset:
         window.showMinimized()
     return window
 

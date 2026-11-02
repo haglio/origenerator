@@ -466,13 +466,12 @@ class WorkflowTemplate(ABC):
                 f"fix{index}_lora", refs.model,
                 [(own["lora"], own["strength"])] if own["lora"] else [], clip_ref=refs.clip_ref)
             nodes.update(fixed.nodes)
-            model, fixed_clip_ref = fixed.model, fixed.clip_ref
             positive, negative = refs.positive, refs.negative
             if own["prompt"] or own["avoid"] or own["lora"]:
                 positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
-                nodes.update(prompt_conditioning(positive_id, fixed_clip_ref, params["positive_prompt"],
+                nodes.update(prompt_conditioning(positive_id, fixed.clip_ref, params["positive_prompt"],
                                                  ahead=own["prompt"]))
-                nodes.update(prompt_conditioning(negative_id, fixed_clip_ref, params["negative_prompt"],
+                nodes.update(prompt_conditioning(negative_id, fixed.clip_ref, params["negative_prompt"],
                                                  ahead=own["avoid"]))
                 positive, negative = [positive_id, 0], [negative_id, 0]
             nodes[detailer_id] = {
@@ -481,8 +480,8 @@ class WorkflowTemplate(ABC):
                 "inputs": {
                     "image": image_ref,
                     "segs": segs_ref,
-                    "model": model,
-                    "clip": fixed_clip_ref,
+                    "model": fixed.model,
+                    "clip": fixed.clip_ref,
                     "vae": refs.vae,
                     "guide_size": _DETAIL_GUIDE_SIZE,
                     "guide_size_for": True,

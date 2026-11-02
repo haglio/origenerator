@@ -656,9 +656,7 @@ class GalleryPane(QObject):
                    appearance: TileAppearance) -> ItemTile:
         prompt_id = row["prompt_id"]
         thumb_path = row.get("thumbnail_path")
-        caption = appearance.caption
-        if caption is None:
-            caption = self._host.item_name(prompt_id)
+        caption = self._host.item_name(prompt_id) if appearance.caption is None else appearance.caption
         tile = self._kept.take(
             prompt_id, ItemTile.look_of(prompt_id, thumb_path, caption, appearance),
             wiring)

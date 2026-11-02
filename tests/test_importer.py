@@ -27,7 +27,6 @@ from tests.media_files import write_mp4
 
 
 def _make_png_with_metadata(path, prompt_data, size=(64, 64)):
-    """Create a PNG with ComfyUI-style metadata embedded."""
     img = Image.new("RGB", size, (128, 0, 0))
     pnginfo = PngInfo()
     pnginfo.add_text("prompt", json.dumps(prompt_data))
@@ -76,7 +75,6 @@ def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
     output_dir.mkdir(parents=True)
     thumb_dir = tmp_path / "thumbs"
 
-    # ComfyUI names outputs "<prefix>_NNNNN_.mp4"; the prefix identifies the workflow.
     (output_dir / "wan22_i2v_842719365028413_00001_.mp4").write_bytes(b"")
     (output_dir / "flf2v_loop_00001.mp4").write_bytes(b"")
     (output_dir / "mystery_clip_00001.mp4").write_bytes(b"")
@@ -106,8 +104,6 @@ def test_an_imported_video_has_its_thumbnail_ready_to_animate(tmp_path):
 
 def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
     db = Database(tmp_path / "test.db")
-    # An early import: the graph is on the row, but its UNET/LoRA were never
-    # pulled into params, so it can't nest by model or LoRA yet.
     graph = {
         "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_high.safetensors"}},
         "5": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_low.safetensors"}},
@@ -125,8 +121,6 @@ def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
         params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
     )
-    # What the app generated itself is left alone: its params are already what
-    # it ran, so nothing is read back off the graph onto it.
     db.insert_generation(
         prompt_id="fresh", workflow_name="wan22_i2v", workflow_version="v001",
         params_json=json.dumps({
@@ -143,10 +137,8 @@ def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
     assert old["unet_high"] == "wan_high.safetensors"
     assert old["lora_high"] == "styleB_high.safetensors"
     assert old["lora_low"] == "styleB_low.safetensors"
-    assert old["positive_prompt"] == "a fox"  # existing params kept
-    # The already-complete row's LoRA is not overwritten by the graph's.
+    assert old["positive_prompt"] == "a fox"
     assert json.loads(db.get_generation("fresh")["params_json"])["lora_high"] == "l_h.safetensors"
-    # Idempotent: a second pass finds nothing left to fill.
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
@@ -265,9 +257,6 @@ def test_backfill_splits_the_imports_of_no_known_workflow_by_their_shape(tmp_pat
 
 def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
     db = Database(tmp_path / "test.db")
-    # An early video import: the graph is on the row (LoadImage names the source
-    # frame), but input_image was never pulled into params, so the video can't
-    # link back to the gallery image it was animated from.
     graph = {
         "1": {"class_type": "LoadImage", "inputs": {"image": "sdxl_t2i_00022_.png"}},
         "5": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"start_image": ["1", 0]}},
@@ -277,14 +266,11 @@ def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
         params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
     )
-    # A row that already names its input image is left alone — a re-roll's fresh
-    # start-frame reference must not be clobbered by the graph's original.
     db.insert_generation(
         prompt_id="fresh", workflow_name="wan22_flf2v_loop", workflow_version="v005",
         params_json=json.dumps({"input_image": "video/x_00001.mp4 [output]"}),
         workflow_json=json.dumps(graph),
     )
-    # A row whose graph loads no image (a T2I) has no source to recover.
     db.insert_generation(
         prompt_id="t2i", workflow_name="sdxl_t2i", workflow_version="imported",
         params_json=json.dumps({"seed": 9}),
@@ -297,11 +283,9 @@ def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
     assert old["input_image"] == "sdxl_t2i_00022_.png"
-    assert old["positive_prompt"] == "a fox"  # existing params kept
-    # The re-rolled row's fresh input reference is preserved.
+    assert old["positive_prompt"] == "a fox"
     assert json.loads(db.get_generation("fresh")["params_json"])["input_image"] == "video/x_00001.mp4 [output]"
     assert "input_image" not in json.loads(db.get_generation("t2i")["params_json"])
-    # Idempotent: a second pass finds nothing left to fill.
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
@@ -320,7 +304,6 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
 
     add_unknown("bf-i2v", "wan22_i2v_842719365028413_00001_.mp4")
     add_unknown("bf-mystery", "mystery_00001.mp4")
-    # An already-identified row must be left untouched.
     db.insert_generation(
         prompt_id="bf-known", workflow_name="wan22_flf2v_loop",
         workflow_version="v004", params_json="{}", workflow_json="{}",
@@ -400,7 +383,6 @@ def test_backfill_files_an_import_whose_name_says_nothing_under_the_workflow_its
 
 
 def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
-    # No _meta titles: prompts must be found structurally via the Wan node's links.
     graph = {
         "1": {"class_type": "LoadImage", "inputs": {"image": "start.png"}},
         "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "a serene lake"}},
@@ -466,13 +448,10 @@ def test_extract_metadata_reads_a_videos_sound_settings(tmp_path, monkeypatch):
     meta = imp._extract_metadata(tmp_path / "wan22_i2v_00001_.mp4", ".mp4")
 
     assert {key: meta["params"][key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
-    assert meta["params"]["steps"] == 8  # the sound's own steps are not the video's
+    assert meta["params"]["steps"] == 8
 
 
 def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monkeypatch):
-    # An i2v variant differs from its siblings only by LoRA. The LoRA (and base
-    # model) live in the two samplers' model chains; extracting them is what lets
-    # the gallery nest the import under its model -> LoRA folders.
     graph = {
         "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "a fox"}},
         "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry"}},
@@ -504,7 +483,7 @@ def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monk
 
 def test_video_prompt_graph_handles_double_encoded(tmp_path, monkeypatch):
     graph = {"1": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
-    double = json.dumps(json.dumps(graph))  # VHS_VideoCombine double-encodes
+    double = json.dumps(json.dumps(graph))
     out = json.dumps({"format": {"tags": {"prompt": double}}})
     monkeypatch.setattr(imp.shutil, "which", lambda n: "ffprobe")
     monkeypatch.setattr(imp.subprocess, "run",
@@ -519,9 +498,6 @@ def test_video_prompt_graph_empty_without_ffprobe(tmp_path, monkeypatch):
 
 
 def test_video_prompt_graph_runs_ffprobe_without_a_console_window(tmp_path, monkeypatch):
-    """Each ffprobe child must be spawned windowless: importing a batch of videos
-    calls it once per file, and on Windows an unsuppressed child flashes a console
-    window per call. Assert the console-suppressing creationflag is passed."""
     captured: dict = {}
 
     def fake_run(*args, **kwargs):
@@ -597,9 +573,6 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     output_dir.mkdir(parents=True)
     thumb_dir = tmp_path / "thumbs"
 
-    # VHS_VideoCombine writes a metadata PNG beside the MP4; the PNG carries the
-    # prompt/seed, the MP4 is the playable output. The Wan conditioning node
-    # links to the prompts, the way the embedded graph really does.
     prompt_data = {
         "9": {"class_type": "CLIPTextEncode", "inputs": {"text": "a dancing cat"}},
         "10": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry"}},
@@ -614,13 +587,13 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     db = Database(tmp_path / "test.db")
     count = import_comfyui_output(OutputPlaces.in_one_folder(output_dir.parent), db, thumb_dir)
 
-    assert count == 1  # one entry, not one-per-file
+    assert count == 1
     rows = db.list_generations()
     assert len(rows) == 1
     row = rows[0]
     files = json.loads(row["output_files"])
-    assert files[0]["filename"] == "flf2v_loop_00001.mp4"   # plays the video
-    assert row["positive_prompt"] == "a dancing cat"        # keeps the PNG metadata
+    assert files[0]["filename"] == "flf2v_loop_00001.mp4"
+    assert row["positive_prompt"] == "a dancing cat"
     assert row["seed"] == 777
     assert row["workflow_name"] == "wan22_flf2v_loop"
 
@@ -641,14 +614,6 @@ def test_a_video_is_never_filed_under_a_workflow_that_only_makes_images(tmp_path
 
 
 def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
-    """A still and a video that share a filename stem must not share a thumbnail.
-
-    ComfyUI's default ``SaveImage`` prefix yields ``ComfyUI_00001_.png`` while a
-    video lands at ``video/ComfyUI_00001_.mp4``; both import as separate rows.
-    Naming the thumbnail by the source stem collapsed them onto one file, so the
-    image row's thumbnail showed the video's frame even though its preview was
-    the still. Each row must own a distinct, existing thumbnail.
-    """
     output_dir = tmp_path / "output"
     (output_dir / "video").mkdir(parents=True)
     thumb_dir = tmp_path / "thumbs"
@@ -661,7 +626,7 @@ def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
     thumbs = [r["thumbnail_path"] for r in db.list_generations()]
     assert all(thumbs)
     assert len(set(thumbs)) == 2
-    assert all(Path(t).exists() for t in thumbs)          # neither overwritten away
+    assert all(Path(t).exists() for t in thumbs)
 
 
 def test_import_standalone_video_without_sidecar_still_imports(tmp_path):
@@ -716,11 +681,11 @@ def test_merge_repoints_image_sidecar_to_video_and_drops_video_row(tmp_path):
     _completed(db, "vid", "flf2v_loop_00001.mp4", "video")
 
     assert merge_video_sidecar_rows(db) == 1
-    assert db.get_generation("vid") is None              # redundant video row gone
+    assert db.get_generation("vid") is None
     survivor = db.get_generation("img")
     files = json.loads(survivor["output_files"])
-    assert files[0]["filename"] == "flf2v_loop_00001.mp4"   # now plays the video
-    assert survivor["positive_prompt"] == "a dancing cat"   # metadata preserved
+    assert files[0]["filename"] == "flf2v_loop_00001.mp4"
+    assert survivor["positive_prompt"] == "a dancing cat"
     assert survivor["thumbnail_path"] == "thumbs/flf2v_loop_00001.jpg"
 
 
@@ -935,21 +900,14 @@ def test_a_copy_whose_video_could_not_be_sent_waits_for_the_next_launch(tmp_path
 
 
 def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
-    """Repair the old collision: two rows pointing at one stem-named thumbnail.
-
-    Before the per-prompt naming fix, ``ComfyUI_00001_.png`` and
-    ``video/ComfyUI_00001_.mp4`` both wrote ``ComfyUI_00001_.jpg`` — the later
-    import winning — so the image row's thumbnail showed the video's frame. The
-    backfill re-renders each sharer from its own output under its prompt_id.
-    """
     output_dir = tmp_path / "output"
     (output_dir / "video").mkdir(parents=True)
     thumb_dir = tmp_path / "thumbs"
     thumb_dir.mkdir()
     Image.new("RGB", (512, 768), (255, 0, 0)).save(output_dir / "ComfyUI_00001_.png")
     (output_dir / "video" / "ComfyUI_00001_.mp4").write_bytes(b"")
-    shared = thumb_dir / "ComfyUI_00001_.jpg"  # the single file both rows share
-    Image.new("RGB", (256, 144), (0, 255, 0)).save(shared)  # currently the video's frame
+    shared = thumb_dir / "ComfyUI_00001_.jpg"
+    Image.new("RGB", (256, 144), (0, 255, 0)).save(shared)
 
     db = Database(tmp_path / "test.db")
     _completed(db, "img", "ComfyUI_00001_.png", "", thumbnail_path=str(shared))
@@ -960,15 +918,13 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
     img_thumb = db.get_generation("img")["thumbnail_path"]
     vid_thumb = db.get_generation("vid")["thumbnail_path"]
     assert img_thumb != vid_thumb
-    assert Path(img_thumb).name == "img.jpg"   # named by prompt_id now
+    assert Path(img_thumb).name == "img.jpg"
     assert Path(img_thumb).exists()
     assert Path(vid_thumb).exists()
-    # The image row's thumbnail reflects its own portrait still, not the video.
     assert Image.open(img_thumb).size[0] < Image.open(img_thumb).size[1]
 
 
 def test_backfill_leaves_a_uniquely_owned_thumbnail_untouched(tmp_path):
-    """A thumbnail no other row shares (and that exists) is left exactly as is."""
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     thumb_dir = tmp_path / "thumbs"
@@ -985,11 +941,6 @@ def test_backfill_leaves_a_uniquely_owned_thumbnail_untouched(tmp_path):
 
 
 def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
-    """A completed row whose thumbnail file has vanished gets a fresh one.
-
-    This is the tail of the same bug: deleting one stem-twin trashed the shared
-    thumbnail, leaving the survivor pointing at a file that no longer exists.
-    """
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     thumb_dir = tmp_path / "thumbs"
@@ -998,7 +949,7 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
 
     db = Database(tmp_path / "test.db")
     _completed(db, "gone", "sdxl_t2i_5_.png", "",
-               thumbnail_path=str(thumb_dir / "sdxl_t2i_5_.jpg"))  # never on disk
+               thumbnail_path=str(thumb_dir / "sdxl_t2i_5_.jpg"))
 
     assert backfill_shared_thumbnails(db, OutputPlaces.in_one_folder(output_dir), thumb_dir) == 1
     new = db.get_generation("gone")["thumbnail_path"]
@@ -1007,10 +958,6 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
 
 
 def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
-    # Flux embeds no checkpoint and no Wan node: its UnetLoaderGGUF + DualCLIPLoader
-    # + FluxGuidance signature is what names it, and the GGUF model is pulled out
-    # so the gallery can split Flux runs by which model made them. The filename
-    # matches no workflow prefix, proving the embedded graph alone suffices.
     graph = {
         "1": {"class_type": "UnetLoaderGGUF",
               "inputs": {"unet_name": "ultrarealFineTune_v4_fp16.gguf"}},
@@ -1051,9 +998,6 @@ def test_an_sdxl_image_whose_prompts_were_read_in_boxes_re_imports_in_its_boxes(
 
 
 def test_a_krea2_images_own_graph_re_imports_as_krea2(tmp_path):
-    # Dropped back in under a name that says nothing, a Krea 2 image is named
-    # by its graph alone, and its model is read off the loader so the gallery
-    # files it under the checkpoint that made it.
     wf = WORKFLOW_REGISTRY["krea2_t2i"]
     graph = wf.build_api_payload(dict(wf.default_params(), positive_prompt="a harbor at dawn",
                                       seed=4242, unet="a_krea2_model.safetensors"))
@@ -1068,8 +1012,6 @@ def test_a_krea2_images_own_graph_re_imports_as_krea2(tmp_path):
 
 
 def test_backfill_relabels_unknown_flux_import_by_filename(tmp_path):
-    # The Flux imports that predate this workflow landed as "unknown"; once it's
-    # registered, the flux_t2i_upscaled_* filename prefix identifies them.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="flux", workflow_name="unknown", workflow_version="imported",
@@ -1083,9 +1025,6 @@ def test_backfill_relabels_unknown_flux_import_by_filename(tmp_path):
 
 
 def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
-    # The same "unknown"-era Flux imports stored their graph but never pulled the
-    # GGUF model into params, so they collapse under "(unknown model)" until the
-    # backfill reads it back — the same repair the WAN dual-sampler test covers.
     db = Database(tmp_path / "test.db")
     graph = {
         "1": {"class_type": "UnetLoaderGGUF",
@@ -1100,8 +1039,8 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
     params = json.loads(db.get_generation("flux-old")["params_json"])
     assert params["unet"] == "cyberrealisticFlux_v25GGUFQ80.gguf"
-    assert params["positive_prompt"] == "a portrait"   # existing params kept
-    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0         # idempotent
+    assert params["positive_prompt"] == "a portrait"
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
 
 def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(tmp_path):
@@ -1164,11 +1103,6 @@ def test_backfill_fills_the_strength_each_wan_stage_ran_its_lora_at(tmp_path):
 
 
 def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
-    # WAN 2.2 T2I embeds no Wan conditioning node and no checkpoint, so
-    # its EmptyHunyuanLatentVideo + ImageFromBatch + SaveImage signature is what
-    # names it. The filename matches no workflow prefix, proving the graph alone
-    # suffices. Prompts come from the CLIPTextEncode titles, the seed from the
-    # noise-adding (stage 1) sampler.
     graph = {
         "99": {"class_type": "CLIPTextEncode", "inputs": {"text": "a kitten"},
                "_meta": {"title": "CLIP Text Encode (Positive Prompt)"}},
@@ -1189,14 +1123,10 @@ def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
     assert meta["workflow_name"] == "wan22_t2i"
     assert meta["positive_prompt"] == "a kitten"
     assert meta["negative_prompt"] == "blurry"
-    assert meta["seed"] == 746703007625838   # stage-1 (add_noise enable) seed
+    assert meta["seed"] == 746703007625838
 
 
 def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
-    # An enhanced SDXL graph carries two KSamplers. A re-imported output must
-    # record the graph's base pass, not the low-denoise refinement the enhance
-    # tail runs over its VAEEncode'd latent — otherwise the import would claim
-    # the run took 20 steps at denoise 0.3.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     graph = wf.build_api_payload(dict(
         wf.default_params(), positive_prompt="a harbor at dawn", seed=4242,
@@ -1266,19 +1196,11 @@ def test_an_import_whose_graph_states_no_size_takes_the_size_of_its_own_image(tm
 
     assert (params["width"], params["height"]) == (720, 1072)
 
-# --- which workflow made this graph -------------------------------------------
-
 def _graph_of(*class_types):
-    """A minimal ComfyUI graph carrying nothing but these node classes."""
     return {str(i): {"class_type": name, "inputs": {}}
             for i, name in enumerate(class_types, start=1)}
 
 
-# (the node classes in the graph, the workflow it must be read as). The chain is
-# ORDERED, because a graph can satisfy more than one test: an flf2v graph also
-# carries the i2v conditioning, a Flux one can also load a checkpoint. So the
-# cases that matter are the ones naming the node that must LOSE beside the one
-# that must win.
 _READ_AS = (
     (("WanFirstLastFrameToVideo",), "wan22_flf2v_loop"),
     (("WanFirstLastFrameToVideo", "WanImageToVideo"), "wan22_flf2v_loop"),
@@ -1290,9 +1212,6 @@ _READ_AS = (
     (("UnetLoaderGGUF", "DualCLIPLoader"), "flux_t2i_upscaled"),
     (("FluxGuidance", "CheckpointLoaderSimple"), "flux_t2i_upscaled"),
     (("CheckpointLoaderSimple",), "sdxl_t2i"),
-    # A video latent that was NOT saved as an image is not T2I, and a
-    # GGUF UNET without the dual encoders is not Flux: both fall through, and
-    # the filename's guess (none, for this name) stands.
     (("EmptyHunyuanLatentVideo",), "unknown"),
     (("UnetLoaderGGUF",), "unknown"),
     (("SomeNodeNobodyHasHeardOf",), "unknown"),
@@ -1301,7 +1220,6 @@ _READ_AS = (
 
 @pytest.mark.parametrize("node_types, expected", _READ_AS)
 def test_the_graphs_nodes_name_the_workflow(tmp_path, node_types, expected):
-    # A filename matching no workflow prefix, so the graph alone decides.
     path = tmp_path / "renamed_00001_.png"
     _make_png_with_metadata(path, _graph_of(*node_types))
 
@@ -1309,10 +1227,6 @@ def test_the_graphs_nodes_name_the_workflow(tmp_path, node_types, expected):
 
 
 def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
-    """The filename is a first guess only — a file renamed, or written under a
-    prefix that was later reused, would otherwise be filed under the wrong
-    workflow forever. Workflow names are persisted into every row and named from
-    the overlay's pinned settings, so this is a data defect, not a display one."""
     path = tmp_path / "sdxl_t2i_00001_.png"
     _make_png_with_metadata(path, _graph_of("WanImageToVideo"))
 
@@ -1321,12 +1235,6 @@ def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
 
 @pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))
 def test_every_workflows_own_output_re_imports_as_itself(tmp_path, name):
-    """A file named by a workflow's own prefix and carrying that workflow's own
-    graph is that workflow's output.  Two workflows build the same kind of
-    graph as a third -- the pose transfer and the standalone enhance both load
-    an SDXL checkpoint -- and the graph read, which overrules the filename,
-    filed a re-import of either under sdxl_t2i although the filename had it
-    right (bug 70).  The graph overrules only where it can tell the two apart."""
     workflow = WORKFLOW_REGISTRY[name]
     prefix = workflow.default_params().get("filename_prefix", "").rsplit("/", 1)[-1]
     if not prefix:

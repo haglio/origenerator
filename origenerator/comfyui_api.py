@@ -1,18 +1,3 @@
-"""ComfyUI's REST surface: everything this app asks the server over HTTP.
-
-Qt-free on purpose, and that is the whole point of it being its own module.
-``ComfyUIClient`` is a ``QThread`` running a websocket event pump, so holding
-the eleven calls below on it would make every consumer of them need Qt --
-including the ones that plainly should not: ``completion`` is read by the
-reconciler with no running UI, and ``inflight`` and ``base_backfill`` are pure.
-
-``ComfyUIClient`` holds one of these and forwards every one of its methods, so
-nothing that already has a client had to change. What is new is that a unit
-needing only the HTTP half can declare THIS, and be handed one -- or a stub --
-with no Qt anywhere.
-
-The websocket half stays where it must: it emits Qt signals from a thread.
-"""
 from __future__ import annotations
 
 import http.client
@@ -29,48 +14,18 @@ from origenerator.comfyui_inputs import ComfyFolders, within_reach
 
 logger = logging.getLogger(__name__)
 
-# Every HTTP call to ComfyUI carries this timeout. Without one, a wedged or
-# swap-thrashed server hangs the calling thread forever — the GUI thread for a
-# cancel (the whole app freezes), the submit's own thread (see the follow-up
-# below, and JobQueue._hand_over), or the websocket thread for a history
-# fetch (no job ever completes again). Generous, because a busy server that IS
-# answering can legitimately take a while; it's a socket-inactivity limit, not a
-# total-transfer one, so even a large /view download streams fine under it.
 _HTTP_TIMEOUT_S = 30.0
 
-# Queue reads the GUI repeats on its poll timer get a much tighter deadline. They
-# run on the GUI thread every couple of seconds, so a wedged server under the
-# generous limit above would freeze the window for half a minute at a time; under
-# this one it costs a skipped reading.
 _POLL_TIMEOUT_S = 2.0
 
-# A submit whose POST timed out is not yet a failed submit. ComfyUI logs "got
-# prompt" the moment the request lands and only then validates it, on its event
-# loop: while that takes long -- fifty seconds on 2026-09-05, for a two-scene
-# video whose one-scene twin took a tenth of one -- it answers nothing, the
-# websocket's keepalive dies, and the POST's answer comes after the client has
-# stopped listening; the job runs all the same. Declared failed, that job ran
-# untracked and its video never reached the gallery. So a late submit goes on
-# asking, for this long in all, whether the server lists the prompt.
+# ComfyUI validates a prompt on its event loop after logging it and answers nothing meanwhile
 _ACCEPTANCE_WAIT_S = 120.0
-# Once the server is answering and does not list it, this much longer for the
-# POST, which it received first, to finish landing in the queue.
 _ACCEPTANCE_GRACE_S = 15.0
 _ACCEPTANCE_POLL_S = 3.0
-# Each ask's own deadline: short, since a stalled server answers none of them
-# and the wait above is what bounds the whole.
 _ACCEPTANCE_READ_TIMEOUT_S = 10.0
 
 
 class ForeignQueue(NamedTuple):
-    """What clients other than this one have on ComfyUI's queue right now.
-
-    ``running`` is what ComfyUI is executing for them (at most one), ``pending``
-    what waits on it. Split because they're cleared differently: a pending
-    prompt is deleted out of the queue, while the executing one can only be
-    interrupted.
-    """
-
     running: list[str]
     pending: list[str]
 
@@ -80,15 +35,6 @@ class ForeignQueue(NamedTuple):
 
 
 def format_prompt_error(body: str) -> str:
-    """Turn ComfyUI's 400 ``/prompt`` body into a one-line, human-readable reason.
-
-    A rejected prompt returns JSON with ``node_errors`` — per failing node, its
-    ``class_type`` and one or more ``errors`` whose ``details`` say what's wrong
-    (e.g. ``LoadImage: image - Invalid image file: foo.png``). That detail is
-    what makes a 400 actionable; ``urllib``'s own ``HTTPError`` string throws it
-    away as a bare "Bad Request". Falls back to the top-level ``error`` message,
-    then to the raw body, when the shape isn't the expected one.
-    """
     try:
         data = json.loads(body)
     except (json.JSONDecodeError, TypeError):
@@ -114,19 +60,6 @@ def _node_refusal(node: str, error: dict) -> str:
 
 
 def format_execution_error(message: str) -> str:
-    """Turn ComfyUI's execution-error blob into a one-line, readable reason.
-
-    A run that dies partway through the graph reports a JSON object naming the
-    node that threw (``node_type``) and what it threw (``exception_message``) --
-    the latter often with a whole download log and a traceback stapled to it. The
-    first line of that is the sentence; the rest is not something to read out of
-    a dialog. The sibling of :func:`format_prompt_error`, which does the same for
-    the other kind of failure, the one that happens before the run starts.
-
-    Falls back to the message as it came when the shape is not the expected one:
-    a failure that reaches the user unreadable is still better than one that
-    never reaches them, which is what this exists to end.
-    """
     try:
         data = json.loads(message)
     except (json.JSONDecodeError, TypeError):
@@ -142,8 +75,7 @@ def format_execution_error(message: str) -> str:
 
 
 def _timed_out(error: BaseException) -> bool:
-    """Whether urllib gave up waiting: a read that timed out raises the socket's
-    own ``TimeoutError``; a connect that did wraps one in ``URLError``."""
+    # urllib: a read that times out raises TimeoutError; a connect that does wraps one in URLError
     if isinstance(error, TimeoutError):
         return True
     return isinstance(error, urllib.error.URLError) and isinstance(error.reason, TimeoutError)
@@ -154,14 +86,12 @@ def unreachable(error: BaseException) -> bool:
 
 
 def _queue_prompt_id(item):
-    """The prompt id of a ``/queue`` entry — element 1 of its tuple — or ``None``."""
     if isinstance(item, (list, tuple)) and len(item) > 1:
         return item[1]
     return None
 
 
 def _queue_number(item):
-    """A ``/queue`` entry's queue number (element 0), which orders execution."""
     if isinstance(item, (list, tuple)) and item and isinstance(item[0], (int, float)):
         return item[0]
     return None
@@ -171,18 +101,11 @@ _EXTRA_DATA_AT = 3
 
 
 def _queue_client_id(item):
-    """Which websocket client submitted a ``/queue`` entry, from its extra_data."""
     extra = item[_EXTRA_DATA_AT] if isinstance(item, (list, tuple)) and len(item) > _EXTRA_DATA_AT else None
     return extra.get("client_id") if isinstance(extra, dict) else None
 
 
 def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
-    """True only if the server at host:port is actually ComfyUI.
-
-    A bare port check is not enough: another app can occupy the port and
-    answer HTTP without being ComfyUI. ComfyUI's /system_stats returns a
-    JSON object with a "system" key; anything else means "not ComfyUI".
-    """
     url = f"http://{host}:{port}/system_stats"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
@@ -193,13 +116,6 @@ def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
 
 
 class ComfyUIApi:
-    """The eleven HTTP calls, over nothing but urllib.
-
-    *client_id* is what ComfyUI routes a job's websocket messages to and what
-    tells this app's queue entries from another client's; a fresh uuid is minted
-    when none is given (a read-only gallery, or a test).
-    """
-
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
                  client_id: str | None = None, *, folders: ComfyFolders,
                  clock: Callable[[], float] = time.monotonic,
@@ -216,17 +132,7 @@ class ComfyUIApi:
         return f"http://{self.host}:{self.port}"
 
     def submit_job(self, workflow_payload: dict, prompt_id: str) -> str:
-        """Queue a prompt on ComfyUI under our own ``prompt_id``.
-
-        ComfyUI honors a caller-supplied ``prompt_id`` (minting its own only when
-        none is given), so passing ours makes its websocket signals and its
-        ``/history`` entry for this job key on the same id the DB row uses. That
-        one shared id is what lets a job be matched live and, after a restart,
-        reconnected to. Returns the id for symmetry; it always equals ``prompt_id``.
-
-        A POST the server answers too late is followed up rather than failed:
-        see :meth:`_await_acceptance`.
-        """
+        # ComfyUI honors a caller-supplied prompt_id, so its websocket signals and /history key on ours
         workflow_payload = within_reach(workflow_payload, self.folders)
         try:
             self._post_prompt(workflow_payload, prompt_id)
@@ -241,15 +147,6 @@ class ComfyUIApi:
         return prompt_id
 
     def _await_acceptance(self, prompt_id: str) -> bool:
-        """Whether ComfyUI took a prompt whose POST timed out.
-
-        Asks ``/queue`` and ``/history`` for it, patiently: the stall that
-        outlasted the POST swallows these reads at first, so one that fails is
-        asked again, for :data:`_ACCEPTANCE_WAIT_S` in all. A server that
-        answers without the prompt gets :data:`_ACCEPTANCE_GRACE_S` more for the
-        POST, which it received first, to land; after that the prompt is not
-        there and the submit failed.
-        """
         deadline = self._clock() + _ACCEPTANCE_WAIT_S
         absent_since = None
         while True:
@@ -257,7 +154,7 @@ class ComfyUIApi:
                 if self._lists_prompt(prompt_id):
                     return True
                 absent_since = absent_since if absent_since is not None else self._clock()
-            except Exception as e:  # a stalled server answers none of these
+            except Exception as e:
                 logger.debug("Still waiting on ComfyUI to list %s: %s", prompt_id, e)
             now = self._clock()
             if now >= deadline:
@@ -267,7 +164,6 @@ class ComfyUIApi:
             self._sleep(_ACCEPTANCE_POLL_S)
 
     def _lists_prompt(self, prompt_id: str) -> bool:
-        """Whether the server has ``prompt_id`` queued, running, or finished."""
         data = self._fetch_queue_data(timeout=_ACCEPTANCE_READ_TIMEOUT_S)
         queued = {
             pid for key in ("queue_running", "queue_pending") for item in data.get(key, [])
@@ -278,14 +174,6 @@ class ComfyUIApi:
         return bool(self._history_entry(prompt_id, timeout=_ACCEPTANCE_READ_TIMEOUT_S))
 
     def interrupt(self, prompt_id: str | None = None):
-        """Stop ``prompt_id`` if it is what ComfyUI is executing -- or, given
-        none, whatever is executing, whoever submitted it.
-
-        Naming the prompt is what makes stopping a job of ours safe without
-        first asking the server what is running: a prompt that has since
-        finished, or was never started, is skipped rather than something
-        else's run being cut off in its place.
-        """
         body = json.dumps({"prompt_id": prompt_id}).encode() if prompt_id else b""
         req = urllib.request.Request(
             f"{self.base_url}/interrupt",
@@ -296,15 +184,7 @@ class ComfyUIApi:
             resp.read()
 
     def free_memory(self):
-        """Ask ComfyUI to unload its models and give the GPU back.
-
-        ComfyUI keeps the last run's models resident between prompts, which is
-        right when the next prompt is its own and wrong when another program
-        needs the graphics card first -- the voice that speaks a story's lines, run
-        before the video that lip-syncs to them is submitted. ComfyUI takes the
-        request as a flag it acts on before its next prompt, so the call returns
-        at once.
-        """
+        # ComfyUI keeps the last run's models loaded; this flag is acted on before its next prompt
         body = json.dumps({"unload_models": True, "free_memory": True}).encode()
         req = urllib.request.Request(
             f"{self.base_url}/free",
@@ -315,16 +195,9 @@ class ComfyUIApi:
             resp.read()
 
     def cancel_prompt(self, prompt_id: str):
-        """Remove a still-queued prompt so it never starts executing."""
         self.cancel_prompts([prompt_id])
 
     def cancel_prompts(self, prompt_ids):
-        """Remove several still-queued prompts at once.
-
-        ``/queue`` takes a list, so clearing a backlog is one round trip rather
-        than one per job — which matters when the caller is the GUI thread and
-        the backlog is a whole batch of another app's experiments.
-        """
         body = json.dumps({"delete": list(prompt_ids)}).encode()
         req = urllib.request.Request(
             f"{self.base_url}/queue",
@@ -349,9 +222,6 @@ class ComfyUIApi:
             with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
-            # ComfyUI explains a rejected prompt in the response body (which node
-            # and why); HTTPError's own string is only "Bad Request". Surface the
-            # body so the failure is actionable rather than opaque.
             detail = e.read().decode("utf-8", "replace")
             raise RuntimeError(format_prompt_error(detail)) from e
 
@@ -359,14 +229,6 @@ class ComfyUIApi:
         return self._history_entry(prompt_id, timeout=_HTTP_TIMEOUT_S)
 
     def forget_history(self, prompt_id: str):
-        """Drop the server's record of ``prompt_id``, so a prompt sent again
-        under that id is read against nothing but its new run.
-
-        Every read of a job goes by its id -- the late-submit follow-up in
-        :meth:`submit_job`, the poll's completion backstop -- and a job taken off
-        the server to be re-run leaves a record that answers them all as
-        if the false start were the run.
-        """
         body = json.dumps({"delete": [prompt_id]}).encode()
         req = urllib.request.Request(
             f"{self.base_url}/history",
@@ -377,33 +239,18 @@ class ComfyUIApi:
             resp.read()
 
     def _history_entry(self, prompt_id: str, timeout: float) -> dict:
-        """The prompt's ``/history`` entry, ``{}`` while the server has none."""
         url = f"{self.base_url}/history/{prompt_id}"
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read())
             return data.get(prompt_id, {})
 
     def fetch_queue(self) -> set[str]:
-        """The prompt ids ComfyUI is currently running or has pending.
-
-        Used at startup to tell a job still in flight from one that has gone.
-        """
         return self._queue_ids("queue_running", "queue_pending")
 
     def executing_prompts(self) -> set[str]:
         return self._queue_ids("queue_running", timeout=_POLL_TIMEOUT_S)
 
     def foreign_backlog(self, prompt_id: str) -> int | None:
-        """How many prompts from *other* clients ComfyUI will run before ``prompt_id``.
-
-        The user's own jobs ahead of it deliberately don't count: those are things
-        they asked for, the first of them is on screen being generated, and calling
-        that a wait "in ComfyUI" turns their own queue into a phantom they go
-        hunting for. What's worth reporting is work this app didn't launch —
-        another Origenerator instance, another app on the same server — which they
-        can neither see here nor cancel. ``None`` when the prompt isn't queued at
-        all: ComfyUI is executing it already, or it has left the queue.
-        """
         data = self._fetch_queue_data(timeout=_POLL_TIMEOUT_S)
         pending = data.get("queue_pending", [])
         mine = next((it for it in pending if _queue_prompt_id(it) == prompt_id), None)
@@ -412,10 +259,9 @@ class ComfyUIApi:
         running = data.get("queue_running", [])
         number = _queue_number(mine)
         if number is None:
-            ahead = list(running)  # unnumbered: all that's certain is what's executing
+            ahead = list(running)
         else:
-            # Pending entries come back heap-ordered rather than run-ordered, so a
-            # position in the list says nothing — the queue number is what orders them.
+            # ComfyUI returns pending entries heap-ordered; the queue number orders them
             ahead = list(running) + [
                 it for it in pending
                 if (n := _queue_number(it)) is not None and n < number
@@ -423,29 +269,11 @@ class ComfyUIApi:
         return sum(1 for it in ahead if _queue_client_id(it) != self.client_id)
 
     def foreign_queue(self) -> ForeignQueue:
-        """Everything on ComfyUI's queue that this app did not submit.
-
-        ComfyUI is a shared server that outlives whatever queued on it, so its
-        queue can be full of work no window here accounts for — another
-        Origenerator instance, a branch preview whose background experiments
-        outlived it, another app entirely. Until it's read, the first sign of it
-        is a fresh Generate landing after a pile of jobs the user never asked
-        for. Reading it lets a surface say so beforehand, and
-        :meth:`clear_foreign_queue` is what gets rid of it.
-        """
         data = self._fetch_queue_data(timeout=_POLL_TIMEOUT_S)
         return ForeignQueue(running=self._their_ids(data, "queue_running"),
                             pending=self._their_ids(data, "queue_pending"))
 
     def clear_foreign_queue(self) -> int:
-        """Drop another app's work off ComfyUI, and report how much was asked to go.
-
-        This app's own jobs are never touched: those are what the user asked
-        for, and they're visible and cancellable here already. Pending ones go
-        by deletion; one already executing is stopped by name, so that if it
-        has finished and a job of ours has started meanwhile, the server skips
-        the interrupt rather than cutting ours off.
-        """
         foreign = self.foreign_queue()
         if foreign.pending:
             self.cancel_prompts(foreign.pending)
@@ -454,11 +282,6 @@ class ComfyUIApi:
         return foreign.total
 
     def _their_ids(self, data: dict, section: str) -> list[str]:
-        """The prompt ids in a ``/queue`` section some other client submitted.
-
-        We only ever recognize our own id, so an entry with none — a client that
-        didn't identify itself — counts as someone else's rather than ours.
-        """
         return [
             pid for item in data.get(section, [])
             if (pid := _queue_prompt_id(item)) is not None
@@ -466,7 +289,6 @@ class ComfyUIApi:
         ]
 
     def _queue_ids(self, *sections: str, timeout: float = _HTTP_TIMEOUT_S) -> set[str]:
-        """The prompt ids in the named ``/queue`` sections."""
         data = self._fetch_queue_data(timeout=timeout)
         return {
             pid for key in sections for item in data.get(key, [])
@@ -474,9 +296,6 @@ class ComfyUIApi:
         }
 
     def _fetch_queue_data(self, timeout: float = _HTTP_TIMEOUT_S) -> dict:
-        """``/queue`` as ``{queue_running: [...], queue_pending: [...]}``, each
-        entry a tuple of ``(number, prompt_id, prompt, ...)``. Callers that read
-        it on the GUI's poll timer pass the shorter ``_POLL_TIMEOUT_S``."""
         url = f"{self.base_url}/queue"
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             return json.loads(resp.read())

@@ -1,8 +1,3 @@
-"""The policy that turns a spoken request into a prompt-pair edit.
-
-Every prompt here is invented — plain photographic vocabulary standing in for
-whatever the library's own prompts say, which never appears in this repo.
-"""
 from __future__ import annotations
 
 import json
@@ -33,8 +28,6 @@ from origenerator.prompt_edit import (
 )
 from origenerator.workflows.base import story_of
 
-# --- reading the request ----------------------------------------------------
-
 
 @pytest.mark.parametrize("request_text, polarity, term", [
     ("no silver earrings", REMOVE, "silver earrings"),
@@ -51,12 +44,10 @@ def test_a_spoken_request_reads_as_a_polarity_and_a_term(request_text, polarity,
 
 
 def test_naming_a_thing_is_asking_for_it():
-    # No wish word at all: the bare noun phrase is a desire for it.
     assert parse_request("golden hour light") == (ADD, "golden hour light")
 
 
 def test_the_first_wish_word_decides():
-    # "no more X" is a request against X, not for more of it.
     assert parse_request("no more silver earrings") == (REMOVE, "silver earrings")
 
 
@@ -69,15 +60,13 @@ def test_the_term_keeps_its_own_casing():
     assert parse_request("add a Dutch angle") == (ADD, "Dutch angle")
 
 
-# --- applying it ------------------------------------------------------------
-
 
 def test_against_something_in_the_positive_prompt_takes_it_out():
     revision = apply_request("a woman, silver earrings, soft light", "blurry",
                              "no silver earrings")
 
     assert revision.positive == "a woman, soft light"
-    assert revision.negative == "blurry"  # untouched: it was enough to drop it
+    assert revision.negative == "blurry"
     assert revision.action == DROPPED
 
 
@@ -126,8 +115,6 @@ def test_for_something_in_neither_prompt_adds_it():
 
 
 def test_something_in_neither_prompt_is_worked_into_the_whole_prompt_by_the_rewrite():
-    # "two women" over a prompt describing one woman: appended, the prompt would
-    # ask for both at once, so the local model rewrites what the words contradict.
     asked = []
 
     def rewrite(positive, negative, words):
@@ -154,7 +141,6 @@ def test_a_rewrite_that_fails_leaves_the_words_appended(caplog):
 
 
 def test_a_term_inside_a_longer_phrase_is_cut_out_of_it_by_the_rewrite():
-    # Dropped whole, "a woman wearing a straw hat" would take the woman with it.
     asked = []
 
     def rewrite(positive, negative, words):
@@ -221,8 +207,6 @@ def test_an_edit_the_rules_are_sure_of_never_asks_the_rewrite():
 
 
 def test_for_something_being_excluded_stops_excluding_it():
-    # The mirror of dropping it from the positive: the smallest change that
-    # answers the request. Asked again it would then be added.
     revision = apply_request("a woman", "blurry, freckles", "more freckles")
 
     assert revision.negative == "blurry"
@@ -237,8 +221,6 @@ def test_a_bracketed_weight_is_read_and_rewritten_explicitly():
 
 
 def test_the_segment_is_the_unit_a_request_acts_on():
-    # "small silver earrings" is one thing the image has, so a request about
-    # silver earrings takes the whole phrase rather than the two words inside it.
     revision = apply_request("a woman, small silver earrings, soft light", "",
                              "no silver earrings")
 
@@ -264,15 +246,12 @@ def test_a_request_naming_nothing_yields_no_revision():
 
 
 def test_a_revision_carries_the_prompts_it_started_from():
-    # What the tab marks the prompt's change against, so the record stands alone.
     revision = apply_request("a woman, freckles", "blurry", "no freckles")
 
     assert revision.old_positive == "a woman, freckles"
     assert revision.old_negative == "blurry"
     assert revision.changed
 
-
-# --- a video told in scenes: the story is one prompt per scene ---------------
 
 
 def test_a_prompt_that_tells_no_story_is_asked_of_as_one_however_many_lines_of_dashes_it_holds():
@@ -324,11 +303,8 @@ def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
     assert revision.positive == story_of(["two of a man reading", "two of a man asleep"])
 
 
-# --- catching a term the prompt names in its own words ----------------------
-
 
 def _matcher(pairs):
-    """A stand-in for the model: maps a spoken term to the prompt term it means."""
     def match(terms, term):
         wanted = pairs.get(term)
         return terms.index(wanted) if wanted in terms else None
@@ -336,9 +312,6 @@ def _matcher(pairs):
 
 
 def test_a_synonym_in_the_positive_prompt_is_dropped_like_the_words_themselves():
-    # The failure this exists for: the request said one thing, the prompt says
-    # the same thing in its own words, and excluding the spoken words would have
-    # changed nothing because the prompt still asks for it.
     revision = apply_request(
         "a woman, silver ear studs, soft light", "blurry", "no earrings",
         match=_matcher({"earrings": "silver ear studs"}),
@@ -349,8 +322,6 @@ def test_a_synonym_in_the_positive_prompt_is_dropped_like_the_words_themselves()
 
 
 def test_the_words_themselves_win_over_the_matcher():
-    # A prompt that says what the speaker said needs nothing decided, and a
-    # model asked anyway could talk itself out of the obvious answer.
     called = []
 
     def match(terms, term):
@@ -372,9 +343,6 @@ def test_a_matcher_that_finds_nothing_leaves_the_words_to_stand_alone():
 
 
 def test_only_what_to_take_out_of_the_prompt_is_looked_for_by_meaning():
-    # Asked which of "blurry" meant "two women", a model once answered blurry,
-    # and the negative prompt lost it. A wish for something is only ever read
-    # in the words themselves.
     revision = apply_request("a woman on a couch", "blurry", "two women",
                              match=lambda terms, term: 0)
 
@@ -383,8 +351,6 @@ def test_only_what_to_take_out_of_the_prompt_is_looked_for_by_meaning():
 
 
 def test_a_matcher_answering_out_of_range_is_ignored():
-    # A number the model invented is not a term the speaker meant, and acting on
-    # it would edit a part of the prompt nobody mentioned.
     revision = apply_request("a woman, soft light", "", "no earrings",
                              match=lambda terms, term: 99)
 
@@ -453,8 +419,6 @@ def test_the_match_request_offers_the_terms_numbered():
     assert "1. silver ear studs" in messages[1]["content"]
     assert "earrings" in messages[1]["content"]
 
-
-# --- the rewrite: a term in neither prompt worked into the whole pair ---------
 
 
 def test_build_rewrite_messages_carries_both_prompts_and_the_instruction():

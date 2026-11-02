@@ -764,31 +764,6 @@ def test_the_window_is_watched_before_the_app_runs(qapp, monkeypatch):
     assert events == [("watching", qapp, crash_log), "running"]
 
 
-def test_main_reclaims_unreachable_trash_on_startup(qapp):
-    """The trash folders no trashed item names are reclaimed before the window
-    opens. Nothing the Trash holds is touched, however old it is."""
-    trash = MagicMock()
-    with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity", return_value=None), \
-         patch("origenerator.gui.loading_screen.loading_screen"), \
-         patch("origenerator.gui.core.Core"), \
-         patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
-         patch("origenerator.app_state.AppState"), \
-         patch("origenerator.db.Database"), \
-         patch("origenerator.trash.Trash", return_value=trash), \
-         patch("origenerator.trash_collection.reclaim_orphans", return_value=0) as reclaim, \
-         patch("origenerator.importer.import_comfyui_output", return_value=0), \
-         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
-         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
-         patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        assert main([]) == 0
-
-    reclaim.assert_called_once()
-    assert reclaim.call_args.args[1] is trash
-
-
 def test_main_connects_the_client_under_the_persisted_id(qapp):
     # The client must connect under the id persisted across launches, so a restart
     # reconnects to the job ComfyUI is still running (it targets that job's live
@@ -1191,28 +1166,13 @@ def _held_trashed(library_path, prompt_id, *, days_ago):
 
 
 def test_the_launch_keeps_a_trashed_item_however_long_it_has_been_held(qapp, library):
-    # Nothing ages out. The Trash holds what it holds until the user restores it
-    # or ends it from the Trash collection, and two years is no different from two
-    # minutes.
+    # What a day in the Trash takes is the files; the item stays there until the
+    # user restores it or ends it.
     _held_trashed(library, "p1", days_ago=730)
 
     db = _boot(library)
 
     assert [record["prompt_id"] for record in db.list_trashed()] == ["p1"]
-
-
-def test_the_launch_reclaims_a_trash_folder_no_trashed_item_names(qapp, library):
-    # The one thing launch still clears: a batch nothing can reach, left over
-    # by a crash between the move and the record. Without it the trash only ever
-    # grows.
-
-    orphan = config.TRASH_DIR / "0123456789abcdef"
-    orphan.mkdir(parents=True)
-    (orphan / "0_gone.png").write_bytes(b"x")
-
-    _boot(library)
-
-    assert not orphan.exists()
 
 
 # --- the boot sequence itself -------------------------------------------------
@@ -1227,6 +1187,7 @@ def test_the_launch_reclaims_a_trash_folder_no_trashed_item_names(qapp, library)
 _MAINTENANCE_PASSES = (
     ("origenerator.records_copy", "copy_the_records"),
     ("origenerator.inflight", "reconcile_in_flight"),
+    ("origenerator.trash_collection", "tend_the_trash"),
     ("origenerator.library_filing", "file_what_comfyui_left"),
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.enhanced_start_backfill", "cancel_backfill"),
@@ -1279,7 +1240,6 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
-        "origenerator.trash_collection.reclaim_orphans": 0,
         "origenerator.comfyui_client.ComfyUIClient": DEFAULT,
         "PyQt6.QtWidgets.QApplication.exec": 0,
     }
@@ -1323,7 +1283,7 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
 
     assert "import_comfyui_output" not in ran
     # ...and everything after it still ran, up to and including the window.
-    assert ran[-1] == "reconcile_favorites"
+    assert ran[-1] == _MAINTENANCE_PASSES[-1][1]
     window.show.assert_called_once()
 
 
@@ -1335,12 +1295,10 @@ def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qap
     ran = []
 
     with _a_faked_boot(ran) as _, \
-         patch("origenerator.trash_collection.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.branch_session.is_branch_session", return_value=True):
         assert main([]) == 0
 
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
-    reclaim.assert_called_once()
 
 
 def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(tmp_path):

@@ -220,6 +220,11 @@ def _put_the_backfill_in_place(library: Library):
     return folded
 
 
+def _tend_the_trash(library: Library):
+
+    return trash_collection.tend_the_trash(library.db, library.places)
+
+
 def _hand_the_remakes_down_again(library: Library):
     from origenerator import enhanced_start_backfill
 
@@ -368,6 +373,9 @@ MAINTENANCE = (
              failure="Copying the records for backup failed: %s"),
     BootPass("Reconnecting to running generations...", _reconnect_to_running_generations,
              failure="Reconcile of in-flight generations failed: %s"),
+    BootPass(None, _tend_the_trash,
+             counted="Emptied %d item(s) that had been in the Trash for a day",
+             failure="Tending the Trash failed: %s"),
     BootPass(None, _file_what_comfyui_left,
              counted="Filed %d file(s) ComfyUI had saved into the library",
              failure="Filing what ComfyUI saved failed: %s"),
@@ -508,23 +516,6 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
     screen = loading_screen(CHECKOUT / "icon.ico", preview, boot_steps(MAINTENANCE),
                             app_id=app_id, taskbar=button)
     return Loading(app, logger, screen)
-
-
-def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
-    """Reclaim any trash folder no trashed item names (see origenerator.trash_collection).
-
-    Nothing the Trash is holding is touched: a trashed item stays until the
-    user restores it or ends it from the Trash collection. This clears only what
-    nothing can reach.
-    """
-    from origenerator import trash_collection
-    from origenerator.trash import Trash
-    try:
-        reclaimed = trash_collection.reclaim_orphans(db, Trash(trash_dir))
-        if reclaimed:
-            logger.info("Trash: reclaimed %d unreachable batch folder(s)", reclaimed)
-    except Exception as e:
-        logger.warning("Trash orphan reclaim failed: %s", e)
 
 
 def _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch):
@@ -854,7 +845,6 @@ def _boot_and_run(app, app_args, preview) -> int:
         PRODUCTION_CHECKOUT,
         STATE_DIR,
         THUMB_DIR,
-        TRASH_DIR,
         UI_STATE_PATH,
     )
 
@@ -903,7 +893,6 @@ def _boot_and_run(app, app_args, preview) -> int:
         from origenerator.db import Database
         logger.info("Library: %s", DB_PATH)
         db = Database(DB_PATH)
-        _reclaim_orphaned_trash(db, TRASH_DIR, logger)
 
         from origenerator.evolver_export import default_inbox
         _run_maintenance(

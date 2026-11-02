@@ -1583,7 +1583,8 @@ class GalleryView(QWidget):
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._combine.offer_the_actions(rows)
         self._listed_rows = rows
-        self._held_rows = trash_collection.trash_items(self._trash_records())
+        trash_collection.settle_regenerations(self._db)
+        self._held_rows = trash_collection.trash_items(self._db.list_trashed())
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`) — and kept as the
@@ -2731,7 +2732,7 @@ class GalleryView(QWidget):
         folder.  All of it: narrowing a slideshow to its favorites or its enhanced
         images is the slideshow's own doing, from the two switches on its HUD.
         """
-        rows = self._gallery_pane.collection_rows()
+        rows = [] if self._in_the_trash() else self._gallery_pane.collection_rows()
         if rows is None:
             group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
@@ -2799,8 +2800,10 @@ class GalleryView(QWidget):
             # Media, not rows: a folder gets its node the moment a generation
             # starts, so a folder being filled can hold nothing anyone can look at
             # yet, and a button that opens an empty slideshow is worse than no button.
-            slideshow=Button(visible=self._slideshows.anything_to_play(),
-                             tip=f"Play {self.slideshow_subject()} as a slideshow"),
+            slideshow=(Button(enabled=False, tip="Trash doesn't play as a slideshow")
+                       if self._in_the_trash()
+                       else Button(visible=self._slideshows.anything_to_play(),
+                                   tip=f"Play {self.slideshow_subject()} as a slideshow")),
             # Lit means "Auto-Generate is running", in this folder or any other:
             # clicking it off stops whichever folder has it, from wherever the user is.
             # Grayed only when there is genuinely nothing to do. While Auto-Generate
@@ -2835,7 +2838,7 @@ class GalleryView(QWidget):
         which has no folder to be favorited in.
         """
         pids = self.selected_prompt_ids() if self._gallery_pane.selected_ids else []
-        if pids and not self._gallery_pane.showing_trash():
+        if pids and not self._in_the_trash():
             favoriting = not self._all_favorites(pids)
             return Button(tip=f"{'Favorite' if favoriting else 'Unfavorite'} {len(pids)} "
                               f"item{'s' if len(pids) != 1 else ''}")
@@ -2853,7 +2856,7 @@ class GalleryView(QWidget):
         has to say so before it is clicked.
         """
         count = len(self._gallery_pane.selected_ids)
-        if self._gallery_pane.showing_trash():
+        if self._in_the_trash():
             return Button(
                 enabled=bool(count),
                 tip=f"Permanently delete {count} item{'s' if count != 1 else ''}"
@@ -2885,7 +2888,7 @@ class GalleryView(QWidget):
         """The Gallery pane button's action: favorite the picked thumbnails, or the
         folder on screen — and un-favorite them when they already are, so the one
         button is the whole of the toggle."""
-        if self._gallery_pane.selected_ids and not self._gallery_pane.showing_trash():
+        if self._gallery_pane.selected_ids and not self._in_the_trash():
             pids = self.selected_prompt_ids()
             self.set_items_favorite(pids, not self._all_favorites(pids))
             return
@@ -3725,7 +3728,7 @@ class GalleryView(QWidget):
         one meaning it can have where it is standing — rather than a control that
         looks live and quietly does nothing.
         """
-        if self._gallery_pane.showing_trash():
+        if self._in_the_trash():
             self.purge_from_trash(self.selected_prompt_ids())
             return
         if self._gallery_pane.selected_ids:
@@ -3744,9 +3747,8 @@ class GalleryView(QWidget):
 
     # --- the Trash collection: restoring a delete, or ending it --------------
 
-    def _trash_records(self) -> list[dict]:
-        """The trashed items the Trash collection offers."""
-        return self._db.list_trashed()
+    def _in_the_trash(self) -> bool:
+        return self._gallery_pane.showing_trash()
 
     def _on_trash_action(self, prompt_id: str, action_id: str):
         """A Trash tile's hover control: restore this item, or end it now."""
@@ -3760,7 +3762,8 @@ class GalleryView(QWidget):
         suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [self._item_names.of(pid) for pid in ids])
-        restore_action = menu.addAction("Restore" + suffix)
+        restore_action = trash_collection.restore_action_on(menu, "Restore" + suffix,
+                                                    [self.row_for(pid) or {} for pid in ids])
         purge_action = menu.addAction("Delete" + suffix + " permanently")
         chosen = menu.exec(global_pos)
         if chosen is restore_action:
@@ -3776,7 +3779,9 @@ class GalleryView(QWidget):
         if not prompt_ids:
             return
         try:
-            restored = self._edits.restore_deleted(prompt_ids)
+            restored = trash_collection.restore_from_trash(self._db, self._jobs, prompt_ids,
+                                                   self._edits.restore_deleted,
+                                                   self.image_config_index())
         except Exception as e:
             logger.exception("Failed to restore %d deleted item(s)", len(prompt_ids))
             QMessageBox.warning(

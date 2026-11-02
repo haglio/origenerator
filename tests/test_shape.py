@@ -695,7 +695,7 @@ def test_the_trash_collection_splits_too(qtbot, tmp_path):
 
     view._tree.setCurrentItem(view._item_by_key[shaped_key(TRASH_KEY, "portrait")])
     assert view._current_collection_key() == shaped_key(TRASH_KEY, "portrait")
-    assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
+    assert view.listed_prompt_ids() == ["t1"]
 
 
 def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):

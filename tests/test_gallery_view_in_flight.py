@@ -29,6 +29,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     LATEST_KEY,
 )
+from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_tab as generate_tab_module
@@ -37,6 +38,8 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
+from origenerator.trash import Trash
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     _NO_MOD,
@@ -2559,3 +2562,39 @@ def test_cancel_all_leaves_auto_generate_on_to_start_its_next_seed(
     assert view._auto.is_active(key)
     (next_seed,) = view._jobs.all_jobs
     assert next_seed.prompt_id != job.prompt_id
+
+
+def test_restoring_an_emptied_item_runs_it_again_in_its_own_folder_and_brings_it_back(
+        qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json=json.dumps({"seed": 4242}), workflow_json="{}")
+    db.set_generation_favorite("p1", True)
+    db.update_generation("p1", status="completed",
+                         output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
+    view = GalleryView(db, client=_reroll_client(),
+                       actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+                                              Trash(tmp_path / "trash")))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._delete_rows([db.get_generation("p1")])
+    record = db.get_trashed("p1")
+    db.record_trashed("p1", record["row"], {**record["batch"], "emptied": True},
+                       deleted_at=record["deleted_at"])
+
+    view.restore_from_trash(["p1"])
+
+    job_prompt_id = db.get_trashed("p1")["batch"]["regenerating_as"]
+    job_row = db.get_generation(job_prompt_id)
+    assert json.loads(job_row["params_json"])["seed"] == 4242
+    assert view._jobs.job_for_prompt(job_prompt_id) is not None
+    assert not view._gallery_pane.showing_trash()
+
+    new_files = json.dumps([{"filename": "b.png", "subfolder": ""}])
+    db.update_generation(job_prompt_id, status="completed", output_files=new_files)
+    view.refresh()
+
+    back = db.get_generation("p1")
+    assert (back["output_files"], back["starred"]) == (new_files, 1)
+    assert db.get_generation(job_prompt_id) is None
+    assert db.get_trashed("p1") is None

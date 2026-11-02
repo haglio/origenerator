@@ -5,10 +5,8 @@ can move them straight back to where they were. Each deleted item gets its own
 subdirectory, keyed by a unique token, so items never tread on one another and
 ending one is a single ``rmtree``.
 
-How long a batch is held is not decided here, and nothing decides it anywhere:
-the Trash records each one alongside the row it belonged to and holds it
-until the user restores it or ends it (see :mod:`origenerator.trash_collection`), so a
-batch outlives the session that made it for as long as it is left alone.
+How long a batch is held is not decided here: the Trash records each one
+alongside the row it belonged to and decides (see :mod:`origenerator.trash_collection`).
 :meth:`Trash.purge_orphans` is the other half of that — it clears whatever the
 Trash does *not* name, which is the only thing left that nothing can reach.
 """
@@ -64,6 +62,11 @@ class TrashedBatch:
         """Delete the held files for good — the opposite of ``restore``."""
         if self.subdir is not None:
             shutil.rmtree(self.subdir, ignore_errors=True)
+
+    def empty(self, *, keeping: Path | None) -> None:
+        for _original, trashed in self.moves:
+            if trashed != keeping:
+                trashed.unlink(missing_ok=True)
 
     def holding(self, original: Path) -> Path | None:
         return next((trashed for was, trashed in self.moves if was == Path(original)), None)

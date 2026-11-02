@@ -59,7 +59,8 @@ _COLLECTION_TIPS = {
     FAVORITES_KEY: "Your favorite folders and items — drop a folder here to add it",
     ENHANCED_KEY: "Your enhanced images",
     EXPERIMENTS_KEY: "Background experiments awaiting your review",
-    TRASH_KEY: "Deleted items — restorable here until you delete them for good",
+    TRASH_KEY: "Deleted items — after a day only their thumbnails are kept, "
+               "and restoring one makes it again",
 }
 
 

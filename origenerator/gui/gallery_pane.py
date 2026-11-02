@@ -64,7 +64,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.inflight_items import InFlightItems
 from origenerator.gui.inflight_tile import InFlightTile
-from origenerator.gui.item_tile import CornerButton, ItemTile
+from origenerator.gui.item_tile import CornerButton, ItemTile, trash_corner_buttons
 from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
@@ -1071,34 +1071,25 @@ class GalleryPane(QObject):
         """The Trash collection: every deleted item the Trash is still
         holding, newest first, each tile wearing restore / delete-permanently
         hover controls and captioned with how long it has left. A restored item
-        returns to its own folder, files and all; a purged one is gone for good,
-        which is what the whole collection exists to make deliberate rather than
-        automatic."""
+        returns to its own folder; a purged one is gone for good."""
         container, flow = self._fresh_tile_pane()
-        actions = [
-            CornerButton("restore", icons.trash_action_icon("restore"),
-                         "Restore — put it and its files back where they were"),
-            CornerButton("purge", icons.trash_action_icon("purge"),
-                         "Delete permanently — remove it and its files for good"),
-        ]
         rows = self._open_collection_rows(TRASH_KEY)
         if not rows:
             self.show_widget(self._empty_state(self._trash_empty_hint()))
             return
         self._show_paged(container, [
-            _Entry(partial(self._add_trash_thumbnail, flow, row, list(actions)),
+            _Entry(partial(self._add_trash_thumbnail, flow, row),
                    item=row["prompt_id"])
             for row in rows])
 
-    def _add_trash_thumbnail(self, flow, row, corner_buttons):
+    def _add_trash_thumbnail(self, flow, row):
         """One deleted item's tile — a collection tile like any other, wired to
         everything a deleted item can still do.
 
-        Its files are all in the trash rather than gone, and the Trash kept its row
-        whole, so it previews on a click, loops if it's a video, opens full size,
-        plays in the collection's slideshow and fills a Generate tab with the settings
-        that made it — the whole point of a Trash being that you can look before you
-        decide. Double-clicking opens it as a Generate tab (the gesture a folder's
+        Until it is emptied its files are all in the trash, and the Trash kept its row
+        whole, so it previews on a click, loops if it's a video, opens full size and
+        fills a Generate tab with the settings that made it. Once emptied, its
+        thumbnail stands in wherever its file would have shown. Double-clicking opens it as a Generate tab (the gesture a folder's
         tiles carry) rather than jumping to its folder, which is the one thing a
         deleted item hasn't got.
 
@@ -1123,7 +1114,7 @@ class GalleryPane(QObject):
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
             controls=False,       # its two controls are restore and purge, in the corners
-            corner_buttons=corner_buttons,
+            corner_buttons=trash_corner_buttons(row),
         )
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
@@ -1138,9 +1129,9 @@ class GalleryPane(QObject):
         self.trash_menu_requested.emit(global_pos)
 
     def _trash_empty_hint(self) -> str:
-        return ("Nothing deleted.\n\nItems you delete wait here for as long as "
-                "you leave them — nothing here is removed on its own. Restore one, "
-                "or delete it permanently when you're sure.")
+        return ("Nothing deleted.\n\nItems you delete wait here. After a day, only "
+                "their thumbnails are kept, and restoring one makes it again. Restore "
+                "one, or delete it permanently when you're sure.")
 
     def showing_trash(self) -> bool:
         return base_of(self._tree.selected_folder_key()) == TRASH_KEY
@@ -1181,8 +1172,7 @@ class GalleryPane(QObject):
         listed items, Favorites is its favorited items plus everything under each
         favorited folder, since a folder tile there stands for its whole folder,
         Enhanced is its enhanced images, Experiments is its unreviewed queue, and
-        Trash is what is held there — deleted is not unwatchable, and items you
-        are deciding whether to keep are ones to sit and look through.
+        Trash is what the Trash is holding.
         A favorited item inside a favorited folder is one item, so repeats drop out.
         A running search gathers too — its hits are gathered exactly as a
         collection's are, and sitting through what a search turned up is

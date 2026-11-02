@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import palette, tile_shape
+from origenerator.gui import icons, palette, tile_shape
 from origenerator.gui.corner_buttons import (
     CORNER_GAP,
     CORNER_INSET,
@@ -25,6 +25,7 @@ from origenerator.gui.looping_preview import play_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.tile_status_scrim import TileStatusScrim
+from origenerator.trash_collection import why_it_cannot_be_restored
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()  # the thumbnail area, inside the family tile
 _BORDER_PX = 2
@@ -57,6 +58,19 @@ class CornerButton(NamedTuple):
     action_id: str
     icon: QIcon
     tooltip: str
+    enabled: bool = True
+
+
+def trash_corner_buttons(row: dict) -> list[CornerButton]:
+    why_not = why_it_cannot_be_restored(row)
+    restore_tip = why_not or ("Restore — make it again" if row.get("emptied")
+                              else "Restore — put it and its files back where they were")
+    return [
+        CornerButton("restore", icons.trash_action_icon("restore"), restore_tip,
+                     enabled=why_not is None),
+        CornerButton("purge", icons.trash_action_icon("purge"),
+                     "Delete permanently — remove it and its files for good"),
+    ]
 
 
 class ItemTile(QWidget):
@@ -186,7 +200,8 @@ class ItemTile(QWidget):
                 corner_buttons: list[CornerButton] | None = None, **_mutable) -> tuple:
         """What a tile cannot be changed into once built."""
         return (prompt_id, thumb_path, label_text, media_type, movie_path, controls,
-                tuple(action.action_id for action in corner_buttons or ()))
+                tuple((action.action_id, action.tooltip, action.enabled)
+                      for action in corner_buttons or ()))
 
     def set_selected(self, selected: bool):
         """Lighten the whole tile when selected; restore the resting look when not."""
@@ -332,6 +347,7 @@ class ItemTile(QWidget):
             button.setIcon(action.icon)
             button.setIconSize(QSize(CORNER_SIZE - 8, CORNER_SIZE - 8))
             button.setToolTip(action.tooltip)
+            button.setEnabled(action.enabled)
             button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setStyleSheet(_CORNER_BUTTON_CSS)

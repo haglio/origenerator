@@ -5,10 +5,17 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from PIL import Image
+
 from origenerator import trash_collection
+from origenerator.branch_session import ENV_FLAG
 from origenerator.db import Database
 from origenerator.db_connection import SqliteFile
+from origenerator.gallery.output import resolve_preview
+from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 _NOW = datetime(2026, 8, 15, 3, 0, 0, tzinfo=UTC).replace(tzinfo=None)
 
@@ -189,10 +196,7 @@ def test_the_launch_reclaims_a_batch_no_record_names(tmp_path):
     assert not orphan.subdir.exists()
 
 
-def test_the_launch_never_takes_a_trashed_item_however_old(tmp_path):
-    # The whole point of holding forever: age is not a reason to destroy
-    # anything. An item trashed two years ago is as recoverable as one trashed a
-    # minute ago, and only the user ends it.
+def test_reclaiming_never_takes_a_trashed_item_however_old(tmp_path):
     db = Database(tmp_path / "test.db")
     trash = Trash(tmp_path / "trash")
     ancient = trash.store([_file(tmp_path / "out" / "ancient.png")])
@@ -234,3 +238,267 @@ def test_a_stored_record_survives_the_round_trip_through_the_database(tmp_path):
         (str(source), str(batch.moves[0][1]))
     ]
     assert Path(record["batch"]["subdir"]) == batch.subdir
+
+
+# --- what a day in the Trash leaves ----------------------------------------
+
+
+def _held_item(tmp_path, db, prompt_id="p1", *, days=2):
+    video = _file(tmp_path / "out" / f"{prompt_id}.mp4", b"video")
+    thumb = _file(tmp_path / "thumbs" / f"{prompt_id}.jpg", b"thumb")
+    row = {"prompt_id": prompt_id, "thumbnail_path": str(thumb),
+           "output_files": json.dumps([{"filename": video.name, "subfolder": ""}])}
+    batch = Trash(tmp_path / "trash").store([video, thumb])
+    db.record_trashed(prompt_id, row, batch.record())
+    _age(db, prompt_id, days)
+    return batch
+
+
+def _places(tmp_path):
+    return OutputPlaces.in_one_folder(tmp_path / "out")
+
+
+def test_a_day_in_the_trash_leaves_only_the_thumbnail(tmp_path):
+    db = Database(tmp_path / "test.db")
+    batch = _held_item(tmp_path, db)
+
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 1
+
+    assert [path.name for path in batch.subdir.iterdir()] == ["1_p1.jpg"]
+    assert trash_collection.is_emptied(db.get_trashed("p1"))
+
+
+def test_an_item_deleted_less_than_a_day_ago_keeps_its_files(tmp_path):
+    db = Database(tmp_path / "test.db")
+    batch = _held_item(tmp_path, db, days=0)
+
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 0
+
+    assert sorted(path.name for path in batch.subdir.iterdir()) == ["0_p1.mp4", "1_p1.jpg"]
+    assert not trash_collection.is_emptied(db.get_trashed("p1"))
+
+
+def test_emptying_leaves_when_the_item_was_deleted_as_it_was(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _held_item(tmp_path, db)
+    deleted_at = db.get_trashed("p1")["deleted_at"]
+
+    trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
+
+    assert db.get_trashed("p1")["deleted_at"] == deleted_at
+
+
+def test_an_item_emptied_once_is_not_counted_again(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _held_item(tmp_path, db)
+
+    trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
+
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 0
+
+
+def test_an_emptied_item_says_so_and_still_finds_its_thumbnail(tmp_path):
+    db = Database(tmp_path / "test.db")
+    batch = _held_item(tmp_path, db)
+
+    trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
+
+    item = trash_collection.trash_items(db.list_trashed())[0]
+    assert item["emptied"] is True
+    assert Path(item["thumbnail_path"]) == batch.subdir / "1_p1.jpg"
+    assert resolve_preview(item, _places(tmp_path)) == (batch.subdir / "1_p1.jpg", MediaType.IMAGE)
+
+
+def test_an_emptied_item_shows_its_thumbnail_even_where_a_newer_item_took_its_name(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _held_item(tmp_path, db)
+    trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
+    _file(tmp_path / "out" / "p1.mp4", b"a newer video")
+
+    item = trash_collection.trash_items(db.list_trashed())[0]
+
+    assert resolve_preview(item, _places(tmp_path))[1] == MediaType.IMAGE
+
+
+def test_an_item_with_no_thumbnail_is_given_one_before_it_is_emptied(tmp_path):
+    db = Database(tmp_path / "test.db")
+    image = tmp_path / "out" / "p1.png"
+    image.parent.mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(image)
+    batch = Trash(tmp_path / "trash").store([image])
+    db.record_trashed("p1", {"prompt_id": "p1", "output_files": json.dumps(
+        [{"filename": "p1.png", "subfolder": ""}])}, batch.record())
+    _age(db, "p1", 2)
+
+    trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
+
+    item = trash_collection.trash_items(db.list_trashed())[0]
+    assert not (batch.subdir / "0_p1.png").exists()
+    assert Path(item["thumbnail_path"]).is_file()
+    assert Path(item["thumbnail_path"]).parent == batch.subdir
+
+
+def test_an_item_whose_thumbnail_cannot_be_made_keeps_its_file(tmp_path):
+    db = Database(tmp_path / "test.db")
+    unreadable = _file(tmp_path / "out" / "p1.png", b"not an image")
+    batch = Trash(tmp_path / "trash").store([unreadable])
+    db.record_trashed("p1", {"prompt_id": "p1", "output_files": json.dumps(
+        [{"filename": "p1.png", "subfolder": ""}])}, batch.record())
+    _age(db, "p1", 2)
+
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 0
+
+    assert (batch.subdir / "0_p1.png").exists()
+    assert not trash_collection.is_emptied(db.get_trashed("p1"))
+
+
+# --- making an emptied item again ------------------------------------------
+
+
+def _emptied_item_being_regenerated(tmp_path, db):
+    _held_item(tmp_path, db)
+    trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
+    held = db.get_trashed("p1")
+    db.record_trashed("p1", {**held["row"], "workflow_name": "sdxl_t2i", "workflow_version": "v1",
+                              "params_json": "{}", "workflow_json": "{}", "starred": 1},
+                       held["batch"], deleted_at=held["deleted_at"])
+    db.insert_generation(prompt_id="job", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json="{}", workflow_json="{}")
+    trash_collection.start_regenerating(db, db.get_trashed("p1"), "job")
+
+
+def test_an_item_being_regenerated_is_not_in_the_trash(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _emptied_item_being_regenerated(tmp_path, db)
+
+    assert trash_collection.trash_items(db.list_trashed()) == []
+
+
+def test_a_job_still_running_leaves_everything_as_it_is(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _emptied_item_being_regenerated(tmp_path, db)
+
+    assert trash_collection.settle_regenerations(db) == 0
+
+    assert db.get_generation("job") is not None
+    assert db.get_generation("p1") is None
+
+
+def test_a_finished_job_brings_the_item_back_as_itself_with_the_new_files(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _emptied_item_being_regenerated(tmp_path, db)
+    subdir = Path(db.get_trashed("p1")["batch"]["subdir"])
+    new_files = json.dumps([{"filename": "new.mp4", "subfolder": ""}])
+    db.update_generation("job", status="completed", output_files=new_files,
+                         thumbnail_path="new.jpg")
+
+    assert trash_collection.settle_regenerations(db) == 1
+
+    back = db.get_generation("p1")
+    assert (back["output_files"], back["thumbnail_path"], back["status"], back["starred"]) == (
+        new_files, "new.jpg", "completed", 1)
+    assert db.get_generation("job") is None
+    assert db.get_trashed("p1") is None
+    assert not subdir.exists()
+
+
+def test_a_failed_job_puts_the_item_back_in_the_trash_and_leaves_no_failed_item(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _emptied_item_being_regenerated(tmp_path, db)
+    db.update_generation("job", status="error", error_message="made up")
+
+    assert trash_collection.settle_regenerations(db) == 1
+
+    assert db.get_generation("job") is None
+    assert [item["prompt_id"] for item in trash_collection.trash_items(db.list_trashed())] == ["p1"]
+    assert trash_collection.is_emptied(db.get_trashed("p1"))
+
+
+def test_a_canceled_job_puts_the_item_back_in_the_trash(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _emptied_item_being_regenerated(tmp_path, db)
+    db.delete_generation("job")
+
+    assert trash_collection.settle_regenerations(db) == 1
+
+    assert [item["prompt_id"] for item in trash_collection.trash_items(db.list_trashed())] == ["p1"]
+
+
+# --- what each launch does to the Trash ------------------------------------
+
+
+def _places_with_trash(tmp_path):
+    return OutputPlaces.in_one_folder(tmp_path / "out", trash=tmp_path / "trash")
+
+
+def test_a_launch_empties_what_has_waited_a_day_and_says_how_many(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _held_item(tmp_path, db)
+
+    assert trash_collection.tend_the_trash(db, _places_with_trash(tmp_path), environ={}) == 1
+
+    assert trash_collection.is_emptied(db.get_trashed("p1"))
+
+
+def test_a_preview_leaves_the_trash_as_it_is_until_the_change_ships(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _held_item(tmp_path, db)
+
+    assert trash_collection.tend_the_trash(db, _places_with_trash(tmp_path), environ={ENV_FLAG: "1"}) == 0
+
+    assert not trash_collection.is_emptied(db.get_trashed("p1"))
+
+
+def test_a_launch_reclaims_what_no_record_names_and_settles_what_was_being_made_again(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _emptied_item_being_regenerated(tmp_path, db)
+    db.delete_generation("job")
+    orphan = Trash(tmp_path / "trash").store([_file(tmp_path / "out" / "orphan.png")])
+
+    trash_collection.tend_the_trash(db, _places_with_trash(tmp_path), environ={})
+
+    assert not orphan.subdir.exists()
+    assert [item["prompt_id"] for item in trash_collection.trash_items(db.list_trashed())] == ["p1"]
+
+
+
+
+def _held_start_image(tmp_path, db):
+    image = _file(tmp_path / "out" / "frame.png", b"image")
+    thumb = _file(tmp_path / "thumbs" / "frame.jpg", b"thumb")
+    batch = Trash(tmp_path / "trash").store([image, thumb])
+    db.record_trashed("frame", {"prompt_id": "frame", "thumbnail_path": str(thumb), "output_files":
+                                 json.dumps([{"filename": "frame.png", "subfolder": ""}])},
+                       batch.record())
+    _age(db, "frame", 2)
+    return batch
+
+
+def _video_started_from_the_frame(db):
+    workflow = next(name for name, template in WORKFLOW_REGISTRY.items()
+                    if "input_image" in dict(template.input_params))
+    db.insert_generation(prompt_id="video", workflow_name=workflow, workflow_version="v1",
+                         params_json=json.dumps({"input_image": "frame.png [output]"}),
+                         workflow_json="{}")
+
+
+def test_the_start_image_of_a_video_in_the_library_keeps_its_file(tmp_path):
+    db = Database(tmp_path / "test.db")
+    batch = _held_start_image(tmp_path, db)
+    _video_started_from_the_frame(db)
+
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 0
+
+    assert (batch.subdir / "0_frame.png").exists()
+    assert not trash_collection.is_emptied(db.get_trashed("frame"))
+
+
+def test_a_start_image_is_emptied_once_its_video_has_left_the_library(tmp_path):
+    db = Database(tmp_path / "test.db")
+    batch = _held_start_image(tmp_path, db)
+    _video_started_from_the_frame(db)
+    db.delete_generation("video")
+
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 1
+
+    assert not (batch.subdir / "0_frame.png").exists()

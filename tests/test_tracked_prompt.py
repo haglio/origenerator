@@ -384,3 +384,104 @@ def test_a_form_freed_while_its_prompt_waits_to_be_redrawn_leaves_the_app_runnin
     assert (ran.returncode, ran.stdout.strip()) == (0, "still running"), ran.stderr
 
 
+
+
+def _struck_out_of_the_middle(pair) -> None:
+    """The field settled on "a on a couch", with "cat" struck between "a" and "on"."""
+    pair.edit.setPlainText("a on a couch")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    assert _marked(pair.edit, "struck") == "cat"
+
+
+def test_backspace_works_after_the_left_arrow_meets_struck_words(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a o"))
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Left)
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Left)
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Backspace)
+
+    assert diff_text.live_text(pair.edit) == " on a couch"
+
+
+def test_the_right_arrow_takes_one_press_per_letter_of_the_prompt(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, 0)
+    walked = []
+
+    for _letter in "a on a couch":
+        qtbot.keyClick(pair.edit, Qt.Key.Key_Right)
+        walked.append(tracked_prompt.caret_in_prompt(pair.edit))
+
+    assert walked == list(range(1, len("a on a couch") + 1))
+
+
+def test_the_left_arrow_takes_one_press_per_letter_of_the_prompt(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a on a couch"))
+    walked = []
+
+    for _letter in "a on a couch":
+        qtbot.keyClick(pair.edit, Qt.Key.Key_Left)
+        walked.append(tracked_prompt.caret_in_prompt(pair.edit))
+
+    assert walked == list(range(len("a on a couch") - 1, -1, -1))
+
+
+def test_the_right_arrow_stops_at_the_end_of_the_prompt_before_struck_words(pair, qtbot):
+    pair.edit.setPlainText("a cat")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a cat"))
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Right)
+
+    assert pair.edit.textCursor().position() == len("a cat")
+
+
+def test_the_left_arrow_stays_put_at_the_start_of_the_prompt(pair, qtbot):
+    pair.edit.setPlainText("on a couch")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    tracked_prompt.put_caret_in_prompt(pair.edit, 0)
+    before = pair.edit.textCursor().position()
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Left)
+
+    assert pair.edit.textCursor().position() == before
+
+
+def test_shift_with_an_arrow_selects_over_struck_words_one_letter_of_the_prompt_at_a_time(
+        pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a"))
+
+    for _letter in " o":
+        qtbot.keyClick(pair.edit, Qt.Key.Key_Right, Qt.KeyboardModifier.ShiftModifier)
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Backspace)
+
+    assert diff_text.live_text(pair.edit) == "an a couch"
+
+
+def test_an_arrow_with_a_selection_and_no_shift_still_goes_to_the_selections_edge(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    end = len(pair.edit.toPlainText())
+    cursor = pair.edit.textCursor()
+    cursor.setPosition(end - len("couch"))
+    cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+    pair.edit.setTextCursor(cursor)
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Left)
+
+    assert pair.edit.textCursor().position() == end - len("couch")
+    assert not pair.edit.textCursor().hasSelection()
+
+
+def test_ctrl_with_an_arrow_still_moves_by_the_word(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, 0)
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Right, Qt.KeyboardModifier.ControlModifier)
+
+    assert pair.edit.textCursor().position() == len("a ")

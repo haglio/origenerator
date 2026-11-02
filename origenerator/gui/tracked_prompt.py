@@ -51,6 +51,10 @@ from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 # rewrites the document once rather than once per letter.
 SETTLE_MS = 150
 
+_ARROW_STEPS = {Qt.Key.Key_Left: -1, Qt.Key.Key_Right: 1}
+_ARROW_MODES = {Qt.KeyboardModifier.NoModifier: QTextCursor.MoveMode.MoveAnchor,
+                Qt.KeyboardModifier.ShiftModifier: QTextCursor.MoveMode.KeepAnchor}
+
 
 def _plain_format() -> QTextCharFormat:
     """The unmarked look, spelled out rather than left default: the marks are
@@ -331,7 +335,22 @@ class _Tracker(QObject):
         # Leaving the field ends the typing, whatever the clock still says.
         if event.type() == QEvent.Type.FocusOut:
             self.show_whole_change()
-        return False
+        return event.type() == QEvent.Type.KeyPress and self._arrow_stepped(event)
+
+    def _arrow_stepped(self, event) -> bool:
+        step = _ARROW_STEPS.get(event.key())
+        mode = _ARROW_MODES.get(event.modifiers())
+        cursor = self._edit.textCursor()
+        if (step is None or mode is None
+                or (mode == QTextCursor.MoveMode.MoveAnchor and cursor.hasSelection())
+                or not any(kind == REMOVED for kind, _piece in self._layout)):
+            return False
+        here = self.prompt_offset(cursor.position())
+        there = min(max(here + step, 0), len(self._value))
+        if there != here:
+            cursor.setPosition(self.document_offset(there), mode)
+            self._edit.setTextCursor(cursor)
+        return True
 
 
 def _tracker_of(edit: QPlainTextEdit) -> _Tracker | None:
@@ -358,20 +377,20 @@ def write(edit: QPlainTextEdit, value: str) -> None:
 
 def caret_in_prompt(edit: QPlainTextEdit) -> int:
     position = edit.textCursor().position()
-    trackers = edit.findChildren(_Tracker)
-    return trackers[0].prompt_offset(position) if trackers else position
+    tracker = _tracker_of(edit)
+    return tracker.prompt_offset(position) if tracker is not None else position
 
 
 def prompt_ranges_from(edit: QPlainTextEdit, offset: int) -> list[tuple[int, int]]:
-    trackers = edit.findChildren(_Tracker)
-    if not trackers:
+    tracker = _tracker_of(edit)
+    if tracker is None:
         return [(offset, len(edit.toPlainText()))]
-    return trackers[0].prompt_ranges_from(offset)
+    return tracker.prompt_ranges_from(offset)
 
 
 def put_caret_in_prompt(edit: QPlainTextEdit, offset: int) -> None:
-    trackers = edit.findChildren(_Tracker)
-    position = trackers[0].document_offset(offset) if trackers else offset
+    tracker = _tracker_of(edit)
+    position = tracker.document_offset(offset) if tracker is not None else offset
     cursor = QTextCursor(edit.document())
     cursor.setPosition(min(position, len(edit.toPlainText())))
     edit.setTextCursor(cursor)

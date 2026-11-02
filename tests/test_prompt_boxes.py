@@ -12,7 +12,7 @@ from shared_ui.spacing import GAP_SMALL
 
 from origenerator import config
 from origenerator.box_breaks import BOX_BREAK
-from origenerator.gui import diff_text
+from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
 from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
@@ -337,6 +337,21 @@ def test_a_word_taken_out_is_struck_through_in_its_box(qtbot, typed_into):
     qtbot.waitUntil(lambda: ("b ", "struck") in _marks(typed_into.boxes()[0]), timeout=5000)
 
     assert typed_into.value() == "a c"
+
+
+def test_the_left_arrow_steps_over_a_word_struck_through_in_its_box(qtbot, typed_into):
+    typed_into.set_value("a b c")
+    typed_into.track("a b c")
+    _type(qtbot, typed_into, 0, 3, "\b\b")
+    box = typed_into.boxes()[0]
+    qtbot.waitUntil(lambda: ("b ", "struck") in _marks(box), timeout=5000)
+    tracked_prompt.put_caret_in_prompt(box, len("a c"))
+
+    for _letter in "c ":
+        qtbot.keyClick(box, Qt.Key.Key_Left)
+    qtbot.keyClick(box, Qt.Key.Key_Backspace)
+
+    assert typed_into.value() == " c"
 
 
 def test_untracking_takes_every_boxs_marks_off(qtbot, typed_into):

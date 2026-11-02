@@ -1,5 +1,3 @@
-"""Spoken slideshow control — which utterances claim to be a command, and which are
-left alone."""
 from __future__ import annotations
 
 import pytest
@@ -31,7 +29,6 @@ def test_whispers_punctuation_and_case_are_ignored():
 
 
 def test_slide_show_as_two_words_still_counts():
-    # Whisper splits it about as often as not, and the speaker said one thing.
     assert match_slideshow_command("start the slide show") is SlideshowCommand.START
 
 
@@ -40,7 +37,6 @@ def test_a_few_filler_words_are_tolerated():
 
 
 def test_a_verb_with_no_slideshow_named_is_not_a_command():
-    # "stop" alone could be about anything — the device, the loop, a sentence.
     assert match_slideshow_command("stop") is None
     assert match_slideshow_command("close it") is None
 
@@ -50,7 +46,6 @@ def test_naming_the_slideshow_with_no_verb_is_not_a_command():
 
 
 def test_a_sentence_that_mentions_a_slideshow_is_no_command():
-    # It mentions a slideshow, but it is plainly a sentence.
     said = "a slideshow of her standing by the window in the morning light"
     assert match_slideshow_command(said) is None
 

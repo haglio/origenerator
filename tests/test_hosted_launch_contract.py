@@ -1,13 +1,3 @@
-"""The document this repo publishes about its hosted launch, held against the code.
-
-A host builds an 18-flag command line, then finds the windows it opened by
-their captions.  It cannot import this package, so ``origenerator_contract.json``
-is the whole agreement -- and a document that no longer matches this app is
-exactly the silent break it exists to end: a flag renamed on one side, a window
-that never appears on the other, every suite green through it.
-
-These hold the document to the parser and to the windows.
-"""
 from __future__ import annotations
 
 import json
@@ -37,16 +27,12 @@ def flags_the_parser_accepts() -> set[str]:
 
 
 def test_the_published_document_is_what_this_module_says():
-    """Run this module when it fails: ``origenerator.fun_time_mode`` writes it."""
     published = contract.contract_path(REPO_ROOT)
 
     assert published.read_text(encoding="utf-8") == contract.published_text()
 
 
 def test_the_parser_accepts_exactly_the_flags_the_document_names():
-    """No more: a flag this app grew and never published is one no host will
-    ever send.  No fewer: a flag the document names and the parser refuses
-    kills a hosted launch in argparse before it can log."""
     document = _document()
     declared = {
         *document["required_flags"],
@@ -60,8 +46,6 @@ def test_the_parser_accepts_exactly_the_flags_the_document_names():
 
 
 def test_a_hosted_launch_short_of_a_required_flag_is_refused():
-    """The half of the drift argparse cannot see.  An unknown flag it already
-    refuses; a flag a host STOPPED sending used to be a silent default."""
     full = [word
             for flag in contract.required_flags()[1:]
             for word in (flag, "7")] + [contract.MODE_FLAG]
@@ -87,9 +71,6 @@ def test_the_caption_the_document_names_is_the_one_hosted_core_wears(
 
 
 def test_no_other_window_here_wears_that_caption():
-    """A host matches the caption exactly, so a second window of this app's
-    wearing it would be picked up in Core's place -- which is why
-    the splash is "Origenerator Loading" rather than the plain name."""
     wears_it = re.compile(
         r'setWindowTitle\(\s*"' + re.escape(_document()["window_title"]) + r'"\s*\)')
     elsewhere = [
@@ -108,8 +89,6 @@ def test_the_module_the_document_names_tells_a_session_what_to_hear_said_to_a_si
 
 
 def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):
-    """Byte for byte what the tracked copy holds, line endings included, so
-    publishing on Windows leaves the checkout clean."""
     written = contract.publish(tmp_path)
 
     assert written == tmp_path / contract.CONTRACT_FILE
@@ -117,9 +96,6 @@ def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):
 
 
 def test_a_region_rect_is_not_required_of_a_launch():
-    """A session that hands a Funestra over opens no window of ours on that side,
-    so the rect it would take is beside the point -- and a session too old to
-    send them must go on launching."""
     full = [word
             for flag in contract.required_flags()[1:]
             for word in (flag, "7")] + [contract.MODE_FLAG]
@@ -131,9 +107,6 @@ def test_a_region_rect_is_not_required_of_a_launch():
 
 
 def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():
-    # The session owns the room's microphone and can only hear a phrase it was
-    # told to listen for, so a part added here without being published is one
-    # nobody can fix by voice from the headset.
     phrases = contract.declaration()["fix_phrases"]
     assert {"fix teeth", "fix skin", "fix hair"} <= set(phrases)
     assert [phrase for phrase in phrases if not detail_parts.match_fix_command(phrase)] == []

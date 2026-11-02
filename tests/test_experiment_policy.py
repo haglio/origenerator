@@ -9,9 +9,6 @@ from origenerator.workflows.base import ParamDef, WorkflowTemplate
 
 
 class FakeWorkflow(WorkflowTemplate):
-    """A minimal registered workflow for policy tests: one numeric dim, one
-    dropdown dim, a prompt, and a seed."""
-
     name = "fake_t2i"
     version = "v001"
     display_name = "Fake T2I"
@@ -44,9 +41,6 @@ class FakeWorkflow(WorkflowTemplate):
 
 
 class FakeI2vWorkflow(FakeWorkflow):
-    """An image-conditioned fake: adds the input_image its video starts from,
-    and a LoRA slot (file + strength) like the real video workflows carry."""
-
     name = "fake_i2v"
     output_type = "video"
     lora_keys = ("lora_name",)
@@ -106,13 +100,6 @@ def test_proposes_nothing_with_no_eligible_rows():
 
 
 def test_machinery_is_never_an_experiment_base_whatever_it_is_called():
-    # An enhance is a derivative of a generation, not settings worth exploring:
-    # mutating one just re-enhances an existing image. The rule was written as
-    # the one machinery workflow's name, which is the only place in the source
-    # tree that spelled it -- so a second machinery workflow would silently have
-    # become an experiment base, and a rename would have left the guard matching
-    # nothing. The app already models it as `selectable`, which is what the
-    # Generate form's dropdown reads.
     machinery = FakeWorkflow()
     machinery.name = "machine_only"
     machinery.selectable = False
@@ -155,15 +142,11 @@ def test_prompt_crossover_draws_from_sibling_generations():
         proposal = policy.propose(rows)
         if "positive_prompt" in proposal.mutated_keys:
             crossed.add(proposal.params["positive_prompt"])
-    # Prompts come only from finished siblings of the same workflow — never from
-    # another workflow's rows, and never invented from thin air.
     assert crossed
     assert crossed <= {"a cat", "a dog"}
 
 
 def test_down_voted_values_are_sampled_less_than_up_voted_ones():
-    # The user reviewed past experiments: dpmpp_2m keeps winning, uni_pc keeps
-    # losing. New proposals should lean the same way.
     rows = [make_row("base-1")]
     rows += [
         make_row(f"exp-up-{i}", source="experiment", verdict="up",
@@ -185,8 +168,6 @@ def test_down_voted_values_are_sampled_less_than_up_voted_ones():
 
 
 def test_batch_size_is_not_an_experiment_dimension():
-    # Varying batch size re-runs the same settings in bulk — it explores nothing
-    # and multiplies the GPU bill, so it is never mutated.
     base = make_row("base-1")
     policy = make_policy(seed=8)
     for _ in range(300):
@@ -209,8 +190,6 @@ def test_a_clearly_damned_value_stops_being_proposed():
 
 
 def test_unreviewed_experiments_do_not_compound():
-    # An unreviewed experiment must not become the base of further experiments —
-    # mutations only build on results the user has actually vetted.
     rows = [
         make_row("vetted", source="experiment", verdict="up"),
         make_row("unvetted", source="experiment", verdict=None),
@@ -221,8 +200,6 @@ def test_unreviewed_experiments_do_not_compound():
 
 
 def test_video_bases_dominate_even_an_image_heavy_gallery():
-    # Videos are the goal; a gallery that is overwhelmingly stills (the usual
-    # shape — many frames tried per video made) must not drown them out.
     rows = [make_row(f"img-{i}") for i in range(40)]
     rows += [make_row(f"vid-{i}", workflow_name="fake_i2v",
                       params={"input_image": "frame.png [output]"}) for i in range(2)]
@@ -233,12 +210,6 @@ def test_video_bases_dominate_even_an_image_heavy_gallery():
 
 
 def test_lora_dims_are_the_favorite_mutation(monkeypatch):
-    # "Experimenting with LoRAs" — the LoRA file and its strength get picked to
-    # mutate well beyond an even split with the other dimensions. Measured against
-    # the same run with the favouring switched off, not against a number: the
-    # arithmetic under the old threshold was wrong for this fixture (an even
-    # split already lands at 51%, not 40%), so removing the weighting entirely
-    # left the one behaviour this test names passing.
     rows = [make_row("vid-1", workflow_name="fake_i2v",
                      params={"input_image": "frame.png [output]"})]
 
@@ -257,9 +228,6 @@ def test_lora_dims_are_the_favorite_mutation(monkeypatch):
 
 
 def test_video_experiments_keep_their_start_frame():
-    # An i2v experiment re-runs on the base row's stored frame — the frame is an
-    # instance of the settings, not a dimension to wander. A row with no frame
-    # recorded can't be re-run at all, so it is never a base.
     rows = [
         make_row("with-frame", workflow_name="fake_i2v",
                  params={"input_image": "frame.png [output]"}),
@@ -281,7 +249,7 @@ def test_proposal_mutates_declared_dims_and_rerolls_the_seed():
         proposal = policy.propose([base])
         assert proposal.workflow.name == "fake_t2i"
         assert proposal.base_prompt_id == "base-1"
-        assert proposal.params["seed"] != 777  # a fresh variation, never a re-run
+        assert proposal.params["seed"] != 777
         assert proposal.mutated_keys
         for key in proposal.mutated_keys:
             assert proposal.params[key] != base_params[key]

@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 import time
 
-from funestra.main_hud import ModeHud
 from funestra.funestra import User
 from funestra.funestra_verbs import RELOAD_PLAYLIST, play_file
 from funestra.hud_overlay import HUD_OVERLAY_ID
+from funestra.main_hud import ModeHud
 from funestra.playlist import PlaylistItem
 from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.satellite_hud import HudModel

@@ -18,8 +18,8 @@ from funestra.robot_hand import (
     phase_advanced,
     position_fraction,
     set_amplitude,
-    set_center,
     set_bars,
+    set_center,
     set_max_intensity,
     set_speed,
 )

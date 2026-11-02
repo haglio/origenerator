@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import pytest
+from funestra.hud_osr2 import state_for
 from funestra.main_hud import (
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra.hud_osr2 import state_for
 from funestra.modes import Osr2State
 from funestra.volume import VolumeHud
 from PyQt6.QtCore import (

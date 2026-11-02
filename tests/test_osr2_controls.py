@@ -6,6 +6,7 @@ import random
 import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
+from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.main_hud import (
     BROKER_PRESS,
     OSR2_CONTROL_BUTTONS,
@@ -14,9 +15,8 @@ from funestra.main_hud import (
     OSR2_PARKED,
 )
 from funestra.main_hud_painter import MainHudPainter, hud_xy
-from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
-from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
+from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import POSITION_MAX
 from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, pyqtSignal
 from PyQt6.QtGui import QMouseEvent

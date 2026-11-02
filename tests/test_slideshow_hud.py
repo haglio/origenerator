@@ -5,14 +5,14 @@ import json
 import numpy as np
 import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
-from funestra.main_hud import BROKER_PRESS
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
+from funestra.main_hud import BROKER_PRESS
 from funestra.modes import Osr2State
 from funestra.satellite_hud import MARGIN
-from funestra.testing import FakeEngine
 from funestra.scrubber_bar import SCRUBBER_HEIGHT
+from funestra.testing import FakeEngine
 from PyQt6.QtCore import QEvent, QPoint, QPointF
 from PyQt6.QtWidgets import QApplication
 

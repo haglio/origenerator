@@ -45,6 +45,7 @@ from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
+from origenerator.gui.prompt_marks import has_unpaired_parentheses
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
@@ -1701,6 +1702,21 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     # form's own beside the tiles would read as the video's where the tiles' are
     # the scenes'.
     assert form._present_keys["Prompts"] == ["scene_frames"]
+
+
+def test_a_scenes_prompts_mark_unpaired_parentheses_and_its_spoken_line_does_not(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    (prompt,) = editor.fields("positive_prompt")
+    (line,) = editor.fields("scene_lines")
+
+    prompt.setPlainText("a (dog")
+    assert has_unpaired_parentheses(prompt)
+
+    prompt.setPlainText("a (dog)")
+    line.setPlainText("oh :)")
+    assert not has_unpaired_parentheses(line)
 
 
 def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(qtbot):

@@ -14,10 +14,11 @@ from origenerator.box_breaks import (
     cut_into_boxes,
     prompt_boxes,
     unboxed,
+    unpaired_parentheses,
 )
 from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
-from origenerator.gui.prompt_marks import mark_past_the_limit
+from origenerator.gui.prompt_marks import mark_past_the_limit, mark_unpaired_parentheses
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
 COUNTING_DOWN_FROM = 15
@@ -47,6 +48,12 @@ def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReadi
     mark_past_the_limit(field, None if reading is None or not in_use
                         else reading.past_limit_at(text),
                         unread=reading is not None and reading.past_it == CUT_OFF)
+    _mark_parentheses(field, in_use=in_use)
+
+
+def _mark_parentheses(field: QPlainTextEdit, *, in_use: bool) -> None:
+    mark_unpaired_parentheses(
+        field, unpaired_parentheses(diff_text.live_text(field)) if in_use else ())
 
 
 class PromptBoxes(QWidget):
@@ -283,6 +290,8 @@ class PromptBoxes(QWidget):
             for countdown, (_start, tokens) in zip(self._countdowns,
                                                    self._reading.pieces(self._cut_from), strict=True):
                 countdown.show_left(self._reading.reads_well - tokens if self._in_use else None)
+            for box in self._boxes:
+                _mark_parentheses(box, in_use=self._in_use)
             return
         for box, countdown in zip(self._boxes, self._countdowns, strict=True):
             count_down(countdown, box, self._reading, in_use=self._in_use)

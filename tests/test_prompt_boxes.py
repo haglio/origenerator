@@ -17,6 +17,7 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
 from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
 from origenerator.gui.prompt_field import PromptField, PromptHeights
+from origenerator.gui.prompt_marks import has_unpaired_parentheses
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, story_of
@@ -554,3 +555,102 @@ def test_a_prompt_written_for_him_into_a_prompt_read_whole_stays_one_box(typed_i
     typed_into.edit("x y a b c")
 
     assert _texts(typed_into) == ["x y a b c"]
+
+
+def _yellow_in(box) -> list[str]:
+    text = box.toPlainText()
+    return [text[span.start:span.start + span.length]
+            for block in _blocks_of(box) for span in block.layout().formats()
+            if span.format.background().color() == YELLOW]
+
+
+def _blocks_of(box):
+    block = box.document().firstBlock()
+    while block.isValid():
+        yield block
+        block = block.next()
+
+
+def test_an_unpaired_parenthesis_is_highlighted_in_yellow_and_the_rest_of_the_prompt_is_not(prompt):
+    prompt.set_value("a (b c")
+
+    (box,) = prompt.boxes()
+    assert _past_the_limit(box) == [("(", YELLOW.name(), BG_PRIMARY.name())]
+    assert has_unpaired_parentheses(box)
+
+
+def test_paired_parentheses_are_left_plain(prompt):
+    prompt.set_value("a (b:1.2) c")
+
+    (box,) = prompt.boxes()
+    assert _past_the_limit(box) == []
+    assert not has_unpaired_parentheses(box)
+
+
+def test_the_highlight_follows_the_typing(prompt):
+    prompt.set_value("a (b c")
+    (box,) = prompt.boxes()
+
+    box.setPlainText("a (b) c")
+    assert _past_the_limit(box) == []
+    assert not has_unpaired_parentheses(box)
+
+    box.setPlainText("a (b) c)")
+    assert _past_the_limit(box) == [(")", YELLOW.name(), BG_PRIMARY.name())]
+
+
+def test_an_unpaired_parenthesis_on_a_later_line_is_the_one_highlighted(prompt):
+    prompt.set_value("a (b)\nc (d")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == ["("]
+    assert box.document().lastBlock().layout().formats()[0].start == 2
+
+
+def test_each_box_pairs_its_own_parentheses_since_each_is_read_on_its_own(prompt):
+    prompt.set_value(f"a (b{BOX_BREAK}c) d")
+
+    first, second = prompt.boxes()
+    assert _yellow_in(first) == ["("]
+    assert _yellow_in(second) == [")"]
+
+
+def test_a_prompt_made_before_the_boxes_highlights_its_unpaired_parentheses_as_it_opens_cut(
+        made_before_the_boxes):
+    made_before_the_boxes.set_value(f"{_CUT_IN_HALF})")
+
+    first, second = made_before_the_boxes.boxes()
+    assert _yellow_in(first) == []
+    assert _yellow_in(second) == [")"]
+    assert has_unpaired_parentheses(second)
+
+
+def test_a_parenthesis_in_words_taken_out_of_the_prompt_counts_for_nothing(prompt):
+    prompt.set_value("a b")
+
+    prompt.track("a (x b")
+
+    (box,) = prompt.boxes()
+    assert box.toPlainText() == "a (x b"
+    assert _yellow_in(box) == []
+    assert not has_unpaired_parentheses(box)
+
+
+def test_an_unpaired_parenthesis_among_words_added_to_a_shown_prompt_is_the_one_highlighted(prompt):
+    prompt.set_value("a (b c")
+
+    prompt.track("a x b c")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == ["("]
+    assert has_unpaired_parentheses(box)
+
+
+def test_a_prompt_not_in_use_highlights_no_parenthesis(prompt):
+    prompt.set_value("a (b c")
+
+    prompt.set_in_use(False, "Nothing reads this")
+
+    (box,) = prompt.boxes()
+    assert _past_the_limit(box) == []
+    assert not has_unpaired_parentheses(box)

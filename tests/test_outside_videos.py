@@ -579,6 +579,19 @@ def test_a_video_made_from_a_hidden_starting_frame_is_filed_under_the_frames_ite
     assert re.fullmatch(r"\S+ \d{3}", folder.label)
 
 
+def test_a_hidden_starting_frame_goes_by_its_videos_name(tmp_path):
+    _video, shown, frame = _brought_in(tmp_path)
+    db = Database(tmp_path / "test.db")
+    _made_here_from(db, frame)
+
+    names = ItemNames.from_library(db)
+
+    [folder] = _source_image_folders(build_gallery_tree(db.list_generations(),
+                                                        name_of=names.of))
+    assert folder.label == names.of(frame["prompt_id"]) == names.of(shown["prompt_id"])
+    assert names.prompt_id_of(folder.label) == shown["prompt_id"]
+
+
 def _leaves(db, media_label: str) -> list[list[str]]:
     rows = db.list_generations()
     [media] = [group for group in build_gallery_tree(rows, image_index=start_frame_index(rows))
@@ -820,16 +833,6 @@ def test_videos_moved_to_their_kinds_folder_are_numbered_afresh_in_it(tmp_path):
     names = ItemNames.from_library(db)
     assert sorted(names.of(video["prompt_id"])[-3:] for video in _videos(db)) == [
         "000", "000", "001"]
-
-
-def test_a_word_made_videos_starting_frame_is_numbered_in_its_videos_family(tmp_path):
-    db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
-        "c2_topaz.mp4": _made_from_words("a run in the rain", "12")})
-
-    names = ItemNames.from_library(db)
-
-    assert [names.of(_frame_of(db, row)["prompt_id"])[-3:] for row in _videos(db)] == ["000", "000"]
 
 
 def _images(db) -> list[dict]:

@@ -24,9 +24,11 @@ class ItemNames:
         return names
 
     def take(self, rows: list[dict], held_rows: list[dict], image_index: dict) -> None:
+        video_of_frame = _videos_of_starting_frames(rows, held_rows, image_index)
         folders: dict[str, list[str]] = defaultdict(list)
         for row in _items_oldest_first(rows, held_rows):
-            folders[gallery.settings_folder_key(row, image_index)].append(row["prompt_id"])
+            if row["prompt_id"] not in video_of_frame:
+                folders[gallery.settings_folder_key(row, image_index)].append(row["prompt_id"])
         recorded = self._numbers.list_item_numbers()
         numbering = number_items(folders, recorded)
         changed = {prompt_id: item for prompt_id, item in numbering.items()
@@ -36,12 +38,25 @@ class ItemNames:
         self._names = {prompt_id: item_name(item)
                        for prompt_id, item in numbering.items()}
         self._wearing = {name: prompt_id for prompt_id, name in self._names.items()}
+        self._names.update({frame: self._names[video] for frame, video in video_of_frame.items()
+                            if video in self._names})
 
     def of(self, prompt_id: str | None) -> str:
         return self._names.get(prompt_id, "")
 
     def prompt_id_of(self, name: str) -> str | None:
         return self._wearing.get(name)
+
+
+def _videos_of_starting_frames(rows: list[dict], held_rows: list[dict],
+                               image_index: dict) -> dict[str, str]:
+    row_of = {row["prompt_id"]: row for row in rows}
+    videos: dict[str, str] = {}
+    for video in [*rows, *held_rows]:
+        frame = row_of.get(gallery.source_image_id_in(video, image_index))
+        if frame is not None and gallery.was_taken_from(frame, video):
+            videos.setdefault(frame["prompt_id"], video["prompt_id"])
+    return videos
 
 
 def _items_oldest_first(rows: list[dict], held_rows: list[dict]) -> list[dict]:

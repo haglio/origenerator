@@ -50,17 +50,12 @@ def enhance_state(row: dict, settings) -> str | None:
 
 
 class _CornerButtonFace(QPushButton):
-    """One corner button's face, which re-draws itself while the cursor is on it.
-
-    Qt's own hover state would do this through a stylesheet, but what changes
-    here is the *mark* rather than the button — a trash can going red, a star
-    going light gray — so the icon is swapped on the crossing instead.
-    """
+    """One corner button's face, which swaps its icon as the cursor crosses it: Qt's hover state would change the button, not the mark."""
 
     def __init__(self, host: QWidget, render, *, enabled: bool = True):
         super().__init__(host)
         self.setEnabled(enabled)
-        self._render = render  # (armed) -> QIcon
+        self._render = render
         self._armed = False
         self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
         self.setIconSize(QSize(_GLYPH_SIZE, _GLYPH_SIZE))
@@ -94,7 +89,7 @@ class CornerButtons(QObject):
     def __init__(self, host: QWidget, *, restore: RestoreOffer | None = None):
         super().__init__(host)
         self._restore_tip, can_restore = restore or (None, True)
-        self._available = False   # is there a saved generation here to act on?
+        self._available = False
         self._favorite = False
         self._enhance: str | None = None
         self._star = _CornerButtonFace(

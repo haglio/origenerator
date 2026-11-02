@@ -11,7 +11,7 @@ _ROOM_AROUND_A_REVEALED_PROMPT = 40
 def reveal_prompt(field):
     _unfold(field)
     _scroll_into_view(field)
-    # A section unfolded a line ago has not been laid out yet, so that scroll
+    # Qt: a section unfolded a line ago has not been laid out yet, so that scroll
     # aimed at where the field used to be.
     defer(field, lambda: _scroll_into_view(field))
 

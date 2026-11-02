@@ -62,7 +62,7 @@ class BasicSection(QWidget):
 
     def _render(self, section: BasicFacts | None):
         if self._block is not None:
-            # deleteLater alone leaves it among the children until the next loop turn.
+            # Qt: deleteLater alone leaves it among the children until the next loop turn.
             self._block.setParent(None)
             self._block.deleteLater()
             self._block = None

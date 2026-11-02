@@ -56,8 +56,8 @@ class PromptField(QPlainTextEdit):
         self._key = key
         self._heights = heights or PROMPT_HEIGHTS
         self._drag: tuple[float, int] | None = None
-        # Without tracking, the edge can only offer its resize cursor while a
-        # button is already down — by which time you have clicked into the text.
+        # Qt: without tracking, the edge can only offer its resize cursor while a button is already down,
+        # by which time you have clicked into the text.
         self.viewport().setMouseTracking(True)
         self._apply_height(self._heights.height(key))
         self._heights.changed.connect(self._on_shared_height_changed)
@@ -75,12 +75,7 @@ class PromptField(QPlainTextEdit):
                 + 2 * int(self.document().documentMargin()) + chrome)
 
     def _in_grip(self, pos) -> bool:
-        """Is this point on the lower edge's grip?
-
-        Mouse events on a scroll area arrive in *viewport* coordinates, so the
-        grip is measured from the viewport's own lower edge — which also means the
-        scrollbar, a child with its own events, is never part of it.
-        """
+        """Is this point on the lower edge's grip? Qt delivers a scroll area's mouse events in viewport coordinates."""
         return pos.y() >= self.viewport().height() - GRIP
 
     def mousePressEvent(self, event):

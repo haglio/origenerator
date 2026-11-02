@@ -100,7 +100,7 @@ class GalleryPaneButtons(QWidget):
     def __init__(self, handlers: ButtonHandlers, *, hosted: bool):
         super().__init__()
         policy = self.sizePolicy()
-        policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
+        policy.setHeightForWidth(True)  # Qt's column above gives it the rows it asks for only with this
         self.setSizePolicy(policy)
         self.back = _tool_button(icons.back_icon(), "Back", handlers.go_back)
         self.forward = _tool_button(icons.forward_icon(), "Forward", handlers.go_forward)

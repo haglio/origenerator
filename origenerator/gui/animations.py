@@ -52,7 +52,7 @@ class Animations(QWidget):
         _show_heading(self._heading, heading)
 
     def show_videos(self, items: list[tuple[str, object, object]]):
-        # Deleting the old host stops and frees its tiles' movies.
+        # Qt: deleting the old host stops and frees its tiles' movies.
         self._column.removeWidget(self._host)
         self._host.deleteLater()
         self._host = QWidget()

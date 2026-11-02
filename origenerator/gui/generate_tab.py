@@ -600,7 +600,7 @@ class GenerateTab(DropZones):
         self._param_form.resolve_every_warning()
 
     def _detach_form(self):
-        """Detached from its parent at once: deleteLater leaves it on screen until the event loop spins."""
+        """Detached from its parent at once: Qt's deleteLater leaves it on screen until the event loop spins."""
         if self._param_form is None:
             return
         self._form_host_column.removeWidget(self._param_form)

@@ -229,7 +229,7 @@ class FunestraPane(QWidget):
 
 
 class _FunestraWindow(QWidget):
-    """Native, because the engine is handed a native window, and asked for at first show since a window never on screen is not one to hand over."""
+    """Native, because mpv is handed a native window, and asked for at first show since a window never on screen is not one to hand over."""
 
     def __init__(self, pane: FunestraPane):
         super().__init__(pane)

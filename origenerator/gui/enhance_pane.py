@@ -156,9 +156,7 @@ def _narrowest(widget: QWidget) -> int:
 
 
 class _FieldGrid(QGridLayout):
-    """Fields beside one column of captions, its warning marks in a column left of
-    it: a dropdown to a line, and the numbers sharing a line while each keeps its
-    width, a line each when they cannot.
+    """Fields beside one column of captions, its warning marks in a column left of it.
 
     A layout, because Qt asks a widget's layout for its height at a width, never the widget."""
 
@@ -240,8 +238,7 @@ def _settings_dragged(mime, _source) -> tuple[dict] | None:
 
 
 class _SettingsScroll(QScrollArea):
-    """The settings, scrolling down once the pane is squeezed shorter than they
-    are, and sideways once it is squeezed narrower.
+    """The settings, scrolling down once the pane is squeezed shorter than they are, and sideways once it is squeezed narrower.
 
     Qt's own scroll area asks for their height as though nothing in them had wrapped."""
 
@@ -467,10 +464,7 @@ class EnhancePane(QWidget):
             label.setEnabled(on)
 
     def _fix_number(self) -> NoWheelDoubleSpinBox:
-        """One part's denoise spinner, ranged from the enhancer's own ParamDef.
-
-        Sized to its digits because Qt's own hint for a spinner is two and a half times 0.00.
-        """
+        """One part's denoise spinner, sized to its digits because Qt's own hint for a spinner is two and a half times 0.00."""
         widget = NoWheelDoubleSpinBox()
         pd = self._defs.get("enhance_detail_fixes")
         widget.setMinimum(pd.min_val if pd is not None else 0.0)

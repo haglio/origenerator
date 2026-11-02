@@ -264,7 +264,7 @@ class PreviewWidget(QWidget):
         if drawn is None or drawn.isEmpty():
             return self._media_host.geometry()
         rect = QRect(QPoint(0, 0), drawn)
-        # Centered on the media area: a stacked layout sizes only the page showing, so the label keeps a stale geometry under a video
+        # Qt: centered on the media area: a stacked layout sizes only the page showing, so the label keeps a stale geometry under a video
         rect.moveCenter(self._media_host.geometry().center())
         return rect
 
@@ -425,7 +425,7 @@ class PreviewWidget(QWidget):
         )
 
     def eventFilter(self, obj, event):
-        # The label resizes a beat after the widget going fullscreen, so refit off the label's own resize, not the widget's
+        # Qt resizes the label a beat after the widget going fullscreen, so refit off the label's own resize, not the widget's
         if obj is self._image_label and event.type() == QEvent.Type.Resize:
             if self._movie is not None:
                 self._scale_movie()

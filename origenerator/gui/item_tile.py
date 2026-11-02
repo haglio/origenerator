@@ -116,7 +116,7 @@ class ItemTile(QWidget):
         tile_shape.style_caption(self._text_label)
         self._text_label.setStyleSheet("background-color: transparent;")
 
-        # Without it enter/leave flicker as the cursor crosses a child.
+        # Qt: without it enter/leave flicker as the cursor crosses a child.
         self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._text_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
@@ -127,13 +127,13 @@ class ItemTile(QWidget):
         if media_type:
             ItemTypeIcon(media_type, self)
 
-        layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
+        layout.activate()  # Qt gives the thumbnail its rectangle only once the layout has run
         self._controls = CornerButtons(self, restore=restore)
         self._controls.place(self._image_label.geometry())
         self._controls.triggered.connect(
             lambda action: self.control_triggered.emit(self.prompt_id, action))
         for button in self._controls.buttons():
-            button.installEventFilter(self)  # an off-tile exit from a control
+            button.installEventFilter(self)  # Qt reports a cursor leaving through a control only to the control
         self._sync_controls()
 
         self._status_scrim = TileStatusScrim(self)
@@ -154,7 +154,6 @@ class ItemTile(QWidget):
                 media_type: str | None = None, movie_path: str | None = None,
                 corner_buttons: list[CornerButton] | None = None,
                 restore: RestoreOffer | None = None, **_mutable) -> tuple:
-        """What a tile cannot be changed into once built."""
         return (prompt_id, thumb_path, label_text, media_type, movie_path, restore,
                 tuple(action.action_id for action in corner_buttons or ()))
 
@@ -277,8 +276,6 @@ class ItemTile(QWidget):
         return self.rect().contains(self.mapFromGlobal(QCursor.pos()))
 
     def _hover_buttons(self) -> list:
-        """Every child a cursor can be over while it is still "on the tile" — the
-        collection's own actions and the three corner buttons alike."""
         return self._corner_buttons + self._controls.buttons()
 
     def eventFilter(self, obj, event):

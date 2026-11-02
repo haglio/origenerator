@@ -88,9 +88,9 @@ def _says(slideshow: FunestraSlideshow, **fields) -> None:
 
 
 def _funestra_says(channel: FunestraChannel, *, loads: int = 1, idle: bool = False,
-                   **fields) -> None:
+                   has_funscript: bool = False, **fields) -> None:
     lines = {**status_fields(FunestraStatus(**fields)), "loads": str(loads),
-             "idle": "1" if idle else "0"}
+             "idle": "1" if idle else "0", "has_funscript": "1" if has_funscript else "0"}
     channel.status_file.write_text(
         "".join(f"{key}={value}\n" for key, value in lines.items()), encoding="utf-8")
 

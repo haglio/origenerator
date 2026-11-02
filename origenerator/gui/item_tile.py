@@ -208,9 +208,6 @@ class ItemTile(QWidget):
         self._enhance = enhance
         self._sync_controls()
 
-    def play_moving_preview(self, movie_path: str) -> None:
-        play_in(self._image_label, movie_path, _IMAGE_SIZE)
-
     def set_in_sight(self, in_sight: bool) -> None:
         video_in_sight(self._image_label, in_sight)
 

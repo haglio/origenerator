@@ -2879,6 +2879,14 @@ def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_
     assert asked == [(OutputPlaces.in_one_folder(tmp_path / "output"), tmp_path / "thumbs")]
 
 
+def test_a_gallery_given_no_thumbnails_folder_shows_stills(qtbot, tmp_path):
+    view = GalleryView(_trash_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(tmp_path),
+                                                 thumb_dir=None))
+    qtbot.addWidget(view)
+
+    assert view.animated_preview({"prompt_id": "p1"}) is None
+
+
 def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
     # The name is a short code, and what the folder holds used to ride on the
     # hover: the prompt and the settings that set it apart, each cut to 24

@@ -20,7 +20,6 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 
-from origenerator.config import OUTPUT_PLACES, THUMB_DIR
 from origenerator.gallery import (
     media_type_of_row,
     start_images_among,
@@ -31,7 +30,6 @@ from origenerator.gallery import (
 from origenerator.gui.animations import Animations
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 from origenerator.voice.dictation import words_of
@@ -84,7 +82,7 @@ class RelatedMedia(QWidget):
                  row_of: Callable[[str], dict | None],
                  name_of: Callable[[str], str],
                  held_rows: Callable[[], list[dict]] = list,
-                 previews: MovingPreviews | None = None,
+                 animated_preview: Callable[[dict], str | None],
                  request_of: Callable[[str], dict | None],
                  requests_about: Callable[[str], list[dict]]):
         super().__init__(parent)
@@ -92,10 +90,7 @@ class RelatedMedia(QWidget):
         self._row_of = row_of
         self._name_of = name_of
         self._held_rows = held_rows
-        self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
-        self._previews.made.connect(self._show_made_preview)
-        self._shown: tuple | None = None
-        self._in_animations: set[str] = set()
+        self._animated_preview = animated_preview
         self._request_of = request_of
         self._requests_about = requests_about
         layout = QVBoxLayout(self)
@@ -153,9 +148,7 @@ class RelatedMedia(QWidget):
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
         # Hides itself when empty, which for anything but an animated image it is.
-        self._shown = (row, start_image_of, videos)
         items = self._animated_items(row, start_image_of, videos)
-        self._in_animations = {item[0] for item in items}
         self._animations.set_heading("Starting frame animated in"
                                      if media_type_of_row(row) == MediaType.VIDEO else "")
         self._animations.show_videos(items)
@@ -178,7 +171,6 @@ class RelatedMedia(QWidget):
 
     def clear(self) -> None:
         """Put every link down — the tab has no generation on display."""
-        self._shown, self._in_animations = None, set()
         self._source_tile.clear()
         self._source_video_tile.clear()
         self._source_section.hide()
@@ -271,11 +263,7 @@ class RelatedMedia(QWidget):
             if image is None or not was_taken_from(image, row):
                 return []
         could_name_it = videos_from_source_image(image, videos)
-        return [(video["prompt_id"], self._previews.of(video), video.get("thumbnail_path"))
+        return [(video["prompt_id"], self._animated_preview(video), video.get("thumbnail_path"))
                 for video in could_name_it
                 if (self._built_from(video, start_image_of)[0] or {}).get("prompt_id")
                 == image["prompt_id"]]
-
-    def _show_made_preview(self, prompt_id: str, _path: str) -> None:
-        if prompt_id in self._in_animations:
-            self._animations.show_videos(self._animated_items(*self._shown))

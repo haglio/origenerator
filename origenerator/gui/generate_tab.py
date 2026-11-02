@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,7 +23,14 @@ from shared_ui.icons import icon_then_text, qt_icon
 from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from origenerator import action_settings, evolver_export, look_training, outside_videos, prompt_edit
+from origenerator import (
+    action_settings,
+    evolver_export,
+    gallery,
+    look_training,
+    outside_videos,
+    prompt_edit,
+)
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -77,7 +85,6 @@ from origenerator.gui.how_many import GenerateWithHowMany, HowManyDropdown
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
 from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.message import set_marked_text
-from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
@@ -249,7 +256,7 @@ class GenerateTab(DropZones):
                  inbox: evolver_export.EvolverInbox | None = None,
                  library: LibraryViews | None = None,
                  names: ItemNames | None = None,
-                 previews: MovingPreviews | None = None):
+                 animated_preview: Callable[[dict], str | None] | None = None):
         super().__init__(parent=parent)
         self._heights = heights  # the window's prompt heights, for its forms
         # Where a video is handed to Evolver. Asked for rather than performed
@@ -261,7 +268,8 @@ class GenerateTab(DropZones):
         self._db = db
         self._library = library or LibraryViews(db)
         self._names = names or ItemNames(db)
-        self._previews = previews or MovingPreviews(OUTPUT_PLACES, THUMB_DIR, parent=self)
+        self._animated_preview = animated_preview or (
+            lambda row: gallery.animated_preview_if_made(row, OUTPUT_PLACES, THUMB_DIR))
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._making_one = None
@@ -516,7 +524,7 @@ class GenerateTab(DropZones):
         self._related = RelatedMedia(video_rows=self._video_rows,
                                      row_of=self._db.get_generation,
                                      held_rows=lambda: self._library.now().held_rows,
-                                     name_of=self._names.of, previews=self._previews,
+                                     name_of=self._names.of, animated_preview=self._animated_preview,
                                      request_of=self._db.get_request,
                                      requests_about=self._db.requests_about)
         self._related.link_clicked.connect(self.link_clicked)
@@ -1089,12 +1097,12 @@ class GenerateTab(DropZones):
 
     def _looping_preview(self, item: str) -> str | None:
         row = self._db.get_generation(item)
-        return self._previews.of(row) if row else None
+        return self._animated_preview(row) if row else None
 
     def _zone_items(self) -> ZoneItems:
         return ZoneItems(self._db, self._names, self._library, places=OUTPUT_PLACES,
                          input_dir=COMFYUI_INPUT_DIR, thumb_dir=THUMB_DIR,
-                         moving_preview=self._previews.of)
+                         moving_preview=self._animated_preview)
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)

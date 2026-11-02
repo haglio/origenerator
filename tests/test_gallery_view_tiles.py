@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import threading
 from unittest.mock import MagicMock
 
 import pytest
@@ -496,28 +495,6 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
 
     view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video's settings folder
     assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)  # its grid tile loops
-
-
-def test_a_videos_moving_preview_is_made_off_the_window_thread_while_its_tile_shows_its_still(
-        qtbot, tmp_path, monkeypatch):
-    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
-    rows = [_row("v1", "wan22_i2v",
-                 {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4")]
-    made_on = []
-    monkeypatch.setattr(gallery, "animated_preview_if_made",
-                        lambda row, o, t: str(webp) if made_on else None)
-    monkeypatch.setattr(gallery, "make_animated_preview",
-                        lambda row, o, t: made_on.append(threading.current_thread()) or str(webp))
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])
-
-    assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie) == []
-    qtbot.waitUntil(lambda: bool(view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)))
-    assert made_on
-    assert threading.main_thread() not in made_on
 
 
 def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):

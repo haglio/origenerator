@@ -18,6 +18,7 @@ restart, so the tabs carry no job state at all.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import NamedTuple
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -35,7 +36,6 @@ from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.how_many import HOW_MANY
-from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
@@ -94,9 +94,9 @@ class GeneratePane(QTabWidget):
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None, heights=None, names: ItemNames | None = None,
-                 previews: MovingPreviews | None = None):
+                 animated_preview: Callable[[dict], str | None] | None = None):
         super().__init__(parent)
-        self._previews = previews
+        self._animated_preview = animated_preview
         self._heights = heights  # the window's prompt heights, for its tabs
         self._client = client
         # The hosting session, or None standalone: a tab lays its preview out
@@ -185,7 +185,7 @@ class GeneratePane(QTabWidget):
         """
         tab = GenerateTab(self._client, self._db, fun_time=self._fun_time,
                                     heights=self._heights, library=self._library,
-                                    names=self._names, previews=self._previews)
+                                    names=self._names, animated_preview=self._animated_preview)
         index = self.addTab(tab, tab_mark(tab.tab_icon()), tab.title())
         tab.title_changed.connect(lambda _text, p=tab: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name

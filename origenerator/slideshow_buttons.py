@@ -36,11 +36,6 @@ MODE_BUTTONS = (
     ("satellites_kino_activate", "Kino", False),
     (ORIGENERATOR_MODE, "Origenerator", True),
 )
-MODE_TOOLTIPS = {
-    "satellites_kino_activate": "Kino mode — the Satellite Funestras and the Random Favs Browser",
-    "origenerator_activate":
-        "Origenerator mode — Origenerator over the browser, its slideshows over the Funestras",
-}
 
 ENHANCED_ICON = shared_icon("enhance_filter")
 
@@ -157,6 +152,6 @@ def answer(host, action: str, argument: str = "") -> bool:
 
 def _mode_row() -> tuple[Button, ...]:
     return tuple(
-        Button(action, label, MODE_TOOLTIPS[action], width=FIT_THE_WORD, lit=lit)
+        Button(action, label, "", width=FIT_THE_WORD, lit=lit)
         for action, label, lit in MODE_BUTTONS
     )

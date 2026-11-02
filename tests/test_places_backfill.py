@@ -1,5 +1,3 @@
-"""Finding the places in images enhanced before the places were kept: only the Fixes' finding,
-run while the app is shut."""
 from __future__ import annotations
 
 import json
@@ -150,9 +148,6 @@ class _TheProcessEnded(BaseException):
 
 
 class _ComfyEndedPartway(FakeComfy):
-    """The ComfyUI the closed app's turn was handing images to when that turn
-    was ended, as a turn that runs out of its time is."""
-
     def __init__(self, folders: ComfyFolders, ended_after: int) -> None:
         super().__init__(folders)
         self._ended_after = ended_after
@@ -164,8 +159,6 @@ class _ComfyEndedPartway(FakeComfy):
 
 
 def test_a_hand_over_ended_partway_leaves_a_note_of_every_image_it_sent(tmp_path, folders):
-    # The next launch takes back off ComfyUI what the note names, so an image
-    # sent and not written down would be looked over while the app is open again.
     db = Database(tmp_path / "t.db")
     for name in ("a", "b", "c"):
         _enhanced(db, name, _file(f"enhanced_{name}.png"))

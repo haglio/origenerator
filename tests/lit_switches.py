@@ -1,5 +1,3 @@
-"""What color a switch among the Gallery pane buttons is lit in while it is on, read off its
-own style and named the way a person would name it."""
 from __future__ import annotations
 
 import re

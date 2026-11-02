@@ -1,4 +1,3 @@
-"""The "Generation failed" dialog: one, however many failures arrive while it is up."""
 from __future__ import annotations
 
 from collections import Counter

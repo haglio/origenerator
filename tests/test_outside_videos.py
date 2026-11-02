@@ -1,7 +1,3 @@
-"""The AI videos other sources made, brought in from Evolver's library.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json

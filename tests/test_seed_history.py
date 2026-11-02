@@ -1,8 +1,3 @@
-"""The seeds a Generate tab's Seed dropdown offers: every seed used for the kind of
-item the tab makes, newest first, each beside a thumbnail of the item it made.
-
-Fixture rows are fabricated (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json

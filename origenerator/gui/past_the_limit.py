@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QSyntaxHighlighter, QTextCharFormat
 from PyQt6.QtWidgets import QPlainTextEdit
-from shared_ui.colors import AMBER, BG_PRIMARY, TEXT_MUTED
+from shared_ui.colors import BG_PRIMARY, TEXT_MUTED, YELLOW
 
 from origenerator.gui.tracked_prompt import prompt_ranges_from
 
@@ -15,7 +15,7 @@ class _PastTheLimit(QSyntaxHighlighter):
         if self.starts_at is None:
             return
         marked = QTextCharFormat()
-        marked.setBackground(AMBER)
+        marked.setBackground(YELLOW)
         marked.setForeground(TEXT_MUTED if self.unread else BG_PRIMARY)
         block = self.currentBlock().position()
         for start, end in prompt_ranges_from(self.parent(), self.starts_at):

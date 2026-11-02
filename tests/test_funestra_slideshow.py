@@ -2116,3 +2116,26 @@ def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tm
     slideshow._timer.stop()
 
     assert read_playlist(slideshow.channel.playlist)[0].path.name == "two.png"
+
+
+def test_on_a_sessions_funestra_a_request_and_what_is_being_dictated_are_said_in_the_gallerys_caption(
+        qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=lambda text, mark: said.append(text))
+
+    slideshow.shown.request_line("a request")
+    slideshow.shown.dictating("some words")
+    slideshow.shown.dictating("")
+    slideshow.shown.room_paused(True)
+
+    assert said == ["a request", "some words"]
+
+
+def test_a_press_on_the_job_queue_on_a_sessions_funestra_reaches_its_foot(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+    pressed = []
+    slideshow.shown._press_the_foot = lambda verb, payload: pressed.append((verb, payload))
+
+    slideshow.shown.press_the_queue("a press", "1|2")
+
+    assert pressed == [("a press", "1|2")]

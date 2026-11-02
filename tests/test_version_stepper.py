@@ -1,10 +1,3 @@
-"""Stepping the versions of the image on screen.
-
-Shift+Left/Right moves within one image's versions rather than along
-the set. Which versions exist, which image they belong to, and which of them
-is showing were three fields on the slideshow, read and written from five of its
-methods; they are one small object now, and this is what it promises.
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,8 +6,6 @@ import pytest
 
 from origenerator.gui.version_stepper import Version, VersionStepper
 
-# Two images. The first has three versions, newest first, as the gallery hands
-# them over: (path, media_type, label). The second has only itself.
 _LEVELS = {
     "a.png": [("a-v3.png", "image", "Version 3"),
               ("a-v2.png", "image", "Version 2"),
@@ -52,8 +43,6 @@ def test_the_versions_wrap_round_in_both_directions(armed):
 
 
 def test_an_image_with_one_version_does_not_step(armed):
-    # And says so by answering nothing, so the caller can leave the set alone
-    # rather than stepping it when the shift was the whole point.
     assert armed.step(1, base="b.png") is None
     assert armed.index == 0
 
@@ -63,8 +52,6 @@ def test_an_image_with_no_versions_at_all_does_not_step(armed):
 
 
 def test_the_image_being_stepped_stays_the_key_once_stepping_starts(armed):
-    # The file on screen is no longer the one the set lists the image under the
-    # moment a version is showing, so the base is remembered rather than re-asked.
     armed.step(1, base="a.png")
 
     assert armed.step(1, base="a-v2.png") == Version("a.png", "image", "Base")
@@ -85,7 +72,7 @@ def test_the_versions_on_offer_are_the_ones_for_the_image_being_stepped(armed):
     assert armed.versions(base="unknown.png") == []
 
     armed.step(1, base="a.png")
-    assert len(armed.versions(base="a-v2.png")) == 3  # still a.png's, being stepped
+    assert len(armed.versions(base="a-v2.png")) == 3
 
 
 def test_re_arming_replaces_what_there_is_to_step(armed):
@@ -96,9 +83,6 @@ def test_re_arming_replaces_what_there_is_to_step(armed):
 
 
 def test_the_keys_and_the_lists_are_taken_as_this_object_s_own(armed):
-    # The gallery rebuilds its map on every poll, and the paths arrive as Paths
-    # as often as strings; neither may reach back in here afterwards.
-
     versions = [("d.png", "image", "Base"), ("d-v2.png", "image", "Version 2")]
     stepper = VersionStepper()
     stepper.arm({Path("d.png"): versions})

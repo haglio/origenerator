@@ -1,16 +1,3 @@
-"""Origenerator's voice outside its own window, and the way back in from it.
-
-What it says is :mod:`origenerator.run_toast`'s; this is the saying of it, and
-the answering of it.
-
-A toast is a message to whoever comes back, which may be an hour later
-with this app closed, so it is raised through Windows' own toast platform
-(:mod:`origenerator.windows_toast`), which carries a link Windows follows
-whenever it is answered (:mod:`origenerator.app_link`). The heading over it and
-the mark beside it are read off the id the process claims, so this names the app
-there too, and registers what a click runs beside it: production Origenerator,
-whichever copy raised the toast.
-"""
 from __future__ import annotations
 
 import logging
@@ -39,16 +26,10 @@ from origenerator.win32 import (
 
 logger = logging.getLogger(__name__)
 
-# What Windows calls this app over a toast, and in its Notifications
-# settings — the app's name, not the id the taskbar groups by.
 APP_NAME = "Origenerator"
 
-# The mark's size in pixels square. The master the .ico is cut from, so Windows
-# scales it down to whatever the toast draws rather than up.
 _MARK_PX = 256
 
-# The mark beside a toast, by whether the run landed: the family's information
-# and warning marks, which its alert dialogs wear for the same two answers.
 _TOAST_MARKS = {
     True: ("toast-ready.png", Level.INFO),
     False: ("toast-failed.png", Level.WARNING),
@@ -70,15 +51,11 @@ def _away() -> bool:
 
 
 def _where_marks_live() -> Path:
-    """Outside the checkout on purpose. What is registered below outlives the
-    copy of the app that registered it, and a branch preview's tree does not, so
-    a mark named inside one would be gone by the next toast."""
     home = Path(os.environ.get("LOCALAPPDATA") or tempfile.gettempdir())
     return home / APP_NAME
 
 
 def _the_apps_mark(shown_as: Preview | None) -> Path:
-    """Origenerator's O, written where a toast can still find it later."""
     mark = _where_marks_live() / (
         "toast.png" if shown_as is None else "toast-preview.png")
     mark.parent.mkdir(parents=True, exist_ok=True)
@@ -88,9 +65,6 @@ def _the_apps_mark(shown_as: Preview | None) -> Path:
 
 
 def _the_marks_beside_a_toast() -> dict[bool, Path | None]:
-    """The family's information and warning marks, written out where a toast can
-    name them. ``None`` for one that could not be written: a toast with no
-    glyph beside it still says what happened, which is what it is for."""
     marks: dict[bool, Path | None] = {}
     for landed, (name, level) in _TOAST_MARKS.items():
         mark = _where_marks_live() / name
@@ -99,17 +73,12 @@ def _the_marks_beside_a_toast() -> dict[bool, Path | None]:
             drawn = icon_pixmap_for(level, _MARK_PX)
             marks[landed] = mark if drawn.save(str(mark)) else None
         except Exception as e:
-            # Broad on purpose, as for the identity below: a toast with no
-            # glyph beside it still says what happened.
             logger.warning("No mark to draw beside a toast: %s", e)
             marks[landed] = None
     return marks
 
 
 class Toasts(QObject):
-    """What reaches the desktop when a run ends, what a click on it does, and
-    taking it back once its video has been watched here."""
-
     def __init__(self, icon: QIcon, parent=None, *, shown_as: Preview | None = None,
                  video_in_front=lambda: None):
         super().__init__(parent)
@@ -128,7 +97,6 @@ class Toasts(QObject):
         self._looks.start(_LOOK_EVERY_MS)
 
     def note(self, outcome: RunOutcome) -> None:
-        """Say what a run came to, if it is one worth interrupting for."""
         toast = toast_for(outcome)
         if toast is None:
             return
@@ -150,8 +118,6 @@ class Toasts(QObject):
                 self._identity, name=window_title(APP_NAME, shown_as),
                 icon=_the_apps_mark(shown_as))
         except Exception as e:
-            # Broad on purpose: nothing about the heading over a toast is
-            # worth a launch, and an unwritable mark fails in more ways than one.
             logger.warning("Toast identity unavailable: %s", e)
 
     def _answer_clicks_with_production(self) -> None:

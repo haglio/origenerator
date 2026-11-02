@@ -404,7 +404,7 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
 
 
 def _run(**kw):
-    base = dict(status="running", frame=None)
+    base = {"status": "running", "frame": None}
     base.update(kw)
     return RunReading(**base)
 

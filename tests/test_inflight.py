@@ -20,9 +20,9 @@ from origenerator.gui.inflight import (
 
 
 def _item(**over) -> InFlightItem:
-    fields = dict(key="p1", caption="Alpha Workflow › a cat",
-                  reading=RunReading(status=JobState.QUEUED, typical_seconds=120.0),
-                  reveal=lambda: None)
+    fields = {"key": "p1", "caption": "Alpha Workflow › a cat",
+                  "reading": RunReading(status=JobState.QUEUED, typical_seconds=120.0),
+                  "reveal": lambda: None}
     fields.update(over)
     return InFlightItem(**fields)
 

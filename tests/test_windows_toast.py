@@ -70,7 +70,7 @@ def test_a_toast_is_filed_under_a_tag_and_a_group_of_up_to_64_characters_each():
         assert toast
 
 
-@pytest.mark.parametrize("filing", [dict(tag="t" * 65, group="g"), dict(tag="t", group="g" * 65)])
+@pytest.mark.parametrize("filing", [{"tag": "t" * 65, "group": "g"}, {"tag": "t", "group": "g" * 65}])
 def test_a_name_longer_than_windows_files_under_is_refused_before_anything_is_raised(filing):
     with pytest.raises(OSError, match=r"call \d+ failed: 0x"), windows_toast.filed(_A_TOAST, **filing):
         pass

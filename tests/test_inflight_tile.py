@@ -22,7 +22,7 @@ _READING_KEYS = ("status", "frame", "progress", "pass_progress", "stage", "start
 
 def _item(**kw):
     reading = {"status": "queued"} | {k: kw.pop(k) for k in list(kw) if k in _READING_KEYS}
-    base = dict(key="p1", caption="SDXL › a cat", reveal=lambda: None)
+    base = {"key": "p1", "caption": "SDXL › a cat", "reveal": lambda: None}
     base.update(kw)
     return InFlightItem(reading=RunReading(**reading), **base)
 

@@ -11,9 +11,8 @@ from origenerator.workflows import model_arch
 
 _MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 
-# Where the enhance graph's detail pass finds its face/hand detectors: the
-# directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, so a
-# model dropped in for ComfyUI is the same one this app offers.
+# The directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, where the enhance graph's detail pass
+# finds its face/hand detectors in ComfyUI.
 _DETECTOR_CATEGORY = "ultralytics/bbox"
 _OUTLINE_DETECTOR_CATEGORY = "ultralytics/segm"
 

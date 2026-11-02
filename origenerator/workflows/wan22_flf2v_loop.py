@@ -27,11 +27,6 @@ from origenerator.workflows.wan_experts import (
 
 
 class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
-    """WAN 2.2 first-last-frame loop: a single image drives both endpoints.
-
-    The audio loops with the file only as far as a player lets it: a player restarting
-    the loop restarts the track with it, and only the frames loop seamlessly.
-    """
 
     name = "wan22_flf2v_loop"
     version = "v009"

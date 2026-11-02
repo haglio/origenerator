@@ -59,7 +59,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
-            # The detailer node rejects a zero denoise, so a named part's floor sits above zero.
+            # ComfyUI's detailer node rejects a zero denoise, so a named part's floor sits above zero.
             ParamDef("enhance_detail_fixes", "Fixes", ParamType.FIXES, defaults["enhance_detail_fixes"],
                      min_val=0.05, max_val=FIX_MAX, step=0.05),
         ]

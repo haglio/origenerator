@@ -1,4 +1,4 @@
-"""WAN 2.2 samples in two stages against a high-noise and a low-noise expert half of one model, so a dropdown offers only its own half and one shift serves both passes."""
+"""ComfyUI samples WAN 2.2 in two stages against a high-noise and a low-noise expert half of one model, so a dropdown offers only its own half and one shift serves both passes."""
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType

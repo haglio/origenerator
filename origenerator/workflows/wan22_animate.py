@@ -23,7 +23,7 @@ from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
 
-# Comfy's own Animate template runs the model under this LoRA: six steps, no guidance.
+# ComfyUI's own Animate template runs the model under this LoRA: six steps, no guidance.
 DISTILL_LORA = "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"
 _PERSON_FINDER = "yolox_l.torchscript.pt"
 _POSE_ESTIMATOR = "dw-ll_ucoco_384_bs5.torchscript.pt"

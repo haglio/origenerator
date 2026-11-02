@@ -10,7 +10,7 @@ def words(text: str | None, *, keep_apostrophes: bool = False,
 
 
 def sounds_like(word: str, targets: tuple) -> bool:
-    """Off a quiet mic the base whisper model lands the shape of a short word and misses a letter of it, so one substitution is allowed at the same length."""
+    """Off a quiet mic the base Whisper model lands the shape of a short word and misses a letter of it, so one substitution is allowed at the same length."""
     return any(
         word == target
         or (len(word) == len(target)

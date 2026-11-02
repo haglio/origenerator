@@ -340,7 +340,7 @@ ENHANCE_MORE = "more"   # it holds one, and these settings would make another
 # the arming and the state it reports stay two separate readings of one mark.
 _CORNER_REST = TEXT_MUTED
 _CORNER_ARMED = TEXT_SECONDARY
-_CANNOT_ACT_OPACITY = 0.4
+_RESTORE_UNAVAILABLE_OPACITY = 0.4
 # The mark is drawn a little inside its cell rather than filling it, which is what
 # leaves the enhance corner room to shift a second copy of itself down and right
 # without running off the canvas. _ENHANCE_SHADOW is that shift: far enough to
@@ -383,7 +383,7 @@ def corner_restore_icon(*, can_restore: bool, armed: bool) -> QIcon:
     mark = _painted(lambda painter: _mark(painter, "undo_arrow", _CORNER_REST))
 
     def draw(painter: QPainter):
-        painter.setOpacity(_CANNOT_ACT_OPACITY)
+        painter.setOpacity(_RESTORE_UNAVAILABLE_OPACITY)
         painter.drawPixmap(0, 0, mark)
 
     return _same_when_dead(_painted(draw))

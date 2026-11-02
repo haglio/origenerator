@@ -1480,6 +1480,16 @@ def test_a_duration_this_model_cannot_render_is_offered_grayed_out(qtbot):
     assert "5 s" in duration.model().item(2).toolTip()
 
 
+def test_a_frame_rate_past_the_fastest_the_writer_takes_is_offered_grayed_out_naming_that_rate(qtbot):
+    form = ParamForm([ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0,
+                               max_val=112.0, step=16.0, options=[16, 112, 128], unit="fps")])
+    qtbot.addWidget(form)
+    rate = form._widgets["frame_rate"]
+
+    assert _preset_states(rate) == {"16 fps": True, "112 fps": True, "128 fps": False}
+    assert "112 fps" in rate.model().item(2).toolTip()
+
+
 def test_the_presets_a_model_can_reach_are_all_left_alone(qtbot):
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)

@@ -1,5 +1,3 @@
-"""A pane that takes drags where another part of the app says they land, and
-wears the drop zones' style while one is under way that it would take."""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
@@ -16,10 +14,7 @@ from tests.drop_style_seen import worn
 
 
 def _pane(qtbot, landing=lambda _mime, _source: ("taken",)):
-    """A scrolling pane of plain content, as the middle pane is, taking drops.
-    A drag a test leaves held over it is let go of before the pane closes:
-    Qt sends every later drag event to the last widget that took one, even
-    once that widget is gone."""
+    """Qt sends every later drag event to the last widget that took one, so a held drag is let go of before the pane closes."""
     pane = GalleryPaneScrollArea()
     pane.setWidgetResizable(True)
     pane.setWidget(QWidget())
@@ -47,7 +42,6 @@ def test_a_pane_lights_while_a_drag_it_would_take_is_under_way(qtbot):
 
 
 def _hold_over(pane, mime):
-    """Bring a drag of ``mime`` over the middle of ``pane`` and hold it there."""
     held = (pane.viewport().rect().center(), Qt.DropAction.CopyAction, mime,
             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     for event in (QDragEnterEvent(*held), QDragMoveEvent(*held)):

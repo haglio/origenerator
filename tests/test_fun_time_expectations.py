@@ -1,11 +1,3 @@
-"""What Fun Time relies on of this app, held to this app before it ships.
-
-Fun Time publishes it as its tests/origenerator_expectations.json, read off the
-code that relies on it, and holds what this app has shipped to it.  Read here
-from Fun Time's main, a change on this side that would leave a room relying on
-something this app no longer offers is refused before it ships, rather than
-turning Fun Time red after it has.
-"""
 from __future__ import annotations
 
 import json

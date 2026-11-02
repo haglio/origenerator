@@ -209,8 +209,6 @@ _VARIATIONS = {
 _INSTALLED_DETECTORS = ("face_detector.pt", "hand_detector.pt")
 _INSTALLED_OUTLINE_DETECTORS = ("skin_detector.pt", "hair_detector.pt")
 
-# Changing the settings above, or what _fingerprint reads, moves these without any
-# graph changing: re-record every fingerprint that moves, and bump no version for it.
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "95c66b9bc4ef0407",
     ("image_enhance", "v005"): "8d74869dce5e3d09",
@@ -252,7 +250,8 @@ def _what_to_record(name: str, version: str, recorded: str | None, built: str) -
     return (f"{name}'s graph changed while its version stayed {version} (recorded "
             f"{recorded}, built {built}): bump its version to {bumped}, and put "
             f"({name!r}, {bumped!r}): {built!r} in GRAPH_FINGERPRINTS in place of "
-            f"the {version} entry")
+            f"the {version} entry; if the pinned settings or _fingerprint changed "
+            "instead, re-record every fingerprint that moves and bump no version")
 
 
 @pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))

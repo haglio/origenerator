@@ -1,4 +1,3 @@
-"""A drop zone that takes drags wherever another part of the app says they land."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QObject, Qt

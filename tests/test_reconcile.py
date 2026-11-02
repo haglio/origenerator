@@ -16,7 +16,7 @@ from origenerator.favorite_reconcile import (
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
 from origenerator.library_filing import saving_into_its_run_folder
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -60,7 +60,7 @@ def test_finished_row_is_finalized_from_history(tmp_path):
     Image.new("RGB", (8, 8), (1, 2, 3)).save(out / "a.png")
 
     summary = reconcile_in_flight(db, FakeComfy(histories={"p1": SDXL_HISTORY}),
-                                  OutputPlaces.in_one_folder(out), tmp_path / "thumbs")
+                                  OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"))
 
     row = db.get_generation("p1")
     assert row["status"] == "completed"
@@ -73,7 +73,7 @@ def test_still_queued_row_is_left_running(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1")
 
-    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert db.get_generation("p1")["status"] == "running"
     assert summary["running"] == 1
@@ -83,7 +83,7 @@ def test_a_row_the_queue_is_still_holding_is_left_alone(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1", status="pending")
 
-    summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert db.get_generation("p1")["status"] == "pending"
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
@@ -93,7 +93,7 @@ def test_gone_row_is_cleared(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1")
 
-    summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert db.get_generation("p1") is None
     assert summary["cleared"] == 1
@@ -112,7 +112,7 @@ def test_a_run_comfyui_is_still_making_keeps_what_its_folder_holds_so_far(tmp_pa
     so_far.parent.mkdir(parents=True)
     Image.new("RGB", (8, 8)).save(so_far)
 
-    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), places, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(queue={"p1"}), OutputFolders(places, tmp_path / "thumbs"))
 
     assert db.get_generation("p1")["status"] == "running"
     assert so_far.is_file()
@@ -124,7 +124,7 @@ def test_completed_rows_are_untouched(tmp_path):
     _insert_in_flight(db, "done", status="completed")
     _insert_in_flight(db, "gone")
 
-    reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert db.get_generation("done") is not None
 
@@ -133,7 +133,7 @@ def test_server_unreachable_leaves_rows_intact(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "p1")
 
-    summary = reconcile_in_flight(db, FakeComfy(queue_error=True), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(queue_error=True), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert db.get_generation("p1")["status"] == "running"
     assert summary["running"] == 1
@@ -143,7 +143,7 @@ def test_no_in_flight_rows_is_a_noop(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "done", status="completed")
 
-    summary = reconcile_in_flight(db, FakeComfy(), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
 

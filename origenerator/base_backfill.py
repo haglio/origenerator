@@ -14,6 +14,7 @@ from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.inflight import drop_in_flight
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.media import MediaType
+from origenerator.output_places import OutputFolders
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ def render_base_now(client, workflow, params: dict, *,
         if not history:
             continue
         files, _thumb, _duration = extract_completion(
-            workflow, history, OUTPUT_PLACES, THUMB_DIR, prompt_id,
+            workflow, history, OutputFolders(OUTPUT_PLACES, THUMB_DIR), prompt_id,
             params=params,
         )
         return files

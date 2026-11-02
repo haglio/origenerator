@@ -15,15 +15,16 @@ from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
 from origenerator.library_filing import file_into_library
 from origenerator.media import MediaType
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
 logger = logging.getLogger(__name__)
 
 
-def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, prompt_id,
+def extract_completion(workflow, history_data, folders: OutputFolders, prompt_id,
                        params: dict | None = None):
+    places, thumb_dir = folders
     files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
     thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
     source = _first_output_file(files, places)

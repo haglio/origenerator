@@ -15,7 +15,7 @@ from app_support.process_identity import ProcessNamer
 from shared_ui.preview import Preview, taskbar_identity, window_title
 
 from origenerator.branch_session import LAUNCHER, shown_as
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputFolders, OutputPlaces
 
 _CLIENT_ID_KEY = "comfyui_client_id"
 
@@ -122,7 +122,8 @@ def _copy_the_records_for_backup(library: Library):
 def _reconnect_to_running_generations(library: Library):
     from origenerator.inflight import reconcile_in_flight
 
-    reconcile_in_flight(library.db, library.client, library.places, library.thumb_dir)
+    reconcile_in_flight(library.db, library.client,
+                        OutputFolders(library.places, library.thumb_dir))
 
 
 def _file_what_comfyui_left(library: Library):
@@ -418,11 +419,12 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
     return Loading(app, logger, screen)
 
 
-def _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch):
+def _build_window(client, db, app_state, boot, next_launch):
     from origenerator.gui.core import Core
 
-    window = Core(client, db, app_state, fun_time=fun_time, preview=preview,
-                  taskbar=taskbar, next_launch=next_launch)
+    fun_time = boot.fun_time
+    window = Core(client, db, app_state, fun_time=fun_time, preview=boot.preview,
+                  taskbar=boot.taskbar, next_launch=next_launch)
     if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -711,12 +713,13 @@ def _boot_and_run(app, app_args, preview) -> int:
     )
 
     from origenerator import comfyui_launcher
+    from origenerator.comfyui_launcher import Address
     from origenerator.gui.loading_screen import LoadingCanceled
     window = None
     try:
         boot.say(STARTING_THE_SERVER)
         comfyui_launcher.ensure_comfyui_server(
-            logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR,
+            logger, Address(COMFYUI_HOST, COMFYUI_PORT), COMFYUI_DIR,
             on_status=boot.say, pump_events=app.processEvents,
         )
 
@@ -736,7 +739,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         client.start()
 
         boot.say(BUILDING_THE_INTERFACE)
-        window = _build_window(client, db, app_state, fun_time, preview, taskbar, next_launch)
+        window = _build_window(client, db, app_state, boot, next_launch)
         boot.stop_if_canceled()
     except LoadingCanceled:
         return boot.cancel(window, client)

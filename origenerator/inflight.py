@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.library_filing import saved_in_its_run_folder
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputFolders
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -33,20 +32,19 @@ def drop_in_flight(db, client, source: str, noun: str) -> int:
     return dropped
 
 
-def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> dict:
+def reconcile_in_flight(db, client, folders: OutputFolders) -> dict:
     return _reconcile(db, client, [r for r in db.list_generations()
                                    if r.get("status") == GenerationStatus.RUNNING],
-                      places, thumb_dir, "in-flight generations")
+                      folders, "in-flight generations")
 
 
-def reconcile_the_backfill(db, client, places: OutputPlaces, thumb_dir: Path) -> dict:
+def reconcile_the_backfill(db, client, folders: OutputFolders) -> dict:
     waiting_or_running = [r for r in db.list_generations()
                           if source_of(r) == GenerationSource.BACKFILL and is_in_progress(r)]
-    return _reconcile(db, client, waiting_or_running, places, thumb_dir, "the backfill's runs")
+    return _reconcile(db, client, waiting_or_running, folders, "the backfill's runs")
 
 
-def _reconcile(db, client, rows: list[dict], places: OutputPlaces, thumb_dir: Path,
-               what: str) -> dict:
+def _reconcile(db, client, rows: list[dict], folders: OutputFolders, what: str) -> dict:
     summary = {"finalized": 0, "running": 0, "cleared": 0}
     if not rows:
         return summary
@@ -58,7 +56,7 @@ def _reconcile(db, client, rows: list[dict], places: OutputPlaces, thumb_dir: Pa
         return summary
 
     for row in rows:
-        summary[_reconcile_row(db, client, row, queued, places, thumb_dir)] += 1
+        summary[_reconcile_row(db, client, row, queued, folders)] += 1
     logger.info(
         "Reconciled %s: %d finalized, %d still running, %d cleared",
         what, summary["finalized"], summary["running"], summary["cleared"],
@@ -66,25 +64,25 @@ def _reconcile(db, client, rows: list[dict], places: OutputPlaces, thumb_dir: Pa
     return summary
 
 
-def take_in_what_landed(db, client, row, places: OutputPlaces, thumb_dir: Path) -> bool:
+def take_in_what_landed(db, client, row, folders: OutputFolders) -> bool:
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
     history = _safe_history(client, row["prompt_id"]) if workflow is not None else {}
-    return _record(db, row, workflow, history, places, thumb_dir)
+    return _record(db, row, workflow, history, folders)
 
 
-def take_in_what_its_folder_holds(db, row, places: OutputPlaces, thumb_dir: Path) -> bool:
+def take_in_what_its_folder_holds(db, row, folders: OutputFolders) -> bool:
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-    saved = saved_in_its_run_folder(parse_params(row.get("workflow_json")), places,
+    saved = saved_in_its_run_folder(parse_params(row.get("workflow_json")), folders.places,
                                     row["prompt_id"])
-    return _record(db, row, workflow, saved, places, thumb_dir)
+    return _record(db, row, workflow, saved, folders)
 
 
-def _record(db, row, workflow, history: dict, places: OutputPlaces, thumb_dir: Path) -> bool:
+def _record(db, row, workflow, history: dict, folders: OutputFolders) -> bool:
     if workflow is None or not history:
         return False
     prompt_id = row["prompt_id"]
     files, thumb, duration = extract_completion(
-        workflow, history, places, thumb_dir, prompt_id,
+        workflow, history, folders, prompt_id,
         params=parse_params(row.get("params_json")))
     if not files:
         return False
@@ -92,12 +90,12 @@ def _record(db, row, workflow, history: dict, places: OutputPlaces, thumb_dir: P
     return True
 
 
-def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Path) -> str:
-    if take_in_what_landed(db, client, row, places, thumb_dir):
+def _reconcile_row(db, client, row, queued, folders: OutputFolders) -> str:
+    if take_in_what_landed(db, client, row, folders):
         return "finalized"
     if row["prompt_id"] in queued:
         return "running"
-    if take_in_what_its_folder_holds(db, row, places, thumb_dir):
+    if take_in_what_its_folder_holds(db, row, folders):
         return "finalized"
     db.delete_generation(row["prompt_id"])
     return "cleared"

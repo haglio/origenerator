@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 from origenerator.one_look import entries_in
 
@@ -12,6 +13,11 @@ IMAGES = "image"
 SCRIPTS = "funscript"
 AUDIO = "audio"
 WORKING_FOLDER = "origenerator"
+
+
+class OutputFolders(NamedTuple):
+    places: OutputPlaces
+    thumb_dir: Path
 
 
 @dataclass(frozen=True)

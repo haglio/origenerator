@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import NamedTuple
 
 from origenerator.config import LIBRARY_STATE_DIR
 
@@ -40,11 +41,16 @@ def settings_for(lane: str, action: str, state: str, *, path: Path | None = None
     return held
 
 
-def remember(lane: str, action: str, state: str, *, workflow: str, params: dict,
+class Setting(NamedTuple):
+    workflow: str
+    params: dict
+
+
+def remember(lane: str, action: str, state: str, setting: Setting, *,
              path: Path | None = None) -> None:
     held = _read(path)
     held.setdefault(lane, {}).setdefault(action, {})[state] = {
-        "workflow": workflow, "params": dict(params)}
+        "workflow": setting.workflow, "params": dict(setting.params)}
     _write(held, path)
 
 
@@ -67,7 +73,7 @@ def accepted(*, path: Path | None = None) -> set[tuple[str, str, str]]:
 class AcceptedSettings:
     def remember(self, lane: str, action: str, state: str, *, workflow: str,
                  params: dict) -> None:
-        remember(lane, action, state, workflow=workflow, params=params)
+        remember(lane, action, state, Setting(workflow, params))
 
     def accepted_paths(self) -> set[tuple[str, str, str]]:
         return accepted()

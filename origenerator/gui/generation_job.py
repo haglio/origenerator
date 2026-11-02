@@ -20,6 +20,7 @@ from origenerator.gui.job_speaker import Speaker
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.media import MediaType
+from origenerator.output_places import OutputFolders
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
 from origenerator.thumbnail import frame_thumbnail
@@ -384,7 +385,7 @@ class GenerationJob(QObject):
             if self._state == JobState.CANCELED:
                 return
             files, thumb, duration = extract_completion(
-                self.workflow, history_data, self._places, self._thumb_dir,
+                self.workflow, history_data, OutputFolders(self._places, self._thumb_dir),
                 self.prompt_id, params=self.params,
             )
             if not files:

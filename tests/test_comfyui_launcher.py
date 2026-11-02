@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from origenerator import comfyui_launcher
-from origenerator.comfyui_launcher import bring_up, ensure_comfyui_server
+from origenerator.comfyui_launcher import Address, bring_up, ensure_comfyui_server
 from origenerator.gui.loading_screen import LoadingCanceled
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
@@ -49,8 +49,8 @@ def test_with_nothing_starting_it_comfyui_is_started_the_way_the_launch_starts_i
                                  answers=[False, False, True])
 
     assert came_up is True
-    _logger, host, port, comfyui_dir = started.call_args.args
-    assert (host, port, comfyui_dir) == ("127.0.0.1", 8188, COMFYUI_DIR)
+    _logger, address, comfyui_dir = started.call_args.args
+    assert (address, comfyui_dir) == (Address("127.0.0.1", 8188), COMFYUI_DIR)
 
 
 def test_a_start_that_ends_without_comfyui_answering_is_given_up_on_at_once(monkeypatch):
@@ -72,7 +72,7 @@ def test_ensure_server_warns_when_port_held_by_non_comfyui():
     with patch("origenerator.comfyui_launcher.comfyui_responding", return_value=False), \
          patch("socket.create_connection"), \
          patch("importlib.util.spec_from_file_location") as mock_spec:
-        ensure_comfyui_server(logger, "127.0.0.1", 8188, COMFYUI_DIR)
+        ensure_comfyui_server(logger, Address("127.0.0.1", 8188), COMFYUI_DIR)
 
     mock_spec.assert_not_called()
     assert logger.warning.called
@@ -84,7 +84,7 @@ def test_ensure_server_noop_when_comfyui_already_responding():
     logger = MagicMock()
     with patch("origenerator.comfyui_launcher.comfyui_responding", return_value=True), \
          patch("importlib.util.spec_from_file_location") as mock_spec:
-        ensure_comfyui_server(logger, "127.0.0.1", 8188, COMFYUI_DIR)
+        ensure_comfyui_server(logger, Address("127.0.0.1", 8188), COMFYUI_DIR)
 
     mock_spec.assert_not_called()
     logger.warning.assert_not_called()
@@ -103,7 +103,7 @@ def test_ensure_server_forwards_status_and_pump_callbacks_to_launcher():
          patch("importlib.util.spec_from_file_location"), \
          patch("importlib.util.module_from_spec", return_value=fake_server):
         ensure_comfyui_server(
-            logger, "127.0.0.1", 8188, COMFYUI_DIR,
+            logger, Address("127.0.0.1", 8188), COMFYUI_DIR,
             on_status=on_status, pump_events=pump_events,
         )
 
@@ -123,4 +123,4 @@ def test_a_loading_canceled_while_comfyui_starts_is_no_failure_to_start_it():
          patch("importlib.util.spec_from_file_location"), \
          patch("importlib.util.module_from_spec", return_value=fake_server), \
          pytest.raises(LoadingCanceled):
-        ensure_comfyui_server(MagicMock(), "127.0.0.1", 8188, COMFYUI_DIR)
+        ensure_comfyui_server(MagicMock(), Address("127.0.0.1", 8188), COMFYUI_DIR)

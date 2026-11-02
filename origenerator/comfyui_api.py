@@ -7,7 +7,6 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator.comfyui_inputs import ComfyFolders, within_reach
@@ -115,17 +114,23 @@ def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
     return isinstance(data, dict) and "system" in data
 
 
+class _RealClock:
+    def __call__(self) -> float:
+        return time.monotonic()
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
+
+
 class ComfyUIApi:
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
                  client_id: str | None = None, *, folders: ComfyFolders,
-                 clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep):
+                 clock=None):
         self.host = host
         self.port = port
         self.client_id = client_id or str(uuid.uuid4())
         self.folders = folders
-        self._clock = clock
-        self._sleep = sleep
+        self._clock = clock or _RealClock()
 
     @property
     def base_url(self) -> str:
@@ -161,7 +166,7 @@ class ComfyUIApi:
                 return False
             if absent_since is not None and now - absent_since >= _ACCEPTANCE_GRACE_S:
                 return False
-            self._sleep(_ACCEPTANCE_POLL_S)
+            self._clock.sleep(_ACCEPTANCE_POLL_S)
 
     def _lists_prompt(self, prompt_id: str) -> bool:
         data = self._fetch_queue_data(timeout=_ACCEPTANCE_READ_TIMEOUT_S)

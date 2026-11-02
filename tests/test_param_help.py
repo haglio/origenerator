@@ -1,10 +1,3 @@
-"""Every workflow parameter explains itself, once, in one place.
-
-The Generate form's fields carry tooltips drawn from a central map rather than
-from each workflow's own definitions: the same key means the same thing in every
-workflow that has it, so writing the explanation once is what keeps twelve
-descriptions of ``cfg`` from drifting into twelve different claims.
-"""
 from __future__ import annotations
 
 import re
@@ -40,13 +33,10 @@ def test_no_help_is_written_for_a_setting_nothing_on_screen_shows():
 
 
 def test_an_unknown_param_has_no_help_rather_than_a_placeholder():
-    # Qt shows no tooltip for an empty string, and an explanation that says
-    # nothing is worse than no explanation at all.
     assert param_help("mystery_param") == ""
 
 
 def test_help_reads_as_a_sentence_not_a_restatement_of_the_label():
-    # The failure mode a tooltip pass invites: "Steps: the number of steps".
     for key, text in PARAM_HELP.items():
         assert len(text) > len(key) + 12, f"{key} says nothing its label doesn't"
         assert text[0].isupper(), f"{key} help should start as a sentence"

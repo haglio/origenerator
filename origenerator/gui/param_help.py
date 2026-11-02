@@ -1,18 +1,3 @@
-"""One line of help per workflow parameter, keyed by param name.
-
-Every field in the Generate form carries a tooltip, and it comes from here
-rather than from each workflow's own ``param_definitions``: the same key means
-the same thing in every workflow that has it — ``steps`` is steps whether an
-SDXL still or a WAN video is selected — so writing the explanation once is what
-keeps the twelve descriptions of ``cfg`` from drifting into twelve different
-claims. The grouping lives in :mod:`origenerator.gui.param_sections` for exactly
-the same reason.
-
-Each line says what moving the setting does to the result, and every number then
-says what to set it to (RECOMMENDED), which the user asked for on every tooltip.
-Kept Qt-free so the text is unit-testable, and guard tests keep every registered
-workflow's params explained and advised before a new one can ship.
-"""
 from __future__ import annotations
 
 from origenerator.model_titles import trained_sentence
@@ -21,7 +6,6 @@ from origenerator.workflows.base import ParamDef
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
 from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
-# Keyed by param name: what the setting does.
 _COMPOSITION_FOCUS = (
     "How the steps split between composition (the layout, the poses and, in a video, "
     "the motion) and fine detail. Higher keeps the result noisy for longer, so more "
@@ -68,7 +52,6 @@ MORE_THAN_ONE_BOX = (
 )
 
 PARAM_HELP: dict[str, str] = {
-    # --- prompts and the image a run starts from ---
     "positive_prompt": (
         "What you want to see. Comma-separated phrases work best; the earlier a "
         "phrase appears, the more weight it tends to carry. A video can tell a "
@@ -127,7 +110,6 @@ PARAM_HELP: dict[str, str] = {
         "of it is performed from there, and a video that ends sooner ends the run."
     ),
 
-    # --- seeds ---
     "seed": (
         "The starting noise. The same seed with the same settings reproduces the "
         "same image exactly; Random draws a fresh one on every Generate."
@@ -141,7 +123,6 @@ PARAM_HELP: dict[str, str] = {
         "seed — re-roll it to get a different take of the same scene's sound."
     ),
 
-    # --- models ---
     "checkpoint": (
         "The model that does the generating. It sets the look more than any other "
         "setting here — style, anatomy, what the prompt words mean to it."
@@ -160,7 +141,6 @@ PARAM_HELP: dict[str, str] = {
         "rebuilds edges rather than stretching them."
     ),
 
-    # --- LoRAs ---
     **dict.fromkeys(LORA_KEYS, _LORA),
     **{strength_key_of(key): _LORA_STRENGTH for key in LORA_KEYS},
     **dict.fromkeys(FIRST_PASS_LORA_KEYS, _FIRST_PASS_LORA),
@@ -168,7 +148,6 @@ PARAM_HELP: dict[str, str] = {
     **dict.fromkeys(SECOND_PASS_LORA_KEYS, _SECOND_PASS_LORA),
     **{strength_key_of(key): _SECOND_PASS_LORA_STRENGTH for key in SECOND_PASS_LORA_KEYS},
 
-    # --- calibration ---
     "steps": (
         "How many times the model goes over the result, refining it. More steps "
         "means more settled detail and a longer wait, with little gain once the "
@@ -214,7 +193,6 @@ PARAM_HELP: dict[str, str] = {
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 
-    # --- the enhance tail (off the form; the Enhance pane owns these) ---
     "enhance_scale": (
         "How much bigger the enhanced version is than the render it came from. The "
         "bigger it gets, the more the pass has to invent."
@@ -242,7 +220,6 @@ PARAM_HELP: dict[str, str] = {
         "ones makes a different version."
     ),
 
-    # --- structure transfer ---
     "control_mode": (
         "Which structure is lifted out of the structure image and held onto: its "
         "depth, or the skeleton of the people in it."
@@ -257,7 +234,6 @@ PARAM_HELP: dict[str, str] = {
         "lets the last steps add detail the structure has no opinion on."
     ),
 
-    # --- size and length ---
     "width": (
         "The output width in pixels."
     ),
@@ -277,7 +253,6 @@ PARAM_HELP: dict[str, str] = {
         "settles onto the nearest."
     ),
 
-    # --- sound ---
     "audio_prompt": (
         "What the generated soundtrack should be — the sounds themselves, not the "
         "video. It watches the finished motion while it scores."
@@ -430,11 +405,6 @@ OPTION_HELP: dict[str, dict[str, str]] = {
 }
 
 def param_help(key: str) -> str:
-    """The tooltip for one param, or ``""`` when it has none.
-
-    Empty rather than a placeholder: Qt shows no tooltip for an empty string,
-    and an explanation that says nothing is worse than no explanation at all.
-    """
     return " ".join(filter(None, (PARAM_HELP.get(key, ""), RECOMMENDED.get(key, ""))))
 
 

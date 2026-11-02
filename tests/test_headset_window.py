@@ -1,4 +1,3 @@
-"""The gallery handed to a session whose room is in the headset."""
 from __future__ import annotations
 
 import logging
@@ -45,10 +44,6 @@ def _published_color(tmp_path, at: QPoint) -> QColor:
 
 def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
         tmp_path, qtbot, caplog):
-    """His 2026-10-10 session took one click and then none: 404 lines of his
-    aiming and clicking sat unread, with nothing in the records between the
-    crossing and the end of the session to say when it had stopped.  A line
-    every HEARTBEAT_S puts the moment it stopped in the log."""
     window = QWidget()
     window.resize(200, 100)
     qtbot.addWidget(window)
@@ -70,9 +65,6 @@ def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
 
 
 def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog):
-    """The channel drops a press file it cannot read and says nothing unless it
-    is given a logger, and a room whose presses go nowhere looks to him exactly
-    like one whose screen is dead -- which is what his 2026-10-08 session was."""
     window = QWidget()
     window.resize(200, 100)
     qtbot.addWidget(window)
@@ -109,11 +101,6 @@ def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path, 
 
 
 class TestHowBigAPublishedFrameMayBe:
-    """The rect a session names is not a promise about the window: Qt gives it
-    the size its own minimums allow, and it can be resized after.  So the
-    channel is sized to a cap and anything bigger is scaled into it, rather
-    than refused with a frame nobody gets."""
-
     def test_a_window_within_the_cap_is_published_at_its_own_size(self):
         frame = QImage(200, 100, QImage.Format.Format_RGBA8888)
 
@@ -128,9 +115,6 @@ class TestHowBigAPublishedFrameMayBe:
 
 
 class TestTheRoomsPressesReachTheWindow:
-    """The room's pointer lands on a pixel of the published frame, and this
-    window has to feel it where a mouse on that pixel would have landed."""
-
     def _window(self, qtbot) -> QWidget:
         window = QWidget()
         qtbot.addWidget(window)
@@ -156,11 +140,7 @@ class TestTheRoomsPressesReachTheWindow:
 
     def test_a_right_click_is_handed_over_without_waiting_for_what_it_opens(
             self, tmp_path, qtbot):
-        """Every right-click menu in the gallery ends in menu.exec(), which runs
-        an event loop of its own and does not return until the menu is answered.
-        Handed such a click inside the poll's own tick, the poll never returned:
-        the frame stopped and so did the reading of his clicks, so he could not
-        answer the menu either.  His 2026-10-12 room froze on the first one."""
+        # menu.exec() runs an event loop of its own, so a click handed over inside the poll's tick never returns.
         window = self._window(qtbot)
         opened: list[str] = []
         window.contextMenuEvent = lambda event: opened.append("menu")
@@ -195,12 +175,9 @@ class TestTheRoomsPressesReachTheWindow:
 
     def test_a_press_lands_where_it_was_aimed_on_a_frame_drawn_smaller(
             self, tmp_path, qtbot):
-        """A frame the room presses is not always the window's own size: past
-        the cap it is published scaled, and hosted this app draws at a scale of
-        its own, so a pixel of it is that many Qt coordinates of the window."""
         window = QWidget()
         qtbot.addWidget(window)
-        window.resize(CAP_PX * 2, CAP_PX)  # published at half of that
+        window.resize(CAP_PX * 2, CAP_PX)
         label = QLabel("x", window)
         label.setObjectName("target")
         label.setGeometry(CAP_PX, 200, 400, 200)
@@ -219,11 +196,7 @@ class TestTheRoomsPressesReachTheWindow:
         assert pressed == ["100,100"], "the press did not arrive where it was aimed"
 
     def test_a_hand_that_shakes_on_the_trigger_starts_no_drag(self, tmp_path, qtbot):
-        """The room sends a pull of the trigger as a press, a few moves as the
-        hand shakes, and a release.  A move carried far enough starts a drag,
-        and Windows runs a drag off the real mouse -- the one nobody holds in a
-        headset -- so the app waits on it and stops: its frame, the room's
-        presses, the session's own verbs, all of it until the session kills it."""
+        # A drag runs off the real mouse, which nobody holds in a headset, so the app would wait on it forever.
         window = self._window(qtbot)
         label = window.findChild(QLabel, "target")
         gesture = DragOut()
@@ -241,8 +214,6 @@ class TestTheRoomsPressesReachTheWindow:
         assert dragged == [False], "a shake of the laser started a drag"
 
     def test_the_rest_of_the_app_drags_as_it_did_before(self, tmp_path, qtbot):
-        """How far a move must go to become a drag is the whole app's setting;
-        it is held out of reach only while the room's own event is delivered."""
         before = QApplication.startDragDistance()
         headset = HeadsetWindow(self._window(qtbot), _hosted(tmp_path))
         try:
@@ -255,10 +226,6 @@ class TestTheRoomsPressesReachTheWindow:
         assert QApplication.startDragDistance() == before
 
     def test_a_release_whose_press_took_its_widget_away_is_dropped(self, tmp_path, qtbot):
-        """A press on a folder square opens the folder, and the grid it opens
-        is built new: the square the press landed on is gone by the time the
-        trigger lets go.  The release goes nowhere, rather than to a widget
-        that no longer exists -- which raised, and took the app down."""
         window = self._window(qtbot)
         label = window.findChild(QLabel, "target")
         label.mousePressEvent = lambda event: label.deleteLater()
@@ -274,8 +241,6 @@ class TestTheRoomsPressesReachTheWindow:
         assert sip.isdeleted(label)
 
     def test_a_press_with_no_pixel_is_dropped_rather_than_guessed(self, tmp_path, qtbot):
-        """The room writes the pixel with the word; a line short of one is a
-        line to say something about, not to aim at the last place it knew."""
         window = self._window(qtbot)
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
@@ -285,12 +250,7 @@ class TestTheRoomsPressesReachTheWindow:
             headset.close()
 
     def test_the_window_is_published_once_for_each_way_it_looks(self, tmp_path, qtbot):
-        """A window nobody is touching looks the same every frame, and a frame
-        the room already has is a frame not worth the write."""
         def published() -> tuple[int, int, int]:
-            """(sequence, width, height) off the channel's header -- read here
-            rather than through a reader of our own, the reader being the
-            session's (``app_support.frame_channel``)."""
             header = (tmp_path / "frame.bin").read_bytes()[:20]
             sequence, _token, width, height = struct.unpack("<QIII", header)
             return sequence, width, height
@@ -323,11 +283,6 @@ class TestTheRoomsPressesReachTheWindow:
         return grabbed
 
     def test_a_hover_alone_does_not_grab_the_window_again(self, tmp_path, qtbot):
-        """Pointing at the window is not a change to it, and the room sends a
-        hover every time the laser moves a pixel: taken as a reason to look, each
-        one costs a grab of the whole window at the poll's rate.  In the headset
-        that halved the room's frame rate, and the Funestras stopped showing new
-        frames while he pointed at the gallery."""
         window = self._window(qtbot)
         window.show()
         headset = HeadsetWindow(window, _hosted(tmp_path))
@@ -343,8 +298,6 @@ class TestTheRoomsPressesReachTheWindow:
             headset.close()
 
     def test_a_press_has_it_looked_at_once(self, tmp_path, qtbot):
-        """What a press does to the window is what the room is waiting to see,
-        so that one is worth the grab it costs."""
         window = self._window(qtbot)
         window.show()
         headset = HeadsetWindow(window, _hosted(tmp_path))
@@ -361,10 +314,6 @@ class TestTheRoomsPressesReachTheWindow:
 
 
 class TestWhatOpensOverTheWindow:
-    """A menu, a dropped-down list or a dialog is a window of its own, opened
-    over this one: a grab of this one alone leaves it out, and a press aimed at
-    it lands on whatever of this window is underneath."""
-
     def _window(self, qtbot) -> QWidget:
         window = QWidget()
         qtbot.addWidget(window)
@@ -384,8 +333,7 @@ class TestWhatOpensOverTheWindow:
             headset._heard("press 30 30")
             headset._heard("release")
             qtbot.waitUntil(dropdown.view().isVisible)
-            # A list ignores a release as soon after it opens as a double-click:
-            # it takes it for the release of the press that opened it.
+            # A list ignores a release within a double-click interval of opening.
             qtbot.wait(QApplication.doubleClickInterval() + 100)
             view = dropdown.view()
             item = view.visualRect(dropdown.model().index(2, 0)).center()
@@ -415,9 +363,6 @@ class TestWhatOpensOverTheWindow:
 
     def test_a_menu_open_over_the_window_is_off_the_monitors_too(
             self, tmp_path, qtbot, monkeypatch):
-        """A menu is a window of its own, so taking the window a room has off
-        the monitors leaves its menus on them, opening over nothing he can
-        see."""
         window = self._window(qtbot)
         menu = QMenu(window)
         menu.addAction("one")
@@ -436,8 +381,6 @@ class TestWhatOpensOverTheWindow:
         assert hidden == [its_window]
 
     def test_a_press_off_a_menu_puts_it_away(self, tmp_path, qtbot):
-        """As a mouse pressed anywhere else would: a list left open is a list
-        covering the frame until something else closes it."""
         window = self._window(qtbot)
         menu = QMenu(window)
         menu.addAction("one")
@@ -455,8 +398,6 @@ class TestWhatOpensOverTheWindow:
 
     def test_a_press_off_an_open_dialog_is_refused_as_a_mouse_would_be(
             self, tmp_path, qtbot):
-        """A dialog waiting on an answer holds the window under it still; a press
-        that reached past it would act while the question was still standing."""
         window = self._window(qtbot)
         label = QLabel("x", window)
         label.setGeometry(10, 10, 40, 20)

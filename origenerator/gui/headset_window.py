@@ -1,15 +1,3 @@
-"""This window as a frame, for a session whose room is in the headset.
-
-A room in the headset has no monitor to put the gallery on, so the session asks
-for its frame instead (``origenerator.fun_time_mode``): every frame goes into
-a memory-mapped file the session names, the session draws it on a screen in the
-room, and its pointer's presses come back through a file as the words that
-module declares.  The same handover Fun Time's own Random Favs Browser is shown by.
-
-The pure half is here and is what the tests drive; the Qt half is the timer, the
-grab and the synthesized events.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -39,17 +27,10 @@ logger = logging.getLogger(__name__)
 
 _POLL_MS = 15
 
-#: Nothing asked for, nothing moving: a look this often is enough to catch a
-#: tooltip or a spinner, and costs a grab of a window nobody is touching.
 _IDLE_LOOK_S = 0.1
 
 HEARTBEAT_S = 10.0
 
-#: The longest edge a published frame may have.  The rect a session names is
-#: not a promise about the window: Qt gives it the size its own minimums allow,
-#: and it can be resized later.  So the channel is sized to this and anything
-#: bigger is scaled into it -- more pixels than the screen in the room has are
-#: pixels written, read and drawn for nothing.
 CAP_PX = 1440
 
 _NO_DRAG_PX = 1 << 20
@@ -121,7 +102,6 @@ def pixels_per_coordinate(image: QImage, window) -> float:
 
 
 def within_the_cap(image: QImage) -> QImage:
-    """*image* itself, or scaled until its longest edge is :data:`CAP_PX`."""
     if max(image.width(), image.height()) <= CAP_PX:
         return image
     return image.scaled(CAP_PX, CAP_PX, Qt.AspectRatioMode.KeepAspectRatio,
@@ -130,9 +110,6 @@ def within_the_cap(image: QImage) -> QImage:
 
 
 class HeadsetWindow(QObject):
-    """The gallery's frame published for the headset, and the room's presses
-    on it delivered as this window's own mouse events."""
-
     def __init__(self, window: QWidget, session: FunTimeSession, parent=None) -> None:
         super().__init__(parent)
         self._window = window
@@ -159,8 +136,6 @@ class HeadsetWindow(QObject):
         self._frames.close()
         logger.info("Stopped publishing this window for the headset after %d "
                     "frames and %d presses", self._frames.written, self._taken)
-
-    # --- the room's presses, as this window's own events ---------------------
 
     def _tick(self) -> None:
         try:
@@ -261,8 +236,6 @@ class HeadsetWindow(QObject):
             QContextMenuEvent.Reason.Mouse, target.mapFromGlobal(at), at))
 
     def _keep_its_menus_off_the_monitors(self) -> None:
-        """A menu is a window of its own, so it stays on the monitors when this
-        one goes out of sight, opening over a window he cannot see."""
         for top in opened_over(self._window):
             keep_out_of_sight(int(top.winId()))
 
@@ -276,10 +249,7 @@ class HeadsetWindow(QObject):
             Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
             Qt.ScrollPhase.NoScrollPhase, False))
 
-    # --- this window's frame ----------------------------------------------
-
     def publish(self, now: float | None = None) -> None:
-        """Write the window as it looks, unless it looks as it did last time."""
         if not self._window.isVisible():
             return
         now = time.monotonic() if now is None else now

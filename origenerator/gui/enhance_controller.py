@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import namedtuple
 from typing import NamedTuple, Protocol
 
 from PyQt6.QtWidgets import QMessageBox
@@ -89,15 +90,15 @@ class EnhanceHost(Protocol):
     def enhance_offer_changed(self) -> None: ...
 
 
+EnhanceParts = namedtuple("EnhanceParts", "jobs gallery_pane slideshows info_tabs_of")
+
+
 class EnhanceController:
-    def __init__(self, host: EnhanceHost, *, db, jobs, gallery_pane, slideshows,
-                 info_tabs_of):
+    def __init__(self, host: EnhanceHost, parts: EnhanceParts, *, db):
         self._host = host
         self._db = db
-        self._jobs = jobs
-        self._gallery_pane = gallery_pane
-        self._slideshows = slideshows
-        self._generate_pane_of = info_tabs_of
+        (self._jobs, self._gallery_pane, self._slideshows,
+         self._generate_pane_of) = parts
         self._settings = gallery.EnhanceSettings()
         self._targets: dict[str, str | None] = {}
         self._by_prompt: dict[str, object] = {}

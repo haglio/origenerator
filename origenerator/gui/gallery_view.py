@@ -84,7 +84,12 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.drop_target import DropTarget
-from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS, EnhanceController, Offer
+from origenerator.gui.enhance_controller import (
+    ALREADY_AT_THESE_SETTINGS,
+    EnhanceController,
+    EnhanceParts,
+    Offer,
+)
 from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.folder_path import FolderPath
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
@@ -415,8 +420,11 @@ class GalleryView(QWidget):
                 names=self._item_names),
             parent=self, db=db)
         self._enhance = EnhanceController(
-            self, db=db, jobs=self._jobs, gallery_pane=self._gallery_pane,
-            slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane)
+            self,
+            EnhanceParts(
+                jobs=self._jobs, gallery_pane=self._gallery_pane,
+                slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane),
+            db=db)
         self._jobs.changed.connect(self._enhance.reconcile)
         self._jobs.enhance_images_with(
             lambda image: self._enhance.enhance_items([image["prompt_id"]]))

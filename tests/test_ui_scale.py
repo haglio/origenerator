@@ -1,5 +1,3 @@
-"""The hosted app draws at the session's HUD scale, and rects survive it."""
-
 from __future__ import annotations
 
 import ast
@@ -18,22 +16,17 @@ from tests.hosted_launch import hosted_launch
 
 @pytest.fixture(autouse=True)
 def clean_env():
-    """QT_SCALE_FACTOR is process-global, and apply_room_scale writes it
-    straight into os.environ — so it is cleared on the way OUT as well as in.
-    Left set, it scales every Qt widget built by every later test in the run."""
     os.environ.pop("QT_SCALE_FACTOR", None)
     yield
     os.environ.pop("QT_SCALE_FACTOR", None)
 
 
 def test_the_hosted_scale_makes_this_apps_buttons_the_huds_buttons():
-    # The whole point of the number: a BUTTON_SIZE square drawn at this factor
-    # lands on the screen the size of a BUTTON_SIZE_HUD one.
     assert round(BUTTON_SIZE * ui_scale.HOSTED_SCALE) == BUTTON_SIZE_HUD
 
 
 def test_applying_the_scale_sets_what_qt_reads(monkeypatch):
-    assert ui_scale.active_scale() == 1.0  # nothing has scaled us
+    assert ui_scale.active_scale() == 1.0
     applied = ui_scale.apply_room_scale(in_a_headset=False)
     assert applied == ui_scale.HOSTED_SCALE
     assert float(os.environ["QT_SCALE_FACTOR"]) == ui_scale.HOSTED_SCALE
@@ -41,7 +34,6 @@ def test_applying_the_scale_sets_what_qt_reads(monkeypatch):
 
 
 def test_a_headset_launch_is_not_shrunk_at_all():
-    """Leaving Qt's variable unset is what draws it as it does standalone."""
     assert ui_scale.apply_room_scale(in_a_headset=True) == 1.0
     assert "QT_SCALE_FACTOR" not in os.environ
 
@@ -74,19 +66,12 @@ def test_a_length_scales_back_to_the_device_pixels_it_named():
 
 
 def test_a_rect_converts_against_its_own_screens_origin(monkeypatch):
-    """The bug this function exists for.  Qt leaves each scaled screen's ORIGIN
-    at its device position and scales only its size, so dividing a whole-desktop
-    x by the scale lands deep inside the second monitor rather than at its left
-    edge — which put the portrait slideshow in the right third of its region, hanging
-    off the monitor."""
     ui_scale.apply_room_scale(in_a_headset=False)
     scale = ui_scale.HOSTED_SCALE
-    # The real pair off this machine: a 2560-wide primary, a portrait beside it.
     monkeypatch.setattr(ui_scale, "_screen_origin", lambda x, y: (2560, 3))
     x, y, width, height = ui_scale.to_logical_rect(2560, 3, 1440, 3440)
 
-    assert (x, y) == (2560, 3)  # the screen's own left edge, not 2560/scale
-    # And Qt renders it back onto the device rect the session measured.
+    assert (x, y) == (2560, 3)
     assert abs(2560 + (x - 2560) * scale - 2560) <= 1
     assert abs(width * scale - 1440) <= 1
     assert abs(height * scale - 3440) <= 1
@@ -98,15 +83,10 @@ def test_a_rect_inside_a_screen_keeps_its_offset_from_that_screens_edge(monkeypa
     monkeypatch.setattr(ui_scale, "_screen_origin", lambda x, y: (2560, 3))
     x, _y, _w, _h = ui_scale.to_logical_rect(2560 + 400, 3, 200, 200)
 
-    # 400 device px in from the screen edge, and it renders back to 400.
     assert abs((x - 2560) * scale - 400) <= 1
 
 
 def test_the_scale_is_applied_before_pyqt_is_imported():
-    """Qt reads QT_SCALE_FACTOR as the platform plugin starts, so a call that
-    lands after the first PyQt6 import sets a variable nothing will read again.
-    The ordering inside main() is the whole contract, so it is asserted here --
-    off the syntax tree, so a reformat of either line leaves it standing."""
     main = ast.parse(inspect.getsource(app_module.main))
     applied = min(node.lineno for node in ast.walk(main)
                   if isinstance(node, ast.Call)
@@ -149,5 +129,5 @@ def test_a_qt_that_cannot_be_rescaled_leaves_the_app_at_its_size(monkeypatch):
 
 
 def test_only_a_hosted_launch_turns_the_scale_on():
-    assert parse_app_args([]).fun_time is None          # standalone: unscaled
+    assert parse_app_args([]).fun_time is None
     assert parse_app_args(hosted_launch()).fun_time is not None

@@ -34,13 +34,9 @@ from origenerator.gui.panes import BORDER_NAME, BORDERED_SET
 from origenerator.gui.tooltip_shape import shape_long_tooltips
 from origenerator.spin_arrows import arrow_paths
 
-# Set on a button whose ON state says a choice has been made rather than that
-# the control is engaged, which is what the blue below is for.
 CHOSEN = "chosen"
 CHOSEN_CONTROL = f'QAbstractButton[{CHOSEN}="true"]:checked'
 
-# Set on the one button in a window that commits the decision the window exists
-# to make, so it wears the blue rather than sitting among its neighbors.
 COMMITS = "commits"
 COMMITTING_CONTROL = f'QPushButton[{COMMITS}="true"]'
 
@@ -58,14 +54,7 @@ _STEP_BUTTONS = ("QSpinBox::up-button", "QDoubleSpinBox::up-button",
 
 
 def _drawn_arrow_rules() -> str:
-    """The arrows of the step buttons and of Generate's dropdown, as ``image:``
-    rules over generated triangles.
-
-    Qt takes an arrow only as an image — the CSS zero-size-element-with-borders triangle
-    draws a filled rectangle here, which is what appeared over the buttons — so
-    :mod:`origenerator.spin_arrows` renders one. If it can't, this contributes
-    nothing and Qt draws its own arrow: uncertain color, but an arrow.
-    """
+    """Qt takes an arrow only as an image; the CSS border triangle draws a filled rectangle."""
     normal = arrow_paths(TEXT_PRIMARY)
     if normal is None:
         return ""
@@ -92,9 +81,6 @@ def _drawn_arrow_rules() -> str:
 
 
 def build_stylesheet() -> str:
-    """The family's sheet -- ground, tooltip, menus, push buttons -- with this
-    app's own rules after it, where a later rule of equal weight wins and an
-    id out-specifies anything the family says."""
     return f"""
 {family_stylesheet()}
     QLabel {{
@@ -427,18 +413,7 @@ def build_stylesheet() -> str:
 
 
 def dress_application(app, preview: Preview | None) -> None:
-    """Put the family's palette, this app's sheet and its icon on the QApplication.
-
-    The application and not a window, for three reasons that arrived separately.
-    A QToolTip popup is a top-level widget no window-level sheet reaches, so
-    styling per window left every tooltip on the native Windows 11 dark palette
-    -- unreadable, which is to say missing.  And a palette is the application's
-    to begin with: a sheet dresses the widgets it names, while the colors it
-    names none of -- a selection's ground, a link's ink -- stay whatever the
-    desktop handed the app, which here was the user's accent orange.  The icon
-    is the third: a slideshow on a satellite region is a window of its own that sets
-    none, and the window switcher drew it a blank page.
-    """
+    """A QToolTip popup is a top-level widget no window-level sheet reaches, so the sheet and palette go on the QApplication."""
     colors.dress_application(app, build_stylesheet())
     app.setWindowIcon(app_icon(PROJECT_DIR / "icon.ico", preview))
     shape_long_tooltips(app)

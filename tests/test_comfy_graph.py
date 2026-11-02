@@ -74,6 +74,21 @@ def test_dual_sampler_model_files_pairs_high_low_unet_and_lora():
     }
 
 
+def test_the_stage_a_sampler_serves_is_read_from_its_noise_setting_not_from_node_id_order():
+    graph = {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_high.safetensors"}},
+        "2": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_low.safetensors"}},
+        "30": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["1", 0], "add_noise": "enable"}},
+        "9": {"class_type": "KSamplerAdvanced",
+              "inputs": {"model": ["2", 0], "add_noise": "disable"}},
+    }
+    assert dual_sampler_model_files(graph) == {
+        "unet_high": "wan_high.safetensors",
+        "unet_low": "wan_low.safetensors",
+    }
+
+
 def test_a_dual_sampler_offers_its_unets_and_no_lora():
     graph = {
         "3": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_high.safetensors"}},

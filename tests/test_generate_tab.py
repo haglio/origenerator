@@ -308,6 +308,16 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
     assert tab._scroll.viewport().width() >= tab._scroll.widget().minimumSizeHint().width()
 
 
+def test_the_floor_stops_at_the_width_a_monitor_third_can_give_the_pane(app_chrome, blank_panel):
+    tab = blank_panel
+    wider_than_a_monitor_third = QWidget()
+    wider_than_a_monitor_third.setMinimumWidth(3 * generate_tab_module._FLOOR_CAP)
+    tab._scroll.widget().layout().addWidget(wider_than_a_monitor_third)
+
+    assert tab._contents_floor() > generate_tab_module._FLOOR_CAP
+    assert tab.minimumSizeHint().width() == generate_tab_module._FLOOR_CAP
+
+
 def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
     tab._sent_note.setText(export_lane_module.KINO.sent_caption)
     buttons = [tab._sent_row, tab._cancel_btn, tab._generate_btn.parentWidget()]

@@ -76,6 +76,7 @@ def make_related(qtbot):
                               row_of=lambda prompt_id: (looked_up.append(prompt_id),
                                                         by_id.get(prompt_id))[1],
                               held_rows=lambda: list(held),
+                              animated_preview=lambda row: None,
                               name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get,
                               request_of=by_made.get,
                               requests_about=lambda prompt_id: [

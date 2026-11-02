@@ -97,7 +97,6 @@ from origenerator.gui.gallery_pane import (
     LeadTiles,
     PaneHost,
     TreeNavigation,
-    play_once_made,
 )
 from origenerator.gui.gallery_pane_buttons import (
     AUTO_ELSEWHERE_TIP,
@@ -136,7 +135,6 @@ from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.message import ERROR, HEARD_MARK, INFO
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.moving_previews import MovingPreviews
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
@@ -348,10 +346,6 @@ class GalleryView(QWidget):
                 cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
             ),
         )
-        self._moving_previews = MovingPreviews(self._edits.places,
-                                               self._edits.thumb_dir, parent=self)
-        self._moving_previews.made.connect(
-            lambda prompt_id, path: play_once_made(self._gallery_pane, prompt_id, path))
         self._forget_the_listing()
         self._build_the_panes(db, client, search_expander)
         # What another app has on the shared ComfyUI, re-read on every poll so the
@@ -863,7 +857,7 @@ class GalleryView(QWidget):
         # surface here as a source link the view follows.
         self._generate_pane = GeneratePane(self._client, self._db, fun_time=self._fun_time,
                                        heights=self._prompt_heights, names=self._item_names,
-                                       previews=self._moving_previews)
+                                       animated_preview=self.animated_preview)
         # One OSR2 driver for the whole view, under the one global switch
         # (self.osr2_control): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —
@@ -4126,11 +4120,11 @@ class GalleryView(QWidget):
         self._selected_row = row
 
     def animated_preview(self, row: dict) -> str | None:
-        """The looping-WebP preview for a video ``row`` once one is made — until then
-        ``None``, and the tile shows its still while one is made off the window's
-        thread and starts playing it when it is. Feeds the grid tiles, the Latest
-        collection and Combine's drop zones; the Generate pane's Animations ask the same maker."""
-        return self._moving_previews.of(row)
+        """The looping-WebP preview for a video ``row``, or ``None`` for an image or a
+        video with no animated thumbnail, whose tile shows its still."""
+        thumb_dir = self._edits.thumb_dir
+        return (gallery.animated_preview_if_made(row, self._edits.places, thumb_dir)
+                if thumb_dir is not None else None)
 
     def follow_link(self, prompt_id: str):
         """Follow a link to another generation — a video's source image, an

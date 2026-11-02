@@ -76,7 +76,14 @@ from origenerator import (
     running_ahead,
     toast_raising,
 )
-from origenerator.gui import generation_job, job_queue, omnipause, osr2_controls, toasts, voice_router
+from origenerator.gui import (
+    generation_job,
+    job_queue,
+    omnipause,
+    osr2_controls,
+    toasts,
+    voice_router,
+)
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts

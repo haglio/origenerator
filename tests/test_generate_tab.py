@@ -2165,7 +2165,6 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
-    monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     image_rows = [image]
 
     tab.show_saved_generation(image, image_rows)
@@ -2181,7 +2180,6 @@ def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypa
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
-    monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     tab.show_saved_generation(image, [image])
     got = []
     tab.link_clicked.connect(got.append)
@@ -2310,7 +2308,6 @@ def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="i.png")
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (Path("C:/i.png"), "image"))
-    monkeypatch.setattr(gallery, "make_animated_preview", lambda r, o, t: None)
     tab.show_saved_generation(image, [image])
 
     assert tab.osr2_drive_target() is None

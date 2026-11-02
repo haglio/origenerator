@@ -99,12 +99,6 @@ _SECTION_SPACING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
 
 
-def play_once_made(pane: GalleryPane, prompt_id: str, movie_path: str) -> None:
-    tile = pane._thumb_widgets.get(prompt_id)
-    if tile is not None:
-        tile.play_moving_preview(movie_path)
-
-
 class GalleryPaneScrollArea(QScrollArea):
     """The middle pane's scroll area, which says when a click landed on nothing.
 

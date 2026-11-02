@@ -350,12 +350,12 @@ def test_a_widening_that_found_nothing_redraws_an_empty_pane_to_say_so(controlle
 
 
 def test_the_field_says_what_a_query_typed_in_it_would_search(controller):
-    host = FakeHost(scope=_Scope("Landscape  ›  Latest", set()))
+    host = FakeHost(scope=_Scope("Landscape  \u203a  Latest", set()))
     found = controller(host=host)
 
     found.sync_placeholder()
 
-    assert found.field.placeholderText() == "Search Landscape  ›  Latest…"
+    assert found.field.placeholderText() == "Search Landscape  \u203a  Latest…"
 
 
 def test_the_sort_menu_names_the_model_lora_order_the_way_the_forms_do(controller):

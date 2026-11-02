@@ -12,7 +12,7 @@ from origenerator.gui.gallery_tree import PathStep
 
 _STEPS = [PathStep("Landscape", None), PathStep("All", "all@landscape"),
           PathStep("SDXL T2I", "sdxl@landscape"), PathStep("3A7F2C10", "leaf@landscape")]
-_PATH = "Landscape  ›  All  ›  SDXL T2I  ›  3A7F2C10"
+_PATH = "Landscape  \u203a  All  \u203a  SDXL T2I  \u203a  3A7F2C10"
 
 
 def _header(qtbot):

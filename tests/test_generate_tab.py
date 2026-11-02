@@ -3978,7 +3978,7 @@ def test_a_setting_off_its_models_recommendation_shows_its_warning(blank_panel, 
     blank_panel._param_form._widgets["steps"].setValue(80)
 
     assert not mark.isHidden()
-    assert mark.toolTip() == "Default Model's page recommends 20–40 steps. Click to use 40."
+    assert mark.toolTip() == "Default Model's page recommends 20\u201340 steps. Click to use 40."
 
 
 def test_a_number_outside_its_good_range_shows_its_warning_with_no_page_to_judge_it(tab):
@@ -3988,7 +3988,7 @@ def test_a_number_outside_its_good_range_shows_its_warning_with_no_page_to_judge
     tab._param_form._widgets["steps"].setValue(200)
 
     assert not mark.isHidden()
-    assert mark.toolTip() == "Good range: 25–50. Click to use 50."
+    assert mark.toolTip() == "Good range: 25\u201350. Click to use 50."
 
 
 def test_a_settings_tooltip_says_the_range_its_models_page_holds_it_to(blank_panel, recommended):
@@ -3996,7 +3996,7 @@ def test_a_settings_tooltip_says_the_range_its_models_page_holds_it_to(blank_pan
 
     tip = blank_panel._param_form._widgets["cfg"].toolTip()
 
-    assert tip.endswith(" Default Model's page recommends 3–6.")
+    assert tip.endswith(" Default Model's page recommends 3\u20136.")
 
 
 def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recommended):
@@ -4005,8 +4005,8 @@ def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recomm
     _pick_model(blank_panel, "example_other.safetensors")
 
     tips = {key: blank_panel._param_form._widgets[key].toolTip() for key in ("steps", "cfg")}
-    assert tips["steps"].endswith(" Other Model's page recommends 30–40 steps.")
-    assert tips["cfg"].endswith(" Other Model's page recommends 3–7.")
+    assert tips["steps"].endswith(" Other Model's page recommends 30\u201340 steps.")
+    assert tips["cfg"].endswith(" Other Model's page recommends 3\u20137.")
 
 
 def test_a_negative_prompt_grayed_at_prompt_strength_one_says_why(blank_panel):
@@ -4073,8 +4073,8 @@ def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
 
     form.set_values({"steps": 80, "cfg": 9.0})
     assert warning.toolTip() == (
-        "Steps: 80. Default Model's page recommends 20–40 steps. Click to use 40.\n"
-        "Prompt Strength: 9. Default Model's page recommends 3–6. Click to use 6.")
+        "Steps: 80. Default Model's page recommends 20\u201340 steps. Click to use 40.\n"
+        "Prompt Strength: 9. Default Model's page recommends 3\u20136. Click to use 6.")
     qtbot.mouseClick(warning, Qt.MouseButton.LeftButton)
 
     assert warning.isHidden()
@@ -4086,7 +4086,7 @@ def test_a_story_too_long_for_its_good_range_is_among_the_workflows_warnings(qtb
     form = _on_screen(qtbot, blank_panel)._param_form
 
     form.set_values({"scene_frames": [241], "frame_count": 241})
-    assert "Scenes: 15 s. Good range: 5–10 s. Click to use 10 s." in (
+    assert "Scenes: 15 s. Good range: 5\u201310 s. Click to use 10 s." in (
         blank_panel._workflow_warning.toolTip().split("\n"))
     qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
 
@@ -4287,9 +4287,9 @@ def test_a_second_lora_picked_on_a_tab_lowers_each_picked_strengths_good_range(
 
     form.set_values({"lora_2": "second_look.safetensors"})
     assert not mark.isHidden()
-    assert mark.toolTip() == "Good range while another LoRA is picked: 0.6–0.8. Click to use 0.8."
+    assert mark.toolTip() == "Good range while another LoRA is picked: 0.6\u20130.8. Click to use 0.8."
     assert form._widgets["lora_strength_2"].toolTip().endswith(
-        " Good range while another LoRA is picked: 0.6–0.8.")
+        " Good range while another LoRA is picked: 0.6\u20130.8.")
 
 
 def test_a_tabs_lora_dropdown_says_when_its_picked_lora_was_trained(

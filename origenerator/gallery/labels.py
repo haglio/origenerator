@@ -56,7 +56,7 @@ def generate_tab_title(workflow_name: str | None, params: dict) -> str:
         return "New generation"
     headline = _prompt_headline(settings_only(params))
     model = workflow_label(workflow_name)
-    return f"{model} › {headline}" if headline else model
+    return f"{model} \u203a {headline}" if headline else model
 
 
 def config_folder_key(workflow_name: str, signature: str) -> str:

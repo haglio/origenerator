@@ -12,7 +12,7 @@ def _label_texts(tile):
 
 
 def test_folder_tile_shows_its_folder_path_context(qtbot):
-    tile = FolderTile("k", "a dog", [], 3, context="Images › SDXL")
+    tile = FolderTile("k", "a dog", [], 3, context="Images \u203a SDXL")
     qtbot.addWidget(tile)
 
     texts = _label_texts(tile)
@@ -26,7 +26,7 @@ def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
 
     texts = _label_texts(tile)
     assert "a dog" in texts
-    assert all("›" not in t for t in texts)
+    assert all("\u203a" not in t for t in texts)
 
 
 def test_folder_tile_shows_its_toc_initial(qtbot):

@@ -351,7 +351,7 @@ def _nearest_choice(current, choices, order: list[str]) -> str:
 
 def _span(span) -> str:
     low, high = span
-    return _shown(low) if low == high else f"{_shown(low)}–{_shown(high)}"
+    return _shown(low) if low == high else f"{_shown(low)}\u2013{_shown(high)}"
 
 
 def named_models(names: list[str]) -> str:

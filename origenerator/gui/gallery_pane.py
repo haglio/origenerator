@@ -463,7 +463,7 @@ class GalleryPane(QObject):
         for key in collections:
             self._add_collection_tile(flow, key)
         if collections and groups:
-            flow.add_full_row(_time_heading(" "))
+            flow.add_full_row(_time_heading("\u00a0"))
         self._show_paged(container, [
             _Entry(partial(self._add_folder_tile, flow, group, favorite=group.favorite),
                    folder=group.key)

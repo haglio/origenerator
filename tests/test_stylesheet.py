@@ -240,7 +240,7 @@ def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot)
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
     try:
-        heading = QLabel("Sat Sep 12, 7:10 PM – 7:40 PM")
+        heading = QLabel("Sat Sep 12, 7:10 PM \u2013 7:40 PM")
         heading.setObjectName("tileGroupHeading")
         qtbot.addWidget(heading)
         heading.resize(300, heading.sizeHint().height())

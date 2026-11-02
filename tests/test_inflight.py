@@ -20,7 +20,7 @@ from origenerator.gui.inflight import (
 
 
 def _item(**over) -> InFlightItem:
-    fields = {"key": "p1", "caption": "Alpha Workflow › a cat",
+    fields = {"key": "p1", "caption": "Alpha Workflow \u203a a cat",
                   "reading": RunReading(status=JobState.QUEUED, typical_seconds=120.0),
                   "reveal": lambda: None}
     fields.update(over)

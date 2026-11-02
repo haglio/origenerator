@@ -22,7 +22,7 @@ _READING_KEYS = ("status", "frame", "progress", "pass_progress", "stage", "start
 
 def _item(**kw):
     reading = {"status": "queued"} | {k: kw.pop(k) for k in list(kw) if k in _READING_KEYS}
-    base = {"key": "p1", "caption": "SDXL › a cat", "reveal": lambda: None}
+    base = {"key": "p1", "caption": "SDXL \u203a a cat", "reveal": lambda: None}
     base.update(kw)
     return InFlightItem(reading=RunReading(**reading), **base)
 
@@ -31,7 +31,7 @@ def test_tile_says_queued_over_the_frame(qtbot):
     tile = InFlightTile(_item(status="queued"))
     qtbot.addWidget(tile)
     assert tile._status_scrim.text() == "Queued…"
-    assert tile._caption.text() == "SDXL › a cat"
+    assert tile._caption.text() == "SDXL \u203a a cat"
 
 
 def test_tile_says_the_lines_are_being_spoken_before_the_job_is_sent(qtbot):

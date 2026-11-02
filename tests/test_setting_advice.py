@@ -77,8 +77,8 @@ def test_a_sampler_the_models_page_names_without_a_step_spacing_takes_any_good_o
 
 def test_steps_and_prompt_strength_outside_the_models_range_are_advised_against():
     advice = _said(_image(steps=50, cfg=7.5))
-    assert advice == {"steps": "Example Model's page recommends 20–40 steps.",
-                      "cfg": "Example Model's page recommends 3–6."}
+    assert advice == {"steps": "Example Model's page recommends 20\u201340 steps.",
+                      "cfg": "Example Model's page recommends 3\u20136."}
 
 
 def test_a_model_with_no_page_gets_only_the_step_spacing_its_sampler_wants():
@@ -100,7 +100,7 @@ def test_a_speed_lora_on_both_passes_asks_for_its_own_settings():
              "shift_high": 8.0}
     assert _said(video) == {
         "lora_strength_high": "Example Speed's page recommends a strength of 1.",
-        "steps": "With the Example Speed LoRA, its page recommends 4–8 steps.",
+        "steps": "With the Example Speed LoRA, its page recommends 4\u20138 steps.",
         "cfg_high": "With the Example Speed LoRA, its page recommends 1.",
         "shift_high": "With the Example Speed LoRA, its page recommends 5.",
     }
@@ -164,13 +164,13 @@ def test_a_speed_loras_settings_are_set_to_what_its_page_recommends():
 def test_a_number_outside_its_definitions_good_range_is_advised_against():
     steps = ParamDef("steps", "Steps", ParamType.INT, 30, good=(20, 40))
     advice = setting_advice({"steps": 50}, [steps])
-    assert (advice["steps"].text, advice["steps"].fix) == ("Good range: 20–40.", 40)
+    assert (advice["steps"].text, advice["steps"].fix) == ("Good range: 20\u201340.", 40)
 
 
 def test_a_prompt_strength_below_one_is_warned_about_before_its_good_range():
     cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 7.5, good=(3, 8))
     found = setting_advice({"cfg": 0.5}, [cfg])["cfg"]
-    assert (found.text, found.fix) == (f"{STRENGTH_BELOW_ONE} Good range: 3–8.", 3)
+    assert (found.text, found.fix) == (f"{STRENGTH_BELOW_ONE} Good range: 3\u20138.", 3)
 
 
 def test_a_prompt_strength_of_exactly_one_gets_no_warning():
@@ -185,7 +185,7 @@ def test_only_the_pass_whose_strength_is_below_one_is_warned_about():
     ]
     advice = setting_advice({"cfg_high": 0.5, "cfg_low": 3.0}, passes)
     assert {key: (found.text, found.fix) for key, found in advice.items()} == {
-        "cfg_high": (f"{STRENGTH_BELOW_ONE} Good range: 3–4.", 3)}
+        "cfg_high": (f"{STRENGTH_BELOW_ONE} Good range: 3\u20134.", 3)}
 
 
 def test_a_prompt_strength_below_one_is_warned_about_even_with_no_range_to_hold_it_to():
@@ -197,7 +197,7 @@ def test_a_number_its_models_page_judges_is_not_held_to_its_definitions_range():
     cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 4.0, good=(3, 4))
     assert setting_advice(_image(cfg=5.5), [cfg]) == {}
     assert setting_advice(_image(cfg=7.5), [cfg])["cfg"].text == (
-        "Example Model's page recommends 3–6.")
+        "Example Model's page recommends 3\u20136.")
 
 
 def test_a_number_a_speed_loras_page_judges_is_not_held_to_its_definitions_range():
@@ -213,8 +213,8 @@ def test_a_models_page_is_quoted_for_every_setting_it_speaks_for_even_when_follo
     assert recommendations(_image(sampler_name="dpmpp_2m", scheduler="karras")) == {
         "sampler_name": "Example Model's page recommends euler_ancestral or dpmpp_2m.",
         "scheduler": "Example Model's page pairs dpmpp_2m with karras.",
-        "steps": "Example Model's page recommends 20–40 steps.",
-        "cfg": "Example Model's page recommends 3–6.",
+        "steps": "Example Model's page recommends 20\u201340 steps.",
+        "cfg": "Example Model's page recommends 3\u20136.",
     }
 
 
@@ -228,7 +228,7 @@ def test_a_speed_loras_page_is_quoted_for_every_setting_it_speaks_for():
         "lora_strength_low": "Example Speed's page recommends a strength of 1.",
         "cfg_high": "With the Example Speed LoRA, its page recommends 1.",
         "cfg_low": "With the Example Speed LoRA, its page recommends 1.",
-        "steps": "With the Example Speed LoRA, its page recommends 4–8 steps.",
+        "steps": "With the Example Speed LoRA, its page recommends 4\u20138 steps.",
         "shift_high": "With the Example Speed LoRA, its page recommends 5.",
     }
 
@@ -361,7 +361,7 @@ def test_a_strength_takes_a_lower_good_range_while_another_lora_is_picked():
     advice = setting_advice(image, _STRENGTHS_ON_AN_IMAGE)
 
     assert {key: (found.text, found.fix) for key, found in advice.items()} == {
-        "lora_strength": ("Good range while another LoRA is picked: 0.6–0.8.", 0.8)}
+        "lora_strength": ("Good range while another LoRA is picked: 0.6\u20130.8.", 0.8)}
 
 
 def test_the_tooltip_of_every_picked_strength_gives_the_range_while_loras_share_an_image():
@@ -370,8 +370,8 @@ def test_the_tooltip_of_every_picked_strength_gives_the_range_while_loras_share_
                "lora_3": "second_look.safetensors", "lora_strength_3": 0.7}
 
     assert recommendations(image) == {
-        "lora_strength": "Good range while another LoRA is picked: 0.6–0.8.",
-        "lora_strength_3": "Good range while another LoRA is picked: 0.6–0.8."}
+        "lora_strength": "Good range while another LoRA is picked: 0.6\u20130.8.",
+        "lora_strength_3": "Good range while another LoRA is picked: 0.6\u20130.8."}
     assert recommendations(image | {"lora_3": "None"}) == {}
 
 
@@ -381,8 +381,8 @@ def test_loras_share_a_video_pass_by_pass():
              "lora_low": "a_look_low.safetensors", "lora_strength_low": 1.0}
 
     assert recommendations(video) == {
-        "lora_strength_high": "Good range while another LoRA is picked for this pass: 0.6–0.8.",
-        "lora_strength_high_2": "Good range while another LoRA is picked for this pass: 0.6–0.8."}
+        "lora_strength_high": "Good range while another LoRA is picked for this pass: 0.6\u20130.8.",
+        "lora_strength_high_2": "Good range while another LoRA is picked for this pass: 0.6\u20130.8."}
 
 
 def test_a_loras_page_holds_its_strength_in_any_row_even_while_loras_share_its_pass():
@@ -395,7 +395,7 @@ def test_a_loras_page_holds_its_strength_in_any_row_even_while_loras_share_its_p
     assert (advice["lora_strength_low_2"].text, advice["lora_strength_low_2"].fix) == (
         "Example Speed's page recommends a strength of 1.", 1)
     assert advice["lora_strength_low"].text == (
-        "Good range while another LoRA is picked for this pass: 0.6–0.8.")
+        "Good range while another LoRA is picked for this pass: 0.6\u20130.8.")
 
 
 _STYLE = "example_style.safetensors"

@@ -1366,8 +1366,8 @@ def test_a_field_with_a_good_range_says_it_in_its_tooltip(qtbot):
     steps = ParamDef("steps", "Steps", ParamType.INT, 30, min_val=1, max_val=100, good=(20, 40))
     form = ParamForm([steps])
     qtbot.addWidget(form)
-    assert "Good range: 20–40." in form._widgets["steps"].toolTip()
-    assert "Good range: 20–40." in _label_beside(form, "steps").toolTip()
+    assert "Good range: 20\u201340." in form._widgets["steps"].toolTip()
+    assert "Good range: 20\u201340." in _label_beside(form, "steps").toolTip()
 
 
 def test_a_label_with_no_help_spells_out_its_whole_name_on_hover(qtbot):
@@ -1382,14 +1382,14 @@ def test_a_pages_recommendation_takes_the_good_ranges_place_until_it_goes(qtbot)
     form = ParamForm([steps])
     qtbot.addWidget(form)
 
-    form.explain({"steps": "Example Model's page recommends 25–35 steps."})
+    form.explain({"steps": "Example Model's page recommends 25\u201335 steps."})
     recommended = (form._widgets["steps"].toolTip(), _label_beside(form, "steps").toolTip())
     form.explain({})
     left_alone = (form._widgets["steps"].toolTip(), _label_beside(form, "steps").toolTip())
 
-    assert all(tip.endswith(" Example Model's page recommends 25–35 steps.")
+    assert all(tip.endswith(" Example Model's page recommends 25\u201335 steps.")
                and "Good range" not in tip for tip in recommended)
-    assert all(tip.endswith(" Good range: 20–40.") for tip in left_alone)
+    assert all(tip.endswith(" Good range: 20\u201340.") for tip in left_alone)
 
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
@@ -2047,7 +2047,7 @@ def test_one_composition_focus_gives_both_passes_its_value(qtbot):
     assert (form.get_values()["shift_high"], form.get_values()["shift_low"]) == (6.0, 6.0)
 
 
-_STEPS_ADVICE = {"steps": Advice("Example Model's page recommends 20–40 steps.",
+_STEPS_ADVICE = {"steps": Advice("Example Model's page recommends 20\u201340 steps.",
                                  value=50, fix=40)}
 
 
@@ -2059,7 +2059,7 @@ def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot)
 
     assert not form._warning_marks["steps"].isHidden()
     assert form._warning_marks["steps"].toolTip() == (
-        "Example Model's page recommends 20–40 steps. Click to use 40.")
+        "Example Model's page recommends 20\u201340 steps. Click to use 40.")
     assert form._warning_marks["cfg"].isHidden()
     form.set_warnings({})
     assert form._warning_marks["steps"].isHidden()
@@ -2079,7 +2079,7 @@ def test_a_section_warns_with_every_warning_inside_it_one_per_line(qtbot):
     calibration = form._sections["Calibration"].warning
     assert not calibration.isHidden()
     assert calibration.toolTip() == (
-        "Steps: 50. Example Model's page recommends 20–40 steps. Click to use 40.\n"
+        "Steps: 50. Example Model's page recommends 20\u201340 steps. Click to use 40.\n"
         "Sampler: heun. Example Model's page recommends euler_ancestral. "
         "Click to use euler_ancestral.")
     assert form._sections["Models & LoRAs"].warning.isHidden()
@@ -2114,8 +2114,8 @@ def test_clicking_a_warning_sets_its_setting_to_the_recommended_value(qtbot):
 
 
 _STRENGTH_ADVICE = {"lora_strength_high": Advice(
-    "Example LoRA's page recommends a strength of 0.8–1.2.", value=1.5, fix=1.2)}
-_PROMPT_STRENGTH_ADVICE = {"cfg_high": Advice("Example Model's page recommends 3–6.",
+    "Example LoRA's page recommends a strength of 0.8\u20131.2.", value=1.5, fix=1.2)}
+_PROMPT_STRENGTH_ADVICE = {"cfg_high": Advice("Example Model's page recommends 3\u20136.",
                                               value=9.0, fix=6.0)}
 
 
@@ -2142,8 +2142,8 @@ def test_the_whole_forms_warnings_read_and_resolve_in_the_order_of_its_sections(
 
     assert form.every_warning() == (
         "LoRA Strength 1 (First Pass): 1.5. Example LoRA's page recommends a strength of "
-        "0.8–1.2. Click to use 1.2.\n"
-        "Steps: 50. Example Model's page recommends 20–40 steps. Click to use 40.")
+        "0.8\u20131.2. Click to use 1.2.\n"
+        "Steps: 50. Example Model's page recommends 20\u201340 steps. Click to use 40.")
     form.resolve_every_warning()
     values = form.get_values()
     assert (values["steps"], values["lora_strength_high"]) == (40, 1.2)
@@ -2160,8 +2160,8 @@ def test_a_storys_length_off_its_good_range_warns_beside_its_scenes(qtbot):
     form.set_warnings(_duration_advice(form))
 
     assert form._warning_marks["scene_frames"].toolTip() == (
-        "Good range: 5–10 s. Click to use 10 s.")
-    assert form.every_warning() == "Scenes: 15 s. Good range: 5–10 s. Click to use 10 s."
+        "Good range: 5\u201310 s. Click to use 10 s.")
+    assert form.every_warning() == "Scenes: 15 s. Good range: 5\u201310 s. Click to use 10 s."
 
 
 def test_the_scenes_tooltip_says_the_good_range_their_warning_holds_the_story_to(qtbot):
@@ -2169,7 +2169,7 @@ def test_the_scenes_tooltip_says_the_good_range_their_warning_holds_the_story_to
                      size_deriver=lambda values: (464, 912))
     qtbot.addWidget(form)
 
-    assert " Good range: 5–10 s. " in form._labels["scene_frames"].toolTip()
+    assert " Good range: 5\u201310 s. " in form._labels["scene_frames"].toolTip()
 
 
 def test_clicking_the_warning_beside_scenes_shortens_the_last_scene_to_fit(qtbot):

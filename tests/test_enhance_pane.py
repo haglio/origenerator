@@ -1665,8 +1665,8 @@ def test_the_panels_captions_use_plain_words(qtbot):
 
 def test_a_number_on_the_panel_says_its_good_range(qtbot):
     pane, _edits = _panel(qtbot)
-    assert "Good range: 0.1–0.2." in pane._denoise.toolTip()
-    assert "Good range: 1.5–2." in pane._scale.toolTip()
+    assert "Good range: 0.1\u20130.2." in pane._denoise.toolTip()
+    assert "Good range: 1.5\u20132." in pane._scale.toolTip()
 
 
 def test_each_fixs_button_opens_its_prompts_over_the_enhance_pane_alone_leaving_the_window_usable(qtbot):
@@ -2016,7 +2016,7 @@ def test_a_fixs_lora_strength_says_what_range_works_well_as_every_forms_does(qtb
     pane._fix_prompt_buttons["hands"].click()
     window = pane._fix_prompt_windows["hands"]
 
-    assert "Good range: 0.6–1.2." in window.strength.toolTip()
+    assert "Good range: 0.6\u20131.2." in window.strength.toolTip()
     assert window.strength.toolTip().startswith("How hard the LoRA pulls.")
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from funestra.main_hud import ROW_LABEL_W, VALUE_W
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
 from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_controls import (
@@ -21,6 +20,7 @@ from funestra.hud_controls import (
 from funestra.hud_icons import shared_icon
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import LATEST_LABEL
+from funestra.main_hud import ROW_LABEL_W, VALUE_W
 
 from origenerator.osr2_controls_commands import FILTER, spelled_for
 

@@ -6,8 +6,8 @@ from itertools import pairwise
 
 import pytest
 from app_support.osr2_hold import PARK, RESUME, RETRACT
-from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from funestra.learned_model import LearnedModel, Phrase, classify
+from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from funestra.robot_hand import RobotHandState, set_max_intensity
 
 from origenerator import motion_engine

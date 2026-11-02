@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from funestra.hud_overlay import HUD_OVERLAY_ID
-from funestra.testing import FakeEngine
 from funestra.scrubber_bar import SCRUBBER_HEIGHT
+from funestra.testing import FakeEngine
 from funestra.volume import VOLUME_CONTROL_H, volume_control_xy
 from PyQt6.QtCore import QPoint
 

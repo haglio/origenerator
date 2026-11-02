@@ -16,13 +16,13 @@ from funestra.main_hud import (
     osr2_controls,
 )
 from funestra.main_hud_painter import MainHud, MainHudPainter
+from funestra.modes import MainMode, Osr2State
 from funestra.osr2_visualizer import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
-from funestra.modes import MainMode, Osr2State
 from funestra.robot_hand import POSITION_MAX, control_limits
 
 from origenerator import motion_engine, osr2

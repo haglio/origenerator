@@ -25,6 +25,7 @@ from tests.gallery_view_support import (
     _SDXL,
     FakeDB,
     _image,
+    _png_bytes,
     _image_workflow,
     _preview_of,
     _row,
@@ -452,3 +453,20 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
     assert node is not None
     view._tree.setCurrentItem(node)
     assert view._avg_label.text() == "Average time: ~1 min (across 2 runs)"
+
+
+def test_a_rebuild_takes_an_item_that_has_gone_off_the_tab_showing_it(qtbot, tmp_path):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("i2")
+    tab = view._generate_pane.current_generate_tab()
+    gone = tmp_path / "gone.png"
+    gone.write_bytes(_png_bytes())
+    tab._preview.show_image(gone)
+
+    db.delete_generation("i2")
+    view.refresh()
+
+    assert not tab._preview.is_showing_any([gone])

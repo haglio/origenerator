@@ -1378,3 +1378,17 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     assert slideshow._set.playlist._items == [("v1.mp4", "video", "v1", None)]
     assert slideshow._set.playlist.index == 0
     slideshow.close()
+
+
+def test_closing_the_gallery_closes_the_slideshow_up(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._slideshows.start()
+    assert view._slideshows.showing is not None
+
+    view.close()
+
+    assert view._slideshows.showing is None

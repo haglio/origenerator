@@ -912,3 +912,51 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     assert omnipause.frozen()
     assert view._buttons.mic.isChecked()
     assert view._voice.listener.commands_on
+
+
+def test_a_reconcile_with_nothing_changed_leaves_the_driver_running(qtbot):
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view.osr2_control.set_state(OSR2_DRIVING)
+
+    view.reconcile_osr2()
+
+    assert driver.started == [("player-A", "actions-A")]
+
+
+def test_the_same_video_on_a_new_player_re_aims_the_driver(qtbot):
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view.osr2_control.set_state(OSR2_DRIVING)
+
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-B", "actions-A")
+    view.reconcile_osr2()
+
+    assert driver.started[-1] == ("player-B", "actions-A")
+
+
+def test_a_listener_reconciling_on_the_settled_signal_does_not_land_back_in_the_reconcile(qtbot):
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    heard = []
+    view.osr2_control.settled.connect(lambda: heard.append(view.reconcile_osr2()))
+
+    view.osr2_control.set_state(OSR2_DRIVING)
+
+    assert heard
+    assert driver.started == [("player-A", "actions-A")]
+
+
+def test_quitting_lets_go_of_the_script_the_motion_and_the_radio(qtbot):
+    radio = _FakeRadio()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), osr2_motion=_SignalMotion(),
+                       radio=radio)
+    qtbot.addWidget(view)
+    view._osr2_driver.start(FakePlayer(), ACTIONS)
+    view._osr2_motion.active = True
+
+    QApplication.instance().aboutToQuit.emit()
+
+    assert not view._osr2_driver.active
+    assert not view._osr2_motion.active
+    assert radio.stops == 1

@@ -1111,3 +1111,30 @@ def test_picked_folders_offer_no_delete_when_one_of_them_cannot_be_deleted(
 
     assert "Delete 2 folders…" not in labels
     assert not view._buttons.delete.isEnabled()
+
+
+def test_a_rebuild_puts_back_the_picked_folders_and_no_other(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot, extra=[_image("i3", "a bird", 50, 1)])
+    bird = _key(_at(_image_workflow(view._tree), 0, 0, 2))
+    _pick(view, bird, cat, dog)
+    view._db.delete_generation("i3")
+
+    view.refresh()
+
+    assert set(view._tree.selected_folder_keys()) == {shaped_key(cat, LANDSCAPE),
+                                                       shaped_key(dog, LANDSCAPE)}
+
+
+def test_a_further_folder_picked_into_several_loads_nothing_of_its_own(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot, extra=[_image("i3", "a bird", 50, 1)])
+    bird = _key(_at(_image_workflow(view._tree), 0, 0, 2))
+    _pick(view, cat, dog)
+    view._selected_row = None
+
+    view._tree.setCurrentItem(view._tree_item_for(bird))
+    view._tree_item_for(cat).setSelected(True)
+    view._tree_item_for(dog).setSelected(True)
+    view._selected_row = None
+    view._on_folder_selected(view._tree_item_for(bird), None)
+
+    assert view.selected_generation() is None

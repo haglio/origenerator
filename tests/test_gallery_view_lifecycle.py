@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication, QWidget
@@ -79,3 +80,47 @@ def test_being_shown_again_draws_what_landed_while_it_was_away(qtbot, monkeypatc
     view.show()
 
     assert drawn
+
+
+def _reads_held_back(view):
+    held = []
+    view.off_thread = lambda work, done: held.append(done)
+    return held
+
+
+def test_a_tick_while_the_last_ones_reads_are_out_asks_for_nothing_more(qtbot):
+    view = _gallery(qtbot)
+    held = _reads_held_back(view)
+
+    view._poll()
+    view._poll()
+
+    assert len(held) == 1
+
+
+def test_a_tick_whose_answers_raise_leaves_the_next_tick_free_to_read(qtbot):
+    view = _gallery(qtbot)
+    held = _reads_held_back(view)
+    view._poll()
+
+    def raises():
+        raise RuntimeError("made-up failure")
+
+    view._enhance.put_what_is_locked_first = raises
+    with pytest.raises(RuntimeError):
+        held[0](None)
+    view._poll()
+
+    assert len(held) == 2
+
+
+def test_a_listing_that_could_not_be_read_draws_nothing_and_leaves_the_next_tick_free(qtbot):
+    view = _gallery(qtbot)
+    view.refresh()
+    drawn = view._drawn_version
+    view.off_thread = lambda work, done: done(None)
+
+    view._poll()
+
+    assert view._drawn_version == drawn
+    assert view._poll_inflight is False

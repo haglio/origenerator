@@ -1,15 +1,3 @@
-"""App-managed trash that holds deleted files so a deletion can be undone.
-
-Deleting a generation moves its files here instead of removing them, so an undo
-can move them straight back to where they were. Each deleted item gets its own
-subdirectory, keyed by a unique token, so items never tread on one another and
-ending one is a single ``rmtree``.
-
-How long a batch is held is not decided here: the Trash records each one
-alongside the row it belonged to and decides (see :mod:`origenerator.trash_collection`).
-:meth:`Trash.purge_orphans` is the other half of that — it clears whatever the
-Trash does *not* name, which is the only thing left that nothing can reach.
-"""
 from __future__ import annotations
 
 import shutil
@@ -132,6 +120,6 @@ def _name_before(held: str) -> str:
 
 
 def _move(src: Path, dest: Path) -> None:
-    # Retry briefly: the media backend closes a source on its own thread a beat after release, and AV scanners or the indexer can lock any file
+    # Retry briefly: Qt's media backend closes a source on its own thread a beat after release, and Windows AV scanners or the indexer can lock any file
     retried_while_held(lambda: shutil.move(str(src), str(dest)),
                        attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)

@@ -6,8 +6,7 @@ from origenerator.config import project_dir
 
 
 def offer_the_copy_beside_the_checkouts() -> None:
-    """Put the engine copy beside the checkouts first in PATH: the machine-wide folder has
-    answered "nothing here" to this app while holding the file."""
+    """Put the engine copy beside the checkouts first in PATH: Windows has answered "nothing here" from the machine-wide folder while it held the file."""
     beside = project_dir("funestra") / "vendor"
     try:
         if not (beside / "libmpv-2.dll").is_file():

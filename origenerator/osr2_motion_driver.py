@@ -68,7 +68,7 @@ class Osr2MotionDriver(QObject):
         self._now = now_source
         self._last_tick = 0.0
         self._glide_until = 0.0
-        # The bars are moved on the GUI thread while the clock thread samples the state.
+        # The bars are moved on Qt's GUI thread while the clock thread samples the state.
         self._lock = threading.RLock()
         self._interval_s = interval_ms / 1000.0
         self._make_ticker = ticker_factory or _TickThread

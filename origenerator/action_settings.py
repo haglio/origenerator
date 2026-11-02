@@ -37,7 +37,6 @@ def in_its_lane(settings: dict, intent: str) -> dict:
 
 
 def loops(row) -> bool:
-    # Deferred: the workflow registry import pulls in the whole workflow package
     from origenerator.workflows import WORKFLOW_REGISTRY  # noqa: PLC0415 — keeps this module light
 
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")

@@ -6,7 +6,7 @@ import ctypes
 import logging
 import os
 
-# The launch interpreter is the plain system Python (paths.origenerator_python_exe), which has no shared_ui installed; this module is imported before the app's own packages.
+# The launch interpreter is the plain system Python (paths.origenerator_python_exe), which has no pip-installed shared_ui; this module is imported before the app's own packages.
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
 logger = logging.getLogger(__name__)

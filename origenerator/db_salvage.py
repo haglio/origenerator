@@ -63,7 +63,7 @@ def _tables(conn) -> list[str]:
 
 
 def _copy_table(damaged, fresh, table: str) -> int:
-    # One rowid at a time: a single scan stops at the first damaged page.
+    # SQLite: a single scan stops at the first damaged page, so it reads one rowid at a time.
     source = _source_of(damaged, table)
     columns = [c for c in _columns(damaged, source) if c in _columns(fresh, table)]
     select = f'SELECT {", ".join(columns)} FROM "{source}" WHERE rowid = ?'
@@ -94,7 +94,7 @@ def _columns(conn, table: str) -> list[str]:
 
 
 def _highest_rowid(conn, table: str) -> int:
-    # max(rowid) walks to the rightmost leaf, where damage is likeliest; sqlite_sequence keeps the same mark apart.
+    # SQLite: max(rowid) walks to the rightmost leaf, where damage is likeliest; sqlite_sequence keeps the same mark apart.
     for sql, args in (
         (f'SELECT max(rowid) FROM "{table}"', ()),
         ("SELECT seq FROM sqlite_sequence WHERE name = ?", (table,)),

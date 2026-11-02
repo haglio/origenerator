@@ -1,15 +1,3 @@
-"""The Trash: what a delete is still holding, until it is not.
-
-One of the six tables `Database` used to hold all of. Its readers are
-`origenerator.trash_collection` and `origenerator.gallery_edits`, and neither has any
-business with `generations` or the custom collections.
-
-A deleted generation's whole row travels here, plus where in the trash its files
-went, so the Trash collection can list it, put both back, or end it for good. The
-record goes away when the item is restored or purged, and not otherwise;
-the generations row itself is gone the moment it is
-deleted, which is why the row travels here rather than staying gated by a flag.
-"""
 from __future__ import annotations
 
 import json
@@ -23,15 +11,9 @@ from origenerator.trash import TrashedBatch
 
 
 class TrashStore(Store):
-    """The queries over the `deletions` table."""
 
     def record_trashed(self, prompt_id: str, row: dict, batch: dict, *,
                         deleted_at: str | None = None):
-        """Hold a just-deleted ``row`` and its trash ``batch`` for the Trash; given
-        ``deleted_at``, rewrite an item still held, its place kept. Otherwise replaces
-        any earlier record, so an item deleted, restored, and deleted again reads as
-        trashed on the date of the *latest* delete.
-        """
         with self._connect() as conn:
             if deleted_at is not None:
                 conn.execute("UPDATE deletions SET row_json = ?, batch_json = ? WHERE prompt_id = ?",

@@ -278,7 +278,6 @@ def _measured_size(slide: Slide) -> tuple[int, int] | None:
 
 
 def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
-    """(width, height) of the first openable video's frame, or ``None``; a decode of HEVC costs seconds."""
     import cv2  # noqa: PLC0415 (this module is read before the splash)
 
     for slide in slides:

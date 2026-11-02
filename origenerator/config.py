@@ -117,4 +117,4 @@ VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time lis
 # Windows has made a dead headset microphone the default input before.
 VOICE_DEVICE_NAME = "Brio"
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
-LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"  # uncensored; a censored one refuses explicit edits
+LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"  # Ollama model: uncensored, since a censored one refuses explicit edits

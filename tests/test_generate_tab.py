@@ -65,6 +65,7 @@ from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
+from origenerator.library_views import TabViews
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
@@ -1550,7 +1551,7 @@ def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
     image = _image_row(db)
     names = ItemNames(db)
     names.take([image], [], {})
-    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
+    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db, views=TabViews(names=names))
     qtbot.addWidget(tab)
     tab._viewport.show_media = MagicMock()
 
@@ -4257,7 +4258,8 @@ def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_pat
     monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     db = Database(tmp_path / "t.db")
     _image_row(db, "img1", filename="sdxl_img1.png")
-    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db, names=ItemNames.from_library(db))
+    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db,
+                       views=TabViews(names=ItemNames.from_library(db)))
     qtbot.addWidget(tab)
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_i2v"))
     zone = tab._param_form._widgets["input_image"]

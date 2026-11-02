@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import cached_property
 
 from origenerator import gallery, trash_collection
 from origenerator.media import MediaType
+
+
+@dataclass(frozen=True)
+class TabViews:
+    heights: object = None
+    names: object = None
+    animated_preview: Callable[[dict], str | None] | None = None
+    library: object = None
+
+
+NO_VIEWS = TabViews()
 
 
 class LibrarySnapshot:

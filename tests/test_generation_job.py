@@ -34,18 +34,12 @@ def _client():
     client.submit_job = MagicMock(return_value="comfy-A")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
-    # Every send asks after an earlier run of its id first; answered here,
-    # never by a server on the machine.
     client.fetch_history = MagicMock(return_value={})
     client.forget_history = MagicMock()
     return client
 
 
 def _params():
-    # enhance on, so the payload carries the two-sampler shape these tests pin
-    # the whole-run step total against. Nothing turns it on by hand in the app
-    # any more (the gallery's Enhance pane applies enhancement as a layer),
-    # but a reused old run still rebuilds exactly this graph.
     return dict(SDXL.default_params(), enhance=True)
 
 
@@ -71,7 +65,6 @@ def test_a_jobs_payload_saves_into_the_folder_named_for_its_run(qtbot, tmp_path)
 
 def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
-    # We submit under our own prompt_id, so ComfyUI's signals key on the same id.
     client.submit_job.assert_called_once_with(job.payload, "comfy-A")
     assert job.state == "queued"
 
@@ -99,8 +92,6 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     assert started == []
     assert progress == []
 
-    # SDXL runs a 50-step base pass then a 20-step enhance pass, so progress
-    # forwards as this job's position in a whole run budgeted for both.
     client.progress.emit("comfy-A", "5", 5, 50)
     assert started == [True]
     assert progress == [(2, 35)]
@@ -108,15 +99,10 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     assert job.last_progress == (2, 35)
 
     client.progress.emit("comfy-A", "5", 7, 50)
-    assert started == [True]  # started fires only once
+    assert started == [True]
 
 
 def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
-    # A dual-noise video job samples in two passes, then scores itself in a third
-    # — 20 video steps and 50 of audio. ComfyUI counts each pass from its own
-    # zero, so the job must accumulate them into one 0-to-total ramp rather than
-    # forward a bar that resets partway through. The audio's 50 steps are worth
-    # about a hundredth of the video's 20, and the ramp is budgeted accordingly.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     client = _client()
     job = GenerationJob(
@@ -127,22 +113,16 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     seen = []
     job.progress.connect(lambda v, m: seen.append((v, m)))
 
-    client.progress.emit("comfy-A", "15", 10, 10)  # the high-noise pass finishes
-    client.progress.emit("comfy-A", "16", 1, 10)   # the low-noise one starts over
+    client.progress.emit("comfy-A", "15", 10, 10)
+    client.progress.emit("comfy-A", "16", 1, 10)
 
-    assert seen == [(405, 818), (446, 818)]   # continues past the first pass's end
+    assert seen == [(405, 818), (446, 818)]
     assert job.last_progress == (446, 818)
-    # And the pass in hand is reported alongside, for the substep progress bar along the bar's
-    # foot: the whole-run reading above it is what must never restart, so the
-    # restarting count has to live somewhere.
     assert job.last_pass_progress == (1, 10)
-    # …and named, since the substep progress bar on its own says only that something restarted.
     assert job.last_stage == "Second pass"
 
 
 def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
-    # One sampler end to end: a substep progress bar under the bar would count the same steps
-    # the bar is already counting.
     wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
     client = _client()
     job = GenerationJob(client, wf, wf.default_params(),
@@ -150,27 +130,24 @@ def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
     job.start()
 
     client.progress.emit("comfy-A", "8", 5, 20)
-    assert job.last_progress == (2, 10)   # 20 steps of a still, at half a second
+    assert job.last_progress == (2, 10)
     assert job.last_pass_progress is None
 
 
 def test_the_stage_is_named_from_the_first_node_long_before_any_step(qtbot, tmp_path):
-    # The complaint this answers. A WAN run spends over a minute loading two 14B
-    # models before it reports a single step, and the bar said nothing at all for
-    # the whole of it. ComfyUI names the node it is on from the start.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     client = _client()
     job = GenerationJob(client, wf, wf.default_params(),
                         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     job.start()
 
-    client.node_executing.emit("comfy-A", "4")     # the high-noise UNET
+    client.node_executing.emit("comfy-A", "4")
     assert job.last_stage == "Loading models"
-    client.node_executing.emit("comfy-A", "12")    # the start frame
+    client.node_executing.emit("comfy-A", "12")
     assert job.last_stage == "Loading the image"
-    client.node_executing.emit("comfy-A", "8")     # a setting, over in no time
-    assert job.last_stage == "Loading the image"   # …so the last real stage stands
-    client.node_executing.emit("comfy-A", "17")    # the decode after the sampling
+    client.node_executing.emit("comfy-A", "8")
+    assert job.last_stage == "Loading the image"
+    client.node_executing.emit("comfy-A", "17")
     assert job.last_stage == "Decoding frames"
 
 
@@ -209,7 +186,7 @@ def test_completion_for_our_id_emits_finished(qtbot, tmp_path):
     assert len(finished) == 1
     files, thumb, _dur = finished[0]
     assert files == [{"filename": "a.png", "subfolder": ""}]
-    assert thumb is None  # a.png is not on disk, so no thumbnail
+    assert thumb is None
     assert job.state == "finished"
 
 
@@ -319,10 +296,6 @@ def test_a_video_making_its_thumbnail_finishes_once_and_cannot_be_set_aside(qtbo
 
 
 def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
-    # ComfyUI ends an interrupted prompt exactly as it ends a finished one, and
-    # its history then carries no outputs. Such a run made no file, so it must not
-    # be recorded as a completed generation — one that is blocks a re-run of the
-    # same settings as a duplicate of something that doesn't exist.
     job, client = _started_job(tmp_path)
     finished, failed = [], []
     job.finished.connect(lambda *a: finished.append(a))
@@ -346,22 +319,17 @@ def test_completion_detaches_so_later_signals_are_ignored(qtbot, tmp_path):
 
 
 def test_reconcile_finishes_a_job_whose_live_completion_was_missed(qtbot, tmp_path):
-    # The websocket completion is a one-shot; if it never arrives, the poll
-    # fetches /history as a backstop and this applies it, finishing the job
-    # just as the signal would have.
     job, _client = _started_job(tmp_path)
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append(files))
 
-    job.reconcile_with(SDXL_HISTORY)  # no job_completed was ever emitted
+    job.reconcile_with(SDXL_HISTORY)
 
     assert finished == [[{"filename": "a.png", "subfolder": ""}]]
     assert job.state == "finished"
 
 
 def test_reconcile_is_a_noop_while_the_prompt_is_still_running(qtbot, tmp_path):
-    # A queued/running prompt isn't in /history yet, so its fetch comes back
-    # empty — and a tick that fetched nothing at all applies None.
     job, _client = _started_job(tmp_path)
     finished = []
     job.finished.connect(lambda *a: finished.append(a))
@@ -374,7 +342,6 @@ def test_reconcile_is_a_noop_while_the_prompt_is_still_running(qtbot, tmp_path):
 
 
 def test_reconcile_does_nothing_once_the_job_has_finished(qtbot, tmp_path):
-    # After the live signal completed it, the backstop must not re-fire.
     job, client = _started_job(tmp_path)
     finished = []
     job.finished.connect(lambda *a: finished.append(a))
@@ -400,14 +367,8 @@ def test_error_for_our_id_emits_failed(qtbot, tmp_path):
 
 
 def test_cancel_dequeues_and_stops_the_prompt_by_name(qtbot, tmp_path):
-    # Both, whatever this job last heard: "running" is what ComfyUI said some
-    # time ago, and a job rebound after a restart says it whether the server
-    # is executing the prompt or still holding it. Dequeuing takes it out of
-    # the server's line if it is there, and a stop by name ends it if it is the
-    # one on the GPU -- the server skips a named stop for anything else, where
-    # a nameless one would cut off whatever is executing.
     job, client = _started_job(tmp_path)
-    client.node_executing.emit("comfy-A", "5")  # job is now executing
+    client.node_executing.emit("comfy-A", "5")
     job.cancel()
     client.cancel_prompt.assert_called_once_with("comfy-A")
     client.interrupt.assert_called_once_with("comfy-A")
@@ -429,10 +390,9 @@ def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
         client, SDXL, _params(), "running-id",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
-    client.submit_job.assert_not_called()  # already on the server; don't resubmit
+    client.submit_job.assert_not_called()
     assert job.prompt_id == "running-id"
 
-    # Live signals for that id now flow through, ending in a normal completion.
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append(files))
     client.job_completed.emit("running-id", SDXL_HISTORY)
@@ -440,8 +400,6 @@ def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
 
 
 def test_a_job_taken_back_with_no_start_recorded_waits_on_the_server(qtbot, tmp_path):
-    # Closing the app sends ComfyUI every run still waiting, and ComfyUI makes
-    # them one at a time, so most of what a reopened app finds there is queued.
     job = GenerationJob.reconnect(
         _client(), SDXL, _params(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
@@ -461,21 +419,17 @@ def test_a_job_taken_back_that_had_started_is_still_being_made(qtbot, tmp_path):
 
 
 def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
-    # What gets persisted on the running row: a JSON-able snapshot of where the ramp
-    # is, so a restart can resume it.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     job = GenerationJob(_client(), wf, {**wf.default_params(), "steps": 20},
                         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="pid")
-    job._on_progress("pid", "15", 10, 10)  # the high-noise pass is done
-    job._on_progress("pid", "16", 3, 10)   # the low-noise one is 3 steps in
+    job._on_progress("pid", "15", 10, 10)
+    job._on_progress("pid", "16", 3, 10)
 
     state = job.progress_state()
     assert state["last_progress"] == [526, 818]
 
 
 def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):
-    # Submitted isn't started: on a busy queue the wait can be many minutes, and
-    # counting it as run time would make the estimate of what's left nonsense.
     job, _client = _started_job(tmp_path)
     assert job.started_at is None
 
@@ -488,7 +442,7 @@ def test_the_start_time_is_stamped_at_the_first_sign_of_life(qtbot, tmp_path):
 
     stamped = job.started_at
     client.progress.emit("comfy-A", "s", 6, 50)
-    assert job.started_at == stamped  # the run began once, not on every tick
+    assert job.started_at == stamped
 
 
 def test_progress_state_carries_the_start_time(qtbot, tmp_path):
@@ -498,9 +452,6 @@ def test_progress_state_carries_the_start_time(qtbot, tmp_path):
 
 
 def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path):
-    # The payoff for persisting it: an app restarted mid-run picks the count back
-    # up where the run really began, rather than restarting the clock at zero and
-    # claiming a job ten minutes in has only just started.
     began = time.time() - 600
     job = GenerationJob.reconnect(
         _client(), SDXL, _params(), "pid",
@@ -511,8 +462,6 @@ def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path
 
 
 def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot, tmp_path):
-    # ComfyUI can be making a prompt before the call that sent it has returned,
-    # and the clock counts from its first word about it, not from the return.
     client = _client()
     job = GenerationJob(client, SDXL, _params(),
                         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
@@ -527,8 +476,6 @@ def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot
 
 
 def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_path):
-    # Taken back with no start time, it waits for ComfyUI's word, and the first
-    # tick stamps one: an undercount beats a job that never shows a clock at all.
     job = GenerationJob.reconnect(
         _client(), SDXL, _params(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
@@ -539,9 +486,6 @@ def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_
 
 
 def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
-    # The payoff: a reconnected job shows its last position at once, and the restored
-    # tracker carries the multi-pass ramp forward rather than restarting from the
-    # pass it reconnects into.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     state = {"last_progress": [446, 818],
              "tracker": {"total": 818.0, "banked": 405.0, "stage_max": 10,
@@ -550,15 +494,12 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
         _client(), wf, {**wf.default_params(), "steps": 20}, "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", progress_state=state,
     )
-    assert job.last_progress == (446, 818)   # bar resumes at its last spot immediately
-    # Its substep progress bar comes back with it, so the bar isn't whole for a tick and then
-    # split. The snapshot predates the recorded pass count; the payload's own
-    # (three, for this workflow) stands in.
+    assert job.last_progress == (446, 818)
     assert job.last_pass_progress == (3, 10)
     assert job.last_stage == "Second pass"
 
-    job._on_progress("pid", "16", 4, 10)     # next real tick from ComfyUI
-    assert job.last_progress == (567, 818)   # carries on, not back to the pass's own 4
+    job._on_progress("pid", "16", 4, 10)
+    assert job.last_progress == (567, 818)
 
 
 def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):
@@ -566,7 +507,7 @@ def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):
         _client(), SDXL, _params(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
-    assert job.last_progress == (0, 0)  # nothing persisted yet -> indeterminate, as before
+    assert job.last_progress == (0, 0)
 
 
 def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
@@ -581,9 +522,6 @@ def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
 
 
 def test_a_waiting_job_comfyui_says_it_is_making_is_being_made(qtbot, tmp_path):
-    # The server's own word, read by the poll, for a run whose start the job
-    # never heard: one taken back after it started with no copy of the app
-    # listening, whose next word can be a whole sampler step away.
     job, _client = _started_job(tmp_path)
     started = []
     job.started.connect(lambda: started.append(True))
@@ -594,8 +532,6 @@ def test_a_waiting_job_comfyui_says_it_is_making_is_being_made(qtbot, tmp_path):
     job.take_executing(True)
     assert (job.state, started) == ("running", [True])
 
-
-# --- what another app is holding ComfyUI with, ahead of a job it hasn't started
 
 def test_take_backlog_holds_another_apps_count_while_the_job_waits(qtbot, tmp_path):
     job, _client = _started_job(tmp_path)
@@ -609,19 +545,15 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     job.take_backlog(3)
 
-    client.progress.emit("comfy-A", "s", 1, 50)  # ComfyUI picked it up
+    client.progress.emit("comfy-A", "s", 1, 50)
 
     assert job.state == "running"
-    assert job.foreign_ahead is None  # the count clears the moment it's ours
-    job.take_backlog(3)  # a count fetched for a job no longer queued is dropped
+    assert job.foreign_ahead is None
+    job.take_backlog(3)
     assert job.foreign_ahead is None
 
 
-# --- what the queue needs of a job it has not sent yet -----------------------
-
 def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
-    # The queue places a job before it has run, so what it will produce has to be
-    # readable from the settings alone.
     image = GenerationJob(_client(), SDXL, _params())
     video = GenerationJob(_client(), WORKFLOW_REGISTRY["wan22_i2v"],
                           WORKFLOW_REGISTRY["wan22_i2v"].default_params())
@@ -630,8 +562,6 @@ def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
 
 
 def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
-    # A built job is only a job this app is holding: nothing was submitted, so
-    # the queue is free to re-order it, gate it, or drop it.
     client = _client()
 
     job = GenerationJob(client, SDXL, _params())
@@ -641,10 +571,6 @@ def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
 
 
 def test_a_job_taken_back_lands_the_run_the_last_copy_had_already_sent(qtbot, tmp_path):
-    # The previous copy sent this id and the server still holds its record:
-    # the stop that set the job aside reached ComfyUI after its last node had
-    # saved. Sending it again makes a second image nothing points at, and
-    # leaves every read of the id answering with the first one.
     client = _client()
     client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
     job = GenerationJob(
@@ -662,8 +588,6 @@ def test_a_job_taken_back_lands_the_run_the_last_copy_had_already_sent(qtbot, tm
 
 
 def test_a_job_taken_back_reports_the_run_it_is_finally_given(qtbot, tmp_path):
-    # It has to listen on the same id its row carries, or the run it eventually
-    # gets would finish invisibly.
     client = _client()
     job = GenerationJob(
         client, SDXL, _params(), prompt_id="held-1",
@@ -679,8 +603,6 @@ def test_a_job_taken_back_reports_the_run_it_is_finally_given(qtbot, tmp_path):
 
 
 def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
-    # A count that outlived the read under it would be a worse lie than none:
-    # a failed fetch arrives as None, and None replaces what was showing.
     job, _client = _started_job(tmp_path)
     job.take_backlog(2)
     assert job.foreign_ahead == 2
@@ -690,19 +612,15 @@ def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
     assert job.foreign_ahead is None
 
 
-# --- setting a job aside to run again later -----------------------------------
-
 def test_defer_stops_the_prompt_and_brings_the_job_back_unsent(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
-    client.progress.emit("comfy-A", "5", 3, 10)  # ComfyUI is rendering it
+    client.progress.emit("comfy-A", "5", 3, 10)
 
     assert job.defer() is True
 
     client.cancel_prompt.assert_called_once_with("comfy-A")
     client.interrupt.assert_called_once_with("comfy-A")
     assert job.state == "idle"
-    # Nothing of the run survives -- it starts over -- so the job shows as one
-    # that has not started, rather than a bar parked at where it was stopped.
     assert job.last_progress == (0, 0)
     assert job.last_pass_progress is None
     assert job.last_stage == ""
@@ -710,8 +628,6 @@ def test_defer_stops_the_prompt_and_brings_the_job_back_unsent(qtbot, tmp_path):
 
 
 def test_defer_detaches_so_the_stopped_runs_end_is_not_taken_as_this_jobs(qtbot, tmp_path):
-    # ComfyUI ends an interrupted prompt the way it ends a finished one, with a
-    # history carrying no outputs; taken as this job's, that would fail it.
     job, client = _started_job(tmp_path)
     job.defer()
     failed = []
@@ -735,10 +651,6 @@ def test_a_job_the_server_does_not_hold_cannot_be_deferred(qtbot, tmp_path):
 
 
 def test_a_deferred_job_sent_again_first_forgets_its_false_start(qtbot, tmp_path):
-    # The server keeps a record of the stopped run under this job's id, and
-    # every read of the job goes by that id: the late-submit follow-up would
-    # take it as the prompt having landed, and the poll's backstop as a run to
-    # finish. So it is wiped before the prompt is sent again.
     job, client = _started_job(tmp_path)
     client.fetch_history = MagicMock(return_value={"outputs": {}})
     client.forget_history = MagicMock()
@@ -752,9 +664,6 @@ def test_a_deferred_job_sent_again_first_forgets_its_false_start(qtbot, tmp_path
 
 
 def test_a_job_taken_over_from_another_copy_forgets_its_false_start_when_sent_again(qtbot, tmp_path):
-    # One copy of Origenerator sent it, another took it over while ComfyUI made
-    # it and then set it aside for an image: the record of the stopped run is
-    # under its id all the same, whichever copy sends it again.
     client = _client()
     job = GenerationJob.reconnect(client, SDXL, _params(), "comfy-A",
                                   places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
@@ -768,9 +677,6 @@ def test_a_job_taken_over_from_another_copy_forgets_its_false_start_when_sent_ag
 
 
 def test_a_deferred_job_whose_run_finished_after_all_lands_instead_of_running_again(qtbot, tmp_path):
-    # A stop that reaches the server after the last node has saved stops
-    # nothing: the run finished, and sending the prompt again would make the
-    # same file twice.
     job, client = _started_job(tmp_path)
     client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
     client.forget_history = MagicMock()
@@ -782,7 +688,7 @@ def test_a_deferred_job_whose_run_finished_after_all_lands_instead_of_running_ag
 
     assert finished == [[{"filename": "a.png", "subfolder": ""}]]
     assert job.state == "finished"
-    client.submit_job.assert_called_once()  # the first send; nothing went again
+    client.submit_job.assert_called_once()
     client.forget_history.assert_not_called()
 
 
@@ -797,16 +703,11 @@ def test_a_first_send_forgets_nothing_on_a_server_with_no_record_of_it(qtbot, tm
 
 
 def test_a_row_waiting_to_be_sent_is_called_queued_on_screen():
-    # The database calls it pending and the line calls it queued, and that
-    # translation was a ternary buried in the tile builder.
-
     assert display_status(GenerationStatus.PENDING) == JobState.QUEUED
     assert display_status(GenerationStatus.RUNNING) == JobState.RUNNING
 
 
 def test_a_job_waiting_here_or_on_the_server_is_called_queued_on_screen():
-    # Only a job ComfyUI has started is being made; one sent but still waiting
-    # there reads the same as one this app has not sent yet.
     assert display_status(JobState.IDLE) == JobState.QUEUED
     assert display_status(JobState.QUEUED) == JobState.QUEUED
     assert display_status(JobState.RUNNING) == JobState.RUNNING

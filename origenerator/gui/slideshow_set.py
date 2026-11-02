@@ -17,7 +17,7 @@ re-renders; a Funestra is handed a new playlist), so it arrives as
 the new pass.
 
 The map is the Funestras' own (:mod:`origenerator.gui.hud_nav_map`): the slide's
-act under other seeds runs right, what else was made of its image runs
+action under other seeds runs right, what else was made of its image runs
 down, and a
 loop along either axis deals THAT row or column as the pass, the way a
 satellite loops a seed family, until it is stepped off or ended.  The set it
@@ -52,7 +52,7 @@ from origenerator.slideshow import (
     in_order,
 )
 
-NO_ACTION_ON_SCREEN = "No act for this one"
+NO_ACTION_ON_SCREEN = "No action for this one"
 ENHANCEMENT_RUNNING = "running"
 ENHANCEMENT_QUEUED = "queued"
 _ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
@@ -81,9 +81,9 @@ class SlideshowSet:
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen
         self._known: dict[str, NavMapNeighbors] = {}
-        # What each generation's map row is named for, by id -- the acts an
+        # What each generation's map row is named for, by id -- the actions an
         # action filter matches it on.  None for a slideshow with no library under it.
-        self._actions_of = actions.acts
+        self._actions_of = actions.actions_of
         self._named: dict[str, str] = {}
         self._slides_of = actions.slides
         self._on_filters_change = actions.filters_changed
@@ -205,7 +205,7 @@ class SlideshowSet:
             self._on_filters_change(self.filters)
 
     def set_action_filter(self, query: str) -> bool:
-        return self.set_filters(replace(self.filters, act=query))
+        return self.set_filters(replace(self.filters, action=query))
 
     def drop_the_filters(self) -> bool:
         """Every filter off, the pass re-dealt over the whole set — a reset.
@@ -257,11 +257,11 @@ class SlideshowSet:
             return False
         if filters.enhanced and prompt_id not in self.enhanced_ids:
             return False
-        return not filters.act or label_is_filtered(self._named_for(prompt_id), filters.act,
+        return not filters.action or label_is_filtered(self._named_for(prompt_id), filters.action,
                                                     camera_words=())
 
     def _named_for(self, prompt_id) -> str:
-        """The act(s) *prompt_id*'s map row is named for.  The whole set is
+        """The action(s) *prompt_id*'s map row is named for.  The whole set is
         asked about at once, the first time anything is: the answer costs a
         walk of the library, and a filter asks it of every item."""
         if prompt_id is None or self._actions_of is None:
@@ -464,8 +464,8 @@ class SlideshowSet:
 
     def configuration_row(self, query: str) -> Slide | None:
         """The slide of the column row *query* names, where that row is a
-        configuration rather than an act — the half of the column whose button
-        jumps to it and loops its seed row.  ``None`` for an act's row, which
+        configuration rather than an action — the half of the column whose button
+        jumps to it and loops its seed row.  ``None`` for an action's row, which
         narrows the slideshow instead, and for a row the map does not draw."""
         shown = self.map()
         if shown is None:
@@ -517,7 +517,7 @@ class SlideshowSet:
             at = 0 if bucket == "corner" else index + 1
         else:
             # Off the lit cell's own axis — down from a seed, sideways from a
-            # act — into that cell's other axis, as if it were the corner.
+            # action — into that cell's other axis, as if it were the corner.
             current = self.playlist.current()
             around = self.neighbors(current.prompt_id)
             cells = (current, *(around.seeds if along_the_row
@@ -605,22 +605,22 @@ class SlideshowSet:
 
 
 def narrow_to_actions(slideshow_set: SlideshowSet, posted: str) -> tuple[str, bool]:
-    """Narrow *slideshow_set* to the act(s) a row's button or a spoken act *posted*
+    """Narrow *slideshow_set* to the action(s) a row's button or a spoken action *posted*
     — or lift the filter, for nothing posted — and answer with what a slideshow
     says about it, the way a satellite says it, and whether that is a dead
-    end: an act nothing here is named for leaves the pass alone."""
-    acts = actions_posted(posted)
-    if not (slideshow_set.set_action_filter(acts) or acts == slideshow_set.filters.act):
-        return f"Filter: no matches for '{acts}'", False
-    summary = f"'{acts}'" if acts else "cleared"
+    end: an action nothing here is named for leaves the pass alone."""
+    actions = actions_posted(posted)
+    if not (slideshow_set.set_action_filter(actions) or actions == slideshow_set.filters.action):
+        return f"Filter: no matches for '{actions}'", False
+    summary = f"'{actions}'" if actions else "cleared"
     return f"Filter: {summary} ({len(slideshow_set.playlist)})", True
 
 
 def narrow_to_the_action_on_screen(slideshow_set: SlideshowSet) -> tuple[str, bool]:
-    act = slideshow_set.action_on_screen()
-    if not act:
+    action = slideshow_set.action_on_screen()
+    if not action:
         return NO_ACTION_ON_SCREEN, False
-    return narrow_to_actions(slideshow_set, act)
+    return narrow_to_actions(slideshow_set, action)
 def item_note(slideshow_set: SlideshowSet, *, versions, version_index: int) -> str:
     if slideshow_set.playlist.current_is_live():
         return GENERATING

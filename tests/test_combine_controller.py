@@ -1,7 +1,7 @@
 """Combine, driven with no gallery around it.
 
-The whole act used to be reachable only by building the app's central widget:
-which settings a picked act resolves to, what a stand-in row does before there is
+The whole action used to be reachable only by building the app's central widget:
+which settings a picked action resolves to, what a stand-in row does before there is
 a job, and what a spoken animation refuses. Here the host is a handful of
 recorded calls.
 
@@ -270,10 +270,10 @@ def _image(prompt_id="img", *, prompt="a doll on a couch", files=("one.png",),
 
 
 def _video(prompt_id="clip", *, workflow_name=VIDEO_WORKFLOW, status="completed",
-           requested=None, exported=None, source_image=None, files=None, act=None):
+           requested=None, exported=None, source_image=None, files=None, action=None):
     return {
         "prompt_id": prompt_id,
-        "act": act,
+        "action": action,
         "workflow_name": workflow_name,
         "positive_prompt": "a doll on a couch, waving",
         "status": status,
@@ -424,8 +424,8 @@ def test_a_panel_with_no_server_behind_it_hides(combine):
 # --- what a session keeps ---------------------------------------------------
 
 
-def test_the_session_keeps_the_image_each_lanes_videos_the_lane_and_the_act(combine):
-    # None of the four is recoverable from the others: an act says nothing about
+def test_the_session_keeps_the_image_each_lanes_videos_the_lane_and_the_action(combine):
+    # None of the four is recoverable from the others: an action says nothing about
     # which lane answers it.
     controller, _host = combine()
     controller.widget.image_zone.set_item("img")
@@ -489,8 +489,8 @@ def test_recent_leaves_out_what_the_video_slot_would_not_take(combine):
     assert _recent_under(controller, action_settings.VIDEO) == []
 
 
-def test_a_restore_puts_the_lane_in_before_the_act(combine):
-    # The lane decides which acts are answerable, and set_category refuses one
+def test_a_restore_puts_the_lane_in_before_the_action(combine):
+    # The lane decides which actions are answerable, and set_category refuses one
     # that is grayed out under it.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
@@ -536,13 +536,13 @@ def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine, starting)
     assert row.source_video_thumbnail == "clip-thumb.png"
 
 
-def test_a_picked_act_names_itself_rather_than_showing_a_video(combine, starting):
+def test_a_picked_action_names_itself_rather_than_showing_a_video(combine, starting):
     controller, _host = combine(db=FakeDB([_image("img")]))
 
     controller._show_starting("img", category="waving")
 
     (row,) = starting.rows()
-    assert row.act == "waving"
+    assert row.action == "waving"
     assert row.source_video_thumbnail is None
 
 
@@ -596,10 +596,10 @@ def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
     assert jobs.prepared == []
 
 
-# --- finding the settings an act names --------------------------------------
+# --- finding the settings an action names --------------------------------------
 
 
-def test_an_act_with_nothing_assigned_runs_its_most_used_video_and_asks_no_model(
+def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_model(
         combine, monkeypatch):
     sent = []
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: sent.append(a))
@@ -609,7 +609,7 @@ def test_an_act_with_nothing_assigned_runs_its_most_used_video_and_asks_no_model
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7})
     controller, host = combine(
-        db=FakeDB([_image("img", state="state one"), _video("clip", act="waving")]))
+        db=FakeDB([_image("img", state="state one"), _video("clip", action="waving")]))
 
     controller.generate_category("img", "waving")
 
@@ -638,7 +638,7 @@ def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
     assert host.revealed == [f"folder-for-{VIDEO_WORKFLOW}-3"]
 
 
-def test_an_act_with_no_past_video_says_so_and_launches_nothing(combine,
+def test_an_action_with_no_past_video_says_so_and_launches_nothing(combine,
                                                                 monkeypatch):
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.action_settings, "most_used_video", lambda *a, **k: None)
@@ -701,7 +701,7 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
     assert tab.combination == Combination("img-thumb.png", "clip.webp")
 
 
-def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
+def test_a_curated_action_opened_shows_the_frame_alone(combine, monkeypatch):
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
@@ -719,7 +719,7 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
 
 def _nothing_assigned(monkeypatch):
     monkeypatch.setattr(module.animation_settings, "settings_for",
-                        lambda lane, act, state: None)
+                        lambda lane, action, state: None)
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
 
 
@@ -729,15 +729,15 @@ def _apart_from_the_image_and_the_seeds(params, workflow):
 
 
 @pytest.mark.parametrize("state", ["state one", None], ids=["sorted", "unsorted"])
-def test_an_act_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
+def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
         combine, monkeypatch, state):
-    # A past video of the act is there, and its settings are not what opens.
+    # A past video of the action is there, and its settings are not what opens.
     _nothing_assigned(monkeypatch)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tab = FakeGenerateTab()
     tabs = FakeTabs(tab)
     controller, host = combine(
-        db=FakeDB([_image("img", state=state), _video("clip", act="waving")]), tabs=tabs)
+        db=FakeDB([_image("img", state=state), _video("clip", action="waving")]), tabs=tabs)
 
     controller._open_category("img", "waving")
 
@@ -796,7 +796,7 @@ def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
                          ids=["generate", "edit individual"])
 def test_settings_assigned_by_prompts_alone_run_as_if_they_named_the_lanes_own_workflow(
         combine, monkeypatch, edit_first, lane):
-    # Assigned in Edit default… where no video was kept and the act had no
+    # Assigned in Edit default… where no video was kept and the action had no
     # settings of its own, so the record holds what he typed and no workflow.
     prompts = {"positive_prompt": "scene one", "negative_prompt": "scene two"}
     lanes_own = action_settings.starting_settings(lane)["workflow"]
@@ -929,10 +929,10 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
     assert db.exported == []
 
 
-# --- which acts are pickable at all -----------------------------------------
+# --- which actions are pickable at all -----------------------------------------
 
 
-def test_an_act_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
+def test_an_action_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_image_conditioned",
                         lambda name: name == VIDEO_WORKFLOW)
     monkeypatch.setattr(module.action_settings, "available_categories",
@@ -945,8 +945,8 @@ def test_an_act_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     assert controller.widget.available == ["clip"]
 
 
-def test_switching_lanes_re_asks_which_acts_are_answerable(combine, monkeypatch):
-    # An act with plenty of long-form video under it may have no loop at all.
+def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypatch):
+    # An action with plenty of long-form video under it may have no loop at all.
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     seen = []
     monkeypatch.setattr(module.action_settings, "available_categories",
@@ -959,7 +959,7 @@ def test_switching_lanes_re_asks_which_acts_are_answerable(combine, monkeypatch)
     assert seen == [action_settings.GENAU]
 
 
-def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch):
+def test_a_spoken_action_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch):
     # One item at a time per folder, and the spoken request still gets its video: the
     # run already going is stamped to be handed over when it lands, rather than a
     # second one being made of the same thing.
@@ -1000,7 +1000,7 @@ def _no_mining(monkeypatch, available=("waving",)):
     monkeypatch.setattr(module.action_settings, "most_used_video", lambda *a, **k: None)
 
 
-def test_animate_as_runs_the_act_it_names_in_the_lane_it_names(combine, monkeypatch):
+def test_animate_as_runs_the_action_it_names_in_the_lane_it_names(combine, monkeypatch):
     _paths(monkeypatch)
     _no_mining(monkeypatch)
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
@@ -1013,7 +1013,7 @@ def test_animate_as_runs_the_act_it_names_in_the_lane_it_names(combine, monkeypa
     assert launched == [(("img", "waving", action_settings.GENAU), {"send": True})]
 
 
-def test_animate_as_with_no_act_said_takes_the_one_the_image_leaves(combine,
+def test_animate_as_with_no_action_said_takes_the_one_the_image_leaves(combine,
                                                                     monkeypatch):
     _paths(monkeypatch)
     _no_mining(monkeypatch)
@@ -1039,7 +1039,7 @@ def test_a_full_length_animation_is_left_in_the_gallery_rather_than_handed_on(
     assert launched == [(("img", "leaning", action_settings.VIDEO), {"send": False})]
 
 
-def test_an_act_this_image_cannot_do_is_said_and_nothing_is_run(combine,
+def test_an_action_this_image_cannot_do_is_said_and_nothing_is_run(combine,
                                                                 monkeypatch):
     _paths(monkeypatch)
     _no_mining(monkeypatch)
@@ -1073,7 +1073,7 @@ def test_animate_as_declines_a_video(combine):
         None, "only an image can be animated", WARNING)
 
 
-def test_an_act_with_no_past_video_yet_says_so(combine, monkeypatch):
+def test_an_action_with_no_past_video_yet_says_so(combine, monkeypatch):
     _paths(monkeypatch)
     _no_mining(monkeypatch, available=())
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
@@ -1099,7 +1099,7 @@ def test_a_second_loop_asked_for_over_an_image_with_one_coming_is_refused(
         None, ALREADY_GENAUD, WARNING)
 
 
-def test_the_acts_narrow_to_what_the_dropped_image_can_start_from(combine,
+def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,
                                                                      monkeypatch):
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
@@ -1119,7 +1119,7 @@ def test_the_acts_narrow_to_what_the_dropped_image_can_start_from(combine,
 
 
 def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
-    # Graying every act over an image that says nothing about itself would read
+    # Graying every action over an image that says nothing about itself would read
     # as the tab being broken.
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
@@ -1131,15 +1131,15 @@ def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
     assert sorted(controller.widget.available) == ["leaning", "waving"]
 
 
-def test_the_settings_accepted_for_this_images_own_state_outrank_the_acts_pin(
+def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin(
         combine, monkeypatch, tmp_path):
-    """The same act started from two situations is two runs, and the overlay's
-    per-act pin can only be right for one of them."""
+    """The same action started from two situations is two runs, and the overlay's
+    per-action pin can only be right for one of them."""
     pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
     accepted = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 24}}
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: pinned)
     monkeypatch.setattr(module.animation_settings, "settings_for",
-                        lambda lane, act, state: accepted if state else None)
+                        lambda lane, action, state: accepted if state else None)
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
 
     built = controller._curated_combination("img", "waving")
@@ -1148,11 +1148,11 @@ def test_the_settings_accepted_for_this_images_own_state_outrank_the_acts_pin(
     assert built[1]["steps"] == 24
 
 
-def test_an_image_nobody_sorted_still_gets_the_acts_pin(combine, monkeypatch):
+def test_an_image_nobody_sorted_still_gets_the_actions_pin(combine, monkeypatch):
     pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: pinned)
     monkeypatch.setattr(module.animation_settings, "settings_for",
-                        lambda lane, act, state: None)
+                        lambda lane, action, state: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
     built = controller._curated_combination("img", "waving")
@@ -1238,7 +1238,7 @@ def test_browsing_an_image_puts_the_file_in_the_image_zone(combine, monkeypatch,
     assert controller.widget.image_zone.current_id() == photo
 
 
-def test_a_picked_act_runs_its_pinned_settings_on_a_browsed_image(combine, tmp_path, monkeypatch):
+def test_a_picked_action_runs_its_pinned_settings_on_a_browsed_image(combine, tmp_path, monkeypatch):
     photo = square(tmp_path, "green")
     monkeypatch.setattr(action_settings, "pinned_settings",
                         lambda category, intent: {"workflow": VIDEO_WORKFLOW,

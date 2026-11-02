@@ -19,7 +19,7 @@ new performer name it has never seen passes every check and lands. The guard is 
 backstop for names already known; it cannot see the next one.
 
 So fabricate fully. Use `Jane Doe`, `Sample Studio`, `scene one`, the
-`alpha`/`beta`/`gamma` act placeholders the committed `content.example.json`
+`alpha`/`beta`/`gamma` action placeholders the committed `content.example.json`
 already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that video, still that performer. Make
 it up from scratch, don't lightly edit a real one.
@@ -31,7 +31,7 @@ for one thing cost four. So:
 
 - A submitted piece of work is a **job** (`JobQueue`, `GenerationJob`,
   `job_for`, `held_jobs`), from the press to the saved row. **Re-roll** is kept
-  for the act it names -- a fresh variation of a settings folder, or a fresh
+  for the action it names -- a fresh variation of a settings folder, or a fresh
   seed on one row (`start_reroll`, `reroll_image_seed`, `reroll_video_seed`)
   -- and for nothing else, the "+" that asks for one being the New tile
   (`NewTile`); the class that owns every generation
@@ -56,7 +56,7 @@ for one thing cost four. So:
   them. **Recipe** is no word of the user's, and nothing here says it: a
   video's settings are its settings, the video a combine takes them from is
   its source video (`source_video`, as "From source video" under the form
-  says), and the act a video was launched as is its `act`. Only names already
+  says), and the action a video was launched as is its `action`. Only names already
   stored keep the old word, each read under it in one place: the two
   `generations` columns, which only the database code names
   (`db_schema.STORED_NAMES`), the overlay's old keys
@@ -250,18 +250,18 @@ then leaves as it is.
 
 Two columns answer it and nothing else does: an image's `image_state`, set in
 the sorting window or the Action list on a Generate tab, and a video's
-`act`, the act picked when it was launched. `action_settings.action_of`
+`action`, the action picked when it was launched. `action_settings.action_of`
 reads those two and returns "" for a row nobody has said one for, which a
-slideshow's map draws as a row with no act name, in its gutter and on its filter
+slideshow's map draws as a row with no action name, in its gutter and on its filter
 button (`nav_map.action_of`).
 
-It used to be worked out from the prompt, by matching each act's keywords in
-`acts` against the stored text. That answer named every map row and
-narrowed the show's act filter, and it was wrong often enough to be worse than
-nothing: it named rows for an act none of them shows, which the user found off the map
+It used to be worked out from the prompt, by matching each action's keywords in
+`actions` against the stored text. That answer named every map row and
+narrowed the show's action filter, and it was wrong often enough to be worse than
+nothing: it named rows for an action none of them shows, which the user found off the map
 (2026-09-21). He called the mechanism garbage and had it removed, with the spoken
 "genau it" that animated an image as whatever its prompt read as (2026-09-22).
-`acts` is now a plain list of the act names.
+`actions` is now a plain list of the action names.
 
 So nothing in this repo may go back to guessing from a prompt, however tempting a
 blank row looks: a blank says the image has not been sorted, which is a thing to
@@ -401,13 +401,13 @@ would be lost. `tests/test_launcher_contract.py` holds both to that.
   the user already kept. `animation_samples` finds and orders them,
   `animation_check_session` is the walk, `gui/animation_check_window.py` is the
   window, and what is accepted goes to `animation_settings` -- one set of
-  settings per (lane, act, image state) in a file of its own beside the library, which
-  `CombineController._curated_combination` asks before the overlay's per-act pin.
+  settings per (lane, action, image state) in a file of its own beside the library, which
+  `CombineController._curated_combination` asks before the overlay's per-action pin.
 
-  That per-act pin is on its way out, by the user's decision: it answered for a
-  whole act whatever the image showed, and it did not animate well enough to
+  That per-action pin is on its way out, by the user's decision: it answered for a
+  whole action whatever the image showed, and it did not animate well enough to
   keep. So nothing new may be built on it or around it -- no editor for it, no
-  second place that writes it -- and the end state is settings per (lane, act,
+  second place that writes it -- and the end state is settings per (lane, action,
   image state) and nothing else. Until every one of those is settled it stays
   as one thing only: the starting position the window offers for an animation
   nobody ever kept a video of, which is the last place `starting_point` looks.
@@ -591,7 +591,7 @@ Core` in a fresh interpreter, no `PYTHONPATH`): `tests/
 test_launch_smoke.py` deliberately stands the committed sample in for the
 local overlay, because a public checkout has only the sample, so it cannot
 see a local overlay the code can no longer read. A copy taken two hours
-earlier met exactly that on 2026-09-26 -- the overlay's act list went from a
+earlier met exactly that on 2026-09-26 -- the overlay's action list went from a
 list to a table of keywords on the machine 23 minutes after the copy, and the
 preview died at import with a loading screen that never lifted.
 

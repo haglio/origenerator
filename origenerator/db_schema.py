@@ -79,13 +79,13 @@ CREATE TABLE IF NOT EXISTS generations (
     -- separating such a run from the identical loop workflow started by hand,
     -- which must stay put until Send-to-Genau is pressed.
     genau_requested_at TEXT,
-    -- Where a combine launch got its settings: the act picked in the Combine
+    -- Where a combine launch got its settings: the action picked in the Combine
     -- Combine's dropdown, and the video whose settings the run re-uses. Either can
-    -- stand alone — a dropped video names no act, and an act the overlay pins
+    -- stand alone — a dropped video names no action, and an action the overlay pins
     -- settings for is answered from no past video. Nothing else about the run
     -- records it: the params carry the settings' values, never which video they
-    -- came from or what the user called the act. Stamped at launch, because a
-    -- queue row is read while the run is still pending. Read as ``act`` and
+    -- came from or what the user called the action. Stamped at launch, because a
+    -- queue row is read while the run is still pending. Read as ``action`` and
     -- ``source_video`` (STORED_NAMES).
     recipe_category TEXT,
     recipe_video_id TEXT,
@@ -322,7 +322,7 @@ GENERATION_COLUMNS = (
 
 
 # Every copy of the app opens this database, older ones too, so the columns keep their names.
-STORED_NAMES = {"act": "recipe_category", "source_video": "recipe_video_id",
+STORED_NAMES = {"action": "recipe_category", "source_video": "recipe_video_id",
                 "image_state": "picture_state"}
 
 

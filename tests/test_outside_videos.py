@@ -111,7 +111,7 @@ def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
                       "seed": "22", "model": "Image Model", "style": "Image Style",
                       "resolution": "1024", "aspect_ratio": "9:16", "quality": "Medium",
                       "creativity": "High"}, created="2025-03-01"),
-        act="Wave", image_key=seed_group_key(recorded),
+        action="Wave", image_key=seed_group_key(recorded),
         favorite=True)
 
 
@@ -174,13 +174,13 @@ _IMAGE_PARAMS = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", 
 def test_a_video_and_the_image_it_was_made_from_come_in_with_all_their_record_says(tmp_path):
     db, _video = _bring_in(tmp_path, Record(
         video=Made(_VIDEO_PARAMS, created="2025-03-02"),
-        image=Made(_IMAGE_PARAMS, created="2025-03-01"), act="Wave"))
+        image=Made(_IMAGE_PARAMS, created="2025-03-01"), action="Wave"))
 
     [shown] = _videos(db)
     image = _frame_of(db, shown)
     assert {key: value for key, value in json.loads(shown["params_json"]).items()
             if key != "input_image"} == _VIDEO_PARAMS
-    assert (shown["positive_prompt"], shown["seed"], shown["act"],
+    assert (shown["positive_prompt"], shown["seed"], shown["action"],
             shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
     assert json.loads(image["params_json"]) == _IMAGE_PARAMS
     assert (image["positive_prompt"], image["negative_prompt"], image["seed"],
@@ -453,7 +453,7 @@ def test_starring_a_video_from_another_source_tells_fun_time_through_the_journal
                                 "path": "videos/videos/outbox/portrait/a-site/c1_topaz.mp4"}
 
 
-def test_picking_an_act_for_a_video_from_another_source_tells_evolver_through_the_journal(
+def test_picking_an_action_for_a_video_from_another_source_tells_evolver_through_the_journal(
         tmp_path):
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
@@ -470,20 +470,20 @@ def test_picking_an_act_for_a_video_from_another_source_tells_evolver_through_th
 def _two_word_made_videos_one_action_apart(tmp_path) -> tuple[Database, dict]:
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
-        "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "12", act="Bow")})
+        "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "12", action="Bow")})
     for record in (tmp_path / "videos" / "metadata").rglob("*.json"):
         os.utime(record, (1_700_000_000, 1_700_000_000))
     [picked] = [row for row in _videos(db) if "c1_topaz" in row["output_files"]]
     return db, picked
 
 
-def test_picking_another_act_for_a_word_made_video_leaves_it_where_it_is(tmp_path):
+def test_picking_another_action_for_a_word_made_video_leaves_it_where_it_is(tmp_path):
     db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     named = ItemNames.from_library(db).of(picked["prompt_id"])
 
     pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
 
-    assert db.get_generation(picked["prompt_id"])["act"] == "Bow"
+    assert db.get_generation(picked["prompt_id"])["action"] == "Bow"
     assert ItemNames.from_library(db).of(picked["prompt_id"]) == named
 
 
@@ -494,25 +494,25 @@ def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(
     scan(db, _places(tmp_path), grab=_still)
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4"]]
-    assert db.get_generation(picked["prompt_id"])["act"] == "Bow"
+    assert db.get_generation(picked["prompt_id"])["action"] == "Bow"
 
 
 def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
     db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
     video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
-    _record(tmp_path, video, _made_from_words("a slow walk on the shore", "11", act="Kneel"))
+    _record(tmp_path, video, _made_from_words("a slow walk on the shore", "11", action="Kneel"))
 
     scan(db, _places(tmp_path), grab=_still)
 
-    assert db.get_generation(picked["prompt_id"])["act"] == "Kneel"
+    assert db.get_generation(picked["prompt_id"])["action"] == "Kneel"
 
 
 def test_a_pick_does_not_keep_a_video_from_taking_its_star_from_the_record(tmp_path):
     db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
     video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
-    _record(tmp_path, video, {**_made_from_words("a slow walk on the shore", "11", act="Bow"),
+    _record(tmp_path, video, {**_made_from_words("a slow walk on the shore", "11", action="Bow"),
                               "favorite": True})
     record = tmp_path / "videos" / "metadata" / "outbox" / "portrait" / "a-site" / "c1_topaz.json"
     os.utime(record, (1_700_000_050, 1_700_000_050))
@@ -638,29 +638,29 @@ def test_videos_made_from_two_images_with_one_prompt_are_two_folders(tmp_path):
     assert _leaves(db, "Videos") == [["c1_topaz.mp4"], ["c2_topaz.mp4"]]
 
 
-def _made_from_words(prompt: str, seed: str, act: str = "Wave") -> dict:
-    return {"video": {"prompt": prompt, "seed": seed, "action": act, "model": "Video Model"}}
+def _made_from_words(prompt: str, seed: str, action: str = "Wave") -> dict:
+    return {"video": {"prompt": prompt, "seed": seed, "action": action, "model": "Video Model"}}
 
 
-def test_videos_made_from_words_that_differ_only_by_seed_or_act_share_a_folder(tmp_path):
+def test_videos_made_from_words_that_differ_only_by_seed_or_action_share_a_folder(tmp_path):
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "12"),
-        "c3_topaz.mp4": _made_from_words("a slow walk on the shore", "13", act="Bow"),
+        "c3_topaz.mp4": _made_from_words("a slow walk on the shore", "13", action="Bow"),
         "c4_topaz.mp4": _made_from_words("a run in the rain", "14")})
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4", "c3_topaz.mp4"],
                                      ["c4_topaz.mp4"]]
 
 
-def test_videos_whose_records_name_no_prompt_share_one_folder_each_keeping_its_act(tmp_path):
+def test_videos_whose_records_name_no_prompt_share_one_folder_each_keeping_its_action(tmp_path):
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": {"video": {"action": "Wave", "duration_seconds": 5.0}},
         "c2_topaz.mp4": {"video": {"action": "Wave", "orientation": "portrait"}},
         "c3_topaz.mp4": {"video": {"action": "Bow"}}})
 
     assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4", "c3_topaz.mp4"]]
-    assert sorted(row["act"] for row in _videos(db)) == ["Bow", "Wave", "Wave"]
+    assert sorted(row["action"] for row in _videos(db)) == ["Bow", "Wave", "Wave"]
 
 
 def _workflow_folders(db, media_label: str) -> list[str]:
@@ -761,7 +761,7 @@ def test_a_look_brings_a_video_already_brought_in_up_to_its_record(tmp_path):
 
     [shown] = _videos(db)
     image = _frame_of(db, shown)
-    assert (shown["positive_prompt"], shown["seed"], shown["act"],
+    assert (shown["positive_prompt"], shown["seed"], shown["action"],
             shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
     assert (image["source"], image["positive_prompt"], image["seed"]) == (
         GenerationSource.OUTSIDE, "a quiet shore", 22)

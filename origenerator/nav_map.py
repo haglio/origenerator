@@ -1,15 +1,15 @@
 """The map around one generation, as the Funestras' HUD draws it.
 
 A Fun Time satellite maps the video on screen against its library: the same
-act under other seeds runs right as the seed row, and the same subject's
-other acts run down as the column.  A slideshow of this app's generations reads
+action under other seeds runs right as the seed row, and the same subject's
+other actions run down as the column.  A slideshow of this app's generations reads
 the same way, in the gallery's own terms.  The subject is an image, and what
 was made of it is the videos animated from it: they run down its column, each
-named for the act it shows, and the image heads theirs as their source.  A
+named for the action it shows, and the image heads theirs as their source.  A
 seed is the image's — a video's own sampler seed says nothing about which
 image it is of — so an image's row is its settings folder (the workflow,
 its version, the model, the LoRA and every setting but the seed), and a
-video's is its act animated from the images in its own image's folder.
+video's is its action animated from the images in its own image's folder.
 
 Pure and Qt-free: rows in, rows out.  The slideshow keeps the item on screen and
 the gallery supplies the library it is mapped against.
@@ -28,7 +28,7 @@ from origenerator.search import content_stems
 # dump a whole model's worth of images into a row meant to show close kin.
 WIDEN_ADDITIONS = 6
 
-# What an image is called among the acts of the videos animated from it.
+# What an image is called among the actions of the videos animated from it.
 SOURCE_IMAGE = "Source image"
 
 
@@ -79,11 +79,11 @@ def _likeness(one: frozenset[str], other: frozenset[str]) -> float:
 
 @dataclass(frozen=True)
 class Surroundings:
-    """What the library holds around one generation: the act its own row is
-    named for, the same act under other seeds along the row, down the column
-    one generation for each other action of the same image with the act it
+    """What the library holds around one generation: the action its own row is
+    named for, the same action under other seeds along the row, down the column
+    one generation for each other action of the same image with the action it
     shows, and the rest of that image's whole group — what a loop down the
-    column plays, twins of an act included."""
+    column plays, twins of an action included."""
 
     label: str = ""
     seeds: tuple[dict, ...] = ()
@@ -122,10 +122,10 @@ class _Animations:
         return self._videos_of.get(image["prompt_id"], [])
 
     def label_of(self, row: dict) -> str:
-        """The act(s) *row*'s map row is named for: what it shows, and — for an
+        """The action(s) *row*'s map row is named for: what it shows, and — for an
         image something was animated from — that it is their source."""
         source = SOURCE_IMAGE if self.videos_of(row) else ""
-        return ", ".join(act for act in (source, action_of(row)) if act)
+        return ", ".join(action for action in (source, action_of(row)) if action)
 
     def group_of(self, row: dict) -> list[dict]:
         """The image *row* is or was animated from, then every video animated
@@ -135,8 +135,8 @@ class _Animations:
 
 
 def _one_per_action(labeled) -> tuple[tuple[dict, str], ...]:
-    """The first generation showing each act, in the order they came: the
-    column steps between acts, so twins of one act share its row."""
+    """The first generation showing each action, in the order they came: the
+    column steps between actions, so twins of one action share its row."""
     first: dict[str, dict] = {}
     for row, label in labeled:
         first.setdefault(label, row)
@@ -157,7 +157,7 @@ def surroundings(current: dict, rows, *, image_index) -> Surroundings:
     if image is None:
         seeds = seed_family(current, rows, image_index=image_index)[1:]
     else:
-        # A video's seed is its image's: the same act, animated from the
+        # A video's seed is its image's: the same action, animated from the
         # same configuration of image under other seeds.
         seeds = [video
                  for sibling in seed_family(image, rows, image_index=image_index)
@@ -171,7 +171,7 @@ def surroundings(current: dict, rows, *, image_index) -> Surroundings:
         seeds=tuple(seeds),
         # Configurations belong to images: a video's seed is the image's
         # it was animated from, so another configuration of it is a video of
-        # that image, which the acts below already are.
+        # that image, which the actions below already are.
         configs=() if image is not None else tuple(
             config_family(current, rows, image_index=image_index)[1:]),
         actions=_one_per_action(
@@ -187,8 +187,8 @@ def beyond_the_row(current: dict, rows, *, image_index,
     *additions* of them — nothing when nothing lies beyond it, which is a dead
     end worth saying rather than a row of strangers.
 
-    Beyond a video animated from an image lie other videos of its act — the
-    act is a bound, not a preference: another act is what the column is for —
+    Beyond a video animated from an image lie other videos of its action — the
+    action is a bound, not a preference: another action is what the column is for —
     nearest by the model and LoRA that animated them, then by how alike the
     images they were animated from read.  Beyond anything else lie the other
     configurations of its own model: the same LoRA first, then the prompt that

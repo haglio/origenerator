@@ -848,11 +848,11 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
 _SPOKEN_LOOP = AnimateRequest(action_settings.GENAU, "")
 
 
-def test_a_spoken_loop_takes_the_one_act_the_sorted_image_leaves(qtbot, tmp_path,
+def test_a_spoken_loop_takes_the_one_action_the_sorted_image_leaves(qtbot, tmp_path,
                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    # "img_action" is sorted, and its state leaves the Genau lane one act, so the
+    # "img_action" is sorted, and its state leaves the Genau lane one action, so the
     # command needs none said.
     prompt_id, message, kind = view.animate_it("img_action", _SPOKEN_LOOP)
 
@@ -861,7 +861,7 @@ def test_a_spoken_loop_takes_the_one_act_the_sorted_image_leaves(qtbot, tmp_path
     assert kind == INFO
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
-    assert job.params["input_image"] == "sdxl_act.png [output]"
+    assert job.params["input_image"] == "sdxl_action.png [output]"
     # Spoken, so it hands itself on: whoever said it is not at the keyboard.
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"]
 
@@ -878,10 +878,10 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
     assert not view._live_jobs  # nothing was launched on a guess
 
 
-def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path,
+def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    # A sorted image of a state whose act the gallery holds no looping video of.
+    # A sorted image of a state whose action the gallery holds no looping video of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="another image", seed=3,
@@ -990,7 +990,7 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     assert len(_spoken_genau_rows(view)) == 2
 
 
-def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
+def test_a_pressed_generate_of_the_same_action_is_not_what_the_guard_counts(
         qtbot, tmp_path, monkeypatch):
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
@@ -1117,7 +1117,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # says which image is meant.
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
-    assert match("animate as alpha").command.act == "alpha"
+    assert match("animate as alpha").command.action == "alpha"
     assert [part.name for part in match("fix teeth").command] == ["teeth"]
     assert match("start slideshow") is not None
     assert match("make her hair longer") is None    # a sentence, not a command

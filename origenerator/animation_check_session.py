@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import json
 
-Path = tuple[str, str, str]  # lane, act, state
+Path = tuple[str, str, str]  # lane, action, state
 
 
 class AnimationCheckSession:
 
     def __init__(self, paths: list[Path], samples: dict[Path, list[dict]], store,
                  *, pinned=None):
-        """``pinned(act, lane)`` answers the act's own settings, which an
+        """``pinned(action, lane)`` answers the action's own settings, which an
         animation nobody ever kept a video of starts from instead of a sample."""
-        self._pinned = pinned or (lambda act, lane: None)
+        self._pinned = pinned or (lambda action, lane: None)
         self._paths = list(paths)
         self._ranks = {path: rank for rank, path in enumerate(self._paths)}
         self._samples = {path: list(videos) for path, videos in samples.items()}
@@ -33,7 +33,7 @@ class AnimationCheckSession:
     @property
     def starting_point(self) -> dict | None:
         """The settings on screen: what he has already assigned to this
-        animation, else the sample's own, else the act's."""
+        animation, else the sample's own, else the action's."""
         here = self.path
         if here is None:
             return None

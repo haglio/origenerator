@@ -105,8 +105,8 @@ class Database:
     def set_image_state(self, prompt_id: str, state: str | None):
         return self.generations.set_image_state(prompt_id, state)
 
-    def set_action(self, prompt_id: str, act: str | None):
-        return self.generations.set_action(prompt_id, act)
+    def set_action(self, prompt_id: str, action: str | None):
+        return self.generations.set_action(prompt_id, action)
 
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)

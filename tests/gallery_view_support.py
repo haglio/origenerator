@@ -182,7 +182,7 @@ class FakeDB:
         return [{"prompt_id": row["prompt_id"], "source_video": row["source_video"],
                  "created_at": row.get("created_at") or ""}
                 for row in self._rows
-                if row.get("source_video") and not row.get("act")]
+                if row.get("source_video") and not row.get("action")]
 
     def list_item_numbers(self):
         return dict(self._item_numbers)
@@ -1251,13 +1251,13 @@ def _finish_reroll(view, job):
 
 
 def _genau_db(tmp_path):
-    """The combine DB plus a looping video launched as the "alpha" act to mine.
+    """The combine DB plus a looping video launched as the "alpha" action to mine.
 
-    The long-form video the fixture already carries was launched as the same act,
+    The long-form video the fixture already carries was launched as the same action,
     so this also pins that the Genau lane picks the loop over it. "state two" is
     the one image state the example overlay lets the Genau lane animate at all,
-    and "alpha" the one act it allows from it — so an "animate as go now" over
-    this image needs no act said. Both images are enhanced already, as
+    and "alpha" the one action it allows from it — so an "animate as go now" over
+    this image needs no action said. Both images are enhanced already, as
     the combine DB's is.
     """
     db = _combine_db(tmp_path)
@@ -1282,7 +1282,7 @@ def _genau_db(tmp_path):
         workflow_json="{}",
     )
     db.update_generation("img_action", status="completed", output_files=json.dumps(
-        [{"filename": "sdxl_act.png", "subfolder": ""},
+        [{"filename": "sdxl_action.png", "subfolder": ""},
          {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))
     db.set_image_state("img_action", "state two")
     return db

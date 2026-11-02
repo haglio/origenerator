@@ -19,16 +19,16 @@ from origenerator.gui.action_dropdown import (
 from origenerator.gui.label_cells import LabelForm
 
 _STATES = ("state one", "state two", "state three")
-_ACTIONS_OFFERED = ("act one", "act two")
+_ACTIONS_OFFERED = ("action one", "action two")
 
 
-def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, act=None):
+def _row(prompt_id="img", *, filename="scene_00001_.png", state=None, action=None):
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "output_files": json.dumps([{"filename": filename}]),
         "image_state": state,
-        "act": act,
+        "action": action,
     }
 
 
@@ -98,25 +98,25 @@ def test_taking_the_answer_back_says_so_rather_than_saying_nothing(dropdown, qtb
     assert caught.args == ["img-7", ""]
 
 
-def test_a_video_offers_every_act_and_opens_on_the_one_it_shows(dropdown):
-    dropdown.show_row(_row(filename="scene_00001_.mp4", act="act two"))
+def test_a_video_offers_every_action_and_opens_on_the_one_it_shows(dropdown):
+    dropdown.show_row(_row(filename="scene_00001_.mp4", action="action two"))
 
     assert not dropdown.isHidden()
-    assert dropdown.picked() == "act two"
+    assert dropdown.picked() == "action two"
     assert dropdown.offered() == ["", *_ACTIONS_OFFERED]
 
 
-def test_an_act_the_list_lacks_shows_as_itself_at_its_foot(dropdown):
-    dropdown.show_row(_row(filename="scene_00001_.mp4", act="an act from elsewhere"))
+def test_an_action_the_list_lacks_shows_as_itself_at_its_foot(dropdown):
+    dropdown.show_row(_row(filename="scene_00001_.mp4", action="an action from elsewhere"))
 
-    assert dropdown.picked() == "an act from elsewhere"
-    assert dropdown.offered() == ["", *_ACTIONS_OFFERED, "an act from elsewhere"]
+    assert dropdown.picked() == "an action from elsewhere"
+    assert dropdown.offered() == ["", *_ACTIONS_OFFERED, "an action from elsewhere"]
 
 
-def test_an_act_spelled_like_one_on_the_list_but_for_case_and_spacing_is_that_act(dropdown):
-    dropdown.show_row(_row(filename="scene_00001_.mp4", act="  ACT   two "))
+def test_an_action_spelled_like_one_on_the_list_but_for_case_and_spacing_is_that_action(dropdown):
+    dropdown.show_row(_row(filename="scene_00001_.mp4", action="  ACTION   two "))
 
-    assert dropdown.picked() == "act two"
+    assert dropdown.picked() == "action two"
     assert dropdown.offered() == ["", *_ACTIONS_OFFERED]
 
 
@@ -138,7 +138,7 @@ def test_the_list_says_whether_it_is_an_images_or_a_videos(dropdown):
     dropdown.show_row(_row())
 
     assert (on_a_video, inner.toolTip()) == (
-        "What this video shows — the act it was made as",
+        "What this video shows — the action it was made as",
         "What this image already shows — which decides what it can be animated as")
 
 

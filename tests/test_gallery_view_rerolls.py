@@ -1089,7 +1089,7 @@ def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view._combine.generate_category("img", "alpha", action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
-    # The act has a long-form video too; the Genau lane can only use the loop.
+    # The action has a long-form video too; the Genau lane can only use the loop.
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 

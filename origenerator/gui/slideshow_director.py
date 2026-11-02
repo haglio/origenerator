@@ -664,7 +664,7 @@ class SlideshowDirector:
             omnipause=self._ask_the_room_to_pause(),
             neighbors=partial(self.neighbors_of, shape=shape),
             widen=partial(self.beyond_the_row_of, shape=shape),
-            acts=partial(self.actions_of, shape=shape),
+            actions_of=partial(self.actions_of, shape=shape),
             slides=self.slides_for,
             move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,
@@ -821,12 +821,12 @@ class SlideshowDirector:
 
     def neighbors_of(self, prompt_id: str, *, shape: str) -> NavMapNeighbors:
         """What the library says about one generation, for the map a slideshow on
-        *shape* draws around it: its act under other seeds along the row, and
+        *shape* draws around it: its action under other seeds along the row, and
         down the column the same seed under other configurations, then what
         else was made of its image — the videos animated from it, and for a
         video the image itself (:mod:`origenerator.nav_map`).  A
         configuration is named by its folder, as the tree names it, and the
-        rest by the act each shows.  Nothing at all for a generation the
+        rest by the action each shows.  Nothing at all for a generation the
         gallery does not have a row for — a file being written, a set
         assembled without ids."""
         row = self._host.row_for(prompt_id) if prompt_id else None
@@ -860,7 +860,7 @@ class SlideshowDirector:
     def actions_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
         """What the map names each of *prompt_ids* for, among the library of
         *shape*'s shape — what an action filter matches a generation on.  One the
-        library does not hold is left out, and answers to no act."""
+        library does not hold is left out, and answers to no action."""
         named_for = action_labels(self._library_of(shape),
                                image_index=self._host.image_config_index())
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
@@ -1070,7 +1070,7 @@ class SlideshowDirector:
             corner, minimized = self.hud_place(shape)
             huds[shape] = {"corner": corner, "minimized": minimized}
         volume = self._volume_left_at
-        return {"last_show": state.saved(), "filters": asdict(self._filters),
+        return {"last_show": state.saved(), "filters": SlideshowFilters.saved(self._filters),
                 "panels": huds, "pace": self._pace.seconds,
                 "volume": None if volume is None else asdict(volume)}
 

@@ -3,7 +3,6 @@ and advance policy."""
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 
 from origenerator.slideshow import (
     LIVE,
@@ -494,10 +493,15 @@ def test_where_a_slideshow_was_left_reads_back_as_it_was_saved():
 
 
 def test_the_filters_read_back_as_they_were_saved():
-    filters = SlideshowFilters(favorites=True, enhanced=True, act="alpha")
+    filters = SlideshowFilters(favorites=True, enhanced=True, action="alpha")
 
-    assert SlideshowFilters.restored(json.loads(json.dumps(asdict(filters)))) == filters
+    assert SlideshowFilters.restored(json.loads(json.dumps(filters.saved()))) == filters
     assert SlideshowFilters.restored({"favorites": 1, "act": ["alpha"]}) == SlideshowFilters()
+
+
+def test_the_action_filter_is_saved_under_the_key_older_copies_of_the_app_read():
+    assert SlideshowFilters(action="alpha").saved() == {"favorites": False, "enhanced": False, "act": "alpha"}
+    assert SlideshowFilters.restored({"act": "alpha"}) == SlideshowFilters(action="alpha")
 
 
 def test_a_saved_slideshow_that_makes_no_sense_reads_back_as_nowhere():

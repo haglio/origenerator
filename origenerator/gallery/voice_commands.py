@@ -1,7 +1,7 @@
 """What a spoken utterance over a fullscreen image can ask for.
 
 Three commands share one mic: "fix <part>"
-(:mod:`~origenerator.workflows.detail_parts`), "animate as <act>"
+(:mod:`~origenerator.workflows.detail_parts`), "animate as <action>"
 (:mod:`~origenerator.animate_command`), and "enhance".
 :func:`match_command` is the one matcher the voice surface is given,
 :func:`command_phrases` what the recognizer is asked to hear, and

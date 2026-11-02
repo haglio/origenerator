@@ -81,7 +81,7 @@ def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favor
     assert {config.LIBRARY_ROOT / Path(line["path"]) for line in lines} == {video}
 
 
-def test_an_act_picked_here_is_a_line_evolver_writes_into_the_videos_record(tmp_path):
+def test_an_action_picked_here_is_a_line_evolver_writes_into_the_videos_record(tmp_path):
     promise = _promise()
     journals = promise["journals"]
     video, row = _another_sources_video(promise)

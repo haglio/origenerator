@@ -90,8 +90,8 @@ def test_the_genau_lane_asks_for_settings_one_cycle_long(qtbot, tmp_path):
     assert job.params["positive_prompt"] != "alpha"             # asked for one cycle
 
 
-def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
-    """A cycle is not one motion, so the wording is per act — and the act has to
+def test_the_action_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
+    """A cycle is not one motion, so the wording is per action — and the action has to
     reach the shaping, which is the whole reason it is threaded through."""
     db = _combine_db(tmp_path)
     _looping_video(db)
@@ -216,7 +216,7 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
 
 def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_starts(
         qtbot, tmp_path, monkeypatch):
-    # A past looping video of the act is there, and its settings are not what opens;
+    # A past looping video of the action is there, and its settings are not what opens;
     # nor is the one-cycle cut the lane gives the settings it runs.
     db = _combine_db(tmp_path)
     looping = _looping_video(db)
@@ -244,7 +244,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
 
 def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
     # An "Edit individual…" press reaches the view's open handler, so clicking it with a
-    # dropped video (or a picked act) opens an editable tab.
+    # dropped video (or a picked action) opens an editable tab.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -329,8 +329,8 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
     assert view._live_jobs == {}
 
 
-def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
-    # The combine DB's one "dance" video is the "dancing" act's most-used video.
+def test_category_runs_the_actions_most_used_video(qtbot, tmp_path):
+    # The combine DB's one "dance" video is the "dancing" action's most-used video.
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -343,7 +343,7 @@ def test_category_runs_the_acts_most_used_video(qtbot, tmp_path):
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
 
-def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
+def test_refresh_greys_out_the_actions_with_no_video_to_mine(qtbot, tmp_path):
     db = _combine_db(tmp_path)  # its one video is a "dance" video
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -367,14 +367,14 @@ def test_category_prefers_the_overlays_pinned_settings_over_mining(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     monkeypatch.setattr(combine_controller.action_settings, "most_used_video",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated action must not mine")))
 
     view._combine.generate_category("img", "gamma")
 
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"     # run on the dropped image
-    assert job.params["lora_high"] == "example-act-high.safetensors"  # the curated spec's pin
+    assert job.params["lora_high"] == "example-action-high.safetensors"  # the curated spec's pin
     assert job.params["steps"] == 24
 
 
@@ -398,7 +398,7 @@ def test_settings_from_a_dropped_video_name_that_video(qtbot, tmp_path):
 
     row = _launched_row(view)
     assert row["source_video"] == "vid"
-    assert row["act"] is None  # a dropped video is no dropdown choice
+    assert row["action"] is None  # a dropped video is no dropdown choice
 
 
 def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, tmp_path):
@@ -453,7 +453,7 @@ def test_recent_under_genau_leaves_out_a_full_length_video_used_under_genau(qtbo
     assert _listed_under_recent(combine) == ["looping"]
 
 
-def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):
+def test_a_picked_action_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -461,13 +461,13 @@ def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path,
     view._combine.generate_category("img", "dancing")
 
     row = _launched_row(view)
-    assert row["act"] == "dancing"
+    assert row["action"] == "dancing"
     assert row["source_video"] == "vid"
 
 
-def test_a_curated_act_records_the_act_with_no_video_behind_it(qtbot, tmp_path):
+def test_a_curated_action_records_the_action_with_no_video_behind_it(qtbot, tmp_path):
     # "gamma" is pinned in the example overlay: there is no past run for the
-    # queue row to show, and the act is the whole of what was chosen.
+    # queue row to show, and the action is the whole of what was chosen.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -475,7 +475,7 @@ def test_a_curated_act_records_the_act_with_no_video_behind_it(qtbot, tmp_path):
     view._combine.generate_category("img", "gamma")
 
     row = _launched_row(view)
-    assert row["act"] == "gamma"
+    assert row["action"] == "gamma"
     assert row["source_video"] is None
 
 
@@ -592,7 +592,7 @@ def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path)
     assert not tab._related._source_video_tile.isHidden()
 
 
-def test_an_act_whose_settings_came_from_no_video_links_to_the_image_alone(qtbot, tmp_path):
+def test_an_action_whose_settings_came_from_no_video_links_to_the_image_alone(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -770,7 +770,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     qtbot.addWidget(view)
     view.refresh()
     monkeypatch.setattr(combine_controller.action_settings, "most_used_video",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated action must not mine")))
     opened = []
     monkeypatch.setattr(view._generate_pane, "open_config",
                         lambda name, params: opened.append((name, params)))
@@ -780,10 +780,10 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     (name, params), = opened
     assert name == "wan22_i2v"
     assert params["input_image"] == "sdxl_pick.png [output]"
-    assert params["lora_high"] == "example-act-high.safetensors"
+    assert params["lora_high"] == "example-action-high.safetensors"
 
 
-def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
+def test_category_noop_and_hints_when_the_action_has_no_video(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)  # its one video is a "dance" video — no epsilon video exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -872,9 +872,9 @@ def _combine_view(qtbot, tmp_path):
     return view
 
 
-def _pick_action(tab, act):
-    """Choose an act in the Combine's dropdown, as a click on its row would."""
-    index = tab._category.findText(act)
+def _pick_action(tab, action):
+    """Choose an action in the Combine's dropdown, as a click on its row would."""
+    index = tab._category.findText(action)
     tab._category.setCurrentIndex(index if index >= 1 else 0)
 
 
@@ -896,9 +896,9 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
     }
 
 
-def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
+def test_combine_selection_carries_the_lane_and_the_action(qtbot, tmp_path):
     # All four are choices the user made, and none is recoverable from the
-    # others: an act says nothing about which lane answers it.
+    # others: an action says nothing about which lane answers it.
     view = _combine_view(qtbot, tmp_path)
     view._combine.widget.image_zone.set_item("img")
     _pick_lane(view._combine.widget, action_settings.GENAU)
@@ -937,7 +937,7 @@ def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_
     assert restored._combine.widget.video_zone.current_id() == "vid"
 
 
-def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
+def test_restore_combine_selection_puts_the_lane_and_action_back(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(
@@ -957,10 +957,10 @@ def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot,
     assert view._combine.widget.selected_intent() == action_settings.VIDEO
 
 
-def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
-    # The lane decides which acts are answerable, and what could be answered when
+def test_restore_drops_an_action_the_saved_lane_cannot_answer(qtbot, tmp_path):
+    # The lane decides which actions are answerable, and what could be answered when
     # the session closed may not be now — a video trashed, or the lane itself
-    # changed. A grayed act must not come back selected: the buttons would be
+    # changed. A grayed action must not come back selected: the buttons would be
     # live on a pick that can only report "no past video yet".
     view = _combine_view(qtbot, tmp_path)
 

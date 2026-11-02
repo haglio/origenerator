@@ -79,17 +79,17 @@ def test_checking_animations_opens_on_the_first_of_them(
     assert up[0].findChild(QLabel, HEADING).text()
 
 
-def test_an_animation_with_no_sample_starts_from_the_acts_own_settings(
+def test_an_animation_with_no_sample_starts_from_the_actions_own_settings(
         a_library_of_its_own, monkeypatch):
-    """His ask: the per-act settings are the starting position where nothing
+    """His ask: the per-action settings are the starting position where nothing
     kept was ever made this way."""
     monkeypatch.setattr(action_settings, "pinned_settings",
-                        lambda act, lane: {"workflow": "wan22_i2v",
-                                           "params": {"positive_prompt": "the act's own"}})
+                        lambda action, lane: {"workflow": "wan22_i2v",
+                                           "params": {"positive_prompt": "the action's own"}})
 
     made = check_animations.the_animation_window()
 
-    assert made.findChild(QPlainTextEdit, POSITIVE).toPlainText() == "the act's own"
+    assert made.findChild(QPlainTextEdit, POSITIVE).toPlainText() == "the action's own"
 
 
 def test_each_window_names_itself_to_windows_under_the_apps_own_name():

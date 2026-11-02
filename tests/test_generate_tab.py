@@ -4364,13 +4364,13 @@ def test_a_story_lacks_its_loras_trigger_word_in_a_scene_without_it_and_a_click_
 
 def test_the_workflows_warning_click_adds_the_first_of_a_loras_several_trigger_words(
         qtbot, installed_models, worded_loras, blank_panel):
-    installed_models.add("loras", "example_acts.safetensors", arch=KREA2, lora=True)
-    worded_loras({"example_acts": ["alpha", "beta"]})
+    installed_models.add("loras", "example_actions.safetensors", arch=KREA2, lora=True)
+    worded_loras({"example_actions": ["alpha", "beta"]})
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
     form = _on_screen(qtbot, blank_panel)._param_form
     form._widgets["positive_prompt"].boxes()[0].setPlainText("a portrait")
     lora = form._widgets["lora"]
-    lora.setCurrentIndex(lora.findData("example_acts.safetensors"))
+    lora.setCurrentIndex(lora.findData("example_actions.safetensors"))
 
     qtbot.mouseClick(blank_panel._workflow_warning, Qt.MouseButton.LeftButton)
 
@@ -4440,7 +4440,7 @@ def test_taking_that_answer_back_leaves_the_image_unsorted_again(saved_panel):
     assert db.get_generation("img9")["image_state"] is None
 
 
-def test_a_video_on_the_tab_is_offered_the_acts_opened_on_its_own(saved_panel):
+def test_a_video_on_the_tab_is_offered_the_actions_opened_on_its_own(saved_panel):
     tab, db = saved_panel
     _video_row(db, "vid9")
     db.set_settings_source("vid9", category=CATEGORIES[1])
@@ -4452,13 +4452,13 @@ def test_a_video_on_the_tab_is_offered_the_acts_opened_on_its_own(saved_panel):
     assert tab._action.picked() == CATEGORIES[1]
 
 
-def test_saying_what_act_the_shown_video_is_lands_on_its_row(saved_panel):
+def test_saying_what_action_the_shown_video_is_lands_on_its_row(saved_panel):
     tab, db = saved_panel
     tab.show_saved_generation(_video_row(db, "vid9"), [])
 
     tab._action.pick(CATEGORIES[1])
 
-    assert db.get_generation("vid9")["act"] == CATEGORIES[1]
+    assert db.get_generation("vid9")["action"] == CATEGORIES[1]
 
 
 def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,

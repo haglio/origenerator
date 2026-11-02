@@ -70,20 +70,26 @@ class Slide(NamedTuple):
         )
 
 
+_SAVED_FILTER_NAMES = {"action": "act"}
+
+
 @dataclass(frozen=True)
 class SlideshowFilters:
     favorites: bool = False
     enhanced: bool = False
-    act: str = ""
+    action: str = ""
+
+    def saved(self) -> dict:
+        return {_SAVED_FILTER_NAMES.get(name, name): value for name, value in asdict(self).items()}
 
     @classmethod
     def restored(cls, saved) -> SlideshowFilters:
         if not isinstance(saved, dict):
             return cls()
-        act = saved.get("act")
+        action = saved.get(_SAVED_FILTER_NAMES["action"])
         return cls(favorites=saved.get("favorites") is True,
                    enhanced=saved.get("enhanced") is True,
-                   act=act if isinstance(act, str) else "")
+                   action=action if isinstance(action, str) else "")
 
 
 @dataclass(frozen=True)

@@ -1,4 +1,4 @@
-"""What a slideshow is handed when it opens: the acts it can ask for, and the facts
+"""What a slideshow is handed when it opens: the actions it can ask for, and the facts
 its HUD reads off the set.
 
 :class:`~origenerator.gui.slideshow_view.SlideshowView` took nineteen
@@ -52,10 +52,10 @@ class SlideshowActions:
     itself.
 
     ``neighbors`` and ``widen`` take a prompt_id and answer for the library
-    the slideshow cannot see: what shows that generation's act under other seeds
+    the slideshow cannot see: what shows that generation's action under other seeds
     and what else was made of its image (the map's two axes, as
     :class:`~origenerator.gui.hud_nav_map.NavMapNeighbors`), and what lies just
-    beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
+    beyond the row (the slides "more seeds" adds to it).  ``actions_of`` takes
     prompt_ids and answers what each one's map row is named for, which is
     what an action filter matches it on, and ``slides`` the slides they play as,
     which a loop picked back up plays whatever set it reopened on.
@@ -89,7 +89,7 @@ class SlideshowActions:
     move_hud: Callable[[str], None] | None = None
     neighbors: Callable[[str], object] | None = None
     widen: Callable[[str], tuple] | None = None
-    acts: Callable[[list], dict] | None = None
+    actions_of: Callable[[list], dict] | None = None
     slides: Callable[[tuple], tuple] | None = None
     filters_changed: Callable[[SlideshowFilters], None] | None = None
     volume_moved: Callable[[VolumeHud], None] | None = None

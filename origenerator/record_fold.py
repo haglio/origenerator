@@ -34,7 +34,7 @@ def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> N
         if row.get("enhance_of") == gone:
             db.set_enhance_target(row["prompt_id"], stays)
         if row.get("source_video") == gone:
-            db.set_settings_source(row["prompt_id"], category=row.get("act"),
+            db.set_settings_source(row["prompt_id"], category=row.get("action"),
                                    video_prompt_id=stays)
     db.repoint_combine_video_uses(gone, stays)
     for folder_meta in db.folder_meta_full():

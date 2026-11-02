@@ -53,7 +53,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           progress=None, reveal=None, cancel=None, foreign_ahead=None, starts_at=None,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
-          act="", source_video_thumbnail=None, prompt_edited=False,
+          action="", source_video_thumbnail=None, prompt_edited=False,
           starting=False, movable=None, shield=None, shielded=False,
           move_up=_EITHER_WAY, move_down=_EITHER_WAY):
     # The job being made holds its place unless a test says it can be moved.
@@ -69,7 +69,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                         auto_generating=auto_generating,
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
-                        act=act, source_video_thumbnail=source_video_thumbnail,
+                        action=action, source_video_thumbnail=source_video_thumbnail,
                         prompt_edited=prompt_edited, starting=starting,
                         shield=shield, shielded=shielded)
 
@@ -593,7 +593,7 @@ def test_a_rows_arrows_follow_where_its_job_can_go_in_place(queue):
 def test_a_rows_text_elides_rather_than_widen_the_row_past_a_narrow_strip(queue):
     queue.resize(900, 60)
     queue.set_items([_item(key="a", status="queued", job_kind="Video",
-                           act="an act with a name long enough to run past the Job Queue",
+                           action="an action with a name long enough to run past the Job Queue",
                            cancel=lambda: None, shield=lambda _on: None)])
     QApplication.processEvents()
     row = queue.rows()[0]
@@ -1324,26 +1324,26 @@ def test_a_hand_launched_job_says_neither(queue):
     assert queue.rows()[0]._lead.text() == "~30 sec · Image"
 
 
-def test_a_row_names_the_act_it_was_asked_for(queue):
-    # The kind says a video is being made; the act says which video —
+def test_a_row_names_the_action_it_was_asked_for(queue):
+    # The kind says a video is being made; the action says which video —
     # the whole of what the user chose in Combine, and the one thing separating
     # two runs on the same image.
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
-                           act="dancing")])
+                           action="dancing")])
     assert queue.rows()[0]._lead.text() == "~2 min · Video · dancing"
 
 
-def test_a_run_nobody_picked_an_act_for_names_none(queue):
+def test_a_run_nobody_picked_an_action_for_names_none(queue):
     # A dropped video is the settings' own source: there was no dropdown choice to show,
     # and inventing one from its prompt would be a guess the row states as fact.
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video")])
     assert queue.rows()[0]._lead.text() == "~2 min · Video"
 
 
-def test_the_hover_spells_out_where_the_act_came_from(queue):
+def test_the_hover_spells_out_where_the_action_came_from(queue):
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
-                           act="dancing")])
-    assert "“dancing” act" in queue.rows()[0]._lead.toolTip()
+                           action="dancing")])
+    assert "“dancing” action" in queue.rows()[0]._lead.toolTip()
 
 
 def test_a_workflow_nobody_has_timed_admits_it(queue):
@@ -1434,7 +1434,7 @@ def test_a_combine_row_whose_prompt_was_edited_draws_its_source_video_in_parenth
 def test_a_row_that_is_not_a_job_yet_says_so(queue):
     # The press of Generate has an answer on screen before the work that turns it
     # into a job is done — otherwise the button reads as one that did nothing.
-    queue.set_items([_item(status="queued", job_kind="Video", act="dancing",
+    queue.set_items([_item(status="queued", job_kind="Video", action="dancing",
                            cancel=None, starting=True)])
     row = queue.rows()[0]
 

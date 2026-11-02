@@ -552,7 +552,7 @@ def _fox_library(tmp_path):
             _row("v1", "wan22_i2v",
                  {"positive_prompt": "the fox runs", "noise_seed": 5,
                   "input_image": "sdxl_t2i_g1.png"},
-                 "wan22_i2v_v1.mp4", act="alpha")]
+                 "wan22_i2v_v1.mp4", action="alpha")]
     for row in rows:
         row["thumbnail_path"] = str(tall)
         if row["workflow_name"] == "sdxl_t2i":
@@ -578,7 +578,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     """The slide in the corner; the same configuration under its other seed
     running right; its own seed under another configuration running down,
     named by that folder, and then the video animated from it, named for its
-    act, with the image's own row named as that video's source; the corner
+    action, with the image's own row named as that video's source; the corner
     lit and no loop — the Funestras' map, drawn against this app's library of
     that side's shape."""
     rows = _fox_library(tmp_path)
@@ -805,7 +805,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     model = slideshow_hud_model("portrait", slideshow)
     assert model.active_loop == "seed"
     # A seed loop lights the row it is playing, which is what that row's
-    # button says about it; an act filter would light every row it keeps.
+    # button says about it; an action filter would light every row it keeps.
     assert model.filter_query == model.current_action == "Source image"
     assert model.title.startswith("Looping seeds")
     assert "Unlocked" not in model.title

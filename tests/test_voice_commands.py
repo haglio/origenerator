@@ -29,7 +29,7 @@ def test_a_sentence_merely_mentioning_it_is_not_a_command():
 def test_the_three_commands_do_not_shadow_each_other():
     (fix,) = voice_commands.match_command("fix teeth")
     assert fix.name == "teeth"
-    assert voice_commands.match_command("animate as video alpha").act == "alpha"
+    assert voice_commands.match_command("animate as video alpha").action == "alpha"
     assert voice_commands.match_command("enhance") == voice_commands.ENHANCE_COMMAND
     assert voice_commands.match_command("make her hair longer") is None
 
@@ -52,7 +52,7 @@ def test_the_gallery_facade_exposes_the_one_matcher():
     # What the voice surface is actually given; a verb added to the module has to
     # reach it without the caller changing.
     assert gallery.match_command("enhance") == gallery.ENHANCE_COMMAND
-    assert gallery.match_command("animate as video alpha").act == "alpha"
+    assert gallery.match_command("animate as video alpha").action == "alpha"
     assert gallery.command_phrases() == voice_commands.command_phrases()
 
 
@@ -111,7 +111,7 @@ def test_the_gallery_facade_exposes_the_spelling_too():
 
 def test_the_genau_lane_is_said_in_german_and_nothing_else_is():
     """What lets a mangled hearing of the lane be read once more in German before
-    it is doubted; the acts after it are English and must not be."""
+    it is doubted; the actions after it are English and must not be."""
     heard = voice_commands.command_phrases()
     naming_the_lane = {phrase for phrase in heard if "go now" in phrase}
 

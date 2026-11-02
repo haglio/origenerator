@@ -73,16 +73,16 @@ class InFlightItem:
     # under the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
     # where the run came from nothing, which is most images.
     source_file: str | None = None
-    # The act picked in the Combine's dropdown, for a run launched from
+    # The action picked in the Combine's dropdown, for a run launched from
     # there — "" for every other run, and for a combine that was given a dropped
-    # video instead of a picked act. It is the one word saying what this video
+    # video instead of a picked action. It is the one word saying what this video
     # will *do*, and nothing else on the row carries it.
-    act: str = ""
+    action: str = ""
     # The thumbnail of the video whose settings this run re-uses, for a combine
     # given a dropped video — the only thing naming which video that was. Drawn
     # gray beside the start frame: it lends the settings, not the result, and a row
-    # showing it alone reads as a job that is that video. Empty where an act was
-    # picked instead: :attr:`act` already says what was chosen, and
+    # showing it alone reads as a job that is that video. Empty where an action was
+    # picked instead: :attr:`action` already says what was chosen, and
     # the video its settings were mined out of was never the user's pick.
     source_video_thumbnail: str | None = None
     prompt_edited: bool = False
@@ -108,8 +108,8 @@ def queue_lead_text(item: InFlightItem) -> str:
     added up out of, and because it is the one figure that makes a queue of four
     videos read differently from a queue of four images.
 
-    The act follows the kind, for a run the Combine launched from its
-    dropdown: the kind says a video is being made, and the act says
+    The action follows the kind, for a run the Combine launched from its
+    dropdown: the kind says a video is being made, and the action says
     which video — the whole of what the user chose, and the one thing separating
     two runs on the same image. It rides through "Edit…" too, so a
     combination edited before launching still says what it was asked for.
@@ -123,8 +123,8 @@ def queue_lead_text(item: InFlightItem) -> str:
     parts = [queue_estimate_label(item.reading.typical_seconds)]
     if item.job_kind:
         parts.append(item.job_kind)
-    if item.act:
-        parts.append(item.act)
+    if item.action:
+        parts.append(item.action)
     if item.auto_generating:
         parts.append("Auto")
     if item.requested:
@@ -149,8 +149,8 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
         lines = [f"About {queue_estimate_label(item.reading.typical_seconds).lstrip('~')}"
                  " on this workflow's recent runs"]
     lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
-    if item.act:
-        lines.append(f"The “{item.act}” act, picked in Combine")
+    if item.action:
+        lines.append(f"The “{item.action}” action, picked in Combine")
     if item.auto_generating:
         lines.append("Queued by its folder's Auto-Generate")
     if item.requested:

@@ -151,7 +151,7 @@ class _Host:
         self.calls.append(("filter", query))
 
     def slideshow_filter_to_the_action_on_screen(self):
-        self.calls.append("filter to the act on screen")
+        self.calls.append("filter to the action on screen")
 
     def slideshow_step_version(self, delta):
         self.calls.append(("version", delta))
@@ -173,14 +173,14 @@ def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
                           ("favorites filter", True), ("favorites filter", False)]
 
 
-def test_filter_said_of_a_side_narrows_to_the_act_on_screen():
-    """The Funestras' "filter" with no act named, as a satellite takes it: the
-    act read off what is showing."""
+def test_filter_said_of_a_side_narrows_to_the_action_on_screen():
+    """The Funestras' "filter" with no action named, as a satellite takes it: the
+    action read off what is showing."""
     host = _Host()
 
     assert answer(host, "lock_action")
 
-    assert host.calls == ["filter to the act on screen"]
+    assert host.calls == ["filter to the action on screen"]
 
 
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():

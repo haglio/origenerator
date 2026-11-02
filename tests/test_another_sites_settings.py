@@ -48,7 +48,7 @@ def _brought_in(db, tmp_path, name: str, record: Record,
 def library(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     image, video = _brought_in(db, tmp_path, "c1_topaz.mp4", Record(
-        video=Made(_VIDEO), image=Made(_IMAGE), act="Wave"))
+        video=Made(_VIDEO), image=Made(_IMAGE), action="Wave"))
     tab =GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab._preview.show_media = MagicMock()
@@ -76,7 +76,7 @@ def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site
         qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     image, video = _brought_in(db, tmp_path, "c1_topaz.mp4", Record(
-        video=Made(_VIDEO), image=Made(_IMAGE), act="Wave"),
+        video=Made(_VIDEO), image=Made(_IMAGE), action="Wave"),
         kind=VideoKind.IMAGE_TO_VIDEO)
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
@@ -182,12 +182,12 @@ def test_generate_is_grayed_on_an_ai_item_and_says_why(library, qtbot, shown):
     assert tab._generate_btn.toolTip() == "Another site made this — Origenerator can't remake it"
 
 
-def test_picking_an_act_on_an_ai_videos_tab_goes_where_its_star_goes(library, monkeypatch):
+def test_picking_an_action_on_an_ai_videos_tab_goes_where_its_star_goes(library, monkeypatch):
     tab, _db, video, image = library
     places, picks = object(), []
     monkeypatch.setattr(outside_videos, "places_here", lambda: places)
     monkeypatch.setattr(outside_videos, "pick_action",
-                        lambda db, where, row, act: picks.append((where, row["prompt_id"], act)))
+                        lambda db, where, row, action: picks.append((where, row["prompt_id"], action)))
     tab.show_saved_generation(video, [image])
 
     tab._action.pick(CATEGORIES[1])

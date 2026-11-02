@@ -616,10 +616,10 @@ class FunestraSlideshow(QObject):
             self._flash("Widening net failed", kind=WARNING)
 
     def slideshow_filter(self, query: str) -> None:
-        """The button at the head of a map row, and the session's spoken acts.
+        """The button at the head of a map row, and the session's spoken actions.
 
         A configuration's row is gone to and its seeds looped, the way it was
-        before the acts joined the column; an act's narrows the slideshow to it.
+        before the actions joined the column; an action's narrows the slideshow to it.
         """
         row = self._set.configuration_row(query)
         if row is not None:
@@ -667,7 +667,7 @@ class FunestraSlideshow(QObject):
 
     @property
     def hud_action_filter(self) -> str:
-        return self._set.filters.act
+        return self._set.filters.action
 
     @property
     def hud_order_label(self) -> str:

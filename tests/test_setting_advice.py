@@ -443,24 +443,24 @@ def test_only_the_lora_rows_asked_about_are_checked(worded_style):
 
 
 @pytest.fixture
-def worded_acts(worded_loras, titled_models):
-    worded_loras({"example_acts": ["alpha", "beta", "gamma", "delta"]})
-    titled_models({"example_acts": "Example Acts 1.0"})
+def worded_actions(worded_loras, titled_models):
+    worded_loras({"example_actions": ["alpha", "beta", "gamma", "delta"]})
+    titled_models({"example_actions": "Example Actions 1.0"})
 
 
 def test_a_lora_with_several_trigger_words_names_them_all_and_its_click_adds_the_first(
-        worded_acts):
+        worded_actions):
     found = trigger_word_advice({"positive_prompt": "a portrait",
-                                 "lora": "example_acts.safetensors"}, ("lora",))["lora"]
+                                 "lora": "example_actions.safetensors"}, ("lora",))["lora"]
 
-    assert found.said == ("Example Acts 1.0's trigger words, alpha, beta, gamma and delta, "
+    assert found.said == ("Example Actions 1.0's trigger words, alpha, beta, gamma and delta, "
                           "aren't in the Positive Prompt. Click to add alpha.")
     assert found.fixed("a portrait") == "alpha, a portrait"
 
 
 def test_a_lora_with_several_trigger_words_warns_only_while_none_of_them_is_in_the_prompt(
-        worded_acts):
-    params = {"positive_prompt": "a portrait, gamma", "lora": "example_acts.safetensors"}
+        worded_actions):
+    params = {"positive_prompt": "a portrait, gamma", "lora": "example_actions.safetensors"}
 
     assert trigger_word_advice(params, ("lora",)) == {}
 

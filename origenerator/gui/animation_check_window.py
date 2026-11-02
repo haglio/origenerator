@@ -39,7 +39,7 @@ NO_SAMPLE = ("No video made this way has been favorited "
               "or sent to Genau or Evolver.")
 FROM_THE_ACTIONS_OWN = (
     "No video made this way has been favorited or sent to Genau or Evolver. "
-    "The prompts below are this act's own settings, to start from.")
+    "The prompts below are this action's own settings, to start from.")
 ALL_DONE = "Every animation has been through."
 
 
@@ -60,7 +60,7 @@ class AnimationCheckWindow(QWidget):
         self._heading.setStyleSheet("font-weight: bold;")
         self._counted = QLabel(objectName=COUNTED)
         self._counted.setToolTip(
-            "Every animation that can be asked for — each act, in each lane, from each "
+            "Every animation that can be asked for — each action, in each lane, from each "
             "kind of image — and how many already have settings assigned.")
         self._said = QLabel(objectName=SAID)
         self._said.setWordWrap(True)
@@ -135,7 +135,7 @@ class AnimationCheckWindow(QWidget):
              "Queue a video of this image with the prompts as they now read, "
              "and come back to this animation once it is done", self._on_submit),
             (ACCEPT, "Assign these settings",
-             "Every animation of this act from this kind of image runs these "
+             "Every animation of this action from this kind of image runs these "
              "settings, with the prompts as they now read", self._on_accept),
         ):
             button = QPushButton(caption, objectName=name)
@@ -181,9 +181,9 @@ class AnimationCheckWindow(QWidget):
             self._press(REJECT).setEnabled(False)
             self._press(SUBMIT).setEnabled(False)
             return
-        lane, act, state = path
+        lane, action, state = path
         self._heading.setText(
-            f"{lane_said_as(lane)} · {act} · from a “{state}” image")
+            f"{lane_said_as(lane)} · {action} · from a “{state}” image")
         at, of = self._session.position
         self._counted.setText(f"{at} of {of} · {self._session.answered} done")
         sample = self._session.sample

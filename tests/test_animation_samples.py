@@ -29,11 +29,11 @@ def _image(prompt_id, state, filename=None):
     }
 
 
-def _video(prompt_id, *, made_from, act="alpha", workflow="wan22_i2v",
+def _video(prompt_id, *, made_from, action="alpha", workflow="wan22_i2v",
           created="2026-01-01 00:00:00", **marks):
     return {
         "prompt_id": prompt_id, "workflow_name": workflow, "status": "completed",
-        "positive_prompt": f"a scene, {act}", "act": act,
+        "positive_prompt": f"a scene, {action}", "action": action,
         "params_json": json.dumps({"input_image": f"{made_from}.png [output]"}),
         "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}]),
         "created_at": created, **marks,
@@ -48,7 +48,7 @@ def samples():
     return build
 
 
-def test_a_kept_clip_stands_as_the_example_for_its_act_and_its_images_state(samples):
+def test_a_kept_clip_stands_as_the_example_for_its_action_and_its_images_state(samples):
     rows = [_image("pic", "state one"), _video("clip", made_from="pic", starred=1)]
 
     found = samples(rows)
@@ -95,9 +95,9 @@ def test_only_a_looping_clip_is_an_example_for_the_loop_lane(samples):
 
 
 def test_an_animation_the_table_rules_out_gets_no_example_however_it_was_made(samples):
-    # A video of an act its own image cannot start is a video made before the
+    # A video of an action its own image cannot start is a video made before the
     # image was sorted, or sorted since: the table is what decides.
-    rows = [_image("pic", "state one"), _video("clip", made_from="pic", act="beta",
+    rows = [_image("pic", "state one"), _video("clip", made_from="pic", action="beta",
                                               starred=1)]
 
     assert samples(rows) == {}
@@ -121,9 +121,9 @@ def test_the_newest_kept_clip_leads(samples):
 def test_the_animations_with_the_most_kept_clips_come_first(samples):
     rows = [
         _image("one", "state one"), _image("two", "state two"),
-        _video("a", made_from="two", act="beta", starred=1),
-        _video("b", made_from="two", act="beta", starred=1),
-        _video("c", made_from="one", act="alpha", starred=1),
+        _video("a", made_from="two", action="beta", starred=1),
+        _video("b", made_from="two", action="beta", starred=1),
+        _video("c", made_from="one", action="alpha", starred=1),
     ]
 
     order = animation_samples.paths_in_order(rows, content=_PATHS)

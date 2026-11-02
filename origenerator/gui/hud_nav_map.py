@@ -4,7 +4,7 @@ that holds it still.
 The Funestras' nav map: the video on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
 slideshow draws the same nav map over its own generations — the seed row is the same
-act under other seeds, the column what else was made of the same image
+action under other seeds, the column what else was made of the same image
 (:mod:`origenerator.nav_map` says which is which) — and the
 map hangs on whatever is on screen until a loop is started along one of its
 axes, when it hangs on the slide the loop began on and the lit cell walks the
@@ -29,10 +29,10 @@ CORNER: Cell = ("corner", 0)
 
 class NavMapRow(NamedTuple):
     """One row down the column: the slide it draws, the name in its margin, and
-    whether that name is a configuration's folder rather than an act.
+    whether that name is a configuration's folder rather than an action.
 
     The two are pressed differently — a configuration's button jumps to it and
-    loops its seed row, an act's narrows the slideshow to that act — so which it is
+    loops its seed row, an action's narrows the slideshow to that action — so which it is
     travels with the row rather than being guessed from the words.
     """
 
@@ -43,10 +43,10 @@ class NavMapRow(NamedTuple):
 
 @dataclass(frozen=True)
 class NavMapNeighbors:
-    """What the library says about one generation: the slides showing its act
+    """What the library says about one generation: the slides showing its action
     under other seeds (the seed row), the column of rows under it — the same
     seed under other configurations, then what else was made of its image —
-    the act its own row is named for, and the rest of that image's whole
+    the action its own row is named for, and the rest of that image's whole
     group, which is what a loop down the column plays."""
 
     seeds: tuple[Slide, ...] = ()
@@ -117,7 +117,7 @@ def build_nav_map(current: Slide, loop: Loop | None,
         lit = neighbors_of(current.prompt_id)
         return NavMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
                             at_anchor.label)
-    # A loop down the column plays the whole group, twins of an act included,
+    # A loop down the column plays the whole group, twins of an action included,
     # so every slide in it is a row of its own, named as the library names it.
     column = tuple(NavMapRow(slide, neighbors_of(slide.prompt_id).label)
                    for slide in loop.pool[1:])
@@ -126,9 +126,9 @@ def build_nav_map(current: Slide, loop: Loop | None,
 
 
 def actions_posted(query: str) -> str:
-    """The act(s) a row's filter button posted, put back into words: the
+    """The action(s) a row's filter button posted, put back into words: the
     Funestras' HUD lower-cases the row's label and writes its spaces as
-    underscores, and a spoken act arrives the same way."""
+    underscores, and a spoken action arrives the same way."""
     return " ".join(str(query or "").replace("_", " ").split()).lower()
 
 

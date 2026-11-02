@@ -10,7 +10,7 @@ no detector installed, so the Enhance pane can gray that part with the reason
 on it and the answer to "fix teeth" can name the file to add.
 
 Only the anatomy any photo has is named here. The rest of the vocabulary is
-library content, unpublishable for the same reason the act names are, so it
+library content, unpublishable for the same reason the action names are, so it
 comes from the content overlay's optional ``detail_fix_parts`` entries
 (``content.example.json`` documents the shape) and extends this table at load.
 """

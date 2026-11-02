@@ -97,7 +97,7 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
         seeds=tuple(_cell(slide) for slide in shown.seeds),
         actions=tuple(_cell(row.slide, row.label) for row in shown.column),
         current_action=shown.label,
-        # The act(s) the slideshow is narrowed to, so the rows the filter keeps
+        # The action(s) the slideshow is narrowed to, so the rows the filter keeps
         # light their buttons and a second press on the row it already is
         # lifts it, exactly as on a satellite.  With no filter on, a seed
         # loop lights the row it is playing, which is what the button on

@@ -942,7 +942,7 @@ def test_the_source_video_half_of_a_combination_loops_in_gray(make_preview, tmp_
 
 
 def test_a_combination_with_no_source_video_shows_the_frame_alone(make_preview, tmp_path):
-    # A curated act is pinned in the content overlay: there is no past video
+    # A curated action is pinned in the content overlay: there is no past video
     # under it, so there is no sum to draw a plus in the middle of.
     w = make_preview()
 

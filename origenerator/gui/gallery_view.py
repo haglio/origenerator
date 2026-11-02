@@ -1365,7 +1365,7 @@ class GalleryView(QWidget):
         if launching is not None:
             # A tab Combine opened stamps its runs with where the settings came
             # from, whether they were launched as opened or edited first — that
-            # mark is the only thing telling the queue what act a video is of.
+            # mark is the only thing telling the queue what action a video is of.
             category, video_id, intent = launching.settings_source()
             asked = launching.asked()
             for prompt_id in launched:
@@ -2531,13 +2531,13 @@ class GalleryView(QWidget):
         image, and the video whose settings it follows as ``source_video_media`` shows
         that video — a still on the folder's tile, a loop in a Generate tab.
 
-        The video only where a *video* was dropped: an act picked off the Combine
+        The video only where a *video* was dropped: an action picked off the Combine
         dropdown names what the run will do rather than a video, and a thumbnail of
         some video the user never chose reads as a job that is that video — the
         same reason the queue's rows leave it out (see GalleryPane).
         """
         row = self._db.get_generation(job.prompt_id) if job is not None else None
-        source_video = (None if row is None or row.get("act")
+        source_video = (None if row is None or row.get("action")
                         else self._db.get_generation(row.get("source_video") or ""))
         return Combination(
             self._job_source_image(job),
@@ -3113,7 +3113,7 @@ class GalleryView(QWidget):
 
     def animate_it(self, image_id: str | None,
                    asked) -> tuple[str | None, str, str]:
-        """Animate an image as a named act — what an "animate as" runs."""
+        """Animate an image as a named action — what an "animate as" runs."""
         return self._combine.animate_it(image_id, asked)
 
     def reveal_launch(self, key: str):

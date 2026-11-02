@@ -241,7 +241,7 @@ def test_an_overlay_written_before_three_keys_were_renamed_reads_under_the_new_o
 
     loaded = content.load_content(local, example)
 
-    assert loaded["acts"] == ["alpha"]
+    assert loaded["actions"] == ["alpha"]
     assert loaded["pinned_kino_settings"] == {"alpha": {"workflow": "wan22_i2v"}}
     assert loaded["pinned_genau_settings"] == {}
     assert content.missing_overlay_keys(local, example) == ()

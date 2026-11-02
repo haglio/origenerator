@@ -6,7 +6,7 @@ import time
 from contextlib import ExitStack
 
 from app_support.osr2_hold import PARK, RESUME
-from funestra.console import HOLD_VERB
+from funestra.main_hud import HOLD_VERB
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine

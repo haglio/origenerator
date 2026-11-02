@@ -5,14 +5,14 @@ import json
 import numpy as np
 import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
-from funestra.console import BROKER_PRESS
+from funestra.main_hud import BROKER_PRESS
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
 from funestra.modes import Osr2State
 from funestra.satellite_hud import MARGIN
 from funestra.testing import FakeEngine
-from funestra.timeline import TIMELINE_HEIGHT
+from funestra.scrubber_bar import SCRUBBER_HEIGHT
 from PyQt6.QtCore import QEvent, QPoint, QPointF
 from PyQt6.QtWidgets import QApplication
 
@@ -171,7 +171,7 @@ class TestTheOneHudASlideshowWears:
         rows = slideshow_hud_model("portrait", slideshow, own_window=False).rows
 
         assert ("portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up") in [
-            tuple(button.command or button.glyph for button in row[1:]) for row in rows]
+            tuple(button.command or button.icon for button in row[1:]) for row in rows]
 
     @pytest.mark.parametrize("running", [True, False])
     def test_the_broker_button_rides_on_the_osr2_line_lit_while_the_broker_runs(
@@ -600,7 +600,7 @@ class TestTheRowOnTheOneHud:
         track_x0, track_x1 = row.track
         left, top, _bgra = _hud(window)
         window._pane.press(QPointF(left + x + (track_x0 + track_x1) // 2,
-                                   top + y + height - TIMELINE_HEIGHT // 2))
+                                   top + y + height - SCRUBBER_HEIGHT // 2))
 
     def test_pressing_the_middle_of_the_track_runs_the_video_to_its_middle(self, qtbot):
         window = self._window(qtbot, [("scene one.mp4", "video")])
@@ -633,7 +633,7 @@ class TestTheRowOnTheOneHud:
         x, y, _width, height = row.rect
         track_x0, track_x1 = row.track
         bgra = _hud(window)[2]
-        return tuple(bgra[y + height - TIMELINE_HEIGHT // 2,
+        return tuple(bgra[y + height - SCRUBBER_HEIGHT // 2,
                           x + round(track_x0 + (track_x1 - track_x0 - 1) * fraction)])
 
     def _slideshow_of(self, qtbot, tmp_path, name, actions=None):

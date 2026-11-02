@@ -5,7 +5,7 @@ from functools import partial
 from pathlib import Path
 
 import pytest
-from funestra.console import (
+from funestra.main_hud import (
     OSR2_PARKED,
 )
 from PyQt6.QtCore import (

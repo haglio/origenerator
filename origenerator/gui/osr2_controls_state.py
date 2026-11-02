@@ -5,18 +5,18 @@ from types import SimpleNamespace
 
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
-from funestra.console import (
+from funestra.main_hud import (
     BROKER_PRESS,
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
-    ConsoleModel,
+    MainHudModel,
     aim_row,
     osr2_controls,
 )
-from funestra.console_hud import ConsoleHud, ConsolePainter
-from funestra.drive_readout import (
+from funestra.main_hud_painter import MainHud, MainHudPainter
+from funestra.osr2_visualizer import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
     DRIVEN_BY_ROBOT_HAND,
@@ -63,11 +63,11 @@ def _bars_drawn(bars) -> dict:
 
 def osr2_controls_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2Trouble | None = None,
                 control: str = OSR2_CONTROL_UNANSWERED, script=None,
-                broker_running: bool = True) -> ConsoleHud:
+                broker_running: bool = True) -> MainHud:
     shown = osr2_controls_state(motion, device=device, trouble=trouble, control=control, script=script,
                              broker_running=broker_running)
-    return ConsoleHud(
-        console=ConsoleModel(
+    return MainHud(
+        main_hud_model=MainHudModel(
             main_mode=MainMode.GENAU,
             osr2=shown.osr2, osr2_control=control, paused=shown.paused,
             osr2_rows=shown.osr2_rows, osr2_controls=shown.osr2_controls,
@@ -110,7 +110,7 @@ def osr2_controls_state(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
 
 def osr2_controls_room(motion) -> tuple[int, int]:
     driving = SimpleNamespace(active=True, state=motion.state, parked_by_the_pause=False)
-    return ConsolePainter(device_only=True).rgba(osr2_controls_hud(driving, control=OSR2_DRIVING))[1]
+    return MainHudPainter(device_only=True).rgba(osr2_controls_hud(driving, control=OSR2_DRIVING))[1]
 
 
 def post_device_action(action: str, *, motion, control=None) -> bool:

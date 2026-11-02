@@ -6,15 +6,15 @@ import random
 import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
-from funestra.console import (
+from funestra.main_hud import (
     BROKER_PRESS,
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
 )
-from funestra.console_hud import ConsolePainter, hud_xy
-from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
+from funestra.main_hud_painter import MainHudPainter, hud_xy
+from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
 from funestra.robot_hand import POSITION_MAX
@@ -77,7 +77,7 @@ def test_the_osr2_controls_are_up_while_nothing_drives_since_their_switch_is_wha
 def test_the_drawing_is_the_one_funestras_console_painter_paints(qtbot):
     controls, motion = _controls(qtbot)
     raw, size = controls.drawing()
-    expected, expected_size = ConsolePainter(device_only=True).rgba(osr2_controls_hud(motion))
+    expected, expected_size = MainHudPainter(device_only=True).rgba(osr2_controls_hud(motion))
     assert (raw, size) == (expected, expected_size)
 
 
@@ -102,11 +102,11 @@ def test_the_osr2_controls_declare_the_buttons_this_app_answers(qtbot):
 
     hud = osr2_controls_hud(motion, control=OSR2_DRIVING)
 
-    assert hud.console.rows == ()
-    assert [[b.command for b in row if b.command] for row in hud.console.osr2_rows] == [
+    assert hud.main_hud_model.rows == ()
+    assert [[b.command for b in row if b.command] for row in hud.main_hud_model.osr2_rows] == [
         ["robot_hand_park", "robot_hand_toggle_learned", "robot_hand_cycle_shape"],
     ]
-    assert [b.command for b in hud.console.osr2_controls] == [BROKER_PRESS]
+    assert [b.command for b in hud.main_hud_model.osr2_controls] == [BROKER_PRESS]
 
 
 @pytest.mark.parametrize("running", [True, False])
@@ -136,7 +136,7 @@ def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot)
     _panel_, motion = _controls(qtbot)
     motion.parked_by_the_pause = True
 
-    assert osr2_controls_hud(motion, control=OSR2_DRIVING).console.paused
+    assert osr2_controls_hud(motion, control=OSR2_DRIVING).main_hud_model.paused
 
 
 def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_is_paused(qtbot):
@@ -144,7 +144,7 @@ def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_i
     motion.active = True
     motion.state.state.amplitude = 60
     motion.parked_by_the_pause = True
-    painter = ConsolePainter()
+    painter = MainHudPainter()
     painter.rgba(osr2_controls_hud(motion, control=OSR2_DRIVING))
     left, top = hud_xy()
 
@@ -162,8 +162,8 @@ def test_every_button_the_osr2_controls_declare_does_something_here(qtbot, monke
     controls, motion = _controls(qtbot, control=control)
     motion.active = True
     controls.drawing()
-    console = osr2_controls_hud(motion, control=control.state()).console
-    declared = [b.command for row in (*console.rows, *console.osr2_rows, console.osr2_controls)
+    main_hud = osr2_controls_hud(motion, control=control.state()).main_hud_model
+    declared = [b.command for row in (*main_hud.rows, *main_hud.osr2_rows, main_hud.osr2_controls)
                 for b in row if b.command]
 
     for command in declared:
@@ -189,7 +189,7 @@ def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
     faces = []
     for _waveform in motion_engine.WaveformShape:
         controls.drawing()
-        faces.append(next(b.glyph for _r, b in controls._painter.buttons
+        faces.append(next(b.icon for _r, b in controls._painter.buttons
                           if b.command == "robot_hand_cycle_shape"))
         _press(controls, "robot_hand_cycle_shape")
 
@@ -227,7 +227,7 @@ def test_the_osr2_line_carries_the_max_intensity_the_motion_is_held_to(qtbot):
     motion = FakeMotion()
     motion.set_max_intensity(35)
 
-    assert osr2_controls_hud(motion).console.max_intensity == 35
+    assert osr2_controls_hud(motion).main_hud_model.max_intensity == 35
 
 
 def test_the_readout_carries_the_max_intensity_the_motion_is_held_to(qtbot):
@@ -299,7 +299,7 @@ def test_the_group_lights_the_state_the_switch_is_in(qtbot):
 
     hud = osr2_controls_hud(motion, control=control.state())
 
-    assert hud.console.osr2_control == OSR2_PARKED
+    assert hud.main_hud_model.osr2_control == OSR2_PARKED
     assert controls.drawing()[0]
 
 
@@ -332,7 +332,7 @@ def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
 
     assert hud.drive.driven == "funscript"
     assert hud.drive.waveform == script.trace(80, 12.0)
-    assert hud.console.osr2 is Osr2State.FUNSCRIPT
+    assert hud.main_hud_model.osr2 is Osr2State.FUNSCRIPT
 
 
 def test_the_dot_sits_where_the_script_has_the_device_now(qtbot):
@@ -354,15 +354,15 @@ def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
     hud = osr2_controls_hud(motion, control=control.state(), script=script)
 
     assert hud.drive.driven == "robot_hand"
-    assert hud.console.osr2 is Osr2State.ROBOT_HAND
+    assert hud.main_hud_model.osr2 is Osr2State.ROBOT_HAND
 
 
 def test_with_their_switch_off_the_osr2_controls_say_parked_over_a_device_that_is_on(qtbot):
-    painter = ConsolePainter()
+    painter = MainHudPainter()
     hud = osr2_controls_hud(FakeMotion(), device=Osr2Mode.CONTROLLED, control=OSR2_PARKED)
     painter.rgba(hud)
 
-    assert painter._osr2_state(hud.console) == OSR2_PARKED
+    assert painter._osr2_state(hud.main_hud_model) == OSR2_PARKED
 
 
 def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
@@ -373,7 +373,7 @@ def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
     hud = osr2_controls_hud(motion, device=Osr2Mode.OFF, control=control.state(),
                       script=script)
 
-    assert hud.console.osr2 is Osr2State.OFF
+    assert hud.main_hud_model.osr2 is Osr2State.OFF
 
 
 def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
@@ -405,7 +405,7 @@ def test_off_is_said_only_of_a_device_that_is_switched_off(qtbot):
     motion = FakeMotion()
     for running in (False, True):
         motion.active = running
-        assert osr2_controls_hud(motion).console.osr2 is Osr2State.ROBOT_HAND, running
+        assert osr2_controls_hud(motion).main_hud_model.osr2 is Osr2State.ROBOT_HAND, running
 
 
 def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
@@ -414,7 +414,7 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
 
     hud = osr2_controls_hud(motion, device=Osr2Mode.OFF)
 
-    assert hud.console.osr2 is Osr2State.OFF
+    assert hud.main_hud_model.osr2 is Osr2State.OFF
     assert hud.drive.driven == DRIVEN_BY_NOTHING
     assert not hud.drive.live
 
@@ -427,7 +427,7 @@ def test_an_osr2_the_broker_cannot_hear_says_why_and_drives_nothing(qtbot, troub
 
     hud = osr2_controls_hud(motion, device=Osr2Mode.OFF, trouble=trouble)
 
-    assert hud.console.osr2 is said
+    assert hud.main_hud_model.osr2 is said
     assert hud.drive.driven == DRIVEN_BY_NOTHING
     assert not hud.drive.live
 
@@ -568,7 +568,7 @@ def test_no_state_draws_the_osr2_controls_outside_the_room_kept_for_them():
             (*OSR2_CONTROL_BUTTONS, OSR2_CONTROL_UNANSWERED), (False, True), Osr2Mode,
             (None, FakeScript())):
         motion.active = active
-        _raw, (width, height) = ConsolePainter(device_only=True).rgba(
+        _raw, (width, height) = MainHudPainter(device_only=True).rgba(
             osr2_controls_hud(motion, device=device, control=control, script=script))
 
         fit = (control, active, device)
@@ -615,7 +615,7 @@ def test_with_the_osr2_running_its_own_auto_mode_the_line_says_auto(qtbot):
     motion = FakeMotion()
     motion.active = True
 
-    assert osr2_controls_hud(motion, device=Osr2Mode.AUTO).console.osr2 is Osr2State.AUTO
+    assert osr2_controls_hud(motion, device=Osr2Mode.AUTO).main_hud_model.osr2 is Osr2State.AUTO
 
 
 def test_the_panel_redraws_once_the_osr2_goes_into_its_own_auto_mode(qtbot):

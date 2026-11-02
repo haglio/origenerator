@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from funestra.timeline import (
+from funestra.scrubber_bar import (
     BAR_BORDER,
     BAR_EDGE,
     BAR_FILL,
@@ -8,7 +8,7 @@ from funestra.timeline import (
     BORDER_W,
     CURSOR,
     CURSOR_W,
-    TIMELINE_HEIGHT,
+    SCRUBBER_HEIGHT,
     bar_x,
 )
 from PyQt6.QtCore import QSize
@@ -35,7 +35,7 @@ class Scrubber(QWidget):
         self._actions: list[dict] = []
         self._position: int | None = None
         self._duration = 0
-        self.setFixedHeight(TIMELINE_HEIGHT)
+        self.setFixedHeight(SCRUBBER_HEIGHT)
 
     def set_actions(self, actions) -> None:
         self._actions = list(actions or [])
@@ -52,7 +52,7 @@ class Scrubber(QWidget):
         self.update()
 
     def sizeHint(self) -> QSize:
-        return QSize(0, TIMELINE_HEIGHT)
+        return QSize(0, SCRUBBER_HEIGHT)
 
     def paintEvent(self, event) -> None:
         x0, x1 = _FLOAT_OFF_EVERY_EDGE, self.width() - _FLOAT_OFF_EVERY_EDGE

@@ -54,7 +54,7 @@ def draw_source_video(painter: QPainter, x: int, source_video: QPixmap, prompt_e
     painter.drawPixmap(x, 0, source_video)
 
 
-def _draw_paren(painter: QPainter, rect: QRect, glyph: str) -> None:
+def _draw_paren(painter: QPainter, rect: QRect, icon: str) -> None:
     painter.setFont(paren_font(painter.font(), rect.height()))
     painter.setPen(TEXT_MUTED)
-    painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, glyph)
+    painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, icon)

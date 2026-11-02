@@ -134,7 +134,7 @@ def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize(
     mode_row = [button.command for button in rows[0]]
 
     assert mode_row == ["satellites_kino_activate", "origenerator_activate"]
-    assert [button.glyph for button in rows[0]] == ["Kino", "Origenerator"]
+    assert [button.icon for button in rows[0]] == ["Kino", "Origenerator"]
     assert [button.lit for button in rows[0]] == [False, True]
     assert "minimize" not in _names(rows[-1])
 

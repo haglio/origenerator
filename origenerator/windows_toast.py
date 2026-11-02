@@ -41,13 +41,13 @@ class _GUID(ctypes.Structure):
 
 
 def toast_xml(title: str, body: str, *, link: str | None, mark: Path | None = None) -> str:
-    glyph = (f"<image placement=\"appLogoOverride\" src={quoteattr(mark.as_uri())}/>"
+    icon = (f"<image placement=\"appLogoOverride\" src={quoteattr(mark.as_uri())}/>"
              if mark is not None else "")
     goes = f" activationType=\"protocol\" launch={quoteattr(link)}" if link else ""
     return (
         f"<toast{goes}>"
         "<visual><binding template=\"ToastGeneric\">"
-        f"<text>{escape(title)}</text><text>{escape(body)}</text>{glyph}"
+        f"<text>{escape(title)}</text><text>{escape(body)}</text>{icon}"
         "</binding></visual></toast>"
     )
 

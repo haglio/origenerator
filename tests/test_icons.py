@@ -316,7 +316,7 @@ def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
         assert drawn == icon_pixmap(name, 48, white).toImage(), name
 
 
-_MARK_ARGUMENT = {"qt_icon": 0, "icon_pixmap": 0, "shapes_of": 0, "shared_mark": 0,
+_MARK_ARGUMENT = {"qt_icon": 0, "icon_pixmap": 0, "shapes_of": 0, "shared_icon": 0,
                   "draw_icon": 1}
 
 

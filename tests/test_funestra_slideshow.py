@@ -735,7 +735,7 @@ def test_a_new_pace_is_the_clip_seconds_the_satellites_hud_shows_at_once(qtbot, 
     published = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
     row = next(row for row in published.rows
                if any(button.command == "portrait_clip_seconds_up" for button in row))
-    assert f"{DEFAULT_S + 2}s" in [button.glyph for button in row]
+    assert f"{DEFAULT_S + 2}s" in [button.icon for button in row]
 
 
 def test_a_slideshow_that_is_over_gives_the_side_back(qtbot, tmp_path):

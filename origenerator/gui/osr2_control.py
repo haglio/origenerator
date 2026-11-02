@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from funestra.console import OSR2_DRIVING, OSR2_PARKED
-from funestra.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
+from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
+from funestra.osr2_visualizer import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import FULL_INTENSITY
 from PyQt6.QtCore import QObject, pyqtSignal
 

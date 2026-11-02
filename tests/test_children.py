@@ -1,4 +1,3 @@
-"""The child processes tests wait on: how one that hangs is reported, and how one ends."""
 from __future__ import annotations
 
 import os

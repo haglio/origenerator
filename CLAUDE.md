@@ -738,8 +738,8 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   commits is replayed as its *original* commits onto a `main` they were never
   written against: the same conflicts, again, on every attempt, with
   `github-merge-queue` evicting it each time "due to a conflict with the base
-  branch". A branch already on origin that a rebase rewrites goes up under a new
-  name with a pull request of its own, since nothing here is ever force-pushed.
+  branch". A branch already on origin that a rebase rewrites goes back up under its
+  own name with `git push --force-with-lease`; only `main` is never force-pushed.
   The near miss
   that still counts: reaching for `git merge origin/main` because it resolves
   the conflicts *once* instead of once per commit — cheaper today, unlandable

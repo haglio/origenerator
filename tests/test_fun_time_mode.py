@@ -1,4 +1,3 @@
-"""The Fun Time mode contract: the flags Fun Time launches this app with."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -57,9 +56,6 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
 
 
 def test_a_session_hands_over_each_funestras_own_channel():
-    """Inside a session the Funestras are what shows the slides, so the launch
-    names each one's channel: the list it plays, the verbs it answers, the
-    status it publishes, and the HUD this app publishes for it."""
     args = parse_app_args(hosted_launch(funestras=True, **{
         "--portrait-playlist": "st/portrait.tsv",
         "--portrait-cmd-file": "st/portrait_cmd.txt",
@@ -77,9 +73,6 @@ def test_a_session_hands_over_each_funestras_own_channel():
 
 
 def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
-    """A room in the headset has no monitor to put this window on, so the
-    session asks for its frame instead: the file to write it into, and the
-    file its pointer's presses come back through."""
     args = parse_app_args(hosted_launch(headset=True, **{
         "--frames-file": "st/origenerator_frame.bin",
         "--input-file": "st/origenerator_input.txt",
@@ -92,8 +85,6 @@ def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
 
 
 def test_a_session_on_the_monitors_asks_for_no_frame():
-    """The window itself is what it shows there, so nothing is handed over and
-    this app must not spend a frame drawing one."""
     args = parse_app_args(hosted_launch())
 
     assert args.fun_time.frames_file is None
@@ -101,9 +92,6 @@ def test_a_session_on_the_monitors_asks_for_no_frame():
 
 
 def test_a_session_that_names_no_funestra_hands_over_none():
-    """A session too old to name them is one whose slideshows still open windows of
-    their own, so the answer has to be "there is no Funestra here" rather than a
-    channel of empty paths."""
     args = parse_app_args(hosted_launch())
 
     assert args.fun_time.funestra("portrait") is None
@@ -164,10 +152,6 @@ def test_a_takeover_that_does_not_read_as_a_session_is_spent_unanswered(tmp_path
     ('{"pid": 9999, "args": ["--fun-time"]}', "asked for another window"),
 ])
 def test_a_takeover_this_window_cannot_take_says_why(tmp_path, caplog, written, said):
-    """Each of these left no trace at all until 2026-10-06, so a session that
-    reported hosting this app while this app went on standalone -- which is a
-    room whose Origenerator mode button stays dim -- could be read from neither
-    app's log."""
     (tmp_path / handoff.TAKEOVER).write_text(written, encoding="utf-8")
 
     assert take_the_takeover(tmp_path, pid=4321) is None
@@ -176,7 +160,6 @@ def test_a_takeover_this_window_cannot_take_says_why(tmp_path, caplog, written, 
 
 
 def test_a_poll_that_finds_no_takeover_says_nothing(tmp_path, caplog):
-    """Four of these a second, for as long as the window stands its offer."""
     assert take_the_takeover(tmp_path, pid=4321) is None
 
     assert caplog.text == ""
@@ -185,7 +168,6 @@ def test_a_poll_that_finds_no_takeover_says_nothing(tmp_path, caplog):
 def test_region_for_size_splits_on_aspect():
     assert region_for_size(1920, 1080) == "landscape"
     assert region_for_size(720, 1280) == "portrait"
-    # A square subject goes to the landscape region, the roomier of the two.
     assert region_for_size(512, 512) == "landscape"
 
 
@@ -208,8 +190,6 @@ def test_a_tie_between_the_shapes_goes_to_landscape_the_roomier_region(tmp_path)
 
 
 def test_region_for_items_routes_a_running_slideshows_own_slides(tmp_path):
-    # A slideshow already playing asks again when its region has to be re-decided,
-    # and what it holds are slides rather than the tuples the Gallery pane built.
     tall = _png(tmp_path / "tall.png", 100, 200)
     assert region_for_items([Slide(str(tall), "image", "a", str(tall))]) == "portrait"
 
@@ -226,17 +206,12 @@ def test_region_for_items_defaults_to_landscape_when_nothing_measures(tmp_path):
 
 
 def test_videos_without_stills_are_probed_rather_than_defaulted(tmp_path):
-    # A folder of videos whose rows carry no thumbnails measured as nothing at
-    # all, and "nothing" fell to landscape — which is how a portrait slideshow
-    # once landed on the landscape region.  With no stills to vote, the first
-    # video's own frame answers.
     video = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
     items = [(str(video), "video", "a", None), (str(video), "video", "b", None)]
     assert region_for_items(items) == "portrait"
 
 
 def test_the_probe_only_runs_when_nothing_else_measured(tmp_path):
-    # A measurable still decides without paying for a decode.
     wide_still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide_still)
     items = [

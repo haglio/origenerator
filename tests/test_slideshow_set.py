@@ -1,10 +1,3 @@
-"""The set a slideshow plays, apart from whatever is putting its slides on screen.
-
-What the two surfaces share is here; that a window redraws and a Funestra is
-handed a new playlist is theirs.  So what this covers is the seam between them:
-when a fresh pass is dealt, and whether the slide that was on screen survived
-into it.
-"""
 from __future__ import annotations
 
 import random
@@ -33,11 +26,8 @@ def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
 
 
 def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
-    """A switch is a narrowing of what you are looking through, not a new slideshow:
-    the image stays where it is kept, so the surface only has to say where in
-    the set it now sits."""
     slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
-    slideshow_set.playlist.jump_to(1)          # standing on the favorite
+    slideshow_set.playlist.jump_to(1)
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is True
     assert dealt == [True]
@@ -45,8 +35,6 @@ def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
 
 
 def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
-    """Kept out by the switch, it is gone from the pass — so the surface has to
-    show whatever the new pass opens on rather than leave the old image up."""
     slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-3"}))
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is True
@@ -65,8 +53,6 @@ def test_a_filter_pressed_is_told_of_and_one_taken_up_is_not():
 
 
 def test_a_switch_that_would_leave_nothing_is_refused():
-    """An empty slideshow is not a mode — the button staying dark is the answer, and
-    nothing is re-dealt."""
     slideshow_set, dealt = _set()
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is False
@@ -75,8 +61,6 @@ def test_a_switch_that_would_leave_nothing_is_refused():
 
 
 def test_a_reset_widens_only_where_something_was_narrowed():
-    """With neither switch on there is nothing to widen back to, so the pass is
-    left exactly as it is for the surface to start over in."""
     slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
 
     assert slideshow_set.drop_the_filters() is False
@@ -86,15 +70,11 @@ def test_a_reset_widens_only_where_something_was_narrowed():
     dealt.clear()
 
     assert slideshow_set.drop_the_filters() is True
-    # A reset starts the set over rather than keeping the image: the surface
-    # shows whatever the fresh pass opens on.
     assert dealt == [False]
     assert len(slideshow_set.playlist) == 3
 
 
 def test_the_whole_set_keeps_what_a_switch_left_out():
-    """An arrival while a switch is on is still there when it comes off, and
-    one taken away is still gone — the set is kept by id beside the pass."""
     slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
@@ -181,8 +161,6 @@ def test_a_shuffled_pass_begun_on_a_slide_plays_every_other_one_before_coming_ba
     assert played[0] == "id-5"
     assert sorted(played) == sorted(item[2] for item in _TWELVE)
 
-
-# --- an image that something is being made of -------------------------------
 
 def test_a_pass_dealt_while_an_image_of_it_is_being_enhanced_opens_on_it():
     slideshow_set, _dealt = _set(hud=HudFacts(enhancing={"id-3": "running"}))
@@ -284,8 +262,6 @@ def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated
     assert item_note(slideshow_set, versions=[], version_index=0) == "Generating…"
 
 
-# --- the map around the slide on screen, and the loops along it -------------
-
 _SEEDS = {"id-1": (Slide("one-b.png", "image", "id-1b"), Slide("one-c.png", "image", "id-1c"))}
 _ACTIONS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
             "id-1b": (Slide("one-bx.png", "image", "id-1bx"),)}
@@ -307,9 +283,6 @@ def _ids(slides) -> list:
 
 
 def test_the_map_is_the_slide_on_screen_with_its_seeds_right_and_its_configs_down():
-    """A gamma: the item in the corner, the same configuration under other
-    seeds running right, the same seed under other configurations running
-    down — and nothing lit but the corner, since nothing is looping."""
     slideshow_set, _dealt = _mapped()
 
     shown = slideshow_set.map()
@@ -332,28 +305,22 @@ def test_the_map_re_homes_on_whatever_comes_up():
 
 
 def test_looping_the_seeds_plays_the_row_round_under_a_map_that_holds_still():
-    """The row becomes the pass, in the row's own order and starting on the
-    slide on screen; as it plays the lit cell walks the row while the corner
-    stays put — and the column is the lit seed's own, since every seed has
-    other configurations of its own."""
     slideshow_set, dealt = _mapped()
 
     assert slideshow_set.start_loop("seed") is True
-    assert dealt == [True]                       # the slide on screen stayed
+    assert dealt == [True]
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-1b", "id-1c"]
 
     slideshow_set.playlist.advance()
     shown = slideshow_set.map()
-    assert shown.corner.prompt_id == "id-1"      # the loop's anchor, not the slide
+    assert shown.corner.prompt_id == "id-1"
     assert _ids(shown.seeds) == ["id-1b", "id-1c"]
     assert shown.playing == ("seed", 0)
     assert shown.loop == "seed"
-    assert _ids(shown.actions) == ["id-1bx"]      # the lit seed's column
+    assert _ids(shown.actions) == ["id-1bx"]
 
 
 def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():
-    """The browse resumes underneath; a slide the loop wandered onto that the
-    set never held plays out first, and the browse is what comes next."""
     slideshow_set, dealt = _mapped()
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.advance()
@@ -365,13 +332,10 @@ def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():
     assert _ids(slideshow_set.playlist.items) == ["id-1b", "id-1", "id-2", "id-3"]
     assert slideshow_set.current_prompt_id() == "id-1b"
     assert slideshow_set.map().loop == ""
-    assert slideshow_set.end_loop() is False          # nothing left to end
+    assert slideshow_set.end_loop() is False
 
 
 def test_a_slide_taken_away_leaves_the_loop_it_was_in():
-    """A running loop is drawn on the map from the pool it was dealt, not from
-    the library — so an image taken away has to leave that pool too, or the map
-    goes on drawing it beside the ones still there."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
 
@@ -382,8 +346,6 @@ def test_a_slide_taken_away_leaves_the_loop_it_was_in():
 
 
 def test_a_loop_down_to_one_slide_is_one_to_end():
-    """A cull can leave a loop holding only the slide on screen, and stepping
-    round a row of one is that same image again — so a forward step ends it."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.drop("id-1b")
@@ -394,8 +356,6 @@ def test_a_loop_down_to_one_slide_is_one_to_end():
 
 
 def test_a_loop_with_somewhere_to_go_is_not_one_to_end():
-    """The row is what the forward step walks while it still holds another
-    slide; only a row down to the one on screen is the dead end that ends it."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
 
@@ -415,8 +375,6 @@ def test_the_loop_key_steps_the_lock_then_seeds_then_configs_then_off_and_round_
 
 
 def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_action():
-    """The column steps between actions, so twins of one action share a row; the
-    loop is the image and every video of it, and its map is the loop."""
     twin = Slide("one-y.png", "image", "id-1y")
     whole = lambda pid: NavMapNeighbors(  # noqa: E731
         column=tuple(NavMapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
@@ -472,7 +430,7 @@ def test_a_map_cell_the_pass_never_held_is_spliced_in_and_jumped_to():
     assert slideshow_set.jump_to(stranger) is True
     assert slideshow_set.current_prompt_id() == "id-1x"
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-2", "id-3", "id-1x"]
-    assert slideshow_set.map().corner.prompt_id == "id-1x"    # the map re-homed
+    assert slideshow_set.map().corner.prompt_id == "id-1x"
 
 
 def test_a_slide_the_set_took_in_past_its_switches_is_still_found_by_its_file():
@@ -504,17 +462,17 @@ def test_navigation_walks_the_row_and_the_column_as_rings_headed_by_the_corner()
     assert slideshow_set.nav_target("down").prompt_id == "id-1x"
     assert slideshow_set.nav_target("up").prompt_id == "id-1x"
 
-    slideshow_set.playlist.advance()                  # id-2 has nothing around it
+    slideshow_set.playlist.advance()
     assert slideshow_set.nav_target("right") is None
 
 
 def test_navigation_off_a_lit_seed_dives_into_that_seeds_own_column():
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
-    slideshow_set.playlist.advance()                  # the lit cell is id-1b
+    slideshow_set.playlist.advance()
 
     assert slideshow_set.nav_target("right").prompt_id == "id-1c"
-    assert slideshow_set.nav_target("left").prompt_id == "id-1"     # back to the corner
+    assert slideshow_set.nav_target("left").prompt_id == "id-1"
     assert slideshow_set.nav_target("down").prompt_id == "id-1bx"
 
 
@@ -540,8 +498,6 @@ def test_a_set_with_nothing_in_it_has_nothing_to_map_loop_widen_or_walk():
 
 
 def test_a_slide_that_joined_the_pass_mid_loop_is_mapped_as_itself():
-    """A generation landing while a row loops is played in its turn, and the
-    map re-homes on it rather than lighting a cell of a row it is not in."""
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.add(Slide("new.png", "image", "id-new"))
@@ -558,22 +514,19 @@ _ROW = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b"),
 
 
 def _row_mates(prompt_id):
-    """Every slide of the one row is every other's seed, as a folder's images are."""
     in_the_row = any(item[2] == prompt_id for item in _ROW)
     return NavMapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
                                     if in_the_row and item[2] != prompt_id), label="fox")
 
 
 def test_a_set_that_is_one_seed_row_opens_as_that_row_looping():
-    """A folder played as a slideshow is its seeds played round and round, which is
-    all a seed loop is — so the map says so from the first slide."""
     slideshow_set, dealt = _set(items=_ROW, neighbors=_row_mates)
 
     shown = slideshow_set.map()
 
     assert (shown.loop, shown.playing) == ("seed", ("corner", 0))
     assert _ids(shown.seeds) == ["id-1b", "id-1c"]
-    assert dealt == []                           # it was already playing the row
+    assert dealt == []
 
 
 def test_a_row_opened_part_way_along_lights_its_cells_in_the_order_they_play():
@@ -606,7 +559,6 @@ def test_the_loop_button_over_a_row_opened_looping_ends_the_loop():
 
 
 def _falls_back(answer=True):
-    """A surface that takes another set when asked, and says whether it did."""
     asked = []
 
     def fall_back():
@@ -624,7 +576,7 @@ def test_a_loop_over_a_set_that_is_one_row_ends_somewhere_else_entirely():
 
     assert asked == [True]
     assert slideshow_set.loop is None
-    assert dealt == []          # the set fallen back to is dealt by the surface
+    assert dealt == []
 
 
 def test_a_loop_with_a_set_under_it_ends_into_that_set_rather_than_falling_back():
@@ -695,8 +647,6 @@ def test_a_generation_landing_in_a_row_that_is_looping_joins_the_loop():
     assert (shown.loop, shown.playing) == ("seed", ("seed", 1))
 
 
-# --- picking a closed slideshow back up -------------------------------------
-
 def test_a_loop_is_left_naming_what_it_plays_with_the_slide_it_began_on_first():
     slideshow_set, _dealt = _mapped()
     slideshow_set.start_loop("seed")
@@ -722,8 +672,6 @@ def test_a_loop_picked_back_up_plays_its_own_slides_from_the_one_it_was_left_on(
     assert reopened.map() == closed.map()
 
 
-# --- the action filter: the map's row buttons, and the session's spoken actions ------
-
 _NAMED_FOR = {"id-1": "Source image, alpha", "id-2": "beta", "id-3": "alpha"}
 
 
@@ -742,12 +690,10 @@ def test_an_action_filter_narrows_the_pass_to_what_is_named_for_that_action():
 
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
     assert slideshow_set.filters.action == "alpha"
-    assert dealt == [True]                      # the slide on screen shows that action
+    assert dealt == [True]
 
 
 def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
-    """A filter that selected nothing is a dead end, not a mode: the set plays
-    on, and the row's button stays dark."""
     slideshow_set, dealt = _filterable()
 
     assert slideshow_set.set_action_filter("gamma") is False
@@ -756,8 +702,6 @@ def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
 
 
 def test_a_filter_naming_two_actions_keeps_only_what_is_named_for_both():
-    """Set from a row carrying two actions it names both, and only a generation
-    carrying both answers it — the rule the HUD lights its rows by."""
     slideshow_set, _dealt = _filterable()
 
     assert slideshow_set.set_action_filter("source image, alpha") is True
@@ -766,8 +710,6 @@ def test_a_filter_naming_two_actions_keeps_only_what_is_named_for_both():
 
 
 def test_filtering_to_the_action_on_screen_narrows_to_what_its_row_is_named_for():
-    """A session's spoken "filter", said of a shape: the action read off the item
-    on screen rather than spoken, the way its map row's button would post it."""
     slideshow_set, _dealt = _filterable()
     slideshow_set.playlist.jump_to(2)
 
@@ -776,8 +718,6 @@ def test_filtering_to_the_action_on_screen_narrows_to_what_its_row_is_named_for(
 
 
 def test_an_item_named_for_no_action_says_so_and_leaves_the_pass_alone():
-    """Rather than lifting the filter, which is what nothing posted to a row's
-    button means."""
     slideshow_set, _dealt = _set(actions_of=lambda ids: dict.fromkeys(ids, ""))
 
     said, narrowed = narrow_to_the_action_on_screen(slideshow_set)
@@ -797,8 +737,6 @@ def test_a_reset_drops_the_action_filter_with_the_other_switches():
 
 
 def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
-    """A video landing makes its image a source, so what the library said
-    before it landed is not what a filter may go on matching by."""
     named_for = dict(_NAMED_FOR)
     slideshow_set, _dealt = _set(actions_of=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
     slideshow_set.set_action_filter("alpha")
@@ -811,9 +749,6 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
 
 
 def test_a_configuration_rows_button_is_told_from_an_actions_by_the_row_itself():
-    """Half the column is configurations and half is actions, and the two are
-    pressed differently — so the map says which a row is rather than leaving it
-    to be guessed from the words in its margin."""
     a_configuration = Slide("one-x.png", "image", "id-1x")
     an_action = Slide("one-y.png", "image", "id-1y")
     both = lambda pid: NavMapNeighbors(  # noqa: E731

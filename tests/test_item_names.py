@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 
 import pytest
-from origenerator.db import Database
-from origenerator.item_names import ItemNames
 
 from origenerator import gallery
+from origenerator.db import Database
+from origenerator.item_names import ItemNames
 
 
 def _image(prompt_id: str, id_: int, prompt: str = "a red kite", **extra) -> dict:

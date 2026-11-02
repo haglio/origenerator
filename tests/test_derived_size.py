@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PIL import Image
+
 import origenerator.workflows.derived_size as ds
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows.derived_size import (
@@ -8,7 +10,6 @@ from origenerator.workflows.derived_size import (
     resolve_input_image_path,
     scale_to_total_pixels,
 )
-from PIL import Image
 
 
 def _write_image(path, size):

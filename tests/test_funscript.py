@@ -8,6 +8,7 @@ from app_support.funscript import read_actions
 from funestra.funscript import Funscript
 from funestra.heatmap import build_heatmap
 from funestra.robot_hand import RobotHandState, bpm_for_speed
+
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
     funscript_of,

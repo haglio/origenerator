@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 
+from PIL import Image
+from PyQt6.QtCore import Qt
+
 from origenerator.gui import queue_thumbs
 from origenerator.gui.combination import Combination
 from origenerator.gui.queue_thumbs import (
@@ -12,8 +15,6 @@ from origenerator.gui.queue_thumbs import (
     folder_pixmap,
     source_pixmap,
 )
-from PIL import Image
-from PyQt6.QtCore import Qt
 
 CELL = 28
 

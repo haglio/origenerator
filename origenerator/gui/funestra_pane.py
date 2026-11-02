@@ -5,6 +5,7 @@ import threading
 import time
 from contextlib import ExitStack
 
+from funestra.funestra import Channels, Funestra
 from funestra.funestra_verbs import RELOAD_PLAYLIST
 from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
@@ -17,7 +18,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from funestra.funestra import Channels, Funestra
 from origenerator.funestras_engine import offer_the_copy_beside_the_checkouts
 from origenerator.running_ahead import ahead_while_playing
 

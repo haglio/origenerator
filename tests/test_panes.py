@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from origenerator.gui.panes import FootSplitter, PaneSplitter
-from origenerator.gui.stylesheet import build_stylesheet
 from PyQt6.QtCore import QEvent, QPoint, QPointF, QSize, Qt
 from PyQt6.QtGui import QHoverEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QWidget
+
+from origenerator.gui.panes import FootSplitter, PaneSplitter
+from origenerator.gui.stylesheet import build_stylesheet
 
 
 class _Wanting(QWidget):

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from origenerator.run_toast import Toast
-
 from origenerator import toast_raising, windows_toast
+from origenerator.run_toast import Toast
 
 _RUN = "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 

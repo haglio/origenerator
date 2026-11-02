@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from origenerator.config import PROJECT_DIR
-from origenerator.icon_design import render_icon
 from PIL import Image
 from shared_ui.app_icon import CANVAS, assert_follows_the_family_spec
+
+from origenerator.config import PROJECT_DIR
+from origenerator.icon_design import render_icon
 
 ICON_PATH = PROJECT_DIR / "icon.ico"
 

@@ -4,6 +4,10 @@ import json
 import urllib.request
 
 import pytest
+from PIL import Image
+from PyQt6.QtWidgets import QWidget
+
+from origenerator import action_settings, evolver_export, gallery
 from origenerator.animate_command import AnimateRequest
 from origenerator.db import Database
 from origenerator.export_lane import GENAU
@@ -19,10 +23,6 @@ from origenerator.gui.starting_rows import StartingRows
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
-from PIL import Image
-from PyQt6.QtWidgets import QWidget
-
-from origenerator import action_settings, evolver_export, gallery
 from tests.thumbnail_rows import square
 
 IMAGE_WORKFLOW = "sdxl_t2i"

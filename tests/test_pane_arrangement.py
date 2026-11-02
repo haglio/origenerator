@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from origenerator.gui.pane_arrangement import PaneArrangement
 from PyQt6.QtWidgets import QWidget
+
+from origenerator.gui.pane_arrangement import PaneArrangement
 
 
 def _arrangement(qtbot):

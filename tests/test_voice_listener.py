@@ -1,8 +1,3 @@
-"""CommandAndRequestListener — what the open mic hears: a command, a request, or nothing.
-
-An injected microphone that says text drives the whole flow synchronously, with
-no audio and no model.
-"""
 from __future__ import annotations
 
 import logging
@@ -67,7 +62,7 @@ def test_words_that_are_no_command_and_no_request_do_nothing(qtbot):
 
 @pytest.mark.parametrize("noise", ["   ", ". . . ."])
 def test_a_sound_with_no_words_in_it_is_answered_as_not_caught(qtbot, noise):
-    # Whisper writes '. . . .' for noise; it is neither a command nor nothing.
+    # Whisper writes '. . . .' for noise.
     listener, hearing = _listener(says=noise)
     ran, errors = [], []
     listener.error.connect(errors.append)
@@ -121,13 +116,11 @@ def test_stopping_commands_ends_their_execution(qtbot):
     listener.start_commands(_into(ran))
     listener.stop_commands()
 
-    hearing.hear()  # a late utterance after the mic was shut
+    hearing.hear()
 
     assert ran == []
     assert hearing.stopped
 
-
-# --- spoken requests: "Request … over" on the same mic ----------------------
 
 
 def _request_listener(says="Request, no hat, over."):
@@ -170,15 +163,13 @@ def test_a_request_the_session_heard_keeps_when_it_was_said(qtbot):
 
 
 def test_an_open_request_swallows_what_would_be_a_command(qtbot):
-    # The words of a request are a sentence, not instructions: "fix teeth" said
-    # inside one belongs to the request.
     listener, hearing = _request_listener(says="Request.")
     ran = []
     spoken = []
     listener.request.connect(spoken.append)
     listener.start_commands(_into(ran))
 
-    hearing.hear()          # opens the request
+    hearing.hear()
     hearing.says = "fix teeth"
     hearing.hear()
 
@@ -210,12 +201,8 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
     assert not listener.taking_a_request
 
 
-# --- the bare vocabulary, asked once the request has passed -------------------
-
 
 def _bare_listener(says):
-    """A listener wired as the gallery wires it: a dictation, a loose matcher,
-    and a strict whole-utterance one."""
     hearing = FakeHearing(says)
     listener = CommandAndRequestListener(
         hearing=hearing, dictation=RequestDictation(),
@@ -253,14 +240,12 @@ def test_a_bare_command_word_is_the_command(qtbot):
 
 
 def test_an_open_request_takes_the_word_back(qtbot):
-    # Mid-sentence the dictation is in front again: a command word said inside a
-    # request is one of the request's words, not an order.
     listener, hearing = _bare_listener("Request.")
     ran, spoken = [], []
     listener.request.connect(spoken.append)
     listener.start_commands(_into(ran))
 
-    hearing.hear()          # opens the request
+    hearing.hear()
     hearing.says = "requests"
     hearing.hear()
 

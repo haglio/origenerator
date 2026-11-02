@@ -1,4 +1,3 @@
-"""Fixture values are fabricated throughout (see CLAUDE.md)."""
 from __future__ import annotations
 
 import pytest
@@ -8,7 +7,6 @@ from origenerator.action_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
 from origenerator.image_states import state_names
 
-# A small stand-in for the overlay's own table: two lanes, three actions, three states.
 _PATHS = {
     "animation_paths": {
         VIDEO: {
@@ -34,8 +32,6 @@ def test_a_state_offers_the_actions_its_row_says_yes_to(paths):
 
 
 def test_a_lane_offers_every_action_the_table_gives_it_in_its_own_order(paths):
-    """What the Action list carries: the actions his sheet has a row for in that
-    lane, in the order they are written down."""
     assert animation_paths.actions(VIDEO) == ("alpha", "beta", "gamma")
     assert animation_paths.actions(GENAU) == ("alpha",)
 
@@ -68,9 +64,6 @@ def test_a_malformed_line_costs_that_line_and_no_more():
 
 
 def test_the_example_table_names_only_actions_and_states_the_example_declares():
-    """The two vocabularies the table is written in are the overlay's own, so a
-    line naming an action or a state nothing declares is a line that can never fire.
-    Held over the committed example, which is what documents the shape."""
     example = load_content(EXAMPLE_CONTENT, EXAMPLE_CONTENT)
     actions = set(example["actions"])
     states = set(state_names(example))

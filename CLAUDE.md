@@ -436,6 +436,10 @@ is the two hooks that call the guard, below.
   repair it asks `origenerator.base_backfill` — the same module the app's own
   absence path uses, down to the submit-and-wait — so the two cannot answer
   differently. Run it with the app closed; it is one full render per row.
+- `tools/backfill_animated_thumbnails.py` — makes the animated thumbnail of every
+  finished video that has none, one run from the production checkout: a video is
+  not complete until its thumbnail is ready to animate, and the ones from before
+  that was so have none. No `--apply` is a dry run that prints the count.
 - `tools/speech_worker.py` — the voice: speaks a story's scene lines with
   Qwen3-TTS, one WAV per scene at exactly the scene's length, from a JSON job
   `origenerator.speech` writes. Run by path under the `speech_python` the

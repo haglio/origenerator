@@ -1,25 +1,3 @@
-"""The contract for running inside a Fun Time session's satellite half.
-
-Launched with ``--fun-time``, Origenerator stops being a free-floating desktop
-app and becomes one of the session's managed windows: Core occupies
-the rect Fun Time names (the Random Favs Browser's), each slideshow goes to the
-portrait or landscape shape by its subject's shape, and everything OSR2 is
-left to Fun Time's Main Funestra.  Fun Time drives the slideshows through a command
-file and reads back which shapes are occupied through a status file — the same
-file-channel idioms its own Satellite Funestras speak
-(``funestra.file_channel``).
-
-What a shape IS depends on what the session hands over.  A session that names
-each Funestra's own channel (:class:`FunestraChannel`) is handing this app its
-Funestras: a slideshow is then a playlist written for one, a few verbs, and the HUD
-this app publishes for it.  One that names none is an older session, whose
-slideshows open a window of this app's over each region instead.
-
-This module is the pure half: the argv contract, the session dataclass, and the
-shape policy that picks a region.  The Qt half — placing windows, polling
-the channels — lives in :mod:`origenerator.fun_time_bridge`.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -49,49 +27,21 @@ from origenerator.workflows.detail_parts import published_fix_phrases
 
 logger = logging.getLogger(__name__)
 
-# --- the declared launch contract ------------------------------------------
-#
-# Everything a host must know to start this app inside a session, find the
-# windows it opens and drive it.  Declared once here, published as
-# CONTRACT_FILE at the checkout root for a host that cannot import this
-# package, and used below to BUILD the parser -- so the flags a host writes,
-# the flags this app reads and the document a host checks itself against are
-# all one thing.  They were three hand-kept copies with nothing comparing them,
-# which is how a flag renamed on one shape could become a window that never
-# appeared on the other (audit cross/boundaries/cross/017).
-
-#: The module a host runs.
 MODULE = "origenerator"
 
-#: Present iff this app is being hosted.
 MODE_FLAG = "--fun-time"
 
-#: Core's rect -- the Random Favs Browser's, which it covers -- and
-#: the two satellite regions a slideshow of this app's opens over when the session
-#: hands no Funestra for that shape.
 RECT_FIELDS = ("x", "y", "width", "height")
 MAIN_RECT_PREFIX = ""
 REGION_RECT_PREFIXES = {shape: f"{shape}-" for shape in ("portrait", "landscape")}
 
-#: The session's own channel to this app: how it drives it and reads it back.
 SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-file")
 
-#: The two Satellite Funestras a session hands over, and the four files each
-#: Funestra contract trades through (see :class:`FunestraChannel`).  All four of a
-#: shape or none of it: a session that names none for a shape still wants a
-#: window of this app's over that region instead.
 SHAPES = ("portrait", "landscape")
 FUNESTRA_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
 
-#: Where a session in the headset asks for this window's frames instead: the
-#: memory-mapped file to write it into (``app_support.frame_channel``) and the
-#: file its pointer's presses arrive through.  Both or neither; named, they say
-#: this window has no monitor to be seen on.
 HEADSET_FILES = ("frames-file", "input-file")
 
-#: The words that file carries, one per line, each with the pixel it happened
-#: at: ``press 40 12``.  Declared here because the host writes them and this
-#: app reads them, and neither may import the other.
 HEADSET_PRESS = "press"
 HEADSET_RELEASE = "release"
 HEADSET_DRAG = "drag"
@@ -107,7 +57,6 @@ RELEASE = "RELEASE"
 HAND_OVER = "HAND_OVER"
 TAKE_BACK = "TAKE_BACK"
 SESSION_VERBS = (CLOSE_SLIDESHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
-#: Opening and closing the slideshow on one side's Funestra alone.
 OPEN_SLIDESHOW = "open_slideshow"
 CLOSE_SLIDESHOW = "close_slideshow"
 SIDE_VERBS = (OPEN_SLIDESHOW, CLOSE_SLIDESHOW)
@@ -117,22 +66,14 @@ SAID_AT = " @"
 REQUEST_OPEN = "request_open"
 REQUEST_CLOSED = "request_closed"
 
-#: Whose taskbar button this window joins.
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 
-#: Boot and exit without opening anything -- how a host's suite proves the real
-#: launch works (see :func:`build_parser`).
 CHECK_LAUNCH_FLAG = "--check-launch"
 
 SPOKEN_PHRASES_MODULE = "origenerator.voice.hosted"
 
-#: The caption Core wears, which a host resolves it by (together
-#: with the pid).  The splash deliberately wears another ("Origenerator
-#: Loading"), so a caption match cannot reach it.
 WINDOW_TITLE = "Origenerator"
 
-#: Beside the launcher at the checkout root, which is the path a host is
-#: already told.  Running this module rewrites it.
 CONTRACT_FILE = "origenerator_contract.json"
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -143,14 +84,6 @@ def _rect_flags(prefix: str) -> tuple[str, ...]:
 
 
 def required_flags() -> tuple[str, ...]:
-    """The flags every hosted launch carries, in the order a host writes them.
-
-    Required in the strict sense: :func:`parse_app_args` refuses a hosted
-    launch missing one.  argparse already refuses a flag this app does not
-    know, so a rename on the host's shape fails at its launch with a message --
-    and this is the other half of the same drift, a host that stopped SENDING
-    one, which used to fall through to a default of nothing at all.
-    """
     return (
         MODE_FLAG,
         *_rect_flags(MAIN_RECT_PREFIX),
@@ -160,28 +93,18 @@ def required_flags() -> tuple[str, ...]:
 
 
 def region_flags(shape: str) -> tuple[str, ...]:
-    """One region's rect, for the slideshow this app opens over it itself.
-
-    Not required: a host that names a Funestra for the shape opens no window of
-    ours there at all, so the rect it would take is beside the point.
-    """
     return _rect_flags(REGION_RECT_PREFIXES[shape])
 
 
 def funestra_flags(shape: str) -> tuple[str, ...]:
-    """One side's Funestra channel: all four of them, or none of them."""
     return tuple(f"--{shape}-{name}" for name in FUNESTRA_FILES)
 
 
 def headset_flags() -> tuple[str, ...]:
-    """The pair a session in the headset hands this window over by: both or
-    neither, and neither on the monitors."""
     return tuple(f"--{name}" for name in HEADSET_FILES)
 
 
 def command_lines() -> tuple[str, ...]:
-    """Every line the command file answers, a name in braces standing for what
-    the line carries there."""
     return (
         *SESSION_VERBS,
         f"{HAND_OVER}|{{frames}}|{{input}}",
@@ -215,7 +138,6 @@ def command_patterns() -> tuple[str, ...]:
 
 
 def declaration() -> dict:
-    """The published document, as a host reads it."""
     return {
         "module": MODULE,
         "window_title": WINDOW_TITLE,
@@ -245,7 +167,6 @@ def contract_path(root: Path | None = None) -> Path:
 
 
 def publish(root: Path | None = None) -> Path:
-    """Write the document out, in the shape the tracked copy holds."""
     path = contract_path(root)
     path.write_text(published_text(), encoding="utf-8", newline="\n")
     return path
@@ -261,15 +182,6 @@ class Rect:
 
 @dataclass(frozen=True)
 class FunestraChannel:
-    """One of the session's Funestras, as the Funestra contract reaches it.
-
-    The four files a content source and a Funestra trade through
-    (``funestra.playlist`` / ``funestra_verbs`` / ``status`` /
-    ``satellite_hud``): the list the Funestra plays, the verbs it drains, the
-    status it publishes back, and the HUD this app publishes for the session
-    to draw on it.
-    """
-
     playlist: Path
     command_file: Path
     status_file: Path
@@ -290,8 +202,6 @@ class FunestraChannel:
 
 @dataclass(frozen=True)
 class FunTimeSession:
-    """Everything ``--fun-time`` hands this app about the session hosting it."""
-
     main_rect: Rect
     portrait_rect: Rect
     landscape_rect: Rect
@@ -299,27 +209,20 @@ class FunTimeSession:
     paused_file: Path | None
     status_file: Path | None
     dashboard_cmd_file: Path | None
-    # Each Satellite Funestra's own channel, where the session hands its Funestras
-    # over — ``None`` for a shape it named none for, which is a session that
-    # still wants a window of this app's over that region instead.
     portrait_funestra: FunestraChannel | None = None
     landscape_funestra: FunestraChannel | None = None
-    # Where this window's frames go when the room is in the headset, and
-    # where the pointer's presses on it come back through.
     frames_file: Path | None = None
     input_file: Path | None = None
     taskbar_identity: str | None = None
 
     @property
     def in_a_headset(self) -> bool:
-        """Whether this window is shown in the headset rather than on a monitor."""
         return self.frames_file is not None and self.input_file is not None
 
     def region_rect(self, shape: str) -> Rect:
         return self.portrait_rect if shape == "portrait" else self.landscape_rect
 
     def funestra(self, shape: str) -> FunestraChannel | None:
-        """The Funestra holding *shape*, or ``None`` where the session named none."""
         return self.portrait_funestra if shape == "portrait" else self.landscape_funestra
 
 
@@ -340,11 +243,6 @@ def _rect(args: argparse.Namespace, prefix: str) -> Rect:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """The contract above, as the parser that reads it off a command line.
-
-    Every flag comes from the declaration, so the document a host reads and the
-    argv this app accepts cannot come to disagree.
-    """
     parser = argparse.ArgumentParser(prog=MODULE)
     parser.add_argument(MODE_FLAG, action="store_true")
     _add_rect_arguments(parser, MAIN_RECT_PREFIX)
@@ -356,34 +254,15 @@ def build_parser() -> argparse.ArgumentParser:
         for name in FUNESTRA_FILES:
             parser.add_argument(f"--{shape}-{name}", type=Path, default=None)
     parser.add_argument(TASKBAR_IDENTITY_FLAG, default=None)
-    # Boot far enough to prove this launch works, then exit 0 without opening
-    # anything.  A hosting session's integration suite runs the REAL launch
-    # command it would use in production through this, which is how a break
-    # that kills the process before it can log — an import that cannot resolve
-    # under the launch interpreter, a bad argv contract — is caught by a test
-    # instead of by a session coming up with a window missing.  It stops short
-    # of the database, ComfyUI and any window, so a run costs the machine
-    # nothing and contends with no production app.
     parser.add_argument(CHECK_LAUNCH_FLAG, action="store_true")
     return parser
 
 
 def region_for_size(width: int, height: int) -> str:
-    """Which satellite region a subject of this shape belongs in.
-
-    A square subject goes to the landscape region — the roomier of the two.
-    """
     return shape_of_size(width, height)
 
 
 def _measured_size(slide: Slide) -> tuple[int, int] | None:
-    """(width, height) of *slide*, or ``None`` when nothing about it measures.
-
-    The stored thumbnail is preferred — bounded to 256px but aspect-preserving,
-    so it answers shape without opening the full-size file.  An image
-    with no thumbnail is measured directly; a video without one is passed over
-    rather than decoded, since a frame grab costs seconds on HEVC.
-    """
     from PIL import Image  # noqa: PLC0415 (this module is read before the splash)
 
     for candidate in (slide.still,
@@ -399,13 +278,7 @@ def _measured_size(slide: Slide) -> tuple[int, int] | None:
 
 
 def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
-    """(width, height) of the first openable video's frame, or ``None``.
-
-    The backstop for a set whose stills all failed to measure: one decode of
-    one frame, paid only on that path — a folder of thumbnail-less videos
-    otherwise measured as nothing at all, and "nothing" fell to landscape,
-    which is how a portrait slideshow once landed on the landscape region.
-    """
+    """(width, height) of the first openable video's frame, or ``None``; a decode of HEVC costs seconds."""
     import cv2  # noqa: PLC0415 (this module is read before the splash)
 
     for slide in slides:
@@ -423,12 +296,6 @@ def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
 
 
 def region_for_items(items) -> str:
-    """The region a set of slides plays in, however the caller assembled them.
-
-    Majority shape over what measures — stills first, one decoded video
-    frame as the backstop when no still answered.  A tie, or a set in which
-    nothing measures at all, goes to landscape, the roomier region.
-    """
     slides = [Slide.of(item) for item in items]
     shapes = [region_for_size(*size) for size in map(_measured_size, slides)
               if size is not None]
@@ -449,12 +316,6 @@ def majority_shape(shapes) -> str:
 
 
 def _funestra(args: argparse.Namespace, shape: str) -> FunestraChannel | None:
-    """*shape*'s Funestra channel, or ``None`` where the session named no Funestra.
-
-    All four files or none: half a channel is a Funestra this app could write a
-    list for and never hear back from, which is worse than the window it would
-    otherwise open.
-    """
     files = [getattr(args, flag.removeprefix("--").replace("-", "_"))
              for flag in funestra_flags(shape)]
     return FunestraChannel(*files) if all(files) else None
@@ -480,17 +341,11 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
 
 
 def _missing_required(argv: list[str]) -> list[str]:
-    """Which of :func:`required_flags` a hosted *argv* does not carry."""
     written = {word.split("=", 1)[0] for word in argv}
     return [flag for flag in required_flags() if flag not in written]
 
 
 def parse_app_args(argv: list[str]) -> AppArgs:
-    """The launch contract, parsed.  ``argv`` excludes the program name.
-
-    A hosted launch short of a required flag is refused rather than started:
-    see :func:`required_flags` for why silence was the worse answer.
-    """
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.fun_time and (missing := _missing_required(argv)):

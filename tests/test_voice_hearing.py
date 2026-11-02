@@ -1,8 +1,3 @@
-"""The microphone as text: what reaches the app, and as what words.
-
-Hearing itself is voice_core's and tested there; these hold what is this app's own --
-which of its two roads an utterance takes, and what arrives at the end of each.
-"""
 from __future__ import annotations
 
 import array
@@ -16,7 +11,7 @@ from voice_core.whisper_reader import WhisperReader
 from origenerator.voice.dictation import request_bias
 from origenerator.voice.hearing import Hearing
 
-QUIET = bytes(960)  # one 30 ms frame of digital silence
+QUIET = bytes(960)
 LOUD = array.array("h", [3000, -3000] * 240).tobytes()
 ONE_UTTERANCE = [QUIET] * 15 + [LOUD] * 8 + [QUIET] * 20
 PATIENCE_MS = 10_000
@@ -57,7 +52,6 @@ def test_a_sentence_arrives_as_the_words_it_was_taken_down_as(qtbot):
 
 
 def test_a_phrase_the_verifying_listener_reads_differently_arrives_as_the_sentence_it_was(qtbot):
-    # Said mid-thought, "undo the last one" is not the command its first word is.
     hearing = Hearing({"undo"}, engines=_engines(
         ["undo"], verifying_listener=lambda audio, hint: "undo the last one",
         take_down=lambda audio, hint: "undo the last one"))
@@ -75,8 +69,6 @@ def test_a_phrase_said_in_german_is_read_once_more_in_german_before_it_is_doubte
 
 
 def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
-    # The pause detector hears far quieter sounds than this app's own did, which is what
-    # lets a quiet word through; a quiet nothing is a chair, not something to answer.
     faint = array.array("h", [400, -400] * 240).tobytes()
     engines = scripted_engines([said(""), said("")], take_down=lambda audio, hint: " . . . ",
                                frames=[QUIET] * 15 + [faint] * 8 + [QUIET] * 20 + ONE_UTTERANCE[15:])
@@ -88,7 +80,7 @@ def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
         hearing.start()
     hearing.stop()
 
-    assert arrived == [" . . . "]  # the loud one alone
+    assert arrived == [" . . . "]
 
 
 def test_a_sound_with_no_words_in_it_arrives_as_nothing_so_the_caption_can_say_so(qtbot):
@@ -98,7 +90,6 @@ def test_a_sound_with_no_words_in_it_arrives_as_nothing_so_the_caption_can_say_s
 
 
 def test_a_phrase_that_cannot_be_taken_back_by_voice_is_heard_only_as_the_first_reading(qtbot):
-    # "mic off" has no spoken way back, so a near miss is never repaired into it.
     hearing = Hearing({"mic off", "audio off"}, never_repaired={"mic off"}, engines=_engines(
         ["mic audio off", "mic off"], take_down=lambda audio, hint: "my audio is off"))
 
@@ -128,17 +119,13 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     hearing.stop()
 
     _rules, settings, _events, engines = built.call_args.args
-    # A sentence ends where the speaker pauses, and what is taken down is told to expect
-    # the two words a spoken request hangs on.
     assert (settings.model_name, settings.device_name) == ("a-model", "a-microphone")
     assert settings.pauses is not None
     assert settings.speech_hint == request_bias()
-    # Nothing said here reaches the disk.
     assert settings.miss_dir is None
     assert isinstance(engines.verifying_listener, WhisperReader)
     assert isinstance(engines.take_down, WhisperReader)
     assert engines.take_down is not engines.verifying_listener
     assert set(engines.verifying_listener_in) == {"de"}
     assert isinstance(engines.verifying_listener_in["de"], WhisperReader)
-    # An utterance ends when its speaker pauses, however loud the room stays.
     assert isinstance(engines.hears_speech, HearsSpeech)

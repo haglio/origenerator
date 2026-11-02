@@ -360,7 +360,7 @@ def test_thumbnail_starts_unselected(qtbot):
     assert tw.styleSheet() == ""
 
 
-def _picked_tile_drawn(qtbot):
+def _picked_tile_drawn_under_the_app_stylesheet(qtbot):
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -377,14 +377,14 @@ def _picked_tile_drawn(qtbot):
 
 
 def test_selecting_fills_the_whole_tile_with_the_familys_blue(qtbot):
-    _tile, img = _picked_tile_drawn(qtbot)
+    _tile, img = _picked_tile_drawn_under_the_app_stylesheet(qtbot)
 
     assert img.pixelColor(8, 8) == BLUE
     assert img.pixelColor(8, 182) == BLUE
 
 
 def test_a_picked_tiles_thumbnail_wears_a_white_frame(qtbot):
-    tile, img = _picked_tile_drawn(qtbot)
+    tile, img = _picked_tile_drawn_under_the_app_stylesheet(qtbot)
     area = tile._image_label.geometry()
 
     assert img.pixelColor(area.left(), area.center().y()) == TEXT_PRIMARY

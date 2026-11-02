@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
@@ -47,6 +48,21 @@ class CornerButton(NamedTuple):
     tooltip: str
 
 
+@dataclass(frozen=True)
+class TileAppearance:
+    caption: str | None = None
+    media_type: str | None = None
+    movie_path: str | None = None
+    favorite: bool = False
+    enhance: str | None = None
+    enhancing: RunReading | None = None
+    corner_buttons: list[CornerButton] | None = None
+    restore: RestoreOffer | None = None
+
+
+PLAIN_APPEARANCE = TileAppearance()
+
+
 def restore_offer_of(item: dict) -> RestoreOffer:
     why_not = why_it_cannot_be_restored(item)
     if why_not:
@@ -64,21 +80,14 @@ class ItemTile(QWidget):
     control_triggered = pyqtSignal(str, str)
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
-                 parent=None, *, media_type: str | None = None,
-                 movie_path: str | None = None, favorite: bool = False,
-                 enhance: str | None = None,
-                 enhancing: RunReading | None = None,
-                 corner_buttons: list[CornerButton] | None = None,
-                 restore: RestoreOffer | None = None):
+                 appearance: TileAppearance = PLAIN_APPEARANCE, parent=None):
         super().__init__(parent)
         self.prompt_id = prompt_id
-        self.look = self.look_of(prompt_id, thumb_path, label_text, media_type=media_type,
-                                 movie_path=movie_path,
-                                 corner_buttons=corner_buttons, restore=restore)
+        self.look = self.look_of(prompt_id, thumb_path, label_text, appearance)
         self._selected = False
-        self._favorite = favorite
-        self._enhance = enhance
-        self._enhancing = enhancing
+        self._favorite = appearance.favorite
+        self._enhance = appearance.enhance
+        self._enhancing = appearance.enhancing
         self._resting_pixmap: QPixmap | None = None
         self._corner_buttons: list[QPushButton] = []
         self.drag_out = DragOut()
@@ -99,8 +108,8 @@ class ItemTile(QWidget):
         self._image_label.setFixedSize(_IMAGE_SIZE)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        if movie_path and Path(movie_path).exists():
-            play_in(self._image_label, movie_path, _IMAGE_SIZE)
+        if appearance.movie_path and Path(appearance.movie_path).exists():
+            play_in(self._image_label, appearance.movie_path, _IMAGE_SIZE)
         elif thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
             self._image_label.setPixmap(
@@ -124,11 +133,11 @@ class ItemTile(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
-        if media_type:
-            ItemTypeIcon(media_type, self)
+        if appearance.media_type:
+            ItemTypeIcon(appearance.media_type, self)
 
         layout.activate()  # Qt gives the thumbnail its rectangle only once the layout has run
-        self._controls = CornerButtons(self, restore=restore)
+        self._controls = CornerButtons(self, restore=appearance.restore)
         self._controls.place(self._image_label.geometry())
         self._controls.triggered.connect(
             lambda action: self.control_triggered.emit(self.prompt_id, action))
@@ -138,7 +147,7 @@ class ItemTile(QWidget):
 
         self._build_the_enhancing_bar()
 
-        self._build_corner_buttons(corner_buttons or [])
+        self._build_corner_buttons(appearance.corner_buttons or [])
 
     def _build_the_enhancing_bar(self) -> None:
         self._status_scrim = TileStatusScrim(self)
@@ -153,12 +162,11 @@ class ItemTile(QWidget):
         self._show_enhancing_run()
 
     @staticmethod
-    def look_of(prompt_id: str, thumb_path: str | None, label_text: str, *,
-                media_type: str | None = None, movie_path: str | None = None,
-                corner_buttons: list[CornerButton] | None = None,
-                restore: RestoreOffer | None = None, **_mutable) -> tuple:
-        return (prompt_id, thumb_path, label_text, media_type, movie_path, restore,
-                tuple(action.action_id for action in corner_buttons or ()))
+    def look_of(prompt_id: str, thumb_path: str | None, label_text: str,
+                appearance: TileAppearance = PLAIN_APPEARANCE) -> tuple:
+        return (prompt_id, thumb_path, label_text, appearance.media_type,
+                appearance.movie_path, appearance.restore,
+                tuple(action.action_id for action in appearance.corner_buttons or ()))
 
     def set_selected(self, selected: bool):
         if selected == self._selected:

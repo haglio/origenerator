@@ -12,7 +12,7 @@ from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
 from origenerator.gui.corner_buttons import CORNER_INSET
 from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.item_tile import CornerButton, ItemTile
+from origenerator.gui.item_tile import CornerButton, ItemTile, TileAppearance
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.media import MediaType
 from tests.heard_drags import HeardDrags
@@ -41,7 +41,7 @@ def _write_looping_webp(path, size=(64, 48)):
 
 def test_video_thumbnail_plays_a_looping_movie(qtbot, tmp_path):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
-    tw = ItemTile("v1", None, "label", movie_path=str(webp))
+    tw = ItemTile("v1", None, "label", TileAppearance(movie_path=str(webp)))
     qtbot.addWidget(tw)
     movies = tw.findChildren(QMovie)
     assert len(movies) == 1
@@ -61,7 +61,7 @@ def test_thumbnail_without_a_movie_path_stays_a_still(qtbot, tmp_path):
 def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
     still = tmp_path / "i1.jpg"
     Image.new("RGB", (64, 48), (0, 0, 255)).save(still)
-    tw = ItemTile("v1", str(still), "label", movie_path=str(tmp_path / "gone.webp"))
+    tw = ItemTile("v1", str(still), "label", TileAppearance(movie_path=str(tmp_path / "gone.webp")))
     qtbot.addWidget(tw)
     assert tw.findChildren(QMovie) == []
     assert not tw._image_label.pixmap().isNull()
@@ -107,7 +107,7 @@ def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeyp
     monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
-    tw = ItemTile("v1", None, "label", movie_path=str(webp))
+    tw = ItemTile("v1", None, "label", TileAppearance(movie_path=str(webp)))
     qtbot.addWidget(tw)
 
     _drag_out(qtbot, tw)
@@ -182,7 +182,7 @@ def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     plain = ItemTile("p1", None, "label")
     qtbot.addWidget(plain)
     assert plain.findChildren(ItemTypeIcon) == []
-    typed = ItemTile("p2", None, "label", media_type=MediaType.VIDEO)
+    typed = ItemTile("p2", None, "label", TileAppearance(media_type=MediaType.VIDEO))
     qtbot.addWidget(typed)
     assert len(typed.findChildren(ItemTypeIcon)) == 1
 
@@ -194,7 +194,7 @@ def test_no_corner_buttons_by_default(qtbot):
 
 
 def test_corner_buttons_build_hidden_buttons_with_tooltips(qtbot):
-    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
+    tw = ItemTile("p1", None, "label", TileAppearance(corner_buttons=_corner_button_specs()))
     qtbot.addWidget(tw)
     assert [b.toolTip() for b in tw._corner_buttons] == [
         "Randomize video seed", "Randomize image seed",
@@ -203,7 +203,7 @@ def test_corner_buttons_build_hidden_buttons_with_tooltips(qtbot):
 
 
 def test_corner_buttons_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
-    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
+    tw = ItemTile("p1", None, "label", TileAppearance(corner_buttons=_corner_button_specs()))
     qtbot.addWidget(tw)
     pos = QPointF(1, 1)
 
@@ -216,7 +216,7 @@ def test_corner_buttons_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
 
 
 def test_corner_buttons_stay_up_while_the_cursor_is_on_a_button(qtbot):
-    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
+    tw = ItemTile("p1", None, "label", TileAppearance(corner_buttons=_corner_button_specs()))
     qtbot.addWidget(tw)
     pos = QPointF(1, 1)
     tw.enterEvent(QEnterEvent(pos, pos, pos))
@@ -227,7 +227,7 @@ def test_corner_buttons_stay_up_while_the_cursor_is_on_a_button(qtbot):
 
 
 def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
-    tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
+    tw = ItemTile("p1", None, "label", TileAppearance(corner_buttons=_corner_button_specs()))
     qtbot.addWidget(tw)
     fired = []
     tw.corner_button_triggered.connect(lambda pid, aid: fired.append((pid, aid)))
@@ -238,13 +238,13 @@ def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
 
 
 def test_every_corner_of_a_tile_is_up_at_rest(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN))
     qtbot.addWidget(tw)
     assert all(not b.isHidden() for b in _corners(tw))
 
 
 def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
-    tw = ItemTile("p1", None, "label", favorite=True)
+    tw = ItemTile("p1", None, "label", TileAppearance(favorite=True))
     qtbot.addWidget(tw)
     star, trash, _plus = _corners(tw)
     assert tw._favorite is True
@@ -253,7 +253,7 @@ def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
 
 
 def test_an_enhanced_tile_keeps_its_plus_up_and_says_it_is_spent(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_HELD)
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_HELD))
     qtbot.addWidget(tw)
     _star, _trash, plus = _corners(tw)
     assert not plus.isHidden()
@@ -261,7 +261,7 @@ def test_an_enhanced_tile_keeps_its_plus_up_and_says_it_is_spent(qtbot):
 
 
 def test_an_enhanced_tile_that_could_take_another_offers_one(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_MORE)
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_MORE))
     qtbot.addWidget(tw)
     _star, _trash, plus = _corners(tw)
     assert not plus.isHidden()
@@ -269,14 +269,14 @@ def test_an_enhanced_tile_that_could_take_another_offers_one(qtbot):
 
 
 def test_a_video_tile_grows_no_plus_at_all(qtbot):
-    tw = ItemTile("v1", None, "label", enhance=None)
+    tw = ItemTile("v1", None, "label", TileAppearance(enhance=None))
     qtbot.addWidget(tw)
     _star, _trash, plus = _corners(tw)
     assert plus.isHidden()
 
 
 def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN))
     qtbot.addWidget(tw)
     pos = QPointF(1, 1)
     tw.enterEvent(QEnterEvent(pos, pos, pos))
@@ -289,7 +289,7 @@ def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
 
 
 def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_HELD)
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_HELD))
     qtbot.addWidget(tw)
     plus = _corners(tw)[2]
     assert not plus.isEnabled()
@@ -301,7 +301,7 @@ def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
 
 
 def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN))
     qtbot.addWidget(tw)
     fired = []
     tw.control_triggered.connect(lambda pid, action: fired.append((pid, action)))
@@ -314,8 +314,8 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
 
 
 def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
-    tw = ItemTile("p1", None, "label", favorite=True,
-                         enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE)
+    tw = ItemTile("p1", None, "label", TileAppearance(favorite=True,
+                         enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE))
     qtbot.addWidget(tw)
     star, trash, plus = (b.geometry() for b in _corners(tw))
     area = tw._image_label.geometry()
@@ -335,16 +335,16 @@ def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
 
 
 def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):
-    tw = ItemTile("p1", None, "label", favorite=True,
-                         enhance=icons.ENHANCE_OPEN, enhancing=_run())
+    tw = ItemTile("p1", None, "label", TileAppearance(favorite=True,
+                         enhance=icons.ENHANCE_OPEN, enhancing=_run()))
     qtbot.addWidget(tw)
 
     assert all(not b.isHidden() and b.isEnabled() for b in _corners(tw))
 
 
 def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN,
-                         corner_buttons=_corner_button_specs())
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN,
+                         corner_buttons=_corner_button_specs()))
     qtbot.addWidget(tw)
     assert tw._corner_buttons[0].x() == tw._image_label.x() + CORNER_INSET
     for button in tw._corner_buttons:
@@ -386,7 +386,7 @@ def test_a_picked_tiles_thumbnail_wears_a_white_frame(qtbot):
 def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     webp = tmp_path / "loop.webp"
     Image.new("RGB", (40, 30)).save(webp)
-    tile = ItemTile("p1", None, "a clip", movie_path=str(webp))
+    tile = ItemTile("p1", None, "a clip", TileAppearance(movie_path=str(webp)))
     qtbot.addWidget(tile)
     movie = tile._image_label.movie()
     assert movie is not None
@@ -394,7 +394,7 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     omnipause.freeze(True)
     assert movie.state() == QMovie.MovieState.Paused
 
-    later = ItemTile("p3", None, "a clip", movie_path=str(webp))
+    later = ItemTile("p3", None, "a clip", TileAppearance(movie_path=str(webp)))
     qtbot.addWidget(later)
     assert later._image_label.movie().state() == QMovie.MovieState.Paused
 
@@ -424,8 +424,8 @@ def test_a_resting_tile_wears_neither_overlay(qtbot):
 
 
 def test_an_enhancing_tile_says_so_over_the_thumbnail_and_on_a_bar(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run(
-        progress=(10, 20), started_at=time.time() - 90.5, typical_seconds=725.0))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(
+        progress=(10, 20), started_at=time.time() - 90.5, typical_seconds=725.0)))
     qtbot.addWidget(tw)
 
     assert tw._enhancing is not None
@@ -435,8 +435,8 @@ def test_an_enhancing_tile_says_so_over_the_thumbnail_and_on_a_bar(qtbot):
 
 
 def test_the_fix_being_applied_gets_the_band_under_the_run_s_own_reading(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run(
-        progress=(45, 60), pass_progress=(5, 20)))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(
+        progress=(45, 60), pass_progress=(5, 20))))
     qtbot.addWidget(tw)
 
     assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (45, 60)
@@ -444,15 +444,15 @@ def test_the_fix_being_applied_gets_the_band_under_the_run_s_own_reading(qtbot):
 
 
 def test_an_enhance_still_queued_draws_no_band(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run(
-        status="queued", progress=(45, 60), pass_progress=(5, 20)))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(
+        status="queued", progress=(45, 60), pass_progress=(5, 20))))
     qtbot.addWidget(tw)
 
     assert tw._enhancing_bar.pass_progress() is None
 
 
 def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run())
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run()))
     qtbot.addWidget(tw)
     area, bar = tw._image_label.geometry(), tw._enhancing_bar.geometry()
 
@@ -462,8 +462,8 @@ def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
 
 
 def test_an_enhancing_tiles_bar_leaves_its_lower_corners_clear(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN,
-                         enhancing=_run())
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN,
+                         enhancing=_run()))
     qtbot.addWidget(tw)
     _star, trash, plus = _corners(tw)
     bar = tw._enhancing_bar.geometry()
@@ -473,8 +473,8 @@ def test_an_enhancing_tiles_bar_leaves_its_lower_corners_clear(qtbot):
 
 
 def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
-    tw = ItemTile("p1", None, "label", enhance=icons.ENHANCE_OPEN,
-                         enhancing=_run())
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN,
+                         enhancing=_run()))
     qtbot.addWidget(tw)
 
     tw.set_enhancing(_run(frame=_png_bytes()))
@@ -485,8 +485,7 @@ def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
 
 
 def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
-    tw = ItemTile("p1", None, "label",
-                         enhancing=_run(status="queued", progress=(0, 0)))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(status="queued", progress=(0, 0))))
     qtbot.addWidget(tw)
 
     assert tw._enhancing_bar.caption() == ""
@@ -495,7 +494,7 @@ def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
 
 
 def test_a_fresh_run_updates_the_overlays_in_place(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run(status="queued"))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(status="queued")))
     qtbot.addWidget(tw)
 
     tw.set_enhancing(_run(progress=(5, 20), started_at=time.time() - 30.5,
@@ -506,9 +505,8 @@ def test_a_fresh_run_updates_the_overlays_in_place(qtbot):
 
 
 def test_the_clock_advances_between_polls(qtbot):
-    tw = ItemTile("p1", None, "label",
-                         enhancing=_run(started_at=time.time() - 5.5,
-                                        typical_seconds=100.0))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(started_at=time.time() - 5.5,
+                                        typical_seconds=100.0)))
     qtbot.addWidget(tw)
     assert tw._enhancing_bar.caption() == "~1:34 left"
 
@@ -518,7 +516,7 @@ def test_the_clock_advances_between_polls(qtbot):
 
 
 def test_a_streamed_frame_paints_the_thumbnail_under_the_overlays(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run())
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run()))
     qtbot.addWidget(tw)
 
     tw.set_enhancing(_run(frame=_png_bytes()))
@@ -529,7 +527,7 @@ def test_a_streamed_frame_paints_the_thumbnail_under_the_overlays(qtbot):
 
 
 def test_the_run_ending_takes_both_overlays_away(qtbot):
-    tw = ItemTile("p1", None, "label", enhancing=_run(frame=_png_bytes()))
+    tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(frame=_png_bytes())))
     qtbot.addWidget(tw)
 
     tw.set_enhancing(None)

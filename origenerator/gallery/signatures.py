@@ -5,6 +5,7 @@ from functools import cache, lru_cache
 
 from origenerator.file_refs import frame_name, reference_basename, unannotated
 from origenerator.media import MediaType
+from origenerator.output_files import READINGS_KEPT
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.lora_rows import strength_key_of
 from origenerator.workflows.model_files import is_no_lora

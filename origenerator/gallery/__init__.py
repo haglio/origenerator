@@ -90,7 +90,6 @@ from origenerator.gallery.output import (
     output_disk_files,
     output_file_path,
     output_file_reference,
-    produced_output,
     resolve_preview,
     row_output_files,
     video_file_of,
@@ -155,6 +154,7 @@ from origenerator.gallery.voice_commands import (
     match_command,
     recognized_spelling,
 )
+from origenerator.output_files import produced_output
 
 __all__ = [
     "ALL_KEY",

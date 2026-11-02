@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from origenerator import output_files
 from origenerator.gallery import (
     ALL_KEY,
     CustomCollection,
@@ -260,13 +261,13 @@ def test_a_rows_kind_is_read_off_its_file_list_once_however_often_it_is_asked(mo
 
 def test_whether_a_row_produced_a_file_is_read_once_however_often_it_is_asked(monkeypatch):
     reads = []
-    real = gallery_output.parse_file_list
-    monkeypatch.setattr(gallery_output, "parse_file_list",
+    real = output_files.parse_file_list
+    monkeypatch.setattr(output_files, "parse_file_list",
                         lambda raw: reads.append(raw) or real(raw))
     files = json.dumps([{"filename": "produced_once_00001_.png"}])
 
     for _ in range(3):
-        assert gallery_output.produced_output(_row(output_files=files))
+        assert output_files.produced_output(_row(output_files=files))
 
     assert reads == [files]
 

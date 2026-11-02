@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections import Counter
 
 from origenerator.gallery.groups import child_groups
-from origenerator.gallery.output import produced_output
 from origenerator.gallery.tree import ALL_KEY, folder_chain
+from origenerator.output_files import produced_output
 
 
 class Placement:

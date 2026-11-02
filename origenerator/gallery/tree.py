@@ -36,7 +36,6 @@ from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
 from origenerator.gallery.output import (
     is_in_progress,
     media_type_of_row,
-    produced_output,
 )
 from origenerator.gallery.signatures import (
     _grouping_version,
@@ -54,6 +53,7 @@ from origenerator.gallery.signatures import (
 from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.media import MediaType
+from origenerator.output_files import produced_output
 
 
 def _group_by_creation(newest_first, key):

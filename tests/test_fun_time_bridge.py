@@ -307,13 +307,13 @@ def test_a_side_taken_back_on_its_own_closes_that_sides_slideshow_alone(qtbot, t
     assert view.region_slideshow("portrait") is None
 
 
-def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
+def _fill_both_regions(qtbot, view, monkeypatch, tmp_path):
     tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
     Image.new("RGB", (100, 200)).save(tall)
     Image.new("RGB", (200, 100)).save(wide)
     library = {
-        "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in portrait],
-        "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in landscape],
+        "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in ("p1", "p2")],
+        "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in ("l1", "l2")],
     }
     monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [
         {**(view.row_for(item[2]) or {}), **_row_of(item)}
@@ -336,8 +336,7 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions(
-        qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
+    portrait, landscape = _fill_both_regions(qtbot, view, monkeypatch, tmp_path)
 
     _press_filter_enhanced(bridge, tmp_path)
 
@@ -355,8 +354,7 @@ def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions(
-        qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
+    portrait, landscape = _fill_both_regions(qtbot, view, monkeypatch, tmp_path)
     portrait.toggle_enhanced_mode()
 
     _press_filter_enhanced(bridge, tmp_path)
@@ -369,8 +367,7 @@ def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions(
-        qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
+    portrait, landscape = _fill_both_regions(qtbot, view, monkeypatch, tmp_path)
 
     _press_filter_enhanced(bridge, tmp_path)
 

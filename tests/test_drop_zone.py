@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, Qt
@@ -18,12 +20,10 @@ from origenerator.gui.stylesheet import build_stylesheet
 from tests.drop_style_seen import worn
 
 
-def _zone(qtbot, kind="image", lent_by=lambda pid: pid,
-          preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False,
-          named=lambda name: None, name_of=lambda held: "", browse=None,
-          leads_to=lambda held: held):
-    lookups = ZoneLookups(lent_by=lent_by, preview=preview, named=named, name_of=name_of,
-                          browse=browse, leads_to=leads_to)
+_NO_LOOKUPS = ZoneLookups(lent_by=lambda pid: pid, preview=lambda pid: (None, None))
+
+
+def _zone(qtbot, kind="image", placeholder="Drop here", grayscale=False, lookups=_NO_LOOKUPS):
     zone = DropZone(kind=kind, lookups=lookups, placeholder=placeholder, grayscale=grayscale)
     qtbot.addWidget(zone)
     return zone
@@ -58,7 +58,7 @@ def _write_looping_webp(path, size=(64, 48)):
 
 
 def test_dropping_an_allowed_id_fills_the_zone_and_notifies(qtbot):
-    zone = _zone(qtbot, lent_by=_images_only)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only))
     seen = []
     zone.changed.connect(lambda: seen.append(zone.current_id()))
 
@@ -70,7 +70,7 @@ def test_dropping_an_allowed_id_fills_the_zone_and_notifies(qtbot):
 
 
 def test_a_dropped_item_is_held_as_what_it_lends_the_zone(qtbot):
-    zone = _zone(qtbot, lent_by={"vid1": "img1"}.get)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by={"vid1": "img1"}.get))
 
     ev = _drop(zone, "vid1")
 
@@ -79,7 +79,7 @@ def test_a_dropped_item_is_held_as_what_it_lends_the_zone(qtbot):
 
 
 def test_dropping_a_disallowed_id_is_ignored(qtbot):
-    zone = _zone(qtbot, lent_by=_images_only)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only))
 
     _drop(zone, "vid9")
 
@@ -87,7 +87,7 @@ def test_dropping_a_disallowed_id_is_ignored(qtbot):
 
 
 def test_drag_enter_accepts_only_allowed_ids(qtbot):
-    zone = _zone(qtbot, lent_by=_images_only)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only))
 
     assert _drag_enter(zone, "img1").isAccepted()
     assert not _drag_enter(zone, "vid1").isAccepted()
@@ -116,7 +116,7 @@ def test_clear_on_an_empty_zone_does_not_notify(qtbot):
 
 
 def test_a_filled_zone_names_its_item_under_its_image(qtbot):
-    zone = _zone(qtbot, name_of=lambda held: f"Example Folder {held}")
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, name_of=lambda held: f"Example Folder {held}"))
 
     _drop(zone, "img1")
     named = zone._caption.text()
@@ -126,7 +126,7 @@ def test_a_filled_zone_names_its_item_under_its_image(qtbot):
 
 
 def test_a_held_items_name_sits_as_close_under_its_image_as_under_a_source_thumbnail(qtbot):
-    zone = _zone(qtbot, name_of=lambda held: f"Example Folder {held}")
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, name_of=lambda held: f"Example Folder {held}"))
     _drop(zone, "img1")
     zone.resize(240, 240)
     zone.show()
@@ -149,7 +149,7 @@ def test_clicking_a_filled_zone_goes_to_its_item_and_keeps_it(qtbot):
 
 
 def test_a_click_goes_to_the_gallery_item_the_held_file_belongs_to(qtbot):
-    zone = _zone(qtbot, leads_to={"image/scene_00001_.png [output]": "gen-pic"}.get)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, leads_to={"image/scene_00001_.png [output]": "gen-pic"}.get))
     went = []
     zone.activated.connect(went.append)
     zone.set_item("image/scene_00001_.png [output]")
@@ -162,7 +162,7 @@ def test_a_click_goes_to_the_gallery_item_the_held_file_belongs_to(qtbot):
 
 @pytest.mark.parametrize(("name", "tip"), [("scene one.png", "scene one.png"), ("", "")])
 def test_a_held_file_from_outside_the_gallery_offers_no_way_there(qtbot, name, tip):
-    zone = _zone(qtbot, leads_to=lambda held: None, name_of=lambda held: name)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, leads_to=lambda held: None, name_of=lambda held: name))
     went = []
     zone.activated.connect(went.append)
     zone.set_item("C:/elsewhere/scene one.png")
@@ -176,7 +176,7 @@ def test_a_held_file_from_outside_the_gallery_offers_no_way_there(qtbot, name, t
 
 def test_a_video_preview_animates(qtbot, tmp_path):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
-    zone = _zone(qtbot, kind="video", preview=lambda pid: (None, webp))
+    zone = _zone(qtbot, kind="video", lookups=replace(_NO_LOOKUPS, preview=lambda pid: (None, webp)))
 
     _drop(zone, "vid1")
 
@@ -187,7 +187,7 @@ def test_a_video_preview_animates(qtbot, tmp_path):
 
 def test_emptying_a_zone_stops_the_clip_it_was_looping(qtbot, tmp_path):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
-    zone = _zone(qtbot, kind="video", preview=lambda pid: (None, webp))
+    zone = _zone(qtbot, kind="video", lookups=replace(_NO_LOOKUPS, preview=lambda pid: (None, webp)))
     _drop(zone, "vid1")
     looping = zone._movie
 
@@ -199,7 +199,7 @@ def test_emptying_a_zone_stops_the_clip_it_was_looping(qtbot, tmp_path):
 
 def test_a_grayscale_zone_drains_the_clip_it_holds(qtbot, tmp_path):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
-    zone = _zone(qtbot, kind="video", preview=lambda pid: (None, webp), grayscale=True)
+    zone = _zone(qtbot, kind="video", grayscale=True, lookups=replace(_NO_LOOKUPS, preview=lambda pid: (None, webp)))
 
     _drop(zone, "vid1")
 
@@ -212,8 +212,7 @@ def test_a_grayscale_zone_drains_the_clip_it_holds(qtbot, tmp_path):
 def test_a_grayscale_zone_drains_a_still_too(qtbot, tmp_path):
     still = tmp_path / "thumb.png"
     Image.new("RGB", (40, 30), (200, 30, 30)).save(still)
-    zone = _zone(qtbot, kind="video", preview=lambda pid: (str(still), None),
-                 grayscale=True)
+    zone = _zone(qtbot, kind="video", grayscale=True, lookups=replace(_NO_LOOKUPS, preview=lambda pid: (str(still), None)))
 
     _drop(zone, "vid1")
 
@@ -224,7 +223,7 @@ def test_a_grayscale_zone_drains_a_still_too(qtbot, tmp_path):
 def test_an_ordinary_zone_keeps_its_color(qtbot, tmp_path):
     still = tmp_path / "thumb.png"
     Image.new("RGB", (40, 30), (200, 30, 30)).save(still)
-    zone = _zone(qtbot, preview=lambda pid: (str(still), None))
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, preview=lambda pid: (str(still), None)))
 
     _drop(zone, "img1")
 
@@ -232,7 +231,7 @@ def test_an_ordinary_zone_keeps_its_color(qtbot, tmp_path):
 
 
 def test_a_zone_lights_while_a_drag_it_would_take_is_under_way(qtbot):
-    zone = _zone(qtbot, lent_by=_images_only)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only))
     image, video = generation_mime("img1"), generation_mime("vid1")
 
     under_way.started.emit(image, None)
@@ -256,7 +255,7 @@ def test_a_drag_over_the_zone_lights_it_as_where_the_drop_lands(qtbot):
 
 
 def test_a_drag_the_zone_would_turn_away_does_not_light_it(qtbot):
-    zone = _zone(qtbot, lent_by=_images_only)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only))
 
     _drag_enter(zone, "vid1")
 
@@ -317,7 +316,7 @@ def test_the_zone_under_the_drag_sits_one_step_lighter_than_one_only_lit_for_it(
 
 
 def test_accepts_delegates_to_the_predicate(qtbot):
-    zone = _zone(qtbot, lent_by=_images_only)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only))
 
     assert zone.accepts("img1") is True
     assert zone.accepts("vid1") is False
@@ -343,7 +342,7 @@ def _actions(zone) -> dict:
 
 def test_the_menu_pastes_the_item_the_clipboard_names(qtbot):
     QApplication.clipboard().setText("AB12CD34 007")
-    zone = _zone(qtbot, lent_by=_images_only, named={"AB12CD34 007": "img7"}.get)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only, named={"AB12CD34 007": "img7"}.get))
     paste = _actions(zone)["Paste Origenerator name"]
     assert paste.isEnabled()
 
@@ -355,7 +354,7 @@ def test_the_menu_pastes_the_item_the_clipboard_names(qtbot):
 @pytest.mark.parametrize("on_the_clipboard", ["", "a sentence copied elsewhere", "AB12CD34 007"])
 def test_paste_is_grayed_while_the_clipboard_names_nothing_the_zone_takes(qtbot, on_the_clipboard):
     QApplication.clipboard().setText(on_the_clipboard)
-    zone = _zone(qtbot, lent_by=_images_only, named={"AB12CD34 007": "vid7"}.get)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, lent_by=_images_only, named={"AB12CD34 007": "vid7"}.get))
 
     paste = _actions(zone)["Paste Origenerator name"]
 
@@ -364,7 +363,7 @@ def test_paste_is_grayed_while_the_clipboard_names_nothing_the_zone_takes(qtbot,
 
 def test_browse_is_offered_only_to_a_zone_that_can_take_a_file(qtbot):
     browsed = []
-    with_browse = _zone(qtbot, browse=lambda: browsed.append("asked"))
+    with_browse = _zone(qtbot, lookups=replace(_NO_LOOKUPS, browse=lambda: browsed.append("asked")))
     without = _zone(qtbot)
 
     assert "Browse..." not in _actions(without)
@@ -375,7 +374,7 @@ def test_browse_is_offered_only_to_a_zone_that_can_take_a_file(qtbot):
 
 
 def test_a_held_item_is_named_in_the_zones_tooltip(qtbot):
-    zone = _zone(qtbot, name_of={"img1": "AB12CD34 001"}.get)
+    zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, name_of={"img1": "AB12CD34 001"}.get))
 
     _drop(zone, "img1")
 

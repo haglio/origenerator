@@ -154,8 +154,8 @@ def test_a_picker_offers_only_the_architectures_its_graph_runs(installed_models)
 
 
 def test_a_picker_keeps_what_it_could_not_classify(installed_models):
-    installed_models.add("checkpoints", "old.ckpt", body=b"pickled weights, no header")
-    installed_models.add("checkpoints", "cut.safetensors", body=struct.pack("<Q", 4096) + b"{}")
+    installed_models.add_bytes("checkpoints", "old.ckpt", b"pickled weights, no header")
+    installed_models.add_bytes("checkpoints", "cut.safetensors", struct.pack("<Q", 4096) + b"{}")
     installed_models.add("checkpoints", "future.safetensors", arch=None)
     installed_models.add("checkpoints", "vid.safetensors", arch=WAN)
     assert list_model_files("checkpoints", ["fb.safetensors"], accepts=(SDXL,)) == [

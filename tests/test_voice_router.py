@@ -277,14 +277,13 @@ def router(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "QThreadPool", FakePool())
     built = []
 
-    def build(host=None, *, slideshows=None, db=None, client=_A_CLIENT, motion=None,
-              buttons=None, mic_on=True):
+    def build(host=None, *, slideshows=None, db=None, motion=None, buttons=None):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
         qtbot.addWidget(parent)
         router = VoiceRouter(
-            host, VoiceSources(db=db or FakeDB(), slideshows=slideshows, client=client,
+            host, VoiceSources(db=db or FakeDB(), slideshows=slideshows, client=_A_CLIENT,
                                starting=starting),
             parent=parent, motion=motion)
         built.append((parent, router))
@@ -294,7 +293,7 @@ def router(qtbot, monkeypatch, starting):
                 auto=buttons.get("auto", FakeButton(tip="Auto-generate")),
                 radio=buttons.get("radio", FakeButton(tip="Origenerator Radio")),
                 drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
-                mic=buttons.get("mic", FakeButton(tip="Listen", checked=mic_on))),
+                mic=buttons.get("mic", FakeButton(tip="Listen", checked=True))),
             enhance=buttons.get("enhance",
                                 (FakeButton(tip="Enhance 2 images"), lambda: None)),
             actions=buttons.get("actions", {}),
@@ -321,7 +320,7 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
-    voice, _host, _slideshows = router(mic_on=False)
+    voice, _host, _slideshows = router(buttons={"mic": FakeButton(tip="Listen", checked=False)})
 
     voice.sync()
 

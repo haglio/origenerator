@@ -8,18 +8,19 @@ from origenerator import local_llm, search
 from origenerator.generation_state import GenerationSource
 
 
-def _row(prompt_id, positive, *, negative="", seed=1, workflow="sdxl_t2i",
-         params=None, output=True):
+def _row(prompt_id, positive, **given):
+    negative = given.get("negative", "")
+    seed = given.get("seed", 1)
     stored = {"positive_prompt": positive, "negative_prompt": negative, "seed": seed}
-    stored.update(params or {})
+    stored.update(given.get("params") or {})
     return {
         "prompt_id": prompt_id,
-        "workflow_name": workflow,
+        "workflow_name": given.get("workflow", "sdxl_t2i"),
         "positive_prompt": positive,
         "negative_prompt": negative,
         "seed": seed,
         "status": "completed",
-        "output_files": json.dumps([f"{prompt_id}.png"]) if output else None,
+        "output_files": json.dumps([f"{prompt_id}.png"]) if given.get("output", True) else None,
         "params_json": json.dumps(stored),
     }
 

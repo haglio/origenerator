@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import NamedTuple
 
 from origenerator import gallery
 from origenerator.db import Database, NewGeneration
@@ -30,8 +31,7 @@ def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False
     return db.get_generation(prompt_id)
 
 
-def _add_enhance(db, prompt_id, input_ref, filename, status="completed",
-                 thumbnail="enh_thumb.jpg"):
+def _add_enhance(db, prompt_id, input_ref, filename, status="completed"):
     db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="image_enhance", workflow_version="v001",
         params_json=json.dumps({"input_image": input_ref, "positive_prompt": "a cat"}),
@@ -42,7 +42,7 @@ def _add_enhance(db, prompt_id, input_ref, filename, status="completed",
         fields.update(
             output_files=json.dumps([{"filename": filename, "subfolder": "image",
                                       "type": "output"}]),
-            thumbnail_path=thumbnail,
+            thumbnail_path="enh_thumb.jpg",
         )
     db.update_generation(prompt_id, **fields)
     return db.get_generation(prompt_id)
@@ -333,9 +333,20 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     assert basic_facts(row) is None
 
 
-def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
-                   checkpoint="example_xl_v1.safetensors",
-                   upscale_model="4xExample_v1.pt", detectors=()):
+class _EnhanceLook(NamedTuple):
+    scale_by: float = 0.5
+    steps: int = 20
+    denoise: float = 0.15
+    checkpoint: str = "example_xl_v1.safetensors"
+    upscale_model: str = "4xExample_v1.pt"
+    detectors: tuple = ()
+
+
+_USUAL_LOOK = _EnhanceLook()
+
+
+def _enhance_graph(look):
+    scale_by, steps, denoise, checkpoint, upscale_model, detectors = look
     graph = {
         "1": {"class_type": "CheckpointLoaderSimple",
               "inputs": {"ckpt_name": checkpoint}},
@@ -366,8 +377,8 @@ def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
     return graph
 
 
-def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, **graph_kwargs):
-    graph = _enhance_graph(**graph_kwargs)
+def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, look=_USUAL_LOOK):
+    graph = _enhance_graph(look)
     sampler = graph["9"]["inputs"]
     db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="imported",
@@ -423,9 +434,8 @@ def test_a_rebuilt_version_keeps_the_settings_that_made_it(tmp_path):
     _add_source(db)
     _add_reconstructed_enhance(
         db, "i1", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png",
-        scale_by=0.375, steps=24, denoise=0.25,
-        checkpoint="example_xl_v1.safetensors", upscale_model="4xExample_v1.pt",
-        detectors=(("face_example.pt", 0.45), ("hand_example.pt", 0.6)))
+        _EnhanceLook(scale_by=0.375, steps=24, denoise=0.25,
+                     detectors=(("face_example.pt", 0.45), ("hand_example.pt", 0.6))))
     fold_completed_enhancements(db)
 
     version = gallery.displayed_versions(db.get_generation("src"))[0]

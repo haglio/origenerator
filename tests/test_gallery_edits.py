@@ -10,7 +10,8 @@ from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 
 
-def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=None):
+def _completed_row(db, output_dir, pid, file, *, thumb_dir=None):
+    subfolder, _, filename = file.rpartition("/")
     db.insert_generation(NewGeneration(
         prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
@@ -103,7 +104,7 @@ def test_undo_with_an_empty_stack_does_nothing(tmp_path):
 
 def test_delete_also_takes_the_video_metadata_sidecar(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
-    row = _completed_row(db, output_dir, "v1", "clip.mp4", subfolder="video")
+    row = _completed_row(db, output_dir, "v1", "video/clip.mp4")
     sidecar = output_dir / "video" / "clip.png"
     sidecar.write_bytes(b"png")
 
@@ -397,7 +398,7 @@ def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):
         tmp_path,
         release_files=lambda paths: seen.append([(p, p.exists()) for p in paths]),
     )
-    row = _completed_row(db, output_dir, "v1", "clip.mp4", subfolder="video",
+    row = _completed_row(db, output_dir, "v1", "video/clip.mp4",
                          thumb_dir=tmp_path / "thumbs")
 
     actions.delete_rows([row])
@@ -442,7 +443,7 @@ def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
 def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
     seen = []
     actions, db, output_dir = _actions(tmp_path, release_files=seen.extend)
-    row = _completed_row(db, output_dir, "e1", "exp.mp4", subfolder="video")
+    row = _completed_row(db, output_dir, "e1", "video/exp.mp4")
 
     actions.reject_experiment(row)
 
@@ -486,7 +487,7 @@ def test_undoing_a_rejection_after_a_newer_image_took_its_name_lists_its_new_nam
 
 
 def _enhanced_row(db, output_dir, pid="p1"):
-    _completed_row(db, output_dir, pid, "base.png", subfolder="image")
+    _completed_row(db, output_dir, pid, "image/base.png")
     (output_dir / "image" / "enhanced.png").write_bytes(b"better")
     db.update_generation(
         pid,
@@ -571,7 +572,7 @@ def test_a_versions_files_are_ended_once_its_undo_entry_falls_off_the_stack(tmp_
     actions, db, output_dir = _actions(tmp_path, limit=1)
     first = _enhanced_row(db, output_dir, "p1")
     (output_dir / "image" / "enhanced2.png").write_bytes(b"better")
-    _completed_row(db, output_dir, "p2", "base2.png", subfolder="image")
+    _completed_row(db, output_dir, "p2", "image/base2.png")
     db.update_generation(
         "p2",
         output_files=json.dumps([{"filename": "enhanced2.png", "subfolder": "image"},
@@ -592,7 +593,7 @@ def test_a_versions_files_are_ended_once_its_undo_entry_falls_off_the_stack(tmp_
 def test_a_thumbnail_that_cannot_be_redrawn_stays_as_it_was(tmp_path):
     thumb_dir = tmp_path / "thumbs"
     actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
-    _completed_row(db, output_dir, "p1", "base.png", subfolder="image", thumb_dir=thumb_dir)
+    _completed_row(db, output_dir, "p1", "image/base.png", thumb_dir=thumb_dir)
     (output_dir / "image" / "enhanced.png").write_bytes(b"not a picture")
     db.update_generation(
         "p1",
@@ -623,7 +624,7 @@ def test_undoing_a_version_delete_puts_it_back(tmp_path):
 def test_undoing_a_version_delete_after_a_newer_image_took_its_name_lists_its_new_name(
         tmp_path):
     actions, db, output_dir = _actions(tmp_path)
-    _completed_row(db, output_dir, "p1", "alpha_t2i_00004_.png", subfolder="image")
+    _completed_row(db, output_dir, "p1", "image/alpha_t2i_00004_.png")
     (output_dir / "image" / "alpha_t2i_00005_.png").write_bytes(b"better")
     db.update_generation(
         "p1",
@@ -646,7 +647,7 @@ def test_undoing_a_version_delete_after_a_newer_image_took_its_name_lists_its_ne
 
 def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
-    row = _completed_row(db, output_dir, "p1", "base.png", subfolder="image",
+    row = _completed_row(db, output_dir, "p1", "image/base.png",
                          thumb_dir=tmp_path / "thumbs")
     (output_dir / "image" / "enhanced.png").write_bytes(b"better")
     db.update_generation(

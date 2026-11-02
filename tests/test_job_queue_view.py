@@ -47,28 +47,21 @@ def dressed(qtbot):
 _EITHER_WAY = object()
 
 
-def _item(key="j1", caption="Alpha Workflow \u203a a kite", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, foreign_ahead=None, starts_at=None,
-          started_at=None, typical_seconds=None, auto_generating=False,
-          job_kind="", requested=False, source_image=None, folder_thumbnails=(),
-          action="", source_video_thumbnail=None, prompt_edited=False,
-          starting=False, movable=None, shield=None, shielded=False,
-          move_up=_EITHER_WAY, move_down=_EITHER_WAY):
+def _item(key="j1", caption="Alpha Workflow \u203a a kite", **given):
+    status = given.pop("status", "running")
+    reading = RunReading(status=status, **{field: given.pop(field)
+                                           for field in ("frame", "progress", "started_at",
+                                                         "typical_seconds")
+                                           if field in given})
+    movable = given.pop("movable", None)
     move = (lambda: None) if (status != "running" if movable is None else movable) else None
-    return InFlightItem(key=key, caption=caption,
+    move_up = given.pop("move_up", _EITHER_WAY)
+    move_down = given.pop("move_down", _EITHER_WAY)
+    return InFlightItem(key=key, caption=caption, reading=reading,
+                        reveal=given.pop("reveal", None) or (lambda: None),
                         move_up=move if move_up is _EITHER_WAY else move_up,
                         move_down=move if move_down is _EITHER_WAY else move_down,
-                        reading=RunReading(status=status, frame=frame, progress=progress,
-                                           started_at=started_at,
-                                           typical_seconds=typical_seconds),
-                        reveal=reveal or (lambda: None), cancel=cancel,
-                        foreign_ahead=foreign_ahead, starts_at=starts_at,
-                        auto_generating=auto_generating,
-                        job_kind=job_kind, requested=requested,
-                        source_image=source_image, folder_thumbnails=folder_thumbnails,
-                        action=action, source_video_thumbnail=source_video_thumbnail,
-                        prompt_edited=prompt_edited, starting=starting,
-                        shield=shield, shielded=shielded)
+                        **given)
 
 
 def _image(path, color=(0, 0, 255)):

@@ -31,18 +31,19 @@ from tools import backfill_base_renders as backfill_tool
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 
 
-def _add(db, prompt_id, *, params, files, original_files=None, workflow="sdxl_t2i",
-         source="generated", status="completed"):
+def _add(db, prompt_id, *, params, files, **row):
     db.insert_generation(NewGeneration(
-        prompt_id=prompt_id, workflow_name=workflow, workflow_version="v004",
+        prompt_id=prompt_id, workflow_name=row.get("workflow", "sdxl_t2i"),
+        workflow_version="v004",
         positive_prompt=params.get("positive_prompt", ""), seed=params.get("seed"),
-        params_json=json.dumps(params), workflow_json="{}", source=source,
+        params_json=json.dumps(params), workflow_json="{}",
+        source=row.get("source", "generated"),
     ))
-    fields = {"status": status}
+    fields = {"status": row.get("status", "completed")}
     if files is not None:
         fields["output_files"] = json.dumps(files)
-    if original_files is not None:
-        fields["original_files"] = json.dumps(original_files)
+    if row.get("original_files") is not None:
+        fields["original_files"] = json.dumps(row["original_files"])
     db.update_generation(prompt_id, **fields)
     return db.get_generation(prompt_id)
 

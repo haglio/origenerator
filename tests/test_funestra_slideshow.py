@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import threading
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -66,10 +67,13 @@ def _seat(tmp_path) -> Seat:
     return Seat("portrait", _channel(tmp_path), FrameFiles(tmp_path / "frames"))
 
 
-def _slideshow(qtbot, tmp_path, items=_ITEMS, *, pace=None, say=None, clock=None,
+_NO_HOSTING = Hosting()
+
+
+def _slideshow(qtbot, tmp_path, items=_ITEMS, *, say=None, hosting=_NO_HOSTING,
                **playing) -> FunestraSlideshow:
     slideshow = FunestraSlideshow(Playing(items, shuffle=in_order, **playing), _seat(tmp_path),
-                                  Hosting(pace=pace, say=say, clock=clock))
+                                  replace(hosting, say=say or hosting.say))
     slideshow._timer.stop()
     return slideshow
 
@@ -285,7 +289,7 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
 
 def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_to_read_the_list(
         qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, pace=SlideshowPace(seconds=6))
+    slideshow = _slideshow(qtbot, tmp_path, hosting=Hosting(pace=SlideshowPace(seconds=6)))
 
     assert _sent(slideshow) == ["SET_PACE 6", "LOCK_OFF", "RELOAD_PLAYLIST"]
 
@@ -302,7 +306,7 @@ def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp
 
 def test_a_word_said_at_no_known_time_is_about_the_slide_on_screen(qtbot, tmp_path):
     now = [10.0]
-    slideshow = _slideshow(qtbot, tmp_path, clock=lambda: now[0])
+    slideshow = _slideshow(qtbot, tmp_path, hosting=Hosting(clock=lambda: now[0]))
     _says(slideshow, video="one.png")
     slideshow.tick()
     now[0] = 12.0
@@ -316,7 +320,7 @@ def test_a_word_said_at_no_known_time_is_about_the_slide_on_screen(qtbot, tmp_pa
 
 def test_a_word_said_over_a_slide_since_left_puts_that_slide_back_on_screen(qtbot, tmp_path):
     now = [10.0]
-    slideshow = _slideshow(qtbot, tmp_path, clock=lambda: now[0])
+    slideshow = _slideshow(qtbot, tmp_path, hosting=Hosting(clock=lambda: now[0]))
     _says(slideshow, video="one.png")
     slideshow.tick()
     now[0] = 12.0

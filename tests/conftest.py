@@ -87,12 +87,15 @@ class ModelTree:
     def __init__(self, root):
         self.root = root
 
-    def add(self, category, name, *, arch=None, lora=False, body=None, metadata=None):
+    def add_bytes(self, category, name, body):
         path = self.root / "models" / category / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        if body is not None:
-            path.write_bytes(body)
-            return path
+        path.write_bytes(body)
+        return path
+
+    def add(self, category, name, *, arch=None, lora=False, metadata=None):
+        path = self.root / "models" / category / name
+        path.parent.mkdir(parents=True, exist_ok=True)
         names = list(ARCH_TENSOR_NAMES[arch]) if arch else ["unknown.weight"]
         if lora:
             names = [f"{name}.lora_A.weight" for name in names]

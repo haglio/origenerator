@@ -262,14 +262,17 @@ def _video(prompt_id="v1"):
 def enhance(monkeypatch):
     monkeypatch.setattr(module, "EnhancePane", FakePanel)
 
-    def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None,
-              tabs=None):
-        host = host or FakeHost()
+    def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None):
         parts = EnhanceParts(
             jobs=jobs or FakeReroll(), gallery_pane=gallery_pane or FakeGalleryPane(),
-            slideshows=slideshows or FakeSlideshows(), info_tabs_of=lambda: tabs or FakeTabs())
-        return EnhanceController(host, parts, db=db or FakeDB()), host
+            slideshows=slideshows or FakeSlideshows(), info_tabs_of=FakeTabs)
+        return _assembled(host, parts, db)
     return build
+
+
+def _assembled(host, parts, db):
+    host = host or FakeHost()
+    return EnhanceController(host, parts, db=db or FakeDB()), host
 
 
 
@@ -498,7 +501,9 @@ def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
 def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
     tab = FakeGenerateTab()
     gallery_pane = FakeGalleryPane()
-    controller, host = enhance(gallery_pane=gallery_pane, tabs=FakeTabs([tab]))
+    parts = EnhanceParts(jobs=FakeReroll(), gallery_pane=gallery_pane,
+                         slideshows=FakeSlideshows(), info_tabs_of=lambda: FakeTabs([tab]))
+    controller, host = _assembled(None, parts, None)
 
     settings = gallery.EnhanceSettings()
     controller.pane.on_changed(settings)
@@ -635,9 +640,9 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
     row = _image("i1")
     tab = FakeGenerateTab(row)
     gallery_pane, slideshows = FakeGalleryPane(), FakeSlideshows()
-    controller, _host = enhance(
-        FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
-        gallery_pane=gallery_pane, slideshows=slideshows, tabs=FakeTabs([tab]))
+    parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a")]), gallery_pane=gallery_pane,
+                         slideshows=slideshows, info_tabs_of=lambda: FakeTabs([tab]))
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
 
     controller.reconcile()
 

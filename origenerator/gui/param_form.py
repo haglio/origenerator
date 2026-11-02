@@ -575,7 +575,7 @@ class ParamForm(QWidget):
         return "\n".join(f"{self._labels[self._row_of(key)].text()}: {found.value_shown}. "
                          f"{found.said}" for key, found in self._advised_at(rows))
 
-    def track_prompt_rewrites(self, made_with: dict | None = None) -> None:
+    def track_prompt_rewrites(self, made_with: dict) -> None:
         """Mark every prompt on the form as a rewrite of ``made_with``'s text for
         it, a scene's of its own part of the story, or of what it says right now
         where that holds none (:mod:`origenerator.gui.tracked_prompt`).
@@ -584,7 +584,6 @@ class ParamForm(QWidget):
         (the Foley audio prompts did) is marked the day it lands, for the same
         reason :meth:`text_fields` asks the widgets what they are.
         """
-        made_with = made_with or {}
         scenes = (self._scenes.fields_beside_their_texts(made_with)
                   if self._scenes is not None else [])
         for widget, was in scenes:

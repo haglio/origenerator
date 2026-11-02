@@ -75,6 +75,7 @@ from tests.gallery_view_support import (
     _select_first_leaf,
     _selected_folder,
     _single_i2v_db,
+    _struck_and_lit,
     _tab_with_prompts,
 )
 from tests.slideshow_hud_support import engine_of, funestra_of
@@ -2103,6 +2104,64 @@ def test_canceling_from_the_front_tab_stops_the_reroll(qtbot, tmp_path):
     assert view._live_jobs == {}
     assert view._db.get_generation(prompt_id) is None
     assert tab._cancel_btn.isHidden() is True
+
+
+def _edited_tab_showing_the_saved_image(view, qtbot):
+    panel = _front_panel(view)
+    row = view._db.get_generation("orig")
+    panel.show_saved_generation(row, [row])
+    field = panel._param_form._widgets["positive_prompt"].boxes()[0]
+    field.setPlainText("a dog")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+    return panel, field
+
+
+def test_canceling_a_generate_brings_back_how_the_prompt_differs_from_the_item_shown(
+        qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel, field = _edited_tab_showing_the_saved_image(view, qtbot)
+    panel._on_generate()
+    assert _struck_and_lit(field) == ("", "")
+
+    panel.cancel_requested.emit()
+
+    assert _struck_and_lit(field) == ("cat", "dog")
+
+
+def test_a_generate_with_words_in_the_request_stays_marked_against_what_they_asked_of(
+        qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    db.record_request(prompt_id="orig", source_prompt_id="src", heard="", asked="no bird",
+                      old_positive="a bird", old_negative="",
+                      new_positive="a cat", new_negative="")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    row = db.get_generation("orig")
+    panel.show_saved_generation(row, [row])
+    field = panel._param_form._widgets["positive_prompt"].boxes()[0]
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("bird", "cat"), timeout=5000)
+
+    panel._on_generate()
+
+    assert panel.launched_runs()
+    assert _struck_and_lit(field) == ("bird", "cat")
+
+
+def test_a_generate_that_lands_leaves_the_prompt_plain_under_what_it_made(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel, field = _edited_tab_showing_the_saved_image(view, qtbot)
+    panel._on_generate()
+
+    _finish_reroll(view, next(iter(view._live_jobs.values())))
+
+    assert panel.launched_runs() == []
+    assert _struck_and_lit(field) == ("", "")
 
 
 def test_a_duplicate_generate_switches_the_front_tab_to_a_random_seed(qtbot, tmp_path):

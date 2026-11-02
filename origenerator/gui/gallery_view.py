@@ -1379,7 +1379,7 @@ class GalleryView(QWidget):
                         prompt_id=prompt_id, heard="",
                         new_positive=batch[0].get("positive_prompt", ""),
                         new_negative=batch[0].get("negative_prompt", ""), **asked)
-                launching.note_launched(prompt_id)
+                launching.note_launched(prompt_id, made_of=None if asked else batch[0])
         self._stand_on_the_run_in(key, rebuild=True)
 
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
@@ -2492,7 +2492,7 @@ class GalleryView(QWidget):
                 continue  # the submit failed; the rest of the folder still goes
             launched += 1
             if launching is not None:
-                launching.note_launched(prompt_id)
+                launching.note_launched(prompt_id, made_of=params)
             self._db.record_request(
                 prompt_id=prompt_id, source_prompt_id=row["prompt_id"], heard="",
                 old_positive=was.get("positive_prompt", ""),

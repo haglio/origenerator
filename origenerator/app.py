@@ -1,11 +1,5 @@
 # ruff: noqa: PLC0415
-# Every import below the module header is late on purpose, and the order is
-# the boot: QT_SCALE_FACTOR has to be set before the platform plugin starts,
-# the voice runtimes' native DLLs have to load before Qt, the taskbar identity
-# has to be claimed before a window exists, and the overlay has to be checked
-# before config -- which is the first module a missing key stops from
-# importing.  A top-level import here would pull Qt, the database and the
-# gallery in ahead of all four.
+# Imports below are late on purpose: QT_SCALE_FACTOR must be set before Qt's platform plugin starts, and the voice runtimes load before Qt.
 from __future__ import annotations
 
 import os
@@ -22,20 +16,11 @@ from shared_ui.preview import Preview, taskbar_identity, window_title
 from origenerator.branch_session import LAUNCHER, shown_as
 from origenerator.output_places import OutputPlaces
 
-# The persisted ComfyUI client id lives under this key in the UI state file.
 _CLIENT_ID_KEY = "comfyui_client_id"
 
 
 def resolve_comfyui_client_id(app_state) -> str:
-    """The stable ComfyUI client id for this install: minted once, then persisted.
-
-    ComfyUI routes a running prompt's progress, preview and completion messages
-    only to the websocket client id that submitted it. Reusing the same id every
-    launch is what lets a restart mid-generation reconnect to the job still running
-    in ComfyUI and see its live progress again — without it, each launch's fresh id
-    leaves the reconnected job's bar spinning forever because those messages are
-    still being sent to the previous session's id.
-    """
+    """ComfyUI sends a running prompt's messages only to the client id that submitted it."""
     stored = app_state.get(_CLIENT_ID_KEY)
     if isinstance(stored, str) and stored:
         return stored
@@ -76,27 +61,12 @@ def _taskbar_identity(app, fun_time, preview: Preview | None, state_dir: Path):
 
 
 def _name_this_process() -> None:
-    """Leave ``launch_origenerator.vbs`` an interpreter that says "Origenerator"
-    next time.  The console interpreter, because that is the one the launcher
-    runs -- it redirects the app's output into the launcher log.  Why it is one
-    launch late, and why it can never cost the launch:
-    :meth:`ProcessNamer.name_this_process`."""
     ProcessNamer("Origenerator", icon=CHECKOUT / "icon.ico").name_this_process(
         "Origenerator", interpreter="python.exe")
 
 
 def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None) -> None:
-    """Give Origenerator its own taskbar identity so the pinned launcher icon
-    activates this window instead of spawning a second taskbar button.
-
-    Sets the process AppUserModelID and stamps the matching ID onto the pinned
-    shortcut, which is what lets Windows group them as one app. No-op off Windows.
-
-    With *identity* (Fun Time hands its own), the process joins that identity
-    instead so the hosted window groups with the session's taskbar button — and
-    the pinned shortcut is left unstamped, since it belongs to the standalone
-    launch and must keep activating that one.
-    """
+    """Windows groups the pinned shortcut and the window as one app only when both carry the same AppUserModelID."""
     if sys.platform != "win32":
         return
     from app_support.win32 import set_app_user_model_id, stamp_pinned_shortcuts
@@ -105,7 +75,7 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
     try:
         set_app_user_model_id(identity or taskbar_identity(APP_USER_MODEL_ID, preview))
     except OSError:
-        pass  # Non-fatal — still try to stamp the shortcut below.
+        pass
     if identity is None:
         import logging
 
@@ -118,22 +88,12 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
 
 
 def _warm_voice_runtimes() -> None:
-    """Load the voice stack's native DLLs before Qt can spoil their welcome.
-
-    Imported after PyQt6 is up, ctranslate2 — whisper's engine — dies with a
-    plain access violation the moment the model loads, which took the whole
-    app down the instant a spoken command triggered the first transcription;
-    onnxruntime (whisper's VAD) fails its DLL init the same way. Both import
-    clean the other way round — reproduced in both orders, offscreen, in this
-    interpreter. Guarded per-module and per-failure: the voice extra is
-    optional and a broken install surfaces as OSError rather than
-    ImportError, and neither may cost the app its boot.
-    """
+    """ctranslate2 and onnxruntime fail with an access violation or DLL init error when imported after PyQt6; a broken install raises OSError."""
     for module in ("onnxruntime", "ctranslate2"):
         try:
             __import__(module)
         except Exception:
-            pass  # no voice extra (or a broken one): the app still boots
+            pass
 
 
 @dataclass(frozen=True)
@@ -148,20 +108,6 @@ class Library:
 
 @dataclass(frozen=True)
 class BootPass:
-    """One best-effort pass over the library, and everything the boot says about it.
-
-    These were eleven copies of the same seven lines with two words changed --
-    a status line, a call, a count logged when there was one, and a warning that
-    swallowed whatever went wrong -- so adding a twelfth meant editing the boot
-    rather than registering a pass. What varies between them is exactly this
-    record: the splash line (``None`` to run under the previous pass's line, for
-    a pass that is a second half rather than a step of its own), what to call,
-    the message for a non-zero count, and the message for a failure.
-
-    Every pass is best effort. A library the app cannot finish tidying is still
-    a library it must open, so each is guarded on its own and a failure costs
-    one warning line rather than the launch.
-    """
     status: str | None
     run: Callable[[Library], object]
     failure: str
@@ -177,8 +123,6 @@ def _copy_the_records_for_backup(library: Library):
 
 
 def _reconnect_to_running_generations(library: Library):
-    """Resolve any generation left mid-run by a previous session against ComfyUI
-    (finished-while-away, still-running, or gone)."""
     from origenerator.inflight import reconcile_in_flight
 
     reconcile_in_flight(library.db, library.client, library.places, library.thumb_dir)
@@ -191,12 +135,6 @@ def _file_what_comfyui_left(library: Library):
 
 
 def _follow_moved_files(library: Library):
-    """Repoint every recorded output file the user has since moved on disk.
-
-    Before the scan below, which keys what it has already seen by path under the
-    output dir: a file that moved reads there as one it has never seen, and it
-    would rebuild a bare "imported" row beside the generated row that still
-    holds the prompt and the settings."""
     from origenerator.relocate import relocate_moved_outputs
 
     return relocate_moved_outputs(library.db, library.places)
@@ -276,12 +214,6 @@ def _backfill_workflow_labels(library: Library):
 
 
 def _backfill_import_params(library: Library):
-    """Fill onto every import the settings its own file states and its row
-    never recorded — the model and LoRA it nests under, the size it was made at,
-    what it was told to avoid, the image an i2v was animated from, the sound it
-    was scored with — so the app
-    offers a re-roll of the image in front of the user rather than of the
-    workflow's defaults, and files it on the side its folder's size names."""
     from origenerator.importer import backfill_import_params
 
     return backfill_import_params(library.db, library.places)
@@ -294,11 +226,6 @@ def _backfill_imported_video_seeds(library: Library):
 
 
 def _fold_enhancements(library: Library):
-    """A standalone enhance is an upgrade of an existing image, not its own
-    generation: fold every finished one onto its source. After the scan, because
-    an enhance no instance recorded -- one queued straight on ComfyUI -- reaches
-    here as a bare file, and the standalone image the scan just reconstructed
-    from it is exactly what there is to fold away."""
     from origenerator import config
     from origenerator.gallery import enhancements_of_images_gone, fold_completed_enhancements
 
@@ -318,26 +245,18 @@ def _scrap(library: Library, rows: list[dict]) -> int:
 
 
 def _disown_foreign_runs(library: Library):
-    """And take off the run ids a preview's own database left on the versions it
-    made back when it kept one: numbers from a counter that ran ahead of this
-    table's, which seat those images above everything this app has made since.
-    After the fold, which is what writes a version's run id in the first place."""
     from origenerator.gallery import disown_foreign_runs
 
     return disown_foreign_runs(library.db)
 
 
 def _repair_thumbnails(library: Library):
-    """Re-render any thumbnail an old filename-stem collision left wrong or
-    missing, so each generation's thumbnail matches its own preview again."""
     from origenerator.importer import backfill_shared_thumbnails
 
     return backfill_shared_thumbnails(library.db, library.places, library.thumb_dir)
 
 
 def _recover_generation_times(library: Library):
-    """Recover how long past generations took from ComfyUI's console logs, so
-    estimates have history to draw on before any new run is timed live."""
     from origenerator.log_backfill import backfill_durations_from_logs
 
     return backfill_durations_from_logs(
@@ -345,29 +264,17 @@ def _recover_generation_times(library: Library):
 
 
 def _record_workflow_versions(library: Library):
-    """Stamp every row that has no provenance yet: the rows from before launches
-    were stamped, a row the Trash gives back, and whatever this launch imported."""
     from origenerator.provenance import stamp_unstamped
 
     return stamp_unstamped(library.db)
 
 
 def _reconcile_favorites(library: Library):
-    """Heal stars, custom names and hand-composed folders whose folder key
-    drifted after a key formula change, and stamp identity onto live ones so the
-    next change is handled automatically. Runs after the backfills above -- they
-    can move a generation's folder by filling in its workflow/model/LoRA -- so
-    the tree it reconciles against is final, and it is read once for both."""
     from origenerator.favorite_reconcile import reconcile_favorites
 
     reconcile_favorites(library.db)
 
 
-#: The library maintenance every launch performs, in order -- a branch session's
-#: too, since it runs on the same library. The order is load-bearing: the
-#: enhancement fold after the import scan, and the folder reconciles last because
-#: every backfill above can move a generation's folder. tests/test_app.py reads
-#: this sequence back.
 MAINTENANCE = (
     BootPass("Backing up the records...", _copy_the_records_for_backup,
              counted="Copied %d record file(s) for backup",
@@ -427,7 +334,6 @@ MAINTENANCE = (
 )
 
 def _run_maintenance(library: Library, passes, status, logger) -> None:
-    """Run each pass, saying what it is doing and surviving what it cannot do."""
     for boot_pass in passes:
         if boot_pass.status is not None:
             status(boot_pass.status)
@@ -440,9 +346,6 @@ def _run_maintenance(library: Library, passes, status, logger) -> None:
 
 
 def _configure_logging(state_dir: Path):
-    """The family's rotating file log, on the root logger so the siblings' lines
-    land in it too, with a console copy for the launcher's redirect -- and Qt's
-    own messages and every error nothing caught routed into it."""
     import logging
 
     from app_support.logging_utils import configure_logging, install_exception_logging
@@ -452,7 +355,6 @@ def _configure_logging(state_dir: Path):
     try:
         configure_logging("", state_dir / "origenerator.log", console=True)
     except OSError:
-        # Console logging still works if the file cannot be opened.
         logging.basicConfig(level=logging.INFO,
                             format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     install_qt_message_logging()
@@ -581,28 +483,6 @@ def _look_for_other_sources_videos(db, app) -> None:
 
 
 def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
-    """Say which keys `content.local.json` is short of, and stop the launch.
-
-    That file is git-ignored and hand-maintained, so it does not gain a key when
-    the app does -- and the committed example it is written from has gone from
-    three keys to nine in six weeks. Three of those nine are read with a bare
-    subscript, so an overlay one release out of date used to be a dead icon: no
-    window, and the traceback in a launcher log nobody opens. The other six went
-    quietly one feature at a time, which is worse in its own way -- a motion
-    aimed at the wrong part of the frame reads as the model having a bad day.
-
-    One rule for all nine, then: name what is missing and do not start. A key
-    can be left EMPTY to switch that feature off, so this is not a demand to
-    configure what you do not use.
-
-    Nothing has been logged yet at this point -- logging is configured from
-    ``config``, which is what a missing key stops from importing -- so this goes
-    to the console the launcher redirects into ``state/origenerator_launcher.log``,
-    and to a dialog when there is a screen to put one on. Hosted by Fun Time
-    there is not: nobody is at this window to dismiss a modal and it would sit
-    over one of the session's Funestras, which is why the splash is suppressed
-    there too.
-    """
     from origenerator.content import EXAMPLE_CONTENT, LOCAL_CONTENT
 
     message = (
@@ -633,21 +513,6 @@ def _refuse_a_library_of_its_own(checkout: Path, fun_time) -> int:
 
 
 def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
-    """Name every value the two apps have stopped spelling the same, and open.
-
-    A send copies a video into a folder of Evolver's and the gallery reads its
-    upscale back out of another; four values decide where, and each is written
-    down in both apps (:mod:`origenerator.evolver_agreement`). A rename on
-    either side left videos arriving nowhere with both apps silent, and the test
-    that holds the two together skips wherever no Evolver sits beside the
-    checkout -- which is every run of this repo's gate, so on the one machine
-    with both apps installed nothing compared anything.
-
-    Said, not refused: nothing else about this app is wrong, and a launch
-    declined over a folder name would cost far more than the one lane it
-    protects. No dialog under a Fun Time session, for the reason the refusal
-    above draws none -- nobody is at this window, and it would sit over a Funestra.
-    """
     from origenerator import evolver_agreement
 
     said = evolver_agreement.disagreements(
@@ -665,11 +530,6 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
 
 @dataclass
 class Boot:
-    """The launch's steps between the overlay checks and the window -- the claim on
-    the library, the loading screen, the offer to Fun Time, the crash log and the
-    listener for clicked toasts -- each taken once and undone by a cancel or a
-    close. MAINTENANCE is what runs over the library in between."""
-
     app: object
     fun_time: object
     preview: Preview | None
@@ -698,8 +558,6 @@ class Boot:
             self.loading.done()
 
     def claim_the_library(self, copies) -> int | None:
-        """One copy runs on a library at a time, and the copy Fun Time opens never
-        refuses: ``None`` to go on, else the code the process exits with."""
         from origenerator.app_link import made_for_a_click
         from origenerator.single_instance import say_another_copy_is_running
 
@@ -731,18 +589,11 @@ class Boot:
         self.crash_log = _arm_the_crash_log(self.state_dir, self.logger)
 
     def listen_for_clicked_toasts(self, checkout: Path) -> None:
-        """From here rather than from the window: a launch takes a minute, and a
-        toast clicked during one would otherwise find nobody listening and start
-        a second copy (origenerator.app_link)."""
         from origenerator.gui.link_listener import LinkListener
 
         self.clicked_toasts = LinkListener(checkout=checkout, parent=self.app)
 
     def show(self, window) -> None:
-        """The window up, the loading screen down, then the window in front, since
-        Windows hands a closing window's activation to whatever is next. A window
-        a session took while it was being built, or one Fun Time opened, is the
-        session's to show; the clicks that arrived during the boot land last."""
         if self.fun_time is None:
             self.watch = _watch_for_fun_time(window, self.state_dir, self.library_state_dir)
         still_offered = self.watch is not None and self.watch.stands_its_offer()
@@ -762,8 +613,6 @@ class Boot:
         return self.app.exec()
 
     def cancel(self, window, client) -> int:
-        """Canceled from the loading screen, which stays up until ComfyUI has been
-        let go of; a window already built is put away unseen."""
         self.logger.info("Loading canceled from the loading screen")
         if window is not None:
             _put_away_unseen(window, self.app, self.crash_log)
@@ -784,9 +633,6 @@ class Boot:
 
 
 def _check_the_launch(logger) -> int:
-    """Everything the launch imports, imported, and nothing opened or shown: a
-    hosting session's test runs the real command against a live machine, so this
-    returns before the database, ComfyUI and the first window."""
     from origenerator import app_state, comfyui_client, db  # noqa: F401
     from origenerator.gui import core  # noqa: F401
 
@@ -795,33 +641,20 @@ def _check_the_launch(logger) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Boot the app and run it; return the code the process should exit with.
-
-    ``sys.exit`` is ``__main__.py``'s, not this function's: both .vbs launchers
-    run ``python -m origenerator`` and read the code back out of a hidden
-    console, so the value has to reach the process either way -- but a ``main``
-    that returns it can be called and read by a test, where one that raises
-    can only be caught.
-    """
     from origenerator.fun_time_mode import parse_app_args
 
     app_args = parse_app_args(sys.argv[1:] if argv is None else argv)
     fun_time = app_args.fun_time
     if fun_time is not None:
-        # Hosted, draw at the session's HUD scale (origenerator.ui_scale says
-        # why). Here and not later: Qt reads QT_SCALE_FACTOR as the platform
-        # plugin starts, so it has to be set before PyQt6 is imported at all.
         from origenerator.ui_scale import apply_room_scale
         apply_room_scale(in_a_headset=fun_time.in_a_headset)
-    _warm_voice_runtimes()  # must come before anything below imports Qt
+    _warm_voice_runtimes()
     preview = shown_as(CHECKOUT)
     _init_windows_taskbar_identity(fun_time and fun_time.taskbar_identity, preview)
     _name_this_process()
 
     from shared_ui.application import application
 
-    # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
-    # above, and letting Qt re-read those flags would only invite collisions.
     with application(sys.argv[:1]) as app:
         return _boot_and_run(app, app_args, preview)
 

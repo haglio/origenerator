@@ -81,9 +81,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_path):
-    # A hosted launch's stderr goes nowhere and faulthandler cannot see a
-    # fail-fast abort, so what Qt says on its way down reaches the app's own
-    # log or nothing: twenty crashes in four days left only Windows' record.
     installed = []
     monkeypatch.setattr("origenerator.qt_messages.install_qt_message_logging",
                         lambda: installed.append(True))
@@ -119,14 +116,6 @@ def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
 
 
 def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
-    """As the QApplication's own wrapper is freed, PyQt deletes every QObject
-    Python still owns while it walks sip's map of wrappers, and a deletion that
-    makes enough new wrappers has sip rebuild that map under the walk, which then
-    reads the memory it let go of: the access violation in sip at 0x10726 that
-    copy after copy hit as it finished closing, from 2026-10-11 on. Whether it
-    faults depends on what the heap did with that memory, so what is held here is
-    what makes it impossible -- nothing left for the walk -- in a real launch and a
-    real close, which only a process of its own can show."""
     said = tmp_path / "owned when the application went.json"
 
     _opened_and_closed_for_real("tests.real_close", said, tmp_path / "state")
@@ -135,8 +124,6 @@ def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
 
 
 def _opened_and_closed_for_real(child: str, said: Path, state: Path) -> None:
-    """Run *child*, a module that opens the app and closes it, on a state folder
-    of its own -- never as a preview, whose library is the production app's."""
     not_a_preview = {name: value for name, value in os.environ.items() if name != ENV_FLAG}
     ran = run_python(["-m", child, str(said)],
                      env=not_a_preview | {"QT_QPA_PLATFORM": "offscreen",
@@ -146,10 +133,6 @@ def _opened_and_closed_for_real(child: str, said: Path, state: Path) -> None:
 
 
 def test_a_close_puts_the_window_away_before_comfyui_is_handed_the_queue(tmp_path):
-    """Closing hands ComfyUI what the queue was still holding, one request at a
-    time, which can take many seconds. A window still on screen meanwhile is a
-    window frozen solid, so the window goes first, and only then is ComfyUI
-    asked for anything."""
     said = tmp_path / "when.json"
 
     _opened_and_closed_for_real("tests.real_close_handing_over", said, tmp_path / "state")
@@ -162,10 +145,6 @@ def test_a_close_puts_the_window_away_before_comfyui_is_handed_the_queue(tmp_pat
 
 
 def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
-    """The launcher keeps the app's stdout and stderr in its log, and Qt's Funestra
-    had FFmpeg print a readout of every video it opened there, each of its tags
-    included -- a generated video's embedded prompt among them. Run in a child,
-    since FFmpeg writes to the process's own stderr."""
     tag = "an invented sentence standing in for a prompt"
     video = write_mp4_with_a_comment_tag(tmp_path / "scene one.mp4", tag)
     state = tmp_path / "state"
@@ -198,11 +177,6 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
 
 @pytest.fixture(autouse=True)
 def _no_crash_log_in_the_checkout(monkeypatch):
-    """A test that runs ``main`` must not arm the crash log against the real
-    state dir: thirteen test boots once stamped the checkout's own log as
-    thirteen launches, and the one real launch in it was lost in the noise.
-    The crash-log tests below hold the real function under its own name, so
-    this leaves them untouched."""
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: None)
 
 
@@ -228,11 +202,7 @@ def _each_boot_finds_the_library_free(monkeypatch):
 
 
 def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(monkeypatch):
-    # The warm runs before Qt so ctranslate2/onnxruntime get a clean DLL init
-    # (imported after Qt, the first model load is an access violation that
-    # takes the app with it). So it has to actually reach for them — emptied to a
-    # bare return it ran green. The extra is optional and a broken install
-    # raises OSError, not ImportError — neither may cost the boot.
+    # ctranslate2 and onnxruntime import cleanly only before Qt; a broken install raises OSError, not ImportError.
     real_import = builtins.__import__
     asked = []
 
@@ -241,7 +211,7 @@ def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(mo
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", recording)
-    _warm_voice_runtimes()  # whatever this machine actually has
+    _warm_voice_runtimes()
 
     assert {"ctranslate2", "onnxruntime"} <= set(asked)
 
@@ -251,12 +221,10 @@ def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(mo
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", broken)
-    _warm_voice_runtimes()  # and a machine where both are broken
+    _warm_voice_runtimes()
 
 
 def test_resolve_client_id_mints_and_persists_when_absent(tmp_path):
-    # First launch: no id yet, so one is minted and written to the state file, so the
-    # next launch reads it back rather than minting a different one.
     path = tmp_path / "ui.json"
     client_id = resolve_comfyui_client_id(AppState(path))
 
@@ -272,7 +240,6 @@ def test_resolve_client_id_reuses_the_persisted_value(tmp_path):
 
 
 def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
-    # A corrupt/hand-edited state value must not become a bad clientId; mint instead.
     state = AppState(tmp_path / "ui.json")
     state.set("comfyui_client_id", 12345)
 
@@ -283,9 +250,6 @@ def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
 
 
 def test_client_id_is_stable_across_launches(tmp_path, qtbot):
-    # The crux of restart trash_collection: two launches (two AppStates over the same file)
-    # give ComfyUIClients the same id, so ComfyUI keeps routing a running job's live
-    # progress/preview/completion messages to the reconnecting session.
     path = tmp_path / "ui.json"
     first = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)), folders=SUITE_FOLDERS)
     second = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)), folders=SUITE_FOLDERS)
@@ -294,8 +258,6 @@ def test_client_id_is_stable_across_launches(tmp_path, qtbot):
 
 
 def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
-    # The pin by its whole name: a pin that merely mentions the app, a branch
-    # preview's, must not be relabelled as the live one.
     with patch("origenerator.app.sys.platform", "win32"), \
          app_id_claimed() as mock_set_id, \
          pinned_shortcuts_stamped(return_value={}) as mock_stamp:
@@ -363,7 +325,6 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
         assert main([]) == 0
 
     assert events == ["loading opened", "window.show", "loading.accept"]
-    # The boot phases drive the splash status text.
     statuses = " ".join(str(c.args[0]) for c in loading.say.call_args_list)
     assert "ComfyUI server" in statuses
 
@@ -632,9 +593,6 @@ def test_a_window_put_away_unseen_ends_the_process_if_its_quit_sticks(qapp, monk
 
 def test_handing_comfyui_its_work_after_the_window_goes_has_a_deadline_of_its_own(
         qapp, monkeypatch):
-    """The close's own deadline is armed as the last window goes and is far
-    shorter than handing ComfyUI its work can take, so the hand-over gets one of
-    its own, and the rest of the close the close's again."""
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: object())
     events = []
 
@@ -666,9 +624,7 @@ def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():
 
 
 def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
-    """The window is brought forward LAST — after the splash closes. Windows
-    hands a closing window's activation on to whatever is next in the Z-order,
-    so fronting before that would be undone by the splash's own departure."""
+    """Windows passes a closing window's activation to the next window in the Z-order."""
     events = []
 
     loading = MagicMock()
@@ -699,14 +655,6 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
 
 
 def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
-    """The whole point of arming it: a fault that kills the process outright
-    still says which line was running.
-
-    Run in a child, because there is no surviving this in-process. The child
-    arms the crash log the way the launch does and then faults deliberately --
-    faulthandler's own _sigsegv, so nothing is left to chance about what kind of
-    death it is -- and the file it leaves has to name the frame.
-    """
     state = tmp_path / "state"
     child = textwrap.dedent(f"""
         import logging, sys
@@ -722,15 +670,11 @@ def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
     run_python(["-c", child])
 
     written = (state / "origenerator_crash.log").read_text(encoding="utf-8")
-    assert "launched" in written                  # the run stamped itself first
-    assert "the_frame_that_died" in written       # ...and the fault named the frame
+    assert "launched" in written
+    assert "the_frame_that_died" in written
 
 
 def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
-    # A crash is worth reading after the next launch, and the next launch is the
-    # first thing that happens after one -- so opening the file must not be what
-    # destroys the evidence.
-
     state = tmp_path / "state"
     state.mkdir(parents=True)
     (state / "origenerator_crash.log").write_text("older run\n", encoding="utf-8")
@@ -741,9 +685,6 @@ def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
 
 
 def test_an_unwritable_state_dir_costs_the_log_and_nothing_else(tmp_path):
-    # Never the launch: a crash log that cannot be opened is a missing report,
-    # not a reason for the app not to come up.
-
     assert _arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t")) is None
 
 
@@ -772,10 +713,6 @@ def test_the_window_is_watched_before_the_app_runs(qapp, monkeypatch):
 
 
 def test_main_connects_the_client_under_the_persisted_id(qapp):
-    # The client must connect under the id persisted across launches, so a restart
-    # reconnects to the job ComfyUI is still running (it targets that job's live
-    # messages at this id). Without it, each launch's fresh id leaves the
-    # reconnected job's progress bar spinning forever.
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
@@ -797,9 +734,6 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
 
 
 def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
-    # Fun Time hands its own AUMID so the hosted window groups with the session;
-    # the pinned Origenerator shortcut keeps the standalone identity, so it is
-    # left unstamped.
     with patch("origenerator.app.sys.platform", "win32"), \
          app_id_claimed() as mock_set_id, \
          pinned_shortcuts_stamped() as mock_stamp:
@@ -866,17 +800,11 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
 
     session = mock_window.call_args.kwargs["fun_time"]
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
-    # What the session's channels are wired to is the window's own business
-    # (tests/test_core.py); the boot's part is threading the session in.
-    # Parked until the session's own mode switch restores it: the session may be
-    # in kino mode, where popping over the Random Favs Browser is wrong.
     window.showMinimized.assert_called_once()
     window.show.assert_not_called()
 
 
 def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
-    """The room shows this window's frame there, and Qt draws nothing for a
-    window Windows has unmapped: parked, it would hand over an empty frame."""
     window = MagicMock()
 
     with _a_faked_boot([], **{
@@ -891,11 +819,6 @@ def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
 
 
 def test_main_in_fun_time_mode_shows_no_splash(qapp):
-    """Hosted, the app boots with no splash at all: the session's own loading
-    screen owns the boot's feedback, and an always-on-top splash of ours can
-    outlive the session's reveal and sit over one of its Funestras — reported
-    as 'the Landscape Funestra is under other windows on startup', and the
-    covering window a z-order walk named was exactly this splash."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen") as mock_loading, \
@@ -993,9 +916,6 @@ def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_b
 
 
 def test_a_boot_answers_a_clicked_toast_with_the_window_it_just_built(qapp):
-    # The listening starts before the window does (a launch here is slow enough
-    # to click into twice), so the window has to be handed to it once there is
-    # one -- with anything that arrived meanwhile still waiting.
     window = MagicMock()
     listener = MagicMock()
     with _a_faked_boot([], **{
@@ -1019,22 +939,8 @@ def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
     window.handed_back.connect.assert_called_once_with(watch.return_value.renew)
 
 
-# --- the launch over a library of our own -------------------------------------
-#
-# The tests above hand main a MagicMock database, whose every query answers with
-# an empty iterable — so the boot phases their patch chain does not name run over
-# nothing at all and are asserted by nothing. Four separate mutations to main
-# survived them: the folder-favorite reconcile deleted, and the duration
-# backfill's result thrown away. These boot the same main over a real database
-# under tmp_path and read each phase's effect off it afterwards.
-
 @pytest.fixture
 def library(tmp_path, monkeypatch):
-    """Point every path the launch reads at tmp_path, and hand back its database.
-
-    Also what keeps these tests out of the checkout's own state/ directory, which
-    is where the launch writes its log, its trash and its database by default.
-    """
     state = tmp_path / "state"
     for name, path in (("STATE_DIR", state),
                        ("COMFYUI_LOG_DIR", tmp_path / "logs"),
@@ -1051,8 +957,6 @@ def library(tmp_path, monkeypatch):
 
 
 def _boot(library_path, argv=()):
-    """Run the launch, patching only the boundary: the splash, the window, and
-    ComfyUI. Every maintenance pass runs for real."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
@@ -1060,12 +964,11 @@ def _boot(library_path, argv=()):
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        assert main(list(argv)) == 0  # main hands the code back; __main__ exits with it
+        assert main(list(argv)) == 0
     return Database(library_path)
 
 
 def _completed_image(db, prompt_id, **params):
-    """One finished SDXL image in the library, fabricated whole."""
     values = {"positive_prompt": "a paper boat", "steps": 30, "seed": 1, **params}
     db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json=json.dumps(values),
@@ -1079,32 +982,21 @@ def _completed_image(db, prompt_id, **params):
 
 
 def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
-    # QToolTip popups are top-level widgets: a window-level sheet never reaches
-    # them, which is exactly how every tooltip in the app went missing once. It
-    # has to be the QApplication, and it has to be here — asserted by reading the
-    # sheet back off the application, because the same call sitting in a comment
-    # reads identically to anything that only greps app.py for the line.
+    # QToolTip popups are top-level widgets, so only the QApplication's sheet reaches them.
 
     prior = qapp.styleSheet()
-    qapp.setStyleSheet("")  # so a sheet an earlier launch left on cannot answer for this one
+    qapp.setStyleSheet("")
     try:
         _boot(library)
 
         assert qapp.styleSheet() == build_stylesheet()
     finally:
-        qapp.setStyleSheet(prior)  # every later test renders in the chrome it expected
+        qapp.setStyleSheet(prior)
 
 
 def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library):
-    # The sheet dresses the widgets it names; the palette answers for the colors
-    # it names none of. Left to Qt those are the desktop's, which is how a
-    # selected word in this dark app came to be highlighted in the accent color
-    # the user picked for Windows -- an orange nothing here chose. Read back off
-    # the application for the same reason the sheet above is.
-
     prior = qapp.palette()
     desktop = QPalette(prior)
-    # A fabricated accent, so a launch in an earlier test cannot answer for this one.
     desktop.setColor(QPalette.ColorRole.Highlight, QColor(210, 70, 54))
     qapp.setPalette(desktop)
     try:
@@ -1112,14 +1004,10 @@ def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library)
 
         assert qapp.palette().color(QPalette.ColorRole.Highlight) == BLUE
     finally:
-        qapp.setPalette(prior)  # every later test renders in the chrome it expected
+        qapp.setPalette(prior)
 
 
 def test_the_launch_heals_a_favorite_whose_folder_key_drifted(qapp, library):
-    # The reconcile is why a star survives a change to the key formula. Deleting
-    # both its calls left the boot tests green, and the star would simply be gone
-    # from the folder the user put it on.
-
     row = _completed_image(Database(library), "p1")
     legacy = gallery.legacy_settings_folder_key(row)
     Database(library).set_folder_favorite(legacy, True)
@@ -1128,13 +1016,10 @@ def test_the_launch_heals_a_favorite_whose_folder_key_drifted(qapp, library):
 
     meta = db.folder_meta_map()
     assert meta.get(gallery.settings_folder_key(row), {}).get("starred") is True
-    assert legacy not in meta  # and the stale key is not left beside it
+    assert legacy not in meta
 
 
 def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
-    # Estimates have no history to draw on until this runs, and throwing its
-    # result away left the boot tests green.
-
 
     db = Database(library)
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
@@ -1158,7 +1043,6 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
 
 
 def _held_trashed(library_path, prompt_id, *, days_ago):
-    """A deletion the Trash has been holding for ``days_ago`` days."""
     db = Database(library_path)
     row = _completed_image(db, prompt_id)
     db.delete_generation(prompt_id)
@@ -1171,8 +1055,6 @@ def _held_trashed(library_path, prompt_id, *, days_ago):
 
 
 def test_the_launch_keeps_a_trashed_item_however_long_it_has_been_held(qapp, library):
-    # What a day in the Trash takes is the files; the item stays there until the
-    # user restores it or ends it.
     _held_trashed(library, "p1", days_ago=730)
 
     db = _boot(library)
@@ -1180,15 +1062,7 @@ def test_the_launch_keeps_a_trashed_item_however_long_it_has_been_held(qapp, lib
     assert [record["prompt_id"] for record in db.list_trashed()] == ["p1"]
 
 
-# --- the boot sequence itself -------------------------------------------------
-#
-# What the tests above pin is what main *reaches*; these pin the order it
-# reaches it in, which is the part a phase split can silently reorder. The order
-# is load-bearing and stated in main's own comments: the enhancement fold after
-# the import scan, and the folder reconciles last because every backfill above
-# can move a generation's folder.
 
-# Each maintenance pass, as (module, attribute), in the order main runs them.
 _MAINTENANCE_PASSES = (
     ("origenerator.records_copy", "copy_the_records"),
     ("origenerator.inflight", "reconcile_in_flight"),
@@ -1229,13 +1103,6 @@ def _the_application_keeps_nothing_a_launch_hung_on_it(qapp):
 
 @contextmanager
 def _a_faked_boot(record, *, passes=None, **patches):
-    """``main`` with every collaborator faked, each maintenance pass recording.
-
-    *record* collects the name of each pass as it runs, so a test can read the
-    order back. *passes* overrides individual ones (``{"import_comfyui_output":
-    a_mock}``) where a test needs one to misbehave; *patches* adds or replaces
-    any other target by dotted path.
-    """
     targets = {
         "origenerator.app._init_windows_taskbar_identity": DEFAULT,
         "origenerator.app._taskbar_identity": None,
@@ -1273,9 +1140,6 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
 
 
 def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
-    """Every pass is best-effort: a library the app cannot finish tidying is
-    still a library it must open. Each is guarded on its own, so the one that
-    throws costs only itself."""
     ran = []
     window = MagicMock()
 
@@ -1287,16 +1151,11 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
         assert main([]) == 0
 
     assert "import_comfyui_output" not in ran
-    # ...and everything after it still ran, up to and including the window.
     assert ran[-1] == _MAINTENANCE_PASSES[-1][1]
     window.show.assert_called_once()
 
 
 def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qapp):
-    """A preview runs on the production app's own library (config.LIBRARY_STATE_DIR),
-    so it keeps it the way the production app does: the same passes, in the same order,
-    the orphaned-trash sweep included. A copy of its own would have hidden a
-    branch's generations from the production app and the production app's from the branch."""
     ran = []
 
     with _a_faked_boot(ran) as _, \
@@ -1440,9 +1299,6 @@ def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_start
 
 
 def test_the_entry_point_hands_the_process_whatever_main_gives_back():
-    """``python -m origenerator`` is how both .vbs launchers start the app, and
-    the exit code is all either of them gets back out of the hidden console —
-    so whatever ``main`` reports has to arrive there unchanged."""
     with patch("origenerator.app.main", return_value=7), \
          patch.object(sys, "argv", ["origenerator"]), pytest.raises(SystemExit) as exit_:
         runpy.run_module("origenerator", run_name="__main__")
@@ -1451,7 +1307,6 @@ def test_the_entry_point_hands_the_process_whatever_main_gives_back():
 
 
 def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
-    """End to end through the entry point: Qt's own exit code is the app's."""
     with _a_faked_boot([], **{"PyQt6.QtWidgets.QApplication.exec": MagicMock(return_value=3)}), \
          patch.object(sys, "argv", ["origenerator"]):
         with pytest.raises(SystemExit) as exit_:
@@ -1520,10 +1375,6 @@ def test_a_run_comfyui_finished_and_then_forgot_is_written_down_on_its_own_row(t
         {"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
 
 
-# Every line the splash shows while the library is maintained, in order. The
-# only text a launch puts on screen before the window, so a pass renamed or
-# dropped changes what the user reads; and in a hosted session, where there is
-# no splash, these are the lines that go to the log instead.
 _SPLASH_LINES = (
     "Backing up the records...",
     "Reconnecting to running generations...",
@@ -1545,28 +1396,12 @@ def test_the_boot_says_the_twelve_things_it_says():
 
 
 def test_every_pass_says_what_went_wrong_when_something_does():
-    """The one thing they all share: a failure costs one warning line naming
-    the operation, never the launch. A pass with no failure message would report
-    a genuine bug as a bare format string."""
     for boot_pass in MAINTENANCE:
         assert boot_pass.failure.endswith("%s"), boot_pass.run.__name__
 
 
-# --- the overlay is under the app ---------------------------------------------
-
 
 class TestAnOverlayShortOfAKey:
-    """`content.local.json` is hand-maintained and git-ignored, so it does not
-    gain a key when the app does — and the committed example went from three
-    keys to nine in six weeks. Three of the nine were read with a bare
-    subscript, so an overlay a release out of date was a dead icon: no window, and
-    the traceback only in the launcher's log.
-
-    One rule now, for all nine: the launch says which keys are missing and does
-    not start. A key can be left empty to switch that feature off, which is what
-    keeps this from being a demand to configure things you do not use.
-    """
-
     SHORT = ("detail_fix_parts", "speech_python")
 
     def test_the_launch_stops_and_no_window_is_built(self, qapp):
@@ -1585,8 +1420,6 @@ class TestAnOverlayShortOfAKey:
 
     def test_it_names_every_missing_key_and_the_file_to_put_them_in(
             self, qapp, tmp_path, monkeypatch):
-        # The suite pins the overlay at the committed example (tests/conftest.py),
-        # so point it somewhere with the name a real install would have.
         monkeypatch.setattr(content, "LOCAL_CONTENT", tmp_path / "content.local.json")
         told = MagicMock()
 
@@ -1599,14 +1432,10 @@ class TestAnOverlayShortOfAKey:
         said = " ".join(str(arg) for arg in told.call_args.args)
         for key in self.SHORT:
             assert key in said
-        assert "content.local.json" in said     # the file to fix
-        assert "content.example.json" in said   # the file to copy from
+        assert "content.local.json" in said
+        assert "content.example.json" in said
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
-        """Parked under a Fun Time session there is nobody at this window to
-        dismiss a modal, and it would sit over one of the session's Funestras —
-        the same reason the splash is suppressed there. It goes to the console
-        the launcher redirects into its log instead."""
         told = MagicMock()
 
         with _a_faked_boot([], **{
@@ -1619,8 +1448,6 @@ class TestAnOverlayShortOfAKey:
         told.assert_not_called()
 
     def test_a_complete_overlay_says_nothing_and_boots(self, qapp):
-        """The control: the suite runs on the committed example, which is
-        complete by definition, so nothing here may fire on a normal launch."""
         told = MagicMock()
         window = MagicMock()
 
@@ -1635,9 +1462,6 @@ class TestAnOverlayShortOfAKey:
 
 
 class TestACopyThatWouldStartALibraryOfItsOwn:
-    """A checkout that is neither the production one nor started as a preview
-    would open a database of its own beside the library's thumbnails and Trash."""
-
     def test_it_stops_before_it_opens_a_database(self, qapp, monkeypatch):
         monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)
         opened = MagicMock()
@@ -1664,16 +1488,6 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
 
 
 class TestWhenEvolverHasBeenRenamedUnderUs:
-    """Four values decide where a sent video lands and whether Evolver picks it
-    up, and each is written down in both apps. A rename on either shape used to
-    leave videos arriving nowhere with both apps silent, and the test that holds
-    the two together skips wherever there is no Evolver beside the checkout --
-    which is every run of this repo's gate. So the app asks at startup.
-
-    It says so and opens: nothing else about the app is wrong, and a launch
-    refused over a folder name would cost far more than the lane it protects.
-    """
-
     SAID = ("the inbox a send lands in: this app has A, Evolver has B",)
 
     def test_the_launch_says_what_disagrees_and_still_opens(self, qapp):
@@ -1692,8 +1506,6 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         window.show.assert_called_once()
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
-        """The same reason the incomplete-overlay refusal draws none: nobody is
-        at this window to dismiss a modal, and it would sit over a Funestra."""
         told = MagicMock()
 
         with _a_faked_boot([], **{
@@ -1705,8 +1517,6 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         told.assert_not_called()
 
     def test_agreeing_says_nothing(self, qapp):
-        """The control, and the ordinary case: a checkout with no Evolver beside
-        it has nothing to disagree with, which is every run of this suite."""
         told = MagicMock()
 
         with _a_faked_boot([], **{
@@ -1744,8 +1554,6 @@ class TestASecondCopy:
 
     def test_one_started_by_a_click_on_a_toast_leaves_it_to_that_copy_without_a_word(
             self, qapp, monkeypatch):
-        # The click only had to see that some copy opens to show what it is
-        # about, and the copy already open or on its loading screen has done it.
         monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
         told = MagicMock()
         window = MagicMock()
@@ -1847,8 +1655,6 @@ def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_sayin
 
 def test_a_click_that_waited_in_vain_for_a_closing_copy_is_told_why_nothing_opened(
         qapp, monkeypatch):
-    # The copy it waited a minute for is stuck closing, not open, so nothing
-    # will show what the toast was about.
     monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
     copies = _the_copies(monkeypatch, None, closing=True)
     copies.claim_the_library_once_the_closing_one_lets_go.return_value = None

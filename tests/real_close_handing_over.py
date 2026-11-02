@@ -1,13 +1,3 @@
-"""Origenerator opened and closed for real with its queue still holding work.
-
-Run as ``python -m tests.real_close_handing_over <file>`` by test_app, with the
-state folder it is to use in ``ORIGENERATOR_STATE_DIR``. The library holds three
-images the queue was holding when the app last closed: the window takes them
-back into its line and hands ComfyUI the first, so two are still waiting when it
-is closed, and ComfyUI is a stand-in that takes a moment over each. It writes to
-*file*, as JSON, when the window was asked to close, when the app's last window
-closed and when each hand-over began, on one clock.
-"""
 from __future__ import annotations
 
 import json
@@ -18,13 +8,13 @@ from pathlib import Path
 from tests.real_close import open_and_close
 
 # isort: split
+from origenerator.comfyui_api import ComfyUIApi
+from origenerator.db import Database
+from origenerator.workflows import WORKFLOW_REGISTRY
 from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import config
-from origenerator.comfyui_api import ComfyUIApi
-from origenerator.db import Database
-from origenerator.workflows import WORKFLOW_REGISTRY
 
 A_MOMENT_S = 0.3
 

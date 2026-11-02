@@ -1,18 +1,9 @@
-"""Where the Gallery pane stands, and the scroll that brings a tile into view.
-
-No gallery here: a scroll area with a tall column of plain widgets is all these
-answers need, and it is the only place the arithmetic can be read on its own.
-The gallery's own tests say what a person sees -- the tile picked, in view,
-clear of the pane's edge -- and cannot pin the margin to the pixel, because the
-pane's furniture takes a few of them when a page lands and a scroll bar appears.
-"""
 from __future__ import annotations
 
 import pytest
+from origenerator.gui.pane_place import REVEAL_MARGIN, bring_into_view
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QScrollArea, QVBoxLayout, QWidget
-
-from origenerator.gui.pane_place import REVEAL_MARGIN, bring_into_view
 
 _TILE = 100
 _VIEWPORT = 500
@@ -20,7 +11,6 @@ _VIEWPORT = 500
 
 @pytest.fixture
 def pane(qtbot):
-    """A scroll area of twenty stacked 100-tall widgets, 500 of them in view."""
     scroll = QScrollArea()
     content = QWidget()
     column = QVBoxLayout(content)

@@ -1,4 +1,3 @@
-"""One file dialog for every field that takes a file from outside the gallery."""
 from __future__ import annotations
 
 from PyQt6.QtWidgets import QFileDialog, QWidget

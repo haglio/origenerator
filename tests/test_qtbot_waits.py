@@ -1,4 +1,4 @@
-"""pytest-qt's waits hand back a context manager, and wait only as its `with` block ends."""
+"""pytest-qt's waits hand back a context manager and wait only as its with block ends."""
 from __future__ import annotations
 
 import ast

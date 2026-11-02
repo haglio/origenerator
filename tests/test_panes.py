@@ -1,18 +1,14 @@
-"""The splitters that part the gallery's panes."""
 from __future__ import annotations
 
+from origenerator.gui.panes import FootSplitter, PaneSplitter
+from origenerator.gui.stylesheet import build_stylesheet
 from PyQt6.QtCore import QEvent, QPoint, QPointF, QSize, Qt
 from PyQt6.QtGui import QHoverEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator.gui.panes import FootSplitter, PaneSplitter
-from origenerator.gui.stylesheet import build_stylesheet
-
 
 class _Wanting(QWidget):
-    """A pane that asks for a height a test can change."""
-
     def __init__(self, height):
         super().__init__()
         self.wanted = height
@@ -25,7 +21,7 @@ class _Wanting(QWidget):
 
 
 def _settle():
-    for _ in range(4):  # a resize posts the layout pass that fits the foot
+    for _ in range(4):
         QApplication.processEvents()
 
 
@@ -89,9 +85,6 @@ def test_a_handle_let_go_is_dragged_again(qtbot):
 
 
 def test_a_held_splitter_is_not_moved_by_dragging_its_handle(qtbot):
-    """Where its panes are held, a thick border neither moves nor offers to: a
-    disabled handle takes no drag, and Qt shows no resize pointer over a
-    disabled widget nor lights it under the pointer."""
     splitter = _two_panes(qtbot)
     before = splitter.sizes()
 
@@ -114,8 +107,6 @@ def _under_the_pointer(handle):
 
 
 def test_only_a_handle_that_moves_lights_up_under_the_pointer(qtbot):
-    """Lit blue under the pointer, a border says it can be dragged, and a held
-    one cannot."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())

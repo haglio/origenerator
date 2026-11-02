@@ -1,10 +1,3 @@
-"""The microphone, as text.
-
-Hearing is voice_core's, the listener every app in the family runs. What is this
-app's is which of its two roads an utterance takes: a phrase of the vocabulary said
-outright arrives as that phrase, fast; anything else is a sentence, taken down word
-for word. Both arrive as the same signal, so everything downstream reads one text.
-"""
 from __future__ import annotations
 
 from collections.abc import Callable, Collection
@@ -25,11 +18,6 @@ from voice_core.listening_thread import ListeningThread
 from origenerator import config
 from origenerator.voice.dictation import request_bias
 
-# A sound this loud with no words in it is answered ("Didn't catch that."); a quieter one is
-# let go. The pause detector is ten times as sensitive as the one this app had, which is
-# what lets his quiet words through -- over a sample of his recorded dictation 49 sentences
-# arrived where 39 had -- and answering every quiet nothing as well would have flashed the
-# caption 91 times where it had flashed 34.
 LOUD_ENOUGH_TO_ANSWER = 1000
 
 

@@ -1,5 +1,3 @@
-"""The row on a Generate tab saying what the item it is showing shows: an image's,
-into the column :mod:`origenerator.sort_images` fills in bulk, or a video's action."""
 from __future__ import annotations
 
 from funestra.video_families import normalized_text
@@ -18,7 +16,6 @@ from origenerator.sort_images import the_sorting_window
 
 UNSAID = "— "
 
-# What this is called here and on Combine's list of actions.
 ACTION_LABEL = "Action"
 
 SORT_BUTTON = "image.sort"
@@ -32,9 +29,7 @@ def _as_listed(said: str, names: tuple[str, ...]) -> str:
 
 
 class ActionDropdown(QWidget):
-    """What the item on display shows, pickable, for a Generate tab."""
-
-    chosen = pyqtSignal(str, str)  # prompt_id, what it shows ("" once taken back)
+    chosen = pyqtSignal(str, str)
 
     def __init__(self, states, actions, form: LabelForm):
         super().__init__()
@@ -76,7 +71,7 @@ class ActionDropdown(QWidget):
         is_image = kind == MediaType.IMAGE
         names = self._states if is_image else self._actions
         said = _as_listed(row.get("image_state" if is_image else "action") or "", names)
-        self._prompt_id = ""  # nothing is on display while the list is being set
+        self._prompt_id = ""
         self._offer(names if is_image or not said or said in names else (*names, said))
         self.pick(said)
         self._sort.setVisible(is_image)
@@ -105,7 +100,5 @@ class ActionDropdown(QWidget):
             self._sorting = built
 
     def _on_picked(self) -> None:
-        """Someone picked -- silent while an item is being put up, which moves
-        the list with nobody having answered."""
         if self._prompt_id:
             self.chosen.emit(self._prompt_id, self.picked())

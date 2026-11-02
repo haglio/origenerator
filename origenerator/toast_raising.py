@@ -1,5 +1,3 @@
-"""A run's toast as Windows raises it, from the open app
-and from the process that waits out a run the app was closed on alike."""
 from __future__ import annotations
 
 import hashlib

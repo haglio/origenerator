@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
+from shared_ui.spacing import GAP_MEDIUM
+
 from origenerator.gui import action_dropdown
 from origenerator.gui.action_dropdown import (
     ACTION_LABEL,
@@ -10,8 +13,6 @@ from origenerator.gui.action_dropdown import (
     ActionDropdown,
 )
 from origenerator.gui.label_cells import LabelForm
-from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
-from shared_ui.spacing import GAP_MEDIUM
 
 _STATES = ("state one", "state two", "state three")
 _ACTIONS_OFFERED = ("action one", "action two")

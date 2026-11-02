@@ -48,14 +48,15 @@ def _dress_the_taskbar_button(app, title: str, launcher: str, preview) -> None:
                     dress=dress_window, described=described_taskbar_app)
 
 
-def open_on_its_own(title: str, build, *, launcher: str) -> int:
+def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_keys=None) -> int:
     from PyQt6.QtWidgets import QApplication, QMessageBox
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
 
     # Imported before config, which a missing overlay key stops from importing.
-    from origenerator.content import missing_overlay_keys
-    missing = missing_overlay_keys()
+    if find_missing_overlay_keys is None:
+        from origenerator.content import missing_overlay_keys as find_missing_overlay_keys
+    missing = find_missing_overlay_keys()
     if missing:
         QMessageBox.critical(None, title,
                              "The content overlay is missing: " + ", ".join(missing))

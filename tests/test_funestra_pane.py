@@ -4,6 +4,7 @@ import logging
 import time
 
 from funestra.console import ModeHud
+from funestra.funestra import User
 from funestra.funestra_verbs import RELOAD_PLAYLIST, play_file
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.playlist import PlaylistItem
@@ -11,13 +12,12 @@ from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.satellite_hud import HudModel
 from funestra.testing import FakeEngine, engine_will_not_open
 from funestra.volume import VolumeHud
-from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
 
-from funestra.funestra import User
 from origenerator import running_ahead
+from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from tests import gestures
 from tests.running_ahead_support import record_the_app_running_ahead
 from tests.slideshow_hud_support import speaker_on_screen

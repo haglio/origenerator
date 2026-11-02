@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from origenerator.gui.flow_layout import FlowLayout
 from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
+
+from origenerator.gui.flow_layout import FlowLayout
 
 
 def test_flow_layout_tracks_and_releases_items(qtbot):

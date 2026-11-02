@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from origenerator.gui import omnipause
 from PIL import Image
 from PyQt6.QtCore import QObject
 from PyQt6.QtGui import QMovie
+
+from origenerator.gui import omnipause
 
 
 class _Pane(QObject):

@@ -12,6 +12,10 @@ from funestra.hud_placement import HudCorner
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.radio import radio_file_for, read_radio
 from funestra.satellite_hud import parse_hud
+from PIL import Image
+
+from origenerator import fun_time_mode as contract
+from origenerator import gallery
 from origenerator.fun_time_bridge import FunTimeBridge, ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
@@ -22,10 +26,6 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import ORIGENERATOR_MODE, answer
-from PIL import Image
-
-from origenerator import fun_time_mode as contract
-from origenerator import gallery
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeDB,

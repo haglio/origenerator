@@ -41,16 +41,12 @@ import urllib.request
 import winsound
 
 import pytest
-from origenerator.gui import job_queue, omnipause, osr2_controls, toasts, voice_router
-from origenerator.gui.combine_controller import CombineController
-from origenerator.gui.gallery_view import GalleryView
-from origenerator.workflows import detail_parts
+from app_support import win32 as windows_api
 from PyQt6.QtCore import QCoreApplication, QEvent, QObject, Qt, pyqtSignal, qInstallMessageHandler
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
 
-from app_support import win32 as windows_api
 from origenerator import (
     config,
     enhance_presets,

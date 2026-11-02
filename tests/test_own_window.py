@@ -1,12 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from origenerator.gui import stylesheet
-from origenerator.gui.animation_check_window import (
-    HEADING,
-    POSITIVE,
-    AnimationCheckWindow,
-)
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -21,9 +15,14 @@ from origenerator import (
     branch_session,
     check_animations,
     config,
-    content,
     own_window,
     sort_images,
+)
+from origenerator.gui import stylesheet
+from origenerator.gui.animation_check_window import (
+    HEADING,
+    POSITIVE,
+    AnimationCheckWindow,
 )
 
 
@@ -154,13 +153,12 @@ def test_opening_the_sorting_window_dresses_its_taskbar_button(
     assert dressed == [("Sorting images", "sort_images.vbs")]
 
 
-def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, monkeypatch):
-    shown = []
-    monkeypatch.setattr(content, "missing_overlay_keys", lambda: ["alpha", "beta"])
-    monkeypatch.setattr(QMessageBox, "critical", lambda _parent, title, text: shown.append(text))
+def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, said):
 
     def build():
         raise AssertionError("built a window over a missing overlay")
 
-    assert own_window.open_on_its_own("Check", build, launcher="x") == 1
-    assert shown == ["The content overlay is missing: alpha, beta"]
+    opened = own_window.open_on_its_own(
+        "Check", build, launcher="x", find_missing_overlay_keys=lambda: ["alpha", "beta"])
+    assert opened == 1
+    assert said == ["The content overlay is missing: alpha, beta"]

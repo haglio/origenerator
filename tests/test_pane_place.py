@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from origenerator.gui.pane_place import REVEAL_MARGIN, bring_into_view
 from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QScrollArea, QVBoxLayout, QWidget
+
+from origenerator.gui.pane_place import REVEAL_MARGIN, bring_into_view
 
 _TILE = 100
 _VIEWPORT = 500

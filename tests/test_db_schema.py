@@ -6,10 +6,10 @@ from contextlib import closing
 from pathlib import Path
 
 import pytest
-from origenerator.db import Database
-from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 
 from origenerator import db_schema
+from origenerator.db import Database
+from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 
 SCHEMA = {
     "combine_video_uses": (

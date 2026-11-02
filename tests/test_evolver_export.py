@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from origenerator.evolver_export import export_video
 
 from origenerator import config, evolver_export
+from origenerator.evolver_export import export_video
 
 
 def test_export_copies_video_into_the_inbox(tmp_path):

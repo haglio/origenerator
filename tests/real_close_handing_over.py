@@ -8,13 +8,13 @@ from pathlib import Path
 from tests.real_close import open_and_close
 
 # isort: split
-from origenerator.comfyui_api import ComfyUIApi
-from origenerator.db import Database
-from origenerator.workflows import WORKFLOW_REGISTRY
 from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import config
+from origenerator.comfyui_api import ComfyUIApi
+from origenerator.db import Database
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 A_MOMENT_S = 0.3
 

@@ -3,6 +3,12 @@ from __future__ import annotations
 import time
 from io import BytesIO
 
+from PIL import Image
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt6.QtGui import QEnterEvent, QMovie
+from PyQt6.QtWidgets import QApplication
+from shared_ui.colors import BLUE, TEXT_PRIMARY
+
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
 from origenerator.gui.corner_buttons import CORNER_INSET
 from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
@@ -11,12 +17,6 @@ from origenerator.gui.item_tile import CornerButton, ItemTile
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
-from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QEnterEvent, QMovie
-from PyQt6.QtWidgets import QApplication
-from shared_ui.colors import BLUE, TEXT_PRIMARY
-
 from tests.heard_drags import HeardDrags
 
 

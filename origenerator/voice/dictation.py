@@ -93,7 +93,7 @@ class RequestDictation:
     def _continue(self, text: str):
         self._heard.append(text)
         if self._ends_the_request(words(text, keep_apostrophes=True)):
-            return self._finish(_join(self._parts + [_without_trailing_word(text)]))
+            return self._finish(_join([*self._parts, _without_trailing_word(text)]))
         self._parts.append(text)
         if len(self._heard) >= self._max:
             given_up, opened_at = _join(self._heard), self._opened_at

@@ -122,7 +122,7 @@ def time_taken(job: dict, trainer: Trainer) -> float:
 
 def note_duration(folder: Path, seconds: float) -> None:
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "durations.json").write_text(json.dumps((_durations(folder) + [seconds])[-10:]),
+    (folder / "durations.json").write_text(json.dumps(([*_durations(folder), seconds])[-10:]),
                                            encoding="utf-8")
 
 

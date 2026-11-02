@@ -51,13 +51,7 @@ class FakeI2vWorkflow(FakeWorkflow):
                 "lora_name": "style_a.safetensors", "lora_strength": 1.0}
 
     def param_definitions(self) -> list:
-        return super().param_definitions() + [
-            ParamDef("input_image", "Input Image", "image", ""),
-            ParamDef("lora_name", "LoRA", "dropdown", "style_a.safetensors",
-                     options=["None", "style_a.safetensors", "style_b.safetensors"]),
-            ParamDef("lora_strength", "LoRA Strength", "float", 1.0,
-                     min_val=0.0, max_val=2.0, step=0.05),
-        ]
+        return [*super().param_definitions(), ParamDef("input_image", "Input Image", "image", ""), ParamDef("lora_name", "LoRA", "dropdown", "style_a.safetensors", options=["None", "style_a.safetensors", "style_b.safetensors"]), ParamDef("lora_strength", "LoRA Strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05)]
 
 
 REGISTRY = {FakeWorkflow.name: FakeWorkflow(), FakeI2vWorkflow.name: FakeI2vWorkflow()}
@@ -294,14 +288,7 @@ class FakeTwoLoraWorkflow(FakeWorkflow):
 
     def param_definitions(self) -> list:
         loras = ["None", "style_a.safetensors", "style_b.safetensors"]
-        return super().param_definitions() + [
-            ParamDef("lora", "LoRA 1", "dropdown", "style_a.safetensors", options=loras),
-            ParamDef("lora_strength", "LoRA Strength 1", "float", 1.0,
-                     min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_2", "LoRA 2", "dropdown", "None", options=loras),
-            ParamDef("lora_strength_2", "LoRA Strength 2", "float", 1.0,
-                     min_val=0.0, max_val=2.0, step=0.05),
-        ]
+        return [*super().param_definitions(), ParamDef("lora", "LoRA 1", "dropdown", "style_a.safetensors", options=loras), ParamDef("lora_strength", "LoRA Strength 1", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05), ParamDef("lora_2", "LoRA 2", "dropdown", "None", options=loras), ParamDef("lora_strength_2", "LoRA Strength 2", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05)]
 
 
 def test_an_experiment_never_turns_the_strength_of_a_lora_left_on_none():

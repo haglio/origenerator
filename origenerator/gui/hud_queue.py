@@ -721,5 +721,5 @@ class QueuePointer:
             return
         rest = [other for other in keys if other != key]
         landing = target - 1 if target > keys.index(key) else target
-        if rest[:landing] + [key] + rest[landing:] != keys:
+        if [*rest[:landing], key, *rest[landing:]] != keys:
             self._host.move(key, rest[landing] if landing < len(rest) else None)

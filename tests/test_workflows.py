@@ -1896,7 +1896,7 @@ def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
         joined = payload[joined["inputs"]["image1"][0]]
     assert joined["class_type"] == "VAEDecode"
     first = payload[payload[payload[joined["inputs"]["samples"][0]]["inputs"]["latent_image"][0]]["inputs"]["latent_image"][0]]
-    assert [first["inputs"]["length"]] + pieces == [161, 160, 160]
+    assert [first["inputs"]["length"], *pieces] == [161, 160, 160]
     assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["image"] == written
 
 

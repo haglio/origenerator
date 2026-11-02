@@ -549,7 +549,7 @@ class JobQueueView(QWidget):
         place = self._drop_index(event.position().toPoint())
         rest = [other for other in keys if other != key]
         landing = place - 1 if place > keys.index(key) else place
-        if rest[:landing] + [key] + rest[landing:] != keys:
+        if [*rest[:landing], key, *rest[landing:]] != keys:
             self.move_requested.emit(key, rest[landing] if landing < len(rest) else None)
         event.acceptProposedAction()
 

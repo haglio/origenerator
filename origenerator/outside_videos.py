@@ -25,6 +25,7 @@ from origenerator.gallery.source_image import videos_from_source_image
 from origenerator.gallery.tree import settings_folder_key, start_frame_index
 from origenerator.generation_state import GenerationSource, GenerationStatus, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
+from origenerator.outside_journal import actions_in, favorites_in, said_in
 from origenerator.thumbnail import (
     first_frame_of,
     generate_animated_thumbnail,
@@ -238,8 +239,8 @@ def _frames_by_file(rows: list[dict]) -> dict[str, dict]:
 
 def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
                          kinds: dict[str, set[VideoKind]]) -> dict[tuple, dict]:
-    said = _said_here(places.journal)
-    told_here, acted_here = _favorited_here(said), _acted_here(said)
+    said = said_in(places.journal)
+    told_here, acted_here = favorites_in(said), actions_in(said)
     frames = _frames_by_file(rows)
     made_here_from_frames = [row for row in rows if made_here(row) and _input_image(row)]
     images: dict[tuple, dict] = {}
@@ -343,37 +344,6 @@ def _picked_since(picked: tuple[float, str] | None, written: float | None) -> st
     if picked is None or (written is not None and picked[0] < written):
         return None
     return picked[1]
-
-
-def _said_here(journal: Path | None) -> list[dict]:
-    try:
-        lines = journal.read_text(encoding="utf-8").splitlines() if journal else []
-    except OSError:
-        return []
-    said = []
-    for line in lines:
-        try:
-            event = json.loads(line)
-        except ValueError:
-            continue
-        if (isinstance(event, dict) and isinstance(event.get("path"), str)
-                and isinstance(event.get("t"), int | float)):
-            said.append(event)
-    return said
-
-
-def _favorited_here(said: list[dict]) -> dict[str, float]:
-    told: dict[str, float] = {}
-    for event in said:
-        if event.get("event") in ("favorite", "unfavorite"):
-            told[event["path"]] = max(told.get(event["path"], 0), event["t"] / 1000)
-    return told
-
-
-def _acted_here(said: list[dict]) -> dict[str, tuple[float, str]]:
-    picks = sorted((event for event in said if event.get("event") == "action"),
-                   key=lambda event: event["t"])
-    return {event["path"]: (event["t"] / 1000, str(event.get("action") or "")) for event in picks}
 
 
 class FrameFolders(NamedTuple):

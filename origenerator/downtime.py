@@ -20,9 +20,8 @@ from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
 from origenerator.inflight import reconcile_the_backfill
-from origenerator.landed_while_away import running_trainings, training_toast
+from origenerator.landed_while_away import THIS_LIBRARY, running_trainings, training_toast
 from origenerator.media import MediaType
-from origenerator.output_places import OutputFolders
 from origenerator.single_instance import Copies
 from origenerator.toast_raising import raise_toast
 from origenerator.win32 import APP_USER_MODEL_ID
@@ -155,7 +154,7 @@ def _handed_over(db, client, queue: Callable[[object], int]) -> int:
 
 
 def _queue_the_backfill_into(jobs, db, client, ui: AppState) -> int:
-    reconcile_the_backfill(db, client, OutputFolders(config.OUTPUT_PLACES, config.THUMB_DIR))
+    reconcile_the_backfill(db, client, THIS_LIBRARY)
     return queue_the_backfill(
         jobs, db, db.list_generations(),
         enhance_settings=gallery.EnhanceSettings.parse(ui.get("enhance_settings")))

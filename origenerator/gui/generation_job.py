@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import json
 import logging
 import time
 import uuid
@@ -11,9 +10,8 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from origenerator import comfyui_api, provenance, speech
+from origenerator import comfyui_api, speech
 from origenerator.completion import animate_before_filing, extract_completion
-from origenerator.db import NewGeneration, NewSeedUse
 from origenerator.file_refs import frame_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
@@ -24,8 +22,6 @@ from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.media import MediaType
 from origenerator.output_places import OutputFolders
 from origenerator.progress import ProgressTracker, stage_names
-from origenerator.seed_history import SeedUseKind, output_size
-from origenerator.thumbnail import frame_thumbnail
 
 
 @dataclass(frozen=True)
@@ -61,37 +57,6 @@ logger = logging.getLogger(__name__)
 
 # ComfyUI ends an interrupted prompt exactly as it ends a successful one, with no outputs in its history.
 _NO_OUTPUT_MESSAGE = "The run ended without producing an output file (interrupted)"
-
-
-def insert_generation_row(db, job):
-    params = job.params
-    db.insert_generation(NewGeneration(
-        prompt_id=job.prompt_id,
-        workflow_name=job.workflow.name,
-        workflow_version=job.workflow.version,
-        positive_prompt=params.get("positive_prompt", ""),
-        negative_prompt=params.get("negative_prompt", ""),
-        seed=params.get("seed"),
-        params_json=json.dumps(params),
-        workflow_json=json.dumps(job.payload),
-        source=job.source,
-        provenance=json.dumps(provenance.at_launch(job.workflow)),
-        shielded=job.shielded,
-    ))
-
-
-def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
-    if job.source != GenerationSource.GENERATED:
-        return
-    frame = job.last_preview
-    thumbnail = (frame_thumbnail(frame, job.thumb_dir, name=f"{job.prompt_id}_{kind}")
-                 if frame else None)
-    width, height = output_size(job.workflow.name, job.params) or (None, None)
-    for key in job.workflow.seed_keys():
-        if job.params.get(key) is not None:
-            db.record_seed_use(NewSeedUse(kind=kind, seed_key=key, seed=int(job.params[key]),
-                               media_type=job.workflow.output_type, width=width, height=height,
-                               thumbnail_path=str(thumbnail) if thumbnail else None))
 
 
 class GenerationJob(QObject):

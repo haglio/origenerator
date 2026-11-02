@@ -16,8 +16,8 @@ from origenerator.gui.generation_job import (
     JobSpec,
     JobState,
     display_status,
-    insert_generation_row,
 )
+from origenerator.gui.job_records import insert_generation_row
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION

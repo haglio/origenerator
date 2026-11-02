@@ -1,9 +1,3 @@
-"""The map around one generation: what shares its config, what shares its seed,
-and what is nearest beyond that.
-
-Fixture rows are fabricated (see CLAUDE.md); the settings-folder and model
-keys they are grouped by are the gallery's own.
-"""
 from __future__ import annotations
 
 import json
@@ -47,8 +41,6 @@ def test_the_seed_row_is_the_rest_of_the_items_own_settings_folder():
 
 
 def _video(prompt_id, prompt, *, noise_seed, frame, lora="lora_a", action=None):
-    """A WAN I2V row: its sampler seed is ``noise_seed``, so the
-    ``seed`` column an image fills stays empty on it."""
     return {
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
@@ -78,8 +70,6 @@ def test_beyond_an_images_row_lie_the_nearest_other_configurations_of_its_model(
 
     assert _ids(beyond) == ["g4", "g3", "g5"]
 
-
-# --- the column: an image and the videos animated from it -----------------------
 
 
 def test_an_images_column_is_the_videos_animated_from_it_each_named_for_its_action():
@@ -153,8 +143,6 @@ def test_an_image_nothing_was_animated_from_is_no_source_and_names_only_its_acti
     assert surroundings(shows_none, library, image_index=index).label == ""
 
 
-# --- the seed row: keyed by the image, not by the video's own sampler ---------
-
 
 def test_a_videos_seed_row_is_its_action_animated_from_its_images_other_seeds():
     one = _image("i1", "a fox", seed=1)
@@ -205,8 +193,6 @@ def test_an_action_loop_plays_the_image_and_every_video_of_it_twins_included():
     assert _ids(around.group) == ["i1", "v2", "v3"]
 
 
-# --- what an action filter matches a generation on --------------------------------
-
 
 def test_the_whole_library_says_what_each_generation_is_named_for():
     source = _image("i1", "a fox", seed=1, shows="beta")
@@ -217,8 +203,6 @@ def test_the_whole_library_says_what_each_generation_is_named_for():
     assert action_labels([source, plain, runs], image_index=index) == {
         "i1": "Source image, beta", "i2": "", "v1": "alpha"}
 
-
-# --- "more seeds": what lies just beyond the row -------------------------------
 
 
 def test_beyond_a_videos_row_lie_videos_of_its_action_from_the_images_most_like_its_own():
@@ -260,7 +244,7 @@ def test_a_generation_with_no_prompt_words_is_as_far_from_every_other_as_can_be(
 
     beyond = beyond_the_row(current, [current, wordy, wordless], image_index={})
 
-    assert _ids(beyond) == ["g2", "g3"]      # nothing to tell them apart but their ids
+    assert _ids(beyond) == ["g2", "g3"]
 
 
 def test_the_lora_that_animated_a_video_comes_before_a_likelier_image():
@@ -280,9 +264,6 @@ def test_the_lora_that_animated_a_video_comes_before_a_likelier_image():
 
 
 def test_a_run_of_generations_from_one_folder_is_stood_for_by_the_newest_of_them():
-    """A collection lists newest first, and a sitting usually makes several seeds of
-    one configuration in a row: the collection's slideshow plays the newest of each such
-    run, and a folder come back to later is a run of its own."""
     newest_first = [_image("g5", "a red fox", seed=5), _image("g4", "a red fox", seed=4),
                     _image("g3", "a blue car", seed=3),
                     _image("g2", "a red fox", seed=2), _image("g1", "a red fox", seed=1)]
@@ -291,8 +272,6 @@ def test_a_run_of_generations_from_one_folder_is_stood_for_by_the_newest_of_them
 
 
 def test_an_enhanced_version_belongs_to_its_run_like_any_other_item():
-    """A better version of an image is still one of that folder's stretch, so
-    it neither escapes the run nor breaks it in two."""
     better = _image("g3", "a red fox", seed=2)
     better["params_json"] = json.dumps({**json.loads(better["params_json"]), "enhance": True})
     newest_first = [_image("g4", "a red fox", seed=4), better,
@@ -301,12 +280,8 @@ def test_an_enhanced_version_belongs_to_its_run_like_any_other_item():
     assert _ids(one_per_stretch(newest_first, image_index={})) == ["g4"]
 
 
-# --- the column: this seed's other configurations, then the videos of it ---------
-
 
 def test_the_column_opens_on_the_same_seed_under_other_configurations():
-    """What the column showed before the videos joined it, and still shows
-    first: the same seed drawn under another configuration of the same model."""
     current = _image("g1", "a red fox in snow", seed=7)
     tweaked = _image("g2", "a red fox at dawn", seed=7)
     other_model = _image("g3", "a red fox at dawn", seed=7, checkpoint="model_b.safetensors")
@@ -318,8 +293,6 @@ def test_the_column_opens_on_the_same_seed_under_other_configurations():
 
 
 def test_a_configuration_sibling_is_not_also_one_of_the_actions_below_it():
-    """The two halves of the column are told apart by where they sit, so an
-    image's own re-prompt is a configuration and never an action as well."""
     image = _image("i1", "a fox", seed=1)
     tweaked = _image("i2", "a fox at dawn", seed=1)
     index = gallery.build_image_config_index([image, tweaked])
@@ -332,10 +305,6 @@ def test_a_configuration_sibling_is_not_also_one_of_the_actions_below_it():
 
 
 def test_a_video_has_no_configurations_of_its_own_because_its_seed_is_its_images():
-    """Configurations belong to images.  A video's own sampler seed says
-    nothing about which image it is of, so two videos that happen to share
-    one are strangers; what another configuration of this video's image
-    would be is a video of that image, which the actions below already are."""
     image = _image("i1", "a fox", seed=1)
     other_image = _image("i2", "a hare", seed=2)
     index = gallery.build_image_config_index([image, other_image])

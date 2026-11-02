@@ -1,16 +1,3 @@
-"""The queue's view-model: every generation in flight, as a tile.
-
-Not rendering, and it had grown into the pane's largest function by nearly three
-to one -- it joins the generations table, the requests table, the controller's
-live jobs and its queue order, Auto-Generate, the folder tree and a
-thumbnail index, and builds a twenty-field record per running row.
-The pane held it only because that is where the first consumer lived; three
-surfaces read these items now.
-
-Everything it reaches for is handed in, so the whole join can be exercised with
-plain dictionaries and no widget -- which is what the pane's own suite could not
-do while this sat inside it.
-"""
 from __future__ import annotations
 
 import logging
@@ -29,19 +16,11 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 
 logger = logging.getLogger(__name__)
 
-# The kinds whose start frame is what the run is *of*, rather than one input
-# among several: a video animating an image, and an enhancement of one.
 SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
 TRAINING_KEY = "fix training"
 
 
 class InFlightItems:
-    """The queue's tiles, built from the tables and the controller under them.
-
-    ``on_cancel``, ``on_reveal`` and ``on_go_to_item`` are what a tile's buttons
-    do -- the pane passes its own signals -- so nothing here needs to be a widget.
-    """
-
     def __init__(self, *, db, jobs, auto, tree, image_rows: Callable[[], list],
                  image_index: Callable[[], dict],
                  on_cancel: Callable[[str], None], on_reveal: Callable[[str], None],
@@ -59,47 +38,18 @@ class InFlightItems:
         self._on_shield = on_shield
 
     def build(self, rows=None, requests=None) -> list[InFlightItem]:
-        """Every queued/running generation as a tile model, in the order the queue
-        will work through them.
-
-        The database's running/pending rows are the source of truth for what's in
-        flight — every generation is a gallery re-roll (a tab's Generate launches
-        one too) — so a tile shows even when no live job object is tracking a row
-        (after a restart that hasn't re-adopted it, say). A re-roll tracked this
-        session grafts on its live frame, progress, cancel and start time from its
-        :class:`GenerationJob`; an untracked running row shows a plain tile.
-
-        The queue's own line orders them (:attr:`JobQueue.queue_order`):
-        nothing a row records says whether an image jumped ahead of a video, or
-        whether a drag moved one. A row the line holds no job for — one a restart
-        hasn't re-adopted — sorts to the back rather than jumping the queue on
-        screen.
-
-        The Job Queue's rows carry more than the collection's tiles do — a price, a kind, a
-        thumbnail of what the job is made from or of the folder it will land in —
-        and all of it is read off the row and the tree already in hand, so a poll
-        costs one listing whatever the queue is showing. ``rows``/``requests``
-        take a listing the caller already read (the poll reads its own on the
-        pool); left off, both tables are read here.
-        """
         job_by_pid = {job.prompt_id: (key, job)
                          for key, jobs in self._jobs.jobs_by_folder.items()
                          for job in jobs}
-        # Which of these were asked for, and of what. One listing rather than a
-        # lookup per job: the table is small and the queue rarely is.
         records = {r["prompt_id"]: r for r in (self._db.list_requests()
                                                if requests is None else requests)}
-        typical: dict[str, float | None] = {}  # workflow -> its usual run time
-        stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
+        typical: dict[str, float | None] = {}
+        stablemates: dict[str, tuple] = {}
         if rows is None:
             rows = self._db.list_generations()
-        # Every row by id, so a combine's run can show the video its settings
-        # came from, and say whether its words still match that video's. Off the
-        # listing already in hand rather than a query per job: the source video
-        # is an ordinary finished row somewhere in it.
         row_by_id = {r.get("prompt_id"): r for r in rows}
         items = []
-        sent = set()  # the runs ComfyUI holds, which a fix's training waits behind
+        sent = set()
         for row in rows:
             if not gallery.is_in_progress(row):
                 continue
@@ -108,11 +58,11 @@ class InFlightItems:
             if tracked is not None:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
-                pass_progress = job.last_pass_progress  # the substep progress bar along the foot
-                stage = job.last_stage                   # and what it is doing
-                foreign = job.foreign_ahead  # another app's jobs in front of it, if any
+                pass_progress = job.last_pass_progress
+                stage = job.last_stage
+                foreign = job.foreign_ahead
                 starts_at = self._jobs.starts_at(pid)
-                started = job.started_at  # None until ComfyUI actually starts it
+                started = job.started_at
                 cancel = partial(self._on_cancel, pid)
                 shield = partial(self._on_shield, pid)
                 shielded = job.shielded
@@ -122,7 +72,7 @@ class InFlightItems:
                            if self._jobs.can_move_up(pid) else None)
                 move_down = (partial(self._jobs.move_down, pid)
                              if self._jobs.can_move_down(pid) else None)
-            else:  # a running row no live job holds — no live frame, progress, or cancel
+            else:
                 folder_key = gallery.settings_folder_key(row, self._image_index())
                 frame, progress, cancel, foreign, started = None, None, None, None, None
                 starts_at = None
@@ -152,13 +102,10 @@ class InFlightItems:
                     typical_seconds=self._typical_seconds(workflow_name, typical),
                 ),
                 reveal=reveal,
-                media_type=gallery.media_type_of_row(row),  # image/video item type icon
+                media_type=gallery.media_type_of_row(row),
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,
-                # Its folder auto-generating makes a Cancel discard this run and
-                # Auto-Generate launch another. A menu can offer the real stop
-                # beside it, which is what stop_auto is for.
                 auto_generating=self._auto.is_active(folder_key),
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
@@ -166,26 +113,10 @@ class InFlightItems:
                 job_kind=kind,
                 requested=bool(words_of(records.get(pid))),
                 modified=pid in records and not words_of(records[pid]),
-                # Only where the start frame is what the run is *of*: a video
-                # animating an image, and an enhancement of one. An image
-                # workflow that happens to take an input (the pose transfer's
-                # structure image) is still an image being made, and its row is
-                # placed the way every other image's is — by the folder it joins.
                 source_image=start_frame_of(kind, params),
-                # What to stand under the wait: the image this run was
-                # requested of, else the frame it animates or enhances.
                 source_file=source_file_of(
                     row_by_id.get((records.get(pid) or {}).get("source_prompt_id")),
                     params, kind),
-                # What the Combine was asked for, when this run came from
-                # it: the action off its dropdown, else the video whose settings the
-                # run follows — shown gray beside the frame, lending the settings
-                # rather than the result. Never both. An action names what the video
-                # will do, which is the whole of what was chosen; the video its
-                # settings were mined out of is an answer to a question the user
-                # never asked, and a thumbnail of a video they did not pick reads
-                # as a job that is that video. A dropped video *is* the choice,
-                # so there the thumbnail is the only thing saying which.
                 action=row.get("action") or "",
                 source_video_thumbnail=(source_video or {}).get("thumbnail_path"),
                 prompt_edited=bool(
@@ -219,37 +150,15 @@ class InFlightItems:
         self._on_go_to_item(image)
 
     def _folder_thumbnails(self, folder_key: str, cache: dict) -> tuple:
-        """A few thumbnails already in the folder a queued job is headed for.
-
-        What a queued job with no thumbnail of its own can be recognized by: its
-        output doesn't exist yet, but the folder it will join is full of what the
-        same settings made last time. Newest first, since ``list_generations``
-        hands them back that way and the newest are what the user was just looking
-        at.
-
-        Read off the folder tree the gallery already built rather than by keying
-        every row again — the tree is rebuilt when the rows change, and this runs
-        on every poll. A folder with nothing in it yet (the first run of new
-        settings, or an enhancement, whose product folds into the row it enhanced
-        rather than landing anywhere) has no node in the tree at all and answers
-        with nothing, which the row draws as no block rather than an empty grid.
-        ``cache`` memoizes for the length of one pass, since Auto-Generate
-        fills the line with jobs from a single folder.
-        """
         if folder_key not in cache:
             group = self._tree.group_for_key(folder_key)
             rows = gallery.rows_under(group) if group is not None else []
-            # Only what is finished and has a thumbnail — the job asking, and
-            # every other row still in the line, is exactly what has none.
             cache[folder_key] = tuple(
                 row["thumbnail_path"] for row in rows if row.get("thumbnail_path")
             )[:FOLDER_CELLS]
         return cache[folder_key]
 
     def _typical_seconds(self, workflow_name: str, cache: dict):
-        """What a whole run of ``workflow_name`` usually takes, for the running
-        bar's countdown — memoized into ``cache`` for the length of one pass,
-        since this list is rebuilt on every poll."""
         if workflow_name not in cache:
             cache[workflow_name] = timing.estimate_seconds(
                 self._db.recent_durations(workflow_name)
@@ -262,13 +171,6 @@ def start_frame_of(kind: str, params: dict) -> str | None:
 
 
 def source_file_of(asked_of: dict | None, params: dict, kind: str) -> str | None:
-    """A file showing what a queued run came from, or ``None``.
-
-    The image a request or a Modify was made of comes first: a Modify
-    queues a run per image and every one of them animates nothing, so the
-    image it rewrites is the only one it has. Failing that, the
-    start frame a video or an enhance is built on.
-    """
     thumbnail = (asked_of or {}).get("thumbnail_path")
     if thumbnail:
         return thumbnail

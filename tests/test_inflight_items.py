@@ -1,12 +1,3 @@
-"""The queue's tiles, built with no widget anywhere.
-
-Which is what the move buys: this is a join over four sources — the generations
-table, the requests table, the controller's live jobs with its queue order, the
-Auto-Generate, the folder tree — and it used to be the largest function
-inside a 1,400-line rendering class, reachable only by building one.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -69,7 +60,7 @@ class FakeJobQueue:
         self.jobs_by_folder = jobs_by_folder or {}
         self.queue_order = list(order)
         self.training = training
-        self.stuck = set(stuck)  # (prompt id, "up" or "down") the line cannot do
+        self.stuck = set(stuck)
         self.moved = []
 
     def can_move_up(self, prompt_id):
@@ -156,8 +147,6 @@ def test_only_the_rows_still_being_made_get_a_tile(build):
 
 def test_a_running_row_no_live_job_holds_is_placed_by_the_gallery_s_own_index(
         build, monkeypatch):
-    # Built again at every look at the queue, the index cost a double-click a
-    # fifth of a second, and every poll the same while such a run waited.
     monkeypatch.setattr(gallery, "build_image_config_index",
                         lambda rows: pytest.fail("the index was built again"))
 
@@ -167,9 +156,6 @@ def test_a_running_row_no_live_job_holds_is_placed_by_the_gallery_s_own_index(
 
 
 def test_a_running_row_no_live_job_holds_still_gets_a_plain_tile(build):
-    # After a restart that has not re-adopted its runs, the database is the only
-    # thing that knows the work exists -- a tile with no frame, no progress and
-    # nothing to cancel is still the honest answer.
     items = build([_row("g1", status="running")])
 
     tile, = items
@@ -198,8 +184,6 @@ def test_a_video_waiting_out_the_minute_after_an_image_carries_when_it_starts(bu
 
 
 def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):
-    # A story's lines are read aloud before the job is sent, so the row already
-    # says running while the wait is something else entirely.
     job = FakeJob("g1", state="speaking")
     items = build([_row("g1", status="running")],
                   jobs_by_folder={"image/sdxl_t2i/aaa": [job]})
@@ -208,9 +192,6 @@ def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):
 
 
 def test_a_run_comfyui_holds_but_has_not_started_says_queued(build):
-    # Its row says running from the moment it is sent, and closing the app
-    # sends everything still waiting, so the row cannot tell the run being made
-    # from the ones waiting after it on the server. The job can.
     job = FakeJob("g1", state="queued")
     items = build([_row("g1", status="running")],
                   jobs_by_folder={"video/wan22_i2v/aaa": [job]})
@@ -237,8 +218,6 @@ def test_a_run_no_live_job_holds_cannot_be_moved(build):
 
 
 def test_the_queues_own_line_orders_the_tiles(build):
-    # Nothing a row records says whether an image jumped ahead of a video, or
-    # whether a drag moved one.
     rows = [_row("g1"), _row("g2"), _row("g3")]
     items = build(rows, order=["g3", "g1", "g2"])
 
@@ -319,8 +298,6 @@ def test_a_tiles_shield_is_its_jobs_and_is_set_through_the_caller(build):
 
 
 def test_a_run_a_folders_modify_queued_stands_under_the_image_it_rewrites(build):
-    # A Modify (all seeds) queues a run per image and every one of them animates
-    # nothing, so the image it rewrites is the only one it has.
     rows = [_row("asked-of"), _row("g1")]
     items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": ""}])
@@ -364,14 +341,28 @@ def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build):
         name: getattr(tile, name) for name in drawn}
 
 
+def test_a_run_made_from_a_dropped_video_shows_that_videos_thumbnail(build):
+    source = _row("src", status="completed", thumbnail_path="src.jpg")
+    items = build([source, _row("g1", source_video="src")])
+
+    tile = next(item for item in items if item.key == "g1")
+    assert tile.source_video_thumbnail == "src.jpg"
+    assert tile.action == ""
+
+
+def test_a_run_made_from_a_chosen_action_shows_no_source_video(build):
+    source = _row("src", status="completed", thumbnail_path="src.jpg")
+    items = build([source, _row("g1", source_video="src", action="dancing")])
+
+    tile = next(item for item in items if item.key == "g1")
+    assert tile.action == "dancing"
+    assert tile.source_video_thumbnail is None
+
+
 def test_a_queued_run_with_no_thumbnail_shows_what_its_folder_already_holds(build):
-    # Its output does not exist yet, but the folder it will join is full of what
-    # the same settings made last time.
     key = "image/sdxl_t2i/aaa"
     items = build([_row("g1")], jobs_by_folder={key: [FakeJob("g1", state="queued")]})
 
-    # A folder with nothing in it yet -- the first run of new settings -- has no
-    # node in the tree at all, and draws no block rather than an empty grid.
     assert items[0].folder_thumbnails == ()
 
 

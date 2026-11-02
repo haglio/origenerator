@@ -1,7 +1,3 @@
-"""What a run hands ComfyUI for each file it loads, so that ComfyUI can open it.
-
-Every file here is fabricated and lives under the test's own folders (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import _winapi

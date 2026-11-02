@@ -50,12 +50,6 @@ logger = logging.getLogger(__name__)
 
 
 def _workflow_name_by_filename_prefix() -> dict[str, str]:
-    """Map each workflow's output-filename prefix to its name, from the registry.
-
-    ComfyUI names outputs ``<prefix>_NNNNN_.<ext>`` where ``<prefix>`` is the
-    last path segment of the workflow's ``filename_prefix`` (e.g. the
-    ``video/wan22_i2v`` prefix yields files named ``wan22_i2v_00001_.mp4``).
-    """
     mapping: dict[str, str] = {}
     for name, wf in WORKFLOW_REGISTRY.items():
         prefix = wf.default_params().get("filename_prefix", "")
@@ -66,11 +60,6 @@ def _workflow_name_by_filename_prefix() -> dict[str, str]:
 
 
 def infer_workflow_name(filename: str) -> str | None:
-    """Infer a workflow name from a ComfyUI output filename by its prefix.
-
-    Returns the registered workflow whose output prefix the filename starts
-    with (longest match wins), or ``None`` when nothing matches.
-    """
     best_prefix = ""
     best_name = None
     for prefix, name in _workflow_name_by_filename_prefix().items():
@@ -88,14 +77,10 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
         output_type = media_type_from_filename(fpath.name)
         if output_type is None:
             continue
-        # A video with a metadata image beside it is represented (and made
-        # playable) by that image's entry, so skip the bare video file.
         if (output_type == MediaType.VIDEO
                 and sibling_of_type(fpath, MediaType.IMAGE) is not None):
             continue
-        # An image beside a video is that video's metadata/preview sidecar
-        # (VHS_VideoCombine writes one per video): its entry should play the
-        # video, not show the still frame.
+        # VHS_VideoCombine writes one sidecar image per video
         play_path = fpath
         if output_type == MediaType.IMAGE:
             sibling_video = sibling_of_type(fpath, MediaType.VIDEO)
@@ -250,18 +235,6 @@ def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]
 
 
 def backfill_shared_thumbnails(db: Database, places: OutputPlaces, thumb_dir: Path) -> int:
-    """Re-render thumbnails an old naming collision left wrong or missing.
-
-    Thumbnails were once named after the source file's stem, so two outputs that
-    shared a stem — ComfyUI's default ``ComfyUI_00001_.png`` beside
-    ``video/ComfyUI_00001_.mp4`` — wrote to one file, the later import
-    overwriting the earlier; the losing row then displayed the winner's frame.
-    Each row whose thumbnail file is shared by another row, or has since gone
-    missing (e.g. trashed when its stem-twin was deleted), is re-rendered from
-    its own output under a name keyed by its unique ``prompt_id``. Returns how
-    many rows were repaired. Idempotent: once every thumbnail is uniquely owned
-    and present, a re-run touches nothing.
-    """
     rows = db.list_generations()
     owners = Counter(r["thumbnail_path"] for r in rows if r.get("thumbnail_path"))
     repaired = 0
@@ -270,7 +243,7 @@ def backfill_shared_thumbnails(db: Database, places: OutputPlaces, thumb_dir: Pa
         if not thumb:
             continue
         if owners[thumb] == 1 and Path(thumb).exists():
-            continue  # uniquely owned and present — already correct
+            continue
         fresh = _render_row_thumbnail(row, places, thumb_dir)
         if fresh is not None:
             db.update_generation(row["prompt_id"], thumbnail_path=str(fresh))
@@ -279,11 +252,6 @@ def backfill_shared_thumbnails(db: Database, places: OutputPlaces, thumb_dir: Pa
 
 
 def _render_row_thumbnail(row: dict, places: OutputPlaces, thumb_dir: Path) -> Path | None:
-    """A fresh thumbnail for ``row`` from its own output, keyed by its prompt_id.
-
-    Returns the new path, or ``None`` when the row has no renderable output file
-    on disk to draw from (so the caller leaves the existing reference alone).
-    """
     files = row_output_files(row)
     if not files:
         return None
@@ -333,21 +301,6 @@ def refile_enhancements_another_workflow_made(db: Database) -> int:
 
 
 def backfill_import_params(db: Database, places: OutputPlaces) -> int:
-    """Give every import the settings its own file states and its row is
-    missing — the size it was made at, what it was told to avoid, the models it
-    loaded, the image it started from, the sound it was scored with — read off
-    its stored graph, and its size off the file itself where the graph gives
-    none.
-
-    An import records only what the reading of a file knew to look for on the
-    day it landed, and everything it missed then comes from the workflow's
-    defaults wherever the app shows that item's configuration: a portrait
-    import read before sizes were read offered a landscape re-roll. So the
-    reading is run again, filling only keys the row lacks — what the app
-    generated itself is already complete, and a re-roll's own edits (a fresh
-    start frame) are never clobbered. Returns how many rows were filled.
-    Idempotent.
-    """
     updated = 0
     for row in db.list_generations():
         if source_of(row) != GenerationSource.IMPORTED:
@@ -406,12 +359,7 @@ def graph_of(row: dict) -> dict:
 
 
 def graph_from_text(text: str) -> dict:
-    """Decode a ComfyUI prompt graph, tolerating double-JSON-encoding.
-
-    Native ``SaveVideo`` and PNG chunks store the graph as a JSON object;
-    ``VHS_VideoCombine`` stores it as a JSON *string* of that object. Decode
-    until we reach the dict (or give up).
-    """
+    # VHS_VideoCombine stores the graph as a JSON string of the object, so decode until a dict
     try:
         data = json.loads(text)
         if isinstance(data, str):
@@ -422,9 +370,6 @@ def graph_from_text(text: str) -> dict:
 
 
 def _probe_video(fpath: Path) -> dict:
-    """ffprobe's account of a video container -- its ``format`` (the tags
-    ComfyUI embeds its graph in) and its ``streams`` -- or {} when ffprobe is
-    unavailable or anything goes wrong."""
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
         return {}
@@ -441,8 +386,6 @@ def _probe_video(fpath: Path) -> dict:
 
 
 def _video_prompt_graph(fpath: Path) -> dict:
-    """Read ComfyUI's embedded prompt graph from a video container, or {} --
-    callers then fall back to filename inference."""
     tags = (_probe_video(fpath).get("format", {}) or {}).get("tags", {})
     prompt = tags.get("prompt")
     return graph_from_text(prompt) if prompt else {}
@@ -462,11 +405,6 @@ def _media_size(fpath: Path) -> tuple[int, int] | None:
 
 
 def graph_in_file(fpath: Path, suffix: str) -> dict:
-    """Return the embedded ComfyUI prompt graph for an output file, or {}.
-
-    Images carry it in the PNG ``prompt`` text chunk; videos carry it in the
-    container metadata.
-    """
     if suffix == ".png":
         try:
             prompt_str = Image.open(fpath).info.get("prompt")
@@ -479,8 +417,6 @@ def graph_in_file(fpath: Path, suffix: str) -> dict:
 
 
 def _prompt_texts(graph: dict) -> tuple[str | None, str | None]:
-    """The positive and negative prompt a graph was run with, or ``None`` each
-    (located by :func:`origenerator.comfy_graph.clip_prompt_nodes`)."""
     def text_of(node):
         texts = texts_read(graph, node)
         return BOX_BREAK.join(texts) if texts else None
@@ -504,19 +440,11 @@ def _size_params(graph: dict) -> dict:
 
 
 def _input_image_params(graph: dict) -> dict:
-    """The image an I2V graph animated, when it names one."""
     name = input_image_name(graph)
     return {} if name is None else {"input_image": name}
 
 
 def _sampler_settings(graph: dict) -> tuple[int | None, dict]:
-    """The seed the run used, and every scalar its samplers were given.
-
-    One pass over the graph, because the two sampler kinds decide the seed
-    together: a plain KSampler's seed wins outright, while a KSamplerAdvanced's
-    is taken only when nothing has claimed the seed yet or when this is the
-    noise-adding (stage-1) sampler.
-    """
     skip = {id(node) for node in _refine_passes(graph)}
     seed = None
     params: dict = {}
@@ -543,14 +471,6 @@ def _sampler_settings(graph: dict) -> tuple[int | None, dict]:
 
 
 def _refine_passes(graph: dict) -> list[dict]:
-    """The KSamplers whose settings describe a refinement rather than the base settings.
-
-    The SDXL workflows end in a second, low-denoise KSampler over a re-encoded
-    image (the enhance pass), recognized by sampling a VAEEncode'd latent. Its
-    steps/denoise are the refinement's, so they are skipped — but only when a
-    base sampler exists too, since a graph that is nothing BUT a refinement has
-    no other settings to report.
-    """
     def is_refinement(node: dict) -> bool:
         source = follow(graph, node.get("inputs", {}).get("latent_image"))
         return bool(source) and source.get("class_type") == "VAEEncode"
@@ -561,44 +481,22 @@ def _refine_passes(graph: dict) -> list[dict]:
 
 
 def _scalars(inputs: dict) -> dict:
-    """The plainly-valued inputs of a node — the ones worth recording as params."""
     return {k: v for k, v in inputs.items() if isinstance(v, (int, float, str, bool))}
 
 
-# Which registered workflow a graph's node classes name, MOST SPECIFIC FIRST.
-# The order is load-bearing and cannot come from the registry, whose own order
-# runs the other way (sdxl_t2i first): a graph can satisfy more than one entry —
-# an flf2v graph also carries the i2v conditioning, a Flux one can also load a
-# checkpoint — and the first match wins. Nor can it be derived from the
-# signatures, since flf2v and i2v are each one node class and neither is a
-# superset of the other; what orders them is that an flf2v graph contains both.
-#
-# Each entry is a workflow name and the node-class sets that identify it: any
-# one set being wholly present is enough. tests/test_importer.py holds every
-# case with the losers named; tests/test_workflows.py holds these names against
-# the registry, and holds what every registered workflow's own graph reads as.
 _GRAPH_SIGNATURES = (
     ("wan22_animate", (frozenset({"WanAnimateToVideo"}),)),
     ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
     ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),
-    # A Wan/Hunyuan video latent saved as a still image: T2I.
     ("wan22_t2i", (frozenset({"EmptyHunyuanLatentVideo", "SaveImage"}),)),
-    # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders and a
-    # FluxGuidance node — none of which the other workflows use.
     ("flux_t2i_upscaled", (frozenset({"FluxGuidance"}),
                            frozenset({"UnetLoaderGGUF", "DualCLIPLoader"}))),
-    # A lone CLIPLoader over a plain empty latent: the WAN graphs above pair
-    # theirs with a video latent, and SDXL's reader comes inside its checkpoint.
     ("krea2_t2i", (frozenset({"CLIPLoader", "EmptyLatentImage"}),)),
     ("sdxl_t2i", (frozenset({"CheckpointLoaderSimple"}),)),
 )
 
 
 def _workflow_from_nodes(graph: dict) -> str | None:
-    """Which registered workflow built this graph, from its node classes.
-
-    ``None`` when nothing matches, which leaves the filename's guess standing.
-    """
     node_types = {n.get("class_type") for n in graph.values()}
     return next(
         (name for name, signatures in _GRAPH_SIGNATURES
@@ -609,7 +507,6 @@ def _workflow_from_nodes(graph: dict) -> str | None:
 
 @functools.cache
 def _own_graph_reads_as(name: str) -> str | None:
-    """What the chain reads a registered workflow's own default graph as."""
     workflow = WORKFLOW_REGISTRY[name]
     return _workflow_from_nodes(workflow.build_api_payload(dict(workflow.default_params())))
 
@@ -626,14 +523,6 @@ def _workflow_that_made(filename: str, graph: dict, kind: MediaType | None) -> s
 
 
 def _reconciled(filename_guess: str, graph_read: str | None, kind: MediaType | None) -> str:
-    """The workflow name the two witnesses agree on.
-
-    The graph overrules the filename -- a file can be renamed and a prefix
-    reused -- except where it cannot tell the filename's workflow from the one
-    it read: two workflows building the same kind of graph (an SDXL checkpoint
-    graph, say) both read as one of them, and a filename naming the other is
-    then the better witness, not the worse.
-    """
     if not _could_have_made(graph_read, kind):
         return filename_guess
     if filename_guess in WORKFLOW_REGISTRY and _own_graph_reads_as(filename_guess) == graph_read:
@@ -642,14 +531,6 @@ def _reconciled(filename_guess: str, graph_read: str | None, kind: MediaType | N
 
 
 def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -> dict:
-    """What an output file says about the run that made it.
-
-    Its embedded graph first, read by :func:`_graph_params`; the filename's
-    prefix is the first guess at which workflow ran and the graph overrules it
-    where it can tell (:func:`_reconciled`), because a file can be renamed and a
-    prefix reused. Where the graph states no size for a workflow that asks for
-    one, the file itself does (:func:`_size_from_its_own_file`).
-    """
     kind = kind or media_type_from_filename(fpath.name)
     graph = graph_in_file(fpath, suffix)
     workflow_name = _workflow_that_made(fpath.name, graph, kind)
@@ -694,10 +575,6 @@ def _size_from_its_own_file(fpath: Path, workflow_name: str) -> dict:
 
 
 def _graph_params(graph: dict) -> dict:
-    """Every setting a prompt graph states, keyed as the workflows store them:
-    the size it was sampled at, the image it started from, its base sampler's
-    settings and seed, the model files it loaded, and the prompts it was
-    conditioned on. Empty for a graph that states none."""
     seed, sampler_params = _sampler_settings(graph)
     positive, negative = _prompt_texts(graph)
     stated = (("positive_prompt", positive), ("negative_prompt", negative), ("seed", seed))

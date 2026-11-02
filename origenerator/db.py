@@ -206,8 +206,9 @@ class Database:
 
     # --- the Trash (see origenerator.db_trash) --------------------
 
-    def record_trashed(self, prompt_id: str, row: dict, batch: dict):
-        return self.deletions.record_trashed(prompt_id, row, batch)
+    def record_trashed(self, prompt_id: str, row: dict, batch: dict, *,
+                        deleted_at: str | None = None):
+        return self.deletions.record_trashed(prompt_id, row, batch, deleted_at=deleted_at)
 
     def list_trashed(self) -> list[dict]:
         return self.deletions.list_trashed()

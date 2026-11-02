@@ -367,6 +367,10 @@ class JobQueue(QObject):
         """
         self._reroll_variation(key, row, image_rows, new_image=True, new_video=False)
 
+    def regenerate(self, key: str, row: dict) -> str | None:
+        return self._launch(key, (workflow := WORKFLOW_REGISTRY[row["workflow_name"]]),
+                            filled_params(row, workflow), self._on_finished)
+
     def _reroll_variation(self, key, row, image_rows, *, new_image, new_video):
         """Launch ``row``'s settings with each seed independently re-rolled or kept.
 
@@ -420,6 +424,7 @@ class JobQueue(QObject):
         if job is not None:
             self._enqueue(job)
             self._admit(job)
+        return job and job.prompt_id
 
     def _new_job(self, key, workflow, params, on_finished, *,
                  source=GenerationSource.GENERATED, origin=None, run_media_type=None,
@@ -770,7 +775,7 @@ class JobQueue(QObject):
             return
         # Read the frame configs straight from the DB: the first tree rebuild
         # (which would populate the view's image rows) hasn't run yet at startup.
-        index = self._image_config_index()
+        index = gallery.image_config_index_of(self._db.list_generations())
         # Oldest first, against the newest-first listing: the line is rebuilt by
         # re-queuing each job in the order it was asked for, so the rules that
         # ordered it the first time order it the same way again.
@@ -790,16 +795,6 @@ class JobQueue(QObject):
                 self._start_from(job, start_image)
         self._pump()
         self.changed.emit()
-
-    def _image_config_index(self) -> dict:
-        """The frame-config index for keying image-conditioned folders, built from
-        the current image rows so an i2v row keys to the same leaf the tree gives
-        it (see :func:`gallery.build_image_config_index`)."""
-        image_rows = [
-            r for r in self._db.list_generations()
-            if gallery.media_type_of_row(r) == MediaType.IMAGE
-        ]
-        return gallery.build_image_config_index(image_rows)
 
     def _what_comfyui_is_making(self) -> set[str] | None:
         try:

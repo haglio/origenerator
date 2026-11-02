@@ -240,7 +240,7 @@ class FakeDB:
 
     # --- the Trash (deletions held for the Trash collection) --------
 
-    def record_trashed(self, prompt_id, row, batch):
+    def record_trashed(self, prompt_id, row, batch, *, deleted_at=None):
         self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
         self._deletions[prompt_id] = {
             "prompt_id": prompt_id, "row": row, "batch": batch,

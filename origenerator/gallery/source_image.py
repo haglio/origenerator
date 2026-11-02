@@ -128,6 +128,11 @@ def landing_for(prompt_id: str, rows: list[dict], image_index: dict) -> str:
                  and source_image_id_in(video, image_index) == prompt_id), prompt_id)
 
 
+def image_config_index_of(rows: list[dict]) -> dict:
+    return build_image_config_index(
+        [row for row in rows if media_type_of_row(row) == MediaType.IMAGE])
+
+
 def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
     """Map each image's output filename to the generation that produced it.
 

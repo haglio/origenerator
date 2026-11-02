@@ -354,6 +354,10 @@ def _span(span) -> str:
     return _shown(low) if low == high else f"{_shown(low)}–{_shown(high)}"
 
 
+def named_models(names: list[str]) -> str:
+    return spoken_list(map(model_title, names), "and")
+
+
 def spoken_list(names, conjunction: str) -> str:
     names = list(names)
     return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} {conjunction} {names[-1]}"

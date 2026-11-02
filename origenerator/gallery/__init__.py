@@ -143,6 +143,7 @@ from origenerator.gallery.signatures import (
 from origenerator.gallery.source_image import (
     build_image_config_index,
     find_source_image_id,
+    image_config_index_of,
     image_lent_by,
     landing_for,
     rebuildable_source_image,
@@ -259,6 +260,7 @@ __all__ = [
     "generation_seed",
     "group_level",
     "holds",
+    "image_config_index_of",
     "image_lent_by",
     "input_image_reference",
     "is_enhance_product_row",

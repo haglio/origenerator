@@ -632,13 +632,11 @@ def test_an_empty_latest_names_the_kind_its_folder_holds(qtbot, folder, kind):
     assert scroll.widget().text().startswith(f"No recent {kind} yet.")
 
 
-def test_the_empty_trash_hint_promises_no_expiry(qtbot):
+def test_the_empty_trash_hint_says_what_a_day_there_leaves(qtbot):
     pane, _scroll = _pane(qtbot)
     pane.set_model([], {}, [], [], [])
-    hint = pane._trash_empty_hint()
 
-    assert "as long as you leave them" in hint
-    assert "day" not in hint   # no window to count, so no number to state
+    assert "After a day, only their thumbnails are kept" in pane._trash_empty_hint()
 
 
 def _made_with(prompt_id, checkpoint, prompt="scene one", starred=0):

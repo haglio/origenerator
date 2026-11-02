@@ -212,8 +212,8 @@ CREATE TABLE IF NOT EXISTS requests (
 -- A deleted generation the Trash is still holding: the whole row the
 -- delete dropped, and where in the trash its files went, so the Trash collection can
 -- list it, put both back, or end it for good (see origenerator.trash_collection). The
--- record goes away when the item is restored or purged, and not otherwise --
--- nothing ages out; the generations row itself is gone the moment it is deleted,
+-- record goes away when the item is restored or purged, and not otherwise; the
+-- generations row itself is gone the moment it is deleted,
 -- which is why the row travels here rather than staying gated by a flag.
 CREATE TABLE IF NOT EXISTS deletions (
     prompt_id  TEXT PRIMARY KEY,

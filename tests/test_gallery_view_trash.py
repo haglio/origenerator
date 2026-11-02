@@ -17,12 +17,14 @@ from PyQt6.QtWidgets import (
     QApplication,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QScrollArea,
 )
 
 from origenerator import (
     gallery,
+    trash_collection,
 )
 from origenerator.branch_session import ENV_FLAG
 from origenerator.db import Database
@@ -188,7 +190,7 @@ def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    assert "as long as you leave them" in view._gallery_pane._trash_empty_hint()
+    assert "only their thumbnails are kept" in view._gallery_pane._trash_empty_hint()
     assert view._avg_label.text() == ""  # the hint already says it; don't say it twice
 
 
@@ -496,9 +498,7 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
     assert view._generate_pane._preview_tab is not tab  # pinned: it stays
 
 
-def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
-    # Deciding what to keep out of a Trash of sixty days' deletions is exactly what
-    # a slideshow is for — one at a time, full size, rather than a grid of stamps.
+def test_the_slideshow_button_is_gray_in_the_trash_and_starts_nothing(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
@@ -507,11 +507,92 @@ def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     assert not view._buttons.slideshow.isHidden()
+    assert not view._buttons.slideshow.isEnabled()
+    assert view._buttons.slideshow.toolTip() == "Trash doesn't play as a slideshow"
     view._slideshows.start()
 
-    qtbot.addWidget(view._slideshows.showing.shown)
-    assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"d1", "d2"}
-    view._slideshows.showing.close()
+    assert view._slideshows.showing is None
+
+
+def _emptied_db(workflow_name="sdxl_t2i"):
+    db = _trash_db(held=[("d1", _image("d1", "a cat", 50, 1) | {"workflow_name": workflow_name,
+                                                              "params_json": "{}"})])
+    record = db.get_trashed("d1")
+    db.record_trashed("d1", record["row"], {**record["batch"], "emptied": True})
+    return db
+
+
+_NO_SUCH_WORKFLOW = "made up workflow"
+
+
+def _in_the_trash(view, qtbot):
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
+
+
+def _restore_button(view):
+    return view._gallery_pane._thumb_widgets["d1"]._corner_buttons[0]
+
+
+def test_an_emptied_item_that_can_be_made_again_says_so_on_its_restore_button(qtbot):
+    view = GalleryView(_emptied_db())
+    _in_the_trash(view, qtbot)
+
+    assert _restore_button(view).isEnabled()
+    assert _restore_button(view).toolTip() == "Restore — make it again"
+
+
+def test_an_emptied_item_that_cannot_be_made_again_has_a_gray_restore_saying_why(qtbot):
+    view = GalleryView(_emptied_db(_NO_SUCH_WORKFLOW))
+    _in_the_trash(view, qtbot)
+
+    assert not _restore_button(view).isEnabled()
+    assert _restore_button(view).toolTip() == ("Origenerator doesn't have the workflow this was "
+                                               "made with, so it can't be made again")
+
+
+def test_an_item_with_its_files_keeps_its_restore_as_it_was(qtbot):
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    _in_the_trash(view, qtbot)
+
+    assert _restore_button(view).isEnabled()
+    assert _restore_button(view).toolTip() == "Restore — put it and its files back where they were"
+
+
+def test_restoring_an_emptied_item_asks_for_a_job_and_moves_no_files(qtbot):
+    actions = FakeActions()
+    view = GalleryView(_emptied_db(), actions=actions)
+    _in_the_trash(view, qtbot)
+    asked = []
+    view._jobs.regenerate = lambda _key, row: asked.append(row["prompt_id"])
+
+    view.restore_from_trash(["d1"])
+
+    assert asked == ["d1"]
+    assert actions.restored == [[]]
+
+
+def test_restoring_an_emptied_item_that_cannot_be_made_again_asks_for_nothing(qtbot):
+    view = GalleryView(_emptied_db(_NO_SUCH_WORKFLOW), actions=FakeActions())
+    _in_the_trash(view, qtbot)
+    asked = []
+    view._jobs.regenerate = lambda _key, row: asked.append(row)
+
+    view.restore_from_trash(["d1"])
+
+    assert asked == []
+
+
+def test_the_right_click_menu_grays_restore_when_nothing_picked_can_be_made_again(qtbot):
+    view = GalleryView(_emptied_db(_NO_SUCH_WORKFLOW))
+    _in_the_trash(view, qtbot)
+    menu = QMenu()
+
+    action = trash_collection.restore_action_on(menu, "Restore 1 item", [view.row_for("d1")])
+
+    assert not action.isEnabled()
+    assert "can't be made again" in action.toolTip()
 
 
 def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, monkeypatch):

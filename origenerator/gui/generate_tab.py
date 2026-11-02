@@ -97,12 +97,13 @@ from origenerator.image_states import state_names
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
-from origenerator.model_titles import model_title
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
+from origenerator.regeneration import MADE_ELSEWHERE_TIP, workflow_gone
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
+    named_models,
     not_installed,
     not_installed_advice,
     not_offered_advice,
@@ -152,9 +153,6 @@ _MODIFY_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
-_MADE_ELSEWHERE_TIP = "Another site made this — Origenerator can't remake it"
-
-
 @dataclass(frozen=True)
 class _RequestAim:
     """What the Request section asks its changes of: the image on display, the
@@ -183,18 +181,11 @@ def _lost_workflow_note(workflow_name: str) -> str:
 
 
 def _select_a_workflow_first(workflow_name: str) -> str:
-    retired = RETIRED_WORKFLOW_NAMES.get(workflow_name)
-    gone = (f"{retired} has been retired" if retired
-            else "Origenerator doesn't have the workflow this was made with")
-    return f"{gone} — select a workflow first"
-
-
-def _named_models(names: list[str]) -> str:
-    return spoken_list(map(model_title, names), "and")
+    return f"{workflow_gone(workflow_name)} — select a workflow first"
 
 
 def _not_installed_note(names: list[str]) -> str:
-    shown = _named_models(names)
+    shown = named_models(names)
     if len(names) == 1:
         return (f"This was made with {shown}, which isn't installed anymore, so no new ones "
                 "can be made with it until an installed one is picked in its place.")
@@ -203,7 +194,7 @@ def _not_installed_note(names: list[str]) -> str:
 
 
 def _pick_installed_ones_first(names: list[str]) -> str:
-    shown = _named_models(names)
+    shown = named_models(names)
     if len(names) == 1:
         return f"{shown} isn't installed anymore — pick an installed one first"
     return f"{shown} aren't installed anymore — pick installed ones first"
@@ -644,7 +635,7 @@ class GenerateTab(DropZones):
     def _why_generate_is_blocked(self) -> str | None:
         workflow = workflow_named(self._workflow_dropdown.currentData())
         if workflow is not None and not workflow.generates_here:
-            return _MADE_ELSEWHERE_TIP
+            return MADE_ELSEWHERE_TIP
         lost = self._lost_workflow()
         if lost is not None:
             return _select_a_workflow_first(lost)

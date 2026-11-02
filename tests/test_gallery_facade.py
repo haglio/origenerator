@@ -27,7 +27,7 @@ PUBLISHED = {
     "MATCH_SOURCE_MODEL", "MEDIA_LABELS", "MediaGroup", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_if_made",
-    "build_custom_collections", "build_gallery_tree", "build_image_config_index",
+    "build_custom_collections", "build_gallery_tree", "build_image_config_index", "image_config_index_of",
     "child_groups", "combined_params", "command_phrases", "config_folder_key",
     "config_folder_name",
     "generate_tab_title", "custom_folder_id",

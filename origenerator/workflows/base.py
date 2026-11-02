@@ -338,11 +338,11 @@ class WorkflowTemplate(ABC):
 
     def missing_inputs(self, params: dict) -> list[str]:
         """The labels of the images and videos ``params`` leave unpicked."""
-        return [label for key, label in self._input_params
+        return [label for key, label in self.input_params
                 if not str(params.get(key) or "").strip()]
 
     @cached_property
-    def _input_params(self) -> tuple[tuple[str, str], ...]:
+    def input_params(self) -> tuple[tuple[str, str], ...]:
         return tuple((pd.key, pd.label) for pd in self.param_definitions()
                      if pd.type in (ParamType.IMAGE, ParamType.VIDEO))
 

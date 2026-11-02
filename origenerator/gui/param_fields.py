@@ -325,4 +325,4 @@ def clamped_number(pd: ParamDef, value):
         value = max(pd.min_val, value)
     if pd.max_val is not None:
         value = min(pd.max_val, value)
-    return int(round(value)) if pd.type == ParamType.INT else float(value)
+    return round(value) if pd.type == ParamType.INT else float(value)

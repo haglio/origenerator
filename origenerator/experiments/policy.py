@@ -194,7 +194,7 @@ class ExperimentPolicy:
         if pd.step:
             value = pd.min_val + round((value - pd.min_val) / pd.step) * pd.step
             value = max(pd.min_val, min(pd.max_val, value))
-        return int(round(value)) if pd.type == ParamType.INT else round(value, 4)
+        return round(value) if pd.type == ParamType.INT else round(value, 4)
 
     def _pick_value(self, candidates, workflow, key, rows, *, pd=None,
                     value_of=lambda c: c, appeal=None):

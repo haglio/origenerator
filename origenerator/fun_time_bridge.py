@@ -161,6 +161,9 @@ class FunTimeBridge(QObject):
         if keyword == GO_TO and marker == "|":
             self._gallery.go_to_file(argument)
             return
+        self._apply_to_a_shape(line, keyword, marker, argument, said_at)
+
+    def _apply_to_a_shape(self, line: str, keyword: str, marker: str, argument: str, said_at: float | None) -> None:
         shape = shape_spoken_to(keyword, SHAPES)
         if shape is None:
             logger.warning("Unknown Fun Time verb dropped: %s", line)

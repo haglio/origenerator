@@ -249,6 +249,17 @@ def _is_deletable_folder(group) -> bool:
     )
 
 
+def _press_for_the_gallery(event, *, delete, copy_names, undo, redo):
+    control = event.modifiers() & Qt.KeyboardModifier.ControlModifier
+    if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
+        return delete
+    if event.key() == Qt.Key.Key_C and control:
+        return copy_names
+    if event.key() == Qt.Key.Key_Z and control:
+        return redo if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else undo
+    return None
+
+
 class GalleryView(QWidget):
     run_ended = pyqtSignal(object)
 
@@ -436,21 +447,11 @@ class GalleryView(QWidget):
                     and self.isVisible() and not self._other_window_owns_keys()):
                 self._open_find()
                 return True
-            if self._gallery_owns_keys():
-                if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
-                    self._delete_selection()
-                    return True
-                if (event.key() == Qt.Key.Key_C
-                        and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-                    self._copy_names_of_the_selection()
-                    return True
-                if (event.key() == Qt.Key.Key_Z
-                        and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-                    if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
-                        self._redo()
-                    else:
-                        self._undo()
-                    return True
+            if self._gallery_owns_keys() and (press := _press_for_the_gallery(
+                    event, delete=self._delete_selection, copy_names=self._copy_names_of_the_selection,
+                    undo=self._undo, redo=self._redo)):
+                press()
+                return True
             if (self._gallery_owns_keys(even_from_the_generate_pane=True)
                     and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
                     and apply_motion_key(self._osr2_motion, event.key(),

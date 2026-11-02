@@ -557,7 +557,7 @@
     "origenerator/gui/gallery_view.py": 2045,
     "origenerator/gui/generate_tab.py": 1116,
     "origenerator/gui/hud_queue.py": 474,
-    "origenerator/gui/job_queue.py": 572,
+    "origenerator/gui/job_queue.py": 569,
     "origenerator/gui/job_queue_view.py": 437,
     "origenerator/gui/param_form.py": 641,
     "origenerator/gui/viewport.py": 327,

@@ -54,6 +54,12 @@ _WASD_AS_ARROWS = {
 }
 
 
+def _sent_to_the_dashboard(shape: str) -> tuple[str, ...]:
+    return ("satellites_kino_activate", "origenerator_activate",
+            *(spelled_for(shape, verb)
+              for verb in ("prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash")))
+
+
 class SlideshowView(QWidget):
     def __init__(self, items, *, shape: str = "", start=None,
                  shuffle=None, actions=None, hud=None, versions=None, engine=None, motion=None,
@@ -173,33 +179,25 @@ class SlideshowView(QWidget):
 
     def _route(self, command: str) -> bool:
         verb, _, payload = command.partition("|")
+        action, path = shape_press(self._hud_shape, verb, payload)
         if verb in PRESSES_ON_THE_QUEUE:
             self.queue_foot.press(verb, payload)
-            return True
-        if verb == OMNIPAUSE_TOGGLE:
+        elif verb == OMNIPAUSE_TOGGLE:
             self._press_on_the_slide()
-            return True
-        action, path = shape_press(self._hud_shape, verb, payload)
-        if action in COLLAPSES or action == OPENS_IN:
+        elif action in COLLAPSES or action == OPENS_IN:
             self._place_here_or_out_there(command, action, path)
-            return True
-        if action in THE_SLIDESHOWS_OWN:
+        elif action in THE_SLIDESHOWS_OWN:
             answer(self.slideshow, action, path)
-            return True
-        if self.press_osr2_controls(verb):
-            return True
-        if action in _RATE_STEPS:
+        elif self.press_osr2_controls(verb):
+            pass
+        elif action in _RATE_STEPS:
             self._pane.channel.send(_RATE_STEPS[action])
-            return True
-        if self._dashboard_cmd_file is None:
+        elif self._dashboard_cmd_file is None:
             return self._action_here(action)
-        allowed = ("satellites_kino_activate", "origenerator_activate",
-                   *(spelled_for(self._hud_shape, verb)
-                     for verb in ("prev", "nudge_prev", "nudge_next", "next",
-                                  "funscript_jump", "lock", "trash")))
-        if command not in allowed:
+        elif command in _sent_to_the_dashboard(self._hud_shape):
+            append_command(self._dashboard_cmd_file, command)
+        else:
             return False
-        append_command(self._dashboard_cmd_file, command)
         return True
 
     def _place_here_or_out_there(self, command: str, action: str, corner: str) -> None:

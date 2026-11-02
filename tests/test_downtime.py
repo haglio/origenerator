@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import types
+from dataclasses import dataclass, field
 from unittest.mock import MagicMock, patch
 
 from origenerator import downtime, gallery
@@ -17,25 +18,24 @@ from tests.comfyui_folders import SUITE_FOLDERS
 _HANDS = types.SimpleNamespace(name="hands")
 
 
+@dataclass
 class _Machine:
-    def __init__(self, *, app_open=False, training=False, comfyui_busy=False, batches_due=False,
-                 fix=None, backfill_batches=0):
-        self.app_open = app_open
-        self.training = training
-        self.comfyui_busy = comfyui_busy
-        self.batches_due = batches_due
-        self.fix = fix
-        self.backfill_batches = backfill_batches
-        self.queued = 0
-        self.backfilled = 0
-        self.trained = []
+    app_open: bool = False
+    training: bool = False
+    comfyui_busy: bool = False
+    batches_due: bool = False
+    fix: object = None
+    backfill_batches: int = 0
+    queued: int = 0
+    backfilled: int = 0
+    trained: list = field(default_factory=list)
 
     def turn(self) -> downtime.Turn:
-        return downtime.take_a_turn(
+        return downtime.take_a_turn(downtime.Machine(
             app_open=lambda: self.app_open, training_running=lambda: self.training,
             comfyui_busy=lambda: self.comfyui_busy, batches_due=lambda: self.batches_due,
             queue_batches=self._queue, queue_more_backfill=self._backfill,
-            fix_to_train=lambda: self.fix, train=self._train)
+            fix_to_train=lambda: self.fix, train=self._train))
 
     def _queue(self) -> None:
         self.queued += 1

@@ -1,4 +1,3 @@
-"""The gallery search's matching layer, with no Qt and no network in sight."""
 from __future__ import annotations
 
 import json
@@ -11,7 +10,6 @@ from origenerator.generation_state import GenerationSource
 
 def _row(prompt_id, positive, *, negative="", seed=1, workflow="sdxl_t2i",
          params=None, output=True):
-    """One completed generation, as the database hands it over."""
     stored = {"positive_prompt": positive, "negative_prompt": negative, "seed": seed}
     stored.update(params or {})
     return {
@@ -36,8 +34,6 @@ def _hits(index, query, **kwargs):
     return [result.row["prompt_id"] for result in index.search(query, **kwargs).results]
 
 
-# --- the words a query is taken apart into ---------------------------------
-
 
 def test_stop_words_are_dropped_from_a_query():
     assert search.query_words("a pair of dolls on the beach") == (
@@ -45,7 +41,6 @@ def test_stop_words_are_dropped_from_a_query():
 
 
 def test_a_query_of_nothing_but_stop_words_keeps_them():
-    # Better to search for "the" than to answer a typed query with everything.
     assert search.query_words("the of") == ("the", "of")
 
 
@@ -69,9 +64,6 @@ def test_a_written_number_and_its_digit_are_one_key():
 
 
 def test_a_prompt_several_generations_share_is_not_taken_apart_per_generation(monkeypatch):
-    # Every seed of a settings folder carries the folder's prompt, and the index
-    # is rebuilt with the gallery, so taking one text apart once per row that
-    # says it was most of what a large library's first draw spent its time on.
     taken_apart = []
     words = search._words
     monkeypatch.setattr(search, "_words",
@@ -98,12 +90,8 @@ def test_a_word_two_prompts_share_is_not_stemmed_twice(monkeypatch):
     assert stemmed.about.get("vermilion", 0) <= 1
 
 
-# --- what counts as a match -------------------------------------------------
-
 
 def test_a_synonym_satisfies_a_term_the_prompt_never_used():
-    # The failure the whole module exists for: "two women" has to reach a run
-    # prompted "two dolls", which a substring filter never would.
     rows = [_row("g1", "two dolls on a couch"),
             _row("g2", "two tall ladies at the beach"),
             _row("g3", "a single lady in the rain"),
@@ -112,7 +100,6 @@ def test_a_synonym_satisfies_a_term_the_prompt_never_used():
 
 
 def test_every_word_of_the_query_has_to_be_satisfied():
-    # A superset of the query matches; a row missing one of its words does not.
     rows = [_row("g1", "a red lamp on a wooden table"),
             _row("g2", "a red lamp")]
     assert _hits(_index(rows), "red lamp table") == ["g1"]
@@ -126,8 +113,6 @@ def test_a_word_nothing_reaches_is_named_back():
 
 
 def test_a_query_whose_words_are_all_present_but_never_together_names_nothing():
-    # Both words are in the gallery, so neither is the one to drop — the pane
-    # says so differently, and it needs to be able to tell the two apart.
     rows = [_row("g1", "a red lamp"), _row("g2", "a wooden table")]
     outcome = _index(rows).search("lamp table")
     assert outcome.results == ()
@@ -135,33 +120,24 @@ def test_a_query_whose_words_are_all_present_but_never_together_names_nothing():
 
 
 def test_the_negative_prompt_is_not_searched():
-    # A negative prompt is the list of things a run was told to keep OUT, so
-    # every hit it produces is the opposite of what was asked for. Measured on a
-    # real library, three quarters of one query's results came from here.
     rows = [_row("g1", "a quiet street", negative="rain, blur"),
             _row("g2", "rain over a quiet street")]
     assert _hits(_index(rows), "rain") == ["g2"]
 
 
 def test_a_decimal_is_one_word_not_two():
-    # An emphasis weight — (term:1.2) — used to split off a bare "2", and a
-    # query's "two" folds to "2": searching for two of something matched every
-    # prompt that had ever weighted a term (52% of a real library).
     rows = [_row("g1", "a (red:1.2) lamp"), _row("g2", "two red lamps")]
     assert _hits(_index(rows), "two lamps") == ["g2"]
 
 
 def test_bare_numbers_in_a_model_name_are_not_searchable():
-    # A model filename is full of version parts, dates and counters, none of
-    # them anything anyone searches for, and all of them colliding with the
-    # digits a number word folds to. The names themselves stay reachable.
     rows = [_row("g1", "a quiet street", workflow="wan22_i2v", params={
         "unet_high": "example_2.2_high.safetensors",
         "unet_low": "example_2.2_low.safetensors",
     })]
     index = _index(rows)
-    assert _hits(index, "two streets") == []   # the "2" of the version doesn't count
-    assert _hits(index, "example") == ["g1"]   # the name itself still does
+    assert _hits(index, "two streets") == []
+    assert _hits(index, "example") == ["g1"]
 
 
 def test_a_model_or_lora_name_is_searchable():
@@ -279,16 +255,11 @@ def test_quoted_words_find_a_folder_named_with_them():
 
 
 def test_a_search_can_be_held_to_a_set_of_generations():
-    # The gallery's tree selection is the scope: standing in a folder asks the
-    # question there, and a hit outside it is not an answer.
     rows = [_row("g1", "a red lamp"), _row("g2", "a red lamp")]
     assert _hits(_index(rows), "lamp", within={"g2"}) == ["g2"]
 
 
 def test_a_word_outside_the_scope_still_counts_as_unmatched():
-    # The empty-result message is about the folder being searched, so a word
-    # that exists elsewhere in the library but not here has still reached
-    # nothing — and naming it is what tells the user to widen the folder.
     rows = [_row("g1", "a red lamp"), _row("g2", "a wooden table")]
     outcome = _index(rows).search("lamp", within={"g2"})
     assert outcome.results == ()
@@ -299,8 +270,6 @@ def test_an_empty_query_matches_nothing_rather_than_everything():
     rows = [_row("g1", "a quiet street")]
     assert _index(rows).search("   ") == search.SearchOutcome((), ())
 
-
-# --- the LLM tier only ever widens -----------------------------------------
 
 
 def test_a_volunteered_word_widens_the_match():
@@ -322,12 +291,8 @@ def test_an_expansion_for_a_word_not_in_the_query_is_ignored():
     assert _hits(_index(rows), "puppy", expansions={"cat": ["kitten"]}) == []
 
 
-# --- the index itself -------------------------------------------------------
-
 
 def test_only_generations_that_produced_something_are_searchable():
-    # Search is a way of finding something to look at; a failed or still-running
-    # run has nothing to show.
     rows = [_row("g1", "a red lamp"), _row("g2", "a red lamp", output=False)]
     assert _hits(_index(rows), "lamp") == ["g1"]
 
@@ -339,16 +304,12 @@ def test_a_hidden_starting_frame_is_never_found():
 
 
 def test_results_come_back_in_the_order_the_rows_were_given():
-    # The view hands them over newest-first and reads them straight out, so the
-    # index must not re-order them under its own scoring.
     rows = [_row("g3", "a red lamp"), _row("g1", "a red lamp"),
             _row("g2", "a red lamp")]
     assert _hits(_index(rows), "lamp") == ["g3", "g1", "g2"]
 
 
 def test_a_re_index_keeps_the_words_and_takes_the_fresh_row():
-    # A poll rewrites every row dict without touching the text in it, which is
-    # what makes reusing the tokenized entry safe — and worth doing.
     first = _row("g1", "a red lamp")
     index = _index([first])
     updated = dict(first, starred=1)
@@ -363,8 +324,6 @@ def test_a_generation_that_leaves_the_gallery_leaves_the_index():
     assert _hits(index, "lamp") == []
 
 
-# --- grouping the results by the model and LoRA that made them -------------
-
 
 def _lora_row(prompt_id, lora, prompt="a quiet street"):
     return _row(prompt_id, prompt, workflow="wan22_i2v", params={
@@ -375,31 +334,22 @@ def _lora_row(prompt_id, lora, prompt="a quiet street"):
     })
 
 
-# --- the names the user gave the folders a row sits in ----------------------
-
 
 def test_a_folder_name_finds_what_is_in_it():
-    # A name is typed onto a folder so the folder can be found again, so the
-    # words of that name reach every generation under it — even one whose own
-    # prompt says nothing of the kind.
     rows = [_row("a", "a cat on a windowsill"), _row("b", "a dog in a field")]
     index = _index(rows, {"a": ["Keepers from the beach trip"]})
 
     assert _hits(index, "beach trip") == ["a"]
-    assert _hits(index, "beach cat") == ["a"]      # name and prompt, together
+    assert _hits(index, "beach cat") == ["a"]
 
 
 def test_a_folder_name_reaches_related_words_like_a_prompt_does():
-    # It goes through the same widening the prompt does, so a name is findable
-    # by the word you remember rather than only the word you typed.
     index = _index([_row("a", "a portrait")], {"a": ["two women"]})
 
     assert _hits(index, "pair") == ["a"]
 
 
 def test_renaming_a_folder_is_searchable_at_once():
-    # The names are the one part of an entry that isn't a property of the row,
-    # so a re-index takes them fresh rather than keeping the cached ones.
     rows = [_row("a", "a cat")]
     index = search.GallerySearch()
     index.update(rows, {"a": ["Rejects"]})
@@ -408,7 +358,7 @@ def test_renaming_a_folder_is_searchable_at_once():
     index.update(rows, {"a": ["Keepers"]})
 
     assert _hits(index, "keepers") == ["a"]
-    assert _hits(index, "rejects") == []       # and the old name stops answering
+    assert _hits(index, "rejects") == []
 
 
 def test_an_unnamed_folders_row_is_reached_by_no_name():
@@ -428,8 +378,6 @@ def test_results_group_under_one_heading_per_model_and_lora():
 
 
 def test_the_biggest_combination_leads():
-    # The combination you use most is the one you are most likely reading through,
-    # and it makes a one-off read as the outlier it is.
     rows = [_lora_row("g1", "emberstyle"), _lora_row("g2", "driftstyle"),
             _lora_row("g3", "driftstyle"), _lora_row("g4", "driftstyle")]
     sections = search.group_by_model_lora(_index(rows).search("street").results)
@@ -442,17 +390,13 @@ def test_a_heading_names_both_the_model_and_the_lora():
     assert "driftstyle_high" in heading
 
 
-# --- the synonym table -------------------------------------------------------
-
 
 def test_an_overlay_group_extends_a_built_in_one_it_shares_a_word_with():
     synonyms = search._synonym_index((("doll", "marionette"),))
-    assert "marionette" in synonyms["woman"]  # reached through the shared "doll"
+    assert "marionette" in synonyms["woman"]
 
 
 def test_a_multi_word_overlay_entry_is_dropped_rather_than_shredded():
-    # Shredding it would teach that "form" means "alpha"; matching is word by
-    # word, so a two-word synonym could never be reached anyway.
     synonyms = search._synonym_index((("alpha", "alpha form"),))
     assert "form" not in synonyms
 
@@ -460,8 +404,6 @@ def test_a_multi_word_overlay_entry_is_dropped_rather_than_shredded():
 def test_a_one_word_group_widens_nothing():
     assert "solo" not in search._synonym_index((("solo",),))
 
-
-# --- talking to the model ----------------------------------------------------
 
 
 def _completion(content):
@@ -488,8 +430,6 @@ def test_a_widening_reply_wrapped_in_prose_still_parses():
 
 
 def test_a_widening_keeps_only_single_words_that_were_asked_about():
-    # A phrase can never be reached, the search word itself adds nothing, and a
-    # key of the model's own invention would widen a word nobody typed.
     parsed = search.parse_expansion(
         _completion('{"women": ["dolls", "young women", "women"], '
                     '"boys": ["lads"]}'),
@@ -539,3 +479,21 @@ def test_quoted_words_are_never_sent_to_the_model_to_widen(monkeypatch):
         '"two lamps"', base_url="http://localhost:1", model="m", system_prompt="R")
 
     assert calls == []
+
+
+def test_both_is_not_a_count_of_two():
+    rows = [_row("g1", "she holds a cup in both hands"), _row("g2", "a pair of cups")]
+    assert _hits(_index(rows), "two cups") == ["g2"]
+
+
+def test_a_prompt_held_only_in_the_params_is_searchable():
+    row = _row("g1", "", params={"positive_prompt": "a red lamp"})
+    row["positive_prompt"] = None
+    assert _hits(_index([row]), "lamp") == ["g1"]
+
+
+def test_combinations_of_equal_size_are_ordered_alphabetically():
+    rows = [_lora_row("g1", "emberstyle"), _lora_row("g2", "driftstyle")]
+    sections = search.group_by_model_lora(_index(rows).search("street").results)
+    headings = [heading for heading, _ in sections]
+    assert headings == sorted(headings)

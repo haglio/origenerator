@@ -76,7 +76,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
 
     def build_api_payload(self, params: dict) -> dict:
         refs = NodeRefs(image=["1", 0], model=["2", 0], positive=["3", 0],
-                        negative=["4", 0], vae=["5", 0], clip=["2", 1])
+                        negative=["4", 0], vae=["5", 0], clip_ref=["2", 1])
         enhanced = self.enhance_image_nodes(refs, params, rescale_to=override_size(params))
         detail, saved_ref = self.detail_fix_nodes(replace(refs, image=enhanced.image), params)
         return {

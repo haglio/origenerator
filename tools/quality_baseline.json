@@ -546,7 +546,7 @@
     "tests/test_training_run.py": 1
   },
   "statements": {
-    "origenerator/app.py": 430,
+    "origenerator/app.py": 429,
     "origenerator/gui/combine_controller.py": 342,
     "origenerator/gui/enhance_controller.py": 310,
     "origenerator/gui/enhance_pane.py": 528,

@@ -644,3 +644,14 @@ def test_post_device_action_answers_false_and_touches_nothing_for_a_verb_that_is
 
     assert not post_device_action(verb, motion=motion)
     assert motion.calls == []
+
+
+def test_the_panel_follows_the_device_again_once_the_app_has_finished_re_aiming_it(qtbot):
+    control = FakeControl(state=OSR2_DRIVING)
+    controls, _motion = _controls(qtbot, control=control)
+    controls.show()
+    controls._repaint.stop()
+
+    control.settled.emit()
+
+    assert controls._repaint.isActive()

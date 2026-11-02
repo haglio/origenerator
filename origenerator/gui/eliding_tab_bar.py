@@ -8,33 +8,18 @@ from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 from origenerator.gallery.item_numbers import widest_item_name
 from origenerator.gui.icons import tab_close_icon
 
-# How much wider than its mark a tab's close button sits, so the ✕ isn't flush
-# against the tab's right edge.
 _CLOSE_PADDING = GAP_MEDIUM
 
-# How far a tab's marks sit from its edges, and from the label between them:
-# the same at both ends, so a tab's two ends are one spacing rather than two.
 EDGE = MARGIN_STANDARD
 
-# The square a tab's mark is drawn in, whatever shape the thumbnail is, and the
-# canvas it rides on. The canvas is wider than the square by the gap the label
-# needs, because Qt's own tab layout puts the text a fixed _QT_LABEL_GAP after
-# whatever the icon measures and offers no way to say otherwise — so the mark
-# carries the rest of that gap itself, as transparency.
+# Qt's tab layout puts the label a fixed _QT_LABEL_GAP after the icon, so the
+# mark's canvas carries the rest of the label gap as transparency.
 MARK = 20
 _QT_LABEL_GAP = 4  # QCommonStylePrivate::tabLayout's, not ours to set
 MARK_CANVAS = QSize(MARK + EDGE - _QT_LABEL_GAP, MARK)
 
 
 def tab_mark(icon: QIcon) -> QIcon:
-    """``icon`` as a tab wears it: square, and trailing the gap its label needs.
-
-    Squared by filling rather than fitting, so every tab's mark is the same
-    width and the row's spacing doesn't shift with a thumbnail's shape — at this
-    size a thumbnail is a swatch, and what the crop takes off its sides is not
-    anything the eye was reading. A null icon stays null: a tab that has nothing
-    to show wears nothing, rather than an empty square where a thumbnail goes.
-    """
     if icon.isNull():
         return icon
     # Ask big, then fill: QIcon won't scale a pixmap up, so this is whatever the
@@ -54,28 +39,17 @@ def tab_mark(icon: QIcon) -> QIcon:
 
 
 class _PreviewTabStyle(QProxyStyle):
-    """Draws one tab's label slanted — the IDE mark for a tab held only until the
-    next one is clicked.
+    """Draws one tab's label slanted.
 
-    Qt offers no per-tab font: ``QStyleOptionTab`` carries no font, and a font set
-    on the bar itself is overwritten by the app's stylesheet at every polish. So
-    the slant is applied at the last point that sees one label at a time. Every
-    tab label, however the style draws the tab around it, reaches ``drawItemText``
-    with the label's own rect — enough to tell which tab is being painted.
-
-    Each label sets the flag either way rather than only slanting the preview
-    one: the painter carries its font from one label to the next, so an italic
-    left in place would spread down the row.
+    ``QStyleOptionTab`` carries no font, and the app's stylesheet overwrites a font set on the
+    bar at every polish, so the slant is applied in ``drawItemText``, which receives each label's rect.
     """
 
     def __init__(self, bar: ElidingTabBar):
         super().__init__()
         self._bar = bar
-        # Parented to the bar on purpose. Setting an app stylesheet re-wraps every
-        # widget's own style in a QStyleSheetStyle, and QProxyStyle takes ownership
-        # of a base style that has no parent — so an unparented proxy gets deleted
-        # out from under Python the first time a stylesheet is applied, and the
-        # next thing to touch it faults. Owned by the bar, it is left alone.
+        # QProxyStyle takes ownership of a parentless base style, which a stylesheet
+        # then re-wraps and deletes out from under Python.
         self.setParent(bar)
 
     def drawItemText(self, painter, rect, flags, palette, enabled, text,
@@ -89,51 +63,22 @@ class _PreviewTabStyle(QProxyStyle):
 
 
 class ElidingTabBar(QTabBar):
-    """A tab bar that keeps every tab on screen at once, and marks the preview one.
-
-    Each tab is capped at the width the widest name an item can wear needs, with
-    a longer label elided, so a long title takes only its share of the row
-    instead of stretching the tab. When
-    more tabs open than fit even at that width, they collapse further — down to
-    an equal share of the bar — rather than disappearing under scroll buttons.
-
-    An empty bar still asks for the height it had while it held tabs, so a bar
-    that momentarily empties doesn't collapse the row it stands in.
-
-    One tab at a time may be the *preview* tab (:meth:`set_preview_index`), drawn
-    in italic: the container replaces it on the next click rather than opening
-    another beside it, and the slant is how that shows.
-
-    Each tab carries a close button of this bar's own rather than the stock one,
-    which the platform style paints red on the tab in front and pushes flush
-    against its right edge. Ours is the same mark at every position, padded off
-    the edge.
-    """
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setElideMode(Qt.TextElideMode.ElideRight)
         self.setUsesScrollButtons(False)
-        self._row_height = 0  # what one tab measured; the row an empty bar holds
+        self._row_height = 0
         self._preview_index = -1
-        self._preview_style = _PreviewTabStyle(self)  # parents itself to this bar
+        self._preview_style = _PreviewTabStyle(self)
         self.setStyle(self._preview_style)
 
-    # --- the preview tab ----------------------------------------------------
-
     def set_preview_index(self, index: int):
-        """Mark the tab at ``index`` as the preview one — ``-1`` for none."""
         if index == self._preview_index:
             return
         self._preview_index = index
         self.update()
 
     def rect_is_preview_tab(self, rect) -> bool:
-        """Is ``rect`` — a label about to be painted — inside the preview tab?
-
-        Matched by position because that is all the drawing call carries; a title
-        would not do, since two tabs can be named the same.
-        """
         if not 0 <= self._preview_index < self.count():
             return False
         return self.tabRect(self._preview_index).contains(rect.center())
@@ -141,18 +86,12 @@ class ElidingTabBar(QTabBar):
     def sizeHint(self):
         size = super().sizeHint()
         if self.count() > 0:
-            self._row_height = size.height()  # remember the row a tab asks for
+            self._row_height = size.height()
         else:
             size.setHeight(self._row_height)
         return size
 
     def minimumSizeHint(self):
-        # The row divides whatever width it is given among its tabs (see
-        # minimumTabSizeHint), so it has no width of its own to insist on: how
-        # narrow the pane may go is its contents' to say. Qt's own answer adds
-        # those shares up, which makes the floor a reading of the width the row
-        # happens to have — and a floor like that rises again every time the pane
-        # grows the few pixels to meet it.
         size = super().minimumSizeHint()
         size.setWidth(0)
         if self.count() == 0:
@@ -169,14 +108,9 @@ class ElidingTabBar(QTabBar):
 
     def minimumTabSizeHint(self, index):
         size = super().minimumTabSizeHint(index)
-        # Let a tab shrink to no more than an equal share of the bar, so every
-        # tab keeps a place as more are opened — the row packs them tighter rather
-        # than pushing the overflow off the edge (there are no scroll buttons).
         if self.count() > 0 and self.width() > 0:
             size.setWidth(min(size.width(), self.width() // self.count()))
         return size
-
-    # --- closing a tab: its own ✕, or a middle click on it -------------------
 
     def tabInserted(self, index: int):
         super().tabInserted(index)
@@ -185,7 +119,6 @@ class ElidingTabBar(QTabBar):
                               self._close_button())
 
     def _close_button(self) -> QToolButton:
-        """A tab's ✕: the style's own mark, unchanging, padded off the tab edge."""
         mark = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
         button = QToolButton(self)
         button.setObjectName("tabCloseButton")
@@ -198,11 +131,6 @@ class ElidingTabBar(QTabBar):
         return button
 
     def _close_clicked(self, button):
-        """Ask for whichever tab is wearing this button now to close.
-
-        Its index is looked up rather than captured: tabs shift as their
-        neighbors close, and a captured one would soon name someone else.
-        """
         for index in range(self.count()):
             if self.tabButton(index, QTabBar.ButtonPosition.RightSide) is button:
                 self.tabCloseRequested.emit(index)

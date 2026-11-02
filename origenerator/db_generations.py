@@ -1,11 +1,3 @@
-"""Every image and video this app knows about: one row per generation.
-
-A row carries the run that made it (the workflow and its params, the prompts, the
-seed), what became of it (status, output files, thumbnail, how long it took), and
-the marks the user and the two export lanes leave on it. The DDL and the column
-list are in :mod:`origenerator.db_schema`; evolver reads seven of these columns
-read-only, so tests/test_db_schema.py holds them.
-"""
 from __future__ import annotations
 
 import json
@@ -21,21 +13,12 @@ from origenerator.generation_state import (
     GenerationStatus,
 )
 
-#: The columns :meth:`GenerationStore.update_generation` writes: a job's
-#: lifecycle, from queued to finished or failed. Everything else on the row is
-#: either provenance -- the workflow, its params, the prompts, the seed, all
-#: fixed when the job was submitted -- or a mark the user or an export lane
-#: leaves, and each of those has its own named method below. So a key outside
-#: this set is a caller reaching for the wrong method, which is worth saying.
 LIFECYCLE_COLUMNS = frozenset({
     "status", "output_files", "original_files", "enhance_history",
     "thumbnail_path", "error_message", "completed_at", "duration_seconds",
     "progress_json",
 })
 
-#: Set while a sibling app is holding a copy of the row's video, one column per
-#: lane it can be sent down (:meth:`GenerationStore._record_send` clears it
-#: again when the send is taken back).
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 _KNOWN_SOURCES = tuple(GenerationSource)
@@ -66,8 +49,6 @@ def _read_whole(prompt: str | None) -> str | None:
 
 
 class GenerationStore(Store):
-    """The queries over the `generations` table."""
-
     def __init__(self, file: SqliteFile):
         super().__init__(file)
         self._version = file.version
@@ -75,13 +56,6 @@ class GenerationStore(Store):
         self._listing = threading.Lock()
 
     def _set(self, prompt_id: str, column: str, value):
-        """Write one column outside :data:`LIFECYCLE_COLUMNS`.
-
-        *column* is interpolated into the statement, which is safe because every
-        one is a literal written below and a real column of the table --
-        tests/test_db_stores.py reads that off this file's syntax tree rather
-        than leaving it to care.
-        """
         with self._connect() as conn:
             conn.execute(
                 f"UPDATE generations SET {column} = ? WHERE prompt_id = ?",
@@ -89,9 +63,6 @@ class GenerationStore(Store):
             )
 
     def _stamp(self, prompt_id: str, column: str):
-        """Set one column to now. A marker whose value is only ever tested for
-        presence; the database's clock, so the stamp reads the same as every
-        other one on the row."""
         with self._connect() as conn:
             conn.execute(
                 f"UPDATE generations SET {column} = datetime('now')"
@@ -101,9 +72,6 @@ class GenerationStore(Store):
 
     def _record_send(self, prompt_id: str, at_column: str, unsent_column: str,
                      *, sent: bool):
-        """Say whether a sibling app is holding this video — both stamps at once,
-        because half-written the row would either hide a copy the sibling still
-        holds or condemn one that was just handed over."""
         held, taken_back = ("datetime('now')", "NULL") if sent else ("NULL", "datetime('now')")
         with self._connect() as conn:
             conn.execute(
@@ -140,12 +108,6 @@ class GenerationStore(Store):
             )
 
     def update_generation(self, prompt_id: str, **fields):
-        """Move a job along: any of :data:`LIFECYCLE_COLUMNS`, in one statement.
-
-        A column outside that set is refused by name rather than dropped, because
-        the drop was silent. Callers build the field dict conditionally, so no
-        fields at all is a normal outcome and stays a no-op.
-        """
         refused = set(fields) - LIFECYCLE_COLUMNS
         if refused:
             raise ValueError(
@@ -163,19 +125,9 @@ class GenerationStore(Store):
             )
 
     def set_workflow_name(self, prompt_id: str, workflow_name: str):
-        """Correct a row's workflow_name (e.g. backfilling 'unknown' imports).
-
-        Its own method rather than a key of update_generation, which writes a
-        job's lifecycle and not its provenance.
-        """
         self._set(prompt_id, "workflow_name", workflow_name)
 
     def set_params_json(self, prompt_id: str, params_json: str):
-        """Rewrite a row's params_json (e.g. backfilling model/LoRA onto imports).
-
-        Its own method rather than a key of update_generation: the params are
-        provenance, normally fixed at insert time.
-        """
         self._set(prompt_id, "params_json", params_json)
 
     def set_params_and_workflow(self, prompt_id: str, *, params_json: str, workflow_json: str):
@@ -187,10 +139,6 @@ class GenerationStore(Store):
 
     def set_settings_source(self, prompt_id: str, *, category: str | None = None,
                             video_prompt_id: str | None = None):
-        """Record where a combine launch got its settings: the action picked in the
-        dropdown, and the video whose settings the run re-uses. Written after the
-        launch, because only the caller that built the combination knows either;
-        empty values are stored as NULL, so each records the half it has."""
         with self._connect() as conn:
             conn.execute(
                 "UPDATE generations SET recipe_category = ?, recipe_video_id = ? "
@@ -199,15 +147,6 @@ class GenerationStore(Store):
             )
 
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
-        """Record which image the standalone enhance ``prompt_id`` is of.
-
-        Written straight after the launch, like :meth:`set_settings_source`: the
-        row goes in as the job is submitted, and only the caller that chose the
-        image knows which row it was. The run's params name a *file*, and a
-        file name can belong to more than one row; this is the one thing on the
-        run that names the row. Separate from ``update_generation``, whose
-        allowlist excludes provenance fields.
-        """
         with self._connect() as conn:
             conn.execute(
                 "UPDATE generations SET enhance_of = ? WHERE prompt_id = ?",
@@ -215,9 +154,6 @@ class GenerationStore(Store):
             )
 
     def set_provenance(self, blocks: dict[str, str]):
-        """Write each row's provenance block, keyed by prompt_id, in one
-        transaction: the first launch after this shipped writes every row in
-        the library, and a commit apiece took half a minute of it."""
         with self._connect() as conn:
             conn.executemany(
                 "UPDATE generations SET provenance = ? WHERE prompt_id = ?",
@@ -236,25 +172,12 @@ class GenerationStore(Store):
             )
 
     def set_generation_favorite(self, prompt_id: str, favorite: bool):
-        """Favorite (or unfavorite) one generation — the user's per-item favorite.
-
-        Its own method rather than a key of update_generation, which covers a
-        job's lifecycle rather than a user gesture like this.
-        """
         self._set(prompt_id, "starred", 1 if favorite else 0)
 
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
-        """Record the user's review of a background experiment: ``'up'`` (keep),
-        ``'down'`` (reject), or ``None`` (back to unreviewed — an undone verdict).
-
-        Its own method rather than a key of update_generation, which covers a
-        job's lifecycle rather than a user gesture like this.
-        """
         self._set(prompt_id, "experiment_verdict", verdict)
 
     def set_image_state(self, prompt_id: str, state: str | None):
-        """Record what a still image was sorted as showing, or ``None`` to take
-        the sorting back, which puts it among the ones still to be looked at."""
         self._set(prompt_id, "picture_state", state or None)
 
     def set_action(self, prompt_id: str, action: str | None):
@@ -289,59 +212,25 @@ class GenerationStore(Store):
         self._set(prompt_id, "fun_time_favorite_owed", 0)
 
     def mark_evolver_exported(self, prompt_id: str):
-        """Record that this generation's video was sent to Evolver's inbox.
-
-        Stamps the current time so the gallery remembers the send across
-        sessions, and retracts any earlier withdrawal in the same write: a video
-        handed over again must not still be down for deletion.
-        """
         self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",
                           sent=True)
 
     def mark_evolver_unsent(self, prompt_id: str):
-        """Take that send back: Evolver is to delete every copy it holds.
-
-        The send was a file copy into another app's folders, so undoing it is a
-        file delete, and only that app can find the copies — it has sorted,
-        upscaled and re-filed them since. This stamp is the whole of the ask, and
-        Evolver reads it out of this table on its next run.
-        """
         self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",
                           sent=False)
 
     def mark_genau_exported(self, prompt_id: str):
-        """Record that this generation's video was sent down the Genau lane.
-
-        The twin of :meth:`mark_evolver_exported`, down to retracting a
-        withdrawal: the two lanes are separate errands and each keeps its own
-        pair of stamps.
-        """
         self._record_send(prompt_id, "genau_exported_at", "genau_unsent_at",
                           sent=True)
 
     def mark_genau_unsent(self, prompt_id: str):
-        """Take the Genau send back — the twin of :meth:`mark_evolver_unsent`.
-
-        A video this far down the lane has left the pipeline for the folder Genau
-        plays from, which is the reason the delete cannot be done from here.
-        """
         self._record_send(prompt_id, "genau_exported_at", "genau_unsent_at",
                           sent=False)
 
     def mark_genau_requested(self, prompt_id: str):
-        """Record that a spoken animation started this run.
-
-        Stamped at launch, read at completion: it is what tells the finished video
-        to hand itself to the Genau lane without a second ask.
-        """
         self._stamp(prompt_id, "genau_requested_at")
 
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
-        """Most-recent measured generation times for a workflow, newest first.
-
-        Only completed rows with a recorded ``duration_seconds`` count, so the
-        result feeds duration estimates directly.
-        """
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT duration_seconds FROM generations
@@ -355,11 +244,6 @@ class GenerationStore(Store):
             return [r[0] for r in rows]
 
     def completed_without_duration(self) -> list[dict]:
-        """Completed rows that have a finish time but no recorded duration.
-
-        These are the candidates for log-based backfill: their ``completed_at``
-        (the output file's mtime) is what a log line gets matched against.
-        """
         with self._connect() as conn:
             rows = conn.execute(
                 f"""SELECT * FROM generations
@@ -374,15 +258,6 @@ class GenerationStore(Store):
             return [as_read(r) for r in rows]
 
     def highest_id_issued(self) -> int:
-        """The largest id this table has ever handed out, deleted rows included.
-
-        ``max(id)`` answers what is still here; the gap between the two is every
-        row that has been and gone, such as the transient row an enhancement runs
-        under. AUTOINCREMENT keeps the real high-water mark in ``sqlite_sequence``,
-        which says whether an id recorded elsewhere could ever have been one of
-        this table's own (:func:`~origenerator.branch_session.disown_foreign_runs`).
-        A table that has issued nothing answers 0.
-        """
         with self._connect() as conn:
             for sql in ("SELECT seq FROM sqlite_sequence WHERE name = 'generations'",
                         "SELECT max(id) FROM generations"):
@@ -398,12 +273,6 @@ class GenerationStore(Store):
             )
 
     def restore_generation(self, row: dict):
-        """Re-insert a row captured by ``get_generation``, exactly as it was.
-
-        Unlike ``insert_generation``, this writes every column present in
-        ``row`` — including the original ``id`` and ``created_at`` — so an undone
-        deletion reappears in its former gallery position rather than on top.
-        """
         self.insert_rows([row])
 
     def insert_rows(self, rows: list[dict]):

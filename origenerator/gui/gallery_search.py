@@ -18,29 +18,21 @@ _SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_MODEL_LOR
 
 
 class SearchHost(Protocol):
-    def search_scope(self):
-        pass
+    def search_scope(self): ...
 
-    def image_config_index(self) -> dict:
-        pass
+    def image_config_index(self) -> dict: ...
 
-    def group_for_key(self, key: str):
-        pass
+    def group_for_key(self, key: str): ...
 
-    def show_search_results(self, tiles, **terms) -> None:
-        pass
+    def show_search_results(self, tiles, **terms) -> None: ...
 
-    def name_search_on_screen(self, query: str, scope) -> None:
-        pass
+    def name_search_on_screen(self, query: str, scope) -> None: ...
 
-    def search_results_drawn(self) -> None:
-        pass
+    def search_results_drawn(self) -> None: ...
 
-    def hand_pane_back(self) -> None:
-        pass
+    def hand_pane_back(self) -> None: ...
 
-    def suppress_history(self):
-        pass
+    def suppress_history(self): ...
 
 
 class GallerySearchController(QObject):

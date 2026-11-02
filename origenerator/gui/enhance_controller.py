@@ -74,26 +74,19 @@ class Offer(NamedTuple):
 
 
 class EnhanceHost(Protocol):
-    def selected_prompt_ids(self) -> list[str]:
-        pass
+    def selected_prompt_ids(self) -> list[str]: ...
 
-    def row_for(self, prompt_id: str) -> dict | None:
-        pass
+    def row_for(self, prompt_id: str) -> dict | None: ...
 
-    def image_rows(self) -> list[dict]:
-        pass
+    def image_rows(self) -> list[dict]: ...
 
-    def image_config_index(self) -> dict:
-        pass
+    def image_config_index(self) -> dict: ...
 
-    def current_group(self):
-        pass
+    def current_group(self): ...
 
-    def typical_run_seconds(self, job) -> float | None:
-        pass
+    def typical_run_seconds(self, job) -> float | None: ...
 
-    def enhance_offer_changed(self) -> None:
-        pass
+    def enhance_offer_changed(self) -> None: ...
 
 
 class EnhanceController:

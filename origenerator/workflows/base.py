@@ -212,12 +212,10 @@ class WorkflowTemplate(ABC):
     base_output_node_id: str | None = None
 
     @abstractmethod
-    def default_params(self) -> dict:
-        pass
+    def default_params(self) -> dict: ...
 
     @abstractmethod
-    def param_definitions(self) -> list[ParamDef]:
-        pass
+    def param_definitions(self) -> list[ParamDef]: ...
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
         if not self.derives_size_from_input:
@@ -252,8 +250,7 @@ class WorkflowTemplate(ABC):
         return named + self.extra_enhance_keys
 
     @abstractmethod
-    def build_api_payload(self, params: dict) -> dict:
-        pass
+    def build_api_payload(self, params: dict) -> dict: ...
 
     def tells_a_story(self) -> bool:
         return any(pd.type == ParamType.SCENES for pd in self.param_definitions())

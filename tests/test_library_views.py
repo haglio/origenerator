@@ -3,16 +3,16 @@ from __future__ import annotations
 import json
 
 from origenerator import gallery
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.library_views import LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def _image(db, prompt_id, seed):
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), seed=seed)
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version,
-                         params_json=json.dumps(params), workflow_json="{}")
+                         params_json=json.dumps(params), workflow_json="{}"))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": f"{prompt_id}.png",
                                                    "subfolder": "image"}]))

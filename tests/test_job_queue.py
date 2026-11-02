@@ -14,7 +14,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator import config, gallery
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
@@ -354,10 +354,10 @@ def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
-    db.insert_generation(prompt_id="exp-rr", workflow_name="sdxl_t2i", workflow_version="v",
+    db.insert_generation(NewGeneration(prompt_id="exp-rr", workflow_name="sdxl_t2i", workflow_version="v",
                          positive_prompt="x", seed=1,
                          params_json=json.dumps({**wf.default_params(), "seed": 1}),
-                         workflow_json="{}", source="experiment")
+                         workflow_json="{}", source="experiment"))
     db.update_generation("exp-rr", status="running")
     queue.reconnect_running()
 
@@ -406,10 +406,10 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
-    db.insert_generation(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
+    db.insert_generation(NewGeneration(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
                          positive_prompt="x", seed=1,
                          params_json=json.dumps({**wf.default_params(), "seed": 1}),
-                         workflow_json="{}")
+                         workflow_json="{}"))
     db.update_generation("rr", status="running", progress_json=json.dumps(
         {"last_progress": [30, 50],
          "tracker": {"total": 50, "banked": 0, "stage_max": 50, "last_value": 30}}))
@@ -953,9 +953,9 @@ def _pending_row(db, prompt_id, workflow_name="wan22_i2v", params=None):
     workflow = WORKFLOW_REGISTRY.get(workflow_name)
     if params is None:
         params = dict(workflow.default_params()) if workflow is not None else {}
-    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow_name,
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow_name,
                          workflow_version="v", positive_prompt="x", seed=1,
-                         params_json=json.dumps(params), workflow_json="{}")
+                         params_json=json.dumps(params), workflow_json="{}"))
 
 
 def test_a_queue_held_when_the_app_closed_comes_back_as_a_queue(qtbot, tmp_path):
@@ -1632,9 +1632,9 @@ def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_pa
     client.executing_prompts.return_value = {"v-old"}
     db = Database(tmp_path / "test.db")
     for pid in ("v-old", "v-new"):
-        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="wan22_i2v",
                              workflow_version=_I2V.version, positive_prompt="x", seed=1,
-                             params_json=json.dumps(_params(seed=1)), workflow_json="{}")
+                             params_json=json.dumps(_params(seed=1)), workflow_json="{}"))
         db.update_generation(pid, status="running")
     queue = JobQueue(db, client)
     queue.reconnect_running()
@@ -1651,9 +1651,9 @@ def test_a_restart_takes_back_every_job_comfyui_holds_but_is_not_making(qtbot, t
     client.executing_prompts = MagicMock(return_value={"v-old"})
     db = Database(tmp_path / "test.db")
     for pid in ("v-old", "v-new"):
-        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="wan22_i2v",
                              workflow_version=_I2V.version, positive_prompt="x", seed=1,
-                             params_json=json.dumps(_params(seed=1)), workflow_json="{}")
+                             params_json=json.dumps(_params(seed=1)), workflow_json="{}"))
         db.update_generation(pid, status="running")
     queue = JobQueue(db, client)
 
@@ -1670,9 +1670,9 @@ def test_the_run_comfyui_is_making_is_the_front_of_the_line(qtbot, tmp_path):
     client.executing_prompts.return_value = {"v-new"}
     db = Database(tmp_path / "test.db")
     for pid in ("v-old", "v-new"):
-        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="wan22_i2v",
                              workflow_version=_I2V.version, positive_prompt="x", seed=1,
-                             params_json=json.dumps(_params(seed=1)), workflow_json="{}")
+                             params_json=json.dumps(_params(seed=1)), workflow_json="{}"))
         db.update_generation(pid, status="running")
     queue = JobQueue(db, client)
     queue.reconnect_running()
@@ -2074,8 +2074,8 @@ _PLAIN = {"filename": "image_00001_.png", "subfolder": "image", "type": "output"
 
 
 def _image(db, *, enhanced=False):
-    db.insert_generation(prompt_id="image", workflow_name=_IMAGE_WF, workflow_version="v",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="image", workflow_name=_IMAGE_WF, workflow_version="v",
+                         params_json="{}", workflow_json="{}"))
     db.update_generation(
         "image", status="completed",
         output_files=json.dumps([_ENHANCED, _PLAIN] if enhanced else [_PLAIN]),

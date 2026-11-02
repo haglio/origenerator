@@ -13,6 +13,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from origenerator import comfyui_api, provenance, speech
 from origenerator.completion import animate_before_filing, extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, THUMB_DIR
+from origenerator.db import NewGeneration, NewSeedUse
 from origenerator.file_refs import frame_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
@@ -53,7 +54,7 @@ _NO_OUTPUT_MESSAGE = "The run ended without producing an output file (interrupte
 
 def insert_generation_row(db, job):
     params = job.params
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=job.prompt_id,
         workflow_name=job.workflow.name,
         workflow_version=job.workflow.version,
@@ -65,7 +66,7 @@ def insert_generation_row(db, job):
         source=job.source,
         provenance=json.dumps(provenance.at_launch(job.workflow)),
         shielded=job.shielded,
-    )
+    ))
 
 
 def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
@@ -77,9 +78,9 @@ def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
     width, height = output_size(job.workflow.name, job.params) or (None, None)
     for key in job.workflow.seed_keys():
         if job.params.get(key) is not None:
-            db.record_seed_use(kind=kind, seed_key=key, seed=int(job.params[key]),
+            db.record_seed_use(NewSeedUse(kind=kind, seed_key=key, seed=int(job.params[key]),
                                media_type=job.workflow.output_type, width=width, height=height,
-                               thumbnail_path=str(thumbnail) if thumbnail else None)
+                               thumbnail_path=str(thumbnail) if thumbnail else None))
 
 
 class GenerationJob(QObject):

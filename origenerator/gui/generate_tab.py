@@ -39,7 +39,7 @@ from origenerator.config import (
     OUTPUT_PLACES,
     THUMB_DIR,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewSeedUse
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gallery import (
@@ -818,8 +818,8 @@ class GenerateTab(DropZones):
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)
-        self._db.record_seed_use(kind=SeedUseKind.DRAWN, seed_key=key, seed=seed,
-                                 media_type=self._makes(), width=width, height=height)
+        self._db.record_seed_use(NewSeedUse(kind=SeedUseKind.DRAWN, seed_key=key, seed=seed,
+                                 media_type=self._makes(), width=width, height=height))
 
     def _makes(self) -> MediaType | None:
         return workflow_output_type(self._workflow_dropdown.currentData())

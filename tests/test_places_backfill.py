@@ -9,7 +9,7 @@ from origenerator import downtime, gallery, places_backfill, points_of_interest
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gui.core import Core
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import detail_parts
@@ -42,9 +42,9 @@ def _on_disk(folders: ComfyFolders, *names: str) -> None:
 
 def _enhanced(db, prompt_id, enhanced_file, *, settings=FIXED):
     original = _file(f"{prompt_id}_original.png")
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v004",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v004",
                          positive_prompt="scene one", seed=1, params_json="{}", workflow_json="{}",
-                         source="generated")
+                         source="generated"))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([enhanced_file, original]),
                          original_files=json.dumps([original]),

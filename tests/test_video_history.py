@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from origenerator.action_settings import GENAU, VIDEO
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.video_history import video_history
 
 _LOOPING = "wan22_flf2v_loop"
@@ -80,8 +80,8 @@ def test_a_use_of_a_video_gone_from_the_library_lists_nothing():
 def test_an_acts_generation_does_not_count_as_a_use_of_its_video(tmp_path):
     db = Database(tmp_path / "test.db")
     for prompt_id, category in (("custom", None), ("act", "alpha")):
-        db.insert_generation(prompt_id=prompt_id, workflow_name=_FULL_LENGTH,
-                             workflow_version="v001", params_json="{}", workflow_json="{}")
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=_FULL_LENGTH,
+                             workflow_version="v001", params_json="{}", workflow_json="{}"))
         db.set_settings_source(prompt_id, category=category, video_prompt_id=f"vid-{prompt_id}")
 
     assert [made["source_video"] for made in db.custom_combinations()] == ["vid-custom"]

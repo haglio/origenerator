@@ -8,7 +8,7 @@ from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar
 
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.gui import generate_tab as generate_tab_module
@@ -44,7 +44,7 @@ def _sdxl_full(**over):
 
 
 def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i", workflow_version=None):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id,
         workflow_name=workflow_name,
         workflow_version=workflow_version or WORKFLOW_REGISTRY[workflow_name].version,
@@ -53,7 +53,7 @@ def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i", workflow_versio
         seed=params.get("seed"),
         params_json=json.dumps(params),
         workflow_json="{}",
-    )
+    ))
 
 
 def _complete_gen(db, prompt_id, params, filename, subfolder="image",

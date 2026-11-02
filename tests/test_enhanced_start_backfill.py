@@ -11,7 +11,7 @@ import pytest
 from origenerator import downtime, gallery, trash_collection
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.enhanced_start_backfill import (
     Evolver,
     backfill_params_for,
@@ -50,8 +50,8 @@ def _enhancement(prompt_id):
 
 
 def _image(db, prompt_id, *, enhanced=False):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v1",
-                         params_json=json.dumps({"seed": 1}), workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json=json.dumps({"seed": 1}), workflow_json="{}"))
     files = [_enhancement(prompt_id), _plain(prompt_id)] if enhanced else [_plain(prompt_id)]
     db.update_generation(prompt_id, status="completed", output_files=json.dumps(files))
     if enhanced:
@@ -67,8 +67,8 @@ def _video(db, prompt_id, *, made_from, starred=False, start=None, source="gener
            workflow="wan22_i2v", lines=None):
     params = {"input_image": _reference(start or _plain(made_from)),
               "noise_seed": 7, "audio_seed": 8, **({"scene_lines": lines} if lines else {})}
-    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
-                         params_json=json.dumps(params), workflow_json="{}", source=source)
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
+                         params_json=json.dumps(params), workflow_json="{}", source=source))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([_file(f"{prompt_id}_00001.mp4", "video")]))
     if starred:
@@ -135,8 +135,8 @@ def test_a_video_already_on_its_way_through_the_backfill_is_not_queued_again(tmp
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     _video(db, "video", made_from="image", starred=True)
-    db.insert_generation(prompt_id="on its way", workflow_name="wan22_i2v", workflow_version="v1",
-                         params_json="{}", workflow_json="{}", source=GenerationSource.BACKFILL)
+    db.insert_generation(NewGeneration(prompt_id="on its way", workflow_name="wan22_i2v", workflow_version="v1",
+                         params_json="{}", workflow_json="{}", source=GenerationSource.BACKFILL))
     db.set_backfill_of("on its way", "video")
 
     assert _backfilled(db) == []
@@ -168,8 +168,8 @@ def test_an_imported_video_is_backfilled_like_a_generated_one(tmp_path):
 
 
 def _namesake(db, prompt_id, filename):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v1",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v1",
+                         params_json="{}", workflow_json="{}"))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([_file(filename, "video")]))
 
@@ -335,9 +335,9 @@ def test_a_backfill_run_comfyui_has_no_record_of_is_cleared_so_its_video_is_rema
 
 
 def _backfill_run(db, prompt_id, *, of, status="completed", made=True):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v1",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v1",
                          params_json=json.dumps({"noise_seed": 7, "audio_seed": 8}),
-                         workflow_json="{}", source=GenerationSource.BACKFILL)
+                         workflow_json="{}", source=GenerationSource.BACKFILL))
     db.set_backfill_of(prompt_id, of)
     fields = {"status": status}
     if made:
@@ -699,10 +699,10 @@ def test_a_backfill_run_that_failed_is_cleared_so_the_next_absence_tries_again(t
 def test_a_finished_enhancement_the_backfill_queued_is_left_for_its_image_to_take(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image")
-    db.insert_generation(prompt_id="enhancement", workflow_name="image_enhance",
+    db.insert_generation(NewGeneration(prompt_id="enhancement", workflow_name="image_enhance",
                          workflow_version="v1", workflow_json="{}",
                          params_json=json.dumps({"input_image": _reference(_plain("image"))}),
-                         source=GenerationSource.BACKFILL)
+                         source=GenerationSource.BACKFILL))
     db.update_generation("enhancement", status="completed",
                          output_files=json.dumps([_enhancement("image")]))
 

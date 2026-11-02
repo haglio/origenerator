@@ -25,7 +25,7 @@ from origenerator.config import (
     EVOLVER_INBOX_DIR,
     GENAU_SOURCE,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -809,13 +809,13 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
 def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="another image", seed=3,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=3,
                                     positive_prompt="another image")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("img_delta", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
     db.set_image_state("img_delta", "state two")

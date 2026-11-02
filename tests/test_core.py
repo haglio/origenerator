@@ -25,7 +25,7 @@ from origenerator import action_settings, app_link, downtime, gallery, toast_rai
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
@@ -531,13 +531,13 @@ class _QueueSpyClient(ComfyUIClient):
 
 
 def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1, **params):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt=prompt, seed=seed,
         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                                     positive_prompt=prompt, seed=seed, **params)),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(
         prompt_id, status="completed",
         output_files=json.dumps([{"filename": f"{prompt_id}.png", "subfolder": ""}]),
@@ -587,13 +587,13 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
 
 
 def _waiting_image(db, prompt_id):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i",
         workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version, positive_prompt="a cat", seed=1,
         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                                     positive_prompt="a cat", seed=1)),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="pending")
 
 
@@ -648,11 +648,11 @@ def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
 
 def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
         workflow_json="{}", source="experiment",
-    )
+    ))
     db.update_generation("exp-1", status="running")
     client = _QueueSpyClient()
 
@@ -668,11 +668,11 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     monkeypatch.setenv(ENV_FLAG, "1")
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
         workflow_json="{}", source="experiment",
-    )
+    ))
     db.update_generation("exp-1", status="running")
     client = _QueueSpyClient()
 
@@ -688,11 +688,11 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_folder", "__recents__")
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
         workflow_json="{}", source="experiment",
-    )
+    ))
     db.update_generation(
         "exp-1", status="completed",
         output_files=json.dumps([{"filename": "exp.png", "subfolder": ""}]),
@@ -709,11 +709,11 @@ def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   seed=99, positive_prompt="a cat")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
         positive_prompt="a cat", seed=99,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation("rr", status="running")
 
     win = _window(qtbot, tmp_path)
@@ -726,22 +726,22 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                       seed=1, positive_prompt="a face")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
         positive_prompt="a face", seed=1,
         params_json=json.dumps(img_params), workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "img", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_img.png"}]),
     )
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
                       seed=7, positive_prompt="", input_image="sdxl_t2i_img.png [output]")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="rr", workflow_name="wan22_i2v", workflow_version="v",
         positive_prompt="", seed=7,
         params_json=json.dumps(vid_params), workflow_json="{}",
-    )
+    ))
     db.update_generation("rr", status="running")
 
     win = _window(qtbot, tmp_path)
@@ -755,18 +755,18 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                       seed=1, positive_prompt="a face")
-    db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="img", workflow_name="sdxl_t2i",
                          workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version,
                          positive_prompt="a face", seed=1,
-                         params_json=json.dumps(img_params), workflow_json="{}")
+                         params_json=json.dumps(img_params), workflow_json="{}"))
     db.update_generation("img", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_t2i_img.png"}]))
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
                       seed=7, positive_prompt="", input_image="sdxl_t2i_img.png [output]")
-    db.insert_generation(prompt_id="rr", workflow_name="wan22_i2v",
+    db.insert_generation(NewGeneration(prompt_id="rr", workflow_name="wan22_i2v",
                          workflow_version=WORKFLOW_REGISTRY["wan22_i2v"].version,
                          positive_prompt="", seed=7,
-                         params_json=json.dumps(vid_params), workflow_json="{}")
+                         params_json=json.dumps(vid_params), workflow_json="{}"))
     db.update_generation("rr", status="running")
     state = AppState(tmp_path / "ui.json")
     state.set("generate_tabs", {"tabs": [
@@ -783,9 +783,9 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
 def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), seed=1, positive_prompt="a cat")
-    db.insert_generation(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
+    db.insert_generation(NewGeneration(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
                          positive_prompt="a cat", seed=1,
-                         params_json=json.dumps(params), workflow_json="{}")
+                         params_json=json.dumps(params), workflow_json="{}"))
     db.update_generation("rr", status="running", progress_json=json.dumps(
         {"last_progress": [30, 50],
          "tracker": {"total": 50, "banked": 0, "stage_max": 50, "last_value": 30}}))
@@ -953,8 +953,8 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
 def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     db = win._gallery_view._db
-    db.insert_generation(prompt_id="img1", workflow_name="sdxl_t2i",
-                         workflow_version="v002", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="img1", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}"))
     db.update_generation(
         "img1", status="completed",
         output_files=json.dumps([
@@ -1007,10 +1007,10 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
                       seed=7, positive_prompt="x", input_image="img.png")
-    db.insert_generation(prompt_id="vid_run", workflow_name="wan22_i2v",
+    db.insert_generation(NewGeneration(prompt_id="vid_run", workflow_name="wan22_i2v",
                          workflow_version="v", positive_prompt="x", seed=7,
                          params_json=json.dumps(vid_params),
-                         workflow_json=json.dumps({"1": {"inputs": {}}}))
+                         workflow_json=json.dumps({"1": {"inputs": {}}})))
     db.update_generation("vid_run", status="running")
     state = AppState(tmp_path / "ui.json")
     state.set("generate_tabs", {"tabs": [
@@ -1028,18 +1028,18 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
 
 def _seed_combine_db(tmp_path, videos=("vid",)):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
+    db.insert_generation(NewGeneration(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
                          positive_prompt="a dog", seed=1,
                          params_json=json.dumps({"positive_prompt": "a dog", "seed": 1}),
-                         workflow_json="{}")
+                         workflow_json="{}"))
     db.update_generation("img", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_img.png"}]))
     for video in videos:
-        db.insert_generation(prompt_id=video, workflow_name="wan22_i2v", workflow_version="v",
+        db.insert_generation(NewGeneration(prompt_id=video, workflow_name="wan22_i2v", workflow_version="v",
                              positive_prompt="dance", seed=42,
                              params_json=json.dumps(dict(
                                  WORKFLOW_REGISTRY["wan22_i2v"].default_params(), seed=42)),
-                             workflow_json="{}")
+                             workflow_json="{}"))
         db.update_generation(video, status="completed",
                              output_files=json.dumps([{"filename": f"wan22_i2v_{video}.mp4"}]))
 

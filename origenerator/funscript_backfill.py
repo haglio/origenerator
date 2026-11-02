@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
+from typing import NamedTuple
 
 from origenerator import config
 from origenerator.db import Database
@@ -20,9 +22,15 @@ from origenerator.output_places import OutputPlaces
 logger = logging.getLogger(__name__)
 
 
+class Steps(NamedTuple):
+    write: Callable = synthesize_funscript
+    rewrite: Callable = resynthesize_funscript
+    resolve: Callable = resolve_preview
+
+
 def backfill(db, places: OutputPlaces | None = None, *, hz: float | None = None,
-             write=synthesize_funscript, rewrite=resynthesize_funscript,
-             resolve=resolve_preview) -> dict:
+             steps: Steps | None = None) -> dict:
+    write, rewrite, resolve = steps or Steps()
     places = config.OUTPUT_PLACES if places is None else places
     hz = config.MOTION_DEFAULT_HZ if hz is None else hz
     result = {"written": 0, "rewritten": 0, "skipped": 0, "missing": 0, "failed": 0}

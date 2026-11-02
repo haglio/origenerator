@@ -28,7 +28,7 @@ from origenerator import (
     trash_collection,
 )
 from origenerator.branch_session import ENV_FLAG
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     LATEST_KEY,
     TRASH_KEY,
@@ -122,8 +122,8 @@ def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
 
 def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
-                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}"))
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
     view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
@@ -204,9 +204,9 @@ def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
 
 def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="v1",
-                         params_json=json.dumps({"steps": 20}), workflow_json="{}")
+                         params_json=json.dumps({"steps": 20}), workflow_json="{}"))
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
     view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
@@ -390,8 +390,8 @@ def test_the_delete_button_is_dark_on_an_unpicked_trash_collection(qtbot):
 
 def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
-                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}"))
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
     view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
@@ -584,8 +584,8 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     out = tmp_path / "out" / "video"
     out.mkdir(parents=True)
     (out / "clip.mp4").write_bytes(b"x")
-    db.insert_generation(prompt_id="v1", workflow_name="wan22_i2v",
-                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="v1", workflow_name="wan22_i2v",
+                         workflow_version="v1", params_json="{}", workflow_json="{}"))
     db.update_generation("v1", status="completed", output_files=json.dumps(
         [{"filename": "clip.mp4", "subfolder": "video"}]))
     view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
@@ -914,12 +914,12 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     out = tmp_path / "output"
     out.mkdir()
     for pid, prompt in [("i1", "a cat"), ("i2", "a dog")]:
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v1",
             positive_prompt=prompt,
             params_json=json.dumps({"positive_prompt": prompt, "steps": 20}),
             workflow_json="{}",
-        )
+        ))
         (out / f"sdxl_t2i_{pid}.png").write_bytes(b"x")
         db.update_generation(
             pid, status="completed",
@@ -945,12 +945,12 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     out = tmp_path / "output"
     out.mkdir()
     for pid, prompt in [("i1", "a cat"), ("i2", "a dog")]:
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v1",
             positive_prompt=prompt,
             params_json=json.dumps({"positive_prompt": prompt, "steps": 20}),
             workflow_json="{}",
-        )
+        ))
         (out / f"sdxl_t2i_{pid}.png").write_bytes(b"x")
         db.update_generation(
             pid, status="completed",
@@ -1093,10 +1093,10 @@ def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
 def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     output_dir = tmp_path / "output"
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json=json.dumps({"steps": 50}), workflow_json="{}",
-    )
+    ))
     file_path = output_dir / "sdxl_t2i_i1.png"
     file_path.parent.mkdir(parents=True)
     file_path.write_bytes(b"img")
@@ -1168,12 +1168,12 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     out = tmp_path / "output"
     out.mkdir()
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v1",
         positive_prompt="a cat",
         params_json=json.dumps({"positive_prompt": "a cat", "steps": 20}),
         workflow_json="{}",
-    )
+    ))
     (out / "sdxl_t2i_i1.png").write_bytes(b"x")
     db.update_generation(
         "i1", status="completed",

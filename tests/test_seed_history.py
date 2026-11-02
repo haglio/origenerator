@@ -4,7 +4,7 @@ import json
 
 from PIL import Image
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration, NewSeedUse
 from origenerator.media import MediaType
 from origenerator.seed_history import SeedUse, seed_history
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -121,9 +121,9 @@ def test_the_library_hands_over_every_generation_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for seed in (10, 20):
         prompt_id = f"gen-{seed}"
-        db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                              workflow_version="v002", seed=seed,
-                             params_json=json.dumps({"seed": seed}), workflow_json="{}")
+                             params_json=json.dumps({"seed": seed}), workflow_json="{}"))
         db.update_generation(prompt_id, status="completed",
                              output_files=json.dumps([{"filename": f"{prompt_id}.png"}]),
                              thumbnail_path=f"thumbs/{prompt_id}.jpg")
@@ -137,8 +137,8 @@ def test_the_library_hands_over_every_generation_newest_first(tmp_path):
 def test_a_seed_drawn_and_never_generated_is_listed_with_no_thumbnail_at_its_size(tmp_path):
     db = Database(tmp_path / "test.db")
 
-    db.record_seed_use(kind="drawn", seed_key="seed", seed=77, width=832, height=1216,
-                       media_type=IMAGES)
+    db.record_seed_use(NewSeedUse(kind="drawn", seed_key="seed", seed=77, width=832, height=1216,
+                       media_type=IMAGES))
 
     assert seed_history(db.seed_history_rows(), "seed", db.list_seed_uses(),
                         makes=IMAGES) == [SeedUse(77, None, (832, 1216))]

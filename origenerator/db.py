@@ -7,14 +7,13 @@ from origenerator.db_combine_video_uses import CombineVideoUseStore
 from origenerator.db_connection import SqliteFile
 from origenerator.db_custom_collections import CustomCollectionStore
 from origenerator.db_folder_meta import FolderMetaStore
-from origenerator.db_generations import GenerationStore
+from origenerator.db_generations import GenerationStore, NewGeneration
 from origenerator.db_item_numbers import ItemNumberStore
-from origenerator.db_requests import RequestStore
+from origenerator.db_requests import NewRequest, RequestStore
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import SCHEMA, create
-from origenerator.db_seed_uses import SeedUseStore
+from origenerator.db_seed_uses import NewSeedUse, SeedUseStore
 from origenerator.db_trash import TrashStore
-from origenerator.generation_state import GenerationSource
 
 
 class Database:
@@ -34,18 +33,8 @@ class Database:
         self.custom_collections = CustomCollectionStore(file)
         self.item_numbers = ItemNumberStore(file)
 
-    def insert_generation(self, *, prompt_id: str, workflow_name: str,
-                          workflow_version: str, positive_prompt: str | None = None,
-                          negative_prompt: str | None = None, seed: int | None = None,
-                          params_json: str, workflow_json: str,
-                          source: str = GenerationSource.GENERATED,
-                          provenance: str | None = None, shielded: bool = False):
-        return self.generations.insert_generation(
-            prompt_id=prompt_id, workflow_name=workflow_name,
-            workflow_version=workflow_version, positive_prompt=positive_prompt,
-            negative_prompt=negative_prompt, seed=seed, params_json=params_json,
-            workflow_json=workflow_json, source=source, provenance=provenance,
-            shielded=shielded)
+    def insert_generation(self, new: NewGeneration):
+        return self.generations.insert_generation(new)
 
     def update_generation(self, prompt_id: str, **fields):
         return self.generations.update_generation(prompt_id, **fields)
@@ -159,12 +148,8 @@ class Database:
     def custom_combinations(self) -> list[dict]:
         return self.generations.custom_combinations()
 
-    def record_seed_use(self, *, kind: str, seed_key: str, seed: int, media_type: str,
-                        width: int | None = None, height: int | None = None,
-                        thumbnail_path: str | None = None) -> None:
-        return self.seed_uses.record_seed_use(
-            kind=kind, seed_key=seed_key, seed=seed, media_type=media_type, width=width,
-            height=height, thumbnail_path=thumbnail_path)
+    def record_seed_use(self, use: NewSeedUse) -> None:
+        return self.seed_uses.record_seed_use(use)
 
     def list_seed_uses(self) -> list[dict]:
         return self.seed_uses.list_seed_uses()
@@ -209,16 +194,8 @@ class Database:
     def forget_item_numbers(self, prompt_ids: list[str]):
         return self.item_numbers.forget_item_numbers(prompt_ids)
 
-    def record_request(self, *, prompt_id: str, source_prompt_id: str, heard: str,
-                       term: str | None = None, polarity: str | None = None,
-                       action: str | None = None, old_positive: str = "",
-                       old_negative: str = "", new_positive: str = "",
-                       new_negative: str = "", asked: str | None = None):
-        return self.requests.record_request(
-            prompt_id=prompt_id, source_prompt_id=source_prompt_id, heard=heard,
-            term=term, polarity=polarity, action=action,
-            old_positive=old_positive, old_negative=old_negative,
-            new_positive=new_positive, new_negative=new_negative, asked=asked)
+    def record_request(self, request: NewRequest):
+        return self.requests.record_request(request)
 
     def list_requests(self) -> list[dict]:
         return self.requests.list_requests()

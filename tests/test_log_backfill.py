@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.log_backfill import (
     backfill_durations_from_logs,
     parse_log_durations,
@@ -19,9 +19,9 @@ def _utc_iso_for_local(y, mo, d, h, mi, s, us=0):
 
 
 def _import_row(db, prompt_id, completed_at):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="imported", params_json="{}",
-                         workflow_json="{}", source="imported")
+                         workflow_json="{}", source="imported"))
     db.update_generation(prompt_id, status="completed", completed_at=completed_at)
 
 

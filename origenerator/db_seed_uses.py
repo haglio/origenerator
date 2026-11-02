@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import bisect
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from origenerator.db_connection import Store
@@ -37,16 +38,26 @@ def _just_after_a_press(at: datetime, presses: list[datetime]) -> bool:
     return last > 0 and at - presses[last - 1] <= _A_TABS_PICK_FOR_ITS_NEXT_PRESS
 
 
+@dataclass(frozen=True, kw_only=True)
+class NewSeedUse:
+    kind: str
+    seed_key: str
+    seed: int
+    media_type: str
+    width: int | None = None
+    height: int | None = None
+    thumbnail_path: str | None = None
+
+
 class SeedUseStore(Store):
-    def record_seed_use(self, *, kind: str, seed_key: str, seed: int, media_type: str,
-                        width: int | None = None, height: int | None = None,
-                        thumbnail_path: str | None = None) -> None:
+    def record_seed_use(self, use: NewSeedUse) -> None:
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO seed_uses"
                 " (kind, seed_key, seed, media_type, width, height, thumbnail_path)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (kind, seed_key, seed, media_type, width, height, thumbnail_path),
+                (use.kind, use.seed_key, use.seed, use.media_type, use.width, use.height,
+                 use.thumbnail_path),
             )
 
     def list_seed_uses(self) -> list[dict]:

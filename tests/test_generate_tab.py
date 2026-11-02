@@ -37,7 +37,7 @@ from origenerator.action_settings import CATEGORIES
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.funscript import (
     funscript_path_for,
     synthesize_actions,
@@ -532,10 +532,10 @@ def test_cancel_button_click_emits_cancel_requested(tab):
 
 def test_a_tabs_seed_drops_down_every_seed_the_library_used_newest_first(tab):
     for prompt_id, seed in (("older", 10), ("newer", 20)):
-        tab._db.insert_generation(
+        tab._db.insert_generation(NewGeneration(
             prompt_id=prompt_id, workflow_name="sdxl_t2i",
             workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version, seed=seed,
-            params_json=json.dumps({"seed": seed}), workflow_json="{}")
+            params_json=json.dumps({"seed": seed}), workflow_json="{}"))
         tab._db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": f"{prompt_id}.png", "subfolder": "image"}]))
 
@@ -1097,17 +1097,17 @@ _SDXL_VERSION = WORKFLOW_REGISTRY["sdxl_t2i"].version
 
 def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="wiz", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="drg", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a dragon",
         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                                     positive_prompt="a dragon")),
         workflow_json="{}",
-    )
+    ))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab.prefill("sdxl_t2i", _wiz_params())
@@ -1116,10 +1116,10 @@ def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
 
 def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
-    )
+    ))
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
@@ -1142,10 +1142,10 @@ def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
 
 def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
-    )
+    ))
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
@@ -1157,10 +1157,10 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
 def test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
         qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
-    )
+    ))
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
@@ -1475,10 +1475,10 @@ def test_a_config_that_has_generated_has_a_folder_to_go_to(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt="a wizard")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab.prefill("sdxl_t2i", params)
@@ -1499,11 +1499,11 @@ def test_a_panel_still_on_the_picker_has_no_folder(blank_panel):
 def _image_being_made(db, prompt_id="img1", prompt="a cat", **settings):
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt=prompt, seed=1, **settings)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt=prompt, seed=1,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="running")
     return db.get_generation(prompt_id)
 
@@ -1520,11 +1520,11 @@ def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i
     params = {"positive_prompt": "dance", "seed": 5, **seeds}
     if input_image is not None:
         params["input_image"] = input_image
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=workflow_name, workflow_version="v002",
         positive_prompt="dance", seed=5,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
     return db.get_generation(prompt_id)
@@ -1957,9 +1957,9 @@ def _wizard_panel(qtbot, tmp_path, monkeypatch):
     (output / "image" / "sdxl_g1.png").write_bytes(b"png")
     monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     db = Database(tmp_path / "t.db")
-    db.insert_generation(prompt_id="g1", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="g1", workflow_name="sdxl_t2i",
                          workflow_version=_SDXL_VERSION, positive_prompt="a wizard",
-                         params_json=json.dumps(_wiz_params()), workflow_json="{}")
+                         params_json=json.dumps(_wiz_params()), workflow_json="{}"))
     db.update_generation("g1", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_g1.png", "subfolder": "image"}]))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
@@ -2208,10 +2208,10 @@ def test_a_seed_pinned_while_the_run_was_in_flight_stays_pinned_when_it_lands(sa
 
 def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved_panel, monkeypatch):
     tab, db = saved_panel
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="u1", workflow_name="unknown", workflow_version="imported",
         params_json=json.dumps({"steps": 20}), workflow_json="{}",
-    )
+    ))
     db.update_generation("u1", status="completed",
                          output_files=json.dumps([{"filename": "u1.mp4", "subfolder": "video"}]))
     row = db.get_generation("u1")
@@ -2371,11 +2371,11 @@ def test_putting_the_setting_back_clears_the_mark(saved_panel):
 
 
 def _video_of_a_workflow_the_app_lacks(db, workflow_name, prompt_id="old1"):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=workflow_name, workflow_version="v001",
         positive_prompt="scene one", seed=5,
         params_json=json.dumps({"positive_prompt": "scene one", "seed": 5}), workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
     return db.get_generation(prompt_id)
@@ -2486,10 +2486,10 @@ def test_selecting_a_workflow_after_such_a_video_clears_the_note_and_brings_gene
 def _image_made_with(db, checkpoint, prompt_id="img9"):
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt="scene one", seed=1, checkpoint=checkpoint)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="scene one", seed=1, params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": f"{prompt_id}.png", "subfolder": "image"}]))
     return db.get_generation(prompt_id)
@@ -2637,10 +2637,10 @@ def test_a_video_made_with_two_models_that_are_not_installed_names_both(installe
     tab, db = saved_panel
     params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(), positive_prompt="scene one",
                   unet_high="retired_high.safetensors", unet_low="retired_low.safetensors")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid9", workflow_name="wan22_i2v", workflow_version="v002",
         positive_prompt="scene one", seed=5, params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation("vid9", status="completed",
                          output_files=json.dumps([{"filename": "vid9.mp4", "subfolder": "video"}]))
     video = db.get_generation("vid9")
@@ -2937,10 +2937,10 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
 
 
 def _request_made(db, prompt_id, source="src", asked="no hat"):
-    db.record_request(prompt_id=prompt_id, source_prompt_id=source,
+    db.record_request(NewRequest(prompt_id=prompt_id, source_prompt_id=source,
                       heard=f"Request, {asked}, over.", asked=asked,
                       old_positive="a cat, a hat", old_negative="blurry",
-                      new_positive="a cat", new_negative="blurry, hat")
+                      new_positive="a cat", new_negative="blurry, hat"))
 
 
 def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
@@ -3067,8 +3067,8 @@ def test_each_scene_of_a_requested_video_is_marked_against_the_scene_it_was_aske
     tab, db = saved_panel
     video = _video_row(db, positive_prompt=story_of(["a dog running, grass", "a dog asleep, grass"]),
                        scene_frames=[81, 81], frame_count=161)
-    db.record_request(prompt_id="vid1", source_prompt_id="src", heard="", asked="more grass",
-                      old_positive=story_of(["a dog running", "a dog asleep"]), old_negative="")
+    db.record_request(NewRequest(prompt_id="vid1", source_prompt_id="src", heard="", asked="more grass",
+                      old_positive=story_of(["a dog running", "a dog asleep"]), old_negative=""))
 
     tab.show_saved_generation(video, [])
 
@@ -3189,12 +3189,12 @@ def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtb
 
 
 def _completed_generation(db, workflow_name, params):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="done", workflow_name=workflow_name,
         workflow_version=WORKFLOW_REGISTRY[workflow_name].version,
         positive_prompt=params.get("positive_prompt", ""), negative_prompt="",
         seed=params.get("seed"), params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation("done", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_t2i_done.png", "subfolder": "image"}]))
 
@@ -3237,9 +3237,9 @@ def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_rand
     tab, db = saved_panel
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a cat",
                   seed=1)
-    db.insert_generation(prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="v002",
+    db.insert_generation(NewGeneration(prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="v002",
                          positive_prompt="a cat", seed=1, params_json=json.dumps(params),
-                         workflow_json="{}", source=GenerationSource.IMPORTED)
+                         workflow_json="{}", source=GenerationSource.IMPORTED))
     db.update_generation("imp", status="completed", output_files=json.dumps(
         [{"filename": "imp.png", "subfolder": "image"}]))
 
@@ -4172,9 +4172,9 @@ def test_a_shown_image_whose_prompt_left_off_its_loras_trigger_word_wears_the_wa
     tab, db = saved_panel
     params = dict(WORKFLOW_REGISTRY["krea2_t2i"].default_params(), positive_prompt="a cat",
                   lora="example_style.safetensors", seed=1)
-    db.insert_generation(prompt_id="img1", workflow_name="krea2_t2i", workflow_version="v001",
+    db.insert_generation(NewGeneration(prompt_id="img1", workflow_name="krea2_t2i", workflow_version="v001",
                          positive_prompt="a cat", seed=1, params_json=json.dumps(params),
-                         workflow_json="{}")
+                         workflow_json="{}"))
     db.update_generation("img1", status="completed",
                          output_files=json.dumps([{"filename": "krea_img1.png",
                                                    "subfolder": "image"}]))

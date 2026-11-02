@@ -61,7 +61,7 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG, LAUNCHER
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import GENAU, KINO
 from origenerator.gui.loading_screen import loading_screen
@@ -973,9 +973,9 @@ def _boot(library_path, argv=()):
 
 def _completed_image(db, prompt_id, **params):
     values = {"positive_prompt": "a paper boat", "steps": 30, "seed": 1, **params}
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json=json.dumps(values),
-                         workflow_json="{}")
+                         workflow_json="{}"))
     db.update_generation(
         prompt_id, status="completed",
         output_files=json.dumps([{"filename": f"sdxl_t2i_{prompt_id}.png",
@@ -1025,9 +1025,9 @@ def test_the_launch_heals_a_favorite_whose_folder_key_drifted(qapp, library):
 def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
 
     db = Database(library)
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="imported", params_json="{}",
-                         workflow_json="{}", source="imported")
+                         workflow_json="{}", source="imported"))
     finished = datetime(2026, 6, 29, 12, 20, 53).astimezone().timestamp()
     image = config.OUTPUT_PLACES.folder("image") / "sdxl_t2i_00001_.png"
     image.parent.mkdir(parents=True, exist_ok=True)
@@ -1192,9 +1192,9 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
     db = Database(tmp_path / "t.db")
     for prompt_id, filename, source in (("video", "flf2v_loop_00001-audio.mp4", "generated"),
                                         ("copy", "flf2v_loop_00001.mp4", "imported")):
-        db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
                              workflow_version="v009", params_json="{}", workflow_json="{}",
-                             source=source)
+                             source=source))
         db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": filename, "subfolder": "video", "type": "output"}]))
     db.mark_genau_exported("copy")
@@ -1222,9 +1222,9 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old
     db = Database(tmp_path / "t.db")
     for prompt_id, filename, source in (("first", "first_00001.mp4", "generated"),
                                         ("again", "again_00001.mp4", "backfill")):
-        db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_i2v",
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_i2v",
                              workflow_version="v1", params_json="{}", workflow_json="{}",
-                             source=source)
+                             source=source))
         db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": filename, "subfolder": "video", "type": "output"}]))
     db.set_generation_favorite("first", True)
@@ -1249,8 +1249,8 @@ def test_opening_the_app_hands_a_video_remade_in_place_to_kino_again(tmp_path):
     (output / "video").mkdir(parents=True)
     (output / "video" / "first_00001.mp4").write_bytes(b"made again")
     db = Database(tmp_path / "t.db")
-    db.insert_generation(prompt_id="first", workflow_name="wan22_i2v", workflow_version="v1",
-                         params_json="{}", workflow_json="{}", source="generated")
+    db.insert_generation(NewGeneration(prompt_id="first", workflow_name="wan22_i2v", workflow_version="v1",
+                         params_json="{}", workflow_json="{}", source="generated"))
     db.update_generation("first", status="completed", output_files=json.dumps(
         [{"filename": "first_00001.mp4", "subfolder": "video", "type": "output"}]))
     with sqlite3.connect(tmp_path / "t.db") as conn:
@@ -1273,9 +1273,9 @@ def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path
     monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
     monkeypatch.setattr(config, "COMFYUI_INPUT_DIR", tmp_path / "input")
     db = Database(tmp_path / "t.db")
-    db.insert_generation(prompt_id="enhancement", workflow_name="image_enhance",
+    db.insert_generation(NewGeneration(prompt_id="enhancement", workflow_name="image_enhance",
                          workflow_version="v003", workflow_json="{}",
-                         params_json=json.dumps({"input_image": "image/deleted.png [output]"}))
+                         params_json=json.dumps({"input_image": "image/deleted.png [output]"})))
     db.update_generation("enhancement", status="completed", output_files=json.dumps(
         [{"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]))
     library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
@@ -1300,9 +1300,9 @@ def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_start
     graph = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
     for prompt_id, subfolder, filename in (("video", "video", "scene_one_00001.mp4"),
                                            ("first-frame", "image", "scene_one_00001.png")):
-        db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
                              workflow_version="imported", params_json="{}",
-                             workflow_json=graph, source="imported")
+                             workflow_json=graph, source="imported"))
         db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": filename, "subfolder": subfolder, "type": "output"}]))
     library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
@@ -1340,8 +1340,8 @@ def test_what_a_run_left_in_its_folder_never_becomes_an_item_of_its_own(tmp_path
                           videos=library_root / "videos", scripts=library_root / "scripts",
                           audio=library_root / "sounds")
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="going", workflow_name="sdxl_t2i", workflow_version="v1",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="going", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json="{}", workflow_json="{}"))
     db.update_generation("going", status="running")
     for prompt_id in ("going", "gone"):
         saved = places.run(prompt_id) / "image" / f"{prompt_id}_t2i_00001_.png"
@@ -1375,8 +1375,8 @@ def test_a_run_comfyui_finished_and_then_forgot_is_written_down_on_its_own_row(t
     payload = saving_into_its_run_folder(workflow.build_api_payload(workflow.default_params()),
                                          places, "run-one")
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="run-one", workflow_name="sdxl_t2i", workflow_version="v1",
-                         params_json="{}", workflow_json=json.dumps(payload))
+    db.insert_generation(NewGeneration(prompt_id="run-one", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json="{}", workflow_json=json.dumps(payload)))
     db.update_generation("run-one", status="running")
     saved = places.run("run-one") / "image" / "sdxl_t2i_00001_.png"
     saved.parent.mkdir(parents=True)

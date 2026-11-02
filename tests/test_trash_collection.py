@@ -8,7 +8,7 @@ from PIL import Image
 
 from origenerator import trash_collection
 from origenerator.branch_session import ENV_FLAG
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.db_connection import SqliteFile
 from origenerator.gallery.output import resolve_preview
 from origenerator.media import MediaType
@@ -115,8 +115,8 @@ def test_trash_items_keeps_the_order_it_was_given():
 
 def test_restore_puts_the_row_and_its_files_back(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
-                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}"))
     row = db.get_generation("p1")
     source = _file(tmp_path / "out" / "a.png", b"data")
     batch = Trash(tmp_path / "trash").store([source])
@@ -132,8 +132,8 @@ def test_restore_puts_the_row_and_its_files_back(tmp_path):
 
 def test_a_restored_item_whose_file_name_a_newer_image_took_lists_its_new_name(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
-                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}"))
     db.update_generation("p1", output_files=json.dumps(
         [{"filename": "alpha_t2i_00005_.png", "subfolder": "image"}]))
     row = db.get_generation("p1")
@@ -355,8 +355,8 @@ def _emptied_item_being_regenerated(tmp_path, db):
     db.record_trashed("p1", {**held["row"], "workflow_name": "sdxl_t2i", "workflow_version": "v1",
                               "params_json": "{}", "workflow_json": "{}", "starred": 1},
                        held["batch"], deleted_at=held["deleted_at"])
-    db.insert_generation(prompt_id="job", workflow_name="sdxl_t2i", workflow_version="v1",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="job", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json="{}", workflow_json="{}"))
     trash_collection.start_regenerating(db, db.get_trashed("p1"), "job")
 
 
@@ -467,9 +467,9 @@ def _held_start_image(tmp_path, db):
 def _video_started_from_the_frame(db):
     workflow = next(name for name, template in WORKFLOW_REGISTRY.items()
                     if "input_image" in dict(template.input_params))
-    db.insert_generation(prompt_id="video", workflow_name=workflow, workflow_version="v1",
+    db.insert_generation(NewGeneration(prompt_id="video", workflow_name=workflow, workflow_version="v1",
                          params_json=json.dumps({"input_image": "frame.png [output]"}),
-                         workflow_json="{}")
+                         workflow_json="{}"))
 
 
 def test_the_start_image_of_a_video_in_the_library_keeps_its_file(tmp_path):

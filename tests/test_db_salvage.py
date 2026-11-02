@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 import sqlite3
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 
 PAGE = 4096
 FILLER = "x" * 2500
@@ -12,14 +12,14 @@ FILLER = "x" * 2500
 def _fill(path, count):
     db = Database(path)
     for i in range(count):
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=f"job-{i}",
             workflow_name="sdxl_t2i",
             workflow_version="v002",
             positive_prompt=f"marker-{i}-{FILLER}",
             params_json="{}",
             workflow_json="{}",
-        )
+        ))
 
 
 def _journal_mode(path):

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator import config
 from origenerator.comfyui_api import ComfyUIApi
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 A_MOMENT_S = 0.3
@@ -26,11 +26,11 @@ def _images_waiting_in_the_line() -> None:
     db = Database(config.DB_PATH)
     for seed in (1, 2, 3):
         prompt_id = f"waiting-{seed}"
-        db.insert_generation(prompt_id=prompt_id, workflow_name=workflow.name,
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow.name,
                              workflow_version=workflow.version, positive_prompt="a cat",
                              seed=seed, workflow_json="{}",
                              params_json=json.dumps(dict(workflow.default_params(),
-                                                         positive_prompt="a cat", seed=seed)))
+                                                         positive_prompt="a cat", seed=seed))))
         db.update_generation(prompt_id, status="pending")
 
 

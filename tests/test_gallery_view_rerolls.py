@@ -14,7 +14,7 @@ from origenerator import (
     action_settings,
     evolver_export,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.shapes import PORTRAIT
 from origenerator.gui import (
     combine_controller,
@@ -124,12 +124,12 @@ def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
 
 def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="imported",
         positive_prompt="a cat", seed=1,
         params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
         workflow_json="{}", source="imported",
-    )
+    ))
     db.update_generation("imp", status="completed",
                          output_files=json.dumps([{"filename": "imp.png", "subfolder": ""}]))
     client = _reroll_client()
@@ -222,7 +222,7 @@ def _request_tile(view):
 def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
     db = Database(tmp_path / "folder.db")
     for seed in seeds:
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=f"pic{seed}", workflow_name="sdxl_t2i",
             workflow_version=_SDXL.version, positive_prompt=prompt,
             negative_prompt="blurry", seed=seed,
@@ -230,7 +230,7 @@ def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
                                         positive_prompt=prompt,
                                         negative_prompt="blurry")),
             workflow_json="{}",
-        )
+        ))
         db.update_generation(
             f"pic{seed}", status="completed",
             output_files=json.dumps([{"filename": f"sdxl_{seed}.png", "subfolder": ""}]),
@@ -457,13 +457,13 @@ def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
 def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
     client = _reroll_client()
     db = _seeded_db(tmp_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="other", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="a dog", negative_prompt="", seed=9,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=9,
                                     positive_prompt="a dog")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("other", status="completed",
                          output_files=json.dumps([{"filename": "b.png", "subfolder": ""}]))
     view = GalleryView(db, client=client)
@@ -924,11 +924,11 @@ def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_pa
 
 def test_generate_from_a_tab_back_on_its_videos_own_seeds_draws_a_fresh_one(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
         params_json=json.dumps({"positive_prompt": "dance", "input_image": "frame.png",
                                 "noise_seed": 22, "audio_seed": 33}),
-        workflow_json="{}")
+        workflow_json="{}"))
     db.update_generation("vid", status="completed", output_files=json.dumps(
         [{"filename": "vid.mp4", "subfolder": "video"}]))
     view = GalleryView(db, client=_reroll_client())
@@ -1105,10 +1105,10 @@ def test_a_rewrite_that_comfyui_refuses_for_one_image_still_sends_the_rest(qtbot
 
 def test_a_rewrite_of_a_sparsely_recorded_image_keeps_its_own_seed_not_the_tabs(qtbot, tmp_path):
     db = Database(tmp_path / "sparse.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="sparse", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="a cat", negative_prompt="", seed=5,
-        params_json=json.dumps({"positive_prompt": "a cat"}), workflow_json="{}")
+        params_json=json.dumps({"positive_prompt": "a cat"}), workflow_json="{}"))
     db.update_generation("sparse", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
     client = _reroll_client()

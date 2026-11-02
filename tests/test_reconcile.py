@@ -6,7 +6,7 @@ import pytest
 from PIL import Image
 
 from origenerator import favorite_reconcile, gallery
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.favorite_reconcile import (
     reconcile_custom_collections,
     reconcile_favorites,
@@ -45,10 +45,10 @@ def _recording(ran, name, real):
 
 
 def _insert_in_flight(db, prompt_id, *, workflow="sdxl_t2i", status="running"):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=workflow, workflow_version="v",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status=status)
 
 
@@ -105,8 +105,8 @@ def test_a_run_comfyui_is_still_making_keeps_what_its_folder_holds_so_far(tmp_pa
     workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
     payload = saving_into_its_run_folder(workflow.build_api_payload(workflow.default_params()),
                                          places, "p1")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i", workflow_version="v",
-                         params_json="{}", workflow_json=json.dumps(payload))
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i", workflow_version="v",
+                         params_json="{}", workflow_json=json.dumps(payload)))
     db.update_generation("p1", status="running")
     so_far = places.run("p1") / "image" / "sdxl_t2i_00001_.png"
     so_far.parent.mkdir(parents=True)
@@ -149,8 +149,8 @@ def test_no_in_flight_rows_is_a_noop(tmp_path):
 
 
 def _add_completed(db, pid, *, params, filename, workflow="sdxl_t2i"):
-    db.insert_generation(prompt_id=pid, workflow_name=workflow, workflow_version="v",
-                         params_json=json.dumps(params), workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=pid, workflow_name=workflow, workflow_version="v",
+                         params_json=json.dumps(params), workflow_json="{}"))
     db.update_generation(
         pid, status="completed",
         output_files=json.dumps([{"filename": filename, "subfolder": ""}]),

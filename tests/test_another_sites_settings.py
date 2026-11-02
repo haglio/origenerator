@@ -9,7 +9,7 @@ from PIL import Image
 from origenerator import outside_videos
 from origenerator.action_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gui.generate_pane import parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
@@ -140,9 +140,9 @@ def test_an_ai_video_after_an_image_made_here_shows_none_of_that_images_prompts(
     _frame, bare = _brought_in(db, tmp_path, "c2_topaz.mp4", Record(video=Made({"seed": "33"})))
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt="a red door", negative_prompt="fog", seed=1)
-    db.insert_generation(prompt_id="made-here", workflow_name="sdxl_t2i", workflow_version="v002",
+    db.insert_generation(NewGeneration(prompt_id="made-here", workflow_name="sdxl_t2i", workflow_version="v002",
                          positive_prompt="a red door", seed=1, params_json=json.dumps(params),
-                         workflow_json="{}")
+                         workflow_json="{}"))
     db.update_generation("made-here", status="completed",
                          output_files=json.dumps([{"filename": "door.png", "subfolder": "image"}]))
     made_here = db.get_generation("made-here")

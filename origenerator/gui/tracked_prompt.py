@@ -1,38 +1,3 @@
-"""A prompt field that shows what you are changing to it, while you change it.
-
-Every prompt on a tab showing an image is marked against the prompt that made
-the image, or that a request was asked of, and a folder's Modify against the
-folder's own, so a glance shows how far the words have come. The marks keep up with the
-typing: type over a word and the word you replaced is struck through beside what
-replaced it, right there, without waiting for you to click somewhere else.
-
-Which means the document holds more than the prompt: the words that survived,
-the words that arrived, and the words that left. So the field is worth what
-:func:`origenerator.gui.diff_text.live_text` says it is rather than what it
-literally contains, exactly as a request's diff is, and the form reads it
-through that.
-
-Keeping the two in step is the whole of this module. The rule is that the
-rendered spans always spell the document exactly, so any edit the user makes can
-be translated from where it landed in the *document* to where it belongs in the
-*prompt* — which is what ``QTextDocument.contentsChange`` reports precisely
-enough to do. Nothing is read back out of the character formats: a struck-through
-line break does not report itself as struck, so a reader built on the marks would
-silently gain and lose newlines.
-
-Two states, and the field moves between them on its own:
-
-* **Being typed in.** The document is the prompt, with arriving words lit.
-  Lighting adds no text and moves no cursor, so this costs a keystroke nothing.
-* **Settled.** A moment after the typing stops, the words that left are put back
-  in, struck through. The next keystroke takes them out again and the clock
-  restarts, so the strikes are never in the way of the typing they describe.
-
-The document's own undo is off while a field is tracked: it is rewritten under
-the typist on every settle, so its undo would step back through renders rather
-than through edits. The tracker keeps its own instead, one step per burst of
-typing, over the prompt rather than the document.
-"""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -45,10 +10,6 @@ from PyQt6.QtWidgets import QPlainTextEdit
 from origenerator.gui import diff_text
 from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 
-# How long after the last keystroke the departed words are put back. Short
-# enough to read as "while I type" — the complaint this answers was a strike
-# that waited for the field to be left — and long enough that a burst of typing
-# rewrites the document once rather than once per letter.
 SETTLE_MS = 150
 
 _BACK = (QTextCursor.MoveOperation.PreviousCharacter, QTextCursor.MoveOperation.PreviousWord)
@@ -58,9 +19,6 @@ _ERASES = {Qt.Key.Key_Backspace: _BACK, Qt.Key.Key_Delete: _ON}
 
 
 def _plain_format() -> QTextCharFormat:
-    """The unmarked look, spelled out rather than left default: the marks are
-    re-applied from scratch on every pass, so a pass has to be able to take one
-    back off a word that is no longer new."""
     fmt = QTextCharFormat()
     fmt.setFontStrikeOut(False)
     fmt.setBackground(QBrush(Qt.BrushStyle.NoBrush))
@@ -69,13 +27,7 @@ def _plain_format() -> QTextCharFormat:
 
 
 def _unmark(edit: QPlainTextEdit) -> None:
-    """Take every mark off the whole field, ready for a pass to put back only the
-    ones that still apply.
-
-    Needed even straight after the text is rewritten: a field writes new text in
-    whatever format was under the caret, so a document replaced while a word was
-    lit comes back lit end to end.
-    """
+    # Qt: a field writes new text in the format under the caret, so a document replaced while a word was lit comes back lit
     cursor = QTextCursor(edit.document())
     cursor.select(QTextCursor.SelectionType.Document)
     cursor.mergeCharFormat(_plain_format())
@@ -117,7 +69,7 @@ class UndoHistory(QObject):
             undo = event.matches(QKeySequence.StandardKey.Undo)
             redo = event.matches(QKeySequence.StandardKey.Redo)
             if undo or redo:
-                event.accept()  # the field's, not the window's own Undo
+                event.accept()
                 if event.type() == QEvent.Type.KeyPress:
                     self._step(*((self._undone, self._redone) if undo
                                  else (self._redone, self._undone)))
@@ -132,19 +84,13 @@ class UndoHistory(QObject):
 
 
 class _Tracker(QObject):
-    """Keeps one field's marks — and the prompt under them — in step with what is
-    typed into it."""
-
     def __init__(self, edit: QPlainTextEdit, baseline: str, undo: bool):
         super().__init__(edit)
         self._edit = edit
         self._baseline = baseline
-        self._value = edit.toPlainText()  # the prompt the field is worth
-        # The spans the document is currently spelled out of. Their texts joined
-        # are exactly its text, which is the invariant every translation below
-        # rests on.
+        self._value = edit.toPlainText()
         self._layout: list = [(SAME, self._value)] if self._value else []
-        self._writing = False  # our own rewrites, which must not re-enter
+        self._writing = False
         self._history = (UndoHistory(self, lambda: self._value, self._show_whole) if undo
                          else None)
         self._settle = QTimer(self)
@@ -155,7 +101,7 @@ class _Tracker(QObject):
         self._redraw = QTimer(self)
         self._redraw.setSingleShot(True)
         self._redraw.timeout.connect(self._show_prompt_only)
-        edit.setUndoRedoEnabled(False)  # see the module docstring
+        edit.setUndoRedoEnabled(False)
         edit.installEventFilter(self)
         if self._history is not None:
             self._history.watch(edit)
@@ -182,14 +128,7 @@ class _Tracker(QObject):
         finally:
             self._writing = False
 
-    # --- translating between the document and the prompt --------------------
-
     def prompt_offset(self, doc_offset: int) -> int:
-        """Where a position in the document falls in the prompt.
-
-        A position inside a struck-through run is the point that run sits at:
-        those words are not in the prompt, so there is nowhere else for it to be.
-        """
         doc = prompt = 0
         for kind, text in self._layout:
             if doc + len(text) >= doc_offset:
@@ -200,9 +139,6 @@ class _Tracker(QObject):
         return prompt
 
     def document_offset(self, prompt_offset: int) -> int:
-        """Where a position in the prompt falls in the document — the earliest
-        such position, so a caret at the end of a word lands before the struck
-        run that follows it rather than after it."""
         doc = prompt = 0
         for kind, text in self._layout:
             if kind != REMOVED:
@@ -223,16 +159,10 @@ class _Tracker(QObject):
             doc += len(text)
         return ranges
 
-    # --- rendering ----------------------------------------------------------
-
     def _paint(self, spans: list, caret: int) -> None:
-        """Spell the document out of ``spans`` and put the caret back at
-        ``caret`` — a position in the prompt, not in the document, since the
-        document is about to be a different length."""
         self._layout = spans
         text = "".join(piece for _kind, piece in spans)
         with self._own_write():
-            # What the field is worth, whenever that is no longer what it says.
             diff_text.hold_value(self._edit,
                                  None if text == self._value else self._value)
             self._edit.setPlainText(text)
@@ -251,13 +181,6 @@ class _Tracker(QObject):
             self._edit.setTextCursor(place)
 
     def _light(self, spans: list) -> None:
-        """Re-mark the document without touching its text — every arriving word
-        lit, everything else plain.
-
-        Formatting only, so the caret stays exactly where the typist left it.
-        This is what a keystroke costs; the struck-through words wait for
-        :meth:`show_whole_change`, which cannot avoid rewriting.
-        """
         self._layout = spans
         with self._own_write():
             _unmark(self._edit)
@@ -272,8 +195,6 @@ class _Tracker(QObject):
             diff_text.hold_value(self._edit, None)
 
     def show_whole_change(self) -> None:
-        """Put the words that left back into the field, struck through beside the
-        ones that arrived. What a settled field shows."""
         self._settle.stop()
         self._redraw.stop()
         caret = self.prompt_offset(self._edit.textCursor().position())
@@ -282,36 +203,25 @@ class _Tracker(QObject):
                 or self._edit.toPlainText() != self._value):
             self._paint(spans, caret)
         else:
-            self._light(spans)  # nothing left: the document already reads right
+            self._light(spans)
 
     def measure_against(self, baseline: str) -> None:
         self._baseline = baseline
         self.show_whole_change()
 
     def _show_prompt_only(self) -> None:
-        """The field as the prompt alone, arriving words still lit — what it is
-        while being typed in."""
         spans = [span for span in diff_spans(self._baseline, self._value)
                  if span[0] != REMOVED]
         if self._edit.toPlainText() == self._value:
-            self._light(spans)  # already the prompt: mark it, don't rewrite it
+            self._light(spans)
         else:
             self._paint(spans, self._prompt_caret)
 
-    # --- what the typist does -----------------------------------------------
-
     def _on_contents_change(self, position: int, removed: int, added: int) -> None:
-        """Follow one edit of the document through to the prompt under it.
-
-        The document may hold struck-through words at this point, so where the
-        edit landed in it is not where it landed in the prompt — which is why
-        this works off the reported offsets and the spans the document was last
-        spelled out of, rather than off what the field now says.
-        """
         if self._writing:
             return
         inserted = self._edit.toPlainText()[position:position + added]
-        if self._history is not None and not self._settle.isActive():  # a burst's first keystroke
+        if self._history is not None and not self._settle.isActive():
             self._history.took(self._value)
         start = self.prompt_offset(position)
         end = self.prompt_offset(position + removed)
@@ -321,7 +231,7 @@ class _Tracker(QObject):
                              None if self._edit.toPlainText() == self._value else self._value)
         self._prompt_caret = start + len(inserted)
         self._redraw.start()
-        self._settle.start()  # ...and the strikes come back once the typing stops
+        self._settle.start()
 
     def take(self, value: str) -> None:
         if self._history is not None:
@@ -335,7 +245,6 @@ class _Tracker(QObject):
         self._paint(diff_spans(self._baseline, value), len(value))
 
     def eventFilter(self, obj, event):
-        # Leaving the field ends the typing, whatever the clock still says.
         if event.type() == QEvent.Type.FocusOut:
             self.show_whole_change()
         return event.type() == QEvent.Type.KeyPress and self._key_kept_off_struck_words(event)
@@ -415,7 +324,6 @@ def _tracker_of(edit: QPlainTextEdit) -> _Tracker | None:
 
 
 def track(edit: QPlainTextEdit, baseline: str, *, undo: bool = True) -> None:
-    """Show ``edit`` as a rewrite of ``baseline``, now and as it is typed in."""
     tracker = _tracker_of(edit)
     if tracker is not None:
         tracker.measure_against(baseline)
@@ -454,12 +362,10 @@ def put_caret_in_prompt(edit: QPlainTextEdit, offset: int) -> None:
 
 
 def untrack(edit: QPlainTextEdit) -> None:
-    """Stop tracking ``edit`` and leave it an ordinary field holding its prompt."""
     for tracker in edit.findChildren(_Tracker):
         tracker.detach()
     diff_text.clear_diff(edit)
     _unmark(edit)
-    # ...and off whatever is typed or written into it next, which would otherwise
-    # take the format that was under the caret when the marks came off.
+    # Qt: text written into a field takes the format under the caret, so reset it
     edit.setCurrentCharFormat(_plain_format())
 

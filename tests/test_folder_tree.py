@@ -35,9 +35,6 @@ class _Group:
 
 
 def _folder_row(label, key, favorite=False):
-    """A folder row as the tree draws one: the folder it holds, and its own key —
-    that folder's, plus the shape this copy of it is drawn on. The two differ
-    because both shapes draw the same folder (see origenerator.item_shape)."""
     item = QTreeWidgetItem([label])
     item.setData(0, _ROLE, _Group(key, favorite))
     item.setData(0, TREE_KEY_ROLE, shaped_key(key, LANDSCAPE))
@@ -45,18 +42,16 @@ def _folder_row(label, key, favorite=False):
 
 
 def test_action_rects_sit_left_of_the_label_star_nearest():
-    content = QRect(60, 0, 140, 24)  # a label indented 60px, leaving room to its left
+    content = QRect(60, 0, 140, 24)
     star, delete = _action_rects(content)
-    assert star.right() <= content.left()      # both sit left of the label...
-    assert delete.right() <= star.left()       # ...delete beyond the star
-    assert delete.left() >= 0                   # and within the indentation, not off-screen
+    assert star.right() <= content.left()
+    assert delete.right() <= star.left()
+    assert delete.left() >= 0
 
 
 def _tree_with_leaf(qtbot, *, favorite=False):
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
-    # Nest the leaf a few levels deep, as real folders are, so its indentation has
-    # room for the icons to its left.
     media = _folder_row("Media", "m")
     wf = _folder_row("Workflow", "m/w")
     model = _folder_row("Model", "m/w/mo")
@@ -116,12 +111,11 @@ def test_a_picked_row_can_be_told_to_offer_no_delete(qtbot):
 
 def test_a_parent_row_offers_no_actions(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
-    parent = leaf.parent()  # "Model" has a child, so it is a non-leaf
+    parent = leaf.parent()
     fired = []
     tree.favorite_clicked.connect(fired.append)
     tree.delete_clicked.connect(fired.append)
 
-    # Where a leaf would show its icons, a parent shows nothing and just selects.
     star_rect, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(parent)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star_rect.center())
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=delete_rect.center())
@@ -131,16 +125,11 @@ def test_a_parent_row_offers_no_actions(qtbot):
 
 
 def _caret_pos(tree, item):
-    """A point in ``item``'s own disclosure column, where its caret is drawn."""
     row = tree.visualRect(tree.indexFromItem(item))
     return QPoint(row.left() - tree.indentation() // 2, row.center().y())
 
 
 def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
-    # QTreeView toggles the caret on a press of any button. A folder with
-    # sub-folders wears no star of its own, so its right-click menu is the only
-    # way to favorite it — and the menu covers the tree, so a collapse on the way in
-    # is only seen once the menu closes, reading as something the star did.
     tree, leaf = _tree_with_leaf(qtbot)
     parent = leaf.parent()
 
@@ -148,7 +137,7 @@ def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
                      pos=_caret_pos(tree, parent))
 
     assert parent.isExpanded()
-    assert tree.currentItem() is parent  # still picked, so the menu acts on it
+    assert tree.currentItem() is parent
 
 
 def test_left_clicking_the_caret_still_collapses_the_folder(qtbot):
@@ -165,12 +154,11 @@ def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
 
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
-    # The hovered ROW, so its delete is drawn — and only that copy of the folder.
     assert tree._hover_key == shaped_key("m/w/mo/key", LANDSCAPE)
 
     parent = leaf.parent()
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(parent)).center())
-    assert tree._hover_key is None          # a parent isn't tracked — it has no actions
+    assert tree._hover_key is None
 
 
 def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
@@ -180,11 +168,11 @@ def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
     tree.delete_clicked.connect(fired.append)
 
     row = tree.visualRect(tree.indexFromItem(leaf))
-    label_pos = QPoint(row.center().x(), row.center().y())  # on the label, right of the icons
+    label_pos = QPoint(row.center().x(), row.center().y())
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=label_pos)
 
     assert fired == []
-    assert tree.currentItem() is leaf  # a normal click still selects the row
+    assert tree.currentItem() is leaf
 
 
 def _shown(item):
@@ -208,11 +196,8 @@ def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
     assert _shown(leaf) == "A folder"
 
 
-# --- picking several folders, and dragging them onto a collecting row ---------
-
 def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False,
                      takes_folder=lambda _row_key, _folder_key: True):
-    """A tree with a collecting row, the Favorites collection, atop two ordinary folders."""
     tree = FolderTree(_ROLE, takes_item=takes_item, takes_folder=takes_folder)
     qtbot.addWidget(tree)
     collection = QTreeWidgetItem(["Favorites"])
@@ -229,9 +214,7 @@ def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False,
 
 
 def _drag(keys):
-    """The mime a folder drag carries. Every caller keeps it in a local of its
-    own: a synthetic drop event does not own its QMimeData, so letting it fall out
-    of scope frees it under the handler."""
+    # A synthetic drop event does not own its QMimeData, so keep it in a local of your own
     mime = QMimeData()
     mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
     return mime
@@ -273,8 +256,6 @@ def test_a_collection_row_holding_no_folder_contributes_no_key(qtbot):
 
 
 def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
-    # setCurrentItem reads the live keyboard modifiers unless told otherwise, so
-    # a programmatic move made while Ctrl is held would otherwise ADD the row.
     tree, _collection, a, b = _collecting_tree(qtbot)
     a.setSelected(True)
     b.setSelected(True)
@@ -285,9 +266,6 @@ def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
 
 
 def _started_drags(monkeypatch):
-    """Capture the drags ``startDrag`` begins rather than entering the real drag
-    loop, which waits on a mouse no test has. Each capture is the test's own list,
-    so nothing carries from one test to the next."""
     started = []
 
     class _Drag:
@@ -306,9 +284,6 @@ def _started_drags(monkeypatch):
 
 
 def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, monkeypatch):
-    # The payload's producer and its reader, in one pass. Every other drag test
-    # here writes the mime itself, so the format could be anything at all and they
-    # would all still pass.
     tree, collection, a, b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     dropped = []
@@ -325,15 +300,13 @@ def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, mo
 
 
 def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch):
-    # The file-manager rule, and what keeps a multi-selection the user has since
-    # forgotten about from riding along on the next drag.
     tree, collection, a, b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     dropped = []
     tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
     tree.setCurrentItem(a)
     a.setSelected(False)
-    b.setSelected(True)  # the pick is elsewhere; the pressed row is A
+    b.setSelected(True)
 
     tree.startDrag(Qt.DropAction.CopyAction)
     (drag,) = started
@@ -343,7 +316,6 @@ def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch
 
 
 def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
-    # A collection gathers folders; it is not one, so there is nothing to pick it up by.
     tree, collection, _a, _b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     tree.setCurrentItem(collection)
@@ -354,7 +326,6 @@ def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
 
 
 def _folder_of_your_own(tree):
-    """A row that holds a folder and collects as well, as a custom collection's does."""
     own = _folder_row("Mine", "__custom__/1")
     own.setData(0, DROP_KEY_ROLE, "__custom__/1")
     tree.addTopLevelItem(own)
@@ -362,7 +333,6 @@ def _folder_of_your_own(tree):
 
 
 def test_a_folder_of_your_own_drags_like_any_folder(qtbot, monkeypatch):
-    # Another collection of your own can take it, so its row is picked up as any row is.
     tree, collection, _a, _b = _collecting_tree(qtbot)
     own = _folder_of_your_own(tree)
     started = _started_drags(monkeypatch)
@@ -439,17 +409,13 @@ def test_a_folder_dragged_out_tells_every_place_a_drop_can_land(qtbot, monkeypat
     assert heard.ended == 1
 
 
-# --- the drop style, on the rows a drag would land in ---------------------------
-
 def _style_of(tree, row):
-    """The drop style ``row`` wears across the whole width of the list."""
     rect = tree.visualRect(tree.indexFromItem(row))
     return worn(tree.viewport().grab().toImage(),
                 QRect(0, rect.top(), tree.viewport().width(), rect.height()))
 
 
 def _lit_for_a_folder(qtbot):
-    """A list Favorites is lit in, for folder A, with B an ordinary folder beside it."""
     tree, favorites, _a, b = _collecting_tree(qtbot)
     tree.setStyleSheet(build_stylesheet())
     mime = _drag([shaped_key("k/a", LANDSCAPE)])
@@ -517,7 +483,6 @@ def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
 
     assert dropped == [("__starred__", ["k/a", "k/b"])]
     assert event.isAccepted()
-    # The tree's shape comes from the generations, so nothing was reparented.
     assert tree.topLevelItemCount() == 3
     assert collection.childCount() == 0
 
@@ -553,7 +518,7 @@ def test_a_drop_carrying_something_other_than_folders_is_ignored(qtbot):
     dropped = []
     tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
     text = QMimeData()
-    text.setText("k/a")  # a plain-text drag from anywhere else
+    text.setText("k/a")
 
     assert not _drag_move_at(tree, collection, text).isAccepted()
     _drop_at(tree, collection, text)
@@ -581,7 +546,7 @@ def test_an_item_dropped_on_a_collecting_row_that_takes_it_is_reported(qtbot):
 
 
 def test_an_item_a_collecting_row_does_not_take_is_refused(qtbot):
-    tree, collection, _a, _b = _collecting_tree(qtbot)  # takes no item
+    tree, collection, _a, _b = _collecting_tree(qtbot)
     dropped = []
     tree.dropped.connect(lambda *landed: dropped.append(landed))
     mime = generation_mime("p1")
@@ -593,7 +558,6 @@ def test_an_item_a_collecting_row_does_not_take_is_refused(qtbot):
 
 
 def test_an_ordinary_folder_refuses_an_item(qtbot):
-    # Only a collecting row is asked; a derived folder's contents are its settings'.
     tree, _collection, a, _b = _collecting_tree(qtbot, takes_item=lambda *_: True)
     dropped = []
     tree.dropped.connect(lambda *landed: dropped.append(landed))
@@ -606,7 +570,6 @@ def test_an_ordinary_folder_refuses_an_item(qtbot):
 
 
 def test_an_item_drag_is_let_into_the_tree(qtbot):
-    # Refused at the door, it would never be offered a row to land on.
     tree, collection, _a, _b = _collecting_tree(qtbot)
     mime = generation_mime("p1")
     pos = tree.visualRect(tree.indexFromItem(collection)).center()
@@ -635,7 +598,6 @@ def _held_at(spot, mime):
 
 
 def test_a_drag_held_at_the_top_edge_jumps_the_tree_to_its_top(qtbot):
-    # Where the collections of your own are, and almost always where the drag is going.
     tree, bar = _too_long_for_its_height(qtbot)
     bar.setValue(bar.maximum())
     mime = generation_mime("p1")
@@ -670,15 +632,12 @@ def test_letting_a_drag_go_at_the_edge_stops_the_scrolling(qtbot):
 
 
 def _is_blue(color) -> bool:
-    """Whether a pixel carries the family's blue, rather than a gray or the
-    colored edge a letter picks up where it is drawn against one."""
     return (color.blue() > color.red() + 50
             and color.blue() > color.green() + 30
             and color.blue() > 120)
 
 
 def _row_pixels(tree, item) -> list:
-    """Every pixel of the row ``item`` is drawn on, as ``(x, color)`` pairs."""
     image = tree.viewport().grab().toImage()
     row = tree.visualRect(tree.indexFromItem(item))
     return [(x, image.pixelColor(x, y))
@@ -692,9 +651,6 @@ def _wears_within(tree, item, columns: QRect, ink) -> bool:
 
 
 def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):
-    # The platform draws a picked row an accent bar down its left edge on top of
-    # that ground -- straight through the mark the row leads with, and saying
-    # nothing the ground has not already said.
     tree, leaf = _tree_with_leaf(qtbot)
     tree.setStyleSheet(build_stylesheet())
     leaf.setText(0, "")
@@ -711,9 +667,8 @@ def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
 
     marked = {x for x, color in _row_pixels(tree, leaf) if _is_blue(color)}
     _star, delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
-    assert marked                        # the mark is drawn...
-    assert max(marked) < delete.left()   # ...at the pane's own edge, clear of the
-                                         # row's actions however deep it sits
+    assert marked
+    assert max(marked) < delete.left()
 
 
 def _is_white(color) -> bool:
@@ -764,7 +719,6 @@ def _laid_out(tree, item, element) -> QRect:
 
 
 def _tree_with_a_collection(qtbot, which=LATEST_KEY):
-    """A collection row under a workflow folder, under All, the way a shape lays them out."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")

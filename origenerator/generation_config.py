@@ -1,8 +1,3 @@
-"""Pure helpers for reasoning about a generation's configuration.
-
-Qt-free so the logic stays unit-testable without a widget toolkit. Shared by
-the gallery (reuse) and the generate view (subtab prefill + version-list-click compare).
-"""
 from __future__ import annotations
 
 import json
@@ -18,19 +13,11 @@ _SEED_MAX = (1 << 63) - 1
 
 @dataclass
 class ConfigSnapshot:
-    """A Generate tab's live settings, captured for comparison.
-
-    ``seed_is_random`` records whether the seed's "Random" checkbox is checked (in
-    which case the tab can never match a concrete past generation), so a
-    reopened tab comes back the way it was left.
-    """
-
     workflow_name: str
     params: dict
     seed_is_random: bool
 
     def to_dict(self) -> dict:
-        """A JSON-serializable view, for persisting an open generate tab."""
         return {
             "workflow_name": self.workflow_name,
             "params": self.params,
@@ -39,7 +26,6 @@ class ConfigSnapshot:
 
     @classmethod
     def from_dict(cls, data: dict) -> ConfigSnapshot:
-        """Rebuild from :meth:`to_dict` output, tolerating partial/corrupt data."""
         params = data.get("params")
         if not isinstance(params, dict):
             params = {}
@@ -62,13 +48,6 @@ def _values_equal(a, b) -> bool:
 
 
 def merge_denormalized(row: dict) -> dict:
-    """Return a generation row's full params dict.
-
-    ``params_json`` is authoritative; the denormalized ``positive_prompt``,
-    ``negative_prompt`` and ``seed`` columns are folded in only for keys the
-    JSON doesn't already carry. Missing or malformed ``params_json`` yields an
-    empty base.
-    """
     raw = row.get("params_json")
     try:
         params = json.loads(raw) if raw else {}
@@ -84,31 +63,17 @@ def merge_denormalized(row: dict) -> dict:
 
 
 def _params_identical(a: dict, b: dict) -> bool:
-    """True when two param dicts carry the same keys and equal values."""
     return a.keys() == b.keys() and all(_values_equal(a[k], b[k]) for k in a)
 
 
 def configs_match(a: ConfigSnapshot, b: ConfigSnapshot) -> bool:
-    """True when two snapshots would run the same generation.
-
-    Everything that decides the output: the workflow, every parameter, and
-    whether the seed is pinned or re-rolled — a config that draws a fresh seed
-    reproduces nothing, so it never matches one that pins it, even at the same
-    seed value. Used to tell whether an editable form still describes the
-    generation whose output it was seeded from.
-    """
     return (a.workflow_name == b.workflow_name
             and a.seed_is_random == b.seed_is_random
             and _params_identical(a.params, b.params))
 
 
 def _recorded_an_output(row: dict) -> bool:
-    """True when a row has at least one output file recorded against it.
-
-    The gallery's :func:`origenerator.gallery.output.produced_output` in miniature,
-    re-derived here rather than imported because ``origenerator.gallery`` imports
-    this module (see :mod:`origenerator.gallery.combine`).
-    """
+    # Not gallery.output.produced_output: origenerator.gallery imports this module
     try:
         files = json.loads(row.get("output_files") or "[]")
     except (json.JSONDecodeError, TypeError):
@@ -117,28 +82,6 @@ def _recorded_an_output(row: dict) -> bool:
 
 
 def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
-    """Return the first already-completed generation ``snapshot`` would reproduce.
-
-    Re-running a config whose seed isn't randomized re-creates a byte-identical
-    output, so this lets the caller warn before wasting a run. A row counts only
-    when it is a reproducible generation of ours whose full parameters match:
-
-    * ``completed`` -- a failed or canceled attempt is a legitimate retry.
-    * it recorded an output file -- a run that started but never finished can
-      still be sitting there marked ``completed`` with nothing to show for it
-      (ComfyUI ends an interrupted prompt exactly as it ends a finished one, so a
-      cancel that didn't come from the job's own Cancel is reported as a
-      completion with no outputs). The gallery already shows only rows that
-      produced a file, so counting one that didn't refuses to make something the
-      user cannot see anywhere.
-    * ``source == "generated"`` -- imports lack our full graph/params and aren't
-      reproducible, so re-running never re-creates one.
-    * every parameter equal -- matching only the keys a stored row happens to
-      carry would wrongly flag a sparsely recorded row (e.g. a reused import)
-      when the user changed a field it never stored.
-
-    Returns ``None`` when the seed is random (every run differs) or nothing matches.
-    """
     if snapshot.seed_is_random:
         return None
     for row in rows:
@@ -159,20 +102,6 @@ def reproducible(row: dict) -> bool:
 
 def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
                                    seed_is_random: bool = False) -> bool:
-    """True when launching ``workflow`` with ``params`` would re-create a
-    byte-identical past generation among ``rows``.
-
-    The question under both the "already generated" guard the gallery runs at
-    launch and the caption the Generate button wears while a press would do it —
-    one function, so the button can never promise a fresh seed the launch doesn't
-    draw (or stay silent about one it does).
-
-    ``params`` is filled from the workflow's defaults first: a stored row carries
-    every param, and :func:`find_duplicate_generation` matches only on identical
-    key sets, so a caller passing just the fields it edited would otherwise never
-    match. ``seed_is_random`` is the form's Random checkbox — a seed drawn per run
-    reproduces nothing, whatever the field it was last pinned to says.
-    """
     snapshot = ConfigSnapshot(workflow.name,
                               {**workflow.default_params(), **params},
                               seed_is_random)
@@ -180,12 +109,6 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
 
 
 def randomize_seeds(params: dict, seed_keys) -> dict:
-    """Return a copy of ``params`` with every key in ``seed_keys`` re-rolled.
-
-    Used to re-run a generation as a fresh variation: same settings, new seed.
-    Each named key is set (even if absent) so the rebuilt payload always has a
-    seed to use; a workflow with two seeds (e.g. dual-noise video) re-rolls both.
-    """
     out = dict(params)
     for key in seed_keys:
         out[key] = random.randint(0, _SEED_MAX)
@@ -193,19 +116,6 @@ def randomize_seeds(params: dict, seed_keys) -> dict:
 
 
 def filled_params(row: dict, workflow) -> dict:
-    """A stored row's params with any it didn't carry filled from the workflow's
-    defaults (imports keep only sparse metadata) — its seeds left exactly as
-    stored. The reproducible half of :func:`prepared_params`, used on its own to
-    re-run settings while pinning one of their two seeds (an i2v re-roll that keeps
-    the video seed, say).
-
-    The enhance layer is taken from the workflow's defaults rather than the row,
-    so a new run never inherits an enhancement from the one it varies. Every
-    other param is part of the settings, and a variation reproduces them; enhancement is not
-    — it is what the gallery's Enhance pane applies, deliberately and
-    app-wide. Inheriting it silently is what made a re-roll come out enhanced
-    with the Enhance pane's checkbox unchecked.
-    """
     defaults = workflow.default_params()
     params = merge_denormalized(row)
     never_recorded = [key for key in workflow.seed_keys() if key not in params]
@@ -218,10 +128,4 @@ def filled_params(row: dict, workflow) -> dict:
 
 
 def prepared_params(row: dict, workflow) -> dict:
-    """A stored row's params readied to generate a fresh variation of it.
-
-    :func:`filled_params` with every seed re-rolled — the common preparation a
-    gallery re-roll and a Generate-tab random input both run before rebuilding a
-    payload.
-    """
     return randomize_seeds(filled_params(row, workflow), workflow.seed_keys())

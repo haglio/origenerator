@@ -1,4 +1,3 @@
-"""A prompt field showing what is being typed into it as a change to what it said."""
 from __future__ import annotations
 
 import os
@@ -15,13 +14,6 @@ from origenerator.gui import diff_text, tracked_prompt
 
 
 class _Pair(QWidget):
-    """The field under test and somewhere else to click.
-
-    A window with two fields in it, because leaving a field is one of the things
-    that settles it — and a field can only be left for something. Shown, since an
-    unshown widget takes no focus and so is never left either.
-    """
-
     def __init__(self, text):
         super().__init__()
         column = QVBoxLayout(self)
@@ -42,13 +34,11 @@ def pair(qtbot):
 
 
 def _settle_timer(edit: QPlainTextEdit) -> QTimer:
-    """The clock a tracked field puts the departed words back on."""
     timer, = [timer for timer in edit.findChildren(QTimer) if timer.interval()]
     return timer
 
 
 def _drawn(edit: QPlainTextEdit) -> None:
-    """The redraw a keystroke leaves waiting, delivered the way its timer does."""
     redraw, = [timer for timer in edit.findChildren(QTimer) if not timer.interval()]
     if redraw.isActive():
         redraw.stop()
@@ -56,19 +46,10 @@ def _drawn(edit: QPlainTextEdit) -> None:
 
 
 def _settle(qtbot, edit: QPlainTextEdit) -> None:
-    """Wait out the pause after which the departed words are put back.
-
-    Until the clock has fired, not for a stretch of time long enough that it
-    probably has. A sleep a hair over the interval is a race every test here
-    would ride on at once: late in a loaded suite the timeout lands after the
-    sleep is over, and everything below reads the field one render early.
-    """
     qtbot.waitUntil(lambda: not _settle_timer(edit).isActive(), timeout=5000)
 
 
 def _type_over(edit, word: str, replacement: str):
-    """Select ``word`` and type ``replacement`` over it — the gesture this whole
-    module exists for."""
     start = edit.toPlainText().index(word)
     cursor = edit.textCursor()
     cursor.setPosition(start)
@@ -78,8 +59,6 @@ def _type_over(edit, word: str, replacement: str):
 
 
 def _marks(edit: QPlainTextEdit) -> list[tuple]:
-    """``(text, mark)`` runs down the field, where mark is "lit", "struck" or
-    "plain" — how the change reads to someone looking at it."""
     cursor = QTextCursor(edit.document())
     runs = []
     for _ in range(len(edit.toPlainText())):
@@ -98,15 +77,10 @@ def _marks(edit: QPlainTextEdit) -> list[tuple]:
 
 
 def _marked(edit, mark) -> str:
-    """What is marked this way, with the whitespace either side of it dropped —
-    a diff may hand a changed word its leading or trailing space, and which of
-    the two it picks says nothing about the change."""
     return "".join(text for text, kind in _marks(edit) if kind == mark).strip()
 
 
 def _heard_either_side_of_the_tracker(edit, baseline) -> tuple[list, list]:
-    """What the field holds at every change it reports, heard just before the
-    tracker and just after it."""
     before, after = [], []
     edit.document().contentsChange.connect(
         lambda *_change: before.append((edit.toPlainText(), _marks(edit))))
@@ -132,14 +106,11 @@ def test_words_typed_in_are_lit_as_they_are_typed(pair):
     _drawn(pair.edit)
 
     assert _marked(pair.edit, "lit") == "ginger"
-    # Lighting a word adds no text: the field still says exactly the prompt.
     assert pair.edit.toPlainText() == "a ginger cat on a couch"
     assert diff_text.live_text(pair.edit) == "a ginger cat on a couch"
 
 
 def test_lighting_a_word_does_not_move_the_cursor(pair):
-    # A keystroke only re-marks; if it rewrote the text the typist would be
-    # thrown to the end of the field mid-word.
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
     cursor = pair.edit.textCursor()
@@ -154,11 +125,6 @@ def test_lighting_a_word_does_not_move_the_cursor(pair):
 
 
 def test_the_departed_words_wait_out_the_typing_rather_than_arriving_per_letter(pair):
-    """Ten tests here pay this pause and none of them says what it is worth.
-
-    It is the whole answer to two complaints at once: a strike that waited for the
-    field to be left, and a document re-laid under the caret on every keystroke.
-    """
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
 
@@ -167,19 +133,15 @@ def test_the_departed_words_wait_out_the_typing_rather_than_arriving_per_letter(
     settle = _settle_timer(pair.edit)
     assert settle.isActive()
     assert settle.isSingleShot()
-    assert _marked(pair.edit, "struck") == ""  # nothing put back while typing
-    # The number itself, not SETTLE_MS: read back through the constant that sets
-    # it, a strike arriving on every letter passes just as well as this does.
+    assert _marked(pair.edit, "struck") == ""
     assert settle.interval() == 150
 
-    settle.timeout.emit()  # the pause, delivered the way the timer does
+    settle.timeout.emit()
 
     assert _marked(pair.edit, "struck") == "cat"
 
 
 def test_typing_over_a_word_strikes_it_through_without_leaving_the_field(pair, qtbot):
-    # The complaint this answers: the green arrived at once and the red waited
-    # for a click somewhere else.
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
 
@@ -188,13 +150,10 @@ def test_typing_over_a_word_strikes_it_through_without_leaving_the_field(pair, q
 
     assert _marked(pair.edit, "struck") == "cat"
     assert _marked(pair.edit, "lit") == "dog"
-    # The struck word is shown, not asked for: the prompt is what would generate.
     assert diff_text.live_text(pair.edit) == "a dog on a couch"
 
 
 def test_what_went_is_struck_through_in_red(pair, qtbot):
-    # The words are still in the field, so a reader skimming a long prompt has
-    # to be able to tell at a glance which of it is no longer asked for.
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
     _type_over(pair.edit, "cat", "dog")
@@ -214,8 +173,6 @@ def test_the_caret_stays_where_it_was_typed_when_the_strike_arrives(pair, qtbot)
     _type_over(pair.edit, "cat", "dog")
     _settle(qtbot, pair.edit)
 
-    # Still just after "dog", which is now further along the document than it is
-    # along the prompt — the struck "cat" sits in front of it.
     after_dog = pair.edit.toPlainText().index("dog") + len("dog")
     assert pair.edit.textCursor().position() == after_dog
 
@@ -301,8 +258,6 @@ def test_leaving_the_field_settles_it_without_waiting_out_the_clock(pair):
 
 
 def test_a_rewrite_across_lines_keeps_the_prompt_whole(qtbot):
-    # A struck-through line break doesn't report itself as struck, so a field
-    # that read its own marks back would gain or lose newlines here.
     widget = _Pair("a cat\non a couch")
     qtbot.addWidget(widget)
     with qtbot.waitExposed(widget):
@@ -326,10 +281,10 @@ def test_deleting_a_whole_line_keeps_the_prompt_whole(qtbot):
     widget.edit.setFocus()
 
     cursor = widget.edit.textCursor()
-    cursor.setPosition(5)  # end of "a cat"
+    cursor.setPosition(5)
     cursor.setPosition(len("a cat\non a couch"), QTextCursor.MoveMode.KeepAnchor)
     widget.edit.setTextCursor(cursor)
-    widget.edit.insertPlainText("")  # delete the selection
+    widget.edit.insertPlainText("")
     _settle(qtbot, widget.edit)
 
     assert diff_text.live_text(widget.edit) == "a cat"
@@ -344,9 +299,6 @@ def test_untracking_leaves_an_ordinary_field_holding_its_prompt(pair, qtbot):
     tracked_prompt.untrack(pair.edit)
 
     assert pair.edit.toPlainText() == "a dog on a couch"
-    # And no longer marks anything typed into it. There is no waiting to do
-    # here — untracking took the clock with it, which is the whole reason
-    # nothing arrives after this.
     assert pair.edit.findChildren(QTimer) == []
     pair.edit.setPlainText("a dog on a rug")
     assert _marks(pair.edit) == [("a dog on a rug", "plain")]
@@ -374,7 +326,6 @@ print("still running")
 
 
 def test_a_form_freed_while_its_prompt_waits_to_be_redrawn_leaves_the_app_running():
-    # In a fresh interpreter, since what breaks here is the process itself.
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
                PYTHONPATH=str(Path(__file__).resolve().parent.parent))
     ran = subprocess.run([sys.executable, "-c", _FORMS_FREED_WHILE_A_REDRAW_WAITS],
@@ -387,7 +338,6 @@ def test_a_form_freed_while_its_prompt_waits_to_be_redrawn_leaves_the_app_runnin
 
 
 def _struck_out_of_the_middle(pair) -> None:
-    """The field settled on "a on a couch", with "cat" struck between "a" and "on"."""
     pair.edit.setPlainText("a on a couch")
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()

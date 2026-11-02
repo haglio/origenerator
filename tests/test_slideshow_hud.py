@@ -1,5 +1,3 @@
-"""The one HUD a slideshow wears: what the slideshow tells it to draw, where the
-Funestra draws it, and what a press on it asks of the slideshow."""
 from __future__ import annotations
 
 import json
@@ -57,7 +55,6 @@ def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image"
 
 
 def _hud(window):
-    """The HUD as the Funestra composited it: where, and the pixels."""
     window._pane.tick()
     return window._pane._engine.overlays[HUD_OVERLAY_ID]
 
@@ -100,7 +97,6 @@ def test_an_undressed_slideshow_wears_nothing(qtbot):
 
 
 def test_a_slideshow_whose_funestra_is_not_open_yet_still_has_its_hud_ready(qtbot):
-    """The first beat comes before the pane has a window to hand the engine."""
     window = SlideshowView([("scene one.mp4", "video")], shuffle=in_order)
     qtbot.addWidget(window)
     window.wear_the_hud("portrait")
@@ -123,15 +119,6 @@ def test_the_hud_names_the_item_the_way_this_app_names_it(qtbot):
 
 
 class TestTheOneHudASlideshowWears:
-    """A slideshow used to wear TWO HUDs: the Funestras' HUD for the set, and Genau's
-    whole OSR2 controls seated under it for the device.  Between them the status was
-    said twice and disagreed -- "Looping seeds · Shuffle" over "Unlocked · 4s" --
-    and prev, next, lock and trash were drawn on both.
-
-    One HUD now: the Funestras' HUD, carrying the device's line and the drive
-    readout out of the OSR2 controls' own code.
-    """
-
     @staticmethod
     def _window(qtbot, **kwargs):
         motion = FakeMotion()
@@ -148,8 +135,8 @@ class TestTheOneHudASlideshowWears:
     def test_the_device_is_on_the_one_hud(self, qtbot):
         model = self._model(qtbot)
 
-        assert model.osr2 != ""          # who has the device
-        assert model.drive is not None   # and the motion it is being sent
+        assert model.osr2 != ""
+        assert model.drive is not None
 
     def test_the_osr2_line_carries_the_max_intensity_the_motion_is_held_to(self, qtbot):
         window = self._window(qtbot)
@@ -173,7 +160,6 @@ class TestTheOneHudASlideshowWears:
             "(this Funestra doesn't have the OSR2 and this slide has no funscript)")
 
     def test_the_pace_rides_with_the_rows_that_step_the_set(self, qtbot):
-        """It sets how long an unheld slide stays up, which is about the set."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 
         assert "portrait_clip_seconds_up" in posted
@@ -210,9 +196,6 @@ class TestTheOneHudASlideshowWears:
         assert slideshow_hud_model("portrait", self._window(qtbot).slideshow).osr2_controls == ()
 
     def test_everything_that_aims_the_device_rides_with_the_device(self, qtbot):
-        """Human-inspired motion, the waveform and the OSR2 switch act on the
-        OSR2, so they sit in its own block at the foot of the
-        HUD rather than up among the rows that act on the set."""
         model = self._model(qtbot)
         aiming = [button.command for row in model.osr2_rows for button in row]
 
@@ -221,8 +204,6 @@ class TestTheOneHudASlideshowWears:
         assert "robot_hand_release" in aiming
 
     def test_the_transport_is_drawn_once(self, qtbot):
-        """The Funestras' console's own prev/next/lock/trash row is off it: the side's
-        four are already there, and they act on the very same slideshow."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 
         assert posted.count("portrait_prev") == 1
@@ -265,8 +246,6 @@ class TestTheOneHudASlideshowWears:
         assert window.slideshow.dwell_s == at
 
     def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
-        """The device rows are checked before the session's transport now, so a
-        shape verb that fell into them would be swallowed instead of posted."""
         window = self._window(qtbot)
         channel = tmp_path / "dashboard_cmd.txt"
         window.wear_the_hud("portrait", dashboard_cmd_file=channel)
@@ -276,13 +255,12 @@ class TestTheOneHudASlideshowWears:
         assert channel.read_text(encoding="utf-8").split() == ["portrait_next"]
 
     def test_a_press_on_the_transport_still_reaches_the_slideshow(self, qtbot):
-        """The device rows sit beside the side's own button row, not in place of it."""
         window = self._window(qtbot)
         window.wear_the_hud("portrait")
         before = window.slideshow._set.playlist.index
 
         window.press("portrait_next")
-        window.slideshow.tick()  # it reads its Funestra, as its poll does a moment later
+        window.slideshow.tick()
 
         assert window.slideshow._set.playlist.index != before
 
@@ -323,9 +301,6 @@ class TestTheOneHudASlideshowWears:
 
 
 class TestWhereTheSlideshowsHudSits:
-    """The room moves this HUD round the corners of the slideshow, and collapses it
-    to a square with a plus on it."""
-
     @staticmethod
     def _window(qtbot, **kw):
         window = _dressed(qtbot, [("scene one.png", "image")], **kw)
@@ -362,8 +337,6 @@ class TestWhereTheSlideshowsHudSits:
         assert collapsed == [True]
 
     def test_a_click_landing_on_the_minus_is_what_collapses_it(self, qtbot):
-        """The whole way in: a left button down on the square, where the HUD
-        drew it, and the HUD is a plus by the time the button comes back up."""
         collapsed: list[bool] = []
         window = self._window(qtbot, collapse=collapsed.append)
         (rect, _minus), = [(rect, button) for rect, button in hud_targets(window).buttons
@@ -421,10 +394,6 @@ class TestWhereTheSlideshowsHudSits:
 
 
 class TestACornerTheHudIsNotIn:
-    """A click in any other corner of the slideshow sends its HUD there, the way it
-    does on every Funestra, and the pointer in such a corner shows the plus that
-    says so."""
-
     @staticmethod
     def _window(qtbot, **kw):
         return TestWhereTheSlideshowsHudSits._window(qtbot, **kw)
@@ -482,8 +451,6 @@ def _point_at(window, rect) -> None:
 
 
 def _click_at(window, rect) -> None:
-    """A left click at the middle of *rect*, in the HUD's own pixels, where
-    the Funestra composited the HUD."""
     window._pane.press(_middle_of(window, rect))
     window._pane.release()
 
@@ -492,7 +459,7 @@ def test_an_image_still_being_generated_is_drawn_on_the_map_without_its_frame_by
     window = _window(qtbot, [("scene one.png", "image", "id-one")])
     window.slideshow.note_generating("id-run", b"\x89PNG frame bytes")
     window.slideshow.slideshow_step(1)
-    window.slideshow.tick()  # it reads its Funestra, as its poll does a moment later
+    window.slideshow.tick()
 
     corner = slideshow_hud_model("portrait", window.slideshow).corner
 
@@ -500,10 +467,6 @@ def test_an_image_still_being_generated_is_drawn_on_the_map_without_its_frame_by
 
 
 class _Core:
-    """Core's window as the HUD asks after it: shown or minimized, and where it
-    sits -- beside the screen Qt reports for it, which off screen is the first
-    one whatever the window's place, and so no guide to its monitor."""
-
     def __init__(self, place, *, screen=None, minimized: bool = False) -> None:
         self._place, self._screen, self._minimized = place, screen, minimized
 
@@ -521,7 +484,6 @@ class _Core:
 
 
 def _core_as(qtbot, *, over: bool, minimized: bool = False, **dressed):
-    """A slideshow, and Core under it or beside it on another monitor."""
     core = {}
     window = _dressed(qtbot, actions=SlideshowActions(core_window=lambda: core["window"]),
                       **dressed)
@@ -533,14 +495,6 @@ def _core_as(qtbot, *, over: bool, minimized: bool = False, **dressed):
 
 
 class TestTheQueueOnTheOneHud:
-    """The lower strip's queue rides on the HUD a slideshow already wears.
-
-    A slideshow covers the strip, and a slideshow is when the user keeps adding to it
-    (locking a slide asks for an enhancement).  It used to float in the
-    lower-left corner as a plate of its own, which is a second HUD over the
-    same image.
-    """
-
     def test_what_is_in_flight_is_a_block_of_the_hud(self, qtbot):
         window = _dressed(qtbot)
         window.set_queue([_inflight("j1", job_kind="Image", typical_seconds=30)], 0)
@@ -590,8 +544,6 @@ class TestTheQueueOnTheOneHud:
         assert len(sizes) == 1
 
     def test_a_press_on_the_block_reaches_the_queue_through_the_hud(self, qtbot):
-        """The Funestra hands the pointer on the block back in the block's own
-        pixels; the slideshow places it against the rows it painted."""
         stopped = []
         window = _dressed(qtbot)
         window.set_queue([_inflight("j1", cancel=lambda: stopped.append("j1"),
@@ -604,7 +556,6 @@ class TestTheQueueOnTheOneHud:
         assert stopped == ["j1"]
 
     def test_a_click_landing_on_the_block_is_placed_against_its_rows(self, qtbot):
-        """The whole way in: a press on the Funestra's window, over the block."""
         opened = []
         window = _dressed(qtbot)
         window.set_queue([_inflight("j1", reveal=lambda: opened.append("j1"),
@@ -629,9 +580,6 @@ class TestTheQueueOnTheOneHud:
 
 
 class TestTheRowOnTheOneHud:
-    """The track, the time and the volume ride on the one HUD a slideshow wears,
-    and they are the Funestra's own."""
-
     def _window(self, qtbot, items, **kw):
         return _dressed(qtbot, items, engine=FakeEngine(duration_ms=60_000), **kw)
 
@@ -681,7 +629,6 @@ class TestTheRowOnTheOneHud:
         assert _hud(window)[2] is not before
 
     def _track_fill(self, window, fraction: float):
-        """The color of the track *fraction* of the way along it."""
         row = hud_targets(window).row
         x, y, _width, height = row.rect
         track_x0, track_x1 = row.track
@@ -699,13 +646,12 @@ class TestTheRowOnTheOneHud:
 
     def test_the_track_is_colored_by_the_funscript_of_the_video_on_screen(
             self, qtbot, tmp_path):
-        # Half as much motion in the first half of the video as in the second.
         slow = [{"at": at, "pos": 100 * (index % 2)}
                 for index, at in enumerate(range(0, 2_000, 500))]
         fast = [{"at": at, "pos": 100 * (index % 2)}
                 for index, at in enumerate(range(2_000, 4_001, 125))]
         window = self._slideshow_of(qtbot, tmp_path, "scene one.mp4", slow + fast)
-        window._pane.tick()  # the first beat measures the track, the second fills it
+        window._pane.tick()
 
         assert self._track_fill(window, 0.25) != self._track_fill(window, 0.75)
 
@@ -721,10 +667,6 @@ class TestTheRowOnTheOneHud:
 
 
 class TestASlideshowOverASessionsRegion:
-    """A slideshow over a session's region in a window of this app's hands the
-    transport to the session; what only it holds -- which version of the
-    image is on screen, how fast its own Funestra plays -- it answers here."""
-
     @staticmethod
     def _slideshow_over_a_region(qtbot, tmp_path, items, **kw):
         window = _window(qtbot, items, **kw)
@@ -763,4 +705,4 @@ class TestASlideshowOverASessionsRegion:
         gestures.double_click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
 
         qtbot.waitUntil(lambda: not window.isVisible())
-        assert asked == ["the room's pause"] * 2  # the first click's pause, taken back
+        assert asked == ["the room's pause"] * 2

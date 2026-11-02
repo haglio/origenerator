@@ -26,7 +26,7 @@ def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
     loras.mkdir(parents=True)
     (loras / "b.safetensors").touch()
     (loras / "a.safetensors").touch()
-    (loras / "notes.txt").touch()   # not a model file — skipped
+    (loras / "notes.txt").touch()
     assert list_model_files("loras", ["fallback.safetensors"], accepts=ANY) == [
         "a.safetensors", "b.safetensors",
     ]
@@ -46,8 +46,6 @@ def test_a_picker_lists_its_files_in_the_order_of_their_titles(tmp_path, monkeyp
 
 
 def test_lists_gguf_models(tmp_path, monkeypatch):
-    # Flux runs on GGUF-quantized diffusion models (loaded by UnetLoaderGGUF), so
-    # the Model dropdown must list them alongside the .safetensors it already finds.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     diffusion = tmp_path / "models" / "diffusion_models"
     diffusion.mkdir(parents=True)
@@ -59,9 +57,6 @@ def test_lists_gguf_models(tmp_path, monkeypatch):
 
 
 def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
-    # ComfyUI's loaders list models in subfolders too, naming them by the path
-    # relative to the category dir (e.g. WAN's split_files/…). The dropdown must
-    # match, so a nested model is selectable and its stored value round-trips.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     diffusion = tmp_path / "models" / "diffusion_models"
     (diffusion / "split_files").mkdir(parents=True)
@@ -73,9 +68,6 @@ def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
 
 
 def test_a_models_folder_nothing_has_changed_in_is_not_walked_again(installed_models, monkeypatch):
-    # Every dropdown of every form listed its folder afresh -- a walk of the whole
-    # folder and a stat of every model in it -- which the first draw of a window
-    # paid some thirty times over for folders that change once a month.
     installed_models.add("checkpoints", "a.safetensors", arch=SDXL)
     walks = []
     walk = model_files._model_paths
@@ -111,7 +103,7 @@ def test_a_model_taken_out_of_its_folder_is_no_longer_listed(installed_models):
 
 
 def test_falls_back_when_the_category_dir_is_absent(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)  # no models/loras at all
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     assert list_model_files("loras", ["default.safetensors"], accepts=ANY) == [
         "default.safetensors",
     ]
@@ -126,9 +118,6 @@ def test_falls_back_when_the_category_dir_is_empty(tmp_path, monkeypatch):
 
 
 def test_lora_picker_leads_with_the_none_sentinel(installed_models):
-    # A LoRA is optional: the dropdown offers "None" first (which the workflow
-    # builds with no LoraLoader, running the base model unmodified), then the
-    # installed files from the same scan as any model dropdown.
     installed_models.add("loras", "b.safetensors", arch=WAN, lora=True)
     installed_models.add("loras", "a.safetensors", arch=WAN, lora=True)
     assert list_lora_files(["fallback.safetensors"], accepts=(WAN,)) == [
@@ -138,14 +127,11 @@ def test_lora_picker_leads_with_the_none_sentinel(installed_models):
 
 
 def test_a_lora_picker_whose_default_is_none_offers_none_once(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)  # no LoRA installed at all
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     assert list_lora_files([NO_LORA], accepts=(WAN,)) == [NO_LORA]
 
 
 def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path, monkeypatch):
-    # Where the detail pass's provider node looks for them. Empty rather than a
-    # fallback name: "no detector installed" is a real state the Enhance pane has to be
-    # able to read, and a fabricated default would hide it under a failed submit.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     assert list_detector_files() == []
 
@@ -157,10 +143,6 @@ def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path,
 
 
 def test_a_picker_offers_only_the_architectures_its_graph_runs(installed_models):
-    # models/checkpoints is a folder, not a catalogue: WAN's high/low expert
-    # pairs and LTX land there beside the SDXL checkpoints, carrying no text
-    # encoder for an SDXL graph's CLIPTextEncode to read. Offering the pair asks
-    # the user to choose between two runs that can only error.
     installed_models.add("checkpoints", "an_xl_model.safetensors", arch=SDXL)
     installed_models.add("checkpoints", "a_15_model.safetensors", arch=SD15)
     installed_models.add("checkpoints", "vid_high.safetensors", arch=WAN)
@@ -172,9 +154,6 @@ def test_a_picker_offers_only_the_architectures_its_graph_runs(installed_models)
 
 
 def test_a_picker_keeps_what_it_could_not_classify(installed_models):
-    # Dropping a model that works is the costly mistake; keeping one that
-    # doesn't is not. A file with no readable index — a .ckpt, one truncated
-    # mid-header, an architecture postdating these signatures — stays listed.
     installed_models.add("checkpoints", "old.ckpt", body=b"pickled weights, no header")
     installed_models.add("checkpoints", "cut.safetensors", body=struct.pack("<Q", 4096) + b"{}")
     installed_models.add("checkpoints", "future.safetensors", arch=None)
@@ -185,10 +164,6 @@ def test_a_picker_keeps_what_it_could_not_classify(installed_models):
 
 
 def test_a_picker_drops_the_other_half_of_the_expert_pair(installed_models):
-    # WAN 2.2 splits into a high-noise and a low-noise expert, and the workflow
-    # has a slot for each. A file naming the other half is the one pick that is
-    # certainly wrong; a file naming neither stays in both, because nothing
-    # inside a WAN 2.2 file tells the two experts apart.
     for name in ("wan_high_noise.safetensors", "wan_low_noise.safetensors",
                  "wan_unmarked.safetensors"):
         installed_models.add("diffusion_models", name, arch=WAN)
@@ -201,9 +176,6 @@ def test_a_picker_drops_the_other_half_of_the_expert_pair(installed_models):
 
 
 def test_a_model_dropdown_and_a_lora_picker_do_not_offer_each_other(installed_models):
-    # Both folders hold the wrong kind — a WAN LoRA filed under
-    # diffusion_models, a full checkpoint filed under loras — and neither loads
-    # in the other's slot, whatever architecture it was trained for.
     installed_models.add("diffusion_models", "real_model.safetensors", arch=WAN)
     installed_models.add("diffusion_models", "stray_lora.safetensors", arch=WAN, lora=True)
     installed_models.add("loras", "real_lora.safetensors", arch=WAN, lora=True)
@@ -249,8 +221,6 @@ def test_a_picker_drops_the_parts_of_a_sharded_download(installed_models):
 
 
 def test_filtering_never_empties_a_dropdown(installed_models):
-    # A folder holding nothing this graph can run still offers the workflow's
-    # own default, so the form always has something selected.
     installed_models.add("checkpoints", "vid_high.safetensors", arch=WAN)
     assert list_model_files("checkpoints", ["default.safetensors"], accepts=(SDXL,)) == [
         "default.safetensors",
@@ -258,11 +228,6 @@ def test_filtering_never_empties_a_dropdown(installed_models):
 
 
 def test_listing_a_folder_requires_saying_what_the_graph_runs():
-    # The enforcement, and the reason `accepts` is keyword-only with no default:
-    # a workflow added later cannot list a category without answering the
-    # question. Forgetting is a TypeError at the call, not a dropdown that
-    # quietly went back to offering everything. ANY is how a genuinely
-    # architecture-neutral category (the ESRGAN upscalers) says so out loud.
     for dropdown in (list_model_files, list_lora_files):
         accepts = inspect.signature(dropdown).parameters["accepts"]
         assert accepts.kind is inspect.Parameter.KEYWORD_ONLY, dropdown.__name__
@@ -275,9 +240,6 @@ def test_listing_a_folder_requires_saying_what_the_graph_runs():
 
 
 def test_is_no_lora_recognizes_the_sentinel_and_empty_values():
-    # A bypassed LoRA reads the same however it was recorded: the "None" sentinel
-    # a generation stores, or the empty/absent value an older row or a no-LoRA
-    # import carries.
     assert is_no_lora(NO_LORA)
     assert is_no_lora("")
     assert is_no_lora(None)

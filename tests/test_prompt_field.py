@@ -1,4 +1,3 @@
-"""Dragging a prompt field taller and the height it keeps, and graying one out."""
 from __future__ import annotations
 
 import pytest
@@ -18,11 +17,6 @@ from origenerator.gui.prompt_field import (
 
 @pytest.fixture(autouse=True)
 def _forget_dragged_heights():
-    """Start and end each test with no remembered heights.
-
-    They are app-wide by design — one number per param for the whole process —
-    so without this one test's drag would set the next one's starting size.
-    """
     PROMPT_HEIGHTS.restore({})
     yield
     PROMPT_HEIGHTS.restore({})
@@ -38,7 +32,6 @@ def _field(qtbot, key="positive_prompt"):
 
 
 def _drag_edge(qtbot, field, dy):
-    """Grab the field's lower edge and pull it ``dy`` pixels down (up, if negative)."""
     grab = QPoint(field.viewport().width() // 2, field.viewport().height() - 1)
     drop = grab + QPoint(0, dy)
     qtbot.mousePress(field.viewport(), Qt.MouseButton.LeftButton, pos=grab)
@@ -47,8 +40,6 @@ def _drag_edge(qtbot, field, dy):
 
 
 def test_a_fresh_prompt_field_is_the_familiar_height(qtbot):
-    # Nothing dragged yet: the size prompts have always been, so the form looks
-    # the same until the user asks for something else.
     assert _field(qtbot).height() == DEFAULT_HEIGHT
 
 
@@ -65,11 +56,9 @@ def test_dragging_the_lower_edge_up_makes_it_shorter(qtbot):
 
 
 def test_a_drag_far_up_stops_at_one_readable_line(qtbot):
-    # The handle can't be dragged into nothing: a field you can't read a line of
-    # is a field you can no longer find the handle on either.
     field = _field(qtbot)
     _drag_edge(qtbot, field, -500)
-    assert field.height() < DEFAULT_HEIGHT           # it did shrink
+    assert field.height() < DEFAULT_HEIGHT
     assert field.height() >= field.fontMetrics().lineSpacing()
     assert field.viewport().height() >= field.fontMetrics().lineSpacing()
 
@@ -81,7 +70,6 @@ def test_a_runaway_drag_stops_at_the_cap(qtbot):
 
 
 def test_pressing_in_the_middle_types_rather_than_resizes(qtbot):
-    # Only the lower edge is a handle; the rest of the field is for writing in.
     field = _field(qtbot)
     field.setPlainText("a fox in snow")
     middle = QPoint(field.viewport().width() // 2, field.viewport().height() // 2)
@@ -92,19 +80,14 @@ def test_pressing_in_the_middle_types_rather_than_resizes(qtbot):
 
 
 def test_the_height_sticks_to_the_param_not_the_widget(qtbot):
-    # The form is rebuilt on every workflow switch and every new tab, so a height
-    # that lived on the widget would be gone by the next click.
     field = _field(qtbot)
     _drag_edge(qtbot, field, 70)
 
     assert PromptField("positive_prompt").height() == DEFAULT_HEIGHT + 70
-    # …and only that param's: the short negative prompt isn't dragged open too.
     assert PromptField("negative_prompt").height() == DEFAULT_HEIGHT
 
 
 def test_fields_already_open_follow_the_drag(qtbot):
-    # Two tabs showing the same prompt: dragging one and finding the other still
-    # small would make "this field is this tall" untrue the moment you switch tabs.
     dragged = _field(qtbot)
     other = _field(qtbot)
     _drag_edge(qtbot, dragged, 50)
@@ -116,9 +99,9 @@ def test_dragged_heights_survive_a_snapshot_and_restore(qtbot):
     _drag_edge(qtbot, field, 90)
     saved = PROMPT_HEIGHTS.snapshot()
 
-    PROMPT_HEIGHTS.restore({})                     # a fresh process, nothing dragged
+    PROMPT_HEIGHTS.restore({})
     assert field.height() == DEFAULT_HEIGHT
-    PROMPT_HEIGHTS.restore(saved)                  # the session state, reloaded
+    PROMPT_HEIGHTS.restore(saved)
     assert field.height() == DEFAULT_HEIGHT + 90
     assert PromptField("positive_prompt").height() == DEFAULT_HEIGHT + 90
 
@@ -126,16 +109,11 @@ def test_dragged_heights_survive_a_snapshot_and_restore(qtbot):
 @pytest.mark.parametrize("stored", [None, "300", {"positive_prompt": "tall"},
                                     {"positive_prompt": True}, [100]])
 def test_a_corrupt_stored_height_opens_at_the_default(qtbot, stored):
-    # ui_state.json is hand-editable and outlives any one version of this app; a
-    # value that isn't a height must cost the default, not the launch.
     PROMPT_HEIGHTS.restore(stored)
     assert _field(qtbot).height() == DEFAULT_HEIGHT
 
 
 def test_a_field_built_with_its_own_heights_keeps_to_them(qtbot):
-    # The set a field files its height in is handed to it, so a window can open
-    # its fields at its own sizes without every other field in the process
-    # following — and so a test can hand it a set of its own.
     mine = PromptHeights()
     mine.set_height("positive_prompt", 260)
 
@@ -171,3 +149,17 @@ def test_a_prompt_given_no_reason_is_never_grayed_out(qtbot):
     assert (field.property("inert"), label.property("inert")) == (False, False)
     assert not field.isReadOnly()
     assert field.toolTip() == label.toolTip() == "What to keep out of the image."
+
+
+def test_pressing_the_lower_edge_leaves_the_text_cursor_where_it_was(qtbot):
+    field = _field(qtbot)
+    field.setPlainText("one\ntwo")
+    cursor = field.textCursor()
+    cursor.setPosition(0)
+    field.setTextCursor(cursor)
+    grab = QPoint(field.viewport().width() // 2, field.viewport().height() - 1)
+
+    qtbot.mousePress(field.viewport(), Qt.MouseButton.LeftButton, pos=grab)
+    qtbot.mouseRelease(field.viewport(), Qt.MouseButton.LeftButton, pos=grab)
+
+    assert field.textCursor().position() == 0

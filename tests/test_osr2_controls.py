@@ -1,9 +1,3 @@
-"""Osr2Controls — the Funestras' console's OSR2 section, shown here, and what a press on it does.
-
-The console painter is funestra's and tested there. What this covers is the two
-things that are this app's: that the drawing really is that console painter's (not a
-lookalike), and that each command it posts reaches the right thing here.
-"""
 from __future__ import annotations
 
 import itertools
@@ -43,7 +37,6 @@ def _controls(qtbot, motion=None, control=None):
 
 
 def _press(controls, action):
-    """Press whatever button posts *action*, at its own middle."""
     x, y, w, h = next(r for r, b in controls._painter.buttons if b.command == action)
     QTest.mousePress(controls, Qt.MouseButton.LeftButton, pos=QPoint(x + w // 2, y + h // 2))
 
@@ -55,9 +48,6 @@ def _slide(controls, along: float) -> None:
 
 
 def test_the_osr2_controls_carry_no_filter_switches_of_their_own(qtbot):
-    # Over a slideshow the two switches saying what it may play are on the Funestras'
-    # HUD this controls sits under, and a second pair here would be two switches
-    # for one thing — so the OSR2 controls offer neither, the way Genau's own do.
     controls, _motion = _controls(qtbot)
     controls.drawing()
     for action in ("main_fmode", "genau_filter_enhanced"):
@@ -70,18 +60,16 @@ def test_the_osr2_controls_are_up_while_nothing_drives_since_their_switch_is_wha
 
     assert motion.active is False
     assert controls.isVisible()
-    assert not controls._repaint.isActive()   # nothing is moving, so nothing repaints
+    assert not controls._repaint.isActive()
 
     motion.active = True
     controls.refresh()
 
     assert controls.isVisible()
-    assert controls._repaint.isActive()       # the trace scrolls, so now it does
+    assert controls._repaint.isActive()
 
 
 def test_the_drawing_is_the_one_funestras_console_painter_paints(qtbot):
-    # Not a repaint of the design, and not a third of it: the same painter, the
-    # same rows, the same bitmap.
     controls, motion = _controls(qtbot)
     raw, size = controls.drawing()
     expected, expected_size = ConsolePainter(device_only=True).rgba(osr2_controls_hud(motion))
@@ -181,8 +169,7 @@ def test_every_button_the_osr2_controls_declare_does_something_here(qtbot, monke
 
 def test_the_motion_buttons_reach_the_driver(qtbot):
     controls, motion = _controls(qtbot)
-    motion.active = True  # a parked device's marks are dimmed, and dim is unpressable
-    # A full-travel motion has its center pinned, and a pinned mark is dim too.
+    motion.active = True
     motion.state.state.amplitude = 40
     controls.drawing()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
@@ -205,8 +192,6 @@ def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
 
 
 class FakeControl(QObject):
-    """The app's OSR2 switch reduced to what the OSR2 controls' group asks of one."""
-
     changed = pyqtSignal()
     settled = pyqtSignal()
 
@@ -292,8 +277,6 @@ def test_a_panel_with_no_switch_hands_the_max_intensity_to_the_motion(qtbot):
 
 
 def test_the_osr2_controls_switch_is_the_apps_one_switch(qtbot):
-    """A press while driving parks, and a press while parked drives -- which is
-    what the separate Gallery pane button was replaced by."""
     control = FakeControl()
     controls, _motion = _controls(qtbot, control=control)
 
@@ -306,20 +289,16 @@ def test_the_osr2_controls_switch_is_the_apps_one_switch(qtbot):
 
 
 def test_the_group_lights_the_state_the_switch_is_in(qtbot):
-    """The OSR2 controls draw the lit button; what this app owes them is the answer to
-    which state, which nothing on the controls itself knows."""
     control = FakeControl(OSR2_PARKED)
     controls, motion = _controls(qtbot, control=control)
 
     hud = osr2_controls_hud(motion, control=control.state())
 
     assert hud.console.osr2_control == OSR2_PARKED
-    assert controls.drawing()[0]  # and it paints in that state
+    assert controls.drawing()[0]
 
 
 def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
-    """OSR2 controls outside a gallery -- a test's, and any future host that hands
-    over no switch -- can still release what it does have."""
     controls, motion = _controls(qtbot)
     controls.drawing()
 
@@ -329,9 +308,6 @@ def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
 
 
 class FakeScript:
-    """The funscript driver reduced to what the OSR2 controls ask of one: whether it
-    has the device, and the line it is about to send."""
-
     parked_by_the_pause = False
 
     def __init__(self, active=True, heights=None):
@@ -343,9 +319,6 @@ class FakeScript:
 
 
 def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
-    """The whole of what the OSR2 controls said before: nothing.  The motion is
-    stopped while a script drives, so OSR2 controls drawn from the motion showed a
-    dead readout over a device that was working."""
     script = FakeScript()
     control = FakeControl(script=script)
     controls, motion = _controls(qtbot, control=control)
@@ -388,8 +361,6 @@ def test_with_their_switch_off_the_osr2_controls_say_parked_over_a_device_that_i
 
 
 def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
-    """The script streams into the air with the OSR2 switched off, and a green
-    line would say it was arriving."""
     script = FakeScript()
     control = FakeControl(script=script)
     controls, motion = _controls(qtbot, control=control)
@@ -401,9 +372,6 @@ def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
 
 
 def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
-    # A press that could do nothing is not offered — the readout is dimmed whole
-    # while nothing is reaching the device, exactly as it is in Fun Time while a
-    # funscript has it.
     controls, _motion = _controls(qtbot, control=FakeControl(state=OSR2_PARKED))
     controls.drawing()
     marks = [b for _r, b in controls._painter.buttons
@@ -436,11 +404,6 @@ def test_off_is_said_only_of_a_device_that_is_switched_off(qtbot):
 
 
 def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
-    # The motion goes on with the device unplugged — it cannot see the
-    # wire — so without this the OSR2 controls animated a blue wave nobody was riding.
-    # Saying "off" is also what grays the readout and holds its trace still: the
-    # painter reads who has the device off this one value (funestra).
-
     motion = FakeMotion()
     motion.active = True
 
@@ -510,9 +473,6 @@ def test_the_panel_watches_the_device_for_as_long_as_it_is_shown(qtbot):
 
 
 def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
-    # Asked per draw rather than once: the OSR2 is switched on and off without
-    # this app's back, so OSR2 controls that read it at build time would go on
-    # claiming whatever was true when it opened.
     answers = [Osr2Mode.OFF, Osr2Mode.CONTROLLED]
     motion = FakeMotion()
     motion.active = True
@@ -520,13 +480,13 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     qtbot.addWidget(controls)
 
     controls.drawing()
-    assert answers == [Osr2Mode.CONTROLLED]  # it asked
+    assert answers == [Osr2Mode.CONTROLLED]
     controls.drawing()
-    assert answers == []      # and asked again rather than reusing the answer
+    assert answers == []
 
 
 def _first_named_button(controls) -> tuple[int, int, int, int]:
-    controls.grab()  # lays the buttons out
+    controls.grab()
     return next(rect for rect, button in controls._painter.buttons if button.tooltip)
 
 
@@ -544,17 +504,12 @@ def _move_onto(controls, rect) -> None:
 
 
 def test_the_panel_hears_the_pointer_move_with_no_button_held(qtbot):
-    # Qt hands a widget a plain move only when it asks for every move; without
-    # that, the controls heard the pointer only while a button was held.
     controls, _motion = _controls(qtbot)
 
     assert controls.hasMouseTracking()
 
 
 def test_the_button_under_the_pointer_lights_up(qtbot):
-    # The controls over a Slideshow lit the button under the pointer and this one
-    # did not, though the same painter draws both: nothing told it where the
-    # pointer was.
     controls, _motion = _controls(qtbot)
     button = _first_named_button(controls)
     at_rest = _ground_lightness(controls, button)
@@ -582,8 +537,6 @@ def test_no_tooltip_of_the_panels_own_comes_up_over_a_buttons_name(qtbot):
 
 
 def test_the_panel_actually_paints(qtbot):
-    # A NameError in paintEvent takes the whole app down the first time the
-    # controls is shown — which is what shipped once.
     controls, motion = _controls(qtbot)
 
     assert not controls.grab().isNull()
@@ -591,13 +544,13 @@ def test_the_panel_actually_paints(qtbot):
     motion.active = True
     motion.state.learned.active = True
 
-    assert not controls.grab().isNull()  # and again with every reading lit
+    assert not controls.grab().isNull()
 
 
 def test_the_osr2_controls_keep_the_room_they_take_at_their_widest(qtbot):
     controls, motion = _controls(qtbot)
     controls.show()
-    controls.grab()  # a paint of the OSR2 controls as they stand, narrower than at their widest
+    controls.grab()
 
     assert (controls.width(), controls.height()) == osr2_controls_room(motion)
 
@@ -633,9 +586,6 @@ def test_the_readout_holds_the_waves_drawing_still_between_knots(qtbot):
 
 
 def test_the_readout_holds_the_learned_motions_drawing_still_between_knots(qtbot):
-    # The learned motion is read on knots: a tick later the same heights are
-    # drawn, shifted left by the fraction of a knot the clock has moved.
-
 
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
     motion = FakeMotion()

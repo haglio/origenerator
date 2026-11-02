@@ -1324,9 +1324,9 @@ def test_the_entry_point_hands_the_process_whatever_main_gives_back():
 
 def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
     with _a_faked_boot([], **{"PyQt6.QtWidgets.QApplication.exec": MagicMock(return_value=3)}), \
-         patch.object(sys, "argv", ["origenerator"]):
-        with pytest.raises(SystemExit) as exit_:
-            runpy.run_module("origenerator", run_name="__main__")
+         patch.object(sys, "argv", ["origenerator"]), \
+         pytest.raises(SystemExit) as exit_:
+        runpy.run_module("origenerator", run_name="__main__")
 
     assert exit_.value.code == 3
 

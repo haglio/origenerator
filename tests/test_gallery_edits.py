@@ -578,7 +578,9 @@ def test_a_versions_files_are_ended_once_its_undo_entry_falls_off_the_stack(tmp_
                                  {"filename": "base2.png", "subfolder": "image"}]),
         original_files=json.dumps([{"filename": "base2.png", "subfolder": "image"}]))
     second = db.get_generation("p2")
-    held = lambda: [path for path in (tmp_path / "trash").rglob("*") if path.is_file()]
+
+    def held():
+        return [path for path in (tmp_path / "trash").rglob("*") if path.is_file()]
 
     actions.delete_enhance_versions(first, ["enhanced.png"])
     assert len(held()) == 1

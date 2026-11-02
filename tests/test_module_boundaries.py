@@ -55,11 +55,11 @@ def _qt_after_importing(module: str) -> bool:
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
     result = subprocess.run(
         [sys.executable, "-c",
-         "import sys\n"
+         ("import sys\n"
          "import origenerator.content as content\n"
          "content.LOCAL_CONTENT = content.EXAMPLE_CONTENT\n"
          f"import {module}\n"
-         'print("PyQt6" in sys.modules)'],
+         'print("PyQt6" in sys.modules)')],
         cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr

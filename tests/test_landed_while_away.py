@@ -191,13 +191,13 @@ def test_what_the_watcher_says_lands_in_the_apps_log(tmp_path):
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
     subprocess.run(
         [sys.executable, "-c",
-         "from pathlib import Path\n"
+         ("from pathlib import Path\n"
          "import origenerator.content as content\n"
          "content.LOCAL_CONTENT = content.EXAMPLE_CONTENT\n"
          "from origenerator import landed_while_away as watcher\n"
          f"watcher.LIBRARY_STATE_DIR = watcher.STATE_DIR = Path({str(tmp_path)!r})\n"
          "watcher.watch = lambda *_a, **_k: watcher.logger.info('said by the watcher')\n"
-         "watcher.main(['Origenerator'])\n"],
+         "watcher.main(['Origenerator'])\n")],
         cwd=REPO_ROOT, env=env, check=True,
     )
 

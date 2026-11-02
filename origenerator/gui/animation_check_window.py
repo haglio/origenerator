@@ -124,11 +124,11 @@ class AnimationCheckWindow(QWidget):
             (REJECT, "View next preexisting sample from library",
              "Drop this one and show the next video made this way", self._on_reject),
             (SUBMIT, "Generate new sample with current settings",
-             "Queue a video of this image with the prompts as they now read, "
-             "and come back to this animation once it is done", self._on_submit),
+             ("Queue a video of this image with the prompts as they now read, "
+              "and come back to this animation once it is done"), self._on_submit),
             (ACCEPT, "Assign these settings",
-             "Every animation of this action from this kind of image runs these "
-             "settings, with the prompts as they now read", self._on_accept),
+             ("Every animation of this action from this kind of image runs these "
+              "settings, with the prompts as they now read"), self._on_accept),
         ):
             button = QPushButton(caption, objectName=name)
             button.setToolTip(tip)

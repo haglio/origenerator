@@ -1655,8 +1655,8 @@ def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path,
 
     assert [record.message for record in caplog.records
             if record.name == "origenerator.gui.core"] == [
-        "Taken into a Fun Time session; the OSR2 and the appliance switches are "
-        "the session's from here",
+        ("Taken into a Fun Time session; the OSR2 and the appliance switches are "
+         "the session's from here"),
         "Handed back by the Fun Time session; standalone again"]
 
 

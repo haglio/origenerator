@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef
-from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
+from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
+from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
 
 
 def _frames(max_val=161):
@@ -31,5 +32,16 @@ def test_a_frame_count_reads_back_as_the_shortest_seconds_that_reproduce_it():
 
 
 def test_a_clip_cut_short_by_the_model_reads_back_at_its_real_length():
-    # 161 frames at 24 fps is 6.7 s; "7" would only round-trip through the clamp.
     assert seconds_for_frames(161, 24.0, _frames()) == 6.7
+
+
+def test_a_frame_rate_between_two_native_multiples_lands_where_the_graph_puts_it():
+    rate_grid = ParamDef("frame_rate", "Frame Rate", "int", 16, min_val=NATIVE_FPS, max_val=64, step=NATIVE_FPS)
+
+    for rate in (20, 24, 28, 40):
+        assert on_grid(rate, rate_grid) == playback_rate(rate)
+
+
+def test_a_frame_count_counts_from_one_not_from_the_fewest_the_model_renders():
+    assert on_grid(6, _frames()) == 5
+    assert on_grid(7, _frames()) == 9

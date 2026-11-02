@@ -1,6 +1,3 @@
-"""The window for settling what each animation runs: the image a sample started
-from, the sample, and the prompts, which are editable. The walk is
-:class:`~origenerator.animation_check_session.AnimationCheckSession`."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
@@ -44,11 +41,7 @@ ALL_DONE = "Every animation has been through."
 
 
 class AnimationCheckWindow(QWidget):
-    """One animation at a time, with the video that stands as its sample."""
-
     def __init__(self, session, look, submit, parent=None):
-        """``look`` answers ``(image path, looping sample path)`` for a sample;
-        ``submit`` queues a run of the edited prompts on that sample's image."""
         super().__init__(parent)
         self._session = session
         self._look = look
@@ -77,7 +70,6 @@ class AnimationCheckWindow(QWidget):
         shown.setSpacing(GAP_MEDIUM)
         shown.addWidget(self._image, 1)
         shown.addWidget(self._video, 1)
-        # Sharing the row it reads as a caption on the image's half.
         self._blank = QLabel(NO_SAMPLE, objectName=BLANK)
         self._blank.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._blank.setWordWrap(True)
@@ -206,7 +198,6 @@ class AnimationCheckWindow(QWidget):
         return self.findChild(QPushButton, name)
 
     def _only_offer_a_new_sample_once_edited(self) -> None:
-        """A new sample is worth the GPU only once a prompt differs from it."""
         sample = self._session.sample or {}
         edited = (self._positive.toPlainText() != (sample.get("positive_prompt") or "")
                   or self._negative.toPlainText() != (sample.get("negative_prompt") or ""))

@@ -94,7 +94,7 @@ def test_the_funestra_opens_on_the_pass_it_is_handed(qtbot, tmp_path):
 
 
 def test_the_pass_opens_standing_on_the_item_it_is_told_to(qtbot, tmp_path):
-    pane, engine, _running = _pane(qtbot)
+    pane, _engine, _running = _pane(qtbot)
     items = _items(tmp_path, "one", "two")
 
     _hand_over(pane, items, land=items[1].path)

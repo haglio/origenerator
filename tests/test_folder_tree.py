@@ -473,7 +473,7 @@ def test_a_drag_let_go_over_a_row_leaves_it_dark_and_not_under_the_next_drag(qtb
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
-    tree, collection, a, b = _collecting_tree(qtbot)
+    tree, collection, _a, _b = _collecting_tree(qtbot)
     dropped = []
     tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
 
@@ -488,7 +488,7 @@ def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
 
 
 def test_an_ordinary_folder_refuses_a_drop(qtbot):
-    tree, _collection, a, b = _collecting_tree(qtbot)
+    tree, _collection, _a, b = _collecting_tree(qtbot)
     dropped = []
     tree.dropped.connect(lambda key, keys, _items: dropped.append((key, keys)))
 

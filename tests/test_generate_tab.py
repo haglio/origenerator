@@ -2141,7 +2141,7 @@ def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
 def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
     saved_panel, monkeypatch, tmp_path
 ):
-    tab, db = saved_panel
+    tab, _db = saved_panel
     vpath = tmp_path / "auto.mp4"
     vpath.write_bytes(b"v")
     actions = _script_for(vpath)
@@ -3879,7 +3879,7 @@ def test_every_lane_is_told_apart_by_its_folder_its_column_and_its_stamp():
 
 
 def test_every_lane_stamps_a_column_the_database_actually_writes(saved_panel):
-    tab, db = saved_panel
+    _tab, db = saved_panel
     _video_row(db, "vid1")
 
     for lane in _lanes():

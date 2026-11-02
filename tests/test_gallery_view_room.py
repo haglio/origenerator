@@ -188,7 +188,7 @@ def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
 
 
 def test_every_osr2_controls_drawing_over_the_device_hears_that_it_was_re_aimed(qtbot):
-    view, _driver, tab = _osr2_view(qtbot)
+    view, _driver, _tab = _osr2_view(qtbot)
     heard = []
     view.osr2_control.settled.connect(lambda: heard.append(True))
 

@@ -605,7 +605,7 @@ def test_a_run_from_an_edited_combination_keeps_its_source_video_in_parentheses_
     drawn = []
     monkeypatch.setattr(generating_tile_module, "combination_pixmap",
                         lambda made_from, size: drawn.append(made_from))
-    view, tab = _opened_combination(qtbot, tmp_path)
+    _view, tab = _opened_combination(qtbot, tmp_path)
     tab._param_form.set_values({"positive_prompt": "dance in the rain"})
 
     tab._on_generate()

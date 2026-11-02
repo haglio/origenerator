@@ -169,7 +169,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
 
 
 def test_a_custom_folder_shows_the_items_it_holds_ahead_of_its_folders(qtbot):
-    view, cat, dog = _two_leaf_view(qtbot)
+    view, _cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Mine", [dog])
     view._db.add_items_to_custom_collection(folder_id, ["i1"])
     view.refresh()
@@ -664,7 +664,7 @@ def test_copy_name_on_a_folder_given_a_name_copies_that_name(qtbot, monkeypatch)
 
 
 def test_a_folder_squares_menu_copies_its_name_too(qtbot, monkeypatch):
-    view, cat, dog = _two_leaf_view(qtbot)
+    view, _cat, dog = _two_leaf_view(qtbot)
     view._tree.setCurrentItem(view._tree_item_for(dog).parent())
     QApplication.clipboard().clear()
     _answer_menu(monkeypatch, "Copy name")

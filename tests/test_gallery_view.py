@@ -1648,7 +1648,7 @@ def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
     here = _first_leaf(view)
     view._tree.setCurrentItem(here)
 
-    shape, *above, _here = view._tree_view.path_steps(here)
+    _shape, *above, _here = view._tree_view.path_steps(here)
 
     assert list(_path_links(view)) == [step.name for step in above]
 

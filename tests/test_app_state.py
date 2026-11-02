@@ -41,3 +41,23 @@ def test_non_object_json_loads_as_empty(tmp_path):
     path = tmp_path / "ui_state.json"
     path.write_text("[1, 2, 3]", encoding="utf-8")
     assert AppState(path).get("anything") is None
+
+
+def test_a_save_leaves_only_the_state_file_in_its_folder(tmp_path):
+    path = tmp_path / "ui_state.json"
+    state = AppState(path)
+    state.set("gallery_folder", "image/sdxl_t2i")
+
+    state.save()
+
+    assert [entry.name for entry in tmp_path.iterdir()] == ["ui_state.json"]
+
+
+def test_a_save_makes_the_folder_it_goes_in(tmp_path):
+    path = tmp_path / "state" / "ui_state.json"
+    state = AppState(path)
+    state.set("gallery_folder", "image/sdxl_t2i")
+
+    state.save()
+
+    assert AppState(path).get("gallery_folder") == "image/sdxl_t2i"

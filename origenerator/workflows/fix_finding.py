@@ -5,9 +5,9 @@ import re
 from origenerator import points_of_interest
 from origenerator.workflows.detail_parts import DetailFixPass, DetailPart, detector_part, finder_of
 
-_DETECTOR_THRESHOLD = 0.5
-_DETECTOR_CROP_FACTOR = 3.0
-_DETECTOR_DROP_SIZE = 10
+_DETECTOR_MIN_CONFIDENCE = 0.5
+_DETECTOR_CONTEXT_AROUND_RECT = 3.0
+_DETECTOR_MIN_RECT_SIDE = 10
 
 _DETECTOR_NODE = re.compile(r"fix(\d+)_detector")
 
@@ -27,10 +27,10 @@ def finding_nodes(index: int, fix: DetailFixPass, image_ref, original_ref) -> tu
             "inputs": {
                 f"{finder}_detector": [provider_id, 1 if fix.part.outline else 0],
                 "image": image_ref,
-                "threshold": _DETECTOR_THRESHOLD,
+                "threshold": _DETECTOR_MIN_CONFIDENCE,
                 "dilation": fix.part.dilation,
-                "crop_factor": _DETECTOR_CROP_FACTOR,
-                "drop_size": _DETECTOR_DROP_SIZE,
+                "crop_factor": _DETECTOR_CONTEXT_AROUND_RECT,
+                "drop_size": _DETECTOR_MIN_RECT_SIDE,
                 "labels": "all",
             },
         },

@@ -64,7 +64,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.inflight_items import InFlightItems
 from origenerator.gui.inflight_tile import InFlightTile
-from origenerator.gui.item_tile import CornerButton, ItemTile, trash_corner_buttons
+from origenerator.gui.item_tile import CornerButton, ItemTile, restore_offer_of
 from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
@@ -778,7 +778,8 @@ class GalleryPane(QObject):
                                   context=self._tree.folder_context(tile.group.key))
             self._listed_folders.append(tile.group.key)
         else:
-            self._add_collection_thumbnail(flow, tile.row)
+            (self._add_trash_thumbnail if "days_in_trash" in tile.row
+             else self._add_collection_thumbnail)(flow, tile.row)
             self._selection.note_shown(tile.row["prompt_id"])
         self._search_rows.extend(tile.rows or [tile.row])
 
@@ -1070,7 +1071,7 @@ class GalleryPane(QObject):
     def _render_trash(self):
         """The Trash collection: every deleted item the Trash is still
         holding, newest first, each tile wearing restore / delete-permanently
-        hover controls and captioned with how long it has left. A restored item
+        controls and captioned with how long it has left. A restored item
         returns to its own folder; a purged one is gone for good."""
         container, flow = self._fresh_tile_pane()
         rows = self._open_collection_rows(TRASH_KEY)
@@ -1093,18 +1094,18 @@ class GalleryPane(QObject):
         tiles carry) rather than jumping to its folder, which is the one thing a
         deleted item hasn't got.
 
-        What it doesn't get is the ordinary tile's right-click menu or its corner
-        controls — star, enhance, delete all want a row in the gallery — and no
-        drag to a Combine drop zone, whose graphs read files out of ComfyUI's output
-        folder, not ours. In their place the corners and the menu offer the two
-        actions that do apply: restore, or end it for good.
+        What it doesn't get is the ordinary tile's right-click menu, its star or its
+        enhance — those all want a row in the gallery — and no drag to a combine slot,
+        whose graphs read files out of ComfyUI's output folder, not ours. Its corners
+        and its menu offer the two acts that do apply: restore, where the star goes,
+        or end it for good, where delete goes.
         """
         def wire(tile):
             tile.pressed.connect(self.apply_selection)
             tile.clicked.connect(self.thumbnail_activated)          # preview it here
             tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
             tile.context_requested.connect(self._trash_context_menu)
-            tile.corner_button_triggered.connect(self.trash_action_triggered)
+            tile.control_triggered.connect(self.trash_action_triggered)
 
         name = self._host.item_name(row["prompt_id"])
         return self._draw_tile(
@@ -1113,8 +1114,7 @@ class GalleryPane(QObject):
             media_type=gallery.media_type_of_row(row),  # an item type icon: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
-            controls=False,       # its two controls are restore and purge, in the corners
-            corner_buttons=trash_corner_buttons(row),
+            restore=restore_offer_of(row),
         )
 
     def _trash_context_menu(self, prompt_id: str, global_pos):

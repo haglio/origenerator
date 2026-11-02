@@ -9,13 +9,14 @@ from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import icons, palette, tile_shape
+from origenerator.gui import palette, tile_shape
 from origenerator.gui.corner_buttons import (
     CORNER_GAP,
     CORNER_INSET,
     CORNER_SIZE,
     GROUND_CSS,
     CornerButtons,
+    RestoreOffer,
 )
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
@@ -58,19 +59,14 @@ class CornerButton(NamedTuple):
     action_id: str
     icon: QIcon
     tooltip: str
-    enabled: bool = True
 
 
-def trash_corner_buttons(row: dict) -> list[CornerButton]:
-    why_not = why_it_cannot_be_restored(row)
-    restore_tip = why_not or ("Restore — make it again" if row.get("emptied")
-                              else "Restore — put it and its files back where they were")
-    return [
-        CornerButton("restore", icons.trash_action_icon("restore"), restore_tip,
-                     enabled=why_not is None),
-        CornerButton("purge", icons.trash_action_icon("purge"),
-                     "Delete permanently — remove it and its files for good"),
-    ]
+def restore_offer_of(item: dict) -> RestoreOffer:
+    why_not = why_it_cannot_be_restored(item)
+    if why_not:
+        return RestoreOffer(why_not, can_restore=False)
+    return RestoreOffer("Restore — make it again" if item.get("emptied")
+                        else "Restore — put it and its files back where they were")
 
 
 class ItemTile(QWidget):
@@ -84,14 +80,15 @@ class ItemTile(QWidget):
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, favorite: bool = False,
-                 enhance: str | None = None, controls: bool = True,
+                 enhance: str | None = None,
                  enhancing: RunReading | None = None,
-                 corner_buttons: list[CornerButton] | None = None):
+                 corner_buttons: list[CornerButton] | None = None,
+                 restore: RestoreOffer | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self.look = self.look_of(prompt_id, thumb_path, label_text, media_type=media_type,
-                                 movie_path=movie_path, controls=controls,
-                                 corner_buttons=corner_buttons)
+                                 movie_path=movie_path,
+                                 corner_buttons=corner_buttons, restore=restore)
         self._selected = False
         self._favorite = favorite
         self._enhance = enhance       # what the enhance corner has to say, if anything
@@ -156,18 +153,15 @@ class ItemTile(QWidget):
 
         # Star, trash and plus in the tile's other three corners: what the item is
         # (favorited, enhanced) and what can be done to it, as one mark each, all
-        # of them up whenever there is an item under them. A Trash-collection tile
-        # passes controls=False — its item is already deleted, so there is nothing
-        # here to favorite, trash or enhance, and its own restore/purge controls are
-        # the two controls left.
+        # of them up whenever there is an item under them. On a Trash-collection
+        # tile restore stands where the star goes.
         layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
-        self._controls = CornerButtons(self) if controls else None
-        if self._controls is not None:
-            self._controls.place(self._image_label.geometry())
-            self._controls.triggered.connect(
-                lambda action: self.control_triggered.emit(self.prompt_id, action))
-            for button in self._controls.buttons():
-                button.installEventFilter(self)  # an off-tile exit from a control
+        self._controls = CornerButtons(self, restore=restore)
+        self._controls.place(self._image_label.geometry())
+        self._controls.triggered.connect(
+            lambda action: self.control_triggered.emit(self.prompt_id, action))
+        for button in self._controls.buttons():
+            button.installEventFilter(self)  # an off-tile exit from a control
         self._sync_controls()
 
         # While an enhancement of this image is in flight, the tile wears the same
@@ -196,12 +190,11 @@ class ItemTile(QWidget):
     @staticmethod
     def look_of(prompt_id: str, thumb_path: str | None, label_text: str, *,
                 media_type: str | None = None, movie_path: str | None = None,
-                controls: bool = True,
-                corner_buttons: list[CornerButton] | None = None, **_mutable) -> tuple:
+                corner_buttons: list[CornerButton] | None = None,
+                restore: RestoreOffer | None = None, **_mutable) -> tuple:
         """What a tile cannot be changed into once built."""
-        return (prompt_id, thumb_path, label_text, media_type, movie_path, controls,
-                tuple((action.action_id, action.tooltip, action.enabled)
-                      for action in corner_buttons or ()))
+        return (prompt_id, thumb_path, label_text, media_type, movie_path, restore,
+                tuple(action.action_id for action in corner_buttons or ()))
 
     def set_selected(self, selected: bool):
         """Lighten the whole tile when selected; restore the resting look when not."""
@@ -231,8 +224,6 @@ class ItemTile(QWidget):
         self._sync_controls()
 
     def _sync_controls(self):
-        if self._controls is None:
-            return
         self._controls.show_for(favorite=self._favorite, enhance=self._enhance)
 
     def set_enhancing(self, run: RunReading | None):
@@ -282,8 +273,7 @@ class ItemTile(QWidget):
         self._status_scrim.cover(
             self._image_label, "Enhancing…" if run is not None else None,
             inset=_BORDER_PX)
-        if self._controls is not None:
-            self._controls.place(self._image_label.geometry())
+        self._controls.place(self._image_label.geometry())
         self._enhancing_bar.setVisible(run is not None)
         if run is None:
             self._enhancing_tick.stop()
@@ -347,7 +337,6 @@ class ItemTile(QWidget):
             button.setIcon(action.icon)
             button.setIconSize(QSize(CORNER_SIZE - 8, CORNER_SIZE - 8))
             button.setToolTip(action.tooltip)
-            button.setEnabled(action.enabled)
             button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setStyleSheet(_CORNER_BUTTON_CSS)
@@ -371,9 +360,8 @@ class ItemTile(QWidget):
 
     def _hover_buttons(self) -> list:
         """Every child a cursor can be over while it is still "on the tile" — the
-        collection's own actions and the three corner buttons alike."""
-        controls = [] if self._controls is None else self._controls.buttons()
-        return self._corner_buttons + controls
+        collection's own actions and the three corner controls alike."""
+        return self._corner_buttons + self._controls.buttons()
 
     def eventFilter(self, obj, event):
         # A button is a child, so the cursor leaving it (back onto the tile, or off

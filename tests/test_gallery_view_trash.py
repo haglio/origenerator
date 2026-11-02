@@ -11,6 +11,7 @@ from PyQt6.QtCore import (
     Qt,
 )
 from PyQt6.QtGui import (
+    QIcon,
     QKeyEvent,
 )
 from PyQt6.QtWidgets import (
@@ -35,7 +36,9 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.corner_buttons import RESTORE, TRASH
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
+from origenerator.gui.item_tile import ItemTile
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 from tests import gestures
@@ -146,7 +149,7 @@ def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    tooltips = [b.toolTip() for b in view._gallery_pane._thumb_widgets["d1"]._corner_buttons]
+    tooltips = [b.toolTip() for b in view._gallery_pane._thumb_widgets["d1"]._controls.buttons()]
     assert any("Restore" in t for t in tooltips)
     assert any("permanently" in t for t in tooltips)
 
@@ -202,7 +205,7 @@ def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    view._gallery_pane._thumb_widgets["d1"].corner_button_triggered.emit("d1", "restore")
+    view._gallery_pane._thumb_widgets["d1"].control_triggered.emit("d1", RESTORE)
 
     assert actions.restored == [["d1"]]
 
@@ -239,13 +242,13 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     asked = []
     monkeypatch.setattr(view, "_confirm", lambda text: asked.append(text) or False)
 
-    view._gallery_pane._thumb_widgets["d1"].corner_button_triggered.emit("d1", "purge")
+    view._gallery_pane._thumb_widgets["d1"].control_triggered.emit("d1", TRASH)
 
     assert actions.purged == []                      # declined: nothing ended
     assert "cannot be undone" in asked[0]
 
     monkeypatch.setattr(view, "_confirm", lambda text: True)
-    view._gallery_pane._thumb_widgets["d1"].corner_button_triggered.emit("d1", "purge")
+    view._gallery_pane._thumb_widgets["d1"].control_triggered.emit("d1", TRASH)
     assert actions.purged == [["d1"]]
 
 
@@ -532,7 +535,7 @@ def _in_the_trash(view, qtbot):
 
 
 def _restore_button(view):
-    return view._gallery_pane._thumb_widgets["d1"]._corner_buttons[0]
+    return view._gallery_pane._thumb_widgets["d1"]._controls.buttons()[0]
 
 
 def test_an_emptied_item_that_can_be_made_again_says_so_on_its_restore_button(qtbot):
@@ -1363,3 +1366,35 @@ def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypa
     qtbot.keyClick(view, Qt.Key.Key_Delete)
 
     assert db.get_generation("i1") is not None
+
+
+def test_a_trash_item_wears_delete_where_every_item_does_and_restore_where_the_star_goes(qtbot):
+    view = GalleryView(_trash_db(rows=[_image("i1", "a dog", 50, 3)],
+                               held=[("d1", _image("d1", "a cat", 50, 1))]))
+    _in_the_trash(view, qtbot)
+    in_the_trash = view._gallery_pane._thumb_widgets["d1"]._controls
+    restore, delete, enhance = in_the_trash.buttons()
+    usual = ItemTile("i1", None, "a dog")
+    star, usual_delete, _usual_enhance = usual._controls.buttons()
+
+    assert restore.pos() == star.pos()
+    assert delete.pos() == usual_delete.pos()
+    assert not restore.isHidden()
+    assert not delete.isHidden()
+    assert enhance.isHidden()
+    assert delete.toolTip() == "Delete permanently — remove it and its files for good"
+
+
+def test_a_restore_that_cannot_run_is_drawn_dimmer_than_the_delete_beside_it(qtbot):
+    view = GalleryView(_emptied_db(_NO_SUCH_WORKFLOW))
+    _in_the_trash(view, qtbot)
+    restore, delete, _enhance = view._gallery_pane._thumb_widgets["d1"]._controls.buttons()
+
+    def strongest_ink(button):
+        size = button.iconSize()
+        image = button.icon().pixmap(size, QIcon.Mode.Disabled if not button.isEnabled()
+                                     else QIcon.Mode.Normal).toImage()
+        return max(image.pixelColor(x, y).alpha() * image.pixelColor(x, y).lightness()
+                   for x in range(image.width()) for y in range(image.height()))
+
+    assert strongest_ink(restore) < strongest_ink(delete) * 0.6

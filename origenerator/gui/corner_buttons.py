@@ -21,6 +21,8 @@ that appeared when you crossed the tile.
 """
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from PyQt6.QtCore import QObject, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import QPushButton, QWidget
 from shared_ui.palette import BLACK, as_rgba
@@ -32,6 +34,7 @@ from origenerator.gui import icons
 STAR = "star"
 TRASH = "trash"
 ENHANCE = "enhance"
+RESTORE = "restore"
 
 # The geometry the Gallery pane's other hover controls (a tile's per-seed
 # re-rolls, a review collection's keep/reject) already use, shared so the star can sit
@@ -51,6 +54,7 @@ GROUND_CSS = (
     f"QPushButton {{ background: {as_rgba(BLACK, 0.55)}; border: none; border-radius: {BUTTON_RADIUS}px; }}"
 )
 
+_DELETE_FOR_GOOD_TIP = "Delete permanently — remove it and its files for good"
 _TIPS = {
     STAR: ("Favorite this item", "Unfavorite this item"),
     TRASH: ("Delete this item",),
@@ -59,6 +63,11 @@ _TIPS = {
                          "change one to make a different version",),
     icons.ENHANCE_MORE: ("Enhance again, at the settings now on the panel",),
 }
+
+
+class RestoreOffer(NamedTuple):
+    tip: str
+    can_restore: bool = True
 
 
 def enhance_state(row: dict, settings) -> str | None:
@@ -90,8 +99,9 @@ class _CornerButtonFace(QPushButton):
     going light gray — so the icon is swapped on the crossing instead.
     """
 
-    def __init__(self, host: QWidget, render):
+    def __init__(self, host: QWidget, render, *, enabled: bool = True):
         super().__init__(host)
+        self.setEnabled(enabled)
         self._render = render  # (armed) -> QIcon
         self._armed = False
         self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
@@ -130,20 +140,23 @@ class CornerButtons(QObject):
 
     triggered = pyqtSignal(str)  # STAR / TRASH / ENHANCE
 
-    def __init__(self, host: QWidget):
+    def __init__(self, host: QWidget, *, restore: RestoreOffer | None = None):
         super().__init__(host)
+        self._restore_tip, can_restore = restore or (None, True)
         self._available = False   # is there a saved generation here to act on?
         self._favorite = False
         self._enhance: str | None = None
         self._star = _CornerButtonFace(
-            host, lambda armed: icons.corner_star_icon(favorite=self._favorite,
-                                                       armed=armed))
+            host, lambda armed: icons.corner_star_icon(favorite=self._favorite, armed=armed)
+            if restore is None
+            else icons.corner_restore_icon(can_restore=can_restore, armed=armed),
+            enabled=can_restore)
         self._trash = _CornerButtonFace(host, lambda armed: icons.corner_trash_icon(
             armed=armed))
         self._enhance_button = _CornerButtonFace(
             host, lambda armed: icons.corner_enhance_icon(
                 self._enhance or icons.ENHANCE_OPEN, armed=armed))
-        self._star.clicked.connect(lambda: self.triggered.emit(STAR))
+        self._star.clicked.connect(lambda: self.triggered.emit(STAR if restore is None else RESTORE))
         self._trash.clicked.connect(lambda: self.triggered.emit(TRASH))
         self._enhance_button.clicked.connect(lambda: self.triggered.emit(ENHANCE))
         self._retip()
@@ -197,8 +210,8 @@ class CornerButtons(QObject):
         self._sync()
 
     def _retip(self):
-        self._star.setToolTip(_TIPS[STAR][1 if self._favorite else 0])
-        self._trash.setToolTip(_TIPS[TRASH][0])
+        self._star.setToolTip(self._restore_tip or _TIPS[STAR][1 if self._favorite else 0])
+        self._trash.setToolTip(_DELETE_FOR_GOOD_TIP if self._restore_tip else _TIPS[TRASH][0])
         if self._enhance is not None:
             self._enhance_button.setToolTip(_TIPS[self._enhance][0])
 

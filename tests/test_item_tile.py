@@ -201,13 +201,13 @@ def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     assert len(typed.findChildren(ItemTypeIcon)) == 1
 
 
-def test_no_corner_actions_by_default(qtbot):
+def test_no_corner_buttons_by_default(qtbot):
     tw = ItemTile("p1", None, "label")
     qtbot.addWidget(tw)
     assert tw._corner_buttons == []
 
 
-def test_corner_actions_build_hidden_buttons_with_tooltips(qtbot):
+def test_corner_buttons_build_hidden_buttons_with_tooltips(qtbot):
     tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     assert [b.toolTip() for b in tw._corner_buttons] == [
@@ -216,7 +216,7 @@ def test_corner_actions_build_hidden_buttons_with_tooltips(qtbot):
     assert all(b.isHidden() for b in tw._corner_buttons)  # revealed only on hover
 
 
-def test_corner_actions_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
+def test_corner_buttons_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
     tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
     qtbot.addWidget(tw)
     pos = QPointF(1, 1)
@@ -229,7 +229,7 @@ def test_corner_actions_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
     assert all(b.isHidden() for b in tw._corner_buttons)
 
 
-def test_corner_actions_stay_up_while_the_cursor_is_on_a_button(qtbot):
+def test_corner_buttons_stay_up_while_the_cursor_is_on_a_button(qtbot):
     # Moving onto a corner button fires the tile's leaveEvent; the buttons must
     # stay up (else they'd vanish under the cursor — a hover/hide flicker loop).
     tw = ItemTile("p1", None, "label", corner_buttons=_corner_button_specs())
@@ -371,15 +371,6 @@ def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):
     qtbot.addWidget(tw)
 
     assert all(not b.isHidden() and b.isEnabled() for b in _corners(tw))
-
-
-def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
-    # The Trash collection's tiles: their item is already deleted, so there is nothing
-    # to favorite, bin or enhance, and their own two acts take the corners.
-    tw = ItemTile("p1", None, "label", controls=False,
-                         corner_buttons=_corner_button_specs())
-    qtbot.addWidget(tw)
-    assert tw._controls is None
 
 
 def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):

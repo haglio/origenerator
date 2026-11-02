@@ -294,7 +294,7 @@ class GenerateTab(DropZones):
         # what says whether anything has actually been rewritten yet.
         self._folder_modify: FolderModify | None = None
         # Where this tab's settings came from, when the Combine opened them
-        # here: the act picked in its dropdown, the video whose settings they are and
+        # here: the action picked in its dropdown, the video whose settings they are and
         # the lane, as (category, video_prompt_id, intent). Carried so a run launched
         # from this tab — as opened, or edited first — says in the queue what it was
         # asked for. Nothing else on the form remembers any of them.
@@ -392,7 +392,7 @@ class GenerateTab(DropZones):
         self._preview = PreviewWidget(show_scrubber=True)
         # Its corners and its right-click go to the gallery, which owns the
         # favorite, the Trash and the enhance queue — the same route the Gallery pane
-        # pane's thumbnails take, so an act means the same thing either side.
+        # pane's thumbnails take, so an action means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)
         # The preview and the settings under it share a splitter, so the line
@@ -453,7 +453,7 @@ class GenerateTab(DropZones):
 
     def _on_action_chosen(self, prompt_id: str, said: str) -> None:
         """Record what the item on display shows: an image's in the column the
-        sorting window writes, so it is answered there too, a video's as its act."""
+        sorting window writes, so it is answered there too, a video's as its action."""
         row = self._displayed_row or {}
         if media_type_of_row(row) != MediaType.VIDEO:
             self._db.set_image_state(prompt_id, said or None)
@@ -986,7 +986,7 @@ class GenerateTab(DropZones):
 
     def set_settings_source(self, category: str, video_prompt_id: str | None,
                             intent: str) -> None:
-        """Remember that these settings came out of Combine — the act off its
+        """Remember that these settings came out of Combine — the action off its
         dropdown, and the video whose settings they are — and link to that video
         and the image under the form, as the generation they make will.
 

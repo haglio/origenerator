@@ -649,7 +649,7 @@ def _sent_everywhere(db, prompt_id):
     db.mark_genau_exported(prompt_id)
 
 
-def test_a_video_remade_in_place_keeps_its_act_and_its_source_video(tmp_path):
+def test_a_video_remade_in_place_keeps_its_action_and_its_source_video(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image", enhanced=True)
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
@@ -659,7 +659,7 @@ def test_a_video_remade_in_place_keeps_its_act_and_its_source_video(tmp_path):
     _fold(db, tmp_path)
 
     video = db.get_generation("video")
-    assert (video["act"], video["source_video"]) == ("alpha", "its source video")
+    assert (video["action"], video["source_video"]) == ("alpha", "its source video")
 
 
 def test_a_fun_time_favorite_stays_on_the_kino_copy_of_a_video_remade_in_place(tmp_path):

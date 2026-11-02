@@ -132,7 +132,7 @@ class InFlightItems:
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
-            source_video = (None if row.get("act")
+            source_video = (None if row.get("action")
                             else row_by_id.get(row.get("source_video")))
             workflow = WORKFLOW_REGISTRY.get(workflow_name)
             if kind == gallery.JobKind.ENHANCE:
@@ -178,15 +178,15 @@ class InFlightItems:
                     row_by_id.get((records.get(pid) or {}).get("source_prompt_id")),
                     params, kind),
                 # What the Combine was asked for, when this run came from
-                # it: the act off its dropdown, else the video whose settings the
+                # it: the action off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, lending the settings
-                # rather than the result. Never both. An act names what the video
+                # rather than the result. Never both. An action names what the video
                 # will do, which is the whole of what was chosen; the video its
                 # settings were mined out of is an answer to a question the user
                 # never asked, and a thumbnail of a video they did not pick reads
                 # as a job that is that video. A dropped video *is* the choice,
                 # so there the thumbnail is the only thing saying which.
-                act=row.get("act") or "",
+                action=row.get("action") or "",
                 source_video_thumbnail=(source_video or {}).get("thumbnail_path"),
                 prompt_edited=bool(
                     source_video and workflow

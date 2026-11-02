@@ -22,14 +22,14 @@ class _Store:
     def __init__(self):
         self.accepted = {}
 
-    def remember(self, lane, act, state, *, workflow, params):
-        self.accepted[(lane, act, state)] = (workflow, dict(params))
+    def remember(self, lane, action, state, *, workflow, params):
+        self.accepted[(lane, action, state)] = (workflow, dict(params))
 
     def accepted_paths(self):
         return set(self.accepted)
 
-    def assigned(self, lane, act, state):
-        held = self.accepted.get((lane, act, state))
+    def assigned(self, lane, action, state):
+        held = self.accepted.get((lane, action, state))
         return None if held is None else {"workflow": held[0], "params": held[1]}
 
 
@@ -154,20 +154,20 @@ def test_it_says_how_many_of_the_table_already_have_settings(session):
     assert made.answered == 1
 
 
-_PINNED = {"workflow": "wan22_i2v", "params": {"positive_prompt": "the act's own",
+_PINNED = {"workflow": "wan22_i2v", "params": {"positive_prompt": "the action's own",
                                                "negative_prompt": "", "steps": 6}}
 
 
-def test_an_animation_nobody_kept_a_video_of_starts_from_the_acts_own_settings(session):
-    made = session({}, pinned=lambda act, lane: _PINNED)
+def test_an_animation_nobody_kept_a_video_of_starts_from_the_actions_own_settings(session):
+    made = session({}, pinned=lambda action, lane: _PINNED)
 
     assert made.sample is None
-    assert made.starting_point["params"]["positive_prompt"] == "the act's own"
+    assert made.starting_point["params"]["positive_prompt"] == "the action's own"
 
 
-def test_assigning_from_the_acts_own_settings_keeps_their_workflow(session):
+def test_assigning_from_the_actions_own_settings_keeps_their_workflow(session):
     store = _Store()
-    made = session({}, store, pinned=lambda act, lane: _PINNED)
+    made = session({}, store, pinned=lambda action, lane: _PINNED)
 
     made.accept(positive="mine", negative="none")
 
@@ -176,7 +176,7 @@ def test_assigning_from_the_acts_own_settings_keeps_their_workflow(session):
     assert params == {"positive_prompt": "mine", "negative_prompt": "none", "steps": 6}
 
 
-def test_an_animation_with_neither_a_sample_nor_pinned_act_settings_starts_from_nothing(
+def test_an_animation_with_neither_a_sample_nor_pinned_action_settings_starts_from_nothing(
         session):
     made = session({})
 
@@ -184,7 +184,7 @@ def test_an_animation_with_neither_a_sample_nor_pinned_act_settings_starts_from_
 
 
 def test_assigning_saves_the_prompts_he_typed_with_nothing_else_to_go_on():
-    """His words, on an animation with no kept video and no act settings behind
+    """His words, on an animation with no kept video and no action settings behind
     it: "assign should still save those prompts; that's not nothing"."""
     store = _Store()
     session = AnimationCheckSession(_ORDER, {}, store)

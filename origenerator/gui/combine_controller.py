@@ -3,11 +3,11 @@
 The fifth of the gallery's screen concerns to come out of the view that used to
 hold all of them. What lives here is the whole act -- Combine with its two drop
 drop zones, what a dropped item lends each and how it shows there, the lane and
-the act picked beside them, and every way settings are found and launched: the
-dropped video's own, the settings assigned for an act, the act's most-used past
+the action picked beside them, and every way settings are found and launched: the
+dropped video's own, the settings assigned for an action, the action's most-used past
 video, or the lane's own workflow as it starts.
 
-The spoken "animate as" rides with it, being this same act asked for out loud:
+The spoken "animate as" rides with it, being this same action asked for out loud:
 the video handed on the moment it exists, and a second ask over the same image
 refused, so saying it twice does not spend the GPU twice.
 
@@ -55,7 +55,7 @@ ALREADY_MAKING_ONE = "already making it — handing that one over"
 
 # What an image can be animated as is read off what it SHOWS, and an image
 # nobody has said that about yet can be animated as nothing at all. Said
-# rather than guessed: the guess would be an act the image cannot do, which
+# rather than guessed: the guess would be an action the image cannot do, which
 # is minutes of the one machine spent on a video that was never going to work.
 NOT_AN_IMAGE = "only an image can be animated"
 
@@ -129,10 +129,10 @@ class CombineController(QObject):
         self._animation_settings = None
         self.widget.animation_settings_requested.connect(self._on_animation_settings)
         self.widget.item_activated.connect(self._host.follow_link)
-        # Switching lanes re-asks which acts are answerable: an act with plenty of
+        # Switching lanes re-asks which actions are answerable: an action with plenty of
         # long-form video under it may have no loop at all.
         self.widget.intent_changed.connect(self._on_intent_changed)
-        # An image dropped in narrows the acts too, so the list is re-asked
+        # An image dropped in narrows the actions too, so the list is re-asked
         # for the moment one lands rather than only when the lane changes.
         self.widget.image_zone.changed.connect(self.image_dropped)
         self.widget.video_zone.changed.connect(self.reconcile_generating)
@@ -234,10 +234,10 @@ class CombineController(QObject):
 
     def restore(self, saved) -> None:
         """Put the Combine back the way a session left it, skipping an item
-        that has since been deleted or no longer fits its drop zone, and an act the
+        that has since been deleted or no longer fits its drop zone, and an action the
         lane can no longer answer.
 
-        The lane goes in before the act: it decides which acts are answerable,
+        The lane goes in before the action: it decides which actions are answerable,
         and ``set_category`` refuses one that is grayed out under it.
 
         A list of two is what sessions before this wrote — the drop zones alone — and
@@ -260,14 +260,14 @@ class CombineController(QObject):
         self.widget.set_category(saved.get("category") or "")
 
     def rebuildable_videos(self, rows: list[dict]) -> list[dict]:
-        """The completed, rebuildable i2v videos among ``rows`` — the pool an act's
-        settings are mined from, each carrying the act it was launched as."""
+        """The completed, rebuildable i2v videos among ``rows`` — the pool an action's
+        settings are mined from, each carrying the action it was launched as."""
         return [row for row in rows
                 if row.get("status") == GenerationStatus.COMPLETED
                 and self._rebuildable_video_row(row)]
 
     def offer_the_actions(self, rows: list[dict]) -> None:
-        """Gray out the acts this press could not answer: those with no video to
+        """Gray out the actions this press could not answer: those with no video to
         mine settings from, and -- once an image is in the drop zone -- those
         :mod:`origenerator.animation_paths` says it cannot start from. An image
         nobody has sorted yet narrows nothing."""
@@ -286,12 +286,12 @@ class CombineController(QObject):
         return (row or {}).get("image_state") or ""
 
     def image_dropped(self) -> None:
-        """The image in the drop zone changed: re-ask which acts it can start from."""
+        """The image in the drop zone changed: re-ask which actions it can start from."""
         self.offer_the_actions(self._db.list_generations())
         self.reconcile_generating()
 
     def _on_intent_changed(self, _intent: str) -> None:
-        """Re-gray the act list for the lane just chosen."""
+        """Re-gray the action list for the lane just chosen."""
         self.offer_the_actions(self._db.list_generations())
         self.reconcile_generating()
 
@@ -340,7 +340,7 @@ class CombineController(QObject):
         self._after_painting(run)
 
     def _on_generate_category(self, image_id: str, category: str, intent: str) -> None:
-        """The Combine's Generate with an act picked, with the line showing
+        """The Combine's Generate with an action picked, with the line showing
         it at once; :meth:`generate_category` drops the stand-in however the
         launch turns out."""
         key = self._show_starting(image_id, category=category)
@@ -374,8 +374,8 @@ class CombineController(QObject):
             caption="A video from Combine, still being started",
             media_type=MediaType.VIDEO,
             job_kind=gallery.JobKind.VIDEO,
-            act=category,
-            # The same rule the finished row follows: a picked act names itself in
+            action=category,
+            # The same rule the finished row follows: a picked action names itself in
             # the text, and only a dropped video is shown.
             source_video_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
             prompt_edited=edited,
@@ -439,7 +439,7 @@ class CombineController(QObject):
         The preview is the point of the pair being visible at all — nothing has
         been generated from it yet, so the pane would otherwise sit on the line a
         tab pointed at nothing wears, with both things the tab is about on hand.
-        A curated act has no ``video_row`` under it, and shows the frame alone.
+        A curated action has no ``video_row`` under it, and shows the frame alone.
         """
         Combine = self._generate_pane_of().open_config(workflow.name, params)
         if Combine is None:
@@ -465,7 +465,7 @@ class CombineController(QObject):
 
         ``send`` hands the video to Genau the moment it exists, as a spoken
         animation asks, and takes no dialog at all, because such a command is
-        answered in the slideshow's message. ``category`` names the act the dropdown was
+        answered in the slideshow's message. ``category`` names the action the dropdown was
         set to, when one was picked.
         """
         built = self._combined_params(image_id, video_id, intent, category)
@@ -498,7 +498,7 @@ class CombineController(QObject):
         self._host.reveal_launch(key)
         return True
 
-    # --- finding the settings an act names ------------------------------------
+    # --- finding the settings an action names ------------------------------------
 
     def _category_candidates(self) -> list:
         """The pool of past videos, read fresh at generate time rather than from the last
@@ -506,7 +506,7 @@ class CombineController(QObject):
         return self.rebuildable_videos(self._db.list_generations())
 
     def _most_used_video(self, image_id: str, category: str, intent: str) -> str | None:
-        """The ``prompt_id`` of the act's most-used rebuildable video, or ``None``
+        """The ``prompt_id`` of the action's most-used rebuildable video, or ``None``
         with a hint on screen so a press never silently does nothing."""
         if self._image_reference(image_id) is None:
             return None
@@ -518,7 +518,7 @@ class CombineController(QObject):
         return video_id
 
     def _say_no_past_video(self, category: str, intent: str) -> None:
-        """Say the act has no past video to take settings from — in the message of the
+        """Say the action has no past video to take settings from — in the message of the
         fullscreen surface being spoken to when one is up, and in a dialog
         otherwise. A dialog thrown over an image someone is looking at is the one
         place this must never appear."""
@@ -563,7 +563,7 @@ class CombineController(QObject):
     def _generate_curated(self, image_id: str, category: str, intent: str,
                           send: bool) -> bool:
         """Launch ``category``'s curated ``intent`` settings on the dropped image;
-        ``False`` when the act has no usable curated entry, so the caller falls back
+        ``False`` when the action has no usable curated entry, so the caller falls back
         to mining."""
         built = self._curated_combination(image_id, category, intent)
         if built is None:
@@ -576,7 +576,7 @@ class CombineController(QObject):
             return True
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
-            # The act, with no video under it: curated settings are pinned in the
+            # The action, with no video under it: curated settings are pinned in the
             # overlay, so there is no past run for the queue row to show in gray.
             self._db.set_settings_source(prompt_id, category=category)
             self._mark_for_sending(prompt_id, send)
@@ -597,7 +597,7 @@ class CombineController(QObject):
                           intent: str = action_settings.VIDEO, send: bool = False,
                           starting: str | None = None) -> None:
         """Run the settings that fit ``category`` on the dropped image: the
-        settings assigned for it, else the act's most-used past video. ``intent``
+        settings assigned for it, else the action's most-used past video. ``intent``
         chooses the lane both answer from; ``send`` hands the finished video to
         Genau without a second ask.
 
@@ -675,11 +675,11 @@ class CombineController(QObject):
         )
 
     def animate_it(self, image_id: str | None, asked) -> tuple[str | None, str, str]:
-        """Animate an image as the act an "animate as" named, in the lane it
+        """Animate an image as the action an "animate as" named, in the lane it
         named: the id it launched on (``None`` when it didn't), the line the
         speaking surface should say, and its kind.
 
-        An act left unsaid is settled by what the image shows, through
+        An action left unsaid is settled by what the image shows, through
         :func:`~origenerator.animate_command.what_to_animate`. From there it is the
         ordinary category path: the loop lane is stamped to hand its video on and
         guarded against being said twice (:meth:`_already_genaud`), and the
@@ -692,16 +692,16 @@ class CombineController(QObject):
         if loop and self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
         answer = what_to_animate(asked, row.get("image_state") or "")
-        if answer.act is None:
+        if answer.action is None:
             return None, answer.said, ERROR if answer.unsupported else WARNING
-        act = answer.act
+        action = answer.action
         available = action_settings.available_categories(
             self.rebuildable_videos(self._db.list_generations()), asked.lane)
-        if act not in available:
-            return None, action_settings.no_past_video(act, asked.lane), WARNING
-        logger.info("animate as: image=%s lane=%s -> act=%s", image_id, asked.lane, act)
-        self.generate_category(image_id, act, asked.lane, send=loop)
-        return image_id, f"animating as “{act}”", INFO
+        if action not in available:
+            return None, action_settings.no_past_video(action, asked.lane), WARNING
+        logger.info("animate as: image=%s lane=%s -> action=%s", image_id, asked.lane, action)
+        self.generate_category(image_id, action, asked.lane, send=loop)
+        return image_id, f"animating as “{action}”", INFO
 
 
 def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:

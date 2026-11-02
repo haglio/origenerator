@@ -187,7 +187,7 @@ class GenerationStore(Store):
 
     def set_settings_source(self, prompt_id: str, *, category: str | None = None,
                             video_prompt_id: str | None = None):
-        """Record where a combine launch got its settings: the act picked in the
+        """Record where a combine launch got its settings: the action picked in the
         dropdown, and the video whose settings the run re-uses. Written after the
         launch, because only the caller that built the combination knows either;
         empty values are stored as NULL, so each records the half it has."""
@@ -230,7 +230,7 @@ class GenerationStore(Store):
                 "UPDATE generations SET source = :source, workflow_name = :workflow_name,"
                 " params_json = :params_json,"
                 " positive_prompt = :positive_prompt, negative_prompt = :negative_prompt,"
-                " seed = :seed, recipe_category = :act, created_at = :created_at,"
+                " seed = :seed, recipe_category = :action, created_at = :created_at,"
                 " completed_at = :completed_at WHERE prompt_id = :prompt_id",
                 rows,
             )
@@ -257,8 +257,8 @@ class GenerationStore(Store):
         the sorting back, which puts it among the ones still to be looked at."""
         self._set(prompt_id, "picture_state", state or None)
 
-    def set_action(self, prompt_id: str, act: str | None):
-        self._set(prompt_id, "recipe_category", act or None)
+    def set_action(self, prompt_id: str, action: str | None):
+        self._set(prompt_id, "recipe_category", action or None)
 
     def set_shielded(self, prompt_id: str, shielded: bool):
         self._set(prompt_id, "shielded", 1 if shielded else 0)

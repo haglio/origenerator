@@ -798,13 +798,13 @@ def _put_up(view) -> list:
     return shown
 
 
-def _acts(prompt_ids):
+def _actions_of(prompt_ids):
     named_for = {"id-a": "Source image, alpha", "id-b": "beta"}
     return {prompt_id: named_for.get(prompt_id, "") for prompt_id in prompt_ids}
 
 
-def test_a_rows_button_narrows_the_slideshow_to_that_act_without_redrawing_what_shows_it(qtbot):
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
+def test_a_rows_button_narrows_the_slideshow_to_that_action_without_redrawing_what_shows_it(qtbot):
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     shown = _put_up(view)
 
     view.slideshow.slideshow_filter("source_image,_alpha")
@@ -816,7 +816,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_act_without_redrawing_what_
 
 
 def test_a_filter_past_the_slide_on_screen_puts_up_what_is_left(qtbot):
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     shown = _put_up(view)
 
     view.slideshow.slideshow_filter("beta")
@@ -825,8 +825,8 @@ def test_a_filter_past_the_slide_on_screen_puts_up_what_is_left(qtbot):
     assert shown == ["id-b"]
 
 
-def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
+def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot):
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     shown = _put_up(view)
 
     view.slideshow.slideshow_filter("gamma")
@@ -837,7 +837,7 @@ def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
 
 
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(qtbot):
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
 
     view.slideshow.slideshow_filter_to_the_action_on_screen()
     _settle(view)
@@ -846,17 +846,17 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
     assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
 
-def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot):
+def test_filter_said_over_an_item_named_for_no_action_says_so(qtbot):
     view = _view(qtbot, _KEYED)
 
     view.slideshow.slideshow_filter_to_the_action_on_screen()
     _settle(view)
 
-    assert (view.slideshow.hud_action_filter, words(view._note)) == ("", "No act for this one")
+    assert (view.slideshow.hud_action_filter, words(view._note)) == ("", "No action for this one")
 
 
-def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
+def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot):
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     view.slideshow.slideshow_filter("beta")
     _settle(view)
 
@@ -930,7 +930,7 @@ def test_a_folder_played_as_a_slideshow_opens_with_its_seed_loop_lit(qtbot):
 
 def _seeds_only(prompt_id):
     """A folder's row and nothing else made of it — so the loop key's next stop
-    is off rather than the act column."""
+    is off rather than the action column."""
     return (NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
             if prompt_id == "id-a" else NavMapNeighbors())
 
@@ -2566,13 +2566,13 @@ def test_a_reorder_keeping_the_slide_leaves_the_image_up_and_browses_on(qtbot, t
 
 def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     """The other half of the column: its rows are gone to and looped, where an
-    act's row narrows the slideshow instead."""
+    action's row narrows the slideshow instead."""
     a_configuration = Slide("c.png", "image", "id-c")
     around = lambda pid: NavMapNeighbors(  # noqa: E731
         column=(NavMapRow(a_configuration, "E629425B", configuration=True),)
         if pid == "id-a" else (),
         seeds=(Slide("d.png", "image", "id-d"),) if pid == "id-c" else ())
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=around, acts=_acts))
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=around, actions_of=_actions_of))
     shown = _put_up(view)
 
     view.slideshow.slideshow_filter("e629425b")

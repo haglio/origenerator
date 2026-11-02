@@ -8,7 +8,7 @@ from origenerator.action_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
 from origenerator.image_states import state_names
 
-# A small stand-in for the overlay's own table: two lanes, three acts, three states.
+# A small stand-in for the overlay's own table: two lanes, three actions, three states.
 _PATHS = {
     "animation_paths": {
         VIDEO: {
@@ -28,19 +28,19 @@ def paths(monkeypatch):
     monkeypatch.setattr(animation_paths, "load_content", lambda: _PATHS)
 
 
-def test_a_state_offers_the_acts_its_row_says_yes_to(paths):
+def test_a_state_offers_the_actions_its_row_says_yes_to(paths):
     assert animation_paths.actions_for("state two", VIDEO) == ("alpha", "beta")
     assert animation_paths.actions_for("state two", GENAU) == ("alpha",)
 
 
-def test_a_lane_offers_every_act_the_table_gives_it_in_its_own_order(paths):
-    """What the Action list carries: the acts his sheet has a row for in that
+def test_a_lane_offers_every_action_the_table_gives_it_in_its_own_order(paths):
+    """What the Action list carries: the actions his sheet has a row for in that
     lane, in the order they are written down."""
-    assert animation_paths.acts(VIDEO) == ("alpha", "beta", "gamma")
-    assert animation_paths.acts(GENAU) == ("alpha",)
+    assert animation_paths.actions(VIDEO) == ("alpha", "beta", "gamma")
+    assert animation_paths.actions(GENAU) == ("alpha",)
 
 
-def test_a_state_no_act_answers_offers_nothing(paths):
+def test_a_state_no_action_answers_offers_nothing(paths):
     assert animation_paths.actions_for("state one", GENAU) == ()
     assert animation_paths.actions_for("a state the table never heard of", VIDEO) == ()
 
@@ -67,19 +67,19 @@ def test_a_malformed_line_costs_that_line_and_no_more():
     assert animation_paths.actions_for("state two", GENAU, content=content) == ()
 
 
-def test_the_example_table_names_only_acts_and_states_the_example_declares():
+def test_the_example_table_names_only_actions_and_states_the_example_declares():
     """The two vocabularies the table is written in are the overlay's own, so a
-    line naming an act or a state nothing declares is a line that can never fire.
+    line naming an action or a state nothing declares is a line that can never fire.
     Held over the committed example, which is what documents the shape."""
     example = load_content(EXAMPLE_CONTENT, EXAMPLE_CONTENT)
-    acts = set(example["acts"])
+    actions = set(example["actions"])
     states = set(state_names(example))
     table = example["animation_paths"]
 
     assert table
     for lane, written in table.items():
-        assert set(written) <= acts, lane
-        for act, listed in written.items():
-            assert set(listed) <= states, (lane, act)
-            assert all(animation_paths.allows(lane, act, state, content=example)
+        assert set(written) <= actions, lane
+        for action, listed in written.items():
+            assert set(listed) <= states, (lane, action)
+            assert all(animation_paths.allows(lane, action, state, content=example)
                        for state in listed)

@@ -1,6 +1,6 @@
 """Content overlay — the values that must not be published, loaded at runtime.
 
-The act vocabulary describes the library this tool serves, so it lives in
+The action vocabulary describes the library this tool serves, so it lives in
 ``content.local.json`` (git-ignored) rather than in source.  A
 committed ``content.example.json`` documents the shape and is what a fresh or
 public checkout loads; every consumer reads it through here, so the matcher,
@@ -49,7 +49,8 @@ def overlay_path(
                                  EXAMPLE_CONTENT if example_path is None else example_path)
 
 
-_RENAMED_KEYS = {"recipe_categories": "acts", "combine_recipes": "pinned_kino_settings",
+_RENAMED_KEYS = {"recipe_categories": "actions", "acts": "actions",
+                 "combine_recipes": "pinned_kino_settings",
                  "genau_recipes": "pinned_genau_settings", "picture_states": "image_states",
                  "picture_state_grid": "image_state_grid"}
 
@@ -94,7 +95,7 @@ def missing_overlay_keys(
     missing = _overlay.missing_keys(LOCAL_CONTENT if local_path is None else local_path,
                                     EXAMPLE_CONTENT if example_path is None else example_path)
     present = load_content(local_path, example_path)
-    return tuple(key for key in missing if key not in present)
+    return tuple(key for key in missing if _RENAMED_KEYS.get(key, key) not in present)
 
 
 def genau_flick_word() -> str:

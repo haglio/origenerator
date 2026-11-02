@@ -254,7 +254,7 @@ class FakeHost:
 
     def animate_it(self, image_id, asked):
         self.animated.append((image_id, asked))
-        return image_id, f"animating as “{asked.act}”…", INFO
+        return image_id, f"animating as “{asked.action}”…", INFO
 
     def queue_request(self, row, workflow, params, spoken, revision):
         self.queued.append((row["prompt_id"], revision))
@@ -677,7 +677,7 @@ def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(rout
     assert slideshows.answers == ["Enhance 2 images"]
 
 
-def test_an_animation_goes_to_the_image_on_screen_with_the_lane_and_act_said(router):
+def test_an_animation_goes_to_the_image_on_screen_with_the_lane_and_action_said(router):
     slideshow = FakeSlideshow(target="g7")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
     asked = AnimateRequest(GENAU, "alpha")

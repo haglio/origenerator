@@ -1670,7 +1670,7 @@ def test_a_job_started_from_words_alone_names_no_frame(qtbot):
 
 
 def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
-    # No act was picked, so the image is the only thing naming which source video
+    # No action was picked, so the image is the only thing naming which source video
     # this run is of — and its row is where that gets read.
     db = FakeDB([])
     db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
@@ -1683,7 +1683,7 @@ def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
     view.refresh()
 
     item = {it.key: it for it in view._inflight_items()}["rr1"]
-    assert item.act == ""
+    assert item.action == ""
     assert item.source_video_thumbnail == "thumbs/source.jpg"
 
 
@@ -1704,8 +1704,8 @@ def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, 
     assert item.prompt_edited is stands_apart
 
 
-def test_a_picked_act_shows_no_source_video_at_all(qtbot):
-    # The act names what the video will do, which is the whole of what was
+def test_a_picked_action_shows_no_source_video_at_all(qtbot):
+    # The action names what the video will do, which is the whole of what was
     # chosen. The video its settings were mined out of answers a question nobody
     # asked, and an image of a video the user never picked reads as a job that
     # is that video.
@@ -1714,13 +1714,13 @@ def test_a_picked_act_shows_no_source_video_at_all(qtbot):
                 thumbnail_path="thumbs/source.jpg"))
     db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
                 "rr1.mp4", status="running", output_files="[]",
-                act="dancing", source_video="source"))
+                action="dancing", source_video="source"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
     item = {it.key: it for it in view._inflight_items()}["rr1"]
-    assert item.act == "dancing"
+    assert item.action == "dancing"
     assert item.source_video_thumbnail is None
 
 
@@ -1733,7 +1733,7 @@ def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
     view.refresh()
 
     item = view._inflight_items()[0]
-    assert item.act == ""
+    assert item.action == ""
     assert item.source_video_thumbnail is None
 
 
@@ -2218,7 +2218,7 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
     assert not any(item.starting for item in view._queue._items)
 
 
-def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_already_carries_the_action_that_was_picked(qtbot, tmp_path, monkeypatch):
     # It is the row that will replace it, minus the price: so the line doesn't
     # blink one thing away and a different-looking one in.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
@@ -2229,9 +2229,9 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     view._combine._on_generate_category("img", "dancing", action_settings.VIDEO)
 
     item = view._queue._items[0]
-    assert item.act == "dancing"
+    assert item.action == "dancing"
     assert item.source_image == "sdxl_pick.png [output]"  # the frame being animated
-    assert item.source_video_thumbnail is None  # an act names itself; no video to show
+    assert item.source_video_thumbnail is None  # an action names itself; no video to show
     assert item.cancel is None            # nothing on the server to stop yet
 
 
@@ -2249,10 +2249,10 @@ def test_the_stand_in_row_shows_the_dropped_video(qtbot, tmp_path, monkeypatch):
 
     item = view._queue._items[0]
     assert item.source_video_thumbnail == "thumbs/vid.jpg"
-    assert item.act == ""
+    assert item.action == ""
 
 
-def test_the_stand_in_row_goes_when_the_act_has_no_past_video(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_goes_when_the_action_has_no_past_video(qtbot, tmp_path, monkeypatch):
     # It stands in for a launch, so it must not outlive one that never happened.
     db = _combine_db(tmp_path)  # its one video is a "dance" video: no epsilon video
     view = GalleryView(db, client=_reroll_client())

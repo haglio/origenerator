@@ -178,7 +178,7 @@ def test_the_words_the_genau_lane_adds_are_words_the_source_video_never_said():
 _SPEC = {
     "workflow": "wan22_i2v",
     "params": {"positive_prompt": "gamma form scene", "steps": 24,
-               "lora_high": "example-act-high.safetensors"},
+               "lora_high": "example-action-high.safetensors"},
 }
 
 
@@ -190,7 +190,7 @@ def test_written_params_lays_the_spec_over_defaults_and_swaps_the_image():
     assert params["input_image"] == "sdxl_new.png [output]"
     assert params["positive_prompt"] == "gamma form scene"          # from the spec
     assert params["steps"] == 24                                    # from the spec
-    assert params["lora_high"] == "example-act-high.safetensors"    # from the spec
+    assert params["lora_high"] == "example-action-high.safetensors"    # from the spec
     assert params["shift_high"] == _I2V.default_params()["shift_high"]  # unnamed → default
 
 
@@ -259,15 +259,15 @@ def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
     assert shaped["negative_prompt"].startswith("beta ")
 
 
-def test_an_act_with_its_own_words_gets_them_and_the_rest_get_the_default():
-    """A cycle is not one motion: what made the difference on the act it was
+def test_an_action_with_its_own_words_gets_them_and_the_rest_get_the_default():
+    """A cycle is not one motion: what made the difference on the action it was
     tuned on was naming the cycle in STAGES, and the stages are different parts of
-    the body from one act to the next."""
+    the body from one action to the next."""
     own = combine.cycle_words("beta")
     default = combine.cycle_words("")
 
     assert own != default
-    assert combine.cycle_words("an act with no entry") == default
+    assert combine.cycle_words("an action with no entry") == default
     assert _shaped(positive_prompt="x", category="beta")["positive_prompt"] !=         _shaped(positive_prompt="x")["positive_prompt"]
 
 

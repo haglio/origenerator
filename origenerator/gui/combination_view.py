@@ -137,7 +137,7 @@ class CombinationView(QWidget):
     def show_pair(self, combination: Combination) -> None:
         """Show the image beside its source video, looping in gray.
 
-        Either may be missing — a curated act is pinned in the overlay and has no
+        Either may be missing — a curated action is pinned in the overlay and has no
         past video under it, and a frame can have moved — and the plus shows only
         when both halves are there, since a lone image is not a sum.
         """

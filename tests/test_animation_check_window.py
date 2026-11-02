@@ -47,14 +47,14 @@ class _Store:
     def __init__(self):
         self.accepted = {}
 
-    def remember(self, lane, act, state, *, workflow, params):
-        self.accepted[(lane, act, state)] = (workflow, dict(params))
+    def remember(self, lane, action, state, *, workflow, params):
+        self.accepted[(lane, action, state)] = (workflow, dict(params))
 
     def accepted_paths(self):
         return set(self.accepted)
 
-    def assigned(self, lane, act, state):
-        held = self.accepted.get((lane, act, state))
+    def assigned(self, lane, action, state):
+        held = self.accepted.get((lane, action, state))
         return None if held is None else {"workflow": held[0], "params": held[1]}
 
 
@@ -100,7 +100,7 @@ def window(qtbot, tmp_path):
     return build
 
 
-def test_the_heading_names_the_lane_the_act_and_the_state_it_starts_from(window):
+def test_the_heading_names_the_lane_the_action_and_the_state_it_starts_from(window):
     made, _store, _sent = window({(VIDEO, "alpha", "state one"): [_video()]})
 
     assert "alpha" in _said(made, HEADING)
@@ -305,14 +305,14 @@ def test_the_arrows_are_wide_enough_to_draw_their_glyph(window):
         assert room.width() >= step.fontMetrics().horizontalAdvance(step.text())
 
 
-def test_an_animation_nobody_kept_a_video_of_starts_from_the_acts_own_prompts(window):
-    """His ask: the act's own settings are a starting position where there is
+def test_an_animation_nobody_kept_a_video_of_starts_from_the_actions_own_prompts(window):
+    """His ask: the action's own settings are a starting position where there is
     nothing kept to copy, so the animation can still be answered."""
-    made, _store, _sent = window({}, pinned=lambda act, lane: {
-        "workflow": "wan22_i2v", "params": {"positive_prompt": "the act's own",
+    made, _store, _sent = window({}, pinned=lambda action, lane: {
+        "workflow": "wan22_i2v", "params": {"positive_prompt": "the action's own",
                                             "negative_prompt": "its flaws"}})
 
-    assert _box(made, POSITIVE).toPlainText() == "the act's own"
+    assert _box(made, POSITIVE).toPlainText() == "the action's own"
     assert _box(made, NEGATIVE).toPlainText() == "its flaws"
     assert made.findChild(QLabel, BLANK).text() == FROM_THE_ACTIONS_OWN
 

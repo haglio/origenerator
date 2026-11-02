@@ -1,5 +1,5 @@
 """Each animation's sample, and the order they are worked through: a video the
-user kept of that act from an image sorted that way, most-kept first."""
+user kept of that action from an image sorted that way, most-kept first."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -11,7 +11,7 @@ from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 
-Path = tuple[str, str, str]  # lane, act, state
+Path = tuple[str, str, str]  # lane, action, state
 
 
 def _made(row: dict) -> str:
@@ -43,15 +43,15 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
     states = _states_by_image(rows)
     found: dict[Path, list[dict]] = defaultdict(list)
     for video in sorted(_kept_videos(rows), key=_made, reverse=True):
-        act = action_of(video)
+        action = action_of(video)
         state = states.get(frame_name(
             gallery.parse_params(video.get("params_json")).get("input_image")), "")
-        if not act or not state:
+        if not action or not state:
             continue
         lanes = (VIDEO, GENAU) if loops(video) else (VIDEO,)
         for lane in lanes:
-            if animation_paths.allows(lane, act, state, content=content):
-                found[(lane, act, state)].append(video)
+            if animation_paths.allows(lane, action, state, content=content):
+                found[(lane, action, state)].append(video)
     return dict(found)
 
 

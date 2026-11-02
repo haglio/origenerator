@@ -103,4 +103,4 @@ def test_a_combine_made_from_the_folded_record_names_the_one_that_stays(tmp_path
     _fold_repeat_into_first(db)
 
     combined = db.get_generation("combined")
-    assert (combined["act"], combined["source_video"]) == ("alpha", "first")
+    assert (combined["action"], combined["source_video"]) == ("alpha", "first")

@@ -32,15 +32,15 @@ _CONTENT = load_content()
 CYCLE_FRAMES = 29
 
 # The words that ask a 29-frame loop for ONE cycle, and for a deep one, PER
-# ACT: ``{act: {"positive": ..., "negative": ...}}`` with a ``""`` entry standing
-# in for an act that has none of its own.
+# ACTION: ``{action: {"positive": ..., "negative": ...}}`` with a ``""`` entry standing
+# in for an action that has none of its own.
 #
-# Per act because a cycle is not one motion. What made the difference on the act
+# Per action because a cycle is not one motion. What made the difference on the action
 # it was tuned on was naming the cycle in stages -- out to one end, in to the
-# other, back -- and the stages are different parts of the body from one act to
+# other, back -- and the stages are different parts of the body from one action to
 # the next; the wording that doubled the travel on one would be describing
-# something that is not happening in another. The default carries whichever act's
-# wording generalizes furthest, and an act sets its own when that is not close
+# something that is not happening in another. The default carries whichever action's
+# wording generalizes furthest, and an action sets its own when that is not close
 # enough.
 #
 # In the overlay rather than here for the reason every other phrase the library
@@ -92,7 +92,7 @@ def _run_on(input_image: str | None, params: dict, workflow) -> dict | None:
 
 def cycle_words(category: str = "") -> tuple[str, str]:
     """The ``(positive, negative)`` a Genau flick of ``category`` asks for, or the
-    default pair when that act has none of its own -- see :data:`_CYCLE_WORDS`.
+    default pair when that action has none of its own -- see :data:`_CYCLE_WORDS`.
 
     Empty strings when the overlay carries nothing at all, which is what leaves
     a run's prompt untouched rather than appending a stray space.
@@ -114,7 +114,7 @@ def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
 
     * :data:`CYCLE_FRAMES` seconds of motion, because that is the shortest loop
       the model closes cleanly (see the note there).
-    * The words, chosen by the act (:func:`cycle_words`). At 29 frames the model
+    * The words, chosen by the action (:func:`cycle_words`). At 29 frames the model
       fits about two cycles on its own, so the prompt asks for one outright —
       naming the cycle in stages rather than saying "one cycle", which does
       nothing. The same wording doubled the travel, so the video reads as a

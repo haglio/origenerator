@@ -1,6 +1,6 @@
-"""The spoken ``animate as [Video|Genau] [act]``, said over an image.
+"""The spoken ``animate as [Video|Genau] [action]``, said over an image.
 
-The lane defaults to the full-length video and an act left unsaid comes back as
+The lane defaults to the full-length video and an action left unsaid comes back as
 ``""`` for :mod:`origenerator.animation_paths` to settle against what the image
 shows. The loop lane answers to "go now" too and is said back as "Genau".
 """
@@ -34,15 +34,15 @@ _GENAU_AS_SAID = "go now"
 class AnimateRequest:
 
     lane: str
-    act: str
+    action: str
 
 
 class Answer(NamedTuple):
-    """What one request comes to for one image: the act to run, or the line to
+    """What one request comes to for one image: the action to run, or the line to
     say instead, and whether that line refuses something the image cannot do
     (said as an error rather than as a question)."""
 
-    act: str | None
+    action: str | None
     said: str = ""
     unsupported: bool = False
 
@@ -63,64 +63,64 @@ def _lane_of(rest: list[str]) -> tuple[str, list[str]]:
     return VIDEO, rest
 
 
-def _action_of(rest: list[str], acts) -> str | None:
-    """The act ``rest`` names, ``""`` for an utterance that names none, and
-    ``None`` for words that are no act -- which is no command at all."""
+def _action_of(rest: list[str], actions) -> str | None:
+    """The action ``rest`` names, ``""`` for an utterance that names none, and
+    ``None`` for words that are no action -- which is no command at all."""
     if not rest:
         return ""
     said = " ".join(rest)
-    for act in acts:
-        if act.lower() == said:
-            return act
+    for action in actions:
+        if action.lower() == said:
+            return action
     return None
 
 
-def match_animate_command(text: str, acts=CATEGORIES) -> AnimateRequest | None:
+def match_animate_command(text: str, actions=CATEGORIES) -> AnimateRequest | None:
     rest = _after_the_verb(words(text))
     if rest is None:
         return None
     lane, named = _lane_of(rest)
-    act = _action_of(named, acts)
-    return None if act is None else AnimateRequest(lane, act)
+    action = _action_of(named, actions)
+    return None if action is None else AnimateRequest(lane, action)
 
 
-def animate_command_phrases(acts=CATEGORIES) -> frozenset[str]:
+def animate_command_phrases(actions=CATEGORIES) -> frozenset[str]:
     said = []
     for lane in ("", _GENAU_AS_SAID):
         opening = f"animate as {lane}".strip()
         said.append(opening)
-        said.extend(f"{opening} {act.lower()}" for act in acts)
+        said.extend(f"{opening} {action.lower()}" for action in actions)
     return frozenset(said)
 
 
 def what_to_animate(asked: AnimateRequest, state: str, *, content: dict | None = None
                     ) -> Answer:
-    """The act to run for an image already in ``state``, or what to say instead:
-    two questions (an unsorted image, an unsaid act with a choice to make) and
+    """The action to run for an image already in ``state``, or what to say instead:
+    two questions (an unsorted image, an unsaid action with a choice to make) and
     two refusals, which are marked so the surface says them as errors."""
     if not state:
         return Answer(None, "this image hasn't been sorted yet — say what it "
                             "shows, then ask again")
-    if asked.act:
-        if animation_paths.allows(asked.lane, asked.act, state, content=content):
-            return Answer(asked.act)
+    if asked.action:
+        if animation_paths.allows(asked.lane, asked.action, state, content=content):
+            return Answer(asked.action)
         return Answer(None, f"a “{state}” image can't be animated as "
-                            f"“{asked.act}”", unsupported=True)
+                            f"“{asked.action}”", unsupported=True)
     offered = animation_paths.actions_for(state, asked.lane, content=content)
     if not offered:
         return Answer(None, f"nothing can be animated from a “{state}” image "
                             "in this lane", unsupported=True)
     if len(offered) > 1:
-        named = ", ".join(f"“{act}”" for act in offered)
+        named = ", ".join(f"“{action}”" for action in offered)
         return Answer(None, f"which one? {named}")
     return Answer(offered[0])
 
 
-def animate_command_spelling(text: str, acts=CATEGORIES) -> str | None:
+def animate_command_spelling(text: str, actions=CATEGORIES) -> str | None:
     """The utterance in the words the app names them by -- "gunow" read back as
     "Genau" -- or ``None`` when it is no animation."""
-    asked = match_animate_command(text, acts)
+    asked = match_animate_command(text, actions)
     if asked is None:
         return None
     lane = _LANE_SPELLING[asked.lane] if asked.lane != VIDEO else ""
-    return " ".join(part for part in ("animate as", lane, asked.act) if part)
+    return " ".join(part for part in ("animate as", lane, asked.action) if part)

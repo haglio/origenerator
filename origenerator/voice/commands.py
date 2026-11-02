@@ -6,7 +6,7 @@ show's own controls (:mod:`origenerator.voice.show_commands`), or a collection's
 which plays that collection the way its slideshow button would.
 
 * a command about the image on screen — ``fix <part>``, ``animate as <lane>
-  <act>`` or ``enhance`` (:mod:`origenerator.gallery.voice_commands` owns all
+  <action>`` or ``enhance`` (:mod:`origenerator.gallery.voice_commands` owns all
   three).
 * ``start`` / ``pause`` / ``stop slideshow`` — the slideshow's own controls
   (:mod:`origenerator.voice.slideshow_commands`).

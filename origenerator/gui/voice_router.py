@@ -96,7 +96,7 @@ _FLASH_MS = 4000
 
 # What an "animate as" wants, said with no image up. Its own line rather
 # than the parts' own naming, because the command is a record rather than a word
-# and every act names itself differently.
+# and every action names itself differently.
 _WANTS_ANIMATING = "an animation"
 
 # The collection each spoken collection name stands you in. What to call it back is the
@@ -175,8 +175,8 @@ class VoiceHost(Protocol):
 
     def animate_it(self, image_id: str | None,
                    asked) -> tuple[str | None, str, str]:
-        """Animate an image as the act an "animate as" named, in the lane it
-        named, the same way. The act may be unsaid, and what the image
+        """Animate an image as the action an "animate as" named, in the lane it
+        named, the same way. The action may be unsaid, and what the image
         already shows is what settles it."""
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:

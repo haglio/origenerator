@@ -768,7 +768,7 @@ def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_source(tmp
     imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
 
     combined = db.get_generation("combined")
-    assert (combined["act"], combined["source_video"]) == ("alpha", "sounded")
+    assert (combined["action"], combined["source_video"]) == ("alpha", "sounded")
 
 
 def test_a_folded_copy_combines_slot_had_is_listed_as_the_video_that_stays(tmp_path):

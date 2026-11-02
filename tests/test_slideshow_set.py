@@ -414,8 +414,8 @@ def test_the_loop_key_steps_the_lock_then_seeds_then_configs_then_off_and_round_
     assert slideshow_set.step_loop(locked=False) == LOCK
 
 
-def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
-    """The column steps between acts, so twins of one act share a row; the
+def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_action():
+    """The column steps between actions, so twins of one action share a row; the
     loop is the image and every video of it, and its map is the loop."""
     twin = Slide("one-y.png", "image", "id-1y")
     whole = lambda pid: NavMapNeighbors(  # noqa: E731
@@ -722,27 +722,27 @@ def test_a_loop_picked_back_up_plays_its_own_slides_from_the_one_it_was_left_on(
     assert reopened.map() == closed.map()
 
 
-# --- the act filter: the map's row buttons, and the session's spoken acts ------
+# --- the action filter: the map's row buttons, and the session's spoken actions ------
 
 _NAMED_FOR = {"id-1": "Source image, alpha", "id-2": "beta", "id-3": "alpha"}
 
 
-def _acts(prompt_ids):
+def _actions_of(prompt_ids):
     return {prompt_id: _NAMED_FOR.get(prompt_id, "") for prompt_id in prompt_ids}
 
 
 def _filterable(**fields):
-    return _set(acts=_acts, **fields)
+    return _set(actions_of=_actions_of, **fields)
 
 
-def test_an_act_filter_narrows_the_pass_to_what_is_named_for_that_act():
+def test_an_action_filter_narrows_the_pass_to_what_is_named_for_that_action():
     slideshow_set, dealt = _filterable()
 
     assert slideshow_set.set_action_filter("alpha") is True
 
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
-    assert slideshow_set.filters.act == "alpha"
-    assert dealt == [True]                      # the slide on screen shows that act
+    assert slideshow_set.filters.action == "alpha"
+    assert dealt == [True]                      # the slide on screen shows that action
 
 
 def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
@@ -752,11 +752,11 @@ def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
 
     assert slideshow_set.set_action_filter("gamma") is False
 
-    assert (slideshow_set.filters.act, dealt, len(slideshow_set.playlist)) == ("", [], 3)
+    assert (slideshow_set.filters.action, dealt, len(slideshow_set.playlist)) == ("", [], 3)
 
 
-def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
-    """Set from a row carrying two acts it names both, and only a generation
+def test_a_filter_naming_two_actions_keeps_only_what_is_named_for_both():
+    """Set from a row carrying two actions it names both, and only a generation
     carrying both answers it — the rule the HUD lights its rows by."""
     slideshow_set, _dealt = _filterable()
 
@@ -765,8 +765,8 @@ def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
     assert _ids(slideshow_set.playlist.items) == ["id-1"]
 
 
-def test_filtering_to_the_act_on_screen_narrows_to_what_its_row_is_named_for():
-    """A session's spoken "filter", said of a shape: the act read off the item
+def test_filtering_to_the_action_on_screen_narrows_to_what_its_row_is_named_for():
+    """A session's spoken "filter", said of a shape: the action read off the item
     on screen rather than spoken, the way its map row's button would post it."""
     slideshow_set, _dealt = _filterable()
     slideshow_set.playlist.jump_to(2)
@@ -775,32 +775,32 @@ def test_filtering_to_the_act_on_screen_narrows_to_what_its_row_is_named_for():
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
 
 
-def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
+def test_an_item_named_for_no_action_says_so_and_leaves_the_pass_alone():
     """Rather than lifting the filter, which is what nothing posted to a row's
     button means."""
-    slideshow_set, _dealt = _set(acts=lambda ids: dict.fromkeys(ids, ""))
+    slideshow_set, _dealt = _set(actions_of=lambda ids: dict.fromkeys(ids, ""))
 
     said, narrowed = narrow_to_the_action_on_screen(slideshow_set)
 
-    assert (said, narrowed) == ("No act for this one", False)
-    assert (slideshow_set.filters.act, len(slideshow_set.playlist)) == ("", 3)
+    assert (said, narrowed) == ("No action for this one", False)
+    assert (slideshow_set.filters.action, len(slideshow_set.playlist)) == ("", 3)
 
 
-def test_a_reset_drops_the_act_filter_with_the_other_switches():
+def test_a_reset_drops_the_action_filter_with_the_other_switches():
     slideshow_set, dealt = _filterable()
     slideshow_set.set_action_filter("beta")
     dealt.clear()
 
     assert slideshow_set.drop_the_filters() is True
 
-    assert (slideshow_set.filters.act, len(slideshow_set.playlist), dealt) == ("", 3, [False])
+    assert (slideshow_set.filters.action, len(slideshow_set.playlist), dealt) == ("", 3, [False])
 
 
 def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
     """A video landing makes its image a source, so what the library said
     before it landed is not what a filter may go on matching by."""
     named_for = dict(_NAMED_FOR)
-    slideshow_set, _dealt = _set(acts=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
+    slideshow_set, _dealt = _set(actions_of=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
     slideshow_set.set_action_filter("alpha")
     assert slideshow_set.passes(Slide("two.png", "image", "id-2")) is False
 
@@ -810,8 +810,8 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
     assert slideshow_set.passes(Slide("two.png", "image", "id-2")) is True
 
 
-def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
-    """Half the column is configurations and half is acts, and the two are
+def test_a_configuration_rows_button_is_told_from_an_actions_by_the_row_itself():
+    """Half the column is configurations and half is actions, and the two are
     pressed differently — so the map says which a row is rather than leaving it
     to be guessed from the words in its margin."""
     a_configuration = Slide("one-x.png", "image", "id-1x")

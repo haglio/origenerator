@@ -46,14 +46,14 @@ def test_the_seed_row_is_the_rest_of_the_items_own_settings_folder():
     assert _ids(row) == ["g2", "g1"]
 
 
-def _video(prompt_id, prompt, *, noise_seed, frame, lora="lora_a", act=None):
+def _video(prompt_id, prompt, *, noise_seed, frame, lora="lora_a", action=None):
     """A WAN I2V row: its sampler seed is ``noise_seed``, so the
     ``seed`` column an image fills stays empty on it."""
     return {
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
         "positive_prompt": prompt,
-        "act": act,
+        "action": action,
         "seed": None,
         "params_json": json.dumps({
             "positive_prompt": prompt, "noise_seed": noise_seed, "input_image": frame,
@@ -82,13 +82,13 @@ def test_beyond_an_images_row_lie_the_nearest_other_configurations_of_its_model(
 # --- the column: an image and the videos animated from it -----------------------
 
 
-def test_an_images_column_is_the_videos_animated_from_it_each_named_for_its_act():
+def test_an_images_column_is_the_videos_animated_from_it_each_named_for_its_action():
     image = _image("i1", "a fox", seed=1)
     other_image = _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([image, other_image])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
-    sleeps = _video("v2", "the fox sleeps", noise_seed=6, frame="i1.png", act="beta")
-    elsewhere = _video("v3", "the fox runs", noise_seed=7, frame="i2.png", act="alpha")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+    sleeps = _video("v2", "the fox sleeps", noise_seed=6, frame="i1.png", action="beta")
+    elsewhere = _video("v3", "the fox runs", noise_seed=7, frame="i2.png", action="alpha")
 
     around = surroundings(image, [image, other_image, runs, sleeps, elsewhere],
                           image_index=index)
@@ -97,12 +97,12 @@ def test_an_images_column_is_the_videos_animated_from_it_each_named_for_its_act(
         ("v1", "alpha"), ("v2", "beta")]
 
 
-def test_two_videos_of_one_act_share_a_row_so_the_column_steps_between_acts():
+def test_two_videos_of_one_action_share_a_row_so_the_column_steps_between_actions():
     image = _image("i1", "a fox", seed=1)
     index = gallery.build_image_config_index([image])
-    first = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
-    again = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", act="alpha")
-    sleeps = _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", act="beta")
+    first = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+    again = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", action="alpha")
+    sleeps = _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", action="beta")
 
     around = surroundings(image, [image, first, again, sleeps], image_index=index)
 
@@ -110,12 +110,12 @@ def test_two_videos_of_one_act_share_a_row_so_the_column_steps_between_acts():
         ("v1", "alpha"), ("v3", "beta")]
 
 
-def test_a_videos_column_is_its_source_image_then_that_images_other_acts():
+def test_a_videos_column_is_its_source_image_then_that_images_other_actions():
     image = _image("i1", "a fox", seed=1)
     index = gallery.build_image_config_index([image])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
-    runs_again = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", act="alpha")
-    sleeps = _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", act="beta")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+    runs_again = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", action="alpha")
+    sleeps = _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", action="beta")
 
     around = surroundings(runs, [image, runs, runs_again, sleeps], image_index=index)
 
@@ -123,27 +123,27 @@ def test_a_videos_column_is_its_source_image_then_that_images_other_acts():
         ("i1", "Source image"), ("v3", "beta")]
 
 
-def test_each_generation_names_its_own_row_by_the_act_it_shows():
+def test_each_generation_names_its_own_row_by_the_action_it_shows():
     image = _image("i1", "a fox", seed=1)
     index = gallery.build_image_config_index([image])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
     library = [image, runs]
 
     assert surroundings(runs, library, image_index=index).label == "alpha"
     assert surroundings(image, library, image_index=index).label == "Source image"
 
 
-def test_a_source_image_carries_the_act_it_shows_beside_being_a_source():
+def test_a_source_image_carries_the_action_it_shows_beside_being_a_source():
     image = _image("i1", "a fox", seed=1, shows="beta")
     index = gallery.build_image_config_index([image])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
 
     around = surroundings(runs, [image, runs], image_index=index)
 
     assert [label for _row, label in around.actions] == ["Source image, beta"]
 
 
-def test_an_image_nothing_was_animated_from_is_no_source_and_names_only_its_act():
+def test_an_image_nothing_was_animated_from_is_no_source_and_names_only_its_action():
     shows_an_action = _image("i1", "a fox", seed=1, shows="beta")
     shows_none = _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([shows_an_action, shows_none])
@@ -156,18 +156,18 @@ def test_an_image_nothing_was_animated_from_is_no_source_and_names_only_its_act(
 # --- the seed row: keyed by the image, not by the video's own sampler ---------
 
 
-def test_a_videos_seed_row_is_its_act_animated_from_its_images_other_seeds():
+def test_a_videos_seed_row_is_its_action_animated_from_its_images_other_seeds():
     one = _image("i1", "a fox", seed=1)
     two = _image("i2", "a fox", seed=2)
     another_config = _image("i3", "a hare", seed=3)
     index = gallery.build_image_config_index([one, two, another_config])
-    current = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
-    same_act = _video("v2", "the fox runs", noise_seed=9, frame="i2.png", act="alpha")
-    other_action = _video("v3", "the fox sleeps", noise_seed=5, frame="i2.png", act="beta")
-    other_family = _video("v4", "the hare runs", noise_seed=5, frame="i3.png", act="alpha")
+    current = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+    same_action = _video("v2", "the fox runs", noise_seed=9, frame="i2.png", action="alpha")
+    other_action = _video("v3", "the fox sleeps", noise_seed=5, frame="i2.png", action="beta")
+    other_family = _video("v4", "the hare runs", noise_seed=5, frame="i3.png", action="alpha")
 
     around = surroundings(
-        current, [one, two, another_config, current, same_act, other_action, other_family],
+        current, [one, two, another_config, current, same_action, other_action, other_family],
         image_index=index)
 
     assert _ids(around.seeds) == ["v2"]
@@ -176,8 +176,8 @@ def test_a_videos_seed_row_is_its_act_animated_from_its_images_other_seeds():
 def test_a_videos_own_twins_join_its_row_and_it_is_known_by_id_not_by_object():
     image = _image("i1", "a fox", seed=1)
     index = gallery.build_image_config_index([image])
-    current = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
-    twin = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", act="alpha")
+    current = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+    twin = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", action="alpha")
 
     around = surroundings(dict(current), [image, current, twin], image_index=index)
 
@@ -185,8 +185,8 @@ def test_a_videos_own_twins_join_its_row_and_it_is_known_by_id_not_by_object():
 
 
 def test_a_video_made_from_no_image_the_library_holds_keeps_its_own_folder_as_its_row():
-    current = _video("v1", "the fox runs", noise_seed=5, frame="gone.png", act="alpha")
-    reroll = _video("v2", "the fox runs", noise_seed=6, frame="gone.png", act="alpha")
+    current = _video("v1", "the fox runs", noise_seed=5, frame="gone.png", action="alpha")
+    reroll = _video("v2", "the fox runs", noise_seed=6, frame="gone.png", action="alpha")
 
     around = surroundings(current, [current, reroll], image_index={})
 
@@ -196,23 +196,23 @@ def test_a_video_made_from_no_image_the_library_holds_keeps_its_own_folder_as_it
 def test_an_action_loop_plays_the_image_and_every_video_of_it_twins_included():
     image = _image("i1", "a fox", seed=1)
     index = gallery.build_image_config_index([image])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
-    runs_again = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", act="alpha")
-    sleeps = _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", act="beta")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+    runs_again = _video("v2", "the fox runs", noise_seed=6, frame="i1.png", action="alpha")
+    sleeps = _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", action="beta")
 
     around = surroundings(runs, [image, runs, runs_again, sleeps], image_index=index)
 
     assert _ids(around.group) == ["i1", "v2", "v3"]
 
 
-# --- what an act filter matches a generation on --------------------------------
+# --- what an action filter matches a generation on --------------------------------
 
 
 def test_the_whole_library_says_what_each_generation_is_named_for():
     source = _image("i1", "a fox", seed=1, shows="beta")
     plain = _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([source, plain])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
 
     assert action_labels([source, plain, runs], image_index=index) == {
         "i1": "Source image, beta", "i2": "", "v1": "alpha"}
@@ -221,17 +221,17 @@ def test_the_whole_library_says_what_each_generation_is_named_for():
 # --- "more seeds": what lies just beyond the row -------------------------------
 
 
-def test_beyond_a_videos_row_lie_videos_of_its_act_from_the_images_most_like_its_own():
+def test_beyond_a_videos_row_lie_videos_of_its_action_from_the_images_most_like_its_own():
     own = _image("i1", "a red fox sleeping in deep snow", seed=1)
     alike = _image("i2", "a red fox sleeping in snow", seed=2)
     unlike = _image("i3", "a blue car parked by the harbor", seed=3)
     index = gallery.build_image_config_index([own, alike, unlike])
-    current = _video("v1", "it runs", noise_seed=1, frame="i1.png", act="alpha")
-    far = _video("v2", "it runs", noise_seed=2, frame="i3.png", act="alpha")
-    near = _video("v3", "it runs", noise_seed=3, frame="i2.png", act="alpha")
-    another_act = _video("v4", "it sleeps", noise_seed=4, frame="i2.png", act="beta")
+    current = _video("v1", "it runs", noise_seed=1, frame="i1.png", action="alpha")
+    far = _video("v2", "it runs", noise_seed=2, frame="i3.png", action="alpha")
+    near = _video("v3", "it runs", noise_seed=3, frame="i2.png", action="alpha")
+    another_action = _video("v4", "it sleeps", noise_seed=4, frame="i2.png", action="beta")
 
-    beyond = beyond_the_row(current, [own, alike, unlike, current, far, near, another_act],
+    beyond = beyond_the_row(current, [own, alike, unlike, current, far, near, another_action],
                             image_index=index)
 
     assert _ids(beyond) == ["v3", "v2"]
@@ -268,10 +268,10 @@ def test_the_lora_that_animated_a_video_comes_before_a_likelier_image():
     alike = _image("i2", "a red fox sleeping in snow", seed=2)
     unlike = _image("i3", "a blue car parked by the harbor", seed=3)
     index = gallery.build_image_config_index([own, alike, unlike])
-    current = _video("v1", "it runs", noise_seed=1, frame="i1.png", act="alpha")
-    likelier_image = _video("v2", "it runs", noise_seed=2, frame="i2.png", act="alpha",
+    current = _video("v1", "it runs", noise_seed=1, frame="i1.png", action="alpha")
+    likelier_image = _video("v2", "it runs", noise_seed=2, frame="i2.png", action="alpha",
                             lora="lora_b")
-    same_lora = _video("v3", "it runs", noise_seed=3, frame="i3.png", act="alpha")
+    same_lora = _video("v3", "it runs", noise_seed=3, frame="i3.png", action="alpha")
 
     beyond = beyond_the_row(current, [own, alike, unlike, current, likelier_image, same_lora],
                             image_index=index)
@@ -317,13 +317,13 @@ def test_the_column_opens_on_the_same_seed_under_other_configurations():
     assert _ids(around.configs) == ["g2"]
 
 
-def test_a_configuration_sibling_is_not_also_one_of_the_acts_below_it():
+def test_a_configuration_sibling_is_not_also_one_of_the_actions_below_it():
     """The two halves of the column are told apart by where they sit, so an
-    image's own re-prompt is a configuration and never an act as well."""
+    image's own re-prompt is a configuration and never an action as well."""
     image = _image("i1", "a fox", seed=1)
     tweaked = _image("i2", "a fox at dawn", seed=1)
     index = gallery.build_image_config_index([image, tweaked])
-    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
 
     around = surroundings(image, [image, tweaked, runs], image_index=index)
 
@@ -335,12 +335,12 @@ def test_a_video_has_no_configurations_of_its_own_because_its_seed_is_its_images
     """Configurations belong to images.  A video's own sampler seed says
     nothing about which image it is of, so two videos that happen to share
     one are strangers; what another configuration of this video's image
-    would be is a video of that image, which the acts below already are."""
+    would be is a video of that image, which the actions below already are."""
     image = _image("i1", "a fox", seed=1)
     other_image = _image("i2", "a hare", seed=2)
     index = gallery.build_image_config_index([image, other_image])
-    current = _video("v1", "it runs", noise_seed=5, frame="i1.png", act="alpha")
-    elsewhere = _video("v2", "it runs", noise_seed=5, frame="i2.png", act="alpha")
+    current = _video("v1", "it runs", noise_seed=5, frame="i1.png", action="alpha")
+    elsewhere = _video("v2", "it runs", noise_seed=5, frame="i2.png", action="alpha")
 
     around = surroundings(current, [image, other_image, current, elsewhere],
                           image_index=index)

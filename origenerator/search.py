@@ -32,8 +32,8 @@ row is either markup or bookkeeping that happens to be spelled like a word.
 
 The table below is plain, publishable English, and it is deliberately
 incomplete: the words describing the library itself — its own vocabulary for
-people, acts and bodies — ride the content overlay's ``search_synonyms``, the
-git-ignored file the act keywords and the detail-fix parts already live in. A
+people, actions and bodies — ride the content overlay's ``search_synonyms``, the
+git-ignored file the action keywords and the detail-fix parts already live in. A
 group named there that shares one word with a group here merges into it, so the
 overlay extends this table rather than standing apart from it.
 """

@@ -46,8 +46,8 @@ def test_a_row_says_what_kind_of_work_it_is_when_the_workflow_is_one_we_know():
     assert queue_lead_text(_item(job_kind="")) == "~2 min"
 
 
-def test_the_act_follows_the_kind_so_two_runs_on_one_image_read_apart():
-    assert queue_lead_text(_item(job_kind="Video", act="alpha")) == (
+def test_the_action_follows_the_kind_so_two_runs_on_one_image_read_apart():
+    assert queue_lead_text(_item(job_kind="Video", action="alpha")) == (
         "~2 min · Video · alpha")
 
 
@@ -94,9 +94,9 @@ def test_a_workflow_this_build_has_no_template_for_contributes_no_line():
 
 def test_the_hover_names_who_asked_when_it_was_not_a_press_of_generate():
     lines = queue_lead_tooltip(_item(auto_generating=True, requested=True,
-                                     act="beta")).splitlines()
+                                     action="beta")).splitlines()
     assert lines[1:] == [
-        "The “beta” act, picked in Combine",
+        "The “beta” action, picked in Combine",
         "Queued by its folder's Auto-Generate",
         "Queued by a request",
     ]

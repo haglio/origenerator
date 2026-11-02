@@ -1,5 +1,5 @@
 """The row on a Generate tab saying what the item it is showing shows: an image's,
-into the column :mod:`origenerator.sort_images` fills in bulk, or a video's act."""
+into the column :mod:`origenerator.sort_images` fills in bulk, or a video's action."""
 from __future__ import annotations
 
 from funestra.video_families import normalized_text
@@ -18,13 +18,13 @@ from origenerator.sort_images import the_sorting_window
 
 UNSAID = "— "
 
-# What this is called here and on Combine's list of acts.
+# What this is called here and on Combine's list of actions.
 ACTION_LABEL = "Action"
 
 SORT_BUTTON = "image.sort"
 
 _IMAGES_TIP = "What this image already shows — which decides what it can be animated as"
-_VIDEOS_TIP = "What this video shows — the act it was made as"
+_VIDEOS_TIP = "What this video shows — the action it was made as"
 
 
 def _as_listed(said: str, names: tuple[str, ...]) -> str:
@@ -36,10 +36,10 @@ class ActionDropdown(QWidget):
 
     chosen = pyqtSignal(str, str)  # prompt_id, what it shows ("" once taken back)
 
-    def __init__(self, states, acts, form: LabelForm):
+    def __init__(self, states, actions, form: LabelForm):
         super().__init__()
         self._prompt_id = ""
-        self._states, self._acts = tuple(states), tuple(acts)
+        self._states, self._actions = tuple(states), tuple(actions)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
@@ -74,8 +74,8 @@ class ActionDropdown(QWidget):
             self.clear()
             return
         is_image = kind == MediaType.IMAGE
-        names = self._states if is_image else self._acts
-        said = _as_listed(row.get("image_state" if is_image else "act") or "", names)
+        names = self._states if is_image else self._actions
+        said = _as_listed(row.get("image_state" if is_image else "action") or "", names)
         self._prompt_id = ""  # nothing is on display while the list is being set
         self._offer(names if is_image or not said or said in names else (*names, said))
         self.pick(said)

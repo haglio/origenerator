@@ -26,7 +26,7 @@ def test_an_accepted_animation_reads_back_as_settings(held):
     assert animation_settings.accepted(path=held) == {(VIDEO, "alpha", "state one")}
 
 
-def test_the_same_act_in_another_state_or_lane_is_another_animation(held):
+def test_the_same_action_in_another_state_or_lane_is_another_animation(held):
     animation_settings.remember(VIDEO, "alpha", "state one",
                                 workflow="wan22_i2v", params={"steps": 8}, path=held)
 

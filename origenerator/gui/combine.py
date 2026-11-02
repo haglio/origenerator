@@ -1,6 +1,6 @@
 """The gallery's image + video Combine, sitting under the TOC folder tree.
 
-Drop an image into the top drop zone, then supply *settings* either by picking an act
+Drop an image into the top drop zone, then supply *settings* either by picking an action
 from the Action list, which sends the app looking for a fitting past video, or by
 dropping a specific i2v video (shown in gray: it is here for its settings). The two
 are mutually exclusive. A video dropped into the top drop zone lends it only the image
@@ -10,8 +10,8 @@ generate tab first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
 video (the default), or a Genau flick — one complete cycle, looping. That choice
-picks which videos the act is answered from, so the dropdown's usable acts change
-with it: an act only the video lane can answer grays out under Genau, and acts that
+picks which videos the action is answered from, so the dropdown's usable actions change
+with it: an action only the video lane can answer grays out under Genau, and actions that
 are no kind of cycle at all are not offered there.
 
 Combine is pure UI, reporting what was asked for as one :class:`CombineRequest` on
@@ -54,10 +54,10 @@ from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.media import MediaType
 
-# The dropdown's leading neutral option: no act chosen, so a dropped video is used.
+# The dropdown's leading neutral option: no action chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
-_NEEDS_ACTION_OR_VIDEO = "Pick an act or drop a video first"
+_NEEDS_ACTION_OR_VIDEO = "Pick an action or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
@@ -81,7 +81,7 @@ def _keep_its_room_when_hidden(widget: QWidget) -> None:
 @dataclass(frozen=True)
 class CombineRequest:
     """One press of Generate or “Edit individual…”: the image, the settings —
-    a dropped video or a picked act, never both — the lane it is answered from,
+    a dropped video or a picked action, never both — the lane it is answered from,
     and whether it is bound for the generator rather than for a run now."""
 
     image_id: str
@@ -92,11 +92,11 @@ class CombineRequest:
 
 
 class Combine(QWidget):
-    """Image drop zone + settings (dropped video or picked act) + an intent + Generate."""
+    """Image drop zone + settings (dropped video or picked action) + an intent + Generate."""
 
     combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
-    intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
+    intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the actions
     item_activated = pyqtSignal(str)  # a drop zone's image or video was clicked (prompt_id)
     video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the drop zone by hand
 
@@ -139,14 +139,14 @@ class Combine(QWidget):
         self._recent_videos.picked.connect(self.video_zone.set_item)
         _keep_its_room_when_hidden(self._recent_videos)
 
-        # The video part's fast path: pick an act and the view finds a fitting past
+        # The video part's fast path: pick an action and the view finds a fitting past
         # video for you. A neutral "(custom)" leads the list (index 0, the default) so
-        # no act is forced; picking it again clears an act.
+        # no action is forced; picking it again clears an action.
         self._category = QComboBox()
         self._list_the_actions(VIDEO)
         open_the_list_in_full(self._category)
         self._category.setToolTip(
-            "Pick an act and Generate — the app reuses a fitting past video's settings "
+            "Pick an action and Generate — the app reuses a fitting past video's settings "
             "on the dropped image. Or pick (custom) and drop a specific video instead."
         )
         self._category.currentIndexChanged.connect(self._on_category_changed)
@@ -177,7 +177,7 @@ class Combine(QWidget):
 
         # What the result is for. Kino is the default because it is the long-
         # standing behavior of Combine and by far the more common ask; Genau is
-        # the deliberate detour. Under it the act list narrows, so the radio sits
+        # the deliberate detour. Under it the action list narrows, so the radio sits
         # directly beneath the dropdown it changes.
         self._video_radio = QRadioButton("Kino")
         self._video_radio.setToolTip(
@@ -211,7 +211,7 @@ class Combine(QWidget):
         self._open_btn.clicked.connect(self._emit_open)
         self._defaults_btn = QPushButton("Edit default…")
         self._defaults_btn.setToolTip(
-            "Settle what each animation runs: an act, in a lane, from each kind "
+            "Settle what each animation runs: an action, in a lane, from each kind "
             "of image")
         self._defaults_btn.clicked.connect(self.animation_settings_requested)
 
@@ -221,7 +221,7 @@ class Combine(QWidget):
         heading = QLabel("Combine")
         heading.setObjectName("combineHeading")
         heading.setToolTip(
-            "Re-run a video's settings on the dropped image: pick an act, or drop a video."
+            "Re-run a video's settings on the dropped image: pick an action, or drop a video."
         )
         layout.addWidget(heading)
         parted = QVBoxLayout()
@@ -247,7 +247,7 @@ class Combine(QWidget):
 
         For putting Combine back the way a session left it
         (:meth:`GalleryView.restore_combine_selection`) -- the lane decides which
-        acts are answerable, so it goes in before the act does.
+        actions are answerable, so it goes in before the action does.
         """
         self._genau_radio.setChecked(intent == GENAU)
         self._video_radio.setChecked(intent != GENAU)
@@ -256,7 +256,7 @@ class Combine(QWidget):
         """Announce the new lane once, on the radio that just went on.
 
         ``buttonToggled`` fires twice for one click — off for the old radio, on for
-        the new — and the view answers by re-graying the whole act list, so only the
+        the new — and the view answers by re-graying the whole action list, so only the
         on edge is passed along.
         """
         if checked:
@@ -271,18 +271,18 @@ class Combine(QWidget):
         picked = self.selected_category() if self._category.count() else ""
         self._category.clear()
         self._category.addItem(_NEUTRAL_LABEL)
-        self._category.addItems(animation_paths.acts(lane))
+        self._category.addItems(animation_paths.actions(lane))
         self.set_category(picked)
 
     def selected_category(self) -> str:
-        """The picked act, or "" when the neutral "(custom)" option (index 0) is selected."""
+        """The picked action, or "" when the neutral "(custom)" option (index 0) is selected."""
         index = self._category.currentIndex()
         return self._category.currentText() if index >= 1 else ""
 
     def set_category(self, category: str):
         """Select ``category``, or the neutral option for anything else --
-        including an act the current lane cannot answer, which
-        :meth:`set_available_categories` has grayed out. A grayed act must not
+        including an action the current lane cannot answer, which
+        :meth:`set_available_categories` has grayed out. A grayed action must not
         arrive selected for the same reason it must not stay selected: the
         buttons would go live on a pick that can only answer "no past video yet".
         """
@@ -291,31 +291,31 @@ class Combine(QWidget):
         self._category.setCurrentIndex(index if usable else 0)
 
     def set_available_categories(self, available: Collection[str]):
-        """Gray out every act the current lane has no settings for — nothing to mine and
+        """Gray out every action the current lane has no settings for — nothing to mine and
         nothing pinned, so offering it could only ever answer "no past video yet". A
-        disabled item says why on hover, naming the lane, since an act the video
+        disabled item says why on hover, naming the lane, since an action the video
         lane answers happily can still be unanswerable as a loop. The neutral
         "(custom)" is never grayed."""
         lane = self.selected_intent()
         model = self._category.model()
         for index in range(1, self._category.count()):
-            act = self._category.itemText(index)
-            usable = act in available
-            reason = as_sentence(no_past_video(act, lane))
+            action = self._category.itemText(index)
+            usable = action in available
+            reason = as_sentence(no_past_video(action, lane))
             model.item(index).setEnabled(usable)
             self._category.setItemData(
                 index, "" if usable else reason, Qt.ItemDataRole.ToolTipRole,
             )
-            # A grayed-out act must not stay selected under it — the buttons would be
+            # A grayed-out action must not stay selected under it — the buttons would be
             # live on a pick the lane cannot answer. Dropping to neutral is what the
-            # Combine already means by "no act chosen".
+            # Combine already means by "no action chosen".
             if not usable and self._category.currentIndex() == index:
                 self._category.setCurrentIndex(0)
 
-    # --- mutual exclusion: an act and a dropped video never coexist -------
+    # --- mutual exclusion: an action and a dropped video never coexist -------
 
     def _on_category_changed(self):
-        """A picked act supersedes a dropped video: clear the drop zone and hide it, its
+        """A picked action supersedes a dropped video: clear the drop zone and hide it, its
         room kept. Going back to "(custom)" shows it again, holding the video this
         lane last had dropped in it."""
         custom = not self.selected_category()
@@ -328,7 +328,7 @@ class Combine(QWidget):
         self._sync()
 
     def _on_video_changed(self):
-        """A dropped video supersedes a picked act: wipe the dropdown back to "(custom)"."""
+        """A dropped video supersedes a picked action: wipe the dropdown back to "(custom)"."""
         video = self.video_zone.current_id()
         if video:
             lane = self.selected_intent()
@@ -391,7 +391,7 @@ class Combine(QWidget):
         self._dispatch(edit_first=True)
 
     def _dispatch(self, *, edit_first: bool):
-        """Announce what was asked for: a picked act, else the dropped video, and
+        """Announce what was asked for: a picked action, else the dropped video, and
         nothing at all while either the image or the settings are missing."""
         image_id = self.image_zone.current_id()
         category = self.selected_category()

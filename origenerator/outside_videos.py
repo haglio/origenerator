@@ -54,21 +54,21 @@ class Made:
 class Record:
     video: Made = field(default_factory=Made)
     image: Made | None = None
-    act: str | None = None
+    action: str | None = None
     image_key: tuple[str, str] | None = None
     favorite: bool = False
 
 
-def record_of(video: Path, records_folder: Path, *, act: str | None = None) -> Record:
+def record_of(video: Path, records_folder: Path, *, action: str | None = None) -> Record:
     recorded = _recorded(video, records_folder)
     shown, made_from = _block(recorded, "video"), recorded.get("source_image")
-    if act is not None:
-        shown = {**shown, "action": act}
+    if action is not None:
+        shown = {**shown, "action": action}
     image = made_from if isinstance(made_from, dict) else None
     read = {"video": shown, "source_image": image}
     return Record(video=_made(shown, PLACES[MediaType.VIDEO]),
                   image=_made(image, PLACES[MediaType.IMAGE]) if image is not None else None,
-                  act=shown.get("action") or None,
+                  action=shown.get("action") or None,
                   image_key=seed_group_key(read) if image else None,
                   favorite=recorded.get("favorite") is True)
 
@@ -148,9 +148,9 @@ def journal_favorites(places: Places, rows: list[dict], favorite: bool, *, now=t
     _journal(places, rows, {"event": "favorite" if favorite else "unfavorite"}, now)
 
 
-def pick_action(db, places: Places, video_row: dict, act: str, *, now=time.time) -> None:
-    _journal(places, [video_row], {"event": "action", "action": act}, now)
-    db.set_action(video_row["prompt_id"], act)
+def pick_action(db, places: Places, video_row: dict, action: str, *, now=time.time) -> None:
+    _journal(places, [video_row], {"event": "action", "action": action}, now)
+    db.set_action(video_row["prompt_id"], action)
 
 
 def _journal(places: Places, rows: list[dict], said: dict, now) -> None:
@@ -249,7 +249,7 @@ def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
             continue
         place, written = path.relative_to(places.library_root).as_posix(), _written_at(path, places)
         record = record_of(path, places.records_folder,
-                           act=_picked_since(acted_here.get(place), written))
+                           action=_picked_since(acted_here.get(place), written))
         frame_row = frames.get(_input_image(video_row))
         site = outside_source(video_row["workflow_name"])
         image = _image_of(site, record)
@@ -413,7 +413,7 @@ def _frame_fields(record: Record, filed: datetime, site: str) -> dict:
         GenerationSource.OUTSIDE if image else GenerationSource.STARTING_FRAME,
         outside_workflow(site, MediaType.IMAGE),
         (image or record.video).params,
-        _made_at(image or record.video, filed), filed, act=None)
+        _made_at(image or record.video, filed), filed, action=None)
 
 
 def _video_fields(record: Record, filed: datetime, frame_file: str | None, site: str,
@@ -421,11 +421,11 @@ def _video_fields(record: Record, filed: datetime, frame_file: str | None, site:
     return _recorded_fields(
         GenerationSource.OUTSIDE, outside_workflow(site, MediaType.VIDEO, kind),
         {**record.video.params, "input_image": frame_file},
-        _made_at(record.video, filed), filed, act=record.act)
+        _made_at(record.video, filed), filed, action=record.action)
 
 
 def _recorded_fields(source: str, workflow_name: str, params: dict, made: datetime,
-                     filed: datetime, *, act: str | None) -> dict:
+                     filed: datetime, *, action: str | None) -> dict:
     return {
         "source": source,
         "workflow_name": workflow_name,
@@ -433,7 +433,7 @@ def _recorded_fields(source: str, workflow_name: str, params: dict, made: dateti
         "positive_prompt": params.get("positive_prompt"),
         "negative_prompt": params.get("negative_prompt"),
         "seed": _seed_number(params.get("seed")),
-        "act": act,
+        "action": action,
         "created_at": made.strftime("%Y-%m-%d %H:%M:%S"),
         "completed_at": filed.isoformat(),
     }

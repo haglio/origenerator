@@ -1121,7 +1121,7 @@ class TestVersions:
 
 def _around(prompt_id):
     """A library in which the first item has one seed sibling and one other
-    act down its column, and the rest have nobody."""
+    action down its column, and the rest have nobody."""
     if prompt_id != "id-1":
         return NavMapNeighbors()
     other_action = Slide("one-x.png", "image", "id-1x")
@@ -1240,28 +1240,28 @@ def _plays(slideshow) -> list[str]:
 _NAMED_FOR = {"id-1": "Source image, alpha", "id-2": "beta", "id-3": "alpha"}
 
 
-def _acts(prompt_ids):
+def _actions_of(prompt_ids):
     return {prompt_id: _NAMED_FOR.get(prompt_id, "") for prompt_id in prompt_ids}
 
 
-def test_a_rows_button_narrows_the_slideshow_to_that_act_and_hands_the_funestra_what_is_left(
+def test_a_rows_button_narrows_the_slideshow_to_that_action_and_hands_the_funestra_what_is_left(
         qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_filter("alpha")
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "three.png"]
-    assert _plays(slideshow) == []                       # the item on screen shows that act
+    assert _plays(slideshow) == []                       # the item on screen shows that action
     assert said == ["Filter: 'alpha' (2)"]
 
 
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(
         qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
 
     slideshow.slideshow_filter_to_the_action_on_screen()
 
@@ -1269,18 +1269,18 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
     assert (played, said) == (["one.png"], ["Filter: 'source image, alpha' (1)"])
 
 
-def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot, tmp_path):
+def test_filter_said_over_an_item_named_for_no_action_says_so(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
     slideshow.slideshow_filter_to_the_action_on_screen()
 
-    assert said == ["No act for this one"]
+    assert said == ["No action for this one"]
 
 
-def test_a_row_naming_two_acts_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):
+def test_a_row_naming_two_actions_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
 
     slideshow.slideshow_filter("source_image,_alpha")
 
@@ -1291,15 +1291,15 @@ def test_a_row_naming_two_acts_is_posted_with_its_spaces_as_underscores(qtbot, t
 
 def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_path):
     """Half the column is configurations, and their buttons mean what they
-    meant before the acts joined them: go to that configuration and play its
-    seeds round and round, rather than narrowing the slideshow to an act."""
+    meant before the actions joined them: go to that configuration and play its
+    seeds round and round, rather than narrowing the slideshow to an action."""
     said = []
     a_configuration = Slide("one-x.png", "image", "id-1x")
     around = lambda pid: NavMapNeighbors(  # noqa: E731
         column=(NavMapRow(a_configuration, "E629425B", configuration=True),)
         if pid == "id-1" else (),
         seeds=(Slide("one-y.png", "image", "id-1y"),) if pid == "id-1x" else ())
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=around, acts=_acts),
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=around, actions_of=_actions_of),
                            say=_into(said))
     _sent(slideshow)
 
@@ -1311,7 +1311,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
 
 
 def test_a_filter_past_the_item_on_screen_sends_the_funestra_to_what_is_left(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of))
     _sent(slideshow)
 
     slideshow.slideshow_filter("beta")
@@ -1319,9 +1319,9 @@ def test_a_filter_past_the_item_on_screen_sends_the_funestra_to_what_is_left(qtb
     assert _plays(slideshow) == ["PLAY_FILE two.png"]
 
 
-def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path):
+def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_filter("gamma")
@@ -1329,8 +1329,8 @@ def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path):
     assert (_sent(slideshow), said) == ([], ["Filter: no matches for 'gamma'"])
 
 
-def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts))
+def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of))
     slideshow.slideshow_filter("beta")
 
     assert slideshow.clear_modes() is True

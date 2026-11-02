@@ -1,16 +1,3 @@
-"""The Job Queue, painted onto the one HUD a slideshow wears.
-
-A slideshow covers Core's Job Queue, and it is the worst
-moment to lose it: a slideshow is when the user keeps adding to it.  So it rides on
-the HUD the slideshow already wears rather than on a plate of its own, which would
-be a second HUD.
-
-It says what Core's Job Queue says: the job being made with its live frame and the
-clock across its bar, then each waiting job as a row -- its arrows, its shield,
-its Cancel, the image it is made from, and what it costs.  They go as the
-HUD's own declared buttons (:class:`funestra.hud_button.Button`), so it
-presses and names them exactly as it presses its own.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -88,8 +75,6 @@ from origenerator.gui.inflight import (
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# What a press on this block posts: move, shield or cancel one job, or every job,
-# go to its folder, drop another app's work, start a video now.
 UP = "queue_up"
 DOWN = "queue_down"
 SHIELD = "queue_shield"
@@ -99,43 +84,33 @@ CANCEL_ALL = "queue_cancel_all"
 OPEN = "queue_open"
 CLEAR = "queue_clear"
 START_NOW = "queue_start_now"
-# The head's thumbnail goes where its row goes, and says so under its own verb:
-# it is a thumbnail of the job being made, not a row that can be dragged anywhere.
 FRAME = "queue_frame"
 
 FRAME_TOOLTIP = "Open the folder this run will land in"
 
-# How many rows the block draws at once. Core's Job Queue opens about this tall in
-# Core, and a line longer than this is scrolled through rather than drawn
-# whole: a HUD that grew a row per queued job would run off the screen the
-# first time a folder's Modify (all seeds) filled it.
 ROWS = 4
-# How far a press on a row has to travel before it is a drag rather than the
-# click that opens the job's folder.
 _DRAG_START = 6
 
-_WORD_PAD = BUTTON_PAD_H_TIGHT           # the room a word button keeps either side of its word
-_GAP = GAP_MEDIUM                # between the things on one row
+_WORD_PAD = BUTTON_PAD_H_TIGHT
+_GAP = GAP_MEDIUM
 _ROW_H = CTRL_BTN + BLOCK_GAP
 _BAR_H = CTRL_BTN
-_BAR_PAD = GAP_MEDIUM            # the clock's breathing room at each end of its bar
-_SUBSTEP_BAR_H = 4      # the substep progress bar along the bar's foot
-_CELL = CTRL_BTN        # one thumbnail cell on a row
+_BAR_PAD = GAP_MEDIUM
+_SUBSTEP_BAR_H = 4
+_CELL = CTRL_BTN
 _CELL_GAP = HAIRLINE
 _BLOCK_W = FOLDER_CELLS * _CELL + (FOLDER_CELLS - 1) * _CELL_GAP
-# The head's thumbnail: a map cell's own height, so the run being made is worth
-# looking at beside the bar measuring it and the two blocks read at one scale.
 _FRAME = MAP_THUMB_H
-_PLUS_W = 10            # the operator between a start frame and its source video
-_PAREN_W = 5            # the marks around a source video whose prompt was edited
-_MARK_H = 8             # the room the "…" takes when the line runs on past the rows
-_MARK_SIDE = 12         # the frame the family's three dots are drawn in, as on the satellite's map
-_DROP_W = 2             # the mark showing where a dragged row would land
-_SHIELD_MARK = CTRL_BTN - 2 * BUTTON_ICON_INSET  # a row's shield's own size
-_MARK_TO_WORD = 3       # between Shield All's shield and its word
+_PLUS_W = 10
+_PAREN_W = 5
+_MARK_H = 8
+_MARK_SIDE = 12
+_DROP_W = 2
+_SHIELD_MARK = CTRL_BTN - 2 * BUTTON_ICON_INSET
+_MARK_TO_WORD = 3
 _HEIGHT = _FRAME + BLOCK_GAP + 2 * _MARK_H + ROWS * _ROW_H
 
-_EMPTY_CELL_ALPHA = 110  # a cell with nothing in it reads as an empty cell, not a thumbnail
+_EMPTY_CELL_ALPHA = 110
 
 
 @cache
@@ -165,8 +140,6 @@ def _on(rect, pointer) -> bool:
 
 @dataclass(frozen=True)
 class JobLine:
-    """One job in the line, as the HUD draws it."""
-
     key: str
     lead: str
     note: str
@@ -184,8 +157,6 @@ class JobLine:
 
 @dataclass(frozen=True)
 class Leader:
-    """The job ComfyUI is making, as the head of the block draws it."""
-
     key: str
     frame: bytes | None
     source: tuple[str | None, str | None]
@@ -200,21 +171,13 @@ class Leader:
 
 @dataclass(frozen=True)
 class QueueSection:
-    """What is in flight, as a slideshow's HUD draws it at its foot: one size
-    whatever that is, and *blank* while Core shows the Job Queue itself."""
-
     lines: tuple[JobLine, ...] = ()
     leader: Leader | None = None
     foreign: int = 0
     any_to_shield: bool = False
     any_to_cancel: bool = False
-    # Which row the drawn window opens on, and where a dragged row would land —
-    # both the HUD's own doing rather than the queue's, and both redrawn
-    # through here because the block is painted, not laid out in widgets.
     first: int = 0
     drop_at: int | None = None
-    # The pointer on the block, told where each row and button was painted so
-    # a press can be placed against them in the block's own pixels.
     pointer: QueuePointer | None = field(default=None, compare=False)
     blank: bool = False
 
@@ -230,7 +193,6 @@ class QueueSection:
 
     @property
     def drawn(self) -> tuple[JobLine, ...]:
-        """The rows the window opens on — the whole line, where it fits."""
         return self.lines[self.first:self.first + ROWS]
 
     def size(self) -> tuple[int, int]:
@@ -313,9 +275,6 @@ class QueueSection:
         return text_width(_tiny(), fitted)
 
     def _paint_bar(self, draw, x, y, width) -> None:
-        """The clock, written across the bar it measures — the reading
-        :class:`~origenerator.gui.progress_bar.ProgressBar` draws in Core's
-        Job Queue, and empty rather than at nought for a run ComfyUI has not started."""
         leader = self.leader
         draw.rounded_rectangle([x, y, x + width - 1, y + _BAR_H - 1], radius=BUTTON_RADIUS_HUD,
                                fill=(*BORDER_SUBTLE, 90), outline=(*BORDER_SUBTLE, 255))
@@ -339,8 +298,6 @@ class QueueSection:
                   font=_tiny(), anchor="mm", fill=(*TEXT_PRIMARY, 255))
 
     def _paint_frame(self, image, draw, x, y) -> int:
-        """What is being made, or — until ComfyUI has streamed a frame of it —
-        what it is being made from."""
         live = _frame_image(self.leader.frame, _FRAME)
         if live is not None:
             image.alpha_composite(live, (x, y + (_FRAME - live.height) // 2))
@@ -394,8 +351,6 @@ class QueueSection:
         draw.rectangle([x, top, x + width - 1, top + _DROP_W - 1], fill=(*BLUE, 255))
 
     def _paint_mark(self, image, x, y, width, more: bool) -> None:
-        """The family's three dots saying the line runs on past the rows drawn, as
-        the map's own axes say it."""
         if not more:
             return
         middle_x, middle_y = x + width / 2, y + _MARK_H / 2
@@ -412,7 +367,6 @@ def _shield_all_width() -> int:
 
 
 def _paint_shield_all(image, draw, rect, pointer, targets, *, dim: bool) -> None:
-    """The shield followed by its word: no declared face draws both."""
     x, y, width, height = rect
     ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, pointer), dim=dim)
     left = x + (width - _shield_all_width()) // 2 + _WORD_PAD
@@ -436,16 +390,11 @@ def _fraction(progress) -> float | None:
 
 
 def _empty_cell(draw, x, y, side) -> int:
-    """A cell with nothing in it: a faint square, so a row with no thumbnail reads
-    as a job whose thumbnail has not arrived rather than as one that failed to draw."""
     draw.rectangle([x, y, x + side - 1, y + side - 1],
                    fill=(*BORDER_SUBTLE, _EMPTY_CELL_ALPHA))
     return side
 
 
-# (file, side, gray, written) -> the fitted cell, or None for a file that would
-# not load. The block is repainted on every beat of the HUD, and a start frame
-# is a full-size render off disk.
 _CELLS: dict[tuple[str, int, bool, int | None], Image.Image | None] = {}
 
 
@@ -457,7 +406,6 @@ def _written(path) -> int | None:
 
 
 def _cell(path, side: int, gray: bool = False) -> Image.Image | None:
-    """``path`` fitted whole into a ``side`` square, or ``None`` if unreadable."""
     if not path:
         return None
     key = (str(path), side, gray, _written(path))
@@ -480,7 +428,6 @@ def _fit(path, side: int, gray: bool) -> Image.Image | None:
 
 
 def _frame_image(frame: bytes | None, side: int) -> Image.Image | None:
-    """The latest live frame off ComfyUI, fitted into a ``side`` square."""
     if not frame:
         return None
     try:
@@ -494,10 +441,6 @@ def _frame_image(frame: bytes | None, side: int) -> Image.Image | None:
 
 
 def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
-    """A job's start frame and, where a combine brought one, the source video it
-    follows — gray, and in parentheses where its prompt was edited, as
-    :mod:`origenerator.gui.combination_view` draws the same pair.  Nought when
-    neither has anything to draw."""
     frame = _cell(source[0], side)
     source_video = _cell(source[1], side, gray=True)
     if frame is None and source_video is None:
@@ -525,9 +468,6 @@ def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
 
 
 def _paint_thumbnails(image, draw, x, y, line: JobLine) -> None:
-    """A row's thumbnail, as Core's Job Queue draws the same one
-    (:mod:`origenerator.gui.queue_thumbs`): what the job is made from, else what
-    its folder holds."""
     if _paint_source(image, draw, x, y, _CELL, line.source, line.prompt_edited):
         return
     if not line.folder:
@@ -585,8 +525,6 @@ def core_shows_the_queue(core, beside) -> bool:
 def queue_section(items, foreign: int = 0, *, first: int = 0,
                   drop_at: int | None = None,
                   pointer: QueuePointer | None = None) -> QueueSection:
-    """The Job Queue a HUD hangs at its foot.  The head is whatever ComfyUI is
-    making; with nothing of ours in flight it names another app's backlog instead."""
     lines = tuple(_line(item) for item in items)
     return QueueSection(lines=lines,
                         leader=_leader(items[0]) if items else None,
@@ -598,11 +536,6 @@ def queue_section(items, foreign: int = 0, *, first: int = 0,
 
 
 class QueueFoot:
-    """The Job Queue a slideshow's HUD hangs at its foot, blank whenever Core
-    shows it beside the slideshow (*beside* answers the window the slideshow
-    fills the monitor with, or None for one in a session's room), and the
-    pointer on it."""
-
     def __init__(self, actions, *, beside=lambda: None) -> None:
         self._actions = actions
         self._beside = beside
@@ -650,10 +583,6 @@ class QueueFoot:
 
 
 class JobQueueFile:
-    """The Job Queue painted to a file beside a session's HUD file, as wide as
-    *side*'s HUD holds it, for the Funestra in another program that draws that
-    HUD to draw at its foot."""
-
     def __init__(self, hud_file: Path, side: str) -> None:
         self._hud_file = Path(hud_file)
         self._width = map_block_width(side)
@@ -689,23 +618,11 @@ def _removed(path: Path) -> bool:
     try:
         path.unlink(missing_ok=True)
     except OSError:
-        return False  # the Funestra still has it open, and the next sweep takes it
+        return False  # Windows refuses to delete a file another program has open; the next sweep takes it
     return True
 
 
 class QueuePointer:
-    """The pointer on the block, in the block's own pixels.
-
-    The HUD hands it a press, a drag, the button coming up and the wheel,
-    and it places each against the rows and buttons as they were last painted:
-    a press on a row's arrows, shield or Cancel moves, shields or drops its
-    job, one on the row goes to the folder its job will land in once the button
-    comes up where it went down, and a press that travels picks the row up and
-    drops it further down the line.  Which row the window opens on and where a drag would land are
-    the block's own state rather than the line's, kept here because the block
-    is painted afresh each beat.
-    """
-
     def __init__(self, host) -> None:
         self._host = host
         self._buttons: list[tuple[tuple, str]] = []
@@ -720,15 +637,11 @@ class QueuePointer:
                          for (x, y, width, height), button in targets]
 
     def where(self, command: str) -> tuple | None:
-        """Where that button was painted, in the block's own pixels."""
         return next((rect for rect, posted in self._buttons if posted == command), None)
 
     def press(self, px: int, py: int) -> None:
         verb, _, key = self._command_at(px, py).partition("|")
         if verb in (OPEN, FRAME):
-            # A row is pressed for two things -- its folder and a place further
-            # down the line -- so the press is held until the release says
-            # which.  The head's thumbnail is pressed for the folder alone.
             self._press = (key, px, py, verb == OPEN)
         elif verb in (UP, DOWN):
             item = self._item(key)
@@ -754,9 +667,6 @@ class QueuePointer:
             self._host.start_now()
 
     def drag(self, px: int, py: int) -> None:
-        """A press on a row that travels is a drag, and the block marks where it
-        would land.  A row that holds its place stays where it is, and nothing
-        can be moved in front of it."""
         if self._press is None:
             return
         key, start_x, start_y, draggable = self._press
@@ -771,7 +681,6 @@ class QueuePointer:
         self.drop = self._drop_index(py)
 
     def release(self, px: int, py: int) -> None:
-        """The button coming up finishes whatever the press turned out to be."""
         pending, self._press = self._press, None
         dragged, drop = self._drag, self.drop
         self._drag, self.drop = None, None
@@ -784,8 +693,6 @@ class QueuePointer:
                 item.reveal()
 
     def wheel(self, steps: int, px: int, py: int) -> None:
-        """Scroll the line past the rows the block draws -- over the rows
-        themselves, never over the head."""
         if not any(_on(rect, (px, py)) for rect, _key in self._rows()):
             return
         lines = len(self._host.hud_queue[0])
@@ -795,35 +702,23 @@ class QueuePointer:
         return next((posted for rect, posted in self._buttons if _on(rect, (px, py))), "")
 
     def _rows(self) -> list[tuple[tuple, str]]:
-        """Each drawn row's rect and the job it stands for, in the order drawn."""
         return [(rect, posted.partition("|")[2]) for rect, posted in self._buttons
                 if posted.startswith(f"{OPEN}|")]
 
     def _item(self, key: str):
-        """The job that row stands for, or ``None`` once it has left the line."""
         return next((item for item in self._host.hud_queue[0] if item.key == key), None)
 
     def _drop_index(self, py: int) -> int:
-        """Which place in the line a drop at ``py`` lands in: above the row whose
-        upper half it fell on, else at the end of what is drawn, and never in
-        front of a row that holds its place."""
         rows = self._rows()
         place = next((index for index, (rect, _key) in enumerate(rows)
                      if py < rect[1] + rect[3] / 2), len(rows))
         return max(first_movable(self._host.hud_queue[0]), self.first + place)
 
     def _drag_to(self, key: str, target: int) -> None:
-        """Ask for *key*'s row to go where it was let go, at *target*.
-
-        Nothing may be moved in front of a row that holds its place, and a row
-        let go where it already was asks for nothing.
-        """
         items = self._host.hud_queue[0]
         keys = [item.key for item in items]
         if key not in keys:
             return
-        # The place was read with the dragged row still in place, so a drop below
-        # it names one further along than it will end up in.
         rest = [other for other in keys if other != key]
         landing = target - 1 if target > keys.index(key) else target
         if rest[:landing] + [key] + rest[landing:] != keys:

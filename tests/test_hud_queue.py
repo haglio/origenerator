@@ -1,4 +1,3 @@
-"""The Job Queue as a block of the one HUD a slideshow wears."""
 from __future__ import annotations
 
 import time
@@ -31,7 +30,6 @@ def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", 
     reading = {name: kw.pop(name) for name in list(kw)
                if name in ("frame", "progress", "pass_progress", "stage",
                            "started_at", "typical_seconds")}
-    # The job being made holds its place unless a test says it can be moved.
     move = (lambda: None) if kw.pop("movable", status != "running") else None
     kw.setdefault("move_up", move)
     kw.setdefault("move_down", move)
@@ -95,8 +93,6 @@ def test_every_job_in_flight_is_a_row_of_its_own():
 
 
 def test_the_job_being_made_leads_the_block_with_its_frame_and_its_clock():
-    """The live half of Core's Job Queue, on the HUD: what is being made, and
-    how far along it is."""
     section = queue_section([_item("running-one", status="running", frame=b"jpeg",
                                    started_at=0.0, typical_seconds=30,
                                    progress=(5, 20))], 0)
@@ -115,7 +111,6 @@ def test_a_video_waiting_at_the_head_of_the_line_leads_the_block():
 
 
 def test_a_video_waiting_out_the_minute_after_an_image_says_when_it_starts():
-    # The half-second keeps the count a clear half-second off a rollover.
     section = queue_section([_item("waiting-one", job_kind="Video",
                                    starts_at=time.monotonic() + 42.5)], 0)
 
@@ -130,7 +125,6 @@ def test_with_nothing_of_ours_in_flight_the_block_names_another_apps_backlog():
 
 
 def _painted(section, width=400):
-    """The block on a HUD-sized canvas, with what it drew there."""
     image = Image.new("RGBA", (width + 20, section.size()[1] + 20), (0, 0, 0, 0))
     return image, section.paint(image, 10, 10, width, None)
 
@@ -170,7 +164,6 @@ def test_a_row_carries_the_button_that_throws_its_job_away():
 
 
 def test_a_row_leads_with_an_up_and_a_down_arrow_ahead_of_its_shield():
-    # Each grayed where its job cannot go that way: here, up.
     section = queue_section([_item("j1", cancel=lambda: None, shield=lambda _on: None,
                                    move_up=None, move_down=lambda: None)], 0)
 
@@ -201,7 +194,6 @@ def test_a_rows_shield_sits_just_left_of_its_cancel_lit_while_shielded():
 
 
 def test_a_rows_shield_and_cancel_are_grayed_where_its_job_cannot_take_them():
-    # His answer for the Job Queue (2026-10-29), and so here too.
     section = queue_section([_item("j1"), _item("j2", cancel=lambda: None,
                                                 shield=lambda _on: None)], 0)
 
@@ -213,8 +205,6 @@ def test_a_rows_shield_and_cancel_are_grayed_where_its_job_cannot_take_them():
 
 
 def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top_line():
-    # Where the user moved them on every slideshow's HUD (2026-10-29): beside the
-    # job being made, its bar stopping short of them.
     section = queue_section([_item("j1", status="running", cancel=lambda: None,
                                    shield=lambda _on: None),
                              _item("j2", cancel=lambda: None, shield=lambda _on: None)], 0)
@@ -227,7 +217,7 @@ def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top
     (cancel_x, cancel_y, cancel_width, cancel_height), cancel_all = drawn[CANCEL_ALL]
     assert all_x == cancel_x
     assert all_width == cancel_width
-    assert all_x + all_width == 10 + 400  # flush with the block's right edge
+    assert all_x + all_width == 10 + 400
     assert all_y + all_height < cancel_y
     above, below = all_y - frame_y, frame_y + frame_height - (cancel_y + cancel_height)
     assert above >= 0
@@ -260,7 +250,6 @@ def test_a_usual_line_reads_in_full_across_the_portrait_satellites_hud(monkeypat
 
 
 def test_with_nothing_of_ours_in_flight_shield_all_and_cancel_all_are_left_off():
-    # His answer for the Job Queue (2026-10-29), and so here beside another app's backlog.
     _image, targets = _painted(queue_section([], 3))
 
     assert not {SHIELD_ALL, CANCEL_ALL} & set(_posted(targets))
@@ -272,10 +261,8 @@ def _brightest(image, rect) -> int:
 
 
 def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield():
-    # His answer for the Job Queue (2026-10-29), and so here too: the HUD's muted
-    # ink, never its bright one, on a press that would do nothing.
     shielded = _item("j1", status="running", shield=lambda _on: None, shielded=True)
-    grayed = queue_section([shielded, _item("j2")], 0)  # one the slideshow cannot shield
+    grayed = queue_section([shielded, _item("j2")], 0)
     lit = queue_section([shielded, _item("j2", shield=lambda _on: None)], 0)
 
     for section, dim in ((grayed, True), (lit, False)):
@@ -286,7 +273,6 @@ def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield():
 
 
 def test_cancel_all_is_grayed_out_while_no_job_can_be_canceled():
-    # His answer for the Job Queue (2026-10-29), and so here too.
     grayed = queue_section([_item("j1", status="running"), _item("j2")], 0)
     lit = queue_section([_item("j1", status="running"), _item("j2", cancel=lambda: None)], 0)
 
@@ -306,16 +292,12 @@ def test_a_row_is_a_way_into_the_folder_its_job_will_land_in():
 
 
 def _reds(image) -> int:
-    """How many pixels of the block are within a hair of the HUD's red."""
     pixels = np.asarray(image).reshape(-1, 4).astype(int)
     near = np.all(np.abs(pixels[:, :3] - np.array(RED[:3])) < 24, axis=1)
     return int(np.count_nonzero(near & (pixels[:, 3] > 0)))
 
 
 def test_the_word_that_throws_a_job_away_is_drawn_in_the_huds_own_ink():
-    """Core's Job Queue draws Cancel in the HUD's ordinary gray,
-    and the HUD's own copy of that queue reads the same: red here is the
-    color the Funestras keep for a live recording."""
     section = queue_section([_item("j1", cancel=lambda: None)], 0)
 
     image, _targets = _painted(section)
@@ -324,8 +306,6 @@ def test_the_word_that_throws_a_job_away_is_drawn_in_the_huds_own_ink():
 
 
 class _Host:
-    """What the pointer asks of the slideshow: the line, a re-line, and the Clear."""
-
     def __init__(self, items, foreign=0):
         self.hud_queue = (items, foreign)
         self.moved = []
@@ -365,10 +345,6 @@ def _lower_half_of(pointer, command):
 
 
 class TestThePointerOnTheBlock:
-    """The source painted the block and knows what is drawn where, so the
-    HUD hands it the pointer in the block's own pixels: a press, a drag,
-    the button coming up and the wheel."""
-
     def test_a_press_on_a_rows_button_throws_that_job_away(self):
         stopped = []
         pointer, _host = _pointer_over([_item("j1", cancel=lambda: stopped.append("j1"),
@@ -389,7 +365,6 @@ class TestThePointerOnTheBlock:
         assert asked == ["up", "down"]
 
     def test_a_press_on_a_grayed_arrow_does_nothing_at_all(self):
-        # Not even the folder the rest of the row opens.
         opened = []
         pointer, _host = _pointer_over([_item("j1", reveal=lambda: opened.append("j1"),
                                               move_up=None, move_down=lambda: None)])
@@ -455,8 +430,6 @@ class TestThePointerOnTheBlock:
         assert host.started_now == 1
 
     def test_start_now_sits_under_the_bar_and_clear_keeps_the_bars_row(self):
-        # Where the user put it in the job queue, 2026-10-22: under the bar,
-        # just right of the countdown.
         pointer, _host = _pointer_over([_item("v1", job_kind="Video",
                                               starts_at=time.monotonic() + 42.5)], 3)
         frame_x, _y, frame_width, _h = pointer.where(f"{FRAME}|v1")
@@ -506,8 +479,6 @@ class TestThePointerOnTheBlock:
         assert opened == []
 
     def test_a_job_that_holds_its_place_cannot_be_picked_up(self):
-        """A shielded run being made, or one this window holds no job for, has
-        no move, so its row has nowhere to go."""
         pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),
                                        _item("j2", typical_seconds=30)])
         x, y = _middle_of(pointer, f"{OPEN}|j1")

@@ -43,7 +43,8 @@ def test_reference_path_routes_the_way_comfyuis_loadimage_does(tmp_path):
     in_dir.mkdir()
     (out_dir / "image" / "gen.png").write_bytes(b"x")
     (in_dir / "frame.png").write_bytes(b"x")
-    resolve = lambda ref: reference_path(ref, places=OutputPlaces.in_one_folder(out_dir), input_dir=in_dir)
+    def resolve(ref):
+        return reference_path(ref, places=OutputPlaces.in_one_folder(out_dir), input_dir=in_dir)
 
     assert resolve("image/gen.png [output]") == out_dir / "image" / "gen.png"
     assert resolve("frame.png [input]") == in_dir / "frame.png"

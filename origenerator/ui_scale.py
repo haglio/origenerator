@@ -80,19 +80,20 @@ def to_logical_rect(x: int, y: int, width: int, height: int):
 
 
 def _screen_origin(x: int, y: int) -> tuple[int, int]:
-    """Logical screen rects overlap under a scale below 1, so screens are matched on their device rects, recovered by scaling the logical size back."""
-    from PyQt6.QtCore import QRect
     from PyQt6.QtGui import QGuiApplication
 
-    scale = active_scale()
-    for screen in QGuiApplication.screens():
-        logical = screen.geometry()
-        device = QRect(logical.x(), logical.y(),
-                       max(1, round(logical.width() * scale)),
-                       max(1, round(logical.height() * scale)))
-        if device.contains(x, y):
-            return logical.x(), logical.y()
+    screens = [(screen.geometry().x(), screen.geometry().y(),
+                screen.geometry().width(), screen.geometry().height())
+               for screen in QGuiApplication.screens()]
     primary = QGuiApplication.primaryScreen()
-    return (primary.geometry().x(), primary.geometry().y()) if primary else (0, 0)
+    fallback = (primary.geometry().x(), primary.geometry().y()) if primary else (0, 0)
+    return origin_of_the_screen_holding(x, y, screens, active_scale(), fallback)
 
 
+def origin_of_the_screen_holding(x: int, y: int, logical_screens, scale: float,
+                                 fallback: tuple[int, int]) -> tuple[int, int]:
+    for left, top, width, height in logical_screens:
+        device_width, device_height = max(1, round(width * scale)), max(1, round(height * scale))
+        if left <= x < left + device_width and top <= y < top + device_height:
+            return left, top
+    return fallback

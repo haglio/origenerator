@@ -131,3 +131,27 @@ def test_a_qt_that_cannot_be_rescaled_leaves_the_app_at_its_size(monkeypatch):
 def test_only_a_hosted_launch_turns_the_scale_on():
     assert parse_app_args([]).fun_time is None
     assert parse_app_args(hosted_launch()).fun_time is not None
+
+
+_SCALE = 0.643
+_FIRST_MONITOR = (0, 0, 3982, 2240)
+_SECOND_MONITOR = (2560, 3, 2240, 5351)
+
+
+def test_a_point_on_the_second_monitor_gets_that_monitors_origin_though_the_firsts_logical_rect_swallows_it():
+    screens = [_FIRST_MONITOR, _SECOND_MONITOR]
+
+    assert ui_scale.origin_of_the_screen_holding(2570, 100, screens, _SCALE, (0, 0)) == (2560, 3)
+    assert ui_scale.origin_of_the_screen_holding(10, 10, screens, _SCALE, (0, 0)) == (0, 0)
+
+
+def test_a_point_on_no_screen_gets_the_fallback_origin():
+    screens = [_FIRST_MONITOR, _SECOND_MONITOR]
+
+    assert ui_scale.origin_of_the_screen_holding(9000, 9000, screens, _SCALE, (7, 8)) == (7, 8)
+
+
+def test_a_length_is_rounded_to_the_nearest_pixel_not_truncated():
+    os.environ["QT_SCALE_FACTOR"] = "0.6"
+
+    assert ui_scale.to_logical_size(1) == 2

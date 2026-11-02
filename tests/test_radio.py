@@ -4,8 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from funestra import mpv_engine
 from funestra.radio import radio_file_for, read_radio
+from funestra.testing import station_opened
 
 from origenerator import funestras_engine
 from origenerator import radio as radio_module
@@ -201,10 +201,9 @@ def test_a_station_is_one_of_the_funestras_own_opened_once_their_engine_is_found
     asked = []
     monkeypatch.setattr(funestras_engine, "offer_the_copy_beside_the_checkouts",
                         lambda: asked.append("the engine found"))
-    monkeypatch.setattr(mpv_engine.MpvStation, "opened",
-                        classmethod(lambda cls, videos: asked.append(list(videos))))
 
-    radio_module._open_a_station(_videos("a.mp4", "b.mp4"))
+    with station_opened(side_effect=lambda videos: asked.append(list(videos))):
+        radio_module._open_a_station(_videos("a.mp4", "b.mp4"))
 
     assert asked == ["the engine found", _videos("a.mp4", "b.mp4")]
 

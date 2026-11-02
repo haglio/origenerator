@@ -6,7 +6,6 @@ import queue
 import time
 
 import pytest
-from app_support import ports
 from app_support.file_channel import consume_command_file
 from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode, Osr2Trouble
 from app_support.osr2_hold import PARK
@@ -18,8 +17,10 @@ from app_support.state_files import (
     OSR2_NOT_FOUND,
     OSR2_SERIAL_RX,
 )
+from app_support.testing import osr2_slot_at
 from app_support.threading_utils import start_daemon_thread
 from funestra.broker import CONTRACT_FILE
+from funestra.testing import broker_pressed
 
 from origenerator.osr2 import (
     Osr2Broker,
@@ -146,22 +147,22 @@ def test_a_press_on_the_broker_goes_through_the_launcher_its_checkout_names(
         "tray_module": "relay_pkg.tray", "tray_launcher": "launch_relay_tray.vbs",
     }), encoding="utf-8")
     pressed = []
-    monkeypatch.setattr("funestra.broker.press", lambda *args: pressed.append(args))
 
-    press_the_broker(state_dir=tmp_path, checkout=checkout)
+    with broker_pressed(side_effect=lambda *args: pressed.append(args)):
+        press_the_broker(state_dir=tmp_path, checkout=checkout)
 
     assert pressed == [(tmp_path, checkout / "launch_relay_tray.vbs")]
 
 
-def test_an_app_named_no_port_reaches_the_brokers_own_slot(the_brokers_slot, monkeypatch):
+def test_an_app_named_no_port_reaches_the_brokers_own_slot(the_brokers_slot):
     slot, lines = the_brokers_slot
-    monkeypatch.setattr(ports, "OSR2_SLOT", slot.address[1])
-    broker = Osr2Broker()
-    broker.want(True)
-    try:
-        assert _first_line_handed_on(broker, lines)[0] == "origenerator"
-    finally:
-        broker.close()
+    with osr2_slot_at(slot.address[1]):
+        broker = Osr2Broker()
+        broker.want(True)
+        try:
+            assert _first_line_handed_on(broker, lines)[0] == "origenerator"
+        finally:
+            broker.close()
 
 
 def test_a_device_running_its_own_auto_mode_reads_as_auto(tmp_path):

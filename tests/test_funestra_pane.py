@@ -13,7 +13,7 @@ from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.playlist import PlaylistItem
 from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.satellite_hud import HudModel
-from funestra.testing import FakeEngine
+from funestra.testing import FakeEngine, engine_will_not_open
 from funestra.volume import VolumeHud
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
@@ -285,10 +285,9 @@ def test_an_engine_that_will_not_open_leaves_the_pane_without_one(qtbot, tmp_pat
     pane.show()
     monkeypatch.setattr(QApplication.instance(), "platformName", lambda: "windows")
     monkeypatch.setattr(type(pane._window), "isVisible", lambda self: True)
-    monkeypatch.setattr("funestra.mpv_engine.MpvEngine",
-                        lambda *a, **kw: (_ for _ in ()).throw(OSError("no engine")))
 
-    _hand_over(pane, _items(tmp_path, "one"))
+    with engine_will_not_open(OSError("no engine")):
+        _hand_over(pane, _items(tmp_path, "one"))
 
     assert pane.playback is None
     assert "could not open" in caplog.text

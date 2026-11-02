@@ -1,11 +1,3 @@
-"""The wordings every surface showing work in flight shares, and the reading.
-
-Pure functions, tested here rather than through the three panes that draw them:
-a wording is one sentence for the whole app, so the place to read what it says
-is the module that owns it.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import pytest
@@ -35,8 +27,6 @@ def _item(**over) -> InFlightItem:
     return InFlightItem(**fields)
 
 
-# --- the head of a queue row -------------------------------------------------
-
 def test_the_price_comes_first_because_that_is_what_a_wait_is_added_up_out_of():
     assert queue_lead_text(_item()).startswith("~2 min")
 
@@ -60,8 +50,6 @@ def test_the_two_marks_at_the_end_are_only_ever_added():
         plain + " · Auto · Request")
     assert queue_lead_text(_item(job_kind="Image", modified=True)) == plain + " · Modify"
 
-
-# --- and the hover that spells it out ----------------------------------------
 
 def test_a_row_not_sent_yet_says_so_before_anything_about_timing():
     assert queue_lead_tooltip(_item(starting=True)).splitlines()[0] == (
@@ -107,8 +95,6 @@ def test_the_hover_says_a_run_came_from_its_folders_modify():
     assert lines[1:] == ["Queued by its folder's Modify (all seeds)"]
 
 
-# --- how the run itself is going ---------------------------------------------
-
 def test_a_run_is_rendering_only_while_comfyui_is_working_on_it():
     assert RunReading(status=JobState.RUNNING).rendering is True
     assert RunReading(status=JobState.QUEUED).rendering is False
@@ -129,8 +115,6 @@ def test_the_line_over_the_bar_names_what_the_app_is_doing():
     assert "Upscaling" in running.caption()
 
 
-# --- the button that throws the run away -------------------------------------
-
 def test_the_cancel_hover_says_which_of_the_two_the_press_will_do():
     assert cancel_tooltip(auto_generating=False) == "Cancel this generation"
     assert cancel_tooltip(auto_generating=True) == (
@@ -143,8 +127,6 @@ def test_the_menu_carries_the_act_the_button_has_no_room_for():
         "Throw this run away and switch Auto-Generate off")
 
 
-# --- the waits -----------------------------------------------------------
-
 def test_a_wait_on_the_users_own_jobs_earns_no_line():
     assert queue_wait_text(None) is None
     assert queue_wait_text(0) is None
@@ -156,7 +138,6 @@ def test_a_wait_on_another_app_counts_its_jobs_and_says_job_or_jobs():
 
 
 def test_a_video_waiting_out_the_minute_after_an_image_counts_down_to_its_start():
-    # Its bar sweeps as if it were being made, and nothing is.
     assert queue_wait_text(None, starts_at=1042.3, now=lambda: 1000.0) == "Starts in 0:43"
 
 

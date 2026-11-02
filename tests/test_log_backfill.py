@@ -14,8 +14,6 @@ def _local_epoch(y, mo, d, h, mi, s, us=0):
 
 
 def _utc_iso_for_local(y, mo, d, h, mi, s, us=0):
-    """The completed_at an importer would store for a file written at this
-    local wall-clock time (mtime -> UTC isoformat)."""
     epoch = datetime(y, mo, d, h, mi, s, us).astimezone().timestamp()
     return datetime.fromtimestamp(epoch, tz=UTC).isoformat()
 
@@ -46,11 +44,9 @@ def test_parse_log_durations_ignores_lines_without_the_marker():
 
 def test_backfill_matches_rows_to_nearest_log_line(tmp_path):
     db = Database(tmp_path / "test.db")
-    # Two imported rows; completed_at is the file mtime as the importer stores it.
     _import_row(db, "rowA", _utc_iso_for_local(2026, 6, 29, 12, 20, 53, 244000))
     _import_row(db, "rowB", _utc_iso_for_local(2026, 6, 29, 12, 33, 57))
 
-    # Log lines land a beat after each file; an extra line matches no row.
     log = tmp_path / "comfyui.log"
     log.write_text(
         "[2026-06-29 09:00:00.000] Prompt executed in 99.00 seconds\n"
@@ -78,8 +74,6 @@ def test_backfill_leaves_unmatched_rows_untouched(tmp_path):
 
 def test_backfill_does_not_reuse_one_line_for_two_rows(tmp_path):
     db = Database(tmp_path / "test.db")
-    # A batch run: two files share one prompt, so one "executed" line. Only one
-    # row may claim it; the other stays NULL rather than double-counting.
     _import_row(db, "batch1", _utc_iso_for_local(2026, 6, 29, 12, 20, 53))
     _import_row(db, "batch2", _utc_iso_for_local(2026, 6, 29, 12, 20, 53))
 

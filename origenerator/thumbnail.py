@@ -17,13 +17,6 @@ _THUMB_MAX = 256
 def generate_thumbnail(
     source_path: Path, output_type: MediaType, thumb_dir: Path, *, name: str
 ) -> Path:
-    """Render a thumbnail for ``source_path`` into ``thumb_dir / f"{name}.jpg"``.
-
-    ``name`` is the caller's unique key for this generation (its ``prompt_id``),
-    not the source filename: two outputs that share a stem — ComfyUI's default
-    ``ComfyUI_00001_.png`` beside ``video/ComfyUI_00001_.mp4`` — would otherwise
-    collapse onto one thumbnail, leaving one row showing the other's frame.
-    """
     if output_type == MediaType.VIDEO:
         img = first_frame_of(source_path) or Image.new("RGB", (_THUMB_MAX, _THUMB_MAX), BG_BUTTON)
     else:
@@ -101,8 +94,6 @@ def animated_thumbnail_path(thumb_dir: Path, name: str) -> Path:
 
 
 def _sample_video_frames(path: Path, count: int, size: int) -> list[Image.Image]:
-    """Up to ``count`` frames evenly spaced across the video, each scaled to fit
-    ``size`` — RGB PIL images, or empty when the video can't be read."""
     import cv2  # noqa: PLC0415 (heavy; only a video needs it)
     cap = cv2.VideoCapture(str(path))
     try:

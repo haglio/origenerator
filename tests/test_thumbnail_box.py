@@ -1,10 +1,3 @@
-"""Every thumbnail drawn beside the gallery is the size the Drop a video box draws it.
-
-His rule (2026-10-21): "all thumbnails aside from the ones in the Gallery view
-(which are bigger) should be the same size", the size the Combine drop box shows.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize

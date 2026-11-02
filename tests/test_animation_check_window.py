@@ -1,7 +1,3 @@
-"""The window for settling an animation's settings.
-
-Acts, states and prompts are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -67,7 +63,6 @@ def _video(prompt_id="clip", positive="a scene", negative="flaws"):
 
 
 def middle(widget) -> int:
-    """Where a widget's vertical center sits, so a row can be told from a column."""
     return widget.y() + widget.height() // 2
 
 
@@ -193,8 +188,6 @@ def test_the_pair_is_shown_at_the_size_the_window_gives_them(window, tmp_path):
     assert shown.height() <= 600
 
 
-# --- what each answer is called, and when it can be pressed -------------------
-
 
 def test_the_lane_in_the_heading_is_the_word_the_app_shows(window):
     made, _store, _sent = window({_ORDER[0]: [_video()]})
@@ -205,7 +198,7 @@ def test_the_lane_in_the_heading_is_the_word_the_app_shows(window):
 def test_the_count_says_what_it_is_counting(window):
     made, _store, _sent = window({})
 
-    assert "93" not in _said(made, COUNTED)  # the fixture has two, not his 93
+    assert "93" not in _said(made, COUNTED)
     assert "animation" in made.findChild(QLabel, COUNTED).toolTip()
 
 
@@ -239,8 +232,6 @@ def test_the_next_sample_can_only_be_asked_for_while_there_is_one(window):
 
 
 def test_an_animation_with_no_sample_says_so_across_the_whole_width(window):
-    """Sharing the row with the sample's half it read as a caption on the
-    image, off to the left of the window rather than centered in it."""
     made, _store, _sent = window({})
     made.show()
     made.layout().activate()
@@ -252,8 +243,6 @@ def test_an_animation_with_no_sample_says_so_across_the_whole_width(window):
 
 
 def test_the_arrows_sit_either_side_of_the_count(window):
-    """A plain step through the line, where "Leave for later" used to send one to
-    the back of it; he asked for the arrows and for that sending to go."""
     made, _store, _sent = window({})
     made.show()
     made.layout().activate()
@@ -273,8 +262,6 @@ def _loop(path):
 
 
 def test_a_step_puts_the_new_sample_in_place_of_the_one_before(window, tmp_path):
-    """Each step made a video of its own and left the one before it on the label,
-    running, so his window stacked them up instead of replacing them."""
     made, _store, _sent = window(
         {path: [_video()] for path in _ORDER},
         look=lambda row: (None, _loop(tmp_path / "loop.webp")))
@@ -288,9 +275,6 @@ def test_a_step_puts_the_new_sample_in_place_of_the_one_before(window, tmp_path)
 
 
 def test_the_arrows_are_wide_enough_to_draw_their_glyph(window):
-    """Fixed at one character's width they came up blank: every button in the
-    family spends sixteen pixels on padding either side, which left the glyph
-    less than nothing and Qt drew none of it."""
     made, _store, _sent = window({})
     made.setStyleSheet(build_stylesheet())
     made.show()
@@ -306,8 +290,6 @@ def test_the_arrows_are_wide_enough_to_draw_their_glyph(window):
 
 
 def test_an_animation_nobody_kept_a_video_of_starts_from_the_actions_own_prompts(window):
-    """His ask: the action's own settings are a starting position where there is
-    nothing kept to copy, so the animation can still be answered."""
     made, _store, _sent = window({}, pinned=lambda action, lane: {
         "workflow": "wan22_i2v", "params": {"positive_prompt": "the action's own",
                                             "negative_prompt": "its flaws"}})

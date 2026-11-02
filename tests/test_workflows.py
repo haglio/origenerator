@@ -67,24 +67,18 @@ def _node_id(payload: dict, class_type: str) -> str | None:
 _VIDEO_WORKFLOWS = [
     n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
 ]
-# The video workflows that score their own soundtrack, not a library video's.
 _SCORED_VIDEO_WORKFLOWS = [
     n for n in _VIDEO_WORKFLOWS if "audio_prompt" in WORKFLOW_REGISTRY[n].default_params()
 ]
 
 
 def test_workflows_declare_the_params_that_identify_their_model():
-    # The gallery groups a workflow's generations by these param values, so each
-    # workflow names the param(s) that pick its model.
     assert SdxlT2iWorkflow().model_keys == ("checkpoint",)
     assert Wan22I2vWorkflow().model_keys == ("unet_high", "unet_low")
     assert Wan22Flf2vLoopWorkflow().model_keys == ("unet_high", "unet_low")
 
 
 def test_workflows_declare_the_params_that_identify_their_lora():
-    # The gallery nests a workflow's runs by LoRA under model, so each workflow
-    # names the param(s) that pick its LoRAs. A workflow with no LoRA (WAN t2i)
-    # declares none, and so grows no LoRA folder level.
     assert Wan22I2vWorkflow().lora_keys == ("lora_high", "lora_high_2", "lora_high_3",
                                             "lora_low", "lora_low_2", "lora_low_3")
     assert Wan22Flf2vLoopWorkflow().lora_keys == Wan22I2vWorkflow().lora_keys
@@ -94,22 +88,12 @@ def test_workflows_declare_the_params_that_identify_their_lora():
 
 
 def test_only_the_flf2v_workflow_declares_itself_looping():
-    # The funscript synthesized alongside a video tiles seamlessly only for a video
-    # that returns to its start, so the loop workflow marks itself looping and the
-    # others (a one-shot i2v, the still-image workflows) don't.
     assert Wan22Flf2vLoopWorkflow().looping is True
     assert Wan22I2vWorkflow().looping is False
     assert SdxlT2iWorkflow().looping is False
 
 
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
-    # The WAN video workflows pick their LoRA from the installed files, like the
-    # SDXL Model dropdown: a dropdown per high/low LoRA, its options led by "None"
-    # (so a run can opt out of a LoRA) then the loras scan, and its default
-    # matching the persisted default — not a hidden param the form silently reset
-    # to default. Where the dropdowns sit is asserted separately, by
-    # test_wan_video_workflows_group_all_models_then_all_loras.
-
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
     monkeypatch.setattr(lora_rows_module, "list_lora_files", lambda fallback, **terms: options)
 
@@ -119,17 +103,11 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
             dropdown = by_key[f"lora_{level}"]
             assert dropdown.type == "dropdown"
             assert dropdown.options == options
-            assert dropdown.options[0] == NO_LORA  # a run can bypass the LoRA
+            assert dropdown.options[0] == NO_LORA
             assert dropdown.default == wf.default_params()[f"lora_{level}"]
 
 
 def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
-    # Choosing "None" for a LoRA builds the graph with no LoraLoader for that
-    # slot: the sampler's model runs straight from the UNET, unmodified. The
-    # other stage's real LoRA is untouched. Verified both by the payload (how
-    # many LoraLoaderModelOnly nodes it has) and by reading the graph back the
-    # way the importer does — a bypassed stage resolves to no LoRA at all.
-
     def lora_count(payload):
         return sum(n["class_type"] == "LoraLoaderModelOnly" for n in payload.values())
 
@@ -145,9 +123,9 @@ def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
         high_off = wf.build_api_payload(dict(base, lora_high=NO_LORA))
         assert lora_count(high_off) == 1
         read = dual_sampler_model_files(high_off)
-        assert "lora_high" not in read           # bypassed → no LoRA on that stage
+        assert "lora_high" not in read
         assert read["lora_low"] == "lo.safetensors"
-        assert read["unet_high"] == base["unet_high"]  # base model still runs
+        assert read["unet_high"] == base["unet_high"]
 
         none = wf.build_api_payload(dict(base, lora_high=NO_LORA, lora_low=NO_LORA))
         assert lora_count(none) == 0
@@ -159,11 +137,6 @@ def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
 
 
 def test_wan_video_workflows_expose_model_dropdowns(monkeypatch):
-    # The base diffusion model (high/low UNET) is a dropdown too, drawn from the
-    # installed diffusion_models — selectable, not a hidden default the form
-    # silently reset. Where the dropdowns sit is asserted separately, by
-    # test_wan_video_workflows_group_all_models_then_all_loras.
-
     installed = {
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
         "loras": ["l.safetensors"],
@@ -181,29 +154,16 @@ def test_wan_video_workflows_expose_model_dropdowns(monkeypatch):
 
 
 def test_wan_video_workflows_group_all_models_then_all_loras():
-    # Model and LoRA settings are grouped by kind, not by noise level: both UNET
-    # dropdowns sit together, then every LoRA dropdown (each directly above its own
-    # strength). So the Generate form and the gallery Generate pane read as "all the
-    # models, then all the LoRAs" rather than "everything high, then everything
-    # low". This order is the single source both surfaces draw from.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         keys = [d.key for d in wf.param_definitions()]
         model_block = [keys.index(k) for k in ("unet_high", "unet_low")]
         lora_block = [index for index, key in enumerate(keys) if key.startswith("lora")]
-        # Each kind is one contiguous run, in the listed order...
         assert model_block == list(range(model_block[0], model_block[0] + 2))
         assert lora_block == list(range(lora_block[0], lora_block[0] + len(lora_block)))
-        # ...with every model dropdown above every LoRA dropdown.
         assert model_block[-1] < lora_block[0]
 
 
 def test_the_two_wan_expert_pair_workflows_offer_one_and_the_same_pair(installed_models):
-    # The expert-pair convention is load-bearing (a High slot must never offer
-    # a Low file), and it was spelled out twice -- 26 identical lines in two
-    # workflows with nothing linking them, so a change to the convention had to
-    # be made in both and nothing failed when it was made in one. Same labels,
-    # same filtered options, same strength ranges, or the two forms have quietly
-    # drifted apart.
     for expert in ("high", "low"):
         installed_models.add("diffusion_models", f"wan_{expert}_noise.safetensors", arch="wan")
         installed_models.add("loras", f"wan_{expert}_lora.safetensors", arch="wan", lora=True)
@@ -223,9 +183,6 @@ def test_the_two_wan_expert_pair_workflows_offer_one_and_the_same_pair(installed
 
 
 def test_workflows_expose_their_seed_param_keys():
-    # A variation re-rolls exactly these. The video workflows carry a third
-    # seed for the foley pass, so a variation re-scores its audio too — the
-    # motion changed, so the old track couldn't fit anyway.
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)
     assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "audio_seed")
     assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "audio_seed")
@@ -243,25 +200,15 @@ def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
 
 
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
-    # Reusing a still's settings pins its seed: the composition is the point of
-    # editing one. Reusing a video's does not — a pinned video seed would ride
-    # every prompt edit out of that lineage, and one seed sampled over and over
-    # says nothing about the motion. Registry-wide, so a new video workflow is
-    # covered the day it is registered.
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
     assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate"}
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
-    # ...and the split is the media, not a list anyone has to remember to add to.
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
     assert all(WORKFLOW_REGISTRY[n].output_type == "image" for n in pinning)
 
 
 def test_wan_video_workflows_expose_editable_audio_params():
-    # The audio prompt/negative/seed are ordinary editable fields (the foley
-    # model files stay read-only passthroughs, like clip_name/vae_name): a run
-    # can steer what the video sounds like, or leave the prompt blank to let the
-    # foley model score the frames on its own.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         prompt = by_key["audio_prompt"]
@@ -308,19 +255,14 @@ def test_sdxl_t2i_build_api_payload_structure():
     params["negative_prompt"] = "bad quality"
     params["seed"] = 42
     payload = wf.build_api_payload(params)
-    # Should have node IDs as string keys
     assert isinstance(payload, dict)
-    # Node 2 is positive CLIPTextEncode
     assert payload["2"]["class_type"] == "CLIPTextEncode"
     assert payload["2"]["inputs"]["text"] == "test prompt"
-    # Node 3 is negative CLIPTextEncode
     assert payload["3"]["inputs"]["text"] == "bad quality"
-    # Node 5 is KSampler
     assert payload["5"]["class_type"] == "KSampler"
     assert payload["5"]["inputs"]["seed"] == 42
     assert payload["5"]["inputs"]["steps"] == params["steps"]
     assert payload["5"]["inputs"]["cfg"] == params["cfg"]
-    # Node 7 is SaveImage
     assert payload["7"]["class_type"] == "SaveImage"
 
 
@@ -352,19 +294,11 @@ def test_sdxl_t2i_extract_output_info():
     assert files[0]["filename"] == "sdxl_t2i_00001_.png"
 
 
-# ---- The upscale/enhance tail (a tick on every image workflow) ----
-
-# Every image-producing workflow carries the enhance toggle; these are they.
 _ENHANCE_TOGGLE_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer",
                              "flux_t2i_upscaled", "wan22_t2i", "krea2_t2i")
 
 
 def test_image_workflows_carry_the_enhance_toggle_off_by_default():
-    # The tail is still a bool param on every image workflow — an old run
-    # reproduces exactly what it recorded — but nothing turns it on by hand any
-    # more, and no form offers it. Enhancement is a layer the gallery applies
-    # afterward (its Enhance pane, per folder), which keeps the original and
-    # names every level; baking the tail in here would leave neither.
     for name in _ENHANCE_TOGGLE_WORKFLOWS:
         wf = WORKFLOW_REGISTRY[name]
         toggle = {pd.key: pd for pd in wf.param_definitions()}["enhance"]
@@ -374,10 +308,6 @@ def test_image_workflows_carry_the_enhance_toggle_off_by_default():
 
 
 def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
-    # With the tick on, every image workflow ends in the shared tail:
-    # model upscale -> rescale to enhance_scale x the base (the model is 4x) ->
-    # re-encode -> a low-denoise KSampler on the workflow's own model and
-    # conditioning -> decode -> save.
     for name in _ENHANCE_TOGGLE_WORKFLOWS:
         wf = WORKFLOW_REGISTRY[name]
         params = dict(wf.default_params(), seed=11, enhance=True,
@@ -412,9 +342,6 @@ def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
 
 
 def test_enhance_toggle_off_ends_at_the_plain_output():
-    # Unchecked, no tail is built: no re-encode, no second low-denoise sampler.
-    # Flux keeps its namesake bare 4x upscale; the others save the base output
-    # exactly as they did before the toggle existed.
     for name in _ENHANCE_TOGGLE_WORKFLOWS:
         wf = WORKFLOW_REGISTRY[name]
         payload = wf.build_api_payload(dict(wf.default_params(), enhance=False))
@@ -429,9 +356,6 @@ def test_enhance_toggle_off_ends_at_the_plain_output():
 
 
 def test_wan22_t2i_enhances_on_its_low_noise_refinement_chain():
-    # The WAN tail re-samples on the LOW-noise model's shift chain — the stage
-    # WAN 2.2 itself refines with — using the same text conditioning and VAE as
-    # the base pass, over the single kept frame.
     wf = WORKFLOW_REGISTRY["wan22_t2i"]
     payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
     encode_id = _node_id(payload, "VAEEncode")
@@ -449,8 +373,6 @@ def test_wan22_t2i_enhances_on_its_low_noise_refinement_chain():
 
 
 def test_flux_enhance_resamples_on_the_guided_conditioning():
-    # Flux's tail re-samples on the same GGUF model, FluxGuidance-wrapped
-    # positive, and its own VAE — cfg stays at Flux's 1.0.
     wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
     payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
     encode_id = _node_id(payload, "VAEEncode")
@@ -492,12 +414,7 @@ def test_flux_with_no_lora_builds_the_graph_it_always_has():
         _node_id(payload, "UnetLoaderGGUF"), 0]
 
 
-# ---- Image Enhance (the standalone form of the tail) ----
-
 def test_krea2_builds_the_turbo_graph_on_the_official_settings():
-    # Krea 2 Turbo is step-distilled: eight euler steps on the simple schedule at
-    # cfg 1, the prompt read by its Qwen3-VL reader through a CLIPLoader of type
-    # krea2, the negative the positive zeroed out, and Qwen-Image's VAE decoding.
     wf = Krea2T2iWorkflow()
     params = dict(wf.default_params(), positive_prompt="a lighthouse at dusk", seed=7)
     payload = wf.build_api_payload(params)
@@ -528,10 +445,6 @@ def test_krea2_builds_the_turbo_graph_on_the_official_settings():
 
 
 def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
-    # Krea 2 Raw, the training version of the model, reads a negative prompt at
-    # a prompt strength above 1 over about fifty steps, where Turbo ignores
-    # both: the form offers them at Turbo's defaults, and a negative given is
-    # encoded in place of the zeroed positive.
     wf = Krea2T2iWorkflow()
     pds = {pd.key: pd for pd in wf.param_definitions()}
     assert pds["negative_prompt"].type == "str"
@@ -553,8 +466,6 @@ def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
 
 
 def test_krea2_runs_its_lora_on_the_model_alone():
-    # A Krea 2 LoRA trains the diffusion model; its prompt reader is left as it
-    # is, and a dropdown set to "None" builds the graph with no LoRA node at all.
     wf = Krea2T2iWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), lora="a_lora.safetensors",
                                         lora_strength=0.8))
@@ -573,8 +484,6 @@ def test_krea2_runs_its_lora_on_the_model_alone():
 
 
 def test_krea2_offers_only_what_a_krea2_graph_can_run(installed_models):
-    # diffusion_models and loras hold every family at once; Krea 2's dropdowns
-    # keep its own files and the ones nobody could read, and drop the rest.
     for family in ("krea2", "flux", "wan"):
         installed_models.add("diffusion_models", f"fam_{family}.safetensors", arch=family)
         installed_models.add("loras", f"fam_{family}.safetensors", arch=family, lora=True)
@@ -587,8 +496,7 @@ def test_krea2_offers_only_what_a_krea2_graph_can_run(installed_models):
 
 
 def test_krea2_loads_a_gguf_model_through_the_gguf_loader():
-    # The quantized builds come as GGUF, which ComfyUI's own UNETLoader cannot
-    # read; those go through the same loader Flux's GGUF models do.
+    # ComfyUI's own UNETLoader cannot read GGUF.
     wf = Krea2T2iWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), unet="krea2_turbo-Q6_K.gguf"))
 
@@ -604,13 +512,9 @@ def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, 
     assert wf.output_type == "image"
     assert wf.model_keys == ("checkpoint",)
     assert wf.seed_keys() == ("seed",)
-    # Machinery, not a peer workflow: launched by the gallery's enhance
-    # buttons, never offered in the Generate dropdown. Every real workflow is.
     assert wf.selectable is False
     assert all(WORKFLOW_REGISTRY[n].selectable for n in WORKFLOW_REGISTRY
                if n != "image_enhance")
-    # It takes an input image, so — like every input-image workflow — its size
-    # derives from it: the source's own dimensions at enhance_scale, no budget.
     assert wf.derives_size_from_input is True
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "src.png", (640, 360))
@@ -638,7 +542,6 @@ def test_image_enhance_build_api_payload_structure():
     assert sampler["inputs"]["steps"] == 12
     assert sampler["inputs"]["denoise"] == 0.2
     assert sampler["inputs"]["seed"] == 5
-    # The SDXL checkpoint does the refining, steered by the prompts.
     ckpt_id = _node_id(payload, "CheckpointLoaderSimple")
     assert sampler["inputs"]["model"] == [ckpt_id, 0]
     assert any(n["class_type"] == "CLIPTextEncode"
@@ -651,8 +554,6 @@ def test_image_enhance_build_api_payload_structure():
 
 
 def test_image_enhance_honors_an_unlocked_size_override():
-    # Unlocking the derived Dimensions swaps the relative rescale for an exact
-    # one, so the override actually governs the saved size.
     wf = WORKFLOW_REGISTRY["image_enhance"]
     params = dict(wf.default_params(), input_image="pick.png", width=1536, height=864)
     payload = wf.build_api_payload(params)
@@ -667,8 +568,6 @@ def test_image_enhance_honors_an_unlocked_size_override():
     assert _find_node(payload, "VAEEncode")["inputs"]["pixels"] == [scale_id, 0]
 
 
-# ---- The detail pass (each part re-sampled where it is) ----
-
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt", "teeth_finder.pt")
 
 
@@ -677,11 +576,6 @@ def _nodes_of(payload: dict, class_type: str) -> list[dict]:
 
 
 def _enhance_payload(installed=_FOUND_DETECTORS, outlined=(), **params):
-    """An enhance payload built against a stated set of installed detectors.
-
-    Stated rather than read off this machine's ComfyUI: the pass drops any part
-    whose model isn't there, so what is installed decides what the graph holds.
-    """
     wf = WORKFLOW_REGISTRY["image_enhance"]
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(detail_module, "list_detector_files", lambda: list(installed))
@@ -719,8 +613,6 @@ def test_a_fix_given_a_lora_redraws_through_it_and_no_other_fix_does():
 
 
 def test_every_part_is_at_zero_by_default_and_adds_nothing():
-    # The whole-frame tail is what an enhance is; the detail pass is a second
-    # opinion on a few small regions, and it costs another sampling run each.
     wf = WORKFLOW_REGISTRY["image_enhance"]
     assert wf.default_params()["enhance_detail_fixes"] == {}
     payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png"))
@@ -729,18 +621,12 @@ def test_every_part_is_at_zero_by_default_and_adds_nothing():
 
 
 def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
-    # What the whole-frame tail cannot do: 0.15 denoise over the full image
-    # refines texture and leaves a six-fingered hand six-fingered, while the
-    # denoise that could redraw it wrecks everything else. So the regions are
-    # found, cropped, re-sampled hard, and pasted back — one part over the last
-    # one's result, so an image with a face and hands gets both.
     payload = _enhance_payload(
         seed=5, enhance_detail_fixes={"faces": 0.45, "hands": 0.6},
     )
 
     providers = {nid: n for nid, n in payload.items()
                  if n["class_type"] == "UltralyticsDetectorProvider"}
-    # The provider names its model the way its own dropdown does, bbox/ and all.
     assert sorted(n["inputs"]["model_name"] for n in providers.values()) == [
         "bbox/face_finder.pt", "bbox/hand_finder.pt",
     ]
@@ -753,17 +639,12 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
         segs = payload[node["inputs"]["segs"][0]]
         assert segs["class_type"] == "BboxDetectorSEGS"
         assert segs["inputs"]["bbox_detector"][0] in providers
-        # Each detector reads the very image its detailer repaints, so the rects
-        # it found land where it found them.
         assert segs["inputs"]["image"] == node["inputs"]["image"]
         assert node["inputs"]["seed"] == 5
         model = payload[segs["inputs"]["bbox_detector"][0]]["inputs"]["model_name"]
         denoises[model] = node["inputs"]["denoise"]
-    # Each part at the number it was given, not one shared between them.
     assert denoises == {"bbox/face_finder.pt": 0.45, "bbox/hand_finder.pt": 0.6}
 
-    # Chained, and the save takes the end of the chain rather than the tail's
-    # decode — otherwise the pass would run and be thrown away.
     decode_id = _node_id(payload, "VAEDecode")
     first = next(nid for nid, n in detailers.items()
                  if n["inputs"]["image"] == [decode_id, 0])
@@ -784,7 +665,7 @@ def test_each_pass_reports_the_regions_its_detector_found_then_the_whole_image()
     assert len(reports) == 2
     joined = []
     for report in reports:
-        assert report["inputs"]["source"][1] == 3  # From_SEG_ELT's crop region
+        assert report["inputs"]["source"][1] == 3
         each = _linked(payload, _linked(payload, report["inputs"]["source"])["inputs"]["seg_elt"])
         joined.append(_linked(payload, each["inputs"]["segs"]))
     assert {tuple(concat["inputs"]["segs1"]) for concat in joined} == {
@@ -855,8 +736,6 @@ def test_a_region_reported_in_a_shape_no_fix_writes_is_passed_over():
 
 
 def test_a_third_part_is_a_third_pass_on_the_chain():
-    # Two detector slots was the old shape's ceiling; a part is a pass of its
-    # own now, so asking for three redraws three.
     payload = _enhance_payload(
         enhance_detail_fixes={"faces": 0.4, "hands": 0.5, "teeth": 0.6})
     assert len(_nodes_of(payload, "DetailerForEach")) == 3
@@ -864,10 +743,6 @@ def test_a_third_part_is_a_third_pass_on_the_chain():
 
 
 def test_the_detail_pass_borrows_the_enhances_model_settings_and_vae():
-    # It is the same enhancement, spent where it matters: the checkpoint
-    # refining the image refines its faces too, steered by the same prompts,
-    # so a redrawn mouth stays in the image's own style rather than the
-    # sampler's idea of a mouth.
     payload = _enhance_payload(
         positive_prompt="a lantern on a jetty",
         enhance_detail_fixes={"faces": 0.45, "hands": 0.45},
@@ -885,9 +760,6 @@ def test_the_detail_pass_borrows_the_enhances_model_settings_and_vae():
 
 
 def test_a_detector_comfyui_hasnt_got_drops_its_part_rather_than_failing_the_submit():
-    # Having only the face model is an ordinary install, and ComfyUI validates
-    # the name — so carrying the missing one anyway would get the whole prompt
-    # rejected, taking the part that could have run down with it.
     payload = _enhance_payload(
         installed=["face_finder.pt"],
         enhance_detail_fixes={"faces": 0.45, "hands": 0.45},
@@ -901,9 +773,6 @@ def test_a_detector_comfyui_hasnt_got_drops_its_part_rather_than_failing_the_sub
 
 
 def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
-    # The Enhance pane greys those numbers for this, but settings stored while a
-    # detector was installed outlive it being removed, and that must not fail
-    # every enhance.
     payload = _enhance_payload(installed=[],
                                enhance_detail_fixes={"faces": 0.45})
     assert _nodes_of(payload, "DetailerForEach") == []
@@ -912,27 +781,15 @@ def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
 
 
 def test_the_detail_passs_setting_is_defined_with_the_range_its_spinners_take():
-    # The Enhance pane builds its per-part spinners from this, so the range
-    # lives with the workflow rather than being retyped beside it.
     defs = {pd.key: pd
             for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()}
 
     assert defs["enhance_detail_fixes"].default == {}
-    # A part not named runs no pass at all, so a part that IS named has a real
-    # denoise: the floor sits above zero, which the detailer node rejects.
     assert defs["enhance_detail_fixes"].min_val > 0
     assert defs["enhance_detail_fixes"].max_val == 1.0
 
 
-# ---- The SDXL upscale/enhance tail (shared by both SDXL workflows) ----
-
 def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
-    # Both SDXL stills workflows finish with a hires-fix tail: the decoded
-    # render is model-upscaled (sharpness), rescaled to enhance_scale x the
-    # base size (the model itself is 4x, so the rescale is relative to its
-    # output), re-encoded, and re-sampled at low denoise — the checkpoint
-    # generating real fine texture rather than interpolating pixels, which is
-    # what keeps the enlargement naturalistic. SaveImage stores that result.
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
         params = dict(wf.default_params(), seed=11, enhance=True, enhance_scale=2.0,
@@ -950,9 +807,6 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
         encode_id = _node_id(payload, "VAEEncode")
         assert payload[encode_id]["inputs"]["pixels"] == [scale_id, 0]
 
-        # Two samplers: the base pass and the enhance pass over the re-encoded
-        # image. The enhance pass runs its own steps/denoise but reuses the
-        # base pass's model, conditioning, cfg and seed — same settings, refined.
         samplers = {nid: n["inputs"] for nid, n in payload.items()
                     if n["class_type"] == "KSampler"}
         assert len(samplers) == 2, name
@@ -970,8 +824,6 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
         assert enhance["sampler_name"] == base["sampler_name"]
         assert enhance["scheduler"] == base["scheduler"]
 
-        # The tail hangs off the BASE pass's decode, and SaveImage stores the
-        # enhance pass's decode, both through the workflow's one VAE.
         base_decode_id = payload[up_id]["inputs"]["image"][0]
         assert payload[base_decode_id]["class_type"] == "VAEDecode"
         assert payload[base_decode_id]["inputs"]["samples"] == [base_id, 0]
@@ -986,11 +838,6 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
 
 
 def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
-    # The enhance tail's look-affecting settings are ordinary form fields: the
-    # upscale model picked from the installed upscale_models files like every
-    # other model dropdown, and the scale/steps/denoise numerics — not hidden
-    # defaults the form would silently reset.
-
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
     dropdown = lambda category, fallback, **terms: installed.get(category, list(fallback))
     monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
@@ -1010,23 +857,15 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
         denoise = by_key["enhance_denoise"]
         assert denoise.type == "float"
         assert denoise.max_val == 1.0
-        # Low by design: 0.3 re-imagined creases into wounds/disfigurements.
         assert denoise.default == 0.15
 
 
 _FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_t2v", "wan_fun_control",
              "wan_animate", "ltx", "krea2")
-# The categories that hold more than one architecture. upscale_models is left
-# out on purpose: the ESRGAN upscalers are architecture-neutral, and a dropdown
-# over them is meant to list everything.
 _MIXED_CATEGORIES = ("checkpoints", "diffusion_models", "controlnet", "loras")
 
 
 def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
-    # The standing rule, checked across the whole registry rather than a list of
-    # workflow names — a workflow added later is covered the day it is added.
-    # Every mixed category is stocked with one model of every architecture, so a
-    # dropdown that offers all of them did not filter at all.
     for category in _MIXED_CATEGORIES:
         for family in _FAMILIES:
             installed_models.add(
@@ -1043,7 +882,7 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
                 continue
             offered = planted.intersection(pd.options)
             if not offered:
-                continue   # not a dropdown over a mixed category
+                continue
             checked += 1
             assert offered < planted, f"{name}.{pd.key} offers every architecture"
     assert checked, "no model dropdowns were exercised — the fixture stopped matching"
@@ -1094,9 +933,6 @@ def test_a_form_that_decodes_with_the_sdxl_vae_offers_no_sd15_checkpoint(install
 
 
 def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
-    # The pair that started this: a slot labelled High must not offer a file
-    # whose name says low, and vice versa. Both halves are installed, so a slot
-    # that stopped filtering would show both.
     for category in ("diffusion_models", "loras"):
         for half in ("high", "low"):
             installed_models.add(
@@ -1139,27 +975,18 @@ def test_every_workflow_name_says_t2i_i2v_and_t2v_rather_than_spelling_them_out(
 
 
 def test_enhance_keys_cover_every_param_only_the_tail_reads():
-    # The gallery drops these from a row's identity, so an enhanced render shares
-    # its unenhanced twin's folder. A tail param left off the list would silently
-    # split that folder again, so every workflow's list must cover its whole tail.
     for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i", "krea2_t2i"):
         wf = WORKFLOW_REGISTRY[name]
         assert set(wf.enhance_keys()) == {
             "enhance", "upscale_model", "enhance_scale", "enhance_steps", "enhance_denoise",
         }, name
-    # Flux keeps upscale_model in its settings: with the toggle OFF that same
-    # param drives the plain 4x upscale this workflow is named for, so it is a
-    # real difference between two of its renders.
     assert set(WORKFLOW_REGISTRY["flux_t2i_upscaled"].enhance_keys()) == {
         "enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
     }
-    # A workflow with no tail at all declares nothing.
     assert WORKFLOW_REGISTRY["wan22_i2v"].enhance_keys() == ()
 
 
 def _every_link(payload: dict):
-    """Each ``[node_id, slot]`` reference the payload's nodes read, with the
-    node that reads it — the shape ComfyUI resolves a graph by."""
     for reader, node in payload.items():
         for name, value in node.get("inputs", {}).items():
             if (isinstance(value, list) and len(value) == 2
@@ -1169,13 +996,6 @@ def _every_link(payload: dict):
 
 @pytest.mark.parametrize("enhance", [False, True])
 def test_no_workflow_can_build_a_graph_with_a_link_to_a_node_it_lost(enhance, monkeypatch):
-    # Every payload is assembled by merging fragments whose node ids the caller
-    # invented, so two fragments sharing an id silently overwrite each other and
-    # the link that pointed at the loser is left naming nothing. Nothing checked
-    # that: allocation was tracked by hand in comments ("21 is the union
-    # ControlNet and 22/23 the depth pair, so this sits clear of both"). ComfyUI
-    # answers a collision with a submit rejection at generate time, which is the
-    # user's first and only warning.
     monkeypatch.setattr(detail_module, "list_detector_files",
                         lambda: list(_FOUND_DETECTORS))
 
@@ -1195,11 +1015,6 @@ def test_no_workflow_can_build_a_graph_with_a_link_to_a_node_it_lost(enhance, mo
 
 
 def test_a_shared_fragment_never_builds_under_an_id_a_hand_numbered_graph_could_pick():
-    # The half a dangling-link check cannot see: an overwrite whose loser was
-    # itself a link target still resolves, to the wrong node. What rules that
-    # out is that a workflow numbers its own nodes and a shared fragment names
-    # its own, so the two sets cannot meet however many nodes either grows --
-    # which is what replaced tracking the numbers by hand in comments.
     fragment_ids = {
         base._SIZE_SCALE, base._SIZE_GET,
         base._ENH_LOADER, base._ENH_UPSCALE, base._ENH_RESCALE,
@@ -1216,11 +1031,6 @@ def test_a_shared_fragment_never_builds_under_an_id_a_hand_numbered_graph_could_
 
 
 def test_a_form_starts_on_the_value_stored_settings_are_normalized_against():
-    # Two readings of one default: `default_params()` is what stored settings are
-    # normalized against (gallery.signatures.canonical_settings) while
-    # `ParamDef.default` is what the Generate form starts on. Let them disagree
-    # and a freshly generated row lands in a different folder from an identical
-    # re-roll — silently, because both values are legal on their own.
     checked = 0
     for name, wf in WORKFLOW_REGISTRY.items():
         defaults = wf.default_params()
@@ -1230,8 +1040,6 @@ def test_a_form_starts_on_the_value_stored_settings_are_normalized_against():
             checked += 1
     assert checked > 100, "the registry stopped being walked"
 
-
-# ---- WAN 2.2 FLF2V Loop ----
 
 def test_wan22_default_params_has_required_keys():
     wf = Wan22Flf2vLoopWorkflow()
@@ -1243,20 +1051,15 @@ def test_wan22_default_params_has_required_keys():
         "lora_strength_high", "lora_strength_low",
     }
     assert required.issubset(params.keys())
-    # Output size is derived from the input image, so it isn't a stored param.
     assert "width" not in params
     assert "height" not in params
 
 
 def test_i2v_workflows_have_no_manual_width_height_controls():
-    # Every input_image-taking workflow derives its output size from that image,
-    # so none exposes a manual width/height control. Asserted across the whole
-    # registry, not just the 2.2 pair, so a new i2v can't silently regress to
-    # hardcoded dimensions.
     i2v_workflows = [
         wf for wf in WORKFLOW_REGISTRY.values() if "input_image" in wf.default_params()
     ]
-    assert len(i2v_workflows) >= 2               # the 2.2 pair, at least
+    assert len(i2v_workflows) >= 2
     for wf in i2v_workflows:
         keys = [d.key for d in wf.param_definitions()]
         assert "width" not in keys, wf.name
@@ -1267,18 +1070,12 @@ def test_i2v_workflows_have_no_manual_width_height_controls():
 
 
 def test_every_input_image_workflow_derives_its_size():
-    # The size-derivation flag and the input-image param travel together: every
-    # i2v workflow derives its output size from the image (so the form shows it
-    # locked), and no manual-size workflow claims to.
     for wf in WORKFLOW_REGISTRY.values():
         takes_image = "input_image" in wf.default_params()
         assert wf.derives_size_from_input == takes_image, wf.name
 
 
 def test_derived_display_size_measures_the_input_image(tmp_path, monkeypatch):
-    # The form reads the derived width/height to show from here: the picked image
-    # measured and scaled exactly as the run will size it.
-
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "wide.png", (1920, 1080))
 
@@ -1289,9 +1086,6 @@ def test_derived_display_size_measures_the_input_image(tmp_path, monkeypatch):
 
 
 def test_derived_display_size_is_none_when_not_derived_or_unmeasurable():
-    # A manual-size workflow reports no derived size; a deriving one with no
-    # measurable image reports None too, so the form shows nothing until an image
-    # resolves rather than a misleading guess.
     manual = WORKFLOW_REGISTRY["sdxl_t2i"]
     assert manual.derives_size_from_input is False
     assert manual.derived_display_size(manual.default_params()) is None
@@ -1312,21 +1106,14 @@ def test_wan22_build_api_payload_structure():
     params["seed"] = 99
     params["input_image"] = "test.png"
     payload = wf.build_api_payload(params)
-    # Node 9 is positive prompt
     assert payload["9"]["class_type"] == "CLIPTextEncode"
     assert payload["9"]["inputs"]["text"] == "video prompt"
-    # Node 11 is LoadImage
     assert payload["11"]["class_type"] == "LoadImage"
     assert payload["11"]["inputs"]["image"] == "test.png"
-    # Node 13 is KSamplerAdvanced (stage 1) - uses noise_seed
     assert payload["13"]["class_type"] == "KSamplerAdvanced"
     assert payload["13"]["inputs"]["noise_seed"] == 42
-    # Node 14 is KSamplerAdvanced (stage 2) - uses seed
     assert payload["14"]["inputs"]["noise_seed"] == 99
-    # Node 16 is VHS_VideoCombine
     assert payload["16"]["class_type"] == "VHS_VideoCombine"
-    # Node 12 (WanFirstLastFrameToVideo) takes its size from the derive nodes:
-    # LoadImage -> ImageScaleToTotalPixels -> GetImageSize -> width/height.
     scale_id = _node_id(payload, "ImageScaleToTotalPixels")
     getsize_id = _node_id(payload, "GetImageSize")
     assert payload[scale_id]["inputs"]["image"] == ["11", 0]
@@ -1338,9 +1125,6 @@ def test_wan22_build_api_payload_structure():
 
 
 def test_wan22_i2v_size_override_replaces_the_in_graph_derivation():
-    # Unlocking the derived size and setting an explicit WxH swaps the in-graph
-    # ImageScaleToTotalPixels/GetImageSize derivation for a plain ImageScale to
-    # that exact size, whose scaled image and literal width/height drive the video.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     params = dict(wf.default_params(), input_image="x.png", width=1024, height=576)
     payload = wf.build_api_payload(params)
@@ -1366,7 +1150,6 @@ def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
     assert _find_node(payload, "ImageScaleToTotalPixels") is None
     scale_id = _node_id(payload, "ImageScale")
     frame = payload["12"]["inputs"]
-    # Both loop endpoints read the one explicitly scaled image.
     assert frame["start_image"] == [scale_id, 0]
     assert frame["end_image"] == [scale_id, 0]
     assert frame["width"] == 848
@@ -1374,10 +1157,6 @@ def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
 
 
 def test_wan22_flf2v_payload_generates_synced_foley_audio():
-    # The loop workflow gets the same HunyuanVideo-Foley pass as the one-shot
-    # i2v, but its writer is VHS_VideoCombine, so the audio rides its ``audio``
-    # input. (The track won't loop seamlessly the way the frames do — Funestras
-    # restart it each cycle — but the video itself is scored to its motion.)
     wf = Wan22Flf2vLoopWorkflow()
     params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3)
     payload = wf.build_api_payload(params)
@@ -1397,9 +1176,7 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
 
 
 def test_foley_duration_never_undercuts_the_models_one_second_floor():
-    # HunyuanFoley rejects sub-second durations, so a video shorter than 1s (the
-    # default 21-frame loop at 16fps is 1.3s, but 5 frames is 0.2s) asks for a
-    # clamped 1s of audio; the mux just carries the sliver of overhang.
+    # HunyuanFoley rejects durations under one second.
     wf = Wan22Flf2vLoopWorkflow()
     params = dict(wf.default_params(), frame_count=5, frame_rate=16.0)
     payload = wf.build_api_payload(params)
@@ -1441,8 +1218,6 @@ def test_a_videos_file_with_sound_is_listed_beside_its_soundless_copy(name):
                         "type": "output", "role": "silent"}
 
 
-# ---- WAN 2.2 I2V (dual-noise) ----
-
 def test_wan22_i2v_default_params_has_required_keys():
     wf = Wan22I2vWorkflow()
     params = wf.default_params()
@@ -1478,14 +1253,11 @@ def test_wan22_i2v_build_api_payload_structure():
     params["seed"] = 0
     payload = wf.build_api_payload(params)
 
-    # I2V conditioning (NOT first-last-frame)
     i2v = _find_node(payload, "WanImageToVideo")
     assert i2v is not None
     assert i2v["inputs"]["length"] == params["frame_count"]
     assert _find_node(payload, "WanFirstLastFrameToVideo") is None
 
-    # Size is derived in-graph from the loaded image, nothing hardcoded:
-    # LoadImage -> ImageScaleToTotalPixels (/16, budget) -> GetImageSize -> w/h.
     load_id = _node_id(payload, "LoadImage")
     scale_id = _node_id(payload, "ImageScaleToTotalPixels")
     getsize_id = _node_id(payload, "GetImageSize")
@@ -1494,17 +1266,14 @@ def test_wan22_i2v_build_api_payload_structure():
     assert payload[getsize_id]["inputs"]["image"] == [scale_id, 0]
     assert i2v["inputs"]["width"] == [getsize_id, 0]
     assert i2v["inputs"]["height"] == [getsize_id, 1]
-    assert i2v["inputs"]["start_image"] == [scale_id, 0]  # the correctly-sized frame
+    assert i2v["inputs"]["start_image"] == [scale_id, 0]
     assert "width" not in params
     assert "height" not in params
 
-    # LoadImage feeds the start image
     assert payload[load_id]["inputs"]["image"] == "start.png"
 
-    # CLIP-vision encode is present (i2v conditions on the image embedding)
     assert _find_node(payload, "CLIPVisionEncode") is not None
 
-    # Two KSamplerAdvanced passes (high/low noise), split at steps // 2
     samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
     assert len(samplers) == 2
     high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
@@ -1513,7 +1282,6 @@ def test_wan22_i2v_build_api_payload_structure():
     assert high["inputs"]["end_at_step"] == params["steps"] // 2
     assert low["inputs"]["start_at_step"] == params["steps"] // 2
 
-    # Positive prompt is encoded
     assert any(
         n["class_type"] == "CLIPTextEncode" and n["inputs"]["text"] == "video prompt"
         for n in payload.values()
@@ -1533,9 +1301,6 @@ def test_wan22_i2v_zero_split_still_hands_off_at_half_the_steps():
 
 
 def test_settings_stored_with_one_shared_strength_still_render_at_that_strength():
-    # Generations made before the stages had their own strength carry cfg 1.0
-    # with a zero for each stage, which meant "use the shared one". Read as no
-    # guidance at all, every one of them would re-run as a different video.
     wf = Wan22I2vWorkflow()
     stored = dict(wf.default_params(), steps=20, cfg=1.0, cfg_high=0.0, cfg_low=0.0)
     payload = wf.build_api_payload(stored)
@@ -1543,7 +1308,6 @@ def test_settings_stored_with_one_shared_strength_still_render_at_that_strength(
     samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
     assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]
 
-    # A stored per-stage number still wins over the shared one.
     tuned = dict(stored, cfg_high=2.0)
     tuned_payload = wf.build_api_payload(tuned)
     high = next(n for n in tuned_payload.values()
@@ -1553,11 +1317,6 @@ def test_settings_stored_with_one_shared_strength_still_render_at_that_strength(
 
 
 def test_wan22_i2v_payload_generates_synced_foley_audio():
-    # Every i2v render carries a HunyuanVideo-Foley pass: the decoded frames
-    # drive the foley sampler (so the audio follows the on-screen motion), and
-    # its output is muxed into the file by the writer's audio input. The
-    # sampler's duration must equal the video's, derived from the same
-    # frame_count/frame_rate the video nodes use, or the tracks drift.
     wf = Wan22I2vWorkflow()
     params = dict(
         wf.default_params(),
@@ -1577,8 +1336,6 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     assert sampler["negative_prompt"] == "music"
     assert sampler["seed"] == 7
 
-    # The foley model and its deps are loaded from the params' file names, so a
-    # generation records exactly which audio model scored it.
     model_id = _node_id(payload, "HunyuanModelLoader")
     deps_id = _node_id(payload, "HunyuanDependenciesLoader")
     assert sampler["hunyuan_model"] == [model_id, 0]
@@ -1587,8 +1344,6 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     assert payload[deps_id]["inputs"]["vae_name"] == params["foley_vae"]
     assert payload[deps_id]["inputs"]["synchformer_name"] == params["foley_synchformer"]
 
-    # Slot 0 is audio_first — the single generated track — and the writer
-    # muxes it, so the saved file is a video WITH sound.
     assert payload[wf.output_node_id]["inputs"]["audio"] == [sampler_id, 0]
 
 
@@ -1605,28 +1360,17 @@ def _write_image(path, size):
     Image.new("RGB", size, (128, 128, 128)).save(path)
 
 
-# ---- SDXL Pose Transfer (re-skin an image, keeping its pose) ----
-
 def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     assert wf.__class__ is SdxlPoseTransferWorkflow
     assert wf.name == "sdxl_pose_transfer"
     assert wf.output_type == "image"
-    # The checkpoint identifies the output, exactly as in sdxl_t2i — the
-    # controlnet is a conditioning aid, not what the gallery groups by.
     assert wf.model_keys == ("checkpoint",)
     assert wf.seed_keys() == ("seed",)
-    # The output size follows the pose image's aspect ratio, so the workflow
-    # derives it from the input rather than exposing manual width/height.
     assert wf.derives_size_from_input is True
 
 
 def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
-    # The pose references this workflow is steered by are a curated folder of the
-    # library, not ComfyUI's input dump, so its Structure Image dropdown opens
-    # there. The path is built from the (private) library root, never spelled out
-    # in source.
-
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     pd = next(pd for pd in wf.param_definitions() if pd.key == "input_image")
     assert pd.browse_dir == config.CUSTOM_POSES_DIR
@@ -1634,12 +1378,6 @@ def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
 
 
 def test_sdxl_pose_transfer_build_api_payload_structure():
-    # The re-skin pipeline: the input image is scaled to the SDXL pixel budget
-    # (keeping its aspect ratio), its structure is extracted — a DepthAnythingV2
-    # map by default — and an SDXL ControlNet applies that map to both prompt
-    # conditionings, while the sampler still denoises a fresh latent, sized off
-    # the same derivation, so everything but the structure is up to the prompt
-    # and checkpoint.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(
         wf.default_params(),
@@ -1649,13 +1387,11 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
         seed=77,
         controlnet_strength=0.65,
         controlnet_end=0.9,
-        enhance=True,  # this test also pins where the tail hangs off the decode
+        enhance=True,
     )
-    assert params["control_mode"] == "depth"  # the shipped default
+    assert params["control_mode"] == "depth"
     payload = wf.build_api_payload(params)
 
-    # The size chain: LoadImage -> ImageScaleToTotalPixels (1 MP, /16 stride)
-    # -> GetImageSize -> the latent's width/height. No hardcoded dimensions.
     load_id = _node_id(payload, "LoadImage")
     scale_id = _node_id(payload, "ImageScaleToTotalPixels")
     getsize_id = _node_id(payload, "GetImageSize")
@@ -1668,10 +1404,6 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     assert latent["inputs"]["height"] == [getsize_id, 1]
     assert latent["inputs"]["batch_size"] == params["batch_size"]
 
-    # The structure chain: DepthAnythingV2 reads the scaled image (so the map
-    # is drawn in the same aspect the latent uses), the union ControlNet is
-    # switched to its depth head, and the map is applied across both
-    # conditionings at the form's strength/end values.
     da_loader_id = _node_id(payload, "DownloadAndLoadDepthAnythingV2Model")
     assert payload[da_loader_id]["inputs"]["model"] == params["depth_model"]
     depth = _find_node(payload, "DepthAnything_V2")
@@ -1691,8 +1423,6 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     assert apply["inputs"]["start_percent"] == 0.0
     assert apply["inputs"]["end_percent"] == 0.9
 
-    # Both prompts route through the ControlNet apply into the sampler, which
-    # otherwise runs the plain sdxl_t2i workflow on the checkpoint's model.
     encodes = {
         n["inputs"]["text"]: nid for nid, n in payload.items()
         if n["class_type"] == "CLIPTextEncode"
@@ -1708,10 +1438,6 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     ckpt = _find_node(payload, "CheckpointLoaderSimple")
     assert ckpt["inputs"]["ckpt_name"] == params["checkpoint"]
 
-    # Decoded through the standalone VAE like sdxl_t2i, then finished by the
-    # enhance tail: the upscaler reads this decode, and SaveImage stores the
-    # tail's own re-sampled decode (the chain itself is pinned by
-    # test_sdxl_workflows_end_with_an_upscale_enhance_pass).
     decode_id = _node_id(payload, "VAEDecode")
     vae_id = _node_id(payload, "VAELoader")
     assert payload[decode_id]["inputs"]["vae"] == [vae_id, 0]
@@ -1724,10 +1450,6 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
 
 
 def test_sdxl_pose_transfer_size_override_replaces_the_in_graph_derivation():
-    # Unlocking the derived size swaps the budget-scaling for a plain ImageScale
-    # to the explicit WxH, whose literal size drives the latent — and the pose
-    # skeleton is still drawn from that same scaled image, so it keeps matching
-    # the canvas it will be applied to.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(wf.default_params(), input_image="x.png", width=1152, height=896)
     payload = wf.build_api_payload(params)
@@ -1747,10 +1469,6 @@ def test_sdxl_pose_transfer_size_override_replaces_the_in_graph_derivation():
 
 
 def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, monkeypatch):
-    # The form's locked Dimensions field must show the size this workflow will
-    # actually render — the pose image's aspect at the 1 MP SDXL budget, not the
-    # video workflows' 0.4 MP.
-
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "tall.png", (1080, 1920))
 
@@ -1759,15 +1477,10 @@ def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, 
     derived = wf.derived_display_size(params)
     assert derived == scale_to_total_pixels(1080, 1920, megapixels=1.0)
     width, height = derived
-    # Sanity-pin the budget itself: the derived area sits at ~1 MP, far above
-    # what the 0.4 MP video budget would produce for the same image.
     assert 0.9 * 1024 * 1024 <= width * height <= 1.1 * 1024 * 1024
 
 
 def test_sdxl_pose_transfer_pose_mode_swaps_depth_for_a_dwpose_skeleton():
-    # "pose" mode is the single-standing-figure alternative: DWPose replaces
-    # the depth chain (skeleton from the same scaled image, so it shares the
-    # latent's aspect), and the union ControlNet switches to its openpose head.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(wf.default_params(), input_image="x.png", control_mode="pose")
     payload = wf.build_api_payload(params)
@@ -1786,14 +1499,10 @@ def test_sdxl_pose_transfer_pose_mode_swaps_depth_for_a_dwpose_skeleton():
 
 
 def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
-    # xinsir's SDXL pose ControlNets were trained on thicker skeleton sticks
-    # than the OpenPose standard, and comfyui_controlnet_aux ships a DWPose
-    # toggle for exactly that. It follows the picked ControlNet by filename
-    # (both shipped defaults are xinsir models), so swapping in a non-xinsir
-    # ControlNet gets standard sticks without a second setting to keep in sync.
+    # xinsir's pose ControlNets were trained on thicker skeleton sticks than the OpenPose standard.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(wf.default_params(), input_image="x.png", control_mode="pose")
-    assert "xinsir" in params["controlnet"].lower()  # the shipped default
+    assert "xinsir" in params["controlnet"].lower()
 
     pose = _find_node(wf.build_api_payload(params), "DWPreprocessor")
     assert pose["inputs"]["scale_stick_for_xinsr_cn"] == "enable"
@@ -1804,10 +1513,7 @@ def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
 
 
 def test_sdxl_pose_transfer_union_type_node_only_wraps_union_controlnets():
-    # SetUnionControlNetType tells a union model which head to run, but a
-    # plain single-purpose ControlNet crashes on the extra argument — so the
-    # node is added only when the picked file says it's a union model, and a
-    # plain ControlNet is applied directly.
+    # A plain single-purpose ControlNet crashes on SetUnionControlNetType's extra argument.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(
         wf.default_params(), input_image="x.png", control_mode="pose",
@@ -1843,7 +1549,7 @@ def test_sdxl_pose_transfer_extract_output_info():
         nid for nid, node in wf.build_api_payload(wf.default_params()).items()
         if node["class_type"] == "SaveImage"
     )
-    assert wf.output_node_id == save_id  # /history is read off the save node
+    assert wf.output_node_id == save_id
     history = {
         "outputs": {
             save_id: {
@@ -1859,15 +1565,11 @@ def test_sdxl_pose_transfer_extract_output_info():
     assert files[0]["filename"] == "sdxl_pose_transfer_00001_.png"
 
 
-# ---- WAN 2.2 T2I (dual-noise) ----
-
 def test_wan22_t2i_is_registered_as_an_image_workflow():
     assert WORKFLOW_REGISTRY["wan22_t2i"].__class__ is Wan22T2iWorkflow
     wf = Wan22T2iWorkflow()
     assert wf.name == "wan22_t2i"
     assert wf.output_type == "image"
-    # Two diffusion models (high/low noise) identify the output, like the video
-    # Wan workflows; a variation re-rolls both stage seeds.
     assert wf.model_keys == ("unet_high", "unet_low")
     assert wf.seed_keys() == ("noise_seed",)
 
@@ -1892,11 +1594,9 @@ def test_wan22_t2i_build_api_payload_structure():
     params["seed"] = 99
     payload = wf.build_api_payload(params)
 
-    def src(ref):  # resolve a [node_id, slot] link to its source node
+    def src(ref):
         return payload[ref[0]]
 
-    # A bare video latent is the canvas — T2I, so no input image and
-    # none of the video conditioning the i2v/flf2v workflows use.
     latent = _find_node(payload, "EmptyHunyuanLatentVideo")
     assert latent["inputs"]["width"] == params["width"]
     assert latent["inputs"]["height"] == params["height"]
@@ -1905,8 +1605,6 @@ def test_wan22_t2i_build_api_payload_structure():
     assert _find_node(payload, "LoadImage") is None
     assert _find_node(payload, "CLIPVisionEncode") is None
 
-    # Two KSamplerAdvanced passes split at steps // 2; stage 1 adds noise and
-    # uses noise_seed, stage 2 refines from it and uses seed.
     samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
     assert len(samplers) == 2
     high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
@@ -1915,24 +1613,19 @@ def test_wan22_t2i_build_api_payload_structure():
     assert high["inputs"]["end_at_step"] == params["steps"] // 2
     assert low["inputs"]["noise_seed"] == 99
     assert low["inputs"]["start_at_step"] == params["steps"] // 2
-    # Stage 2 refines stage 1's latent, not the empty one.
     high_id = next(k for k, v in payload.items() if v is high)
     assert low["inputs"]["latent_image"] == [high_id, 0]
 
-    # Stage 1 runs the high-noise model, stage 2 the low-noise model — each via
-    # its own ModelSamplingSD3 shift. Getting this backwards ruins the output.
     high_unet = src(src(high["inputs"]["model"])["inputs"]["model"])
     low_unet = src(src(low["inputs"]["model"])["inputs"]["model"])
     assert high_unet["inputs"]["unet_name"] == params["unet_high"]
     assert low_unet["inputs"]["unet_name"] == params["unet_low"]
 
-    # One frame is pulled from the batch and saved as a still, not a video.
     assert _find_node(payload, "ImageFromBatch") is not None
     save = _find_node(payload, "SaveImage")
     assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
     assert _find_node(payload, "VHS_VideoCombine") is None
 
-    # The positive prompt is encoded and feeds both samplers.
     assert any(
         n["class_type"] == "CLIPTextEncode" and n["inputs"]["text"] == "a cat"
         for n in payload.values()
@@ -1956,15 +1649,11 @@ def test_wan22_t2i_extract_output_info():
     assert files[0]["filename"] == "wan22_t2i_00026_.png"
 
 
-# ---- Flux T2I, GGUF UNET, with a RealESRGAN upscale pass ----
-
 def test_flux_t2i_upscaled_is_registered_as_an_image_workflow():
     assert WORKFLOW_REGISTRY["flux_t2i_upscaled"].__class__ is FluxT2iUpscaledWorkflow
     wf = FluxT2iUpscaledWorkflow()
     assert wf.name == "flux_t2i_upscaled"
     assert wf.output_type == "image"
-    # The GGUF diffusion model identifies the output; the gallery groups by it,
-    # so runs that differ only in which Flux model made them split into folders.
     assert wf.model_keys == ("unet",)
     assert wf.seed_keys() == ("seed",)
 
@@ -1977,16 +1666,11 @@ def test_flux_t2i_upscaled_default_params_has_required_keys():
         "unet", "clip_name1", "clip_name2", "vae", "upscale_model",
     }
     assert required.issubset(params.keys())
-    # Flux is a guidance-distilled model: it samples at cfg 1.0 with an empty
-    # negative, so the real "prompt strength" setting is FluxGuidance, not cfg.
     assert params["guidance"] == 4.5
     assert params["unet"].endswith(".gguf")
 
 
 def test_flux_t2i_upscaled_exposes_a_gguf_model_dropdown(monkeypatch):
-    # The GGUF diffusion model is a dropdown drawn from the installed diffusion
-    # models, like SDXL's checkpoint dropdown — the one thing a user varies most.
-
     installed = ["a_flux.gguf", "b_flux.gguf"]
     monkeypatch.setattr(dropdowns, "list_model_files",
                         lambda category, fallback, **terms: installed)
@@ -2008,17 +1692,14 @@ def test_flux_t2i_upscaled_build_api_payload_structure():
     params["guidance"] = 3.5
     payload = wf.build_api_payload(params)
 
-    # GGUF UNET loader carries the model that identifies the run.
     unet = _find_node(payload, "UnetLoaderGGUF")
     assert unet["inputs"]["unet_name"] == params["unet"]
 
-    # Flux's dual text encoders (clip_l + t5xxl) via DualCLIPLoader, type "flux".
     dual = _find_node(payload, "DualCLIPLoader")
     assert dual["inputs"]["type"] == "flux"
     assert dual["inputs"]["clip_name1"] == params["clip_name1"]
     assert dual["inputs"]["clip_name2"] == params["clip_name2"]
 
-    # Guidance rides on the positive conditioning; the KSampler runs at cfg 1.0.
     fg = _find_node(payload, "FluxGuidance")
     assert fg["inputs"]["guidance"] == 3.5
     fg_id = _node_id(payload, "FluxGuidance")
@@ -2027,8 +1708,6 @@ def test_flux_t2i_upscaled_build_api_payload_structure():
     assert ks["inputs"]["cfg"] == 1.0
     assert ks["inputs"]["positive"] == [fg_id, 0]
 
-    # The saved image is the upscaled one: SaveImage reads the upscaler's output,
-    # which in turn reads the VAE-decoded sample.
     upscale = _find_node(payload, "ImageUpscaleWithModel")
     decode_id = _node_id(payload, "VAEDecode")
     assert upscale["inputs"]["image"] == [decode_id, 0]
@@ -2038,8 +1717,6 @@ def test_flux_t2i_upscaled_build_api_payload_structure():
     assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
     assert _find_node(payload, "UpscaleModelLoader")["inputs"]["model_name"] == params["upscale_model"]
 
-    # No LLM prompt-enhancer node: it hangs off the side of the saved graph,
-    # unconnected, and needs a custom node + API key we don't drive.
     assert _find_node(payload, "VRGDG_LLM_Multi") is None
 
 
@@ -2060,15 +1737,9 @@ def test_flux_t2i_upscaled_extract_output_info():
 
 
 def test_every_enhance_capable_workflow_keeps_its_base_render():
-    # A workflow whose tail re-samples its own render must save that render too,
-    # or the row lands with one file and no "before" — enhanced pixels with
-    # nothing to compare them against, and the only trash_collection a full re-render at
-    # the recorded seed. 147 rows in this library needed exactly that repair.
-    # Asserted across the registry so a new enhance-capable workflow inherits the
-    # rule rather than a later reader having to know it.
     enhancers = [wf for wf in WORKFLOW_REGISTRY.values()
                  if "enhance" in wf.default_params()]
-    assert len(enhancers) >= 4  # the SDXL pair, Flux upscaled, WAN t2i, at least
+    assert len(enhancers) >= 4
     for wf in enhancers:
         assert wf.base_output_node_id is not None, wf.name
         params = dict(wf.default_params(), enhance=True,
@@ -2079,8 +1750,6 @@ def test_every_enhance_capable_workflow_keeps_its_base_render():
             if node.get("class_type") == "SaveImage"
         ]
         assert f"{params['filename_prefix']}_base" in saves, wf.name
-        # And the run's history reads that file back as the row's original, which
-        # is what makes it a level rather than a second image.
         history = {"outputs": {
             wf.output_node_id: {"images": [{"filename": "enhanced.png"}]},
             wf.base_output_node_id: {"images": [{"filename": "base.png"}]},
@@ -2090,8 +1759,6 @@ def test_every_enhance_capable_workflow_keeps_its_base_render():
 
 
 def test_a_workflow_with_the_tail_off_saves_only_its_own_render():
-    # The base save exists to keep what the tail consumed; with no tail running,
-    # the primary save IS the base render and a second copy is just a duplicate.
     for wf in WORKFLOW_REGISTRY.values():
         if "enhance" not in wf.default_params():
             continue
@@ -2102,16 +1769,6 @@ def test_a_workflow_with_the_tail_off_saves_only_its_own_render():
         assert len(saves) == 1, wf.name
 
 
-# --- what the importer reads a workflow's own graph as ------------------------
-#
-# A re-import reads the graph embedded in an output file and names the workflow
-# from its node classes, overruling what the filename said. The chain that does
-# it names six ComfyUI node classes and five of the registered workflows, so
-# what the rest read as is decided by accident. This runs every registered
-# workflow's OWN payload through it and writes the answer down.
-
-#: workflow name -> what the importer reads its own graph as. Held as an
-#: equality against the registry, so a new workflow has to answer this too.
 READS_AS = {
     "sdxl_t2i": "sdxl_t2i",
     "flux_t2i_upscaled": "flux_t2i_upscaled",
@@ -2119,11 +1776,6 @@ READS_AS = {
     "wan22_t2i": "wan22_t2i",
     "wan22_flf2v_loop": "wan22_flf2v_loop",
     "wan22_i2v": "wan22_i2v",
-    # Both build an SDXL checkpoint graph, so the chain's last branch claims
-    # them; the graph cannot tell them from sdxl_t2i.  Which is why the graph
-    # no longer overrules a filename naming a workflow whose own graph reads
-    # the same way (bug 70; tests/test_importer.py holds every workflow's own
-    # output re-importing as itself).
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
     "wan22_animate": "wan22_animate",
@@ -2131,8 +1783,6 @@ READS_AS = {
 
 
 def test_every_registered_workflow_says_what_its_own_graph_reads_as():
-    """An equality against the registry: a new workflow cannot be added
-    without someone deciding what a re-import of its output would call it."""
     assert set(READS_AS) == set(WORKFLOW_REGISTRY)
 
 
@@ -2145,28 +1795,18 @@ def test_a_workflows_own_graph_reads_as_it_always_has(name):
 
 
 def test_the_graph_signatures_only_ever_name_a_registered_workflow():
-    """The chain hardcodes workflow names; a rename or a removal on one side
-    would leave it writing a name no gallery folder is ever built for, and the
-    value is persisted into every row."""
     assert {name for name, _ in _GRAPH_SIGNATURES} <= set(WORKFLOW_REGISTRY)
 
-
-# ---- video length and rate, as the form offers them ----
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
-    # Seconds are counted at the rate the MODEL paces motion at, never at the
-    # playback rate: that is what makes a video's length hold when its rate moves.
     assert frames.rate == NATIVE_FPS
     assert frames.options == [1, 5, 10, 15, 30, 60]
     assert frames.unit == "s"
-    assert (frames.min_val, frames.step) == (5, 4)     # the models' 4k+1 frames
-    # Every rate offered is a whole multiple of the native one, because those are
-    # the only rates the interpolator can actually produce the frames for — and
-    # none is past the fastest a video is written at.
+    assert (frames.min_val, frames.step) == (5, 4)
     assert rate.options == [16, 32, 48, 64, 80, 96, 112]
     assert all(playback_rate(r) == r for r in rate.options)
     assert rate.unit == "fps"
@@ -2176,9 +1816,6 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
 
 @pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
 def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
-    # 30 s is the longest length on the Duration list. Read back through the
-    # same grid the form uses, the cap has to say exactly that, or the list
-    # offers a length it then greys out on every WAN 2.2 form.
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames = defs["frame_count"]
     assert seconds_for_frames(frames.max_val, NATIVE_FPS, frames) == max(DURATION_OPTIONS)
@@ -2186,8 +1823,6 @@ def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
-    # More steps cost only time, and a long video already costs hours of it;
-    # a step count the machine can finish is nothing the form should refuse.
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     assert defs["steps"].max_val == 100
     if "split_step" in defs:
@@ -2195,9 +1830,6 @@ def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
 
 
 def _segments(payload: dict, conditioning: str) -> list[dict]:
-    """A video's conditioning nodes in the order their segments run: the first
-    is fed by the scaled start image, each later one by a frame cut out of the
-    decode before it, whose samplers lead back to the previous conditioning."""
     nodes = [n for n in payload.values() if n["class_type"] == conditioning]
 
     def position(node):
@@ -2214,8 +1846,6 @@ def _segments(payload: dict, conditioning: str) -> list[dict]:
 
 @pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
 def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
-    # A video of today's lengths is one segment: one conditioning node, fed by
-    # the scaled start image, nothing cut out of a decode or joined back on.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=SINGLE_WINDOW_FRAMES))
     kinds = [n["class_type"] for n in payload.values()]
@@ -2225,10 +1855,6 @@ def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
 
 
 def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame():
-    # 481 frames as one window is 31 GB of activations on a 16 GB tile, and
-    # windows blended over each other crossfade and drift. So a long video is
-    # rendered as videos of the longest length one window takes, each started
-    # from the last frame the one before it decoded: no blend, one scene.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
     segments = _segments(payload, "WanImageToVideo")
@@ -2237,16 +1863,11 @@ def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame(
         last = payload[segment["inputs"]["start_image"][0]]
         assert last["class_type"] == "ImageFromBatch"
         assert (last["inputs"]["batch_index"], last["inputs"]["length"]) == (160, 1)
-        # the same frame is what its CLIP-Vision conditioning looks at
         clip_vision = payload[segment["inputs"]["clip_vision_output"][0]]
         assert clip_vision["inputs"]["image"] == segment["inputs"]["start_image"]
 
 
 def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_frame():
-    # The loop's two endpoints are the same image. Chained, only the last
-    # segment is told to end on it -- an earlier one ending there would close
-    # the loop early and then have to leave it again -- and each segment after
-    # the first starts on the frame before it.
     wf = Wan22Flf2vLoopWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
     segments = _segments(payload, "WanFirstLastFrameToVideo")
@@ -2261,9 +1882,6 @@ def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_
 
 
 def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
-    # Each later segment's first frame IS the previous segment's last, so the
-    # join takes a segment's frames from its second on: 161 + 160 + 160 = 481,
-    # with each seam one shared frame long.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
     written = payload[wf.output_node_id]["inputs"]["images"]
@@ -2277,14 +1895,10 @@ def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
     assert joined["class_type"] == "VAEDecode"
     first = payload[payload[payload[joined["inputs"]["samples"][0]]["inputs"]["latent_image"][0]]["inputs"]["latent_image"][0]]
     assert [first["inputs"]["length"]] + pieces == [161, 160, 160]
-    # Foley scores the same joined frames the writer encodes
     assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["image"] == written
 
 
 def test_each_chained_segment_draws_its_own_noise():
-    # The same seed on every segment would replay the same motion from each
-    # new start frame; the segments step the stored seeds instead, so a run
-    # still reproduces from the one seed pair its row records.
     wf = Wan22I2vWorkflow()
     params = dict(wf.default_params(), frame_count=481, noise_seed=1000, seed=2000)
     payload = wf.build_api_payload(params)
@@ -2297,8 +1911,6 @@ def test_each_chained_segment_draws_its_own_noise():
 
 
 def test_segment_lengths_stay_on_the_models_frame_grid():
-    # 4k+1 frames per segment, the first as long as one window takes, and
-    # every later one rendering the shared frame plus what it adds.
     lengths = WorkflowTemplate.segment_lengths
     assert lengths(21) == [21]
     assert lengths(161) == [161]
@@ -2320,8 +1932,6 @@ def test_a_story_too_short_for_its_good_range_lengthens_its_last_scene():
 
 
 def test_the_last_scene_carries_on_through_the_scenes_after_it():
-    # Three scene lengths, two texts: the third scene reads the second's text
-    # rather than nothing, so a story with fewer texts than lengths still runs.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=481, scene_frames=[161, 161, 161],
@@ -2330,8 +1940,6 @@ def test_the_last_scene_carries_on_through_the_scenes_after_it():
 
 
 def test_a_prompt_without_a_scene_break_is_encoded_once_for_every_segment():
-    # No break, no second encode: the segments share the one text node the
-    # graph always had, and its text is the prompt exactly as typed.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=481, positive_prompt="  she waves, slowly  "))
@@ -2354,11 +1962,6 @@ def _scene_negatives(payload, conditioning):
     ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
 ])
 def test_each_scene_keeps_out_its_own_negative(name, conditioning):
-    # A scene's negative is its own, like its prompt: stored as the one negative
-    # prompt with a break between the scenes' texts, and each segment reads the
-    # text of its scene. A negative with fewer texts than scenes carries its
-    # last text on, and one without a break is the one node every segment
-    # shared before there were scenes.
     wf = WORKFLOW_REGISTRY[name]
     params = dict(wf.default_params(), frame_count=401, scene_frames=[161, 81, 161],
                   positive_prompt="a\n---\nb\n---\nc")
@@ -2374,10 +1977,6 @@ def test_each_scene_keeps_out_its_own_negative(name, conditioning):
     ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
 ])
 def test_each_scene_runs_for_its_own_frames_and_reads_its_own_prompt(name, conditioning):
-    # A story is scenes of their own lengths: 10 s, 5 s and 10 s here, each a
-    # segment started from the frame before it, each conditioned on its own
-    # scene's text. The video is the scenes end to end, one shared frame at each
-    # seam, and the audio is scored for that whole length.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=401, scene_frames=[161, 81, 161],
@@ -2398,26 +1997,18 @@ def test_a_scene_longer_than_one_window_is_two_segments_of_the_same_scene():
 
 
 def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
-    # One scene is the whole video, and the video length is what every other
-    # reader of the settings goes by (settings from the overlay carry only that),
-    # so a single entry never overrules it.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=121, scene_frames=[81]))
     assert [seg["inputs"]["length"] for seg in _segments(payload, "WanImageToVideo")] == [121]
 
 
 def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
-    # The stored video length is derived from the scenes by the form; settings
-    # whose scenes and length disagree scores its audio for the frames it will
-    # really render.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=481, scene_frames=[161, 81],
         positive_prompt="a\n---\nb"))
     assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == pytest.approx(241 / 16)
 
-
-# ---- the file every video is saved as ----
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
@@ -2432,14 +2023,9 @@ def test_every_video_is_saved_as_h264_at_one_high_quality(name):
     assert inputs["filename_prefix"] == params["filename_prefix"]
 
 
-# ---- the frames between the frames ----
-
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_clip_played_at_the_native_rate_carries_no_interpolation_at_all(name):
-    # At 16 fps every frame the file needs already exists, so the graph is the
-    # one it always was: the decode feeds the writer directly, and no second
-    # model is loaded to synthesize frames nobody asked for.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=NATIVE_FPS))
 
@@ -2451,9 +2037,6 @@ def test_a_clip_played_at_the_native_rate_carries_no_interpolation_at_all(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(name):
-    # 48 fps is three frames out of each generated one. The interpolator sits
-    # between the decode and the writer, and the writer's rate is that same
-    # multiple, so a file can never claim a rate its frames weren't made for.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=48.0))
 
@@ -2470,9 +2053,6 @@ def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(n
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
-    # The whole point: the model authors the same seconds of motion whatever the
-    # rate, and the rate only decides how many frames a second of it is shown
-    # in. Same length conditioned, same sampling cost, at every rate.
     wf = WORKFLOW_REGISTRY[name]
     lengths = set()
     for rate in (16.0, 32.0, 128.0):
@@ -2486,10 +2066,6 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
-    # A rate typed by hand — or carried in by settings saved before the rates
-    # were multiples — doesn't get to skew the tempo: the graph interpolates to
-    # the nearest reachable rate and writes at THAT, so the video lands a little
-    # off the rate asked for and exactly on time.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=60.0))
 
@@ -2499,8 +2075,6 @@ def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
-    # Stored settings carrying a rate from before this ceiling, or a number
-    # typed past the field's own range, is written at the ceiling.
     wf = WORKFLOW_REGISTRY[name]
     for asked in (128.0, 240.0, 10_000.0):
         payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=asked))
@@ -2510,9 +2084,6 @@ def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
 
 @pytest.mark.parametrize("name", _SCORED_VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
-    # Foley scores the DECODED frames — the motion the model actually authored,
-    # at the rate it authored them in — so the track is the video's real seconds
-    # and lands on the same beats however many frames the file ends up holding.
     wf = WORKFLOW_REGISTRY[name]
     params = dict(wf.default_params(), frame_count=81, frame_rate=MAX_PLAYBACK_FPS)
     payload = wf.build_api_payload(params)
@@ -2524,10 +2095,6 @@ def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
 
 
 def test_a_loops_two_matched_ends_survive_the_frames_added_between_them():
-    # The loop's seam is that its first and last frames are the same image. The
-    # interpolator fills gaps and hands the endpoints through untouched, so the
-    # seam sits exactly where it did — and the writer is still told to play the
-    # sequence straight through rather than bounce it back.
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     payload = wf.build_api_payload(
         dict(wf.default_params(), frame_count=81, frame_rate=64.0))
@@ -2535,37 +2102,22 @@ def test_a_loops_two_matched_ends_survive_the_frames_added_between_them():
     combine = _find_node(payload, "VHS_VideoCombine")["inputs"]
     assert combine["loop_count"] == 0
     assert combine["pingpong"] is False
-    # multiplier new frames per GAP, so 81 frames become (81-1)*4+1 — the two
-    # generated endpoints handed through, everything new strictly between them.
     multiplier = payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"]
     assert (81 - 1) * multiplier + 1 == 321
-    # …and those 321 frames at 64 fps span the same motion the 81 did at 16.
     interpolated_span = (321 - 1) / 64.0
     assert interpolated_span == pytest.approx((81 - 1) / NATIVE_FPS)
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
-    """The form snaps a typed rate onto the Frame Rate field's grid; the payload
-    picks its multiplier straight from the number. Those are two roundings of
-    one question, and if they ever disagreed the field would be advertising a
-    rate the file isn't written at — so this walks every rate a person could
-    type and holds them to the same answer."""
     rate_def = next(pd for pd in WORKFLOW_REGISTRY[name].param_definitions()
                     if pd.key == "frame_rate")
     for typed in range(200):
         shown = clamped_number(rate_def, float(typed))
         assert shown == min(rate_def.max_val, playback_rate(typed)), typed
-        # …and a rate already on the grid is left exactly where it is.
         assert clamped_number(rate_def, shown) == shown
 
 
-# ---- what the form calls a setting ----
-
-# The graph's names for these stay in the tooltips; the label says what the
-# setting does to the image. The prompts, the LoRAs and the sampler are the
-# exceptions the test below pins: those are what everyone who makes images
-# calls them, so renaming them cost the user the words he uses.
 _GRAPH_JARGON = re.compile(
     r"CFG|Denoise|Stage|Guidance|Input Image|ControlNet|Scheduler|Shift"
     r"|\((High|Low|Speech)\)|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
@@ -2641,9 +2193,6 @@ def test_a_wan_2_2_form_offers_no_seed_for_the_pass_that_draws_no_new_noise(name
 
 
 def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around_it():
-    # A box around the hair takes the face with it, and a box around the skin is
-    # most of the image; their detectors draw the part's outline, and the
-    # redraw stays inside it.
     payload = _enhance_payload(outlined=["skin_finder.pt"], enhance_detail_fixes={"skin": 0.4})
 
     (detailer,) = _nodes_of(payload, "DetailerForEach")
@@ -2671,7 +2220,6 @@ def test_a_part_with_its_own_prompts_is_redrawn_toward_them_ahead_of_the_images_
     assert positive["inputs"]["text"] == f"{skin.prompt}, a lantern on a jetty"
     assert negative["inputs"]["text"] == f"{skin.avoid}, blurry"
     assert positive["inputs"]["clip"] == negative["inputs"]["clip"] == detailer["inputs"]["clip"]
-    # The whole-frame pass still reads the prompt as typed.
     sampler = _find_node(payload, "KSampler")["inputs"]
     assert payload[sampler["positive"][0]]["inputs"]["text"] == "a lantern on a jetty"
     assert payload[sampler["negative"][0]]["inputs"]["text"] == "blurry"

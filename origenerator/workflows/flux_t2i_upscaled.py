@@ -9,28 +9,6 @@ from origenerator.workflows.prompt_readers import T5
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
-    """Flux T2I on a GGUF-quantized UNET, with a RealESRGAN upscale.
-
-    Flux is guidance-distilled: it samples at cfg 1.0 with an empty negative, so
-    the meaningful "prompt strength" setting is ``FluxGuidance``, not cfg. The GGUF
-    diffusion model (loaded by ``UnetLoaderGGUF``) is what a user swaps between
-    — three different Flux checkpoints in the imports this reproduces — so it's
-    the model the gallery groups by. The decoded image is passed through an
-    ``ImageUpscaleWithModel`` (RealESRGAN x4) before ``SaveImage``, which is what
-    the ``flux_t2i_upscaled`` filename prefix records.
-
-    The saved graph also carried a stray ``VRGDG_LLM_Multi`` prompt-enhancer node
-    hanging off the side, unconnected to the sampling path; it isn't part of the
-    pipeline (and needs a custom node plus an API key), so it's left out here.
-
-    The ``enhance`` toggle (off by default — the plain 4x upscale is this
-    workflow's namesake behavior) swaps that bare upscale for the shared
-    enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`): the upscale is
-    rescaled to ``enhance_scale`` x the base render and re-sampled at low
-    denoise by the same Flux model on the same guided conditioning, generating
-    real fine texture instead of leaving interpolated pixels.
-    """
-
     name = "flux_t2i_upscaled"
     version = "v002"
     display_name = "Flux T2I"
@@ -40,7 +18,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     text_reader = T5
     loras_keyed_only_when_named = LORA_KEYS[1:]
     output_node_id = "12"
-    base_output_node_id = "17"  # the plain 4x upscale, saved when the tail runs
+    base_output_node_id = "17"
 
     def default_params(self) -> dict:
         return {
@@ -70,8 +48,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        # GGUF Flux models live under diffusion_models, alongside the WAN UNETs
-        # and a few bare SDXL and Qwen ones — hence the filter.
+        # GGUF Flux models live under diffusion_models beside the WAN UNETs and others.
         defaults = self.default_params()
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
@@ -97,9 +74,6 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                                 clip_ref=["2", 0])
         model_ref, clip_ref = loras.model, loras.clip_ref
         if params.get("enhance"):
-            # The tail's own upscale is this workflow's namesake 4x, so the
-            # plain output stays reachable either way — it is what the base save
-            # keeps when the tail runs.
             enhanced = self.enhance_image_nodes(
                 image_ref=["9", 0], model_ref=model_ref,
                 positive_ref=["5", 0], negative_ref=["6", 0], vae_ref=["3", 0],
@@ -184,8 +158,5 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                     "filename_prefix": params["filename_prefix"],
                 },
             },
-            # With the tail on, keep the plain upscale too — this workflow's own
-            # namesake output, made on the way and otherwise discarded. Last, so
-            # the primary save is still the first SaveImage in the payload.
             **self.base_save_node(self.base_output_node_id, upscaled_ref, params),
         }

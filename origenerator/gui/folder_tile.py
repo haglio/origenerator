@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from dataclasses import dataclass
 
 from PyQt6.QtCore import QPoint, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
@@ -25,15 +26,25 @@ _CELL_SIZE = ((tile_shape.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
 _INNER_WIDTH = tile_shape.TILE_WIDTH - 2 * tile_shape.TILE_MARGIN
 
 
+@dataclass(frozen=True)
+class FolderMarks:
+    favorite: bool = False
+    context: str = ""
+    kind_icon: tuple | None = None
+
+
+NO_MARKS = FolderMarks()
+
+
 class FolderTile(QFrame):
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
     _KIND_ICON = BUTTON_ICON
 
-    def __init__(self, key, text, preview_paths, count, favorite=False,
-                 context="", kind_icon=None, parent=None):
-        super().__init__(parent)
+    def __init__(self, key, text, preview_paths, count, marks=NO_MARKS):
+        super().__init__()
+        favorite, context, kind_icon = marks.favorite, marks.context, marks.kind_icon
         self._key = key
         self._selected = False
         self.setObjectName("folderTile")

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QLabel
 
 from origenerator import gallery
 from origenerator.gui import icons, tile_shape
-from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.folder_tile import FolderMarks, FolderTile
 
 
 def _label_texts(tile):
@@ -12,7 +12,7 @@ def _label_texts(tile):
 
 
 def test_folder_tile_shows_its_folder_path_context(qtbot):
-    tile = FolderTile("k", "a dog", [], 3, context="Images \u203a SDXL")
+    tile = FolderTile("k", "a dog", [], 3, FolderMarks(context="Images \u203a SDXL"))
     qtbot.addWidget(tile)
 
     texts = _label_texts(tile)
@@ -30,8 +30,8 @@ def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
 
 
 def test_folder_tile_shows_its_toc_initial(qtbot):
-    tile = FolderTile("k", "wan model", [], 3,
-                      kind_icon=icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", [])))
+    tile = FolderTile("k", "wan model", [], 3, FolderMarks(
+        kind_icon=icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", []))))
     qtbot.addWidget(tile)
 
     initials = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
@@ -57,7 +57,7 @@ def test_a_folder_tile_is_the_same_tile_as_the_ones_it_stands_beside(qtbot):
 
 
 def test_the_folder_path_line_is_the_whole_of_what_makes_a_collection_tile_taller(qtbot):
-    tile = FolderTile("k", "a dog", [], 3, context="Images > SDXL")
+    tile = FolderTile("k", "a dog", [], 3, FolderMarks(context="Images > SDXL"))
     qtbot.addWidget(tile)
 
     assert tile.height() == tile_shape.folder_tile_size(folder_path=True)[1]

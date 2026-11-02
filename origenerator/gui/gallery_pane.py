@@ -34,7 +34,7 @@ from origenerator.gui.collapsible_section import FOLD, FoldHeader
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.deferred import defer
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.folder_tile import FolderMarks, FolderTile
 from origenerator.gui.inflight import (
     CANCEL_TEXT,
     InFlightItem,
@@ -429,8 +429,8 @@ class GalleryPane(QObject):
     def _add_folder_tile(self, flow, group, *, favorite, context=""):
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
-            len(gallery.rows_under(group)), favorite=favorite, context=context,
-            kind_icon=icons.folder_kind_icon(group),
+            len(gallery.rows_under(group)),
+            FolderMarks(favorite, context, icons.folder_kind_icon(group)),
         )
         tile.clicked.connect(self._drill_into)
         tile.context_requested.connect(self.folder_menu_requested)
@@ -473,7 +473,7 @@ class GalleryPane(QObject):
         rows = self.rows_for_collection(key)
         collection = folder_collection(base_of(key))
         tile = FolderTile(key, COLLECTION_LABELS[collection.which], _thumbnails_of(rows), len(rows),
-                          kind_icon=icons.collection_kind_icon(collection.which))
+                          FolderMarks(kind_icon=icons.collection_kind_icon(collection.which)))
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 

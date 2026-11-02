@@ -340,10 +340,9 @@ class CombinePanel(QWidget):
 
     def _recent_rows(self) -> list[RecentVideo]:
         held = self.video_slot.current_id()
-        listed = dict.fromkeys(video for video in (held, *self._history(self.selected_intent()))
-                               if video)
+        held_first = sorted(self._history(self.selected_intent()), key=lambda video: video != held)
         return [RecentVideo(video, self._preview(video)[0])
-                for video in listed if self.video_slot.accepts(video)]
+                for video in held_first if self.video_slot.accepts(video)]
 
     def _show_dropped(self):
         lane = self.selected_intent()

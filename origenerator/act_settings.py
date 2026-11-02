@@ -66,6 +66,10 @@ def loops(row) -> bool:
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
     return bool(workflow and workflow.looping)
 
+
+def lane_of(row) -> str:
+    return GENAU if loops(row) else VIDEO
+
 # Params that are no part of the settings: the prompt, the start frame, the seeds, the
 # bookkeeping, and the values derived rather than chosen (the output size, the clip
 # length, the dual-sampler split points). Excluding them keeps the signature on the

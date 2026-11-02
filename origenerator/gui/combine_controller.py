@@ -214,8 +214,10 @@ class CombineController(QObject):
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def _video_history(self, intent: str) -> list[str]:
-        return video_history(self._db.custom_combinations(), intent,
+        used = video_history(self._db.custom_combinations(), intent,
                              self._db.list_combine_video_uses())
+        return [video for video in used
+                if act_settings.lane_of(self._db.get_generation(video) or {}) == intent]
 
     def reread_names(self) -> None:
         self.panel.reread_names()

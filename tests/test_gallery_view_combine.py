@@ -416,6 +416,34 @@ def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, 
     assert _listed_under_recent(panel) == []
 
 
+def _view_with_a_looping_video(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    _looping_video(db, "looping")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    return view
+
+
+def test_recent_under_kino_leaves_out_a_looping_video_used_under_kino(qtbot, tmp_path):
+    panel = _view_with_a_looping_video(qtbot, tmp_path)._combine.panel
+
+    panel.video_slot.set_item("vid")
+    panel.video_slot.set_item("looping")
+
+    assert _listed_under_recent(panel) == ["vid"]
+
+
+def test_recent_under_genau_leaves_out_a_full_length_video_used_under_genau(qtbot, tmp_path):
+    panel = _view_with_a_looping_video(qtbot, tmp_path)._combine.panel
+    panel.set_intent(act_settings.GENAU)
+
+    panel.video_slot.set_item("looping")
+    panel.video_slot.set_item("vid")
+
+    assert _listed_under_recent(panel) == ["looping"]
+
+
 def test_a_picked_act_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

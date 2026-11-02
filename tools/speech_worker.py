@@ -1,5 +1,5 @@
-"""Speak lines with Qwen3-TTS, for Origenerator: run by path under the Python of the
-environment Qwen3-TTS lives in, never imported by the app (the tests import only fit_to_seconds).
+"""Speak lines with Qwen3-TTS, for Origenerator: run by path under the Python of the environment pip installed it into,
+never imported by the app (the tests import only fit_to_seconds).
 
     python speech_worker.py job.json
 """

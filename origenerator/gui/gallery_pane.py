@@ -42,7 +42,11 @@ from origenerator.gui.inflight import (
     stop_auto_generate_text,
     stop_auto_generate_tooltip,
 )
-from origenerator.gui.inflight_items import InFlightItems
+from origenerator.gui.inflight_items import (
+    InFlightCallbacks,
+    InFlightItems,
+    InFlightSources,
+)
 from origenerator.gui.inflight_tile import InFlightTile
 from origenerator.gui.item_tile import CornerButton, ItemTile, restore_offer_of
 from origenerator.gui.pane_place import (
@@ -300,13 +304,18 @@ class GalleryPane(QObject):
         self._tree = host.tree
         self._host = host
         self._queue_model = InFlightItems(
+<<<<<<< HEAD
             db=db, jobs=jobs, auto=auto, tree=self._tree,
+=======
+            InFlightSources(db=db, jobs=jobs, auto=auto, tree=tree),
+>>>>>>> c6cde1b90 (Group InFlightItems' sources and callbacks into two values)
             image_rows=host.image_rows,
             image_index=lambda: self._image_index,
-            on_cancel=self.cancel_requested.emit,
-            on_reveal=self.reveal_reroll_requested.emit,
-            on_go_to_item=self.item_jump_requested.emit,
-            on_shield=jobs.shield,
+            callbacks=InFlightCallbacks(
+                cancel=self.cancel_requested.emit,
+                reveal=self.reveal_reroll_requested.emit,
+                go_to_item=self.item_jump_requested.emit,
+                shield=jobs.shield),
         )
         self._collections = {
             LATEST_KEY: PaneCollection(

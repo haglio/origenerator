@@ -8,7 +8,13 @@ from origenerator import gallery
 from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.inflight_items import TRAINING_KEY, InFlightItems, requested_of
+from origenerator.gui.inflight_items import (
+    TRAINING_KEY,
+    InFlightCallbacks,
+    InFlightItems,
+    InFlightSources,
+    requested_of,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -122,17 +128,19 @@ def build():
              auto_generating=(), image_rows=(), image_index=None, groups=None, cancelled=None,
              revealed=None, went_to=None, shielded=None, training=None, jobs=None):
         model = InFlightItems(
-            db=FakeDb(rows, requests),
-            jobs=jobs or FakeJobQueue(jobs_by_folder, order, training),
-            auto=FakeAuto(auto_generating),
-            tree=FakeTree(groups),
+            InFlightSources(
+                db=FakeDb(rows, requests),
+                jobs=jobs or FakeJobQueue(jobs_by_folder, order, training),
+                auto=FakeAuto(auto_generating),
+                tree=FakeTree(groups)),
             image_rows=lambda: list(image_rows),
             image_index=lambda: (gallery.build_image_config_index(list(image_rows))
                                  if image_index is None else image_index),
-            on_cancel=(cancelled if cancelled is not None else lambda _p: None),
-            on_reveal=(revealed if revealed is not None else lambda _k: None),
-            on_go_to_item=(went_to if went_to is not None else lambda _p: None),
-            on_shield=(shielded if shielded is not None else lambda _p, _on: None),
+            callbacks=InFlightCallbacks(
+                cancel=(cancelled if cancelled is not None else lambda _p: None),
+                reveal=(revealed if revealed is not None else lambda _k: None),
+                go_to_item=(went_to if went_to is not None else lambda _p: None),
+                shield=(shielded if shielded is not None else lambda _p, _on: None)),
         )
         return model.build()
     return make

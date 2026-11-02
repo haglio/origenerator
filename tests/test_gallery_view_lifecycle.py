@@ -1,12 +1,3 @@
-"""What a GalleryView stops doing when it is closed.
-
-The view arms two things application-wide in its constructor — a 1.5 s poll of
-the database and the ComfyUI queue, and an event filter on the QApplication —
-and both used to outlive a ``close()``.  Only ``hideEvent`` put either down, and
-a widget that was never shown is never hidden, so a closed gallery went on
-polling and went on answering the room's keys until the garbage collector got
-round to it.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt
@@ -24,8 +15,6 @@ def _gallery(qtbot, db=None):
 
 
 def _press_escape_elsewhere(qtbot):
-    """A key press delivered to a widget that is not the gallery — what an
-    application-wide filter sees and a widget's own handler never does."""
     elsewhere = QWidget()
     qtbot.addWidget(elsewhere)
     QApplication.sendEvent(elsewhere, QKeyEvent(
@@ -33,8 +22,6 @@ def _press_escape_elsewhere(qtbot):
 
 
 def test_closing_a_gallery_that_was_never_shown_stops_its_poll(qtbot):
-    """The poll does blocking HTTP and a whole-table SELECT every 1.5 s, so one
-    left running once a view is closed is work nobody is looking at."""
     view = _gallery(qtbot)
     assert view._poll_timer.isActive()
 
@@ -44,14 +31,11 @@ def test_closing_a_gallery_that_was_never_shown_stops_its_poll(qtbot):
 
 
 def test_a_closed_gallery_stops_answering_the_rooms_keys(qtbot, monkeypatch):
-    """Esc is a panic-stop the filter answers from anywhere, visible or not — so
-    a closed gallery still holding the filter would stop (or start) the whole
-    room on a key pressed at some other window entirely."""
     view = _gallery(qtbot)
     reached = []
     monkeypatch.setattr(view, "_handle_escape", lambda: bool(reached.append(True)))
     _press_escape_elsewhere(qtbot)
-    assert reached  # the filter is on the application while the view is open
+    assert reached
 
     view.close()
     reached.clear()
@@ -61,8 +45,6 @@ def test_a_closed_gallery_stops_answering_the_rooms_keys(qtbot, monkeypatch):
 
 
 def test_a_gallery_shown_after_a_close_takes_the_keys_back(qtbot, monkeypatch):
-    """Dropping the filter on the way out has to be matched on the way back in,
-    or a reopened gallery would be one Delete and one Esc short of working."""
     view = _gallery(qtbot)
     view.close()
 
@@ -75,11 +57,7 @@ def test_a_gallery_shown_after_a_close_takes_the_keys_back(qtbot, monkeypatch):
 
 
 def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, monkeypatch):
-    """Windows answers a minimize with a hide and then a show, so a gallery
-    hosted by a Fun Time session is shown again every time the session parks
-    it -- and drawing four thousand generations afresh is seconds of the one
-    thread that also answers the session's commands.  Nothing has moved at a
-    show, so nothing is drawn afresh."""
+    """Windows answers a minimize with a hide and then a show."""
     view = _gallery(qtbot)
     view.refresh()
     drawn = []
@@ -91,8 +69,6 @@ def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, m
 
 
 def test_being_shown_again_draws_what_landed_while_it_was_away(qtbot, monkeypatch):
-    """The skip is the 1.5 s poll's own test, not a blanket one: a generation
-    that finished while the window was parked is there the moment it is back."""
     db = FakeDB([_image("i1", "scene one", 50, 1)])
     view = _gallery(qtbot, db)
     view.refresh()

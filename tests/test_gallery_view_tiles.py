@@ -147,16 +147,12 @@ def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhanc
 
     _right_click(view, "i2")
 
-    # A collection gathers items from all over, so where this one actually lives is
-    # the question its menu is most often asked — it leads, above a separator.
     assert labels == ["Go to folder", "Copy name", "", "Favorite 1 item", "Enhance 1 image",
                       "Delete 1 item"]
-    assert view.selected_prompt_ids() == ["i2"]  # right-clicking picked it
+    assert view.selected_prompt_ids() == ["i2"]
 
 
 def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch):
-    # Standing in the folder already, it is a click that changes nothing — which
-    # is what leaves it appearing exactly where it earns its place.
     rows = [_image("i1", "a cat", 50, 1)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -243,7 +239,7 @@ def test_an_item_the_gallery_has_not_named_yet_offers_no_name_to_copy(qtbot, mon
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    db.add(_image("i2", "a cat", 50, 2))  # landed since the gallery last drew
+    db.add(_image("i2", "a cat", 50, 2))
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -319,15 +315,12 @@ def test_ctrl_c_in_a_focused_text_field_is_left_to_the_field(qtbot, tmp_path, mo
 
 
 def _folder_buttons(view):
-    """The "Go to folder" buttons the front tab is actually drawing."""
     tab = view._generate_pane.current_generate_tab()
     return [button for button in tab.findChildren(QPushButton, "goToFolderButton")
             if button.isVisibleTo(tab)]
 
 
 def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_click(qtbot):
-    # Pressed and released like a real one, because going there rebuilds the
-    # block it sits in: the button is destroyed in the middle of its own click.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -335,7 +328,7 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i2")
     (button,) = _folder_buttons(view)
-    button.show()   # an unshown button has no rect for a press to land in
+    button.show()
 
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
 
@@ -344,14 +337,11 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
 
 
 def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
-    # Standing in the folder already, there is nowhere for it to take you, and a
-    # button that would do nothing is not drawn — the rule its right-click entry
-    # has always followed.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])   # which opens on i1
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     assert _folder_buttons(view) == []
 
@@ -361,12 +351,10 @@ def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
 
     _click_tile(view, "d1")
 
-    assert _folder_buttons(view) == []      # it left its folder when its row did
+    assert _folder_buttons(view) == []
 
 
 def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
-    # A video's block above the settings carries its file, where an image's
-    # carries none; the way to the folder sits over both the same.
     view = GalleryView(FakeDB([_i2v_video("v1", "smooth")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -380,8 +368,6 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
 
 
 def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
-    # Standing in the videos' Latest leaves the folder list whole, so a tab
-    # showing an image still has somewhere to go.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -404,7 +390,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     assert _folder_buttons(view) == []
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])   # the tab stays on i1
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     (button,) = _folder_buttons(view)
     assert button.toolTip() == "Go to the folder this item is in"
@@ -418,7 +404,7 @@ def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, mon
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    monkeypatch.setattr(  # Delete is the menu's last entry
+    monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[-1]
     )
 
@@ -438,9 +424,9 @@ def test_right_click_favorite_on_the_latest_collection_favorites_the_item(qtbot,
 
     _right_click(view, "i1")
 
-    assert db.get_generation("i1")["starred"]                # persisted
-    assert view._gallery_pane.showing_latest()                           # still in the collection
-    assert view._gallery_pane._thumb_widgets["i1"]._favorite is True    # the tile takes the star at once
+    assert db.get_generation("i1")["starred"]
+    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane._thumb_widgets["i1"]._favorite is True
 
 
 def test_right_click_enhance_on_the_latest_collection_queues_the_image(qtbot, tmp_path, monkeypatch):
@@ -475,9 +461,8 @@ def test_latest_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mon
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)          # the video loops
-    assert view._gallery_pane._thumb_widgets["i1"].findChildren(QMovie) == []    # the image is a still
-    # Each tile resolved its preview through the shared helper, with the app's dirs.
+    assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)
+    assert view._gallery_pane._thumb_widgets["i1"].findChildren(QMovie) == []
     assert ("v1", OUTPUT_PLACES, THUMB_DIR) in calls
 
 
@@ -493,13 +478,11 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video's settings folder
-    assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)  # its grid tile loops
+    view._tree.setCurrentItem(view._leaf_by_id["v1"])
+    assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)
 
 
 def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
-    # The collection mixes kinds, so each finished tile wears an item type icon naming its
-    # own — an image thumbnail and a video thumbnail, told apart at a glance.
     rows = [
         _image("i1", "a cat", 50, 1),
         _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4"),
@@ -518,8 +501,6 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
 
 
 def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
-    # A running video row with no file yet still marks its in-flight tile a video,
-    # inferred from the workflow — so the kind reads before the first frame lands.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("rr1", workflow="wan22_i2v"))
     view = GalleryView(db)
@@ -535,7 +516,7 @@ def _source_tile(view):
 
 
 def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
-    image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
+    image = _image("img1", "a cat", 50, 1)
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
@@ -544,18 +525,15 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()  # don't start WMF playback
+        tab._preview.show_media = MagicMock()
 
-    # Viewing the video shows a tile pointing back to the image it was built from.
     view._on_thumbnail_clicked("vid1")
     assert not _source_tile(view).isHidden()
     assert _source_tile(view)._prompt_id == "img1"
 
-    # Clicking that tile navigates the gallery to the source image.
     _source_tile(view).activated.emit("img1")
     assert "img1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "img1"
-    # The image itself has no source image, so no tile shows.
     view._on_thumbnail_clicked("img1")
     assert _source_tile(view).isHidden()
 
@@ -563,8 +541,6 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
 def test_the_gallery_pane_buttons_are_a_group_of_compact_icon_buttons(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
-    # Back, forward, undo and delete are one group of icon-only tool buttons, not
-    # the oversized text buttons that split them across the header.
     for btn in (view._buttons.back, view._buttons.forward, view._buttons.undo, view._buttons.delete):
         assert isinstance(btn, QToolButton)
         assert not btn.icon().isNull()
@@ -576,14 +552,14 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _image_workflow(view._tree)  # a workflow — not deletable, nothing picked
+    workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     assert not view._buttons.delete.isEnabled()
 
-    _select_first_leaf(view)                    # a settings folder — deletable
+    _select_first_leaf(view)
     assert view._buttons.delete.isEnabled()
 
-    _click_tile(view, "i1")               # a picked thumbnail — deletable
+    _click_tile(view, "i1")
     assert view._buttons.delete.isEnabled()
 
 
@@ -602,8 +578,6 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-# --- the Gallery pane buttons' act-on-this trio: star and enhance aim where delete aims ------
-
 
 def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
@@ -618,7 +592,6 @@ def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     view._buttons.favorite.click()
     assert db.get_generation("i1")["starred"]
 
-    # A second press is the other half of the one toggle.
     _click_tile(view, "i1")
     assert view._buttons.favorite.toolTip() == "Unfavorite 1 item"
     view._buttons.favorite.click()
@@ -630,7 +603,7 @@ def test_favorite_button_falls_back_to_the_folder_on_screen(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_off(view)                               # nothing picked inside it
+    _click_off(view)
     assert view._buttons.favorite.isEnabled()
     assert "folder" in view._buttons.favorite.toolTip()
 
@@ -644,7 +617,7 @@ def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))   # a collection is nobody's folder
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert not view._buttons.favorite.isEnabled()
     assert view._buttons.favorite.toolTip() == "Nothing here to favorite"
 
@@ -661,12 +634,10 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     assert view._buttons.enhance.toolTip().startswith("Enhance 1 item")
     view._buttons.enhance.click()
 
-    assert queued == [["g0"]]  # just the picked one, not the whole folder
+    assert queued == [["g0"]]
 
 
 def _video_leaf(view):
-    """Open the settings folder under the video workflow, its deepest branch's
-    only leaf."""
     item = _video_workflow(view._tree)
     while item.childCount():
         item.setExpanded(True)
@@ -675,13 +646,11 @@ def _video_leaf(view):
 
 
 def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
-    # There is no video enhancer — the workflow under all of this refines a
-    # still — so a picked video is nothing to run, not a run that fails.
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     _video_leaf(view)
-    assert not view._buttons.enhance.isEnabled()   # the folder holds only videos
+    assert not view._buttons.enhance.isEnabled()
 
     _click_tile(view, "v1")
     assert not view._buttons.enhance.isEnabled()
@@ -697,24 +666,18 @@ def test_the_enhance_pane_grays_out_on_a_video_too(qtbot):
     assert not view._enhance.pane.isEnabled()
     assert "no video enhancer" in view._enhance.pane.toolTip()
 
-    _select_first_leaf(view)   # back on images, and the settings come back
+    _select_first_leaf(view)
     assert view._enhance.pane.isEnabled()
     assert view._enhance.pane.toolTip() == ""
 
 
 def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
-    # Pressing it would spend a generation arriving at the image already
-    # sitting in the version list. Turning any setting makes it a different
-    # enhancement, and the button comes back — which is what tells the two
-    # reasons apart: "you have this one" rather than "not this image".
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     settings = gallery.EnhanceSettings(auto=False, params={"enhance_scale": 2.0})
     view.set_enhance_settings(settings.to_json())
     _enhanced_in_place(db)
-    # The level records what the run actually used, as a landed enhance does —
-    # the source-matched model resolved to this image's own checkpoint.
     db.update_generation("g0", enhance_history=json.dumps([
         {"filename": "image_enhance_00001_.png",
          "params": gallery.enhance_params_for(db.get_generation("g0"), settings)},
@@ -726,7 +689,6 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     assert not view._buttons.enhance.isEnabled()
     assert "these settings" in view._buttons.enhance.toolTip()
 
-    # The Enhance pane edited to something else: that enhancement doesn't exist yet.
     view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
     assert view._buttons.enhance.isEnabled()
@@ -742,7 +704,6 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
         "enhance_scale": 3.0,
         "enhance_fix_prompts": {"hands": {"prompt": "open palms", "avoid": "fists"}}}).to_json())
     _enhanced_in_place(db)
-    # Made before a fix had prompts of its own, so the version records none.
     ran = gallery.enhance_params_for(db.get_generation("g0"), gallery.EnhanceSettings(
         params={"enhance_scale": 2.0, "enhance_detail_fixes": {"hands": 0.45}}))
     ran.pop("enhance_fix_prompts")
@@ -762,20 +723,18 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
     assert "already has a version" in tile.toolTip()
 
 
-# --- the controls a tile wears in its own corners -----------------------------
-
 
 def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])  # both on screen
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     view._gallery_pane._thumb_widgets["i2"]._controls.triggered.emit(corner_buttons.STAR)
 
     assert db.get_generation("i2")["starred"]
-    assert view._gallery_pane._thumb_widgets["i2"]._favorite is True   # the tile takes the star at once
+    assert view._gallery_pane._thumb_widgets["i2"]._favorite is True
     assert not db.get_generation("i1").get("starred")
 
 
@@ -857,7 +816,7 @@ def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])  # both on screen
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     view._gallery_pane._thumb_widgets["i2"]._controls.triggered.emit(corner_buttons.TRASH)
 
@@ -865,16 +824,13 @@ def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
 
 
 def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
-    # The control is drawn on a particular image, in that image's own corner,
-    # so it has already said which item it is about. The menu is where a whole
-    # selection is acted on.
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])  # both on screen
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i1")
-    view._gallery_pane.selected_ids.add("i2")   # both picked, as a Ctrl-click
+    view._gallery_pane.selected_ids.add("i2")
 
     view._gallery_pane._thumb_widgets["i1"]._controls.triggered.emit(corner_buttons.STAR)
 
@@ -941,10 +897,6 @@ def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
 
 
 def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp_path):
-    # An image holding the very version the tab describes has nothing to gain
-    # from a press, so its plus is the solid yellow sign alone. Turn a setting and
-    # what it holds is one enhancement short of what the Enhance pane now describes, so
-    # the plus goes back to offering — with the one it has as a shadow under it.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -962,20 +914,17 @@ def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp
     view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
 
-    # Re-read in place: no tile was touched and the pane was never rebuilt.
     assert view._gallery_pane._thumb_widgets["g0"].enhance_state() == icons.ENHANCE_MORE
 
 
 def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
-    # A folder can hold both; picking across them enhances what can be enhanced
-    # rather than going dark because one video is in the set.
     db = FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     _click_tile(view, "i1")
-    view._gallery_pane.selected_ids.add("v1")   # as a Ctrl-click across the two
+    view._gallery_pane.selected_ids.add("v1")
     view._re_aim()
     queued = []
     view._enhance.enhance_items = queued.append
@@ -988,9 +937,6 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
 
 
 def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
-    # Icon-only buttons lean on their neighbors to be read, so the Gallery pane buttons is laid
-    # out in groups: where you are, what you did, what you picked, what to do
-    # with what's in front of you, and what the app is doing on its own.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1001,16 +947,11 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[3] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
     assert view._buttons.auto in groups[4]
     assert view._buttons.radio in groups[4]
-    # The mic has a space of its own: the group beside it is what the app is
-    # doing, and the mic is what it hears with.
     assert groups[5] == (view._buttons.mic,)
     assert view._buttons.mic not in groups[4]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
-    # Group, Auto and Slideshow come and go; the space in front of them must go
-    # with them, or the Gallery pane buttons wears a stray gap (or two in a row) where a hidden
-    # group used to be, and starts indented.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1019,10 +960,10 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
 
     gaps = {id(gap): gap for gap, _ in view._buttons._groups}
     leading, group_gap = view._buttons._groups[0][0], view._buttons._groups[2][0]
-    assert not leading.isVisible()          # nothing to separate from, at the front
+    assert not leading.isVisible()
     assert view._buttons.group.isHidden()
     assert not group_gap.isVisible()
-    assert view._buttons._groups[3][0].isVisible()  # the trio is always there
+    assert view._buttons._groups[3][0].isVisible()
     assert len(gaps) == len(view._buttons._groups)
 
 
@@ -1033,17 +974,17 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
     view.show()
     host = view._buttons
 
-    host.setFixedWidth(BUTTON_SIZE_HUD * 3)  # far narrower than the whole row of buttons
+    host.setFixedWidth(BUTTON_SIZE_HUD * 3)
     host.updateGeometry()
     qtbot.wait(10)
 
     shown = [b for _gap, group in view._buttons._groups for b in group
              if not b.isHidden()]
-    assert len(shown) > 3                       # more buttons than fit on one row
+    assert len(shown) > 3
     for button in shown:
-        assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)  # none squeezed
+        assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)
     rows = {button.y() for button in shown}
-    assert len(rows) > 1                        # so they went onto further rows
+    assert len(rows) > 1
     assert host.heightForWidth(host.width()) >= BUTTON_SIZE_HUD * len(rows)
 
 
@@ -1071,8 +1012,8 @@ def test_right_click_favorite_favorites_the_picked_thumbnail(qtbot, monkeypatch)
 
     view._gallery_pane._thumbnail_context_menu("i1", QPoint(0, 0))
 
-    assert db.get_generation("i1")["starred"]           # persisted
-    assert view._gallery_pane._thumb_widgets["i1"]._favorite is True  # the tile takes the star at once
+    assert db.get_generation("i1")["starred"]
+    assert view._gallery_pane._thumb_widgets["i1"]._favorite is True
 
 
 def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
@@ -1083,11 +1024,11 @@ def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    _answer_menu(monkeypatch, "Unfavorite 1 item")  # a favorited item offers Unfavorite
+    _answer_menu(monkeypatch, "Unfavorite 1 item")
 
     view._gallery_pane._thumbnail_context_menu("i1", QPoint(0, 0))
 
-    assert not db.get_generation("i1")["starred"]      # cleared
+    assert not db.get_generation("i1")["starred"]
 
 
 def test_right_click_favorite_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
@@ -1099,11 +1040,11 @@ def test_right_click_favorite_acts_on_the_whole_multi_selection(qtbot, monkeypat
     view.refresh()
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
-    view._gallery_pane.apply_selection("i3", _CTRL)  # i1 + i3 selected
+    view._gallery_pane.apply_selection("i3", _CTRL)
     _answer_menu(monkeypatch, "Favorite 2 items")
 
     view._gallery_pane._thumbnail_context_menu("i3", QPoint(0, 0))
 
     assert db.get_generation("i1")["starred"]
     assert db.get_generation("i3")["starred"]
-    assert not db.get_generation("i2").get("starred")  # untouched
+    assert not db.get_generation("i2").get("starred")

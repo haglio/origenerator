@@ -119,7 +119,6 @@ _COLLECTION_NAMES_OF_VIDEOS = [name for name in _COLLECTION_NAMES if name != "En
 
 
 def _collection_names(item):
-    """The collections a folder leads with, in order — none of them a folder."""
     names = []
     for i in range(item.childCount()):
         if item.child(i).data(0, _GROUP_ROLE) is not None:
@@ -131,7 +130,7 @@ def _collection_names(item):
 def test_refresh_builds_workflow_model_settings_tree(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),
-        _image("i2", "a cat", 50, 2),  # same settings, different seed
+        _image("i2", "a cat", 50, 2),
         _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
              "wan22_i2v_00001_.mp4"),
     ]
@@ -146,11 +145,9 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
 
     workflow_node = _image_workflow(view._tree)
     assert workflow_node.text(0) == "SDXL T2I"
-    # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
-    # which the two seed variants collapse.
-    assert len(_subs(workflow_node)) == 1           # one model
-    assert len(_subs(_at(workflow_node, 0))) == 1   # its single "(no LoRA)" level
-    assert len(_subs(_at(workflow_node, 0, 0))) == 1  # the two seeds collapse
+    assert len(_subs(workflow_node)) == 1
+    assert len(_subs(_at(workflow_node, 0))) == 1
+    assert len(_subs(_at(workflow_node, 0, 0))) == 1
 
 
 def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
@@ -166,9 +163,6 @@ def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
 
 
 def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, monkeypatch):
-    # Folders no longer float up when a generation lands in one, so the mark is
-    # what is left to say where the work has lately been. Which folders those
-    # are is the gallery model's answer; the tree's job is to wear it.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     asked = []
@@ -180,9 +174,6 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     monkeypatch.setattr(gallery, "recently_worked_folders", fake)
     view.refresh()
 
-    # The shapes drawn, and the listed rows. The marks belong to the one list of
-    # both shapes as much as to each shape's own, so choosing Together asks for
-    # them again -- for that list, which is the only one on screen then.
     assert asked == [([LANDSCAPE, "portrait"], ["i1"])]
 
     view._tree.together_button.click()
@@ -191,8 +182,8 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     view._tree.separate_button.click()
     workflow = _image_workflow(view._tree)
     assert workflow.data(0, RECENT_ROLE)
-    assert "worked in recently" in workflow.toolTip(0)   # so the mark says what it means
-    assert not _at(workflow, 0).data(0, RECENT_ROLE)    # and nothing the model left out
+    assert "worked in recently" in workflow.toolTip(0)
+    assert not _at(workflow, 0).data(0, RECENT_ROLE)
 
 
 def test_tree_rows_carry_a_toc_initial(qtbot):
@@ -206,8 +197,6 @@ def test_tree_rows_carry_a_toc_initial(qtbot):
     source = _at(lora, 0)
     settings = _at(source, 0)
 
-    # Each level carries a ground as its row icon — right of the caret, reading as
-    # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull()
     assert "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull()
@@ -216,8 +205,6 @@ def test_tree_rows_carry_a_toc_initial(qtbot):
     assert lora.toolTip(0).endswith("· LoRA")
     assert not source.icon(0).isNull()
     assert "Source Image" in source.toolTip(0)
-    # ...and the settings leaf, where the generations live, names no level at
-    # all, so its hover says its own name and nothing more.
     assert settings.toolTip(0).startswith(settings.text(0))
     assert "dance" not in settings.toolTip(0)
 
@@ -265,16 +252,13 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # lives in the window's narrowest column, so every wasted pixel per level is
     # six wasted at the foot. Each step is one indentation and no more.
     #
-    # Measured at the left edge of each row's *name block* — its ground when it has
-    # one, its text when it does not — because the ground reads as the first
-    # character of the name. Qt lays the text out after the icon, so the text
-    # alone would step unevenly wherever a initialed row meets an uninitialed one.
+    # Qt lays the text out after the icon, so the text's edge steps unevenly between rows with and without one.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     _on_screen(qtbot, view, 1200, 800)
-    tree = _shape(view._tree)  # one half; both are the same widget class
+    tree = _shape(view._tree)
     step = tree.indentation()
-    assert step <= 16   # a caret's width, not the platform's roomy default
+    assert step <= 16
 
     def name_x(item):
         return tree.visualRect(tree.indexFromItem(item)).left()
@@ -291,10 +275,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     starts = {}
     for depth, item in rows_by_depth:
         starts.setdefault(depth, set()).add(name_x(item))
-    # One name position per depth — every row of a level lines up with its
-    # siblings, collections and folders alike...
     assert all(len(xs) == 1 for xs in starts.values()), starts
-    # ...and each level sits exactly one indentation right of the one above.
     at = [next(iter(starts[d])) for d in sorted(starts)]
     assert [b - a for a, b in pairwise(at)] == [step] * (len(at) - 1)
 
@@ -306,7 +287,6 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
 
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    # The title carries the full folder path, which the narrow tree truncates.
     assert "SDXL T2I" in view._folder_path.display_text()
     assert "All" in view._folder_path.display_text()
 
@@ -349,13 +329,11 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
-    # A branch folder shows its sub-folders as tiles, not loose thumbnails.
+    lora = _at(_image_workflow(view._tree), 0, 0)
     view._tree.setCurrentItem(lora)
     assert len(view._gallery_pane._listed_folders) == 2
     assert view.listed_prompt_ids() == []
 
-    # A leaf (settings) folder shows the actual item thumbnails.
     cat_leaf = _at(lora, 0)
     view._tree.setCurrentItem(cat_leaf)
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
@@ -397,18 +375,15 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
+    lora = _at(_image_workflow(view._tree), 0, 0)
     view._tree.setCurrentItem(lora)
-    a_tile_key = view._gallery_pane._listed_folders[0]  # a settings tile under the LoRA folder
+    a_tile_key = view._gallery_pane._listed_folders[0]
 
-    view._gallery_pane._drill_into(a_tile_key)  # same path the tile's clicked signal triggers
-    assert view.listed_prompt_ids()  # now showing that folder's thumbnails
+    view._gallery_pane._drill_into(a_tile_key)
+    assert view.listed_prompt_ids()
 
 
 def test_opening_a_folder_lands_on_its_first_item(qtbot):
-    # Picking a folder is picking what is in it: the first tile lands selected
-    # and on the form, so a folder opens ready to work in rather than beside
-    # whatever the tab in front happened to be holding.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -418,17 +393,13 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
 
     assert view.listed_prompt_ids()[0] == "i1"
     assert view.selected_generation() == "i1"
-    assert view.selected_prompt_ids() == ["i1"]   # the tile itself, highlighted
+    assert view.selected_prompt_ids() == ["i1"]
     tab = view._generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "i1"
-    # Italic, so the next thing opened takes it over rather than piling up
-    # a tab per folder walked through.
     assert view._generate_pane._preview_tab is tab
 
 
 def _first_leaf(view):
-    """The first settings folder in the tree — the one tier a name of your own
-    can go on, since its own name is a generic code."""
     return _at(_image_workflow(view._tree), 0, 0, 0)
 
 
@@ -440,7 +411,7 @@ def test_the_all_row_holds_images_and_videos_and_is_where_the_gallery_lands(qtbo
 
     all_row = _top_level(view._tree)["All"]
     assert [row.text(0) for row in _subs(all_row)] == ["Images", "Videos"]
-    assert all_row.isExpanded()   # shut, it would be a tree with nothing in it
+    assert all_row.isExpanded()
     assert view._tree.currentItem() is all_row
 
 
@@ -492,8 +463,6 @@ def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
 
 
 def _both_kinds_in_every_collection():
-    """An image and a video in each collection both kinds have: both favorited, an
-    experiment of each kind, and one of each deleted."""
     image, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
     image["starred"] = video["starred"] = 1
     return _trash_db(rows=[image, video,
@@ -647,8 +616,6 @@ def test_starring_another_sources_video_tells_fun_time_through_the_journal(qtbot
 
 
 def _square_texts(view, key) -> list[str]:
-    """The words on the middle pane's square for the folder ``key`` — its name
-    (led by a star once the folder is favorited) and how many items it holds."""
     (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
                  if tile.key == key]
     return [label.text() for label in square.findChildren(QLabel)]
@@ -656,18 +623,16 @@ def _square_texts(view, key) -> list[str]:
 
 def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(cat).parent())  # both, as squares
+    view._tree.setCurrentItem(view._tree_item_for(cat).parent())
 
     _click_beside_the_mark_of(qtbot, view, dog, which=0)
 
     assert any(text.startswith("<img") and text.endswith(view.group_for_key(dog).label)
                for text in _square_texts(view, dog))
-    assert not any(text.startswith("<img") for text in _square_texts(view, cat))  # and only that one
+    assert not any(text.startswith("<img") for text in _square_texts(view, cat))
 
 
 def test_a_folder_the_user_made_takes_no_favorite(qtbot):
-    # A favorite of a favorite collection gathers nothing, so its menu offers no
-    # Favorite — and the star its row shows on hover must not leave one either.
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
 
@@ -681,7 +646,7 @@ def test_the_favorite_button_offers_to_take_back_the_favorite_it_just_made(qtbot
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_off(view)  # nothing picked inside it, so the button aims at the folder
+    _click_off(view)
 
     view._buttons.favorite.click()
 
@@ -697,12 +662,10 @@ def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot)
     view._toggle_favorite(dog)
 
     assert view._gallery_pane._listed_folders == []
-    assert _shown(_collection(view, FAVORITES_KEY)) == "Favorites"  # and its count with it
+    assert _shown(_collection(view, FAVORITES_KEY)) == "Favorites"
 
 
 def _long_list_view(qtbot):
-    """A view holding more folders than its list can show at once, on screen so
-    the list really scrolls. Returns it with that side's folder rows, top-down."""
     view = GalleryView(FakeDB([_image(f"i{n}", f"prompt {n}", 50, n) for n in range(30)]))
     _on_screen(qtbot, view, 700, 500)
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -712,27 +675,22 @@ def _long_list_view(qtbot):
 
 
 def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
-    # The gallery was read back and redrawn whole for one star — seconds of it on a
-    # real library — and the redraw scrolled the list to the folder that was open,
-    # taking the row just favorited out from under the mouse.
     view, folders = _long_list_view(qtbot)
     half = _shape(view._tree)
-    view._tree.setCurrentItem(folders[0])   # the folder that is open, up at the top
-    half.scrollToItem(folders[-1])          # ...with the list scrolled away from it
+    view._tree.setCurrentItem(folders[0])
+    half.scrollToItem(folders[-1])
     target, key = folders[-1], _key(folders[-1])
     scrolled_to = half.verticalScrollBar().value()
     assert scrolled_to > 0
 
     view._toggle_favorite(key)
 
-    assert view._tree_item_for(key) is target  # the row itself, not a redrawn one
+    assert view._tree_item_for(key) is target
     assert target.data(0, _GROUP_ROLE).favorite
     assert half.verticalScrollBar().value() == scrolled_to
 
 
 def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
-    # Each shape draws the folder from a copy of its own, so a star set through
-    # one row has to reach the other side's row too.
     shapes = {"i1": (1280, 720), "i2": (720, 1280)}
     view = GalleryView(FakeDB([
         _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": 50,
@@ -751,11 +709,9 @@ def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
 
 
 def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
-    # The squares a star marks are the ones on screen now: every pane drawn since
-    # deleted the squares of the one before it.
     view, cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(cat).parent())  # both, as squares
-    view._tree.setCurrentItem(view._tree_item_for(cat))           # ...then into one
+    view._tree.setCurrentItem(view._tree_item_for(cat).parent())
+    view._tree.setCurrentItem(view._tree_item_for(cat))
 
     view._toggle_favorite(dog)
 
@@ -763,9 +719,6 @@ def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
 
 
 def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
-    # The star is on screen and in the database, so the tick that follows a second
-    # later must not read it as somebody else's change and redraw the list — which
-    # is the scroll the star itself no longer causes, arriving late.
     view, _cat, dog = _two_leaf_view(qtbot)
     view._toggle_favorite(dog)
     row = view._tree_item_for(dog)
@@ -776,8 +729,6 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
 
 
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
-    # However the lock came about: an image locked from the map, a slideshow put
-    # back the way it was left, a Funestra locking itself.
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []
     monkeypatch.setattr(view._enhance, "put_what_is_locked_first", lambda: ticks.append(1))
@@ -789,18 +740,15 @@ def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
 
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,
                                                                             monkeypatch):
-    # Each tick reads the library on a thread of its own, so a read taken a moment
-    # before a star lands a moment after it. Drawing that read would put the star
-    # back out and jump the list, and put both right again a tick later.
     view, _cat, dog = _two_leaf_view(qtbot)
     held = []
     monkeypatch.setattr(view, "off_thread", lambda work, done: held.append((work(), done)))
-    view._finish_poll([], None)   # the tick's reading, taken first
+    view._finish_poll([], None)
 
-    view._toggle_favorite(dog)    # the star, made while that reading was out
+    view._toggle_favorite(dog)
     row = view._tree_item_for(dog)
     (reading, deliver), = held
-    deliver(reading)              # ...and the reading landing after it
+    deliver(reading)
 
     assert view._tree_item_for(dog) is row
     assert row.data(0, _GROUP_ROLE).favorite
@@ -813,27 +761,20 @@ def test_favoriting_a_folder_persists_without_reordering(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
+    lora = _at(_image_workflow(view._tree), 0, 0)
     cat_key = _key(_at(lora, 0))
-    dog_key = _key(_at(lora, 1))  # cat is first, dog second
+    dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
     lora = _at(_image_workflow(view._tree), 0, 0)
-    # The star marks the folder in place; it does not jump above the cat.
     assert [_key(row) for row in _subs(lora)] == [cat_key, dog_key]
-    # Favorites state rides on the group (the row's star icon reads it), not a ★ text
-    # prefix, so the labels stay the plain folder names.
     assert _at(lora, 1).data(0, _GROUP_ROLE).favorite is True
     assert _at(lora, 0).data(0, _GROUP_ROLE).favorite is False
     assert not _at(lora, 1).text(0).startswith("★")
 
 
 def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
-    # A folder with sub-folders wears no star of its own (the row's actions are a
-    # leaf's), so its right-click menu is the only way to favorite it — and the menu
-    # covers the tree, so a right-click that shut the folder on the way in is only
-    # seen once the menu closes, and reads as something the star did.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -844,8 +785,6 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     images = _image_workflow(tree)
     images.setExpanded(True)
     key = _key(images)
-    # The half that holds the row: the tree is two of them now, and the pixel
-    # geometry belongs to whichever one the row is in.
     half = _shape(tree, LANDSCAPE)
     row = half.visualRect(half.indexFromItem(images))
     caret = QPoint(row.left() - half.indentation() // 2, row.center().y())
@@ -868,13 +807,11 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
+    lora = _at(_image_workflow(view._tree), 0, 0)
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
-    # The Favorites collection sits just below Latest, above the media folders.
     assert list(_alls(view._tree))[:2] == ["Latest", "Favorites"]
-    # Selecting it lists a tile for each favorited folder, wherever it lives.
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
     assert view._gallery_pane._listed_folders == [dog_key]
@@ -891,7 +828,7 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     lora = _at(_image_workflow(view._tree), 0, 0)
     cat = _children_by_prompt(lora)["a cat"]
 
-    view._toggle_favorite(_key(cat))  # the favorited item is in the favorited folder
+    view._toggle_favorite(_key(cat))
 
     alls = _alls(view._tree)
     assert _shown(alls["Favorites"]) == "(2) Favorites"
@@ -900,8 +837,6 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
 
 
 def test_experiments_collection_is_always_reachable(qtbot):
-    # The collection hosts the feature's on/off switch, so it must exist before any
-    # experiment does — an empty gallery included.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
@@ -938,8 +873,6 @@ def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
 
 
 def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
-    # An experiment has a folder like anything else, so the collection's double-click
-    # is the same jump Latest and Favorites make — no verdict needed first.
     experiment = _experiment_row("e1", steps=30)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
@@ -949,8 +882,8 @@ def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot
     view._gallery_pane._thumb_widgets["e1"].double_clicked.emit("e1")
 
     assert _selected_folder(view) == gallery.settings_folder_key(experiment)
-    assert view.listed_prompt_ids() == ["e1"]  # its own settings folder, not i1's
-    assert view.selected_prompt_ids() == ["e1"]  # landed selected
+    assert view.listed_prompt_ids() == ["e1"]
+    assert view.selected_prompt_ids() == ["e1"]
     assert view._gallery_pane._thumb_widgets["e1"]._selected
 
 
@@ -959,16 +892,14 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    # Unreviewed, but already filed in the tree — the collection is a queue over it,
-    # not a holding pen outside it.
     assert "SDXL T2I" in _workflow_rows(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert view.listed_prompt_ids() == []          # reviewed: out of the collection...
-    assert "SDXL T2I" in _workflow_rows(view._tree)       # ...and still in its folder
+    assert view.listed_prompt_ids() == []
+    assert "SDXL T2I" in _workflow_rows(view._tree)
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
@@ -993,11 +924,11 @@ def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch
     monkeypatch.setattr(view, "_show_reroll_result_in_tab",
                         lambda row, launcher: shown.append(row))
 
-    view._on_reroll_finished("some-key", "e1")   # a background experiment landing
-    assert shown == []                           # the user's tab is left alone
+    view._on_reroll_finished("some-key", "e1")
+    assert shown == []
 
-    view._on_reroll_finished("some-key", "i1")   # the user's own re-roll landing
-    assert [r["prompt_id"] for r in shown] == ["i1"]  # handed the finished row itself
+    view._on_reroll_finished("some-key", "i1")
+    assert [r["prompt_id"] for r in shown] == ["i1"]
 
 
 def test_the_experiments_switch_reports_what_each_position_means(qtbot):
@@ -1007,20 +938,17 @@ def test_the_experiments_switch_reports_what_each_position_means(qtbot):
     assert view.experiments_enabled() is False
     assert "Off" in view._experiments_status.text()
 
-    view.set_experiments_enabled(True)           # a restored session turns it on
+    view.set_experiments_enabled(True)
     assert view.experiments_enabled() is True
-    assert view._experiments_cb.isChecked()      # the collection's switch reflects it
-    # The switch is a promise about the closed app, and says so.
+    assert view._experiments_cb.isChecked()
     assert "close the app" in view._experiments_status.text()
 
-    view._experiments_cb.setChecked(False)       # the user clicks it off
+    view._experiments_cb.setChecked(False)
     assert view.experiments_enabled() is False
     assert "Off" in view._experiments_status.text()
 
 
 def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
-    # The whole point of the switch's new meaning: turning it on mid-session
-    # must not put anything on the GPU while the user is sitting right there.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
@@ -1032,31 +960,24 @@ def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
 
 
 def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
-    # Scheduling an absence is the production app's alone. A preview instance
-    # shares the same ComfyUI, so a batch queued as it closes outlives it as
-    # work the production app can neither see nor cancel — and the user's next
-    # Generate waits on jobs "from another app" that were his own preview's.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
-    view.set_experiments_enabled(True)  # the switch a seeded session restores
+    view.set_experiments_enabled(True)
 
-    assert view.experiments_enabled() is False   # forced off, however it was saved
-    assert not view._experiments_cb.isEnabled()  # grayed, with the reason beneath
+    assert view.experiments_enabled() is False
+    assert not view._experiments_cb.isEnabled()
     assert "production app" in view._experiments_status.text()
 
-    view._experiments_cb.setChecked(True)  # and the gate holds even forced on
+    view._experiments_cb.setChecked(True)
 
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
-    # The collection reads the production app's own rows, so a verdict given in a
-    # preview is the verdict: the same items come up for review, and its count
-    # shows on the tree.
     monkeypatch.setenv(ENV_FLAG, "1")
     view = GalleryView(FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
     qtbot.addWidget(view)
@@ -1075,14 +996,14 @@ def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
+    lora = _at(_image_workflow(view._tree), 0, 0)
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    view._gallery_pane._drill_into(view._gallery_pane._listed_folders[0])  # click the favorited tile
-    assert set(view.listed_prompt_ids()) == {"i2"}  # now inside the dog folder
+    view._gallery_pane._drill_into(view._gallery_pane._listed_folders[0])
+    assert set(view.listed_prompt_ids()) == {"i2"}
 
 
 def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
@@ -1092,7 +1013,7 @@ def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view._gallery_pane._listed_folders == []   # no tiles, just the hint
+    assert view._gallery_pane._listed_folders == []
     assert view.listed_prompt_ids() == []
 
 
@@ -1131,26 +1052,26 @@ def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view.listed_prompt_ids() == ["i2"]  # the favorited item, in the collection
+    assert view.listed_prompt_ids() == ["i2"]
     assert view._gallery_pane._thumb_widgets["i2"]._favorite is True
 
 
 def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     db = FakeDB(rows)
-    db.set_generation_favorite("i1", True)  # a favorited item
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
+    lora = _at(_image_workflow(view._tree), 0, 0)
     dog_key = _key(_at(lora, 1))
-    view._toggle_favorite(dog_key)  # and a favorited folder
+    view._toggle_favorite(dog_key)
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view.listed_prompt_ids() == ["i1"]      # the item
-    assert view._gallery_pane._listed_folders == [dog_key]  # the folder
+    assert view.listed_prompt_ids() == ["i1"]
+    assert view._gallery_pane._listed_folders == [dog_key]
 
 
 def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch):
@@ -1168,7 +1089,7 @@ def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch)
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
-    assert view.listed_prompt_ids() == []  # gone from the collection at once
+    assert view.listed_prompt_ids() == []
 
 
 def test_favorite_collection_stays_selected_across_a_refresh(qtbot):
@@ -1177,7 +1098,7 @@ def test_favorite_collection_stays_selected_across_a_refresh(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
 
-    view.refresh()  # a poll-driven rebuild must not knock us out of the collection
+    view.refresh()
 
     assert view._tree.currentItem().text(0) == "Favorites"
 
@@ -1218,23 +1139,18 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
 
 
 def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
-    rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]  # newest first
+    rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Latest leads its shape, above Favorites and the media folders.
     assert list(_alls(view._tree))[0] == "Latest"
-    # Selecting it lists every recently generated item, newest first — not folders.
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._gallery_pane._listed_folders == []
 
 
 def test_latest_collection_lists_imported_files_too(qtbot):
-    # A file ComfyUI wrote on its own arrives at the launch that finds it, and
-    # Latest is where it is looked for then -- it used to sit in its workflow's
-    # folder alone, with nothing to say why it was not the newest thing here.
     generated = _image("gen", "a cat", 50, 1)
     imported = _row("imp", "sdxl_t2i", {"seed": 9}, "imp.png", source="imported")
     view = GalleryView(FakeDB([imported, generated]))
@@ -1252,9 +1168,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")  # click the recent tile for the dog
-    # Its details fill the Generate pane, but the collection stays put — no navigation, so
-    # every recent item is still listed.
+    _click_tile(view, "i2")
     assert view.selected_generation() == "i2"
     assert view._gallery_pane.showing_latest()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
@@ -1267,26 +1181,21 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    # Double-clicking a recent tile is the whole jump — no button stands in for it.
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
-    assert view._gallery_pane.showing_latest() is False             # out of the collection...
-    assert set(view.listed_prompt_ids()) == {"i2"}     # ...into the dog's own folder
-    # The item lands selected — its tile picked and highlighted, not merely
-    # previewed — as if we'd navigated in and clicked it.
-    assert view.selected_prompt_ids() == ["i2"]         # landed selected
+    assert view._gallery_pane.showing_latest() is False
+    assert set(view.listed_prompt_ids()) == {"i2"}
+    assert view.selected_prompt_ids() == ["i2"]
     assert view._gallery_pane._thumb_widgets["i2"]._selected
 
 
 def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
-    # Double-click means the same thing everywhere in the pane — this is a tab I'm
-    # staying on — whether it opens a folder on the way or not.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")  # a plain click borrows the italic tab
+    _click_tile(view, "i2")
     assert view._generate_pane._preview_tab is not None
 
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
@@ -1301,7 +1210,7 @@ def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert view.listed_prompt_ids() == []  # nothing to show: just the hint
+    assert view.listed_prompt_ids() == []
 
 
 def test_latest_collection_stays_selected_across_a_refresh(qtbot):
@@ -1310,31 +1219,27 @@ def test_latest_collection_stays_selected_across_a_refresh(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    view.refresh()  # a poll-driven rebuild must not knock us out of the collection
+    view.refresh()
 
     assert view._tree.currentItem().text(0) == "Latest"
 
 
 def _many_latest(count):
-    """``count`` generated images, newest first, so the collection runs past one page."""
     return [_image(f"i{n}", "a cat", 50, n) for n in reversed(range(count))]
 
 
 def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
-    # The collection lists every generation ever made, so it draws a page of tiles at a
-    # time rather than all 120 at once.
     view = GalleryView(FakeDB(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert len(_drawn(view)) == 50
-    # And it's the newest page — the collection still reads newest-first.
     assert _drawn(view)[0] == "i119"
 
 
 def _scroll_to_the_end(view):
-    QApplication.processEvents()   # the pane laid out as far as it is drawn
+    QApplication.processEvents()
     bar = _scroll_bar(view)
     bar.setValue(bar.maximum())
 
@@ -1355,9 +1260,6 @@ def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
 
 
 def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
-    # A generation landing rebuilds the gallery under the open collection. That must not
-    # collapse it back to one page and throw away everything the user scrolled
-    # down through — the new item just joins the top of what's already drawn.
     db = FakeDB(_many_latest(120))
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
@@ -1365,7 +1267,7 @@ def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
     _scroll_to_the_end(view)
     scrolled_into = _drawn(view)
 
-    db._rows.insert(0, _image("fresh", "a dog", 50, 999))  # a generation lands
+    db._rows.insert(0, _image("fresh", "a dog", 50, 999))
     view.refresh()
 
     assert _drawn(view) == ["fresh", *scrolled_into]
@@ -1396,8 +1298,6 @@ def test_alls_latest_lists_both_kinds(qtbot):
 
 
 def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monkeypatch):
-    # A redraw holds the window thread, so without this the window reads as dead
-    # for as long as it takes rather than as working.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1413,8 +1313,6 @@ def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monke
 
 
 def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot, monkeypatch):
-    # Opening a collection cannot change a single folder, so the table of
-    # contents is not built again for it -- a build takes seconds on a full library.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1429,8 +1327,6 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 
 
 def test_another_latest_opens_on_its_first_page(qtbot):
-    # Another Latest is a new listing, not a redraw of the one on screen, so it
-    # starts at its newest item instead of holding the pages already scrolled.
     view = GalleryView(FakeDB(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1445,7 +1341,7 @@ def test_another_latest_opens_on_its_first_page(qtbot):
 
 def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", workflow="wan22_i2v"))  # a running video
+    db.add(_running_row("rr1", workflow="wan22_i2v"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1465,7 +1361,6 @@ def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert view.listed_prompt_ids() == ["old"]
 
-    # A fresh generation lands; a poll reflects it at the top of the running list.
     db.add(_image("new", "a dog", 50, 2))
     view._poll()
     assert view.listed_prompt_ids() == ["new", "old"]
@@ -1479,7 +1374,6 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     assert set(_top_level(view._tree)) == {"All"}
     assert set(_workflow_rows(view._tree)) == {"SDXL T2I"}
 
-    # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
@@ -1487,9 +1381,6 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
 
 
 def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
-    """Every other poll test calls ``_poll`` by hand, which leaves the timer that
-    makes this screen live — how a finished ComfyUI job arrives without a click —
-    covered by nothing at all."""
     db = FakeDB([_image("old", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1497,19 +1388,15 @@ def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     assert view._poll_timer.isActive()
-    # The number itself, not _POLL_INTERVAL_MS: read back through the constant
-    # that set it, a gallery slowed to one tick a minute still passes.
     assert view._poll_timer.interval() == 1500
 
     db.add(_image("new", "a dog", 50, 2))
-    view._poll_timer.timeout.emit()  # the tick, delivered the way the timer does
+    view._poll_timer.timeout.emit()
 
     assert view.listed_prompt_ids() == ["new", "old"]
 
 
 def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
-    """Polling costs a pair of DB reads a second, so it is worth paying only while
-    the screen is up — and must resume the moment it is back."""
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):
@@ -1561,9 +1448,6 @@ def test_a_minimized_gallery_with_no_slideshow_up_reads_nothing_on_its_tick(
 
 
 def test_a_minimized_gallery_under_an_open_slideshow_reads_on_its_tick(qtbot, monkeypatch):
-    """The slideshow shows what is in flight while Core cannot be seen -- the
-    Job Queue at its foot, and the pictures still being made -- so the poll that
-    feeds both goes on."""
     view = _a_minimized_gallery(qtbot, monkeypatch)
     _select_first_leaf(view)
     view._slideshows.start()
@@ -1610,8 +1494,6 @@ def _counted(monkeypatch, owner, name, calls):
 
 
 def test_a_rebuild_reads_the_library_and_the_requests_once(qtbot, monkeypatch):
-    # The in-flight tiles were built three times over per rebuild, and each
-    # build read both tables again, with the listing already in hand.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1638,9 +1520,6 @@ def test_a_rebuild_works_out_when_each_image_was_last_enhanced_once(qtbot, monke
 
 def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
         qtbot, monkeypatch):
-    # The tree keyed its folders against one index of the images, and the
-    # folder keys asked of the view were derived against a second, built from
-    # scratch on the first ask after every rebuild.
     built = []
     _counted(monkeypatch, gallery, "build_image_config_index", built)
     _counted(monkeypatch, gallery_tree_module, "build_image_config_index", built)
@@ -1657,8 +1536,6 @@ def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
 
 
 def test_a_rebuild_builds_one_folder_tree_per_side_and_no_third(qtbot, monkeypatch):
-    # A third tree of the whole library was built only to read folder names
-    # off it for the search index, which the two sides' trees already carry.
     built = []
     _counted(monkeypatch, gallery, "build_gallery_tree", built)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
@@ -1734,9 +1611,6 @@ def test_double_clicking_a_settings_folder_opens_it_and_renames_nothing(qtbot):
 
 
 def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
-    # A branch folder shows folders, not generations, so it has no first item to
-    # land on the way a settings folder does
-    # (test_opening_a_folder_lands_on_its_first_item).
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -1744,7 +1618,7 @@ def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert view._gallery_pane._listed_folders      # its child folders, as tiles
+    assert view._gallery_pane._listed_folders
     assert view.listed_prompt_ids() == []
     assert view._selected is None
 
@@ -1876,51 +1750,36 @@ def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then
 
 
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
-    """A move always ends with the item on screen, drawn from its own folder.
-
-    The pane can be showing something other than the row the tree has current —
-    a search's hits, a collection — and setting a row Qt already holds current fires
-    no signal to draw anything. The move draws it itself in that case rather than
-    trusting the signal, which is how a click came to fill the Generate pane while
-    the middle pane under it stood still.
-    """
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)                 # that folder's row is now the current one
+    _select_first_leaf(view)
     assert "i1" in view.listed_prompt_ids()
-    view._gallery_pane.show_empty()               # the pane goes off it, the row stays current
+    view._gallery_pane.show_empty()
     assert "i1" not in view.listed_prompt_ids()
 
     view._go_to_generation("i1")
 
-    assert "i1" in view.listed_prompt_ids()          # the folder is drawn again
-    assert view._selected["prompt_id"] == "i1"        # and the item is picked in it
+    assert "i1" in view.listed_prompt_ids()
+    assert view._selected["prompt_id"] == "i1"
 
 
 def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
-    """A generation that failed with no file has no row of its own in the tree —
-    a terminal file-less row is dropped from it — so the move falls back to the
-    row its settings key names. Opening no folder at all is what left the middle
-    pane where it was while the item filled the Generate pane beside it."""
     done = _image("i1", "a cat", 50, 1)
     failed = dict(done, prompt_id="x1", status="error", output_files="[]",
                   thumbnail_path=None)
     view = GalleryView(FakeDB([done, failed]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    assert "x1" not in view._leaf_by_id       # no settings row of its own
+    assert "x1" not in view._leaf_by_id
 
     view._go_to_generation("x1")
 
-    # Its folder is the one its finished sibling sits in, and that is what opened.
     assert "i1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "x1"
 
 
 def test_following_a_link_lands_in_one_tab(qtbot):
-    """A followed link fills the tab a click would, rather than forking one: going
-    to look at something costs no more tabs than browsing to it."""
     image = _image("img1", "a cat", 50, 1)
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -1930,7 +1789,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()  # don't start WMF playback
+        tab._preview.show_media = MagicMock()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _click_tile(view, "vid1")
     tabs = view._generate_pane.count()
@@ -1967,8 +1826,8 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")   # viewing the video
-    view.follow_link("img1")      # follow its input-image link
+    _click_tile(view, "vid1")
+    view.follow_link("img1")
 
     assert view._selected["prompt_id"] == "img1"
     view._navigation.go_back()
@@ -1982,7 +1841,7 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert not view._buttons.back.isEnabled()
     assert not view._buttons.forward.isEnabled()
 
-    _select_first_leaf(view)   # opening a folder is somewhere to come back from
+    _select_first_leaf(view)
     _click_tile(view, "i1")
     _click_tile(view, "i2")
     assert view._buttons.back.isEnabled()
@@ -1996,7 +1855,7 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
 
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
-    for pid, prompt, steps in (("a", "alpha", 10), ("b", "beta", 20)):  # two settings folders
+    for pid, prompt, steps in (("a", "alpha", 10), ("b", "beta", 20)):
         db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
                              positive_prompt=prompt, seed=1,
                              params_json=json.dumps({"positive_prompt": prompt, "seed": 1, "steps": steps}),
@@ -2008,22 +1867,20 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["a"])  # the folder holding "a"
-    _click_tile(view, "a")                       # viewing it
+    view._tree.setCurrentItem(view._leaf_by_id["a"])
+    _click_tile(view, "a")
     assert view._selected["prompt_id"] == "a"
     view._confirm = lambda text: True
     view._delete_folders(view._current_deletable_folders())
     assert db.get_generation("a") is None
-    assert view._selected is None                       # navigated off the emptied folder
+    assert view._selected is None
 
     view._undo()
-    assert db.get_generation("a") is not None            # restored
-    assert view._selected["prompt_id"] == "a"            # and back where we deleted from
+    assert db.get_generation("a") is not None
+    assert view._selected["prompt_id"] == "a"
 
 
 def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
-    # Viewing a generation, then following its source link, records both as history
-    # stops; Back returns to the one we were looking at before the link.
     image = _image("img1", "a cat", 50, 1)
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -2033,19 +1890,16 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")               # viewing the video
+    _click_tile(view, "vid1")
     assert view._selected["prompt_id"] == "vid1"
 
-    view.follow_link("img1")                  # follow its source-image link
+    view.follow_link("img1")
     assert view._selected["prompt_id"] == "img1"
     view._navigation.go_back()
-    assert view._selected["prompt_id"] == "vid1"  # Back to where we were
+    assert view._selected["prompt_id"] == "vid1"
 
 
 def _linked_view(qtbot, source="i7", count=12):
-    """A view on a video whose start frame is one of ``count`` sibling images, laid
-    out in a window too short to hold them all — the setup for following a source
-    link into a folder big enough that landing on the right image matters."""
     images = [_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)]
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -2054,17 +1908,14 @@ def _linked_view(qtbot, source="i7", count=12):
     view = GalleryView(FakeDB([video] + images))
     _on_screen(qtbot, view, 1100, 1200)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")               # viewing the video
+    _click_tile(view, "vid1")
     return view
 
 
 def test_following_a_source_link_lands_on_the_image_itself(qtbot):
-    # Opening the folder the source image lives in isn't enough: with a dozen
-    # siblings in it, which one the link meant has to be picked out — highlighted,
-    # and scrolled to rather than left off the foot of the pane.
     view = _linked_view(qtbot)
 
-    view.follow_link("i7")                    # follow its source-image link
+    view.follow_link("i7")
 
     assert view.selected_prompt_ids() == ["i7"]
     assert view._gallery_pane._thumb_widgets["i7"]._selected
@@ -2093,10 +1944,6 @@ def test_following_a_link_to_a_word_made_videos_hidden_frame_lands_on_that_video
 
 
 def test_a_followed_link_puts_the_image_on_screen_in_the_same_turn(qtbot):
-    # The folder's images are created but not yet positioned when the link lands,
-    # so a scroll that aimed at them straight away would aim at nothing. The pane
-    # lays itself out first, which is what puts the image on screen without
-    # waiting for the turn to end.
     view = _linked_view(qtbot)
 
     view.follow_link("i7")
@@ -2105,8 +1952,6 @@ def test_a_followed_link_puts_the_image_on_screen_in_the_same_turn(qtbot):
 
 
 def test_moving_on_after_a_followed_link_leaves_the_folder_chosen_instead(qtbot):
-    # The link's landing is the folder it opened; choosing another folder after it
-    # is the user overruling that, and what they chose is what stays on screen.
     view = _linked_view(qtbot)
 
     view.follow_link("i7")
@@ -2118,25 +1963,23 @@ def test_moving_on_after_a_followed_link_leaves_the_folder_chosen_instead(qtbot)
 
 
 def test_history_spans_folder_navigation(qtbot):
-    # Every place the user went is a stop: the folder they opened, on the item it
-    # landed them on, so Back retraces the walk rather than skipping the folders.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video folder, landing on v1
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # then the image folder, on i1
-    _click_tile(view, "i2")    # then its other item
+    view._tree.setCurrentItem(view._leaf_by_id["v1"])
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    _click_tile(view, "i2")
     assert view._selected["prompt_id"] == "i2"
 
-    view._navigation.go_back()                    # the image folder, on what it opened on
+    view._navigation.go_back()
     assert view._tree.currentItem() is view._leaf_by_id["i1"]
     assert view._selected["prompt_id"] == "i1"
 
-    view._navigation.go_back()                    # and out to the video folder, on its item
+    view._navigation.go_back()
     assert view._tree.currentItem() is view._leaf_by_id["v1"]
-    assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
+    assert view._selected["prompt_id"] == "v1"
 
 
 def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(qtbot):
@@ -2146,22 +1989,19 @@ def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(q
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
+    view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view._gallery_pane.showing_latest() is False
-    assert view._buttons.back.isEnabled()                    # the collection is somewhere to go back to
+    assert view._buttons.back.isEnabled()
 
     view._navigation.go_back()
-    assert view._gallery_pane.showing_latest()                       # Back returns to the Latest collection
+    assert view._gallery_pane.showing_latest()
 
     view._navigation.go_forward()
-    assert view._gallery_pane.showing_latest() is False              # Forward re-opens the folder
+    assert view._gallery_pane.showing_latest() is False
     assert view.selected_generation() == "i2"
 
 
 def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
-    # The reported bug: a folder was no history stop at all, so leaving Latest by
-    # clicking one in the tree recorded nothing and Back had nowhere to go from —
-    # the collection was on the stack, but the cursor was still sitting on it.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2199,8 +2039,6 @@ def test_back_walks_folders_the_way_it_walks_generations(qtbot):
 
 
 def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
-    # A rebuild re-selects the open folder every poll; each must not pile onto the
-    # stack or Back would walk a hundred copies of where the user already is.
     rows = [_image("i1", "a cat", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2225,13 +2063,13 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
     view._toggle_favorite(dog_key)
 
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
-    view._gallery_pane._drill_into(view._gallery_pane._listed_folders[0])  # into the dog folder, on i2
-    _click_tile(view, "i3")            # view another item there
+    view._gallery_pane._drill_into(view._gallery_pane._listed_folders[0])
+    _click_tile(view, "i3")
     assert view._tree.currentItem() is not _collection(view, FAVORITES_KEY)
 
-    view._navigation.go_back()                                      # the folder drilled into
     view._navigation.go_back()
-    assert view._tree.currentItem() is _collection(view, FAVORITES_KEY)  # Back returns to Favorites
+    view._navigation.go_back()
+    assert view._tree.currentItem() is _collection(view, FAVORITES_KEY)
 
 
 def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
@@ -2240,19 +2078,17 @@ def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")         # select i2 in the collection
-    view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
+    _click_tile(view, "i2")
+    view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view._gallery_pane.showing_latest() is False
 
     view._navigation.go_back()
-    assert view._gallery_pane.showing_latest()                       # back in the collection...
-    assert view.selected_generation() == "i2"            # ...with i2 previewed again
-    assert view._gallery_pane._thumb_widgets["i2"]._selected       # and its tile re-highlighted
+    assert view._gallery_pane.showing_latest()
+    assert view.selected_generation() == "i2"
+    assert view._gallery_pane._thumb_widgets["i2"]._selected
 
 
 def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
-    # The reported bug: previews in a collection were collection state rather than stops, so
-    # Back walked out of the collection entirely instead of to the one looked at before.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
             _image("i3", "a bird", 50, 1)]
     view = GalleryView(FakeDB(rows))
@@ -2260,11 +2096,11 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     for pid in ("i1", "i2", "i3"):
-        _click_tile(view, pid)       # browse a few previews
+        _click_tile(view, pid)
 
     view._navigation.go_back()
-    assert view._gallery_pane.showing_latest()                       # still in the collection...
-    assert view.selected_generation() == "i2"            # ...on the one before
+    assert view._gallery_pane.showing_latest()
+    assert view.selected_generation() == "i2"
 
     view._navigation.go_back()
     assert view.selected_generation() == "i1"
@@ -2274,8 +2110,6 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
 
 
 def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
-    # Landing means landing: the item previewed and its tile lit, so which of the
-    # collection's items Back returned to is visible in the pane and not just the tab.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2306,16 +2140,13 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
 
 
 def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
-    # The results pane redraws for things that are not navigations — a rebuild, a
-    # sort, a widening landing — and a stop per redraw would fill history with the
-    # pane already on screen.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
     _search_for(view, "cat")
-    _click_tile(view, "i1")   # a hit picked among the results
+    _click_tile(view, "i1")
     depth = len(view._navigation._history._stack)
 
     view.refresh()
@@ -2326,32 +2157,28 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
 
 
 def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
-    # A folder of folders has no item to land on, so that is what returning to it
-    # shows — a pane still lit on the item Back just left looks like a dead press.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    view._tree.setCurrentItem(lora)                    # its sub-folders, none picked
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # down into one, landing on i1
+    view._tree.setCurrentItem(lora)
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     view._navigation.go_back()
 
-    assert view._tree.currentItem() is lora   # the folder of folders...
-    assert view._selected is None             # ...showing nothing picked
+    assert view._tree.currentItem() is lora
+    assert view._selected is None
 
 
 def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
-    # A stop is a view, not just an item: the same generation sits in its own
-    # folder too, and Back has to return to the pane it was actually picked in.
     rows = [_image("i1", "a cat", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i1")         # previewed in the collection
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])    # then off to its folder
+    _click_tile(view, "i1")
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     view._navigation.go_back()
 
@@ -2360,8 +2187,6 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
 
 
 def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
-    # A search owns the middle pane while it runs, so it is a view Back returns
-    # to — with the query still in the field and the hits still drawn.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2369,7 +2194,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
 
     _search_for(view, "cat")
     assert view.listed_prompt_ids() == ["i1"]
-    view._gallery_pane._thumb_widgets["i1"].double_clicked.emit("i1")  # open the hit in its folder
+    view._gallery_pane._thumb_widgets["i1"].double_clicked.emit("i1")
     assert view._gallery_pane.showing_search() is False
 
     view._navigation.go_back()
@@ -2380,8 +2205,6 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
 
 
 def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
-    # Clicking a result previews it without leaving the results, so Back returns
-    # to the results themselves rather than to the hit's own folder.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2397,8 +2220,6 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
 
 
 def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
-    # One search field, one view: a query being narrowed re-draws the same pane, so
-    # Back leaves the search rather than replaying every word on the way in.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2423,18 +2244,10 @@ def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):
     view.refresh()
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    # The row, shape and all: reopening on the other side's copy of a folder is
-    # reopening somewhere else.
     assert view.selected_folder() == shaped_key(_key(workflow), LANDSCAPE)
 
 
 def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
-    # The key names the tree leaf a run lands in, and five call sites used to
-    # build the row it is derived from by hand -- one leaving the workflow version
-    # out, two putting it in, two spreading a whole row -- so a reader could not
-    # tell which of those differences meant anything. It does mean something: the
-    # version is part of the signature, and it is an argument now rather than a
-    # field one dict happened to carry.
     row = _image("i1", "a cat", 50, 1)
     view = GalleryView(FakeDB([row]))
     qtbot.addWidget(view)
@@ -2447,15 +2260,12 @@ def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
 
 
 def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
-    # Memoized because it was rebuilt from scratch at eight sites, several on a
-    # click's path -- but an i2v's folder key is derived against it, so a stale
-    # one would file a run under the start frame the gallery used to hold.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     first = view.image_config_index()
-    assert view.image_config_index() is first          # asked twice, built once
+    assert view.image_config_index() is first
 
     db._rows.append(_image("i2", "a dog", 50, 2))
     view.refresh()
@@ -2470,13 +2280,11 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
-    # SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
     dog_leaf = _at(_image_workflow(saved._tree), 0, 0, 1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
     chosen = set(saved.listed_prompt_ids())
 
-    # A brand-new view told to restore that key lands on the same folder.
     restored = GalleryView(db)
     qtbot.addWidget(restored)
     restored.select_folder(saved_key)
@@ -2488,14 +2296,12 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
 def test_select_folder_falls_back_to_default_when_key_gone(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
-    view.select_folder("video/ghost")  # nothing in the tree matches
+    view.select_folder("video/ghost")
     view.refresh()
-    assert view.selected_folder() is not None  # default folder, not a crash
+    assert view.selected_folder() is not None
 
 
 def test_selected_folder_reports_pending_target_before_first_show(qtbot):
-    # The window restores a folder, but the user never opens the Gallery tab;
-    # selected_folder must still report it so closeEvent can persist it again.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.select_folder("image/sdxl_t2i")
@@ -2507,7 +2313,7 @@ def test_selected_generation_tracks_thumbnail_click(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # folder holding i1 and i2
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
     view._on_thumbnail_clicked("i2")
     assert view.selected_generation() == "i2"
 
@@ -2521,7 +2327,6 @@ def test_select_generation_restored_with_folder_after_refresh(qtbot):
     probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
     folder_key = probe.selected_folder()
 
-    # A fresh view restoring that folder + selection lands on the same image.
     fresh = GalleryView(db)
     qtbot.addWidget(fresh)
     fresh.select_folder(folder_key)
@@ -2540,10 +2345,10 @@ def test_selected_generation_survives_a_rebuild(qtbot):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     view._on_thumbnail_clicked("i2")
 
-    db.add(_image("i3", "a dog", 50, 9))  # new generation → a poll rebuild
+    db.add(_image("i3", "a dog", 50, 9))
     view._poll()
 
-    assert view.selected_generation() == "i2"  # not cleared by the rebuild
+    assert view.selected_generation() == "i2"
     assert view._selected["prompt_id"] == "i2"
 
 
@@ -2557,14 +2362,10 @@ def test_selected_generation_reports_pending_before_show(qtbot):
 def test_select_generation_missing_id_is_dropped(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
-    view.select_generation("ghost")  # no such generation
+    view.select_generation("ghost")
     view.refresh()
-    # Quietly dropped (not restored) without crashing; the view falls back to
-    # the folder's own default selection rather than the stale id.
     assert view.selected_generation() != "ghost"
 
-
-# --- the Enhance pane: the app's enhancement settings -------------------
 
 
 def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot, tmp_path):
@@ -2572,7 +2373,7 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
     qtbot.addWidget(view)
     view.resize(1500, 900)
     view.show()
-    for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
+    for _ in range(4):
         QApplication.processEvents()
 
     for inside in (view._tree, view._scroll, view._osr2_controls, view._enhance.pane):
@@ -2616,7 +2417,7 @@ def test_with_room_to_spare_the_enhance_settings_under_the_thumbnails_open_whole
     qtbot.addWidget(view)
     view.resize(1500, 1100)
     view.show()
-    for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
+    for _ in range(4):
         QApplication.processEvents()
     (settings,) = view._enhance.pane.findChildren(QScrollArea)
 
@@ -2630,7 +2431,7 @@ def test_with_room_to_spare_the_hud_opens_whole_at_the_top_left_even_at_its_wide
     qtbot.addWidget(view)
     view.resize(1500, 1100)
     view.show()
-    view.osr2_control.setChecked(True)  # the Robot Hand driving, its widest line
+    view.osr2_control.setChecked(True)
     for _ in range(4):
         QApplication.processEvents()
     (hud,) = _pane_holding(view._osr2_controls).findChildren(QScrollArea)
@@ -2665,15 +2466,6 @@ def test_squeezed_smaller_than_the_hud_its_pane_scrolls_rather_than_spilling(qtb
     assert hud.verticalScrollBar().maximum() > 0
 
 
-# --- the pane→view wiring: each pane gesture reaches its view handler --------
-
-
-#
-# The Gallery pane connects its tiles' signals straight to view handlers today,
-# and the coupling inversion (audit item 30) re-routes every one of these wires
-# through a pane signal. Each test here drives the wire end to end — emit the
-# widget's own signal, observe the app-level consequence — so a re-route that
-# quietly drops a wire fails a test instead of a spoken command or a click.
 
 
 def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
@@ -2705,7 +2497,7 @@ def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_image_workflow(view._tree))  # child folders as tiles
+    view._tree.setCurrentItem(_image_workflow(view._tree))
     labels = []
     _menu_labels(monkeypatch, labels)
     model = _key(_at(_image_workflow(view._tree), 0))
@@ -2748,8 +2540,6 @@ def test_a_queue_items_cancel_drops_that_run(qtbot):
     assert db.get_generation("rr1") is None
 
 
-# --- the poll's batched fetch: every blocking read of one tick, in one place --
-
 
 def test_the_poll_fetch_asks_only_what_each_jobs_state_deserves():
     calls = []
@@ -2775,9 +2565,6 @@ def test_the_poll_fetch_asks_only_what_each_jobs_state_deserves():
         _Client(),
         [("q1", "queued"), ("r1", "running"), ("f1", "finished")])
 
-    # /history for a job that may have quietly finished; a queue position only
-    # for one still waiting, and what ComfyUI is making once while any waits;
-    # nothing at all for a terminal job; the shared queue once.
     assert calls == [("history", "q1"), ("backlog", "q1"),
                      ("history", "r1"), ("executing", None), ("queue", None)]
     assert set(facts.histories) == {"q1", "r1"}
@@ -2833,10 +2620,10 @@ def test_the_poll_fetch_fails_soft_read_by_read():
 
     facts = gallery_view_module._fetch_poll_facts(_Wedged(), [("q1", "queued")])
 
-    assert facts.histories == {}          # nothing fetched: reconcile skips it
-    assert facts.backlogs == {"q1": None}  # an unreadable position clears the count
-    assert facts.foreign.total == 0        # an unreadable queue claims nothing
-    assert facts.executing == frozenset()  # and names nothing as being made
+    assert facts.histories == {}
+    assert facts.backlogs == {"q1": None}
+    assert facts.foreign.total == 0
+    assert facts.executing == frozenset()
 
 
 def test_the_poll_fetch_reads_nothing_with_no_client():
@@ -2846,11 +2633,6 @@ def test_the_poll_fetch_reads_nothing_with_no_client():
 
 
 def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot):
-    """The gallery watches the whole application for its keys, so it is handed
-    events about every object in it — a slideshow's own timer among them, which is
-    destroyed with the slideshow while events about it are still in flight.  Asking
-    the base class about one of those dereferences a freed object and takes the
-    process down with it (2026-09-19 21:26, a Latest slideshow closing)."""
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     doomed = QTimer()
@@ -2861,11 +2643,6 @@ def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot)
 
 def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_path,
                                                                      monkeypatch):
-    """The two folders a preview is resolved out of used to be read off the config
-    module in the middle of the method, so the only way to point a view at a
-    library of its own was to patch module state -- which four tests did while
-    three thousand ran against the live one. They are the actions' now, and the
-    actions are handed both at construction."""
     asked = []
     monkeypatch.setattr(
         gallery, "animated_preview_if_made",
@@ -2888,9 +2665,6 @@ def test_a_gallery_given_no_thumbnails_folder_shows_stills(qtbot, tmp_path):
 
 
 def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
-    # The name is a short code, and what the folder holds used to ride on the
-    # hover: the prompt and the settings that set it apart, each cut to 24
-    # characters. Cut that short it said nothing you could act on, so it is gone.
     rows = [_image("i1", "a cat asleep on a windowsill in the late sun", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)

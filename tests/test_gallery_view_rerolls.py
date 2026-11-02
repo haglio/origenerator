@@ -53,8 +53,6 @@ from tests.gallery_view_support import (
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
-# --- re-roll ("+") tile -----------------------------------------------------
-
 
 def test_leaf_shows_add_tile_when_client_present(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=_reroll_client())
@@ -65,10 +63,7 @@ def test_leaf_shows_add_tile_when_client_present(qtbot):
 
 
 def test_main_view_reflows_to_fill_extra_width(qtbot):
-    # The main view flows tiles to fill the pane: a wide pane packs more per row
-    # and so is shorter than a narrow one. The old fixed 4-column grid ignored
-    # the available width, so its height never changed.
-    rows = [_image(f"i{n}", "a cat", 50, n) for n in range(1, 9)]  # eight tiles
+    rows = [_image(f"i{n}", "a cat", 50, n) for n in range(1, 9)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
@@ -79,8 +74,6 @@ def test_main_view_reflows_to_fill_extra_width(qtbot):
 
 
 def test_add_tile_leads_the_folders_images(qtbot):
-    # Thumbnails are newest-first, so the "new variation" tile leads them rather
-    # than trailing the oldest.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
     qtbot.addWidget(view)
@@ -118,8 +111,6 @@ def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
 
 
 def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
-    # Re-roll works anywhere Reuse Parameters does, imports included — the
-    # workflow's defaults fill in whatever sparse metadata an import lacks.
     rows = [_row("imp", "sdxl_t2i", {"seed": 1}, "imp.png", source="imported")]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
     qtbot.addWidget(view)
@@ -129,13 +120,11 @@ def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
 
 
 def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
-    # An import keeps only sparse metadata (no checkpoint/vae); re-roll must
-    # still build a valid payload by borrowing the workflow's defaults.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="imported",
         positive_prompt="a cat", seed=1,
-        params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),  # sparse
+        params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
         workflow_json="{}", source="imported",
     )
     db.update_generation("imp", status="completed",
@@ -149,9 +138,9 @@ def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
     _new_tile(view).add_requested.emit()
 
     job = view._live_jobs[key]
-    assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
-    assert job.params["seed"] != 1  # re-rolled
-    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)  # built without error
+    assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]
+    assert job.params["seed"] != 1
+    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
 def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
@@ -166,17 +155,12 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     assert key in view._live_jobs
     job = view._live_jobs[key]
     assert job.workflow.name == "sdxl_t2i"
-    assert job.params["seed"] != 7  # same settings, fresh seed
+    assert job.params["seed"] != 7
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
 def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_request_tile(
         qtbot, tmp_path):
-    # Reported: the press that started a run turned the + itself into the run,
-    # with the run's Cancel where the + had been -- so on a slow app, a second
-    # press on a Cancel already taken landed on the + it had turned back into,
-    # and started another. The + stays put now, grayed out, and the run gets a
-    # tile of its own where its image will land.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -191,16 +175,12 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
 
 
 def _press_at(qtbot, view, spot):
-    """A press where a pointer would land: on whatever the pane draws at ``spot``
-    now."""
     container = view._scroll.widget()
     target = container.childAt(spot) or container
     qtbot.mouseClick(target, Qt.MouseButton.LeftButton, pos=target.mapFrom(container, spot))
 
 
 def test_a_second_press_where_the_runs_cancel_was_starts_no_new_run(qtbot, tmp_path):
-    # Reported: Origenerator answered a Cancel so slowly that he pressed it again,
-    # and the second press landed on the + the run's tile had turned back into.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     _on_screen(qtbot, view, 1200, 800)
@@ -226,11 +206,9 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     view._start_reroll(key)
     view._start_reroll(key)
 
-    assert list(view._live_jobs) == [key]  # the second press found one running
+    assert list(view._live_jobs) == [key]
     client.submit_job.assert_called_once()
 
-
-# --- Modify (all seeds): same seeds, changed words --------------------------
 
 
 def _request_tile(view):
@@ -239,8 +217,6 @@ def _request_tile(view):
 
 
 def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
-    """A DB holding one settings folder with a completed image per seed — the
-    folder a rewrite re-runs."""
     db = Database(tmp_path / "folder.db")
     for seed in seeds:
         db.insert_generation(
@@ -260,7 +236,6 @@ def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
 
 
 def _rewritten(view, key, prompt="a dog on a couch"):
-    """Press a rewrite of the folder ``key`` names, saying ``prompt`` instead."""
     params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
                   negative_prompt="blurry")
     view._on_modify_requested(key, "sdxl_t2i", params)
@@ -273,12 +248,10 @@ def test_a_folder_offers_a_request_tile_beside_its_new_tile(qtbot, tmp_path):
     _select_first_leaf(view)
 
     assert _request_tile(view) is not None
-    assert _new_tile(view) is not None  # the pair: new seed, and new words
+    assert _new_tile(view) is not None
 
 
 def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
-    # The rewrite reproduces the folder seed for seed, so a folder whose only row
-    # is still in flight has no image to say differently yet.
     rows = [_row("run1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1}, "x.png",
                  status="running", output_files=json.dumps([]))]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
@@ -301,7 +274,7 @@ def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     tab = view._generate_pane.current_generate_tab()
     assert tab._folder_modify.folder_key == key
     assert tab._preview._stack.currentWidget() is tab._preview._sheet
-    client.submit_job.assert_not_called()  # an edit to make, not a run to start
+    client.submit_job.assert_not_called()
 
 
 def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
@@ -339,13 +312,11 @@ def test_the_rewrite_lands_in_one_folder_beside_the_one_it_came_from(qtbot, tmp_
     _rewritten(view, key)
 
     landing = set(view._jobs.jobs_by_folder)
-    assert len(landing) == 1                 # the seeds don't split it
-    assert landing != {key}                  # ...and it isn't the folder it came from
+    assert len(landing) == 1
+    assert landing != {key}
 
 
 def test_each_rewritten_image_is_linked_to_the_one_it_came_from(qtbot, tmp_path):
-    # Individually, not folder to folder: the link is what says which image
-    # this one is the rewrite of, and it shows on the item itself.
     db = _folder_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -360,7 +331,7 @@ def test_each_rewritten_image_is_linked_to_the_one_it_came_from(qtbot, tmp_path)
     one = records[0]
     assert one["old_positive"] == "a cat on a couch"
     assert one["new_positive"] == "a dog on a couch"
-    assert one["heard"] == ""  # typed, so there is nothing it was heard as
+    assert one["heard"] == ""
 
 
 def test_a_rewrite_of_a_folder_that_has_gone_launches_nothing(qtbot, tmp_path):
@@ -387,14 +358,10 @@ def test_the_folders_live_tile_stands_the_image_it_was_asked_of_behind_the_wait(
 
     _rewritten(view, key)
 
-    # The batch's folder is on screen now; its live tile has no frame of its own
-    # yet, so it shows the image the request was made of.
     assert not _generating_tile(view)._image.pixmap().isNull()
 
 
 def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
-    # Every run is being made, so the folder shows every run — not one tile the
-    # images then arrive through one at a time.
     view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -403,9 +370,6 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
     _rewritten(view, key)
 
     queued = [job.prompt_id for job in view._jobs.all_jobs]
-    # The one in front -- the last asked for, since each image takes the
-    # machine from the one before -- is the folder's generating tile; the rest
-    # each get their own tile.
     assert _generating_tile(view) is not None
     in_front = view._jobs.queue_order[0]
     assert set(view._gallery_pane._inflight_tiles) == set(queued) - {in_front}
@@ -413,28 +377,20 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
 
 
 def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, tmp_path):
-    # Not merely "in some consistent order" — the same order, so laying the two
-    # folders side by side is what tells you at a glance that it worked.
     db = _folder_db(tmp_path, seeds=(7, 8, 9))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    # _tree_item_for: a folder has a row per shape now, and this key has no
-    # shape on it.
     was = [row["seed"] for row in view._tree_item_for(key).data(0, _GROUP_ROLE).rows]
 
     _rewritten(view, key)
 
     made = {job.prompt_id for job in view._jobs.all_jobs}
-    # The gallery lists rows newest first, which is the order they were written in
-    # reversed — so this is the order the new folder will draw them in.
     now = [row["seed"] for row in db.list_generations() if row["prompt_id"] in made]
     assert was == [9, 8, 7]
     assert now == was
 
-
-# --- Auto-Generate: the folder re-roll, again and again until stopped -------
 
 
 def test_toggling_auto_starts_auto_generate(qtbot, tmp_path):
@@ -444,10 +400,10 @@ def test_toggling_auto_starts_auto_generate(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._buttons.auto.click()  # the header's Auto toggle, switched on
+    view._buttons.auto.click()
 
     assert view._auto.is_active(key)
-    assert key in view._live_jobs          # a first variation is running
+    assert key in view._live_jobs
     client.submit_job.assert_called_once()
     assert view._buttons.auto.isChecked()
 
@@ -488,16 +444,14 @@ def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     view._toggle_auto(True)
     job = view._live_jobs[key]
 
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the variation finishes
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert client.submit_job.call_count == 2   # the next one was launched
+    assert client.submit_job.call_count == 2
     assert view._auto.is_active(key)
-    assert key in view._live_jobs            # a fresh variation is running
+    assert key in view._live_jobs
 
 
 def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
-    # One folder at a time: Auto-Generate in two would take turns on the
-    # machine, each waiting out the other's render.
     client = _reroll_client()
     db = _seeded_db(tmp_path)
     db.insert_generation(
@@ -523,7 +477,7 @@ def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path
 
     assert view._auto.is_active(second)
     assert not view._auto.is_active(first)
-    assert view._buttons.auto.isChecked()  # the switch follows the folder in front
+    assert view._buttons.auto.isChecked()
 
 
 def test_toggling_auto_off_stops_auto_generate(qtbot, tmp_path):
@@ -538,7 +492,7 @@ def test_toggling_auto_off_stops_auto_generate(qtbot, tmp_path):
     view._toggle_auto(False)
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert client.submit_job.call_count == 1   # not relaunched after stop
+    assert client.submit_job.call_count == 1
     assert not view._auto.is_active(key)
 
 
@@ -551,10 +505,10 @@ def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
     view._toggle_auto(True)
     job = view._live_jobs[key]
 
-    client.job_error.emit(job.prompt_id, "boom")   # ComfyUI rejected it
+    client.job_error.emit(job.prompt_id, "boom")
 
     assert not view._auto.is_active(key)
-    assert client.submit_job.call_count == 1       # did not spin on the failure
+    assert client.submit_job.call_count == 1
 
 
 def test_cancelling_a_reroll_keeps_auto_generate_on_and_tries_another_seed(qtbot, tmp_path):
@@ -566,16 +520,15 @@ def test_cancelling_a_reroll_keeps_auto_generate_on_and_tries_another_seed(qtbot
     view._toggle_auto(True)
     canceled = view._live_jobs[key].prompt_id
 
-    view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
+    view._cancel_reroll(key)
 
-    assert view._auto.is_active(key)          # Auto-Generate is still on
-    assert view._buttons.auto.isChecked()         # and the toggle still says so
-    assert client.submit_job.call_count == 2  # a fresh seed went out at once
+    assert view._auto.is_active(key)
+    assert view._buttons.auto.isChecked()
+    assert client.submit_job.call_count == 2
     assert view._live_jobs[key].prompt_id != canceled
 
 
 def test_cancelling_an_auto_folders_job_by_name_keeps_auto_generate_going(qtbot, tmp_path):
-    # The queue row's Cancel and a Generate tab's, which name the run to stop.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -616,29 +569,23 @@ def test_only_the_auto_toggle_ends_auto_generate_not_a_string_of_cancels(qtbot, 
     key = _select_first_leaf(view)
     view._toggle_auto(True)
 
-    for _ in range(3):  # discard seed after seed — Auto-Generate keeps offering more
+    for _ in range(3):
         view._cancel_reroll(key)
     assert view._auto.is_active(key)
     assert client.submit_job.call_count == 4
 
-    view._toggle_auto(False)  # the user's own word is what stops it
+    view._toggle_auto(False)
 
     assert not view._auto.is_active(key)
 
 
 def _folder_tab(view, db):
-    """Put the front Generate tab on the seeded folder's settings, as clicking that
-    folder's thumbnail does — where the user is when they press the tile or Auto."""
     row = db.get_generation("orig")
     view._generate_pane.load_selection(row, [row])
     return view._generate_pane.current_generate_tab()
 
 
 def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
-    # Center (the folder's live tile), foot (the queue row) and right (the config
-    # tab) each draw a Cancel for the run in flight. While the folder
-    # auto-generates, the press throws away a seed and Auto-Generate starts
-    # another, so all three hovers say so.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -658,8 +605,6 @@ def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
 
 def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flight(
         qtbot, tmp_path):
-    # Auto off leaves the variation in flight (it still lands), and from then on
-    # that button really does stop it — so its hover must stop promising a next seed.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -670,7 +615,7 @@ def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flig
 
     view._toggle_auto(False)
 
-    assert key in view._live_jobs  # the in-flight variation was left alone
+    assert key in view._live_jobs
     plain = "Cancel this generation"
     assert _generating_tile(view)._cancel.toolTip() == plain
     assert [row._cancel.toolTip() for row in view._queue.rows()] == [plain]
@@ -678,10 +623,6 @@ def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flig
 
 
 def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
-    # Reported: pressing the tile's "New (random seed)" left the tab looking at that
-    # very folder with no button to discard the run, while the pane beside it
-    # streamed the frames of the run it had just started. Nothing had claimed a
-    # launch that came from outside a tab.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -698,8 +639,6 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
 
 
 def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
-    # Same gap for the Auto toggle's own launches, and it recurs on every relaunch:
-    # each new variation is claimed by the tab on that folder.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -712,7 +651,7 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     first = view._live_jobs[key]
     assert view._generate_pane.current_generate_tab().launched_runs() == [first.origin]
 
-    client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # Auto-Generate moves on
+    client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)
 
     tab = view._generate_pane.current_generate_tab()
     assert tab._cancel_btn.isHidden() is False
@@ -720,11 +659,6 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
 
 
 def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
-    # The reported bug: Auto-Generate left running while the user browsed grew a row of
-    # tabs, one per image it made. Each finished variation was loaded into whatever
-    # tab was in front — the pane's resting tab, which nothing in it had asked for
-    # the image, and which then stopped being blank, so the next clicked
-    # generation opened a tab beside it rather than loading into it.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -733,28 +667,20 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
     key = _select_first_leaf(view)
 
     view._toggle_auto(True)
-    for _ in range(3):  # three variations land while the user watches
+    for _ in range(3):
         client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
     assert view._generate_pane.count() == 1
     tab = view._generate_pane.current_generate_tab()
-    # Still holding the item the folder opened on, not a variation Auto-Generate made.
     assert tab.displayed_row()["prompt_id"] == "orig"
 
     landed = next(r for r in db.list_generations() if r["status"] == "completed")
     view._on_thumbnail_clicked(landed["prompt_id"])
 
-    assert view._generate_pane.count() == 1  # it filled that tab instead of forking one
+    assert view._generate_pane.count() == 1
 
 
 def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
-    # The reported bug: Auto-Generate's live frames filled the preview of whichever
-    # tab was open, over the image the user had put there, and its results landed
-    # there too. Auto-Generate runs while the user works on something else; the
-    # folder's own live tile is where it can be watched. Even a tab on the folder
-    # it runs in —
-    # which does light up with its progress and Next-seed button — keeps showing
-    # what the user opened it on.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -768,20 +694,16 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
 
     view._toggle_auto(True)
     job = view._live_jobs[key]
-    client.preview_image.emit(job.prompt_id, b"a frame")   # the run streams
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # ...and lands
+    client.preview_image.emit(job.prompt_id, b"a frame")
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     tab._preview.show_frame.assert_not_called()
     tab._preview.show_media.assert_not_called()
-    assert tab._displayed_row is showing  # still the user's own generation
-    assert view._selected_reroll_key is None  # the pane was never taken over
+    assert tab._displayed_row is showing
+    assert view._selected_reroll_key is None
 
 
 def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
-    # Clicking the folder's live tile is how Auto-Generate is watched full size, and
-    # it is the one thing that gives the pane to Auto-Generate. Watching one variation
-    # is watching what Auto-Generate does next, so the tile picked once keeps mirroring
-    # across the hand-off rather than going dark after one.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -789,7 +711,7 @@ def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtb
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    _generating_tile(view).selected.emit()  # the user points the pane at Auto-Generate
+    _generating_tile(view).selected.emit()
     tab = view._generate_pane.current_generate_tab()
     tab._preview.show_frame = MagicMock()
 
@@ -801,8 +723,6 @@ def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtb
 
 
 def test_auto_generate_ending_lets_the_pane_go(qtbot, tmp_path):
-    # The key stands for Auto-Generate while it runs, so the switch going off is what
-    # ends the pane's watch — nothing else is coming to take it.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -814,14 +734,12 @@ def test_auto_generate_ending_lets_the_pane_go(qtbot, tmp_path):
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
     view._toggle_auto(False)
-    view._cancel_reroll(key)  # and the variation in flight is thrown away
+    view._cancel_reroll(key)
 
     assert view._selected_reroll_key is None
 
 
 def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path):
-    # The claim is by folder, so a tab parked on different settings stays idle
-    # rather than showing progress for a run that has nothing to do with it.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -832,15 +750,12 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
 
     _new_tile(view).add_requested.emit()
 
-    assert view._live_jobs                       # the run started
-    assert tab._cancel_btn.isHidden() is True    # but this tab isn't its home
+    assert view._live_jobs
+    assert tab._cancel_btn.isHidden() is True
     assert tab._generating is False
 
 
 def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
-    # And it still ends up on screen: the press was a press for an image, so a
-    # tab opens on the run rather than the pane going on showing work the press
-    # had nothing to do with. The tab that was up keeps what it was holding.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -858,9 +773,6 @@ def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
 
 
 def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
-    # That run's Cancel and its filling bar are in the opened tab, so it is no
-    # longer one a later click may replace — the rule a tab that claimed the
-    # same press already follows.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -875,8 +787,6 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
 
 
 def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
-    # Never hidden: Auto-Generate runs until it is stopped, and a switch that went away
-    # with its folder would leave one running with nothing on screen to say so.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -884,23 +794,20 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     assert not view._buttons.auto.isHidden()
     assert view._buttons.auto.isEnabled()
 
-    view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
+    view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert not view._buttons.auto.isHidden()   # still there
-    assert not view._buttons.auto.isEnabled()  # with nothing to do from here
+    assert not view._buttons.auto.isHidden()
+    assert not view._buttons.auto.isEnabled()
     assert "open a settings folder" in view._buttons.auto.toolTip()
 
 
 def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtbot, tmp_path):
-    # The tip is only offered while Auto-Generate is somewhere other than the folder on
-    # screen, and being taken there is the whole of what it is for — naming the
-    # folder would be no help, since the names are long and alike.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    view._tree.setCurrentItem(_image_workflow(view._tree))  # look somewhere else
+    view._tree.setCurrentItem(_image_workflow(view._tree))
     assert _selected_folder(view) != key
 
     view._buttons.auto_tip.link_activated.emit("auto")
@@ -908,30 +815,23 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtb
     assert _selected_folder(view) == key
 
 
-# --- a tab's Generate is a re-roll of its folder, navigated to at once ---------
-
 
 def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_path):
-    # Change 1: Generate in a tab whose settings match an existing folder launches a
-    # re-roll there and lands the Gallery pane in that folder, its live tile selected.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    orig_folder = _select_first_leaf(view)      # the folder 'orig' already lives in
-    view._tree.setCurrentItem(_image_workflow(view._tree))  # navigate away first
+    orig_folder = _select_first_leaf(view)
+    view._tree.setCurrentItem(_image_workflow(view._tree))
 
     folder = _generate_in_current_tab(view, positive_prompt="a cat", seed=123)
 
-    assert folder == orig_folder                    # same settings folder as 'orig'
-    assert folder in view._live_jobs              # a re-roll now runs in it
-    assert _selected_folder(view) == folder    # and the view jumped there
-    assert view._selected_reroll_key == folder      # its live tile drives the Generate pane
+    assert folder == orig_folder
+    assert folder in view._live_jobs
+    assert _selected_folder(view) == folder
+    assert view._selected_reroll_key == folder
 
 
 def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
-    # Change 3: edited params make a settings folder with no finished result yet, but
-    # the re-roll's running row gives it a tree node at once — so the view navigates
-    # there DURING generation, not only when it finishes.
     db = _seeded_db(tmp_path, seed=7)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -940,25 +840,22 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
 
     folder = _generate_in_current_tab(view, positive_prompt="a totally new prompt", seed=5)
 
-    assert folder not in before                     # a brand-new folder...
-    assert view._tree_item_for(folder) is not None  # ...that now has a node (its running row)
-    assert folder in view._live_jobs              # the re-roll is in flight
-    assert _selected_folder(view) == folder    # navigated to at once, mid-generation
+    assert folder not in before
+    assert view._tree_item_for(folder) is not None
+    assert folder in view._live_jobs
+    assert _selected_folder(view) == folder
 
-
-# --- a tab's right-click: across to the folder its settings generate into -----
 
 
 def test_a_tabs_go_to_folder_opens_the_folder_its_settings_have_made(qtbot, tmp_path):
-    # The way across from an open generate tab to the images it has made.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    folder = _select_first_leaf(view)            # the folder 'orig' lives in
+    folder = _select_first_leaf(view)
     tab = view._generate_pane.current_generate_tab()
     tab.prefill("sdxl_t2i",
                   dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
-    view._tree.setCurrentItem(_image_workflow(view._tree))  # navigate away first
+    view._tree.setCurrentItem(_image_workflow(view._tree))
 
     view._generate_pane.folder_requested.emit(tab.settings_folder_key())
 
@@ -966,8 +863,6 @@ def test_a_tabs_go_to_folder_opens_the_folder_its_settings_have_made(qtbot, tmp_
 
 
 def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
-    # It is a decision to go somewhere, so the hits it was raised over stop
-    # standing over the folder it opens.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1021,13 +916,10 @@ def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_pa
 
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "sdxl_t2i"
-    assert job.params["seed"] != 42            # a fresh seed, not the duplicate's
+    assert job.params["seed"] != 42
 
 
 def test_generate_from_a_tab_back_on_its_videos_own_seeds_draws_a_fresh_one(qtbot, tmp_path):
-    # Saved before its workflow gained its later settings, this video matches no
-    # saved row key for key; the tab showing it on its own seeds still says
-    # "Generate with Random seed", and the press keeps that promise.
     db = Database(tmp_path / "t.db")
     db.insert_generation(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
@@ -1059,7 +951,7 @@ def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_
     view._on_generate_requested("sdxl_t2i", [{"seed": 999, "positive_prompt": "a novel prompt"}])
 
     job = next(iter(view._live_jobs.values()))
-    assert job.params["seed"] == 999           # launched exactly as asked, unprompted
+    assert job.params["seed"] == 999
 
 
 def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_path):
@@ -1080,8 +972,6 @@ def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_pat
     assert tab._generate_btn.isEnabled() is False
 
 
-# --- the Genau lane: a looping video, made but not sent anywhere ---------------
-
 
 def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
@@ -1089,7 +979,6 @@ def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view._combine.generate_category("img", "alpha", action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
-    # The action has a long-form video too; the Genau lane can only use the loop.
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
@@ -1111,8 +1000,6 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
 
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
-    # Someone at the keyboard can look at the loop first, so nothing leaves for
-    # Evolver until Send-to-Genau is pressed.
     view = _genau_view(qtbot, tmp_path)
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
@@ -1130,8 +1017,6 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
 
 
 def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp_path):
-    # His rule: one item at a time per folder. The press that starts a run takes
-    # the button with it, so the second half of a double-click lands on nothing.
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -1147,9 +1032,6 @@ def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp
 
 
 def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tmp_path):
-    # The double-click he describes: the app has been slow enough that he presses
-    # Generate twice to be sure it took, and the second press used to draw its own
-    # seed and make an image he never asked for.
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

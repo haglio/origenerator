@@ -101,6 +101,14 @@ def test_most_used_video_breaks_count_ties_by_recency():
     assert action_settings.most_used_video("alpha", rows) == "b1"
 
 
+def test_a_video_with_no_creation_time_counts_as_the_oldest_in_a_tie():
+    rows = [
+        _video("a1", "alpha", None, lora_high="X"),
+        _video("b1", "alpha", "2026-01-01", lora_high="Y"),
+    ]
+    assert action_settings.most_used_video("alpha", rows) == "b1"
+
+
 def test_most_used_video_keeps_each_action_to_the_videos_launched_as_it():
     rows = [
         _video("f1", "delta", "2026-01-01", lora_high="X"),

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from PIL import Image
+
 from origenerator import gallery
 from origenerator.db import Database
 from origenerator.output_places import OutputPlaces
@@ -53,3 +55,16 @@ def test_the_image_it_was_opened_on_stands_in_the_line_once(tmp_path):
 
     asked = [image["prompt_id"] for image in waiting]
     assert (asked[0], asked.count("gen-two"), len(asked)) == ("gen-two", 1, 2)
+
+
+def test_a_waiting_image_is_shown_from_its_full_file_and_from_its_thumbnail_once_that_file_is_gone(tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _a_finished_image(db, "gen-one", 1)
+    db.update_generation("gen-one", thumbnail_path=str(tmp_path / "thumb.jpg"))
+    places = OutputPlaces.in_one_folder(tmp_path)
+    assert [image["image_path"] for image in waiting_images(db, places)] == [str(tmp_path / "thumb.jpg")]
+
+    Image.new("RGB", (4, 4)).save(tmp_path / "gen-one.png")
+
+    assert [image["image_path"] for image in waiting_images(db, places)] == [str(tmp_path / "gen-one.png")]
+

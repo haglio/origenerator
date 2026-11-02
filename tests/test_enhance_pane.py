@@ -1,9 +1,3 @@
-"""The Enhance pane and the version list beside it.
-
-Two small widgets for the two halves of "enhancement is a layer": the Enhance pane
-edits what a folder enhances at, and the version list shows what an image has
-already received.
-"""
 from __future__ import annotations
 
 import json
@@ -79,9 +73,6 @@ _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
 
 def _panel(qtbot, detectors=_FOUND_DETECTORS):
-    """A pane built against a stated set of installed detectors — the one thing
-    on it that can be missing, and so the one thing a test must not read off
-    whatever this machine happens to have in its ComfyUI."""
     edits = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parts, "list_detector_files", lambda: list(detectors))
@@ -92,10 +83,6 @@ def _panel(qtbot, detectors=_FOUND_DETECTORS):
 
 
 def _versions(count, params=None):
-    """``count`` enhancements over an original, newest first — the shape
-    :func:`~origenerator.gallery.enhance.enhancement_versions` produces. ``0`` is an
-    image that has received none, which lists nothing at all (not even its own
-    file: with no enhancement there is no version to compare)."""
     if not count:
         return []
     return [
@@ -106,12 +93,8 @@ def _versions(count, params=None):
 
 
 def _items(versions):
-    """Pair each version with the file the list would draw it from — nothing on
-    disk here, so the rows fall back to their labels."""
     return [(version, None) for version in versions]
 
-
-# --- the Enhance pane ----------------------------------------------------------
 
 
 def test_a_fresh_panel_reads_as_the_workflow_defaults_tick_off(qtbot):
@@ -123,8 +106,6 @@ def test_a_fresh_panel_reads_as_the_workflow_defaults_tick_off(qtbot):
 
 
 def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):
-    # The pane's power, not one of its settings: a bare switch on the title row,
-    # at the far end from the heading. What it does lives in its tooltip.
     pane, _ = _panel(qtbot)
     assert isinstance(pane._auto, ToggleSwitch)
     assert pane._auto.isCheckable()
@@ -132,9 +113,9 @@ def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):
     assert pane._auto.toolTip()
 
     title_row = pane.layout().itemAt(0).layout()
-    assert title_row.itemAt(0).widget().text() == "Enhance"      # the heading leads
+    assert title_row.itemAt(0).widget().text() == "Enhance"
     assert title_row.itemAt(title_row.count() - 1).widget() is pane._auto
-    assert title_row.itemAt(1).spacerItem() is not None          # pushed to the right
+    assert title_row.itemAt(1).spacerItem() is not None
 
 
 def test_the_switch_flips_and_reports(qtbot):
@@ -150,8 +131,6 @@ def test_the_switch_flips_and_reports(qtbot):
 
 
 def test_the_switch_draws_at_both_states(qtbot):
-    # It paints itself (a stylesheet cannot move a tick's indicator), so the
-    # paint path is worth exercising in both positions.
     switch = ToggleSwitch("Auto")
     qtbot.addWidget(switch)
     switch.resize(switch.sizeHint())
@@ -160,12 +139,10 @@ def test_the_switch_draws_at_both_states(qtbot):
     on = switch.grab().toImage()
     assert not off.isNull()
     assert not on.isNull()
-    assert off != on            # the setting and the track visibly moved
+    assert off != on
 
 
 def test_loading_a_folders_settings_writes_nothing_back(qtbot):
-    # Opening a folder fills the pane; that is not an edit, and must not
-    # re-persist (which would stamp defaults over settings it failed to load).
     pane, edits = _panel(qtbot)
     pane.show_settings(EnhanceSettings(auto=True, params={"enhance_steps": 40}))
     assert edits == []
@@ -180,7 +157,7 @@ def test_every_setting_reports_its_edit(qtbot):
     pane._steps.setValue(35)
     pane._denoise.setValue(0.4)
 
-    assert len(edits) == 4          # each edit writes through on its own
+    assert len(edits) == 4
     latest = edits[-1]
     assert latest.auto is True
     assert latest.params["enhance_scale"] == 3.0
@@ -189,13 +166,8 @@ def test_every_setting_reports_its_edit(qtbot):
 
 
 def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
-    # One of each per part the app can aim a detail pass at: the tick says
-    # whether that part is fixed, the number how hard — a mouth wants a harder
-    # redraw than a face, and one shared number could never say so.
     pane, edits = _panel(qtbot)
     assert list(pane._fixes) == [part.name for part in part_table()]
-    # Nothing checked, so nothing pays for a pass it didn't ask for — while the
-    # numbers already read as what a fix runs at.
     assert pane.settings().params["enhance_detail_fixes"] == {}
     assert pane._fixes["faces"].value() == DEFAULT_FIX_DENOISE
 
@@ -210,31 +182,23 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
 
 
 def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
-    # Seven parts share one line only if none of them is padded out: Qt's own
-    # hint for a spinner is far wider than "0.00", and a field given a floor
-    # and a share of the slack (as the three numbers above have) costs another
-    # part its place on the line.
     pane, _ = _panel(qtbot)
     spinner = pane._fixes["faces"]
     digits = spinner.fontMetrics().horizontalAdvance("0.00")
 
-    assert digits < spinner.minimumWidth() <= digits + 30   # its own chrome, no more
-    assert spinner.minimumWidth() == spinner.maximumWidth()     # fixed, so a wide pane
-    assert spinner.minimumWidth() < spinner.sizeHint().width()  # doesn't stretch it
+    assert digits < spinner.minimumWidth() <= digits + 30
+    assert spinner.minimumWidth() == spinner.maximumWidth()
+    assert spinner.minimumWidth() < spinner.sizeHint().width()
 
 
 def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
-    # The window tiles into a third of a monitor, so no row of fields may set
-    # the floor for it — and a line too long to fit has to wrap, since a
-    # clipped part is a setting that silently isn't there.
     pane, _ = _panel(qtbot)
     host = pane._fixes["faces"].parent().parent()
     flow = host.layout()
     pairs = [flow.itemAt(i).widget() for i in range(flow.count())]
 
-    assert flow.heightForWidth(120) > flow.heightForWidth(4000)   # it wraps
-    assert host.hasHeightForWidth()   # or the wrapped rows are cut off the foot
-    # Its floor is one part, not the whole line.
+    assert flow.heightForWidth(120) > flow.heightForWidth(4000)
+    assert host.hasHeightForWidth()
     assert host.minimumSizeHint().width() <= max(
         pair.sizeHint().width() for pair in pairs) + 8
 
@@ -242,7 +206,7 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
 def _laid_out_at(pane, width, height=900):
     pane.show()
     pane.resize(width, height)
-    for _ in range(3):  # each reflow posts the layout pass that follows it
+    for _ in range(3):
         QApplication.processEvents()
 
 
@@ -423,8 +387,6 @@ def test_settings_turned_or_loaded_onto_a_preset_show_it_and_off_one_read_custom
 
 
 def _pick(dropdown, index):
-    """What a choice from the open list does: the box moves to it, then says it
-    was picked."""
     dropdown.setCurrentIndex(index)
     dropdown.activated.emit(index)
 
@@ -508,7 +470,7 @@ def test_the_fields_line_up_down_the_panel_either_way_the_numbers_lie(qtbot):
 
 def test_a_number_is_never_squeezed_narrower_than_its_widest_value(qtbot):
     pane, _ = _panel(qtbot)
-    pane.setStyleSheet(build_stylesheet() + pane.styleSheet())  # the app's own chrome
+    pane.setStyleSheet(build_stylesheet() + pane.styleSheet())
     for width in range(pane.minimumSizeHint().width(), 1201, 20):
         _laid_out_at(pane, width)
         for field in _numbers(pane):
@@ -520,8 +482,6 @@ def test_a_number_is_never_squeezed_narrower_than_its_widest_value(qtbot):
 
 
 def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
-    # The tick is the on/off, so unticking must leave the settings — and leave
-    # the number where it was, since the next tick means the same fix again.
     pane, edits = _panel(qtbot)
     pane._fix_checks["faces"].setChecked(True)
     pane._fixes["faces"].setValue(0.7)
@@ -530,13 +490,10 @@ def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
 
     assert edits[-1].params["enhance_detail_fixes"] == {}
     assert pane._fixes["faces"].value() == 0.7
-    # And off, the part reads as off rather than as a live setting.
     assert not pane._fixes["faces"].isEnabled()
 
 
 def test_an_unticked_parts_name_and_number_gray_out(qtbot):
-    # Which parts are on has to be readable down the line at a glance, not
-    # worked out checkbox by checkbox.
     pane, _ = _panel(qtbot)
     label = pane._label_for(pane._fixes["faces"])
 
@@ -550,16 +507,9 @@ def test_an_unticked_parts_name_and_number_gray_out(qtbot):
 
 
 def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
-    # The settings here that can be unavailable rather than merely unset: the
-    # model that finds a part is a separate install, and a run naming one
-    # ComfyUI hasn't got is rejected on submit. Better a tick that says why than
-    # one that quietly fails.
     pane, _ = _panel(qtbot, detectors=("face_finder.pt",))
     assert pane._fix_checks["faces"].isEnabled()
     assert not pane._fix_checks["hands"].isEnabled()
-    # The whole setup, in the one place someone reads carefully: the node pack
-    # that runs the detectors, the folder the models go in, and what the file
-    # this part needs is called.
     tooltip = pane._fix_checks["hands"].toolTip()
     assert "models/ultralytics/bbox" in tooltip
     assert "models/ultralytics/segm" in pane._fix_checks["skin"].toolTip()
@@ -569,21 +519,12 @@ def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
 
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
-    # Some other detector sitting in that folder would leave every part tickable
-    # and every pass finding nothing. Unavailable says which file to add.
     pane, _ = _panel(qtbot, detectors=("cat_finder.pt",))
     assert not any(checkbox.isEnabled() for checkbox in pane._fix_checks.values())
 
 
 def _mean_ink(widget) -> float:
-    """How bright the widget draws over the app's own background, averaged over
-    every pixel — the one thing a "does it actually look disabled?" test can
-    measure without fonts.
-
-    Rendered onto a filled pixmap rather than grabbed: a bare ``grab`` leaves
-    whatever the widget doesn't paint uninitialized, and a switch that dims by
-    going translucent then measures as whatever happened to be under it.
-    """
+    """Mean brightness over the app's background, rendered onto a filled pixmap since a bare ``grab`` leaves unpainted pixels uninitialized."""
     pixmap = QPixmap(widget.size())
     pixmap.fill(BG_PRIMARY)
     widget.render(pixmap, QPoint(), flags=QWidget.RenderFlag.DrawChildren)
@@ -597,9 +538,6 @@ def _mean_ink(widget) -> float:
 
 
 def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
-    # setEnabled alone changed nothing here: the app's sheet colors every label,
-    # dropdown and spinner outright and names no disabled state, so a pane that
-    # could not apply went on reading exactly as live as one that could.
     pane, _ = _panel(qtbot)
     pane.show_settings(EnhanceSettings(auto=True, params={}))
     pane.resize(360, 150)
@@ -611,7 +549,7 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
 
     assert not pane.isEnabled()
     assert pane.toolTip() == "no video enhancer"
-    assert _mean_ink(pane) < live      # visibly dimmer, not merely inert
+    assert _mean_ink(pane) < live
 
     pane.set_applicable(True)
     assert pane.isEnabled()
@@ -619,8 +557,6 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
 
 
 def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
-    # Switching the pane off and on again must not hand back a setting that was
-    # grayed in its own right: the part still has no model to find it.
     pane, _ = _panel(qtbot, detectors=())
     pane.set_applicable(False, "nope")
     pane.set_applicable(True)
@@ -629,8 +565,6 @@ def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
 
 
 def test_a_model_no_longer_installed_is_still_shown(qtbot):
-    # A folder configured against a checkpoint since removed must come back
-    # reading as that checkpoint, not silently snap to whatever sorts first.
     pane, _ = _panel(qtbot)
     pane.show_settings(EnhanceSettings(params={"checkpoint": "retired_v1.safetensors"}))
     assert pane.settings().params["checkpoint"] == "retired_v1.safetensors"
@@ -656,20 +590,16 @@ def test_settings_survive_a_load_and_read_back(qtbot):
     assert pane.settings() == original
 
 
-# --- the version list ------------------------------------------------------
-
 
 def _rows(widget):
     return widget._host.findChildren(_VersionRow)
 
 
 def _labels(widget):
-    """Each row's title — the version it names."""
     return [row._title.text() for row in _rows(widget)]
 
 
 def _facts(row):
-    """Every label on one row, its em-dash "file is gone" placeholder dropped."""
     return " / ".join(lbl.text().replace("\u200b", "")
                       for lbl in row.findChildren(QLabel)
                       if lbl.text() and lbl.text() != "—")
@@ -679,12 +609,10 @@ def test_an_unenhanced_image_shows_no_version_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(0)))
-    assert versions.isHidden()      # no enhancement, nothing to say
+    assert versions.isHidden()
 
 
 def test_a_lone_enhancement_is_still_worth_showing(qtbot):
-    # An image the inline tail finished kept no original, so it has exactly one
-    # version. The yellow plus says it was enhanced; this is where you see how.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items([
@@ -710,17 +638,15 @@ def test_clicking_a_version_reports_its_position(qtbot):
     picked = []
     versions.version_selected.connect(picked.append)
 
-    row = _rows(versions)[2]      # the original
+    row = _rows(versions)[2]
     qtbot.mousePress(row, Qt.MouseButton.LeftButton)
     qtbot.mouseRelease(row, Qt.MouseButton.LeftButton)
 
     assert picked == [2]
-    assert versions.selected_positions() == [2]   # and it is the picked one
+    assert versions.selected_positions() == [2]
 
 
 def test_each_version_carries_its_own_file_and_created_rows(qtbot):
-    # The file information is per enhancement: it belongs with the version that
-    # made the file, alongside the settings that made it.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0})),
@@ -731,8 +657,6 @@ def test_each_version_carries_its_own_file_and_created_rows(qtbot):
     assert "2x" in facts
     assert "File" in facts
     assert "image/e1.png" in facts
-    # The file isn't on disk here, so its own write time can't be read — the
-    # row's timestamp is the closest true answer left.
     assert "Created" in facts
     assert "2026-08-01" in facts
 
@@ -757,15 +681,12 @@ def test_a_versions_settings_caption_its_row(qtbot):
 
 
 def test_rebuilding_for_another_image_drops_the_old_rows(qtbot):
-    # Switching selection must not stack one image's versions under another's.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     versions.show_versions(_items(_versions(1)))
     assert _labels(versions) == ["Enhancement 1/1", "Original"]
 
-
-# --- picking versions and binning them ---------------------------------------
 
 
 def _click(qtbot, row, modifier=Qt.KeyboardModifier.NoModifier):
@@ -774,10 +695,6 @@ def _click(qtbot, row, modifier=Qt.KeyboardModifier.NoModifier):
 
 
 def test_clicking_anywhere_on_a_row_picks_it(qtbot):
-    # A row is one thing to click. Its thumbnail and its lines of text cover
-    # nearly all of it, and a child widget takes the press by default — which
-    # left only the margins around them live.
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), created_fallback="2026-08-01")
@@ -790,10 +707,6 @@ def test_clicking_anywhere_on_a_row_picks_it(qtbot):
 
 
 def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
-    # The pass-through must stop at the copy, trash and Show-in-Explorer buttons:
-    # Qt's hit test skips a container marked transparent along with everything
-    # inside it, so these are laid into the row's grid rather than into one.
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)))
@@ -807,11 +720,6 @@ def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
 
 
 def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
-    # The value labels come from the Basic section, where they are selectable
-    # text — and Qt gives selectable text its own Copy / Select All menu. Over a
-    # version that menu means nothing (the row has a Copy button for the one
-    # value worth copying) and it is in the way of the row's own Delete.
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), created_fallback="2026-08-01")
@@ -834,8 +742,6 @@ def test_a_plain_click_picks_one_version_at_a_time(qtbot):
 
 
 def test_ctrl_click_adds_to_the_picking(qtbot):
-    # The gesture is "these ones", aimed at the Delete that follows — so it
-    # doesn't swap the preview under each click either.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
@@ -846,7 +752,7 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
     _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ControlModifier)
 
     assert versions.selected_positions() == [0, 1]
-    assert shown == [0]   # only the plain click moved the preview
+    assert shown == [0]
 
 
 @pytest.mark.parametrize(("clicked", "shift_clicked", "run"),
@@ -863,7 +769,7 @@ def test_shift_click_picks_the_run_from_the_version_last_clicked(qtbot, clicked,
     _click(qtbot, _rows(versions)[shift_clicked], Qt.KeyboardModifier.ShiftModifier)
 
     assert versions.selected_positions() == run
-    assert shown == [clicked]   # picked for the Delete, like a ctrl-click
+    assert shown == [clicked]
 
 
 def test_an_arrow_after_a_shift_click_steps_on_from_the_version_shift_clicked(qtbot):
@@ -952,7 +858,6 @@ def test_up_from_the_top_version_takes_the_highlight_onto_the_enhance_row(qtbot)
 
 
 def test_a_shift_click_with_the_arrows_on_the_enhance_row_picks_just_the_version_clicked(qtbot):
-    # The Enhance row is no version, so a run has nowhere to start from there.
     versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
 
     qtbot.keyClick(row, Qt.Key.Key_Up)
@@ -1075,9 +980,6 @@ def test_a_version_let_go_of_has_its_facts_back_in_gray(qtbot):
 
 
 def test_delete_and_backspace_trash_the_picked_versions(qtbot):
-    # Sent to the row, not to the list: a click leaves the focus on the row it
-    # picked (the rows take click focus), so the key has to reach the list from
-    # there rather than only when the list itself happens to hold the focus.
     for key in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
         versions = EnhanceVersions()
         qtbot.addWidget(versions)
@@ -1094,8 +996,6 @@ def test_delete_and_backspace_trash_the_picked_versions(qtbot):
 
 
 def test_deleting_the_only_version_is_refused(qtbot):
-    # An image with no file left is a deleted generation, and that is the
-    # gallery's own delete, reached from the thumbnail.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items([
@@ -1154,9 +1054,6 @@ def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
 
 
 def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
-    # A right-click on an unpicked row picks it first, so the menu always works
-    # on what it appeared over.
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
@@ -1236,7 +1133,7 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
     versions._on_row_menu(0, QPoint(0, 0))
 
     assert seen["enabled"] is False
-    assert "only version" in seen["text"]   # grayed with the reason on it
+    assert "only version" in seen["text"]
     assert asked == []
 
 
@@ -1373,15 +1270,9 @@ def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
     assert trash.toolTip() == "Delete this version"
 
 
-# --- dragging a version onto the pane to reuse its settings -----------------
-
-
-# --- the "+ Enhance" row ----------------------------------------------------
 
 
 def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
-    # Leftmost, because that is where a new version arrives: the strip runs
-    # newest first.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
@@ -1395,8 +1286,6 @@ def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
 
 
 def test_a_running_enhance_takes_the_add_tiles_slot_rather_than_sitting_beside_it(qtbot):
-    # The row becomes the thing it asked for, which is what the press looks
-    # like from the other side.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), pending=RunningEnhancement("running", None, "2x"),
@@ -1435,7 +1324,7 @@ def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
     (add_row,) = versions._host.findChildren(_AddRow)
-    plus = add_row._thumbnail.pixmap().toImage()  # drawn, like the Gallery pane buttons' plus, not typed
+    plus = add_row._thumbnail.pixmap().toImage()
 
     inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
                 if plus.pixelColor(x, y).alpha() > 128)
@@ -1459,7 +1348,7 @@ def test_the_tile_dims_when_it_would_only_duplicate_a_version(qtbot):
     pressed = []
     versions.enhance_requested.connect(lambda: pressed.append(True))
     qtbot.mouseRelease(add_row, Qt.MouseButton.LeftButton)
-    assert pressed == []                       # it makes nothing new, so it does nothing
+    assert pressed == []
     assert "already has a version" in add_row.toolTip()
 
 
@@ -1494,11 +1383,7 @@ def test_a_foreign_drag_carries_nothing_this_panel_wants():
 
 @pytest.fixture
 def version_drags(monkeypatch):
-    """The drags a version row begins, in the order it began them.
-
-    QDrag stands aside so no test enters the real drag loop, which is modal and
-    waits on a mouse. The list is this test's own, so nothing carries over.
-    """
+    """The drags a version row begins; QDrag stands aside because the real drag loop is modal and waits on a mouse."""
     started = []
 
     class _Drag:
@@ -1527,8 +1412,6 @@ def _an_image(path, size=(16, 16)):
 
 
 def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, version_drags):
-    # The same gesture as dragging a gallery thumbnail onto Combine: the thumbnail
-    # comes along under the cursor, so what is being dragged is never in doubt.
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
@@ -1542,23 +1425,17 @@ def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, version_drags):
 
 
 def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, version_drags):
-    # Both drag tests here move eighty pixels, well past the threshold that tells
-    # a click from a drag — so removing it left them green, and a click that
-    # wobbles a pixel would pick the row up instead of selecting it.
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
-    qtbot.mouseMove(thumbnail, QPoint(3, 3))  # inside the start-drag distance
+    qtbot.mouseMove(thumbnail, QPoint(3, 3))
 
     assert version_drags == []
 
 
 def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):
-    # An enhancement is an upscale, so the file under a version can be huge; the
-    # thumbnail under the cursor is the same thumbnail every other drag trails.
-
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))
     qtbot.addWidget(thumbnail)
@@ -1571,8 +1448,6 @@ def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, vers
 
 
 def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
-    # A version whose file is gone still carries its settings; there is simply no
-    # image to trail, and that must not stop the drag.
     class _RecordingDrag:
         def __init__(self, source):
             pass
@@ -1594,20 +1469,16 @@ def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
     qtbot.mouseMove(thumbnail, QPoint(90, 90))
 
 
-# --- the enhancement being generated right now -----------------------------
-
 
 def test_a_running_enhance_leads_the_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
     tiles = versions._host.findChildren((_PendingRow, _VersionRow))
-    assert isinstance(tiles[0], _PendingRow)   # newest first, and it's becoming that
+    assert isinstance(tiles[0], _PendingRow)
 
 
 def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
-    # An image with only its original has no versions to choose between — but one
-    # being made for it is worth showing, so the strip appears for that alone.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(0)), RunningEnhancement("queued", None, "2x"))
@@ -1615,9 +1486,6 @@ def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
 
 
 def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
-    # "Enhancing" alone says nothing you didn't already know; the numbers are
-    # the only thing worth reading off a tile that has no thumbnail yet.
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)),
@@ -1636,10 +1504,8 @@ def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     thumbnail = versions._pending
 
     assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
-    assert versions._pending is thumbnail          # the same widget, fed in place
+    assert versions._pending is thumbnail
 
-    # A run starting or ending changes the strip's shape, which only a rebuild
-    # can do — the caller is told so rather than left with a stale strip.
     assert versions.update_pending(None) is False
 
 
@@ -1674,7 +1540,6 @@ def test_dropping_a_version_absorbs_its_settings(qtbot):
     assert settings.params["enhance_scale"] == 3.0
     assert settings.params["enhance_steps"] == 40
     assert settings.params["enhance_denoise"] == 0.35
-    # The drop says what to enhance at, not whether to keep enhancing.
     assert settings.auto is True
     assert edits
     assert edits[-1] == settings
@@ -1694,7 +1559,6 @@ def test_a_dropped_version_leaves_the_panel_at_exactly_what_that_version_ran_wit
 
 
 def _in_the_app(qtbot, pane):
-    """``pane`` shown in a pane of the window, dressed as the app dresses it."""
     host = QWidget()
     QVBoxLayout(host).addWidget(pane)
     host.setStyleSheet(build_stylesheet())
@@ -1706,8 +1570,6 @@ def _in_the_app(qtbot, pane):
 
 
 def _drop_styles_worn(pane) -> set:
-    """The drop style the pane wears, read off its ground in the title row and
-    under the settings, where nothing is drawn."""
     heading = next(label for label in pane.findChildren(QLabel) if label.text() == "Enhance")
     settings = pane.findChild(QScrollArea).geometry()
     image = pane.grab().toImage()
@@ -1750,9 +1612,6 @@ def test_the_panel_stays_as_it_is_while_anything_else_is_dragged(qtbot):
 
 
 def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
-    # The pane is one column of collapsible groups; a heading that cannot fold
-    # reads as the one thing you are not allowed to put away.
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x", None))
@@ -1763,7 +1622,7 @@ def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
 
     versions.set_collapsed(True)
     assert versions.is_collapsed()
-    assert section.content().isHidden()   # the tiles fold away with it
+    assert section.content().isHidden()
 
 
 def test_folding_survives_a_rebuild_for_another_image(qtbot):
@@ -1775,14 +1634,6 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
 
 
 def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
-    """The widest thing in the tab wraps rather than set the pane's floor.
-
-    A thumbnail beside a file's facts and buttons wants some 450px side by side,
-    which is wider than a tiling-narrow Generate pane can be — so the pane would have
-    had to choose between refusing to fit a monitor third and scrolling its
-    settings sideways. Stacked, the row asks for the wider of the two rather than
-    their sum, and neither has to give.
-    """
     (version,) = _versions(1)[:1]
     row = _VersionRow(version, 0, None)
     host = QWidget()
@@ -1795,19 +1646,17 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
     side_by_side = row._thumbnail.sizeHint().width() + row._facts.minimumSize().width()
     assert row.minimumSizeHint().width() < side_by_side
 
-    host.resize(side_by_side + 60, 400)          # room for both
+    host.resize(side_by_side + 60, 400)
     QApplication.processEvents()
     assert row._title.x() > row._thumbnail.x() + row._thumbnail.width()
     assert row._title.y() < row._thumbnail.y() + row._thumbnail.height()
 
-    host.resize(row.minimumSizeHint().width(), 400)   # room for one
+    host.resize(row.minimumSizeHint().width(), 400)
     QApplication.processEvents()
     assert row._title.y() >= row._thumbnail.y() + row._thumbnail.height()
 
 
 def test_the_panels_captions_use_plain_words(qtbot):
-    # The graph's word for the third number is denoise; the caption says what
-    # it does, and the tooltip keeps the graph's word.
     pane, _edits = _panel(qtbot)
     captions = [w.text() for w in pane.findChildren(QLabel)]
     assert {"Model", "Upscaler", "Scale", "Steps", "Redraw Amount"} <= set(captions)

@@ -124,7 +124,8 @@ def test_an_escaped_bracket_is_read_as_a_bracket_where_the_pieces_are_cut(comfyu
 
     pieces = _clip(comfyui).pieces(text)
 
-    assert pieces[0] == (0, 75) and text[pieces[1][0]:].startswith("cat")
+    assert pieces[0] == (0, 75)
+    assert text[pieces[1][0]:].startswith("cat")
 
 
 def test_a_flux_prompt_is_read_whole_by_t5(comfyui):

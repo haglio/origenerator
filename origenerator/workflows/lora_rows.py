@@ -54,14 +54,14 @@ def lora_strength(key: str, default: float, label: str = "") -> ParamDef:
                     min_val=0.0, max_val=2.0, step=0.05, good=(0.6, 1.2))
 
 
-def lora_rows(defaults: dict, keys, *, accepts, expert: str | None = None,
-              qualifier: str = "", beside_model: str = "") -> list[ParamDef]:
+def lora_rows(defaults: dict, keys, *, qualifier: str = "", beside_model: str = "",
+              **offered) -> list[ParamDef]:
     rows: list[ParamDef] = []
     for number, key in enumerate(keys, start=1):
         label = _row_label(number, len(keys), qualifier)
         rows += [
             ParamDef(key, f"LoRA{label}", ParamType.COMBO, defaults[key],
-                     options=list_lora_files([defaults[key]], accepts=accepts, expert=expert),
+                     options=list_lora_files([defaults[key]], **offered),
                      beside_model=beside_model, folder="loras"),
             lora_strength(strength_key_of(key), defaults[strength_key_of(key)], label),
         ]

@@ -47,7 +47,7 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.motion_engine import Motion
 from origenerator.orientation import base_of, oriented_key
 from origenerator.output_places import OutputPlaces
-from origenerator.prompt_edit import apply_request
+from origenerator.prompt_edit import request_applier
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -1231,7 +1231,10 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     qtbot.addWidget(view)
     # The words alone, with no smart matcher: these cover the policy and the
     # plumbing, and a matcher would put a local LLM in the middle of both.
-    view._voice._revision = RevisionWorker(apply_request, parent=view)
+    view._voice._revision = RevisionWorker(
+        lambda positive, negative, request, *, in_scenes:
+            request_applier(in_scenes)(positive, negative, request),
+        parent=view)
     view._voice._revision.revised.connect(view._voice._on_revised)
     view._bank.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()

@@ -344,7 +344,8 @@ class FakeFollowingLoraWorkflow(FakeWorkflow):
                 "lora_strength": 1.0}
 
     def param_definitions(self) -> list:
-        return super().param_definitions() + [
+        return [
+            *super().param_definitions(),
             ParamDef("unet", "Model", "combo", "raw_model.safetensors",
                      options=["raw_model.safetensors", "turbo_model.safetensors"]),
             ParamDef("lora", "LoRA", "combo", "None", beside_model="unet",

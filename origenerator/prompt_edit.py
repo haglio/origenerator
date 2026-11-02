@@ -327,7 +327,7 @@ class PromptRevision:
 
 
 def apply_request(positive: str, negative: str, request: str,
-                  match=None, rewrite=None, *, in_scenes: bool = False) -> PromptRevision | None:
+                  match=None, rewrite=None) -> PromptRevision | None:
     """Apply a ``request`` to a prompt pair, by the policy up top.
 
     ``match(terms, term)`` is how a positive prompt that doesn't say the words
@@ -349,20 +349,31 @@ def apply_request(positive: str, negative: str, request: str,
     parsed = parse_request(request)
     if parsed is None:
         return None
+    return _revised(unboxed(positive or ""), unboxed(negative or ""), request, parsed,
+                    match, rewrite)
+
+
+def apply_request_to_each_scene(positive: str, negative: str, request: str,
+                                match=None, rewrite=None) -> PromptRevision | None:
     positive, negative = unboxed(positive or ""), unboxed(negative or "")
     scenes, negatives = scene_prompts(positive), scene_prompts(negative)
-    if not in_scenes or len(scenes) == 1:
-        return _revised(positive, negative, request, parsed, match, rewrite)
+    if len(scenes) == 1:
+        return apply_request(positive, negative, request, match, rewrite)
     each_negative = [scene_text(negatives, index) for index in range(len(scenes))]
-    revisions = [_revised(scene, scene_negative, request, parsed, match, rewrite)
+    revisions = [apply_request(scene, scene_negative, request, match, rewrite)
                  for scene, scene_negative in zip(scenes, each_negative, strict=True)]
-    polarity, term = parsed
+    if revisions[0] is None:
+        return None
     return PromptRevision(positive, negative,
                           story_of([revision.positive for revision in revisions]),
                           _negative_story(negative, each_negative,
                                           [revision.negative for revision in revisions]),
-                          term, polarity,
+                          revisions[0].term, revisions[0].polarity,
                           ", ".join(dict.fromkeys(revision.action for revision in revisions)))
+
+
+def request_applier(in_scenes: bool):
+    return apply_request_to_each_scene if in_scenes else apply_request
 
 
 def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
@@ -422,8 +433,8 @@ def work_out(positive: str, negative: str, request: str, *,
     """``request`` applied as every request is, spoken or typed: the local LLM
     finding a term the prompt names in its own words, and rewriting the pair for
     one in neither prompt."""
-    return apply_request(
-        positive, negative, request, in_scenes=in_scenes,
+    return request_applier(in_scenes)(
+        positive, negative, request,
         match=partial(smart_match, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
                       system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
         rewrite=partial(rewrite_prompt, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,

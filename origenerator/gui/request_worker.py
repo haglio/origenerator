@@ -51,14 +51,10 @@ class ReviseTask(QRunnable):
     """Runs one ``RevisionWorker.revise`` off the UI thread; the worker's signal
     carries the result back to the thread that owns it."""
 
-    def __init__(self, worker: RevisionWorker, context, positive: str,
-                 negative: str, request: str, *, in_scenes: bool):
+    def __init__(self, worker: RevisionWorker, *asked, in_scenes: bool):
         super().__init__()
         self._worker = worker
-        self._context = context
-        self._positive = positive
-        self._negative = negative
-        self._request = request
+        self._asked = asked
         self._in_scenes = in_scenes
 
     def run(self):
@@ -72,7 +68,6 @@ class ReviseTask(QRunnable):
         one abandoned request failed an unrelated test three files later.
         """
         try:
-            self._worker.revise(self._context, self._positive, self._negative,
-                                self._request, self._in_scenes)
+            self._worker.revise(*self._asked, self._in_scenes)
         except RuntimeError:
             logger.info("The request's window closed before its answer came back")

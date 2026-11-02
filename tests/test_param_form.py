@@ -2434,7 +2434,7 @@ def test_the_scenes_warn_about_their_length_and_a_missing_trigger_word_on_two_li
     form.set_warnings({**_duration_advice(form), "lora_high": _TRIGGER_WORD["lora"]})
 
     assert form._warning_marks["scene_frames"].toolTip() == (
-        f"Good range: 5–10 s. Click to use 10 s.\n{_TRIGGER_WORD_SAID}")
+        f"Good range: 5\N{EN DASH}10 s. Click to use 10 s.\n{_TRIGGER_WORD_SAID}")
 
 
 def test_a_warning_mark_sits_left_of_its_label(qtbot):

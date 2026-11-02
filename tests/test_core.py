@@ -32,7 +32,7 @@ from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts
-from origenerator.gui.core import Core
+from origenerator.gui.core import Core, Launch
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -51,23 +51,20 @@ from tests.test_hard_to_miss import _faded_backgrounds
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
 
 
-def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None,
-            next_launch=None):
+def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, launch=None):
     win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS),
         Database(tmp_path / "t.db"),
         app_state or AppState(tmp_path / "ui.json"),
         fun_time=fun_time,
-        preview=preview,
-        taskbar=taskbar,
-        next_launch=next_launch,
+        launch=launch,
     )
     qtbot.addWidget(win)
     return win
 
 
 def test_a_preview_on_its_own_is_titled_for_the_feature_it_demos(qtbot, tmp_path):
-    win = _window(qtbot, tmp_path, preview=Preview(feature="the new seed row"))
+    win = _window(qtbot, tmp_path, launch=Launch(preview=Preview(feature="the new seed row")))
 
     assert win.windowTitle() == "Origenerator \u2014 preview of the new seed row"
 
@@ -1524,7 +1521,7 @@ def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
 def test_saving_the_session_tells_the_next_launchs_loading_screen_the_monitor_the_window_is_on(
         qtbot, tmp_path):
     next_launch = launchers_screen.MeetingPlace(tmp_path / "screen", ())
-    win = _window(qtbot, tmp_path, next_launch=next_launch)
+    win = _window(qtbot, tmp_path, launch=Launch(next_launch=next_launch))
     win.show()
 
     win.close()
@@ -1534,7 +1531,8 @@ def test_saving_the_session_tells_the_next_launchs_loading_screen_the_monitor_th
 
 def test_a_fun_time_window_tells_the_next_launchs_loading_screen_nothing(qtbot, tmp_path):
     next_launch = launchers_screen.MeetingPlace(tmp_path / "screen", ())
-    win = _window(qtbot, tmp_path, fun_time=_fun_time_session(), next_launch=next_launch)
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session(),
+                   launch=Launch(next_launch=next_launch))
     win.show()
 
     win.close()
@@ -1756,7 +1754,7 @@ def taskbar_buttons(qapp):
 def test_a_window_taken_into_a_session_shows_under_the_sessions_taskbar_button(
         qtbot, tmp_path, taskbar_buttons):
     taskbar, worn = taskbar_buttons
-    win = _window(qtbot, tmp_path, taskbar=taskbar)
+    win = _window(qtbot, tmp_path, launch=Launch(taskbar=taskbar))
     win.show()
 
     win.become_hosted(replace(_fun_time_session(), taskbar_identity="FunTime.App"))
@@ -1767,7 +1765,7 @@ def test_a_window_taken_into_a_session_shows_under_the_sessions_taskbar_button(
 def test_a_window_handed_back_from_a_session_shows_under_its_own_taskbar_button(
         qtbot, tmp_path, taskbar_buttons):
     taskbar, worn = taskbar_buttons
-    win = _window(qtbot, tmp_path, taskbar=taskbar)
+    win = _window(qtbot, tmp_path, launch=Launch(taskbar=taskbar))
     win.show()
     win.become_hosted(replace(_fun_time_session(), taskbar_identity="FunTime.App"))
 

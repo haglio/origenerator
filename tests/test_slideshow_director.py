@@ -824,13 +824,13 @@ def test_one_of_two_hosted_slideshows_closing_leaves_the_other_showing(slideshow
     assert director.showing is made[0]
 
 
-def test_what_the_session_says_of_a_sides_osr2_reaches_the_slideshow_there_whenever_it_opens(
+def test_what_the_session_says_of_a_shapes_osr2_reaches_the_slideshow_there_whenever_it_opens(
         slideshows):
     director, _host, made = slideshows(fun_time=FakeSession())
     director.tell_the_hud(PORTRAIT, "osr2", "1")
 
-    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
-    director.open([("b.png", "image", "g2", None)], side=LANDSCAPE)
+    director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
+    director.open([("b.png", "image", "g2", None)], shape=LANDSCAPE)
     assert [slideshow.has_osr2 for slideshow in made] == [True, False]
 
     director.tell_the_hud(PORTRAIT, "osr2", "0")

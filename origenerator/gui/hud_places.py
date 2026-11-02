@@ -15,46 +15,46 @@ class HudPlaces:
     has_osr2: dict[str, bool] = field(default_factory=dict)
 
 
-def place_of(places: HudPlaces, side: str) -> tuple[HudCorner, bool]:
-    return (places.corners.get(side, HudCorner.UPPER_LEFT), places.minimized.get(side, False))
+def place_of(places: HudPlaces, shape: str) -> tuple[HudCorner, bool]:
+    return (places.corners.get(shape, HudCorner.UPPER_LEFT), places.minimized.get(shape, False))
 
 
-def has_the_osr2(places: HudPlaces, side: str) -> bool:
-    return places.has_osr2.get(side, False)
+def has_the_osr2(places: HudPlaces, shape: str) -> bool:
+    return places.has_osr2.get(shape, False)
 
 
-def told(places: HudPlaces, side: str, action: str, argument: str) -> None:
+def told(places: HudPlaces, shape: str, action: str, argument: str) -> None:
     if action == HUD_CORNER:
-        places.corners[side] = read_mode(HudCorner, argument, place_of(places, side)[0])
+        places.corners[shape] = read_mode(HudCorner, argument, place_of(places, shape)[0])
     elif action == HAS_THE_OSR2:
-        places.has_osr2[side] = argument == "1"
+        places.has_osr2[shape] = argument == "1"
     else:
-        places.minimized[side] = argument == "1"
+        places.minimized[shape] = argument == "1"
 
 
-def moved(places: HudPlaces, side: str, direction: str) -> None:
-    places.corners[side] = place_of(places, side)[0].toward(direction)
+def moved(places: HudPlaces, shape: str, direction: str) -> None:
+    places.corners[shape] = place_of(places, shape)[0].toward(direction)
 
 
-def collapsed(places: HudPlaces, side: str, minimized: bool) -> None:
-    places.minimized[side] = minimized
+def collapsed(places: HudPlaces, shape: str, minimized: bool) -> None:
+    places.minimized[shape] = minimized
 
 
-def opened_in(places: HudPlaces, side: str, corner: HudCorner) -> None:
-    places.corners[side] = corner
-    places.minimized[side] = False
+def opened_in(places: HudPlaces, shape: str, corner: HudCorner) -> None:
+    places.corners[shape] = corner
+    places.minimized[shape] = False
 
 
 def as_saved(places: HudPlaces) -> dict:
     saved = {}
-    for side in sorted(places.corners.keys() | places.minimized.keys()):
-        corner, minimized = place_of(places, side)
-        saved[side] = {"corner": corner, "minimized": minimized}
+    for shape in sorted(places.corners.keys() | places.minimized.keys()):
+        corner, minimized = place_of(places, shape)
+        saved[shape] = {"corner": corner, "minimized": minimized}
     return saved
 
 
 def restore(places: HudPlaces, saved: object) -> None:
-    for side, place in (saved.items() if isinstance(saved, dict) else ()):
+    for shape, place in (saved.items() if isinstance(saved, dict) else ()):
         if isinstance(place, dict):
-            places.corners[side] = read_mode(HudCorner, place.get("corner"), HudCorner.UPPER_LEFT)
-            places.minimized[side] = place.get("minimized") is True
+            places.corners[shape] = read_mode(HudCorner, place.get("corner"), HudCorner.UPPER_LEFT)
+            places.minimized[shape] = place.get("minimized") is True

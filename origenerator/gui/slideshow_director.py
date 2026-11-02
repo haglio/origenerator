@@ -60,6 +60,7 @@ from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_places import (
     HudPlaces,
     as_saved,
@@ -71,8 +72,7 @@ from origenerator.gui.hud_places import (
     restore,
     told,
 )
-from origenerator.gui.level_stepper import Version
-from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -645,7 +645,7 @@ class SlideshowDirector:
         the gallery says about the library the slideshow on *shape* is mapped
         against — that side's own shape of it."""
         def at_its_regions_base(slideshow) -> bool:
-            shown_on = self._side_of(slideshow)
+            shown_on = self._shape_of(slideshow)
             where = next((where for live, where in self._live_slideshows if live is slideshow), None)
             return shown_on is None or where == self.base_location(shown_on)
 
@@ -738,7 +738,7 @@ class SlideshowDirector:
         # way a window one does.
         if self._room_paused:
             slideshow.set_paused(True)
-        slideshow.transport.set_has_osr2(has_the_osr2(self._huds, side))
+        slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
         return slideshow
 
     def _open_a_window(self, items, shape: str, *, window_shape: str, actions, hud, versions,

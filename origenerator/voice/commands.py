@@ -32,8 +32,8 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_LABEL,
     FAVORITES_KEY,
     FAVORITES_LABEL,
-    RECENTS_KEY,
-    RECENTS_LABEL,
+    LATEST_KEY,
+    LATEST_LABEL,
 )
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command

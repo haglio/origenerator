@@ -3,7 +3,7 @@
 A slideshow wears the Funestras' own HUD (:mod:`origenerator.gui.slideshow_hud`), and a
 HUD's buttons are its source's to declare: rows of
 :class:`funestra.hud_button.Button`, each carrying the verb a press posts.
-The verbs are the side's own, spelled the way a satellite's are — hosted, the
+The verbs are the shape's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that shape; standalone,
 the slideshow answers the same verb itself.
 
@@ -71,11 +71,11 @@ ENHANCED_ICON = shared_mark("enhance_filter")
 
 ENHANCED_TOOLTIP = "Enhanced only — play just the images that have been enhanced"
 # Reset means what the shape goes back TO, which is not the same in both places:
-# hosted it is the region's base state — that side's whole library, the way a
+# hosted it is the region's base state — that shape's whole library, the way a
 # Funestra's reset leaves it browsing its own — and standalone there is no such
 # state, so it is this slideshow's own set from the top.
 RESET_TOOLTIPS = {
-    True: "Reset — this side's whole library back, with both filters off",
+    True: "Reset — this shape's whole library back, with both filters off",
     False: "Reset — both filters off, and this set from the top",
 }
 
@@ -94,7 +94,7 @@ def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool =
     slideshow draws that pair itself.
     """
     mode_row = hosted and own_window
-    band = (
+    row = (
         *transport(shape, noun=SLIDE, longer_than_a_step=longer_than_a_step, image=image),
         funscript_jump_button(f"{shape}_funscript_jump", noun=SLIDE, has_osr2=has_osr2,
                               has_funscript=has_funscript),
@@ -168,9 +168,9 @@ _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
     "play_video": lambda host, path: host.show_item(path, lock=False),
     "lock_video": lambda host, path: host.show_item(path, lock=True),
 }
-# What a session tells a side's HUD about itself: where it sits, whether it
+# What a session tells a shape's HUD about itself: where it sits, whether it
 # is parked in its corner, and whether that Funestra has the OSR2, which only
-# the session knows and the band's Skip ahead grays by.
+# the session knows and the row's Skip ahead grays by.
 HUD_CORNER = "hud_corner"
 HUD_MINIMIZED = "hud_minimized"
 HAS_THE_OSR2 = "osr2"

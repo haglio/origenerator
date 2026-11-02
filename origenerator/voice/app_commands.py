@@ -1,6 +1,6 @@
 """What a bare spoken word asks of the app — a collection, a button, the image.
 
-Fun Time's Funestras answer single words: "trash" condemns the clip, "lock" holds
+Fun Time's Funestras answer single words: "trash" condemns the video, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
 the Gallery pane buttons do and the names of the collections that lead the tree — so
 "experiments" stands you in the Experiments collection exactly as clicking its row

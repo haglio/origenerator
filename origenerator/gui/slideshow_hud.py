@@ -84,7 +84,7 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
                             has_other_versions=slideshow.has_other_versions,
                             clip_seconds=slideshow.dwell_s,
                             has_osr2=device is not None or slideshow.transport.has_osr2,
-                            **slideshow.transport.band_facts()),
+                            **slideshow.transport.row_facts()),
         # The device's own line and readout, where this window is the one
         # driving: on the HUD the set is on, so nothing is said twice.
         osr2_rows=device.osr2_rows if device is not None else (),

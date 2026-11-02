@@ -53,12 +53,12 @@ _STEP_BUTTONS = ("QSpinBox::up-button", "QDoubleSpinBox::up-button",
                  "QSpinBox::down-button", "QDoubleSpinBox::down-button")
 
 
-def _drawn_arrow_rules() -> str:
+def _drawn_arrow_rules(arrows=arrow_paths) -> str:
     """Qt takes an arrow only as an image; the CSS border triangle draws a filled rectangle."""
-    normal = arrow_paths(TEXT_PRIMARY)
+    normal = arrows(TEXT_PRIMARY)
     if normal is None:
         return ""
-    muted = arrow_paths(TEXT_MUTED) or normal
+    muted = arrows(TEXT_MUTED) or normal
     return f"""\
     QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
         image: url("{normal[0]}");

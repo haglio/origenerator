@@ -1,17 +1,3 @@
-"""A preview pane that shows an image or video for the selected generation.
-
-The gallery hands it a resolved ``(path, media_type)`` and it does the rest:
-static images are scaled to fit (and rescaled on resize), animated images
-(animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop with no sound
-output, so selecting one gives an immediate moving preview without stealing audio.
-
-A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
-three controls a gallery thumbnail of the same generation wears in its corners,
-and offers the same right-click menu over the item — because it IS the same
-generation, and where you are standing should not change what you can do to it.
-Unarmed — a live frame, a message — the item is inert.
-"""
-
 from __future__ import annotations
 
 import os
@@ -61,19 +47,17 @@ _PLACEHOLDER = "Select a generation to preview"
 _MESSAGE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
                  f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px;"
                  f" border-radius: {NOTICE_RADIUS}px;")
-_MESSAGE_MARGIN = NOTICE_TOP_MARGIN  # how far the plate floats from the media's top-left corner
+_MESSAGE_MARGIN = NOTICE_TOP_MARGIN
 
 
 def _path_key(path) -> str:
-    """One comparable form for a file path, so two spellings of the same file —
-    a ``Path`` against a string, or Windows' case-blind pair — match."""
     return os.path.normcase(os.path.abspath(str(path)))
 
 
 class PreviewWidget(QWidget):
-    media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
-    action_triggered = pyqtSignal(str, str)  # a corner button: prompt_id, action
-    context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
+    media_resized = pyqtSignal()
+    action_triggered = pyqtSignal(str, str)
+    context_requested = pyqtSignal(str, QPoint)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  show_scrubber: bool = False):
@@ -81,36 +65,18 @@ class PreviewWidget(QWidget):
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
         self._movie_native = None
-        # The current on-disk media as (path, media_type), or None while showing a
-        # placeholder or a live frame — what a double-click pops open fullscreen.
         self._media: tuple | None = None
-        # Whether a generation is running under this pane — its streamed frames, or
-        # the wait before the first one arrives — and that latest frame. A double-click
-        # opens fullscreen over these too, and the view opened that way keeps following
-        # from here: later frames, then the finished file. Without it, watching a
-        # generation had to wait for it to land.
         self._live = False
-        self._fullscreen = None  # the slideshow a double-click here opened, kept alive here
+        self._fullscreen = None
         self._open_fullscreen_view = None
         self._generation: str | None = None
         self.drag_out = DragOut()
 
-        # The shown generation's prompt_id when the owner has armed the corner
-        # controls and the right-click menu over it, else None. Armed separately
-        # from the drag because they answer different questions: a drag needs
-        # something to carry, and these need a row to act on.
         self._actions_id: str | None = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        # Right-click the item for the same menu a gallery thumbnail of it gives.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
-        # Parented before the pane that will hold its video surface: Qt takes a
-        # widget's children down in the order they were parented, so the player
-        # goes first, stopped and detached, rather than rendering into a surface
-        # already gone (test_the_player_is_torn_down_before_the_surface_it_renders_to).
-        # The player is injectable so unit tests can drive playback intent
-        # without spinning up the real (WMF) backend, which deadlocks at exit.
         self._player = player if player is not None else QMediaPlayer(self)
 
         outer = QVBoxLayout(self)
@@ -125,19 +91,10 @@ class PreviewWidget(QWidget):
         self._image_label = QLabel(_PLACEHOLDER)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image_label.setMinimumHeight(240)
-        # Let the placeholder wrap so its text width doesn't set a wide minimum
-        # on the preview pane (and thus the whole window).
+        # Qt: a word-wrapped label's width sets a wide minimum on the pane unless it can wrap
         self._image_label.setWordWrap(True)
-        # Rescale the media whenever the label itself resizes — see eventFilter for
-        # why this can't ride on the widget's own resizeEvent.
         self._image_label.installEventFilter(self)
-        # The media area itself resizes when the scrubber appears or goes, whichever
-        # page is up -- and a video's page is not the label -- so what is placed
-        # against the media's rect re-places off the host too (see eventFilter).
         media_host.installEventFilter(self)
-        # Let mouse events fall through to this widget, so a press/drag/double-click
-        # over the media is handled here (drag-out, open-fullscreen) rather than being
-        # swallowed by the label or the video surface.
         self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._image_label)
 
@@ -146,20 +103,13 @@ class PreviewWidget(QWidget):
         self._player.setVideoOutput(self._video.video_sink())
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
-        # Until a video's resolution arrives, media_rect can only answer "the whole
-        # pane"; the corners have to move to the real item once it can.
         self._player.metaDataChanged.connect(self._place_controls)
         self._stack.addWidget(self._video)
 
-        # A third page, for what is not a generation at all: an image and the
-        # settings of a past video, waiting to be run together (see
-        # :meth:`show_combination`).
         self._combination = CombinationView()
         self._combination.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._combination)
 
-        # A fourth page, for what is not one generation but a whole folder of
-        # them: every item in it, tiled to fill (see :meth:`show_folder`).
         self._sheet = ContactSheet()
         self._sheet.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._sheet)
@@ -182,36 +132,16 @@ class PreviewWidget(QWidget):
             self._player.durationChanged.connect(self._scrubber.set_duration)
             self._player.positionChanged.connect(self._scrubber.set_position)
 
-        # The real WMF backend can deadlock during Qt/Python shutdown if a player
-        # is still active, so release it before the app quits. Injected test
-        # players don't touch the backend and don't need (or want) this hook.
+        # Windows Media Foundation can deadlock at shutdown if a player is still active
         app = QApplication.instance()
         if player is None and app is not None:
             app.aboutToQuit.connect(self.release_player)
 
-        # Last, once there is something to hold: a pane built into a frozen room
-        # is told so here rather than by whoever built it (see the module).
         omnipause.holds(self)
 
     def _take_the_pane(self, media, *, generation: str | None = None,
                        stop_player: bool = True, enhancing: bool = False,
                        live: bool = False) -> None:
-        """Put down everything the pane is holding, ready for new content.
-
-        This is what showing anything means, said once: the movie and the still
-        are retired and the other pages put down (:meth:`_set_movie` clears the
-        combination and the wall), the scrubber drops, the playback stops,
-        the message and the corner buttons — both of which are about the item
-        being replaced, and so can no more outlive it than it can — go, and the
-        pane records what it is about to be showing (``media``, or ``None`` for
-        anything that is not a file on disk).
-
-        The two switches are the deliberate exceptions, one caller each.
-        ``stop_player`` — a video does not stop the player it is about to hand a
-        new source to. ``enhancing`` — frames of an enhancement of the item
-        on screen are the coming state of that item, so its message and its
-        corners are as true of them and stay.
-        """
         self._set_movie(None)
         self._pixmap = None
         self._hide_scrubber()
@@ -224,7 +154,6 @@ class PreviewWidget(QWidget):
         self._live = live
 
     def show_media(self, path, media_type: str, generation: str | None = None) -> None:
-        """Display ``path`` as an image or video per ``media_type``."""
         if media_type == MediaType.VIDEO:
             self.show_video(path, generation)
         else:
@@ -252,43 +181,18 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._video)
         self._player.play()
         if omnipause.frozen():
-            self._player.pause()  # a video loaded into a frozen room opens held
+            self._player.pause()
         self._show_scrubber(path)
 
     def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
-        """Display one in-progress preview frame from raw encoded image bytes.
-
-        ComfyUI streams live previews as encoded images over the websocket
-        rather than writing a file, so this loads straight from memory. Bytes
-        that don't decode (a truncated frame) are ignored, leaving the current
-        view untouched — which is why the decode happens before the pane is put
-        down rather than after.
-
-        ``enhancing`` marks the frames as the coming state of the item
-        already on display — an enhancement of it — rather than a run of the
-        settings beside it. Whatever a message says about that item is just as
-        true of the version being made, so it stays where it is: cleared by each
-        frame and re-asserted by each keystroke, it flickers at the rate the run
-        streams while the form is being typed in. The corners stay for the same
-        reason, since what they act on is that item.
-        """
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
         self._take_the_pane(None, enhancing=enhancing, live=True)
         self._show_image(pixmap)
-        self._raise_message()  # a kept message, back over the frame that just landed
+        self._raise_message()
 
     def show_combination(self, combination) -> None:
-        """Show a combination waiting to be run: the frame on the left, a plus,
-        and the gray looping video whose settings go with it
-        (:class:`~origenerator.gui.combination_view.CombinationView`).
-
-        What "Edit…" leaves a tab holding. Nothing has been generated
-        from it yet, so there is no media to show and the idle placeholder — the
-        line a tab pointed at nothing wears — said only that, when the two things
-        the tab is actually about were both on hand to be shown.
-        """
         self._take_the_pane(None)
         self._image_label.clear()
         self._combination.show_pair(combination)
@@ -298,60 +202,29 @@ class PreviewWidget(QWidget):
         self._combination.mark_prompt_edited(edited)
 
     def show_folder(self, paths) -> None:
-        """Show a whole folder at once: every item in ``paths``, tiled to fill.
-
-        What a tab about a folder rather than a generation puts in the pane —
-        the rewrite a folder's Modify (all seeds) opens. There is no one file on display, so
-        nothing here is draggable, openable fullscreen, or scripted; the wall is
-        the folder, and the folder is what the settings below it are about — and
-        no one of them is what the corner buttons would act on, which is why
-        they come down here as they do everywhere else.
-        """
         self._take_the_pane(None)
         self._image_label.clear()
         self._sheet.show_thumbnails(paths)
         self._stack.setCurrentWidget(self._sheet)
 
     def show_message(self, text: str, *, live: bool = False) -> None:
-        """Show a plain text message in place of any media.
-
-        For a transient state the idle placeholder would misdescribe — a re-roll
-        that's generating but hasn't streamed a preview frame yet.
-
-        ``live`` marks the message as a running generation's, so a double-click
-        opens fullscreen over it all the same — the view comes up saying it's
-        generating and fills in as the frames arrive.
-        """
         self._take_the_pane(None, live=live)
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
 
     def set_message(self, text: str | None) -> None:
-        """Write ``text`` over the media, or take the message away (``None``).
-
-        For a pane whose item no longer answers the settings beside it: the
-        media stays on screen — it is still the last thing generated — but is
-        plainly marked as not what those settings would now make. Anything that
-        changes what's on screen clears it, so a message can never outlive the
-        item it was about; the owner re-asserts it if it still applies.
-        """
         if not text:
             self._message.hide()
             return
         if not self._message.isHidden() and self._message.text() == text:
-            return  # already saying exactly this — don't re-raise it mid-typing
+            return
         self._message.setText(text)
         self._message.show()
         self._place_message()
         self._raise_message()
 
     def _place_message(self) -> None:
-        """Float the message plate in the media's top-left corner.
-
-        The plate stays one line wherever the pane is wide enough for it, and
-        wraps only where it isn't: ``adjustSize`` on a wrapping label picks a
-        squarish block instead, which turns a one-line message into a slab.
-        """
+        # Qt: adjustSize on a wrapping label picks a squarish block, so wrap only past the limit
         host = self._media_host
         limit = max(1, host.width() - 2 * _MESSAGE_MARGIN)
         self._message.setWordWrap(False)
@@ -362,29 +235,19 @@ class PreviewWidget(QWidget):
         self._message.move(_MESSAGE_MARGIN, _MESSAGE_MARGIN)
 
     def _raise_message(self) -> None:
-        """A stacked layout raises the widget it switches to above every sibling
-        it has, the message included."""
+        # Qt: a stacked layout raises the widget it switches to above every sibling, the message included
         self._message.raise_()
 
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
-        self._player.setSource(QUrl())  # release any held video file so it can be deleted
+        self._player.setSource(QUrl())  # Windows will not move a file the player holds open
 
     def is_showing_any(self, paths) -> bool:
-        """Whether the file on screen is one of ``paths``, however each is spelled."""
         if self._media is None:
             return False
         return _path_key(self._media[0]) in {_path_key(p) for p in paths}
 
     def release_media(self, paths) -> None:
-        """Let go of ``paths`` — files about to be moved or deleted.
-
-        A loaded video keeps its file open for as long as it's the player's
-        source, and Windows refuses to move a file anything holds open, so a
-        pane still showing a condemned item is what makes its own deletion
-        fail. Panes showing anything else are left exactly as they are: only
-        what's about to go is dropped, along with a fullscreen slideshow of it.
-        """
         if self._fullscreen is not None:
             self._fullscreen.release_media(paths)
         if self.is_showing_any(paths):
@@ -397,30 +260,15 @@ class PreviewWidget(QWidget):
         return self._generation if self.is_showing_video() else None
 
     def media_rect(self) -> QRect:
-        """Where the media is actually drawn inside this pane, in its coordinates.
-
-        Media is fitted keeping its aspect ratio, so a portrait image on a wide
-        screen leaves surround either side of it — which is what an overlay (the
-        slideshows' neighbor stills) needs to know to keep clear of the item.
-        Falls back to the whole media area whenever the drawn size isn't
-        knowable yet -- a video whose resolution hasn't arrived, or nothing on
-        screen at all -- and never to the scrubber along the foot, which is no
-        part of the item: a corner button laid over it, attached to the video's lower edge.
-        """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():
             return self._media_host.geometry()
         rect = QRect(QPoint(0, 0), drawn)
-        # Centered on the media area itself, not on the label: a stacked layout
-        # sizes only the page it is showing, so while a video is up the label
-        # keeps whatever geometry it last had -- the pane's before the scrubber
-        # took its rows -- and a rect centered on it sits low by half the scrubber.
+        # Centered on the media area: a stacked layout sizes only the page showing, so the label keeps a stale geometry under a video
         rect.moveCenter(self._media_host.geometry().center())
         return rect
 
     def _drawn_size(self):
-        """The media's rendered size — the scaled pixmap or movie frame, or a
-        video's resolution fitted to its surface — or ``None`` when unknown."""
         if self.is_showing_video():
             resolution = self._player.metaData().value(QMediaMetaData.Key.Resolution)
             if isinstance(resolution, QSize) and resolution.isValid():
@@ -434,19 +282,9 @@ class PreviewWidget(QWidget):
         return None if pixmap is None or pixmap.isNull() else pixmap.size()
 
     def player(self) -> QMediaPlayer:
-        """The underlying media player — the OSR2 driver follows its position."""
         return self._player
 
     def set_frozen(self, frozen: bool) -> None:
-        """Hold what is moving here, or let it go: a playing video, or an
-        animated image's own movie.
-
-        This pane is re-pointed constantly — a click, a landing generation, a
-        tab change — and each of those starts the new media playing, so every
-        one of them asks :mod:`~origenerator.gui.omnipause` again rather than
-        this pane keeping the answer. A still takes it inertly; its advance is
-        the owning view's dwell timer, not this pane's.
-        """
         if self._movie is not None:
             self._movie.setPaused(frozen)
         if not self.is_showing_video():
@@ -457,13 +295,6 @@ class PreviewWidget(QWidget):
             self._player.play()
 
     def media_size(self) -> tuple[int, int] | None:
-        """The shown media's own ``(width, height)``, or ``None`` for nothing.
-
-        The MEDIA's shape, not the widget's — what a caller laying out around it
-        needs, and the widget's shape is the answer to a different question.
-        A video's frame is measured off its player where one is up, and an image
-        off the pixmap the label was scaled from rather than the scaled copy.
-        """
         if self._movie is not None:
             frame = self._movie.currentPixmap()
             if not frame.isNull():
@@ -475,19 +306,6 @@ class PreviewWidget(QWidget):
 
     def set_actions(self, prompt_id: str | None, *, favorite: bool = False,
                     enhance: str | None = None) -> None:
-        """Arm the corner buttons and the right-click menu over the shown media.
-
-        ``prompt_id`` is the saved generation on screen — the row every press here
-        lands on — with the state its corners report beside it: whether it is
-        favorited, and what its enhance corner has to say
-        (:func:`~origenerator.gui.corner_buttons.enhance_state`). ``None`` leaves
-        the item inert, which is what everything transient is: a live frame is
-        a file that does not exist yet, and a message is not an item at all.
-
-        Re-armed rather than remembered, because the answers move under the
-        item — a star toggled from the menu, an enhancement landing, a setting
-        turned on the Enhance pane — and the owner is what hears about that.
-        """
         self._actions_id = prompt_id
         if prompt_id is None:
             self._controls.hide_all()
@@ -507,13 +325,6 @@ class PreviewWidget(QWidget):
             self.context_requested.emit(self._actions_id, self.mapToGlobal(pos))
 
     def _place_controls(self) -> None:
-        """Put the corner buttons back in the corners of the item.
-
-        Re-run on every resize and every refit rather than once: what the corners
-        are pinned to is the media's own rectangle, which moves whenever the pane
-        does — and, for a video, again when its resolution finally arrives and the
-        pane stops guessing at where the item is.
-        """
         self._controls.place(self.media_rect())
 
     def resizeEvent(self, event) -> None:
@@ -534,25 +345,17 @@ class PreviewWidget(QWidget):
             self._scrubber.hide()
 
     def mousePressEvent(self, event) -> None:
-        # The media children are transparent to the mouse, so a press over the
-        # image or video lands here. Note the origin for a possible drag of the
-        # shown generation; a plain click still falls through to the double-click.
         if self._generation is not None:
             self.drag_out.note_press(event)
 
     def mouseMoveEvent(self, event) -> None:
-        # Drag the shown generation out to a Combine drop zone, but only once the press
-        # has travelled far enough to read as a drag rather than a click — so a
-        # plain click still just opens fullscreen on the following double-click.
         if self._generation is None or not self.drag_out.should_start(event):
             return
         self._start_drag(self._generation)
 
     def _start_drag(self, prompt_id: str) -> None:
-        """Carry the shown generation out under the shared drag type, so a combine
-        drop zone can read its prompt_id — the same payload a gallery thumbnail drags."""
         self.drag_out.start(generation_mime(prompt_id),
-                            self._drag_thumbnail())  # what is shown trails the cursor
+                            self._drag_thumbnail())
 
     def _drag_thumbnail(self) -> QPixmap:
         if self.is_showing_video():
@@ -561,22 +364,12 @@ class PreviewWidget(QWidget):
         return label_thumbnail(self._image_label)
 
     def set_fullscreen_factory(self, make) -> None:
-        """Wire what a double-click here opens: ``make(media, generation)`` returns
-        the slideshow it put up -- a slideshow of the folder this pane's generation
-        sits in, which only the gallery knows -- or ``None``."""
         self._open_fullscreen_view = make
 
     def mouseDoubleClickEvent(self, event) -> None:
         self.open_fullscreen()
 
     def open_fullscreen(self):
-        """Pop what's on screen open fullscreen (a double-click closes it):
-        a slideshow of this generation's folder, held on this one.
-
-        That's the current file, or — while a generation is running under this pane —
-        the run, which the slideshow follows until it lands. A no-op when nothing has wired
-        :meth:`set_fullscreen_factory`, or when there's nothing to watch at all:
-        the idle placeholder or a plain message."""
         if self._media is None and not self._live:
             return None
         if self._open_fullscreen_view is None:
@@ -589,25 +382,11 @@ class PreviewWidget(QWidget):
         self._player.setSource(QUrl())
 
     def release_player(self) -> None:
-        """Stop the player and point it at nothing, for a pane about to be
-        dropped and for the app about to quit (where a still-active real
-        backend deadlocks)."""
         self._stop_playback()
         self._player.setVideoOutput(None)
 
     def _set_movie(self, movie: QMovie | None, native_size=None) -> None:
-        """Attach (or clear) an animated movie, retiring any previous one.
-
-        The movie is parented to this widget so the label's pointer can't dangle
-        if Python drops the wrapper before the next paint.
-
-        Every ``show_*`` passes through here, so it is also where the other pages
-        are put down — a combination's video would otherwise keep looping under
-        whatever replaced it, and a folder's wall would hold every one of its
-        items in memory. Both :meth:`show_combination` and
-        :meth:`show_folder` call this before laying their own out, so neither
-        is undoing itself.
-        """
+        # Qt: the movie is parented to this widget so the label's pointer cannot dangle when Python drops the wrapper
         self._combination.clear()
         self._sheet.clear()
         if self._movie is not None:
@@ -620,7 +399,7 @@ class PreviewWidget(QWidget):
             self._image_label.setMovie(movie)
             self._scale_movie()
             movie.start()
-            movie.setPaused(omnipause.frozen())  # an animated still, in a frozen room
+            movie.setPaused(omnipause.frozen())
 
     def _scale_movie(self) -> None:
         if self._movie is None or self._movie_native is None or not self._movie_native.isValid():
@@ -646,12 +425,7 @@ class PreviewWidget(QWidget):
         )
 
     def eventFilter(self, obj, event):
-        # Refit the media to the label's *own* size whenever the label resizes, rather
-        # than reacting to this widget's resizeEvent. Going fullscreen resizes the
-        # label a beat after the widget, so scaling to the widget's not-yet-grown size
-        # left the image scaled small and then centered on the full screen — black on
-        # all four sides. Keying off the label's resize fits it to the real pane every
-        # time that changes, initial fullscreen included.
+        # The label resizes a beat after the widget going fullscreen, so refit off the label's own resize, not the widget's
         if obj is self._image_label and event.type() == QEvent.Type.Resize:
             if self._movie is not None:
                 self._scale_movie()
@@ -659,8 +433,6 @@ class PreviewWidget(QWidget):
                 self._rescale()
             if not self._message.isHidden():
                 self._place_message()
-            # The label lags this widget going fullscreen, so anything placed
-            # against the media's rect has to re-place when the refit lands.
             self._place_controls()
             self.media_resized.emit()
         elif obj is self._media_host and event.type() == QEvent.Type.Resize:

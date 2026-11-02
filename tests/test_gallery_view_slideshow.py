@@ -24,7 +24,7 @@ from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.osr2_controls import Osr2Controls
-from origenerator.gui.slideshow_hud import slideshow_hud_model
+from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.item_shape import key_holds, shaped_key
 from origenerator.slideshow import LIVE
 from origenerator.voice.app_commands import AppCommand
@@ -481,7 +481,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
 
     assert slideshow.hud_enhanced_mode is True
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
-    model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, hosted=False)
+    model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, HudPlacement(hosted=False))
     lit = {button.command: button.lit for row in model.rows for button in row}
     assert lit[f"{slideshow.shown.hud_shape}_enhanced"]
     assert "Enhanceds" in model.title

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from funestra.hud_title import hud_title, looping_label
 from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
@@ -24,8 +26,17 @@ def _cell(slide, label: str = "") -> HudCell:
                    label=label)
 
 
-def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
-                        own_window: bool = True, device=None, foot=None) -> HudModel | None:
+@dataclass(frozen=True)
+class HudPlacement:
+    hosted: bool = True
+    own_window: bool = True
+
+
+USUAL_PLACEMENT = HudPlacement()
+
+
+def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_PLACEMENT, *,
+                        device=None, foot=None) -> HudModel | None:
     shown = slideshow.hud_map()
     if shown is None:
         return None
@@ -45,7 +56,7 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
         item_note=slideshow.hud_item_note,
         rows=slideshow_rows(shape, SlideshowFacts(
             locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,
-            order=order_label, hosted=hosted, own_window=own_window,
+            order=order_label, hosted=placement.hosted, own_window=placement.own_window,
             has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
             has_osr2=device is not None or slideshow.transport.has_osr2,
             **slideshow.transport.row_facts())),

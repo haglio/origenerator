@@ -20,7 +20,7 @@ from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_controls import Osr2Controls
-from origenerator.gui.slideshow_hud import slideshow_hud_model
+from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -168,7 +168,7 @@ class TestTheOneHudASlideshowWears:
     def test_a_slideshow_on_a_sessions_funestra_carries_the_clip_seconds_too(self, qtbot):
         slideshow = self._window(qtbot).slideshow
 
-        rows = slideshow_hud_model("portrait", slideshow, own_window=False).rows
+        rows = slideshow_hud_model("portrait", slideshow, HudPlacement(own_window=False)).rows
 
         assert ("portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up") in [
             tuple(button.command or button.icon for button in row[1:]) for row in rows]

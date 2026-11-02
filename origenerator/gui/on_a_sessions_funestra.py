@@ -5,7 +5,7 @@ from funestra.satellite_hud import hud_text
 
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
 from origenerator.gui.message import HEARD_MARK, INFO
-from origenerator.gui.slideshow_hud import slideshow_hud_model
+from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 
 READER_HOLD_BUDGET_S = 1.0
 _RETRY_SPACING_S = 0.005
@@ -31,7 +31,7 @@ class OnASessionsFunestra:
         self._forget_the_foot = published.forget
 
     def hud_changed(self) -> None:
-        model = slideshow_hud_model(self._side, self._slideshow, hosted=True, own_window=False,
+        model = slideshow_hud_model(self._side, self._slideshow, HudPlacement(own_window=False),
                                     foot=self._publish_the_foot(self._foots_section()))
         text = hud_text(model) if model is not None else ""
         if text != self._published and publish_whole(self._hud_file, text):

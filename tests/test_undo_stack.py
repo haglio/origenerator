@@ -1,18 +1,3 @@
-"""The undo/redo machinery, on its own.
-
-It lived inside `GalleryEdits`, mixed with deletion, thumbnails, enhancement
-versions, experiment verdicts, folder renaming and the whole CRUD of
-hand-composed folders — and it is the part every one of those methods has to
-remember to use correctly. It is also entirely generic: nothing here knows what
-a generation is.
-
-The semantics are unusual and deliberate, which is the reason for testing them
-where they can be seen: a redo re-runs the ORIGINAL mutation rather than
-inverting the undo, so it files fresh trash batches and a fresh undo entry, and
-a flag is what stops that fresh entry from clearing the redo stack it came off.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import pytest
@@ -26,7 +11,6 @@ def stack() -> UndoStack:
 
 
 def _entry(log, label, *, redoable=True, commit=False):
-    """A step that records what happens to it."""
     return UndoEntry(
         label,
         undo=lambda: (log.append(f"undo {label}"), label)[1],
@@ -87,9 +71,6 @@ def test_a_new_step_forks_history_and_the_branch_you_left_is_gone(stack):
 
 
 def test_the_entry_a_redo_pushes_does_not_clear_the_redos_behind_it(stack):
-    """The flag this exists for. A redo re-runs the original mutation, which
-    pushes a fresh undo entry — and if that counted as a new step, redoing one
-    of three undos would throw the other two away."""
     log = []
 
     def re_run_first():
@@ -98,14 +79,14 @@ def test_the_entry_a_redo_pushes_does_not_clear_the_redos_behind_it(stack):
 
     stack.push(UndoEntry("first", undo=lambda: None, redo=re_run_first))
     stack.push(_entry(log, "second"))
-    stack.undo()   # second, onto the redo stack
-    stack.undo()   # first, onto the redo stack above it
+    stack.undo()
+    stack.undo()
     assert [stack.redo_label()] == ["first"]
 
-    stack.redo()   # re-runs "first", which pushes an undo entry of its own
+    stack.redo()
 
     assert log[-1] == "redo first"
-    assert stack.can_redo() is True      # "second" is still redoable
+    assert stack.can_redo() is True
     assert stack.redo_label() == "second"
 
 
@@ -127,8 +108,23 @@ def test_a_step_with_nothing_to_commit_falls_off_quietly(stack):
 
 
 def test_undo_hands_back_whatever_the_step_says_to_navigate_to(stack):
-    """A restored generation's prompt id, or ``None`` where there is nowhere in
-    particular to go — a rename."""
     stack.push(UndoEntry("rename", undo=lambda: None))
 
     assert stack.undo() is None
+
+
+def test_a_redone_step_can_be_undone_and_redone_any_number_of_times(stack):
+    runs = []
+
+    def do():
+        runs.append("done")
+        stack.push(UndoEntry("rename", undo=lambda: None, redo=do))
+
+    do()
+    for _ in range(3):
+        stack.undo()
+        assert stack.redo_label() == "rename"
+        stack.redo()
+        assert stack.undo_label() == "rename"
+
+    assert runs == ["done"] * 4

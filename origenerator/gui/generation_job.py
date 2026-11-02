@@ -5,6 +5,7 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
@@ -25,6 +26,16 @@ from origenerator.output_places import OutputFolders
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
 from origenerator.thumbnail import frame_thumbnail
+
+
+@dataclass(frozen=True)
+class JobPlan:
+    workflow: object
+    params: dict
+    source: str = GenerationSource.GENERATED
+    origin: str | None = None
+    run_media_type: str | None = None
+    shielded: bool = False
 
 
 class JobState(StrEnum):

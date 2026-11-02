@@ -309,11 +309,7 @@ class GalleryPane(QObject):
         self._tree = host.tree
         self._host = host
         self._queue_model = InFlightItems(
-<<<<<<< HEAD
-            db=db, jobs=jobs, auto=auto, tree=self._tree,
-=======
-            InFlightSources(db=db, jobs=jobs, auto=auto, tree=tree),
->>>>>>> c6cde1b90 (Group InFlightItems' sources and callbacks into two values)
+            InFlightSources(db=db, jobs=jobs, auto=auto, tree=self._tree),
             image_rows=host.image_rows,
             image_index=lambda: self._image_index,
             callbacks=InFlightCallbacks(

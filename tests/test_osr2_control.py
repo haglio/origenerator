@@ -1,4 +1,3 @@
-"""The app's one OSR2 switch: on drives the device, off parks it."""
 from __future__ import annotations
 
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
@@ -7,8 +6,6 @@ from origenerator.gui.osr2_control import Osr2Control
 
 
 class FakeMotion:
-    """The driver reduced to the hold it is being asked for."""
-
     active = False
 
     def __init__(self):
@@ -65,8 +62,6 @@ def test_off_stills_the_motion_at_home_and_on_lets_it_go():
 
 
 def test_parking_a_switch_nothing_had_turned_on_holds_the_device_home():
-    """Off is parked: the app takes the device and holds it at home, rather
-    than leaving it wherever it was."""
     control = _control()
 
     control.set_state(OSR2_PARKED)
@@ -76,8 +71,6 @@ def test_parking_a_switch_nothing_had_turned_on_holds_the_device_home():
 
 
 def test_the_park_is_in_place_before_the_switch_says_so():
-    """Whatever reconciles on the switch has to see the park already taken, or
-    it re-aims the device at a funscript the park is meant to have stood down."""
     motion = FakeMotion()
     control = _control(motion)
     seen = []
@@ -89,9 +82,6 @@ def test_the_park_is_in_place_before_the_switch_says_so():
 
 
 def test_driving_to_parked_still_says_so():
-    """The app holds the device either way, so nothing engages anew -- and if
-    that reached nobody, the press would change the image and leave the
-    device where it was."""
     control = _control()
     control.set_state(OSR2_DRIVING)
     heard = []
@@ -103,8 +93,6 @@ def test_driving_to_parked_still_says_so():
 
 
 def test_the_switch_announces_a_move_and_not_a_re_statement():
-    """A switch put where the app already is must not re-run what a click does:
-    a resumed session sets it again."""
     control = _control()
     heard = []
     control.changed.connect(lambda: heard.append(control.isChecked()))
@@ -117,8 +105,6 @@ def test_the_switch_announces_a_move_and_not_a_re_statement():
 
 
 def test_anything_that_changes_which_button_lights_says_so():
-    """The OSR2 controls redraw on this, and a hold moves no switch -- so a group
-    following the switch alone would keep the wrong button lit."""
     control = _control()
     heard = []
     control.changed.connect(lambda: heard.append(control.state()))
@@ -131,8 +117,6 @@ def test_anything_that_changes_which_button_lights_says_so():
 
 
 def test_a_session_that_may_not_drive_cannot_be_switched_on():
-    """Hosted by Fun Time the OSR2 is the session's Main Funestra's for the whole
-    session, so nothing here may take it."""
     control = Osr2Control(None)
 
     control.setChecked(True)
@@ -261,8 +245,6 @@ def test_the_same_claim_said_again_changes_nothing():
 
 
 def test_every_move_of_the_control_group_is_recorded(caplog):
-    # The drivers log their own engage and release, which left the park
-    # silent -- so the log could not say whether the device was under this app.
     control = _control()
 
     with caplog.at_level("INFO", logger="origenerator.gui.osr2_control"):
@@ -285,4 +267,4 @@ def test_the_device_changing_hands_with_a_session_is_recorded(caplog):
 
     assert [record.message for record in caplog.records] == [
         "The OSR2 is Fun Time's", f"OSR2 control: {OSR2_PARKED}",
-        "The OSR2 is ours again"]  # the release moved no state, so it says none
+        "The OSR2 is ours again"]

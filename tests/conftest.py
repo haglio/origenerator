@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -13,10 +14,8 @@ if "ORIGENERATOR_STATE_DIR" not in os.environ:
 
 # The voice stack's native DLLs (onnxruntime, ctranslate2, torch) crash with an access violation when first loaded after Qt.
 for _voice_module in ("onnxruntime", "ctranslate2", "torch"):
-    try:
+    with contextlib.suppress(Exception):
         __import__(_voice_module)
-    except Exception:
-        pass
 
 from app_support import haglio_settings as _haglio_settings
 

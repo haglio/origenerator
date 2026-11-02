@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import logging
@@ -342,10 +343,8 @@ def _first_output_path(row: dict, places: OutputPlaces) -> Path:
 def _get_existing_filenames(db: Database) -> set[str]:
     result = set()
     for files_json in db.output_files_of_every_row():
-        try:
+        with contextlib.suppress(json.JSONDecodeError, KeyError):
             result.update(_record_key(f) for f in json.loads(files_json))
-        except (json.JSONDecodeError, KeyError):
-            pass
     return result
 
 

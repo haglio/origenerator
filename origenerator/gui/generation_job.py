@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import time
@@ -324,10 +325,8 @@ class GenerationJob(QObject):
             (self._client.job_completed, self._on_completed),
             (self._client.job_error, self._on_error),
         ):
-            try:
+            with contextlib.suppress(TypeError):
                 signal.disconnect(handler)
-            except TypeError:
-                pass
 
     def _is_mine(self, prompt_id: str) -> bool:
         return prompt_id == self.prompt_id

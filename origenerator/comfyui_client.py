@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 
@@ -131,10 +132,8 @@ class ComfyUIClient(QThread):
         loop, task = self._loop, self._task
         if loop is None or task is None:
             return
-        try:
+        with contextlib.suppress(RuntimeError):
             loop.call_soon_threadsafe(task.cancel)
-        except RuntimeError:
-            pass
 
     def _handle_ws_message(self, raw: str):
         msg = json.loads(raw)

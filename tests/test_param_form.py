@@ -1685,7 +1685,7 @@ def test_removing_a_scene_shortens_the_clip_and_the_last_one_stays(qtbot):
     assert form.get_values()["scene_frames"] == [81, 81]
     editor.remove_scene(0)
     assert form.get_values()["scene_frames"] == [81]
-    assert not [scene.remove for scene in editor._scenes][0].isEnabled()
+    assert not next(scene.remove for scene in editor._scenes).isEnabled()
 
 
 def test_a_story_has_no_length_row_and_still_records_the_scenes_total(qtbot):
@@ -1693,7 +1693,7 @@ def test_a_story_has_no_length_row_and_still_records_the_scenes_total(qtbot):
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
-    [scene.length for scene in editor._scenes][0].setCurrentText("10")
+    next(scene.length for scene in editor._scenes).setCurrentText("10")
 
     assert "frame_count" not in form._present_keys["Video"]
     assert form.get_values()["frame_count"] == 241

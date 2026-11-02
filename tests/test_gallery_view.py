@@ -1140,7 +1140,7 @@ def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert list(_alls(view._tree))[0] == "Latest"
+    assert next(iter(_alls(view._tree))) == "Latest"
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._gallery_pane._listed_folders == []

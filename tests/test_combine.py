@@ -848,8 +848,8 @@ def test_the_word_action_keeps_its_own_height_under_the_dropdown(qtbot):
     combine.setGeometry(0, 0, 420, 460)
     pane.show()
     combine.layout().activate()
-    named = [w for w in combine._action_part.findChildren(QLabel)
-             if w.text() == ACTION_LABEL][0]
+    named = next(w for w in combine._action_part.findChildren(QLabel)
+             if w.text() == ACTION_LABEL)
 
     assert named.height() == named.sizeHint().height()
     assert named.y() == combine._category.y() + combine._category.height()
@@ -857,8 +857,8 @@ def test_the_word_action_keeps_its_own_height_under_the_dropdown(qtbot):
 
 def test_the_word_action_lines_up_with_the_words_in_the_dropdown(qtbot):
     combine = _panel(qtbot)
-    named = [w for w in combine._action_part.findChildren(QLabel)
-             if w.text() == ACTION_LABEL][0]
+    named = next(w for w in combine._action_part.findChildren(QLabel)
+             if w.text() == ACTION_LABEL)
 
     assert named.indent() == _text_inset(combine._category) > 0
 

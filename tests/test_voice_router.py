@@ -578,7 +578,7 @@ def test_a_slideshows_word_with_none_up_says_it_is_a_slideshows(router):
 
     voice.on_command(AppCommand.LOCK)
 
-    assert slideshows.answers == [f"{AppCommand.LOCK.value} is a slideshow's — none is up"]
+    assert slideshows.answers == ["No slideshow to lock"]
     assert slideshows.answer_kinds == [WARNING]
 
 

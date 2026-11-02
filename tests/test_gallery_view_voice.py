@@ -1312,7 +1312,7 @@ def test_locking_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
 
     view._voice.listener.speak("lock")
 
-    assert words(view._voice.status) == "lock is a slideshow's — none is up"
+    assert words(view._voice.status) == "No slideshow to lock"
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):

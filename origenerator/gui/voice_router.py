@@ -566,7 +566,7 @@ class VoiceRouter(QObject):
         """A word said with no slideshow to take it: the Gallery pane button it names, aimed
         exactly as a click on it would be."""
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
-            self._slideshows.answer(f"{command.value} is a slideshow's — none is up",
+            self._slideshows.answer(f"No slideshow to {command.value}",
                                     kind=WARNING)
             return
         button, press = self._buttons[command]

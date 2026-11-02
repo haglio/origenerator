@@ -1,13 +1,3 @@
-"""The gallery search, driven with no gallery around it.
-
-Which is the point of the extraction: the debounce, the widening, the collapse
-onto folders, the count line and the one way out all used to live inside a
-7,000-line widget and could only be exercised through it. Here the host is a
-handful of recorded calls, so what the search does to its own state is separated
-from what a gallery does about it.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -45,13 +35,11 @@ def _row(prompt_id: str, prompt: str, seed: int = 1) -> dict:
 
 
 class FakeHost:
-    """A gallery reduced to what a search asks of one."""
-
     def __init__(self, scope=_ALL, groups=None):
         self.scope = scope
         self.groups = groups or {}
-        self.shown = []          # every show_search_results call, in order
-        self.headers = []        # every header the search wrote
+        self.shown = []
+        self.headers = []
         self.drawn = 0
         self.handed_back = 0
         self.history_held = 0
@@ -85,8 +73,6 @@ class FakeHost:
 
 @pytest.fixture
 def controller(qtbot):
-    """A controller under a parent this fixture keeps alive: a QObject whose
-    parent is collected takes its timers down with it."""
     built = []
 
     def build(rows=(), host=None, expander=None):
@@ -101,7 +87,6 @@ def controller(qtbot):
 
 
 def _type(found, text):
-    """Type a query and let its debounce fire, as the field's own timer would."""
     found.field.setText(text)
     if found._timer.isActive():
         found._timer.stop()
@@ -199,9 +184,6 @@ def test_a_query_reaches_the_pane_as_the_rows_that_matched_it(controller):
 
 
 def test_nothing_at_all_is_searched_under_the_floor(controller):
-    # One or two letters reach a large fraction of any library through stemming
-    # alone, so an as-you-type search would answer the first keystroke of every
-    # query with most of the gallery.
     host = FakeHost()
     found = controller([_row("g1", "a tabby on a wall")], host=host)
 
@@ -213,9 +195,6 @@ def test_nothing_at_all_is_searched_under_the_floor(controller):
 
 
 def test_clearing_the_field_is_the_one_way_out(controller):
-    # Every gesture that leaves a search goes through the field, so the exit runs
-    # once however it was reached -- and `leave` is off the history, because the
-    # folder the pane goes back to is a step on the way rather than a stop.
     host = FakeHost()
     found = controller([_row("g1", "a tabby on a wall")], host=host)
     _type(found, "tabby")
@@ -239,9 +218,6 @@ def test_leaving_a_search_that_was_never_running_does_nothing(controller):
 
 
 def test_several_hits_in_one_folder_come_back_as_that_folder(controller):
-    # Every row in a settings folder shares a prompt and settings and differs
-    # only by seed, so a prompt match hits all of them -- and drawing eight
-    # near-copies of one image buries the other places the query reached.
     rows = [_row("g1", "a tabby on a wall", seed=1),
             _row("g2", "a tabby on a wall", seed=2)]
     host = FakeHost()
@@ -260,7 +236,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(controller):
 def test_a_folder_the_tree_has_no_row_for_falls_back_to_its_own_items(controller):
     rows = [_row("g1", "a tabby on a wall", seed=1),
             _row("g2", "a tabby on a wall", seed=2)]
-    host = FakeHost()   # no groups at all
+    host = FakeHost()
     found = controller(rows, host=host)
 
     _type(found, "tabby")
@@ -276,7 +252,7 @@ def test_a_widening_that_lands_for_the_running_query_re_runs_it(controller, qtbo
     found = controller([_row("g1", "a tabby on a wall"), _row("g2", "a hound")],
                        host=host, expander=expander)
     _type(found, "kitten")
-    assert host.shown[-1][0] == []            # nothing matches the bare word
+    assert host.shown[-1][0] == []
 
     _let_the_widening_land(qtbot, found)
 
@@ -284,9 +260,6 @@ def test_a_widening_that_lands_for_the_running_query_re_runs_it(controller, qtbo
 
 
 def test_a_widening_for_a_query_the_user_has_typed_past_is_ignored(controller, qtbot):
-    # A slow answer can land after the user has moved on, and widening results
-    # for a query they are no longer running would put items on screen they
-    # cannot account for.
     host = FakeHost()
     expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
     found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
@@ -312,8 +285,6 @@ def test_a_folded_band_stays_folded_across_a_redraw(controller):
 
 
 def test_a_restored_query_comes_back_without_searching_again(controller):
-    # The typing signals debounce and re-run, which would answer a restore with a
-    # search a beat later, over whatever the restore had by then moved on to.
     host = FakeHost()
     found = controller([_row("g1", "a tabby on a wall")], host=host)
 
@@ -325,9 +296,6 @@ def test_a_restored_query_comes_back_without_searching_again(controller):
 
 
 def test_the_count_line_says_a_capped_search_is_showing_a_slice(controller):
-    # A capped search that said only "2,000 results" would read as 2,000 tiles
-    # you could scroll to.
-
     host = FakeHost()
     found = controller(
         [_row(f"g{n}", f"a tabby number {n}") for n in range(SEARCH_DRAW_LIMIT + 5)],
@@ -337,6 +305,48 @@ def test_the_count_line_says_a_capped_search_is_showing_a_slice(controller):
 
     assert f"{SEARCH_DRAW_LIMIT + 5:,} results" in found._count.text()
     assert "add a word" in found._count.text()
+
+
+def test_leaving_takes_whatever_the_gesture_passes(controller):
+    found = controller([_row("g1", "a tabby on a wall")])
+    _type(found, "tabby")
+
+    found.leave("opened", 3)
+
+    assert found.query == ""
+
+
+def test_a_remembered_order_this_version_does_not_offer_is_ignored(controller):
+    found = controller()
+    before = found.sort()
+
+    found.set_sort("an_order_a_later_version_offered")
+
+    assert found.sort() == before
+
+
+def test_a_widening_that_found_nothing_leaves_results_already_on_screen(controller, qtbot):
+    host = FakeHost()
+    found = controller([_row("g1", "a tabby on a wall")], host=host,
+                       expander=SearchExpander(expand=lambda query: {}))
+    _type(found, "tabby")
+    drawn = len(host.shown)
+
+    _let_the_widening_land(qtbot, found)
+
+    assert len(host.shown) == drawn
+
+
+def test_a_widening_that_found_nothing_redraws_an_empty_pane_to_say_so(controller, qtbot):
+    host = FakeHost()
+    found = controller([_row("g1", "a tabby on a wall")], host=host,
+                       expander=SearchExpander(expand=lambda query: {}))
+    _type(found, "kitten")
+    drawn = len(host.shown)
+
+    _let_the_widening_land(qtbot, found)
+
+    assert len(host.shown) == drawn + 1
 
 
 def test_the_field_says_what_a_query_typed_in_it_would_search(controller):

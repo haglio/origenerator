@@ -11,7 +11,6 @@ from origenerator.trash import Trash
 
 
 def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=None):
-    """Insert a completed generation with its output (and thumbnail) on disk."""
     db.insert_generation(
         prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
@@ -34,12 +33,13 @@ def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=Non
     return db.get_generation(pid)
 
 
-def _actions(tmp_path, limit=50, release_files=None, cancel_enhancements=None):
+def _actions(tmp_path, limit=50, release_files=None, cancel_enhancements=None, thumb_dir=None):
     db = Database(tmp_path / "test.db")
     output_dir = tmp_path / "output"
     trash = Trash(tmp_path / "trash")
     environment = GalleryEnvironment(release_files=release_files,
-                                     cancel_enhancements=cancel_enhancements)
+                                     cancel_enhancements=cancel_enhancements,
+                                     thumb_dir=thumb_dir)
     return GalleryEdits(db, OutputPlaces.in_one_folder(output_dir), trash, limit=limit,
                           environment=environment), db, output_dir
 
@@ -65,7 +65,7 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
     actions.undo()
 
     restored = db.get_generation("p1")
-    assert restored == row  # whole row back, verbatim
+    assert restored == row
     assert file_path.exists()
     assert file_path.read_bytes() == b"data"
     assert not actions.can_undo()
@@ -84,7 +84,6 @@ def test_undoing_a_delete_after_a_newer_image_took_its_name_lists_its_new_name(t
 
 
 def test_undoing_a_delete_says_which_generation_came_back(tmp_path):
-    # The view uses it to navigate back to the folder the delete emptied.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
     actions.delete_rows([row])
@@ -156,7 +155,7 @@ def test_deleting_many_rows_undoes_as_one_step(tmp_path):
     assert db.get_generation("p1") is None
     assert db.get_generation("p2") is None
 
-    actions.undo()  # a single undo brings the whole batch back
+    actions.undo()
     assert db.get_generation("p1") is not None
     assert db.get_generation("p2") is not None
     assert not actions.can_undo()
@@ -175,8 +174,6 @@ def test_undo_label_describes_the_most_recent_action(tmp_path):
     assert "2" in actions.undo_label()
 
 
-# --- redo: the undo stack walked the other way -----------------------------
-
 def test_redo_re_applies_an_undone_delete(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
@@ -190,14 +187,11 @@ def test_redo_re_applies_an_undone_delete(tmp_path):
 
     assert db.get_generation("p1") is None
     assert not file_path.exists()
-    # And it lands back on the undo stack, so the pair keeps working.
     assert actions.can_undo()
     assert not actions.can_redo()
 
 
 def test_a_delete_can_be_undone_and_redone_over_and_over(tmp_path):
-    # The redo re-runs the delete rather than replaying the undo backwards, which
-    # is what makes the second round work: each pass files its own trash batch.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
     file_path = output_dir / "a.png"
@@ -218,10 +212,10 @@ def test_redo_walks_back_up_several_undos_in_order(tmp_path):
     second = _completed_row(db, output_dir, "p2", "b.png")
     actions.delete_rows([first])
     actions.delete_rows([second])
-    actions.undo()  # p2 back
-    actions.undo()  # p1 back
+    actions.undo()
+    actions.undo()
 
-    actions.redo()  # the most recently undone step goes first
+    actions.redo()
     assert db.get_generation("p1") is None
     assert db.get_generation("p2") is not None
     actions.redo()
@@ -237,7 +231,7 @@ def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
 
     actions.custom_collections.create("Keepers", [])
 
-    assert not actions.can_redo()  # the branch that redo led to is gone
+    assert not actions.can_redo()
 
 
 def test_redo_label_names_the_step_it_would_re_apply(tmp_path):
@@ -253,7 +247,7 @@ def test_redo_with_nothing_undone_is_a_noop(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
     actions.delete_rows([row])
-    actions.redo()  # never undone — nothing to re-apply
+    actions.redo()
     assert db.get_generation("p1") is None
     assert actions.can_undo()
 
@@ -263,17 +257,14 @@ def test_eviction_past_the_limit_leaves_the_oldest_in_the_trash(tmp_path):
     first = _completed_row(db, output_dir, "p1", "a.png")
     second = _completed_row(db, output_dir, "p2", "b.png")
 
-    actions.delete_rows([first])   # batch 1 on the stack
-    actions.delete_rows([second])  # pushes batch 1 off the (size-1) stack
+    actions.delete_rows([first])
+    actions.delete_rows([second])
 
-    # Only the newest deletion is still undoable...
     assert actions.undo_label() is not None
     actions.undo()
     assert db.get_generation("p2") is not None
     assert db.get_generation("p1") is None
     assert not actions.can_undo()
-    # ...but falling off the stack no longer ends anything: the evicted delete is
-    # held in the Trash, files and all, and is restorable from the Trash collection.
     assert [r["prompt_id"] for r in db.list_trashed()] == ["p1"]
     actions.restore_deleted(["p1"])
     assert db.get_generation("p1") == first
@@ -288,17 +279,14 @@ def test_a_delete_is_held_in_the_trash_with_the_row_it_dropped(tmp_path):
 
     (held,) = db.list_trashed()
     assert held["prompt_id"] == "p1"
-    assert held["row"] == row              # the whole row, ready to be put back
-    assert held["deleted_at"]              # stamped, so it can age out
-    # And the batch says where each file went, so a later session can move it back.
+    assert held["row"] == row
+    assert held["deleted_at"]
     moved = dict(held["batch"]["moves"])
     assert set(moved) == {str(output_dir / "a.png"), str(tmp_path / "thumbs" / "p1.jpg")}
     assert all(Path(dest).exists() for dest in moved.values())
 
 
 def test_undoing_a_delete_takes_it_back_out_of_the_trash(tmp_path):
-    # Otherwise the Trash collection would go on offering to restore an item that is
-    # already back in the gallery.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
     actions.delete_rows([row])
@@ -309,8 +297,6 @@ def test_undoing_a_delete_takes_it_back_out_of_the_trash(tmp_path):
 
 
 def test_each_deleted_item_is_held_on_its_own(tmp_path):
-    # A folder's delete is one undo step but many bin entries, so one item can be
-    # brought back weeks later without dragging the rest of the folder with it.
     actions, db, output_dir = _actions(tmp_path)
     rows = [_completed_row(db, output_dir, "p1", "a.png"),
             _completed_row(db, output_dir, "p2", "b.png")]
@@ -320,8 +306,8 @@ def test_each_deleted_item_is_held_on_its_own(tmp_path):
 
     assert db.get_generation("p2") is not None
     assert (output_dir / "b.png").exists()
-    assert db.get_generation("p1") is None            # its neighbor stays deleted...
-    assert [r["prompt_id"] for r in db.list_trashed()] == ["p1"]  # ...and held
+    assert db.get_generation("p1") is None
+    assert [r["prompt_id"] for r in db.list_trashed()] == ["p1"]
 
 
 def test_restoring_returns_the_row_and_the_files_and_clears_the_record(tmp_path):
@@ -330,9 +316,9 @@ def test_restoring_returns_the_row_and_the_files_and_clears_the_record(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png", thumb_dir=thumb_dir)
     actions.delete_rows([row])
 
-    assert actions.restore_deleted(["p1"]) == "p1"  # the item to navigate back to
+    assert actions.restore_deleted(["p1"]) == "p1"
 
-    assert db.get_generation("p1") == row  # whole row back, verbatim
+    assert db.get_generation("p1") == row
     assert (output_dir / "a.png").read_bytes() == b"data"
     assert (thumb_dir / "p1.jpg").read_bytes() == b"thumb"
     assert db.list_trashed() == []
@@ -349,15 +335,40 @@ def test_purging_ends_the_files_and_the_record_for_good(tmp_path):
     actions.purge_deleted(["p1"])
 
     assert not trashed.exists()
-    assert not (output_dir / "a.png").exists()  # purge is not restore
+    assert not (output_dir / "a.png").exists()
     assert db.list_trashed() == []
     assert db.get_generation("p1") is None
+
+
+def test_restoring_from_the_trash_is_not_an_undo_step(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    first = _completed_row(db, output_dir, "p1", "a.png")
+    second = _completed_row(db, output_dir, "p2", "b.png")
+    actions.delete_rows([first])
+    actions.delete_rows([second])
+
+    actions.restore_deleted(["p1"])
+
+    assert actions.undo_label() == "Delete 1 item"
+
+
+def test_two_rows_claiming_one_file_move_it_once_and_both_come_back(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    first = _completed_row(db, output_dir, "p1", "shared.png")
+    second = _completed_row(db, output_dir, "p2", "shared.png")
+
+    actions.delete_rows([first, second])
+    actions.undo()
+
+    assert (output_dir / "shared.png").read_bytes() == b"data"
+    assert db.get_generation("p1") == first
+    assert db.get_generation("p2") == second
 
 
 def test_restoring_or_purging_an_item_the_trash_no_longer_holds_is_a_noop(tmp_path):
     actions, db, _ = _actions(tmp_path)
     assert actions.restore_deleted(["never-deleted"]) is None
-    actions.purge_deleted(["never-deleted"])  # must not raise
+    actions.purge_deleted(["never-deleted"])
 
 
 def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
@@ -370,8 +381,8 @@ def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
     actions.reject_experiment(row)
 
     kept = db.get_generation("e1")
-    assert kept is not None                      # the row survives...
-    assert kept["experiment_verdict"] == "down"  # ...carrying the verdict to learn from
+    assert kept is not None
+    assert kept["experiment_verdict"] == "down"
     assert kept["output_files"] is None
     assert kept["thumbnail_path"] is None
     assert not file_path.exists()
@@ -381,9 +392,6 @@ def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
 
 
 def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):
-    # Windows refuses to move a file the app itself still holds open — a video
-    # being previewed keeps its file open — so every doomed path is handed over
-    # to be released first, while it's still where the app is showing it.
     seen = []
     actions, db, output_dir = _actions(
         tmp_path,
@@ -399,14 +407,9 @@ def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):
 
 
 def test_delete_stops_an_enhancement_being_made_of_what_it_takes(tmp_path):
-    # An enhancement is a version of the image it improves, so a run whose image
-    # is being deleted has nowhere left to fold: left going it holds the queue
-    # for minutes and then lands an enhanced file with no original to belong to.
     seen = []
     actions, db, output_dir = _actions(
         tmp_path,
-        # Recorded with the file's existence, since the run is only stoppable
-        # while its input is still where ComfyUI would read it.
         cancel_enhancements=lambda rows: seen.append(
             [(r["prompt_id"], (output_dir / "a.png").exists()) for r in rows]),
     )
@@ -418,9 +421,6 @@ def test_delete_stops_an_enhancement_being_made_of_what_it_takes(tmp_path):
 
 
 def test_rejecting_an_experiment_stops_its_enhancement_too(tmp_path):
-    # The row survives a rejection but its files don't, so it is no longer a
-    # source anything can fold onto — and a run that did land would resurrect
-    # the rejection as an enhanced image.
     seen = []
     actions, db, output_dir = _actions(tmp_path, cancel_enhancements=seen.extend)
     row = _completed_row(db, output_dir, "e1", "exp.png")
@@ -431,9 +431,6 @@ def test_rejecting_an_experiment_stops_its_enhancement_too(tmp_path):
 
 
 def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
-    # A versions delete takes files off a row that stays, and an enhance
-    # re-derives from the original either way — its run still has an image to
-    # fold onto, so stopping it would only throw away work the user wants.
     seen = []
     actions, db, output_dir = _actions(tmp_path, cancel_enhancements=seen.extend)
 
@@ -443,8 +440,6 @@ def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
 
 
 def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
-    # The Experiments collection's reject trashes files like any delete, so it needs
-    # the same release — the collection is where an item is most likely on screen.
     seen = []
     actions, db, output_dir = _actions(tmp_path, release_files=seen.extend)
     row = _completed_row(db, output_dir, "e1", "exp.mp4", subfolder="video")
@@ -455,8 +450,6 @@ def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
 
 
 def test_rejecting_an_experiment_files_nothing_in_the_trash(tmp_path):
-    # The Trash holds deleted rows so they can be put back; a rejection keeps its
-    # row (verdict and all), so there is no orphan for the Trash collection to offer.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "e1", "exp.png")
 
@@ -474,7 +467,7 @@ def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
     actions.undo()
 
     restored = db.get_generation("e1")
-    assert restored["experiment_verdict"] is None       # unreviewed again
+    assert restored["experiment_verdict"] is None
     assert restored["output_files"] == row["output_files"]
     assert restored["thumbnail_path"] == row["thumbnail_path"]
     assert (output_dir / "exp.png").exists()
@@ -492,10 +485,7 @@ def test_undoing_a_rejection_after_a_newer_image_took_its_name_lists_its_new_nam
         {"filename": "alpha_t2i_00006_.png", "subfolder": ""}]
 
 
-# --- deleting some of one image's versions ---------------------------------
-
 def _enhanced_row(db, output_dir, pid="p1"):
-    """An image enhanced once: the enhanced file leads, the original stays."""
     _completed_row(db, output_dir, pid, "base.png", subfolder="image")
     (output_dir / "image" / "enhanced.png").write_bytes(b"better")
     db.update_generation(
@@ -513,8 +503,6 @@ def _enhanced_row(db, output_dir, pid="p1"):
 
 
 def test_deleting_a_version_keeps_the_generation(tmp_path):
-    # A level is a file, not a generation: the image stays where it is, in its
-    # folder, with the versions that weren't picked.
     actions, db, output_dir = _actions(tmp_path)
     row = _enhanced_row(db, output_dir)
 
@@ -530,23 +518,17 @@ def test_deleting_a_version_keeps_the_generation(tmp_path):
 
 
 def test_deleting_the_last_enhancement_leaves_a_plain_image(tmp_path):
-    # With nothing enhanced left, the bookkeeping goes too — otherwise the one
-    # remaining file would read as an enhancement of itself.
-
     actions, db, output_dir = _actions(tmp_path)
     actions.delete_enhance_versions(_enhanced_row(db, output_dir), ["enhanced.png"])
 
     updated = db.get_generation("p1")
     assert updated["original_files"] is None
     assert updated["enhance_history"] is None
-    assert not is_enhanced_row(updated)   # and the yellow plus is gone with it
+    assert not is_enhanced_row(updated)
     assert enhancement_versions(updated) == []
 
 
 def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
-    # Binning the pre-enhance file to save the space is a fair thing to want;
-    # what is left is still an enhancement, and still says what made it.
-
     actions, db, output_dir = _actions(tmp_path)
     actions.delete_enhance_versions(_enhanced_row(db, output_dir), ["base.png"])
 
@@ -557,8 +539,6 @@ def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
 
 
 def test_deleting_every_version_is_refused(tmp_path):
-    # An image with no file left is a deleted generation, and deleting a
-    # generation is the gallery's own action — not something a version list does.
     actions, db, output_dir = _actions(tmp_path)
     row = _enhanced_row(db, output_dir)
 
@@ -567,6 +547,61 @@ def test_deleting_every_version_is_refused(tmp_path):
     assert db.get_generation("p1")["output_files"] == row["output_files"]
     assert (output_dir / "image" / "enhanced.png").exists()
     assert not actions.can_undo()
+
+
+def test_deleting_a_name_the_row_does_not_hold_deletes_nothing(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _enhanced_row(db, output_dir)
+
+    assert actions.delete_enhance_versions(row, ["never_held.png"]) is False
+
+    assert not actions.can_undo()
+
+
+def test_deleting_a_version_files_nothing_in_the_trash_collection(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _enhanced_row(db, output_dir)
+
+    actions.delete_enhance_versions(row, ["enhanced.png"])
+
+    assert db.list_trashed() == []
+
+
+def test_a_versions_files_are_ended_once_its_undo_entry_falls_off_the_stack(tmp_path):
+    actions, db, output_dir = _actions(tmp_path, limit=1)
+    first = _enhanced_row(db, output_dir, "p1")
+    (output_dir / "image" / "enhanced2.png").write_bytes(b"better")
+    _completed_row(db, output_dir, "p2", "base2.png", subfolder="image")
+    db.update_generation(
+        "p2",
+        output_files=json.dumps([{"filename": "enhanced2.png", "subfolder": "image"},
+                                 {"filename": "base2.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "base2.png", "subfolder": "image"}]))
+    second = db.get_generation("p2")
+    held = lambda: [path for path in (tmp_path / "trash").rglob("*") if path.is_file()]
+
+    actions.delete_enhance_versions(first, ["enhanced.png"])
+    assert len(held()) == 1
+    actions.delete_enhance_versions(second, ["enhanced2.png"])
+
+    assert len(held()) == 1
+
+
+def test_a_thumbnail_that_cannot_be_redrawn_stays_as_it_was(tmp_path):
+    thumb_dir = tmp_path / "thumbs"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+    _completed_row(db, output_dir, "p1", "base.png", subfolder="image", thumb_dir=thumb_dir)
+    (output_dir / "image" / "enhanced.png").write_bytes(b"not a picture")
+    db.update_generation(
+        "p1",
+        output_files=json.dumps([{"filename": "enhanced.png", "subfolder": "image"},
+                                 {"filename": "base.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "base.png", "subfolder": "image"}]))
+    before = db.get_generation("p1")["thumbnail_path"]
+
+    assert actions.delete_enhance_versions(db.get_generation("p1"), ["enhanced.png"]) is True
+
+    assert db.get_generation("p1")["thumbnail_path"] == before
 
 
 def test_undoing_a_version_delete_puts_it_back(tmp_path):
@@ -608,7 +643,6 @@ def test_undoing_a_version_delete_after_a_newer_image_took_its_name_lists_its_ne
 
 
 def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):
-    # Only the picked files go: the thumbnail is the row's, and the row stays.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "base.png", subfolder="image",
                          thumb_dir=tmp_path / "thumbs")
@@ -629,12 +663,6 @@ def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):
 
 
 class TestTheFoldersItWasGiven:
-    """The view that owns these actions draws previews out of the same two
-    folders, and used to reach the config module for them -- so a test could
-    only point it somewhere else by patching module state, which four sites did
-    while three thousand others ran against the live ones. It asks the actions
-    now, which were handed both at construction."""
-
     def test_the_output_places_are_the_ones_it_was_built_with(self, tmp_path):
         places = OutputPlaces.in_one_folder(tmp_path / "output")
         actions = GalleryEdits(Database(tmp_path / "test.db"), places, Trash(tmp_path / "trash"))
@@ -650,8 +678,6 @@ class TestTheFoldersItWasGiven:
         assert actions.thumb_dir == tmp_path / "thumbs"
 
     def test_no_thumbnail_folder_is_answered_rather_than_raised(self, tmp_path):
-        """Every part of the environment is optional, and each absence costs
-        something rather than failing -- see GalleryEnvironment."""
         actions = GalleryEdits(Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(tmp_path / "output"), Trash(tmp_path / "trash"))
 
         assert actions.thumb_dir is None

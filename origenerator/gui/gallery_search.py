@@ -1,19 +1,3 @@
-"""The gallery's search: the field, the results bar, and everything between.
-
-One of the gallery's screen concerns, lifted out of the view that used to hold
-all of them. What lives here is the whole of a search's life — the debounce and
-the widening's longer one, the query and its expansions, the outcome, the tiles
-the pane draws and the Model / LoRA sections folded shut, the sort and the count line.
-
-What stays with the host is what a search is *of*: which folder the tree has
-selected, what rows the gallery is holding, and what the pane and the header do
-once results exist. :class:`SearchHost` names each of those, so this controller
-can be built and driven without a gallery — and so the gallery cannot quietly
-grow a fifteenth way of reaching in.
-
-The field is the one path out of a search: clearing it runs the exit, so there
-is one route rather than two (see :meth:`GallerySearchController.leave`).
-"""
 from __future__ import annotations
 
 from typing import Protocol
@@ -27,71 +11,51 @@ from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
 
-# How long the search waits after the last keystroke before asking the local LLM
-# to widen the query. Long enough to be a real pause rather than a gap between
-# two characters — the table-widened results are already on screen throughout, so
-# nothing is being waited *for*; this only decides how often the model is asked.
 _EXPAND_DELAY_MS = 700
-# How long the field waits after the last keystroke before searching at all. A
-# search is cheap but not free — it scores the whole library and rebuilds the
-# pane — and running one per character means the results churn under a word
-# still being typed, which is unreadable however fast it is.
 _DELAY_MS = 300
-# Below this many characters nothing is searched. One or two letters match a
-# large fraction of any library through sheer stemming, so an as-you-type search
-# would answer the first keystroke of every query with most of the gallery.
 MIN_CHARS = 3
-# The sort orders the results pane offers, as (label, mode) in menu order.
 _SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_MODEL_LORA))
 
 
 class SearchHost(Protocol):
-    """What a search needs of the gallery around it, and nothing else."""
-
     def search_scope(self):
-        """The selected row's folder path and the generations under it — what
-        this query covers, and what the field and the header name it by."""
+        pass
 
     def image_config_index(self) -> dict:
-        """The index folder keys are derived against, for collapsing several
-        hits in one settings folder onto that folder."""
+        pass
 
     def group_for_key(self, key: str):
-        """The tree's group for a folder key, or ``None`` when the current model
-        holds no row for it."""
+        pass
 
     def show_search_results(self, tiles, **terms) -> None:
-        """Hand the pane the results to draw."""
+        pass
 
     def name_search_on_screen(self, query: str, scope) -> None:
-        """Say in the header that a search is what the pane is showing."""
+        pass
 
     def search_results_drawn(self) -> None:
-        """Results are up: re-read whatever depends on what the pane holds."""
+        pass
 
     def hand_pane_back(self) -> None:
-        """The search is over — the pane belongs to the selected folder again."""
+        pass
 
     def suppress_history(self):
-        """A context manager holding the history still, for a move that is a
-        step on the way rather than somewhere the user went."""
+        pass
 
 
 class GallerySearchController(QObject):
-    """The search field and the results it fills the Gallery pane with."""
-
     def __init__(self, host: SearchHost, *, parent: QObject,
                  expander: SearchExpander | None = None):
         super().__init__(parent)
         self._host = host
         self._index = search.GallerySearch()
-        self._query = ""            # what the field holds, stripped ("" = not searching)
-        self._expansions = None     # the widening in force for that query, if any
+        self._query = ""
+        self._expansions = None
         self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
-        self._tiles: list = []      # its hits as the pane draws them
+        self._tiles: list = []
         self._sort = search.SORT_RECENT
-        self._collapsed: set[str] = set()   # Model / LoRA sections folded shut
+        self._collapsed: set[str] = set()
         self._expander = expander or SearchExpander(self)
         self._expander.expanded.connect(self._on_expanded)
         self._timer = QTimer(self)
@@ -103,19 +67,7 @@ class GallerySearchController(QObject):
         self._expand_timer.setInterval(_EXPAND_DELAY_MS)
         self._expand_timer.timeout.connect(self._request_expansion)
 
-        # The gallery search. It sits over the tree but no longer narrows it: what
-        # it fills is the Gallery pane, with the matching generations themselves
-        # (see :meth:`run`), because a thumbnail is what the user recognizes and a
-        # folder name — a short code — is not. Matching is by meaning rather than
-        # by letters, so "two women" reaches "a pair of dolls" and "two tall
-        # ladies" alike; a model name, a LoRA's name and a seed are searchable too.
-        # Its counterpart is the find bar below the Generate pane, which searches
-        # *inside* the open tab's prompts.
         self.field = ScopeSearchEdit()
-        # Its placeholder names the scope — the whole path down to the selected
-        # folder — and is kept current with the tree selection
-        # (:meth:`sync_placeholder`); this is only what it says before the first
-        # selection lands.
         self.field.set_scope(gallery.ALL_LABEL)
         self.field.setToolTip(
             "Search every generation by what it is of — matching related words, "
@@ -127,15 +79,8 @@ class GallerySearchController(QObject):
         self.field.setClearButtonEnabled(True)
         self.field.textChanged.connect(self._on_text_changed)
 
-        # How many the query found, and — past what the pane draws at once — that
-        # it is showing a slice; beside it, the order the results are laid out in.
-        # Recency is one question ("the one I made recently"); model + LoRA is the
-        # other ("which model and LoRA was that"), and picking it cuts the results into a
-        # labelled section per combination rather than interleaving them.
         self._count = QLabel("")
         self._count.setObjectName("estimateLabel")
-        # No-wheel: it rides directly over the scrolling results, and a wheel
-        # notch that lands on it must scroll them rather than re-sort them.
         self._sort_dropdown = NoWheelDropdown()
         for label, mode in _SORTS:
             self._sort_dropdown.addItem(label, mode)
@@ -151,54 +96,32 @@ class GallerySearchController(QObject):
         row.addStretch(1)
         row.addWidget(QLabel("Sort:"))
         row.addWidget(self._sort_dropdown)
-        self.bar.hide()  # shown only while a search is running
-
-    # --- what the gallery asks of a search -----------------------------------
+        self.bar.hide()
 
     @property
     def query(self) -> str:
-        """The query in force, ``""`` when nothing is being searched."""
         return self._query
 
     @property
     def index(self) -> search.GallerySearch:
-        """The index the gallery refills on every rebuild."""
         return self._index
 
     def sort(self) -> str:
-        """The results order in force, for the session state to remember."""
         return self._sort
 
     def set_sort(self, mode: str | None) -> None:
-        """Restore the remembered results order (ignoring anything unrecognized,
-        so a state file from a version that offered a different one still opens)."""
         index = self._sort_dropdown.findData(search.saved_sort(mode))
         if index >= 0:
-            self._sort_dropdown.setCurrentIndex(index)  # its signal sets the mode
+            self._sort_dropdown.setCurrentIndex(index)
 
     def focus_field(self) -> None:
-        """Put the caret in the field with whatever it holds selected — where a
-        find chord goes when there is no prompt in front of it to search."""
         self.field.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self.field.selectAll()
 
     def sync_placeholder(self) -> None:
-        """Say in the empty field what a query typed there would search, so the
-        scope is visible before there is a header or a result to name it.
-
-        The whole path goes in; the field shows as much of its tail as it is wide
-        enough for (:class:`ScopeSearchEdit`)."""
         self.field.set_scope(self._host.search_scope().path)
 
     def run(self) -> None:
-        """Fill the Gallery pane with what the standing query matches, within the
-        folder the tree has selected.
-
-        Takes the pane over from that folder — the tree keeps its selection while
-        a search runs, because the selection is the *scope*: picking another
-        folder re-asks the question there rather than ending it, and clearing the
-        field hands the pane straight back to wherever you had got to.
-        """
         scope = self._host.search_scope()
         self._outcome = self._index.search(
             self._query, expansions=self._expansions, within=scope.ids
@@ -217,32 +140,12 @@ class GallerySearchController(QObject):
         self._host.search_results_drawn()
 
     def leave(self, *_args) -> None:
-        """Clear the field, if a search is running — what navigating away means.
-
-        This is for gestures that go *to* a result: opening a hit's folder, or
-        following a link out of one. Picking a folder in the tree is not one of
-        them — that re-scopes the search.
-
-        Takes and ignores whatever the caller passes, so it can be wired straight
-        to those gestures. Clearing the field is what actually ends the search: its
-        ``textChanged`` runs the exit, so there is one path out rather than two.
-
-        Off the history, because the folder the field hands the pane back to is a
-        step on the way rather than anywhere the user went: the caller records the
-        result it is opening. Recorded, it would sit between the results and that
-        result, and Back out of a hit would land on a folder instead of on the
-        hits it came from.
-        """
         if not self._query:
             return
         with self._host.suppress_history():
             self.field.clear()
 
     def clear_state(self) -> None:
-        """Forget the running query, its results and its bar — the state half of
-        leaving a search, with nothing drawn. Split out because a Back onto a stop
-        that had no search must clear the same state without redrawing the pane
-        twice: the restore fills it itself."""
         self._query = ""
         self._expansions = None
         self._widening_awaited = False
@@ -254,13 +157,6 @@ class GallerySearchController(QObject):
         self.bar.hide()
 
     def restore(self, query: str) -> None:
-        """Put the search field back to what it held at a history stop.
-
-        Set without its typing signals: those debounce and re-run, which would
-        answer a restore with a search a beat later, over whatever the restore had
-        by then moved on to. The expander's cache is consulted so a query that was
-        widened comes back widened, and one it never answered comes back anyway.
-        """
         self.field.blockSignals(True)
         try:
             self.field.setText(query)
@@ -271,18 +167,7 @@ class GallerySearchController(QObject):
         if query:
             self._expansions = self._expander.cached(query)
 
-    # --- the field's own life -------------------------------------------------
-
     def _on_text_changed(self, text: str) -> None:
-        """A keystroke in the search field: line the search up, don't run it yet.
-
-        Nothing happens under three characters — one or two letters reach a large
-        fraction of any library through stemming alone, so searching them would
-        answer the first keystroke of every query with most of the gallery. Past
-        that the search waits out :data:`_DELAY_MS` of quiet, and the model call
-        waits out a longer one, so a word being typed doesn't churn the pane it is
-        about to fill.
-        """
         query = (text or "").strip()
         self._timer.stop()
         self._expand_timer.stop()
@@ -292,7 +177,7 @@ class GallerySearchController(QObject):
             self._query = ""
             return
         if query != self._query:
-            self._expansions = None  # last query's widening isn't this one's
+            self._expansions = None
         self._query = query
         self._widening_awaited = self._index.widens(query) and self._expander.unanswered(query)
         self._timer.start()
@@ -300,45 +185,26 @@ class GallerySearchController(QObject):
         self.field.set_working(True)
 
     def _run_pending(self) -> None:
-        """Typing has paused: run the standing query and draw it."""
         if not self._query:
             return
-        # The cache is consulted, never asked: a query the expander has already
-        # answered (re-typed, or reached again by backspacing) is smart from the
-        # first draw, and one it hasn't waits for _request_expansion.
         self._expansions = self._expander.cached(self._query)
         self.run()
         self.field.set_working(self._widening_awaited)
 
     def _exit(self) -> None:
-        """Put the search away and give the pane back to the selected folder."""
         self.clear_state()
         self._host.hand_pane_back()
 
     def _on_sort_changed(self, _index=0) -> None:
-        """Re-lay the results in the newly picked order (a no-op off a search)."""
         self._sort = self._sort_dropdown.currentData() or search.SORT_RECENT
         if self._query:
             self.run()
 
     def _request_expansion(self) -> None:
-        """Typing has stopped: ask the local LLM to widen this query's words.
-
-        Nothing is awaited — :meth:`_on_expanded` re-runs the search if and when
-        an answer lands, and the table-widened results the user is already
-        looking at stand if one never does.
-        """
         if self._widening_awaited:
             self._expander.request(self._query)
 
     def _on_expanded(self, query: str, expansions) -> None:
-        """A widened vocabulary came back: re-run the search on it.
-
-        Only for the query still in the field — a slow answer can land after the
-        user has typed on, and widening results for a query they are no longer
-        running would put items on screen they cannot account for. An empty
-        answer redraws only a pane with nothing in it, to say nothing matched.
-        """
         if not self._expander.same_words(query, self._query):
             return
         self._widening_awaited = False
@@ -347,20 +213,7 @@ class GallerySearchController(QObject):
             self._expansions = expansions
             self.run()
 
-    # --- what a result looks like ---------------------------------------------
-
     def _collapse_to_folders(self, results) -> list:
-        """The hits as tiles: a folder wherever one answered with several items.
-
-        Every row in a settings folder shares a prompt and settings and differs
-        only by seed, so a prompt match hits all of them — and drawing eight
-        near-copies of one item buries the other places the query reached.
-        The folder stands for them instead, and a folder's lone hit stays itself.
-        Order is by first hit, so the newest thing found still leads.
-
-        A folder the tree has no row for (a hit whose folder the current model
-        doesn't hold) falls back to its own items rather than vanishing.
-        """
         image_index = self._host.image_config_index()
         by_folder: dict[str, list] = {}
         for result in results:
@@ -376,20 +229,12 @@ class GallerySearchController(QObject):
         return tiles
 
     def _on_section_toggled(self, heading: str, collapsed: bool) -> None:
-        """Remember a Model / LoRA section's fold state, so a redraw — a rebuild, a landing
-        generation, a widening — doesn't spring open the sections you shut."""
         if collapsed:
             self._collapsed.add(heading)
         else:
             self._collapsed.discard(heading)
 
     def _count_text(self) -> str:
-        """How many the query found — and, past what the pane will draw at once,
-        that it is showing a slice and what to do about it. A capped search that
-        said only "2,000 results" would read as 2,000 tiles you could scroll to.
-
-        Counted in tiles, which is what is on screen: a folder standing for its
-        eight seed variants is one result to click, not eight."""
         count = len(self._tiles)
         text = f"{count:,} result{'s' if count != 1 else ''}"
         if count > SEARCH_DRAW_LIMIT:

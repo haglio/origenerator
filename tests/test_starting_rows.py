@@ -1,7 +1,3 @@
-"""The Job Queue's rows for work asked for that is not a job yet.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from origenerator.gui.generation_job import JobState
@@ -11,8 +7,6 @@ from origenerator.media import MediaType
 
 
 class FakeLine:
-    """The Job Queue reduced to where it would put a job of each kind."""
-
     def __init__(self, **before):
         self._before = before
 
@@ -39,7 +33,7 @@ def test_a_row_shown_stands_in_the_line_until_it_is_dropped(qtbot):
     assert row.reading.status == JobState.QUEUED
     assert row.cancel is None
     rows.drop(key)
-    rows.drop(key)  # twice costs nothing
+    rows.drop(key)
     assert rows.rows() == []
     assert len(redraws) == 2
 

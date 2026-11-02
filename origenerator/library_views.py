@@ -1,4 +1,3 @@
-"""What the Generate tabs read off the whole library, once for each state of it."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -9,8 +8,6 @@ from origenerator.media import MediaType
 
 
 class LibrarySnapshot:
-    """The library as it stood at one moment, and what is read off all of it."""
-
     def __init__(self, rows: list[dict], trashed: Callable[[], list[dict]] = list):
         self.rows = rows
         self._trashed = trashed
@@ -48,8 +45,6 @@ class LibrarySnapshot:
 
 
 class LibraryViews:
-    """One :class:`LibrarySnapshot` at a time, replaced when the library changes."""
-
     def __init__(self, db):
         self._db = db
         self._version: int | None = None

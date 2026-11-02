@@ -1,5 +1,3 @@
-"""Where a find's match is shown: in a prompt field somewhere down a tab's form."""
-
 from __future__ import annotations
 
 from PyQt6.QtWidgets import QScrollArea

@@ -9,8 +9,6 @@ from origenerator.gui.prompt_reveal import reveal_prompt
 
 
 def test_revealing_a_prompt_unfolds_the_section_hiding_it(qtbot):
-    # The Foley prompts sit in a section that starts closed, and a match inside a
-    # closed section is one the user is told about but can't be shown.
     section = CollapsibleSection("Audio", collapsed=True)
     field = QPlainTextEdit(section.content())
     field.setPlainText("a cat purring")

@@ -1,5 +1,3 @@
-"""The pass a slideshow hands a Funestra: each slide as the item the Funestra plays,
-turned so the slide on screen leads."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -29,7 +27,6 @@ def slide_item(slide, points_of_interest: tuple = (), *,
 
 
 def rotated_onto(items: list, current) -> list:
-    """*items* turned so *current* leads, leaving the order otherwise alone."""
     if current is None:
         return items
     for index, item in enumerate(items):

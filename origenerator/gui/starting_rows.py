@@ -1,5 +1,3 @@
-"""The Job Queue's rows for work asked for that is not a job yet: no row, no id
-on the server and nothing to cancel, only an answer on screen to the asking."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal

@@ -1,8 +1,3 @@
-"""What the Generate tabs read off the whole library, worked out once for each
-state of it.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json

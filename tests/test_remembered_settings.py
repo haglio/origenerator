@@ -1,6 +1,3 @@
-"""Every control a person can set comes back after a restart, or is named here as
-no setting, and a control that is neither fails -- the way a Fun Time setting
-nobody has said either of does."""
 from __future__ import annotations
 
 import json

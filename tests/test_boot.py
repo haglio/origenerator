@@ -1,5 +1,3 @@
-"""The boot's steps, each on its own: a Boot built once, and one collaborator faked
-per step, where tests/test_app.py drives the whole launch through ``main``."""
 from __future__ import annotations
 
 import subprocess
@@ -36,14 +34,11 @@ def hosted(qapp, tmp_path):
 
 @pytest.fixture
 def screens():
-    """Every loading screen opened, in this process rather than one of its own."""
     opened = []
     with patch("origenerator.gui.loading_screen.LoadingProcess.open",
                side_effect=opened_here(opened)):
         yield opened
 
-
-# --- the claim on the library -------------------------------------------------
 
 
 def _copies(claim, *, closing=False, after_the_closing_one=None):
@@ -114,8 +109,6 @@ def test_the_copy_fun_time_opens_goes_on_without_the_library(hosted):
     told.assert_not_called()
 
 
-# --- the loading screen -------------------------------------------------------
-
 
 def test_the_first_thing_the_boot_says_opens_its_loading_screen_and_the_rest_reuses_it(
         boot, screens):
@@ -154,8 +147,6 @@ def test_a_cancel_from_the_loading_screen_stops_the_boot_at_its_next_step(boot, 
         boot.stop_if_canceled()
 
 
-# --- the offer to Fun Time ----------------------------------------------------
-
 
 def _the_offers_standing_in(boot):
     return [handoff.the_offer_in(place) for place in (boot.state_dir, boot.library_state_dir)]
@@ -173,8 +164,6 @@ def test_the_copy_fun_time_opened_offers_itself_to_nobody(hosted):
 
     assert _the_offers_standing_in(hosted) == [None, None]
 
-
-# --- the crash log ------------------------------------------------------------
 
 
 def test_the_crash_log_is_armed_in_the_copys_own_state_folder(boot):
@@ -205,8 +194,6 @@ def test_a_launch_without_a_crash_log_runs_with_nothing_watching_the_window(boot
     assert boot.freeze_watch is None
 
 
-# --- the listener for clicked toasts -----------------------------------------
-
 
 def test_the_boot_listens_for_clicks_on_the_production_checkouts_channel_before_it_has_a_window(
         boot, tmp_path):
@@ -216,8 +203,6 @@ def test_the_boot_listens_for_clicks_on_the_production_checkouts_channel_before_
     listener.assert_called_once_with(checkout=tmp_path / "production", parent=boot.app)
     assert boot.clicked_toasts is listener.return_value
 
-
-# --- the window, once built ---------------------------------------------------
 
 
 def _a_window_saying_what_happens_to_it(events):
@@ -273,8 +258,6 @@ def test_the_window_fun_time_opened_is_the_sessions_to_show(hosted):
     watch.assert_not_called()
     assert events == ["loading screen down", ("clicks go to", window.go_to_generation)]
 
-
-# --- a cancel, and a close ----------------------------------------------------
 
 
 def _a_client_saying_when_it_is_disconnected(events):
@@ -346,17 +329,11 @@ def test_the_copy_fun_time_opened_closes_with_no_offer_to_withdraw_and_no_claim_
     assert events == ["ComfyUI handed its work", "disconnected from ComfyUI"]
 
 
-# --- the ceiling --------------------------------------------------------------
-
 MAX_BOOT_COMPLEXITY = 11
 
 
 @pytest.mark.repo_check
 def test_no_function_of_the_boot_outgrows_the_ceiling():
-    """A ceiling that can only come down, on every function in the module that
-    boots the app, by the count ruff's C901 keeps: the next thing the launch takes
-    on becomes a step of Boot with a test of its own, or seams one out, rather
-    than one more branch of the routine."""
     ruff = subprocess.run(
         [sys.executable, "-m", "ruff", "check", "--no-cache", "--isolated", "--select", "C901",
          "--config", f"lint.mccabe.max-complexity = {MAX_BOOT_COMPLEXITY}",

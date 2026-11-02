@@ -8,7 +8,6 @@ from origenerator.gui.stylesheet import build_stylesheet
 
 
 def drawn_under_the_app_stylesheet(qtbot, build: Callable[[], tuple[QWidget, QWidget]]):
-    """Builds ``(tile, shown)`` under the app's stylesheet, shows ``shown`` and returns the tile with its grab."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())

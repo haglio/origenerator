@@ -8,6 +8,7 @@ import pytest
 from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
+from origenerator.gui.core import Launch
 from origenerator.workflows import detail_parts
 from tests.children import run_python
 from tests.test_core import _fun_time_session, _window
@@ -65,7 +66,8 @@ def test_a_launch_that_is_not_hosted_needs_none_of_them():
 @pytest.mark.parametrize("preview", [None, Preview(feature="the new seed row")])
 def test_the_caption_the_document_names_is_the_one_hosted_core_wears(
         qtbot, tmp_path, preview):
-    window = _window(qtbot, tmp_path, fun_time=_fun_time_session(), preview=preview)
+    window = _window(qtbot, tmp_path, fun_time=_fun_time_session(),
+                     launch=Launch(preview=preview))
 
     assert window.windowTitle() == _document()["window_title"]
 

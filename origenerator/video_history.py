@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.act_settings import GENAU, VIDEO, loops
+from origenerator.act_settings import lane_of
 
 
 def video_history(combinations, intent: str, uses=()) -> list[str]:
@@ -9,7 +9,7 @@ def video_history(combinations, intent: str, uses=()) -> list[str]:
               if use["intent"] == intent),
             *((made["source_video"], made["created_at"]) for made in combinations
               if made["prompt_id"] not in lane_noted
-              and (GENAU if loops(made) else VIDEO) == intent)]
+              and lane_of(made) == intent)]
     last_used: dict[str, str] = {}
     for video, when in used:
         last_used[video] = max(last_used.get(video, ""), when)

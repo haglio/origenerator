@@ -52,7 +52,7 @@ def voice_request(params: dict) -> dict:
     return {"mode": "preset", "speaker": voice}
 
 
-def scene_speech(params: dict) -> list[SceneSpeech | None]:
+def scene_speech(params: dict, *, version: int = SPEECH_VERSION) -> list[SceneSpeech | None]:
     if "scene_lines" not in params:
         return []
     frames = [int(n) for n in (params.get("scene_frames") or [])]
@@ -67,7 +67,7 @@ def scene_speech(params: dict) -> list[SceneSpeech | None]:
         if not text:
             spoken.append(None)
             continue
-        shape = json.dumps([SPEECH_VERSION, text, voice, seed, count], sort_keys=True)
+        shape = json.dumps([version, text, voice, seed, count], sort_keys=True)
         digest = hashlib.sha1(shape.encode("utf-8")).hexdigest()[:20]
         spoken.append(SceneSpeech(text, count, f"{SPEECH_DIR}/{digest}.wav"))
     return spoken

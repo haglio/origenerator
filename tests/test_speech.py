@@ -55,12 +55,10 @@ def test_a_lines_file_is_named_from_everything_that_shapes_it():
                                 voice_sample="C:/v/her.wav"))[0].file != base
 
 
-def test_lines_already_on_disk_are_spoken_again_after_the_worker_changes_what_it_says(monkeypatch):
+def test_lines_already_on_disk_are_spoken_again_after_the_worker_changes_what_it_says():
     before = scene_speech(_params(scene_lines=["hi"]))[0].file
 
-    monkeypatch.setattr(speech, "SPEECH_VERSION", speech.SPEECH_VERSION + 1)
-
-    assert scene_speech(_params(scene_lines=["hi"]))[0].file != before
+    assert scene_speech(_params(scene_lines=["hi"]), version=speech.SPEECH_VERSION + 1)[0].file != before
 
 
 def test_the_voice_is_a_preset_unless_the_custom_one_is_chosen():

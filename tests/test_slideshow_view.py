@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from funestra.testing import FakeEngine
 from funestra.volume import VolumeHud
 from PIL import Image
 from PyQt6.QtCore import QPoint, QPointF, Qt
@@ -35,7 +36,6 @@ from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests import gestures
-from tests.funestra_fakes import FakeEngine
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, speaker_on_screen, thumbnail_on_screen

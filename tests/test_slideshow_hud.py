@@ -13,6 +13,7 @@ from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
 from funestra.modes import Osr2State
 from funestra.satellite_hud import MARGIN
+from funestra.testing import FakeEngine
 from funestra.timeline import TIMELINE_HEIGHT
 from PyQt6.QtCore import QEvent, QPoint, QPointF
 from PyQt6.QtWidgets import QApplication
@@ -27,7 +28,6 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import in_order
 from tests import gestures
-from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, hud_targets
 

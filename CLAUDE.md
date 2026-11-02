@@ -135,7 +135,8 @@ for one thing cost four. So:
   on the screen, the word the user says, the words the code says today, the one
   word the code is to say, and whether he has ruled. A noun the code reaches
   for to name a drawn thing (tile, card, badge, chip, scrim, plate, strip, cell,
-  slot, pane, panel, console, band, toast, and the rest the test names) is a
+  slot, pane, panel, console, band, toast, and the rest `app_support.glossary`
+  names) is a
   row there before it is a word in the code, so a new name is a row he rules
   on rather than a word an agent invents. A rename moves the old word from the
   row's `code_today` to its `retired`, which the test then holds at zero, and a

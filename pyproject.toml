@@ -22,9 +22,9 @@ requires-python = ">=3.14"
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.339",
-    "funestra @ git+https://github.com/haglio/funestra@v0.1.651",
+    "funestra @ git+https://github.com/haglio/funestra@v0.1.652",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.294",
-    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.101",
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.102",
     # PyQt6 and Qt stay at 6.11, the version production Origenerator runs on, until
     # the family moves on purpose: 6.12.0 (out 2026-10-28) fails
     # test_work_deferred_by_a_dead_owner_never_runs and

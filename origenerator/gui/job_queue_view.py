@@ -1,48 +1,3 @@
-"""The Job Queue, along the foot of the gallery's own panes.
-
-Two halves, each answering one question. On the left, *what is being made*: the
-live frame of the job ComfyUI is rendering, filling the Job Queue's height out of its
-lower-left corner, and beside it a column no wider than a bar needs to be — the
-job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
-bar it measures. That frame opens the folder its run will land in, the way the
-row of the same job on the right does: it is a thumbnail of a job, and a thumbnail of
-a job goes where the job goes. A job ComfyUI hasn't started has no reading to
-write and that bar only sweeps, so where another app's work is what is holding
-it up, the line under the bar says so: a bar sweeping with nothing said about it
-is exactly the thing a user is owed an explanation for. Whatever is true of the
-shared *server* is this half's to say — a row on the right is about one job of
-ours and nothing else. With nothing of ours in flight the same half says what
-that server is busy with instead, and offers a Clear for it.
-On the right, taking the rest of the Job Queue, *what is queued*: every in-flight job
-as a row of its own — the one being made at the top — each led by its arrows, a
-shield and a Cancel, each opening its folder on a click or a double-click, and
-each draggable to a new place in the line. A row says what the job will cost and
-what kind of thing it is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a
-line of waiting work is read to find out how long the wait is, and the
-workflow-and-prompt name that used to be here is the same on every row of a
-folder being re-rolled. Beside that, a thumbnail — the frame an I2V
-animates, the gray video a dropped-video combine takes its settings from, or a
-four-up of the folder the run will land in — because the one thumbnail a queued
-job cannot show is its own.
-Only a run that holds its place is fixed, a shielded one being made say: nothing
-can be moved in front of it. With nothing queued at all, the Job Queue says so in dim letters across the middle of
-the whole of itself, rather than sitting blank: the left half has no frame, no
-bar and (barring another app's backlog to report) nothing to say, so it stands
-down and the line takes the Job Queue's whole width to be centered in.
-
-It opens one progress bar tall — about two rows, the rest a scroll away — and its
-top edge is a splitter handle, so a long queue can be dragged open to as many rows
-as it's worth giving up. The extra height all goes to the line: the thumbnail
-never grows past the Job Queue's opening height, so a queue dragged tall is a queue
-you can read rather than one enormous frame.
-
-It's fed the in-flight view-models the Latest collection uses
-(:class:`origenerator.gui.inflight.InFlightItem`), leading job first, refreshed on
-every poll so the frame and progress stay live; a refresh updates rows in place,
-so a drag is never yanked out from under the user. Reordering is asked for, not
-done here: :attr:`move_requested` names the row let go and the one it was let go
-ahead of, and whoever owns the jobs re-lines the queue.
-"""
 from __future__ import annotations
 
 from PyQt6 import sip
@@ -102,20 +57,9 @@ from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-# The Job Queue's opening height, its floor, and so the widest the live thumbnail
-# ever gets: it takes the lower-left corner whole, being the one thing here worth
-# looking at (the full-size preview is still one click away). The Job Queue never
-# opens taller than this however long the line gets, so the panes above it don't
-# move on their own — only on a drag of the handle at its top edge.
 _ROW_HEIGHT = 88
-# The bar the clock is written across, sized off the line it carries — "45% ·
-# 12:30 elapsed · ~16:02 left" runs about 270px at the app's own font, and a bar
-# narrower than its caption elides the countdown away. The queue's names are
-# long, so the rest of the Job Queue still goes to the line.
 _BAR_WIDTH = 290
 _HALVES_GAP = GAP_MEDIUM
-# Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
-# (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 
@@ -131,30 +75,9 @@ def _offer(button: QPushButton, enabled: bool) -> None:
 
 
 class OpensAFolder:
-    """Going from a job to where its result will land: a press and its release,
-    or a double-click.
-
-    Both halves of the Job Queue stand for a job you can go to — the live frame of
-    the one being made, and the rows of the ones waiting — so both answer the
-    same two gestures, written once here.
-
-    The double-click is answered outright rather than through the release that
-    trails it. Qt hands the second press of a double over as a double-click
-    event, not as a press, so a surface without this reaches the folder only if a
-    further release arrives — one event too many to rest on for what is, to
-    anyone reading a listing, the obvious way to open a row.
-
-    A subclass says what is under the cursor through :meth:`folder_of`. The
-    pending press is :attr:`_press_at`, left where a subclass can call the
-    gesture off: the queue's rows clear it once a press has travelled far enough
-    to be a drag, and the row then reorders rather than opening anything.
-    """
-
-    _press_at = None  # where a left press landed, until it clicks or turns into a drag
+    _press_at = None
 
     def folder_of(self, position):
-        """How to reach the folder of whatever sits at ``position``, or ``None``
-        where nothing there goes anywhere."""
         raise NotImplementedError
 
     def mousePressEvent(self, event):
@@ -167,8 +90,9 @@ class OpensAFolder:
         self._press_at = None
 
     def mouseDoubleClickEvent(self, event):
+        # Qt delivers the second press of a double-click as this event, not as a press.
         if event.button() == Qt.MouseButton.LeftButton:
-            self._press_at = None  # answered here, not again on the release
+            self._press_at = None
             self._open_folder(event.position().toPoint())
 
     def _open_folder(self, position):
@@ -178,22 +102,6 @@ class OpensAFolder:
 
 
 class RunningPreview(OpensAFolder, QWidget):
-    """What is being made: its live frame, and beside it a fat bar with the clock
-    written across it — and, under the bar, what is holding the whole line up.
-
-    That second line is the Job Queue's one place for a fact about the shared server
-    rather than about a job: another app's backlog, or a hold of this queue's own.
-    While the head of the line is held up by another app's work its bar has no
-    reading to write and only sweeps, and the line under it is the explanation
-    that sweeping is owed.
-
-    The frame goes where the row of the same job goes — a click or a double-click
-    on it opens the folder the run will land in (:class:`OpensAFolder`). Only the
-    frame: the bar beside it is a reading of this job rather than a thumbnail of it,
-    and the note under that bar is about the shared server, so neither is
-    something to click through to a folder.
-    """
-
     start_now_requested = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -203,44 +111,28 @@ class RunningPreview(OpensAFolder, QWidget):
         self._press_at = None
 
         layout = QHBoxLayout(self)
-        # No margins: the frame is meant to reach the Job Queue's edges, and the
-        # column beside it centers itself in the same height.
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
         self._frame = QLabel()
-        self._frame.setFixedSize(_ROW_HEIGHT, _ROW_HEIGHT)  # kept square: resizeEvent
+        self._frame.setFixedSize(_ROW_HEIGHT, _ROW_HEIGHT)
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Pinned to the foot, so it still sits in the Job Queue's corner once the
-        # Job Queue is dragged taller than the square it stops growing at.
         layout.addWidget(self._frame, 0, Qt.AlignmentFlag.AlignBottom)
 
         column = QVBoxLayout()
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
         column.addStretch(1)
-        # How far along the run is, how long it has been going and how much longer
-        # it has — written across the bar those numbers measure, so the reading and
-        # the thing read are one object rather than a line of text with a separate
-        # stripe under it. The same line, in the same words, as the Gallery pane's
-        # in-flight tiles carry.
         self._progress = ProgressBar()
         self._progress.setFixedHeight(BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)
         column.addWidget(self._progress)
-        # What the shared server is doing to us: the backlog holding our job
-        # up, under its own sweeping bar — or, with nothing of ours in flight
-        # at all, what that server is busy with instead, in the bar's own place.
-        # Plain text either way, being about the server rather than about a run of
-        # ours that a bar could be measuring. It wraps rather than eliding: the
-        # width here is the bar's, chosen for a line of readings that is shorter
-        # than a sentence, and a truncated explanation explains nothing.
         self._under_the_bar = QWidget()
         self._under_the_bar.setMinimumWidth(_BAR_WIDTH)
         under_the_bar = QHBoxLayout(self._under_the_bar)
         under_the_bar.setContentsMargins(0, 0, 0, 0)
         under_the_bar.setSpacing(_HALVES_GAP)
         self._caption = QLabel()
-        self._caption.setObjectName("estimateLabel")  # muted secondary text
+        self._caption.setObjectName("estimateLabel")
         self._caption.setWordWrap(True)
         under_the_bar.addWidget(self._caption, 1)
         self._start_now = QPushButton(START_NOW_TEXT)
@@ -253,8 +145,6 @@ class RunningPreview(OpensAFolder, QWidget):
         column.addStretch(1)
         layout.addLayout(column)
 
-        # Its own clock rather than the gallery's poll, so the count advances a
-        # second at a time whether or not a refresh has landed.
         self._tick = QTimer(self)
         self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_timing)
@@ -262,52 +152,30 @@ class RunningPreview(OpensAFolder, QWidget):
         self.show_item(None)
 
     def show_foreign(self, text: str):
-        """Say what the shared server is holding us up with — under our own job's
-        bar while it is held up by that work, or in the bar's own place while
-        nothing of ours is in flight at all.
-
-        Hidden with nothing to say, so a job of ours actually being made keeps the
-        place for its bar alone; an empty half keeps it up regardless, holding the
-        space its bar has stood down from.
-        """
         self._caption.setText(text)
         self._under_the_bar.setVisible(bool(text) or self._item is None)
 
     def status_text(self) -> str:
-        """What this half is saying about the head of the line, as one string:
-        the server's hold if it has one, else the bar's own reading, and nothing
-        at all once nothing of ours is running -- a bar keeps its last reading,
-        and reporting that after the queue empties would be a stale clock.
-
-        No production caller: on screen these are two stacked widgets and the
-        half shows whichever has something to say. This is the Job Queue's
-        inspection surface, kept because the caption-else-bar rule is one rule
-        and a second copy of it in a test helper is worse than a method.
-        """
         return self._caption.text() or (
             self._progress.caption() if self._item is not None else ""
         )
 
     def folder_of(self, position):
-        """Where the running job will land — for a press on its frame alone."""
         if self._item is None or not self._frame.geometry().contains(position):
             return None
         return self._item.reveal
 
     def show_item(self, item):
-        """Render ``item``, or blank the half (keeping its space) when nothing runs."""
         self.key = item.key if item is not None else None
         self._item = item
         if item is None:
-            self._frame.unsetCursor()  # nothing to go to, so nothing to invite a click
+            self._frame.unsetCursor()
             self._render_frame(None)
             self._progress.hide()
             self._under_the_bar.show()
             self._offer_start_now(False)
             self._tick.stop()
             return
-        # The hand rides on the frame rather than on the half, so it appears over
-        # the one thing here that goes anywhere.
         self._frame.setCursor(Qt.CursorShape.PointingHandCursor)
         self._progress.show()
         self._render_frame(item)
@@ -315,20 +183,8 @@ class RunningPreview(OpensAFolder, QWidget):
         self._tick.start()
 
     def _render_timing(self):
-        """How far along the running job is, how long it has been going and how
-        much longer it has — written across its bar.
-
-        Read off the clock rather than off the feed. A job ComfyUI hasn't started
-        has no elapsed time to report and the line stays empty — what its bar is
-        sweeping while it waits is said under the bar (:meth:`show_foreign`), not on it,
-        being about the server rather than a run of ours that a bar could measure.
-        A job with no step counts to show leaves the bar indeterminate rather than
-        parked at 0%.
-        """
         if self._item is None:
             return
-        # Under the bar, whatever holds the job up that the bar cannot say for
-        # itself, and the reason it sweeps rather than fills.
         self.show_foreign(queue_wait_text(self._item.foreign_ahead, self._item.starts_at) or "")
         self._offer_start_now(seconds_until_start(self._item.starts_at) is not None)
         self._progress.show_progress(
@@ -345,22 +201,6 @@ class RunningPreview(OpensAFolder, QWidget):
         self._start_now.setVisible(offered)
 
     def _render_frame(self, item):
-        """What is being made, or — until ComfyUI has streamed a frame of it —
-        what it is being made from.
-
-        A live frame is the whole point of this corner and wins whenever there is
-        one. There is none for a good while: a WAN video spends over a minute
-        loading two 14B models before its first preview, and this corner stood
-        empty through all of it. So the wait shows the same sum the Generate tab
-        and the folder's own tile show for that job — the frame, a plus, and the
-        source video in gray where a combine brought one
-        (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and
-        nothing at all for a run made from nothing, which is a T2V with
-        no thumbnail to its name yet.
-
-        The label is sized to what it draws, since the pair is twice as wide as
-        the square a single thumbnail (or a live frame) fills.
-        """
         side = min(self.height(), _ROW_HEIGHT)
         pixmap = QPixmap()
         frame = None if item is None else item.reading.frame
@@ -372,60 +212,19 @@ class RunningPreview(OpensAFolder, QWidget):
                 _made_from(item), QSize(2 * side, side))
         if pixmap is None:
             self._frame.setFixedSize(side, side)
-            self._frame.clear()  # nothing of this run to show — a blank square
+            self._frame.clear()
             return
         self._frame.setFixedSize(max(side, pixmap.width()), side)
         self._frame.setPixmap(pixmap)
 
     def resizeEvent(self, event):
-        """Keep the frame the largest square the Job Queue's height leaves room for.
-
-        Taken off the height rather than a size of its own, so the thumbnail is
-        always as big as the corner it sits in: a Job Queue laid out any other height
-        grows it to match instead of stranding it in an empty square. Only up to
-        the Job Queue's opening height, though — a queue dragged open is being opened
-        to read the line, and every pixel past that goes to the rows.
-        """
         super().resizeEvent(event)
         if min(self.height(), _ROW_HEIGHT) != self._frame.height():
             self._render_frame(self._item)
 
 
 class QueueRow(OpensAFolder, QWidget):
-    """One job in the line: what it costs, what it is, what it is made from, and
-    the buttons that move it, shield it and throw it away.
-
-    Read left to right: the buttons, then the job's thumbnail, then what it is —
-    ``"~2 min · Video · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
-    line is the whole of what the row says about the job. The workflow-and-prompt
-    name a Generate tab is titled with used to be here and is not: it answers
-    "which settings", and every row of a folder being re-rolled carries the same
-    one, so a Job Queue of eight said one thing eight times and none of them said
-    which was the ten-minute one. It is still a hover away.
-
-    The thumbnail is second because that is where it lines up into a column and
-    where the eye lands: the frame an I2V animates (with the gray
-    source video beside it, where one was dropped), or four out of the folder the
-    run will land in (:mod:`origenerator.gui.queue_thumbs`).
-
-    Only a wait worth explaining puts more text on the row, and only one this job
-    is in on its own — one not sent to ComfyUI yet — and that note
-    takes the rest of the width, after everything the row always says. A wait on another app is not one of them:
-    that is the whole line's, and is said once, under the bar in the left half —
-    the bar it is holding up, and the thing it is there to explain.
-
-    The thumbnail block is one width whether it holds one thumbnail or four, so the
-    line of text beside it starts at the same place on every row.
-
-    A press-and-release opens the job's folder, and so does a double-click
-    (:class:`OpensAFolder`); a press that travels starts a drag instead, which
-    the Job Queue turns into a reorder, wherever the queue gives the job a move.
-    """
-
-    HEIGHT = 34  # about two of these fit beside the progress bar
-    # The side of one cell of the thumbnail block: the row's height less its
-    # margins, so the thumbnails are as big as a row that still reads as a row can
-    # make them. The block itself is four of these across.
+    HEIGHT = 34
     THUMB = HEIGHT - 6
     INSET = GAP_SMALL
 
@@ -443,8 +242,6 @@ class QueueRow(OpensAFolder, QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(self.INSET, GAP_SMALL, GAP_MEDIUM, GAP_SMALL)
         layout.setSpacing(GAP_MEDIUM)
-        # They lead the row: a button anywhere after a line that can elide was
-        # pushed out of sight at the right-hand end.
         self._up = self._arrow(icons.move_up_icon(), MOVE_UP_TIP, self._on_up)
         layout.addWidget(self._up)
         self._down = self._arrow(icons.move_down_icon(), MOVE_DOWN_TIP, self._on_down)
@@ -461,20 +258,11 @@ class QueueRow(OpensAFolder, QWidget):
         self._cancel.setFixedHeight(self.HEIGHT - 12)
         self._cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self._cancel)
-        # Straight after the button, so the blocks stack into a column at the
-        # near edge of the line rather than out at the far end of the text.
         self._thumbs = QueueThumbs(self.THUMB)
         layout.addWidget(self._thumbs)
-        # What the row says about the job, in the type the rows always used,
-        # elided rather than widen the row past a narrow pane.
         self._lead = ElidingLabel()
         self._lead.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._lead)
-        # Only a wait needs explaining, so most rows leave this empty. It asks
-        # for no width of its own and is elided into whatever is left
-        # (:meth:`_render_note`): a label that demands its full text instead can
-        # widen the row past the Job Queue and carry everything after it off the
-        # end — the disappearance the button was moved to the front to escape.
         self._note = QLabel()
         self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._note.setSizePolicy(QSizePolicy.Policy.Ignored,
@@ -491,21 +279,12 @@ class QueueRow(OpensAFolder, QWidget):
         return arrow
 
     def update_item(self, item):
-        """Re-render this row in place — a queued→running flip, a fresh estimate,
-        or an Auto toggle that changed what the button gets you."""
         self._item = item
         self.movable = movable(item)
         for arrow, move in ((self._up, item.move_up), (self._down, item.move_down)):
             _offer(arrow, move is not None)
         self._lead.setText(queue_lead_text(item))
-        # The name the row no longer spends its width on, plus what the shorthand
-        # in front of it means. The settings are worth an answer, just not the row.
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
-        # One wait is worth explaining in a row's own width, being this job's
-        # alone: the stretch before what was asked for is a job at all. The
-        # user's own place in the line is the line itself and needs no words, and
-        # a wait on another app is about the server, not this job — the left
-        # half says that one, under the bar that wait is holding up.
         self._note_text = starting_row_text(item.starting) or ""
         self._render_note()
         self._cancel.setToolTip(cancel_tooltip(item.auto_generating))
@@ -515,32 +294,16 @@ class QueueRow(OpensAFolder, QWidget):
         self._render_thumbs(item)
 
     def _render_note(self):
-        """Fit the wait note to the width the row has left for it.
-
-        Elided rather than clipped: clipped, the last word is cut mid-letter and
-        reads as something that failed to draw, where an ellipsis says outright
-        that there is more.
-        """
         self._note.setText(self._note.fontMetrics().elidedText(
             self._note_text, Qt.TextElideMode.ElideRight, self._note.width()
         ))
         self._note.setToolTip(self._note_text)
 
     def resizeEvent(self, event):
-        """Re-fit the note — the Job Queue's width follows the window's."""
         super().resizeEvent(event)
         self._render_note()
 
     def _render_thumbs(self, item):
-        """The row's thumbnail: what the job is made from, else what its folder holds.
-
-        The start frame wins whenever there is one, being about *this* run rather
-        than about where it will land — and being the only thing separating two
-        i2v rows off one folder's settings. A combine handed a dropped video draws that video
-        beside it, in gray. A run with neither, or one whose thumbnails aren't on
-        disk yet, falls back to the folder view; a folder with nothing in it yet
-        leaves the block off the row rather than draw an empty grid.
-        """
         if self._thumbs.show_source(_made_from(item)):
             return
         if item.folder_thumbnails:
@@ -549,7 +312,6 @@ class QueueRow(OpensAFolder, QWidget):
         self._thumbs.clear_block()
 
     def set_dragging(self, dragging: bool):
-        """Dim this row while it is the one being dragged, so the gesture reads."""
         self.setProperty("dragging", dragging)
         self.style().unpolish(self)
         self.style().polish(self)
@@ -571,32 +333,26 @@ class QueueRow(OpensAFolder, QWidget):
             self._item.shield(shielded)
 
     def folder_of(self, position):
-        """Where this job will land — the whole row goes there, wherever it was
-        pressed, the buttons in front of it being buttons of their own."""
         return self._item.reveal
 
     def mouseMoveEvent(self, event):
-        """A press that travels far enough becomes a drag, carrying this row's id."""
         if self._press_at is None or not self.movable:
             return
         travelled = (event.position().toPoint() - self._press_at).manhattanLength()
         if travelled < QApplication.startDragDistance():
             return
-        self._press_at = None  # this gesture is a drag now, not a pending click
+        self._press_at = None
         mime = QMimeData()
         mime.setData(QUEUE_ROW_MIME, self.key.encode())
         self.set_dragging(True)
         try:
             self._drag_out.start(mime, self.grab(), action=Qt.DropAction.MoveAction)
         finally:
-            if not sip.isdeleted(self):  # a poll can redraw the line mid-drag
+            if not sip.isdeleted(self):
                 self.set_dragging(False)
 
 
 class _Rules(QWidget):
-    """Lines drawn over the Job Queue's parts: the app's style sheet grounds the
-    column the rows sit in, so a line painted beneath it would not show."""
-
     def __init__(self, lines, parent):
         super().__init__(parent)
         self._lines = lines
@@ -611,39 +367,30 @@ class _Rules(QWidget):
 
 
 class JobQueueView(QWidget):
-    """The live preview and its bar on the left, the whole line on the right."""
-
-    move_requested = pyqtSignal(str, object)  # a row let go just ahead of another, or past the last
-    clear_queue_requested = pyqtSignal()  # wipe another app's work off ComfyUI
-    start_now_requested = pyqtSignal()  # end the minute a video waits after an image
-    cancel_all_requested = pyqtSignal()  # Cancel All, which asks before anything goes
+    move_requested = pyqtSignal(str, object)
+    clear_queue_requested = pyqtSignal()
+    start_now_requested = pyqtSignal()
+    cancel_all_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("generationQueue")
-        self.setAcceptDrops(True)  # a row dropped anywhere on the Job Queue reorders it
-        # A floor, not a fixed height: the Job Queue opens one bar tall and grows only
-        # when its splitter handle is dragged, so the panes above never move on
-        # their own however long the line gets.
+        self.setAcceptDrops(True)
         self.setMinimumHeight(_ROW_HEIGHT)
         self._items: list = []
-        self._drop_at: int | None = None  # where a drag in progress would land
+        self._drop_at: int | None = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
         layout = QHBoxLayout()
-        # Flush at the left and both ends, so the live frame fills the Job Queue's
-        # lower-left corner; only the far right is held off the window edge.
         layout.setContentsMargins(0, 0, GAP_SMALL, 0)
         layout.setSpacing(_HALVES_GAP)
         outer.addLayout(layout, 1)
         self._running = RunningPreview()
         self._running.start_now_requested.connect(self.start_now_requested)
         layout.addWidget(self._running)
-        # Only ever offered for another app's work — the user's own queue is what
-        # he asked for, and every row of it carries its own Cancel already.
         self._clear = QPushButton(CLEAR_TEXT)
         self._clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self._clear.clicked.connect(self.clear_queue_requested)
@@ -654,27 +401,18 @@ class JobQueueView(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Takes whatever height the Job Queue has and asks for none of its own: a
-        # twelve-job line must not make the Job Queue open twelve rows tall, and a
-        # Job Queue dragged open must hand every extra pixel to these rows.
         self._scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
         self._host = QWidget()
         self._rows_column = QVBoxLayout(self._host)
         self._rows_column.setContentsMargins(0, 0, 0, 0)
         self._rows_column.setSpacing(0)
-        self._rows_column.addStretch(1)  # rows stack from the top
-        # What the empty line is for. The Job Queue holds its space whether or not
-        # anything is queued, so this side spends most of its life with nothing
-        # in it, and a blank half of a laid-out Job Queue reads as something that
-        # failed to draw. It sits between two stretches, so it centers in the
-        # space it is explaining while nothing is listed, and the rows still
-        # stack from the top once it has given way to them.
+        self._rows_column.addStretch(1)
         self._hint = QLabel(EMPTY_QUEUE_TEXT)
-        self._hint.setObjectName("estimateLabel")  # muted secondary text
+        self._hint.setObjectName("estimateLabel")
         self._rows_column.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
         self._rows_column.addStretch(1)
         self._scroll.setWidget(self._host)
-        layout.addWidget(self._scroll, 1)  # the line takes the rest of the Job Queue
+        layout.addWidget(self._scroll, 1)
         self._for_all = self._for_every_job()
         layout.addWidget(self._for_all)
         self._rules = _Rules(self._drawn_rules, self)
@@ -689,7 +427,7 @@ class JobQueueView(QWidget):
         stack.addStretch(1)
         self._shield_all = QPushButton(SHIELD_ALL_TEXT)
         self._shield_all.setIcon(icons.shield_icon())
-        mark = QueueRow.HEIGHT - 12 - 2 * BUTTON_ICON_INSET  # a row's shield's own size
+        mark = QueueRow.HEIGHT - 12 - 2 * BUTTON_ICON_INSET
         self._shield_all.setIconSize(QSize(mark, mark))
         self._shield_all.setToolTip(SHIELD_ALL_TIP)
         self._shield_all.clicked.connect(self._shield_every_job)
@@ -706,25 +444,10 @@ class JobQueueView(QWidget):
         shield_every_job(self._items)
         self._line_up(self._items)
 
-    # --- what the Job Queue is showing -----------------------------------------
-
     def sizeHint(self) -> QSize:
-        """One progress bar tall, whatever is or isn't in it.
-
-        Read off the Job Queue's own opening height rather than added up from its
-        children, whose number changes: an idle Job Queue, whose live half has stood
-        down to leave the hint the full width, asks for exactly the room a busy
-        one does, so the splitter above it doesn't shift as the queue drains.
-        """
-        return QSize(super().sizeHint().width(), _ROW_HEIGHT + 1)  # and its rule
+        return QSize(super().sizeHint().width(), _ROW_HEIGHT + 1)
 
     def rows(self) -> list[QueueRow]:
-        """Every job in the line, in order — the one being made first.
-
-        Jobs only: the hint that fills an empty line shares the same column, and it
-        is no row — nothing may be dropped in front of it, reordered against it,
-        or throw it away with the others on a rebuild.
-        """
         return [self._rows_column.itemAt(i).widget()
                 for i in range(self._rows_column.count())
                 if isinstance(self._rows_column.itemAt(i).widget(), QueueRow)]
@@ -733,17 +456,6 @@ class JobQueueView(QWidget):
         return [row.key for row in self.rows()]
 
     def set_items(self, items: list, foreign_queued: int = 0):
-        """Show ``items`` — every in-flight generation, the one being made first.
-
-        The first drives the live half. A row already standing for a job is
-        refreshed and moved into place, never built again, so a press on it
-        survives a poll that changes the line around it.
-
-        ``foreign_queued`` is how much of ComfyUI's queue belongs to another app.
-        It puts Clear up whenever there is any, and with nothing of ours in
-        flight it is what the free half says — the point being to see that
-        backlog before a Generate joins the line.
-        """
         leader = items[0] if items else None
         self._running.show_item(leader)
         self._clear.setVisible(bool(foreign_queued))
@@ -752,11 +464,6 @@ class JobQueueView(QWidget):
         if leader is None:
             free_half = foreign_queue_text(foreign_queued) or ""
             self._running.show_foreign(free_half)
-        # Nothing of ours in flight at all: the line has no rows to show, so it
-        # says what it is for instead. The left half stands down with it unless
-        # it has something to report — with no frame, no bar and nothing to say
-        # about another app it is an empty third of the Job Queue, and the hint would
-        # be centered in the sliver beside it rather than in the Job Queue itself.
         self._hint.setVisible(not items)
         self._for_all.setVisible(bool(items))
         self._running.setVisible(bool(items) or bool(free_half))
@@ -778,14 +485,10 @@ class JobQueueView(QWidget):
             if self._rows_column.indexOf(row) != index:
                 self._rows_column.removeWidget(row)
                 self._rows_column.insertWidget(index, row)
-        # The scroll area would otherwise squeeze the whole line into its own
-        # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
         _offer(self._shield_all, bool(jobs_to_shield(items)))
         _offer(self._cancel_all, bool(jobs_to_cancel(items)))
         self._rules.update()
-
-    # --- the rules drawn over the Job Queue -------------------------------------
 
     def head_rule(self) -> list[QPoint]:
         rows = self.rows()
@@ -817,10 +520,7 @@ class JobQueueView(QWidget):
         super().resizeEvent(event)
         self._rules.resize(event.size())
 
-    # --- accepting a dragged row --------------------------------------------
-
     def _carried_key(self, event) -> str | None:
-        """The row id a drag carries, if it is one of ours and still in the line."""
         if not event.mimeData().hasFormat(QUEUE_ROW_MIME):
             return None
         key = bytes(event.mimeData().data(QUEUE_ROW_MIME)).decode()
@@ -841,15 +541,12 @@ class JobQueueView(QWidget):
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
-        """Ask for a dragged row to go wherever in the line it was let go."""
         key = self._carried_key(event)
         self._show_drop_mark(None)
         if key is None:
             return
         keys = [item.key for item in self._items]
         place = self._drop_index(event.position().toPoint())
-        # The place was read with the dragged row still in place, so a drop below
-        # it names a place one further along than it will end up in.
         rest = [other for other in keys if other != key]
         landing = place - 1 if place > keys.index(key) else place
         if rest[:landing] + [key] + rest[landing:] != keys:
@@ -862,9 +559,6 @@ class JobQueueView(QWidget):
             self._rules.update()
 
     def _drop_index(self, point) -> int:
-        """Which place a drop at ``point`` (in this widget's coordinates) lands in:
-        above the row whose top half it fell on, else at the end of the line. Never
-        in front of a row that holds its place."""
         for index, row in enumerate(self.rows()):
             middle = row.mapTo(self, row.rect().center())
             if point.y() < middle.y():

@@ -10,8 +10,6 @@ from origenerator.experiments.policy import Proposal
 
 
 class StubPolicy:
-    """Yields a fresh canned proposal per ask, counting the asks."""
-
     def __init__(self, limit=None):
         self.asks = 0
         self._limit = limit
@@ -27,10 +25,6 @@ class StubPolicy:
 
 
 class FakeLauncher:
-    """Stands in for the gallery's launch adapter: records each proposal and
-    returns the launched row's prompt_id — or ``None`` for the launches in
-    ``refuse`` (1-based ordinals), or for every launch when ``refuse_all``."""
-
     def __init__(self, refuse=(), refuse_all=False):
         self.launched = []
         self._refuse = set(refuse)
@@ -44,8 +38,6 @@ class FakeLauncher:
 
 
 def test_each_launch_records_what_it_was_bred_from_and_what_it_varies(caplog):
-    # The only record of what an unattended batch explored: the app is closed
-    # while it runs, and a proposal's provenance is nowhere else.
     with caplog.at_level("INFO", logger="origenerator.experiments.background"):
         queue_experiments([], StubPolicy(limit=1), FakeLauncher())
 
@@ -60,8 +52,6 @@ def test_closing_fills_the_queue_with_a_batch_of_experiments():
 
 
 def test_a_launch_that_didnt_take_doesnt_use_up_the_batch():
-    # A proposal can land in a folder another one already claimed. That's a
-    # skip, not an experiment — the batch is short by one unless it's retried.
     policy = StubPolicy()
     launcher = FakeLauncher(refuse=(1, 4))
     assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
@@ -76,8 +66,6 @@ def test_a_gallery_with_nothing_to_build_on_queues_nothing():
 
 
 def test_launches_that_keep_failing_give_up_instead_of_retrying_the_batch_out():
-    # Nothing takes when ComfyUI is down, and this runs as the app closes —
-    # so it must give up quickly rather than spend a submit timeout per slot.
     policy = StubPolicy()
     launcher = FakeLauncher(refuse_all=True)
     assert queue_experiments([], policy, launcher) == 0
@@ -85,10 +73,6 @@ def test_launches_that_keep_failing_give_up_instead_of_retrying_the_batch_out():
 
 
 class FakeClient:
-    """A ComfyUI stand-in: records what was dequeued and which prompts were
-    asked to stop, and raises from ``cancel_prompt`` for the prompt ids in
-    ``refuse``."""
-
     def __init__(self, refuse=()):
         self.refuse = set(refuse)
         self.canceled = []
@@ -123,21 +107,12 @@ def test_opening_drops_every_experiment_still_waiting_in_the_queue(tmp_path):
     assert sorted(client.canceled) == ["exp-1", "exp-2"]
     assert db.get_generation("exp-1") is None
     assert db.get_generation("exp-2") is None
-    # A finished experiment is a result to review, and the user's own job is
-    # never the experimenter's to cancel.
     assert db.get_generation("exp-done") is not None
     assert db.get_generation("mine") is not None
 
 
 def test_each_experiment_is_asked_to_stop_by_name_in_case_it_is_mid_render(tmp_path):
-    # Dequeuing only unqueues; the one ComfyUI is already executing keeps the
-    # GPU until it's interrupted — and holding it is exactly what the user
-    # turned this off for. Which one that is, the server knows and this does
-    # not: a "running" row was handed over, not necessarily started. So every
-    # one is asked to stop by name, and the server stops the one it is running.
-    # By name and never otherwise: ComfyUI serves other clients too (a sibling
-    # app's upscale, say), and a nameless /interrupt stops whatever is
-    # executing, whoever asked for it.
+    # ComfyUI serves other clients too, and a nameless /interrupt stops whatever is executing, so stop each by name
     db = Database(tmp_path / "test.db")
     _row(db, "exp-1", status="running", source="experiment")
     _row(db, "exp-2", status="pending", source="experiment")
@@ -148,9 +123,6 @@ def test_each_experiment_is_asked_to_stop_by_name_in_case_it_is_mid_render(tmp_p
 
 
 def test_an_experiment_that_wont_dequeue_keeps_its_row(tmp_path):
-    # With ComfyUI unreachable the prompt may still run, so its row has to stay:
-    # the app adopts an in-flight row as a live job, and a user launch preempts
-    # it. Deleting it would orphan the run and lose the result.
     db = Database(tmp_path / "test.db")
     _row(db, "exp-1", status="running", source="experiment")
     _row(db, "exp-2", status="pending", source="experiment")

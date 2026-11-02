@@ -1,9 +1,3 @@
-"""The lanes a finished video is handed down to a sibling app.
-
-One :class:`ExportLane` per lane, :data:`EXPORT_LANES` is all of them, and
-:func:`lane_for` is the one lane the Generate tab offers a video.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -21,29 +15,7 @@ from origenerator.media import MediaType
 
 @dataclass(frozen=True)
 class ExportLane:
-    """One outbound lane: a folder in Evolver's inbox, a column on the row, and
-    the words its button and its failure wear.
-
-    Both lanes are the same errand — copy the video on display into the inbox
-    Evolver watches, then stamp the row so the send survives a restart — and
-    they differ in nothing but the fields below. Written out twice they were
-    fifty lines of code with four literals swapped, and the tab's own docstring
-    said so; a third lane would have been a third copy. It is a row of this
-    table now.
-
-    ``source`` is the sub-folder Evolver reads the destination from, so it is a
-    name agreed with another repo and must stay spelled exactly as
-    :mod:`origenerator.config` has it. ``source_key`` is this lane's name in
-    :data:`origenerator.gallery_contract.LANES`, which holds the two persisted
-    columns — the send and its withdrawal — because the reader on the other
-    side selects them by name and they are the promise this repo publishes.
-    ``mark`` stamps the first and ``unmark`` the second. Each names the database method
-    outright rather than by a string the tab would have to look up: reached by
-    name, a stamp nothing else calls reads as dead code and is deleted by the
-    next person to run the scan. ``noun`` is what the failure dialog calls the
-    file: the two lanes call the same file a video and a clip, and each says it
-    in the words of the app it is bound for.
-    """
+    # Evolver reads the destination from the sub-folder 'source' names, so keep it spelled as in origenerator.config; mark and unmark name database methods outright, since a stamp reached by a string looks like dead code to the scan
 
     name: str
     source_key: str
@@ -59,12 +31,10 @@ class ExportLane:
 
     @property
     def flag(self) -> str:
-        """The column a send is stamped on, from the promise this repo publishes."""
         return LANES[self.source_key]["sent"]
 
     @property
     def unsent_flag(self) -> str:
-        """The column a withdrawal is stamped on, from that same promise."""
         return LANES[self.source_key]["unsent"]
 
     @property

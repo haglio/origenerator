@@ -1,11 +1,3 @@
-"""Turn a finished ComfyUI job's history into what a DB row records.
-
-Every path that completes a generation — the Generate tab, a gallery re-roll,
-and the startup reconciler — needs the same three things out of ComfyUI's
-history: the output files, a thumbnail for them, and how long the run took.
-Defining that once here keeps those paths from drifting apart, and keeps it
-Qt-free so the reconciler can use it without a running UI.
-"""
 from __future__ import annotations
 
 import json
@@ -32,15 +24,6 @@ logger = logging.getLogger(__name__)
 
 def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: Path, prompt_id,
                        params: dict | None = None):
-    """Return ``(output_files, thumbnail_path | None, duration | None)`` for a run.
-
-    ``output_files`` come from the workflow's own output node, filed into the
-    library; the thumbnail is drawn from the first file on disk, named by the
-    run's id; ``duration`` is parsed from the history's timestamps. The thumbnail
-    and duration are best-effort: a failure in either yields ``None`` rather than
-    stranding an otherwise-finished run. ``params``, the run's settings, is where
-    a workflow reads its video's script.
-    """
     files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
     thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
     source = _first_output_file(files, places)
@@ -56,8 +39,6 @@ def extract_completion(workflow, history_data, places: OutputPlaces, thumb_dir: 
 
 
 def _first_output_file(files, places: OutputPlaces) -> Path | None:
-    """The on-disk path of a run's first output, if it exists — the file both the
-    thumbnail and the funscript are made from."""
     if not files:
         return None
     source = output_file_path(files[0], places)
@@ -65,9 +46,6 @@ def _first_output_file(files, places: OutputPlaces) -> Path | None:
 
 
 def _write_video_funscript(workflow, files, places: OutputPlaces, params: dict | None):
-    """A deleted video's filename goes to a later video once Trash lets it go,
-    and the deleted one's script is still where the new one's goes, so the
-    finished video's own script is written over it."""
     if workflow.output_type != MediaType.VIDEO:
         return
     source = _first_output_file(files, places)
@@ -104,7 +82,6 @@ def animate_before_filing(workflow, history_data, places: OutputPlaces, thumb_di
 
 
 def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
-    """Record a finished run on the row it was launched under."""
     fields = dict(
         status=GenerationStatus.COMPLETED,
         output_files=json.dumps(files),

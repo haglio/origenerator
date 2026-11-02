@@ -15,9 +15,6 @@ def test_sections_are_in_the_canonical_display_order():
 
 
 def test_enhance_has_no_section_because_it_is_not_a_folder_setting():
-    # Every section here holds params that decide which gallery folder a run
-    # lands in. An enhancement doesn't — it's a finish applied afterward — so it
-    # is deliberately absent, and the gallery's Enhance pane owns it instead.
     assert "Enhance" not in [s.title for s in ps.SECTIONS]
     for key in ("enhance", "enhance_scale", "enhance_steps", "enhance_denoise"):
         assert ps.section_title(key) == ps.OTHER_TITLE
@@ -42,23 +39,18 @@ def test_section_title_places_each_kind_of_param_in_its_section():
 
 def test_unknown_key_falls_into_the_other_section_sorted_last():
     assert ps.section_title("mystery_param") == ps.OTHER_TITLE
-    # It ranks after every mapped key, so it renders in a trailing catch-all.
     assert ps.key_rank("mystery_param") > ps.key_rank("audio_seed")
 
 
 def test_key_rank_orders_across_and_within_sections():
-    # Across sections: a prompt precedes a seed precedes a sampling setting.
     assert ps.key_rank("positive_prompt") < ps.key_rank("seed")
     assert ps.key_rank("seed") < ps.key_rank("steps")
     assert ps.key_rank("steps") < ps.key_rank("width")
-    # Within Sampling: the user's steps/cfg/sampler/scheduler/shift order holds.
     assert ps.key_rank("steps") < ps.key_rank("cfg") < ps.key_rank("sampler_name")
     assert ps.key_rank("sampler_name") < ps.key_rank("scheduler") < ps.key_rank("shift_high")
 
 
 def test_sorting_a_workflows_keys_by_rank_is_stable_for_unknowns():
-    # Stable sort: unknown keys keep their given order at the end, mapped keys jump
-    # to their canonical slots.
     keys = ["zeta_extra", "steps", "positive_prompt", "alpha_extra"]
     ordered = sorted(keys, key=ps.key_rank)
     assert ordered == ["positive_prompt", "steps", "zeta_extra", "alpha_extra"]

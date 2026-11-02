@@ -209,7 +209,7 @@ class TestTheOneHudASlideshowWears:
         assert posted.count("portrait_prev") == 1
         assert "genau_prev_clip" not in posted
         assert "main_lock" not in posted
-        assert "genau_weird_clip" not in posted
+        assert "genau_trash_clip" not in posted
 
     def test_the_readout_the_slideshow_composes_reaches_the_hud_the_funestra_draws(self, qtbot):
         window = self._window(qtbot)

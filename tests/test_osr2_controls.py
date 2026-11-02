@@ -87,7 +87,7 @@ def test_cores_osr2_controls_are_the_consoles_osr2_section_alone(qtbot):
     actions = [b.command for _rect, b in controls._painter.buttons]
 
     assert not any(a.endswith("_minimize") for a in actions)
-    for gone in ("genau_prev_clip", "genau_next_clip", "main_lock", "genau_weird_clip",
+    for gone in ("genau_prev_clip", "genau_next_clip", "main_lock", "genau_trash_clip",
                  "portrait_clip_seconds_down", "portrait_clip_seconds_up",
                  "landscape_clip_seconds_down", "landscape_clip_seconds_up"):
         assert gone not in actions, gone

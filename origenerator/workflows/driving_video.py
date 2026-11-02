@@ -1,4 +1,3 @@
-"""The stretch of a library video a run performs, and its script cut to it."""
 from __future__ import annotations
 
 from origenerator.workflows.frame_rate import NATIVE_FPS
@@ -11,17 +10,16 @@ SHORTEST_VIDEO_FRAMES = 5
 
 
 def frames_within(frame_count: int, *, video_seconds: float | None, start: int) -> int:
-    """As much of ``frame_count`` as the video has past ``start``, on the 4k+1 grid."""
     if video_seconds is None:
         return frame_count
     available = int(video_seconds * NATIVE_FPS) - start
     if available >= frame_count:
         return frame_count
+    # WAN takes frame counts of the form 4k+1.
     return max(SHORTEST_VIDEO_FRAMES, (available - 1) // 4 * 4 + 1)
 
 
 def driven_actions(actions: list[dict], *, start_ms: int, length_ms: int) -> list[dict]:
-    """The script over the stretch performed, from its start, with a position at either end."""
     if not actions:
         return []
     end_ms = start_ms + length_ms
@@ -33,7 +31,6 @@ def driven_actions(actions: list[dict], *, start_ms: int, length_ms: int) -> lis
 
 
 def _position_at(actions: list[dict], at_ms: int) -> int:
-    """Between the actions either side of ``at_ms``, or held at the script's end."""
     before = [action for action in actions if action["at"] <= at_ms]
     after = [action for action in actions if action["at"] >= at_ms]
     if not before:

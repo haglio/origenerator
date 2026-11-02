@@ -1,4 +1,3 @@
-"""A story's voice, faked: which way each was asked to speak, and the answer it owes."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -8,13 +7,12 @@ from origenerator.gui import generation_job
 
 
 class AskedVoice(NamedTuple):
-    how: str  # "later", off the window's thread, or "here", where it was asked
+    how: str
     lines: list[str]
-    done: Callable[[], None] | None  # what a voice asked for later calls once it has spoken
+    done: Callable[[], None] | None
 
 
 def voices_asked_for(monkeypatch) -> list[AskedVoice]:
-    """A story's lines unspoken until a voice speaks them, and each voice asked for, recorded."""
     asked: list[AskedVoice] = []
 
     class _Voice:

@@ -1,17 +1,3 @@
-"""Rebuilding a database file that was damaged from outside SQLite.
-
-SQLite keeps its own writes consistent, but the file is still just a file: a
-stray write from elsewhere in the process lands in it like any other, and from
-then on every read that crosses the damaged page raises ``database disk image is
-malformed``. That is fatal to the app -- the gallery reads the whole table to
-build itself, so the window never appears -- even when only one page in
-thousands is unreachable.
-
-So on open, a damaged file is rebuilt: every row still reachable is copied into
-a fresh database, the damaged file is kept beside it, and the app comes up
-missing at most the rows that sat on the damaged pages.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -25,23 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 def salvage_if_malformed(path: Path, schema: str) -> None:
-    """Rebuild ``path`` under ``schema`` if its file no longer reads cleanly.
-
-    A no-op for a healthy (or not-yet-created) database, which is every start
-    but the one after damage.
-    """
     if not path.exists() or _reads_clean(path):
         return
     rebuilt = path.with_name(path.name + ".rebuilt")
     rebuilt.unlink(missing_ok=True)
-    read_only = f"{path.resolve().as_uri()}?mode=ro"  # never write to the damaged file
+    read_only = f"{path.resolve().as_uri()}?mode=ro"
     with closing(sqlite3.connect(read_only, uri=True)) as damaged, \
             closing(sqlite3.connect(rebuilt)) as fresh:
         _match_journal_mode(fresh, damaged)
         fresh.executescript(schema)
         kept = {table: _copy_table(damaged, fresh, table) for table in _tables(fresh)}
         fresh.commit()
-    damaged_copy = path.with_name(path.name + ".corrupt")  # a salvage destroys nothing
+    damaged_copy = path.with_name(path.name + ".corrupt")
     _move_aside(path, damaged_copy)
     rebuilt.replace(path)
     logger.warning(
@@ -51,12 +32,7 @@ def salvage_if_malformed(path: Path, schema: str) -> None:
 
 
 def _move_aside(path: Path, target: Path) -> None:
-    """Move a database and its journal files out of the way as one thing.
-
-    A write-ahead log names no database of its own -- SQLite finds it by the
-    file name beside it -- so one left over would be replayed into whatever
-    inherits that name, which here is the freshly rebuilt database.
-    """
+    # SQLite finds a write-ahead log by file name, so a left-over one would be replayed into the rebuilt database.
     for suffix in ("", "-wal", "-shm"):
         source = path.with_name(path.name + suffix)
         destination = target.with_name(target.name + suffix)
@@ -66,20 +42,14 @@ def _move_aside(path: Path, target: Path) -> None:
 
 
 def _reads_clean(path: Path) -> bool:
-    """Whether SQLite can still walk the whole file."""
     with closing(sqlite3.connect(path)) as conn:
         try:
             return conn.execute("PRAGMA quick_check").fetchall() == [("ok",)]
         except sqlite3.DatabaseError:
-            return False  # too damaged to even check
+            return False
 
 
 def _match_journal_mode(fresh, damaged) -> None:
-    """Give the rebuilt file the journaling the damaged one was running.
-
-    The mode lives in the file, not in the code that opens it, so a rebuild that
-    forgets it silently swaps the database's concurrency out from under the app.
-    """
     mode = damaged.execute("PRAGMA journal_mode").fetchone()[0]
     fresh.execute(f"PRAGMA journal_mode = {mode}")
 
@@ -93,14 +63,7 @@ def _tables(conn) -> list[str]:
 
 
 def _copy_table(damaged, fresh, table: str) -> int:
-    """Copy every row of ``table`` the damaged file will still hand over.
-
-    One rowid at a time: a single scan would stop dead at the first damaged
-    page, where asking row by row loses only the rows actually on it. A row is
-    dropped both when the damaged file cannot produce it and when the fresh one
-    refuses it -- what a damaged file hands back is not to be trusted, and one
-    unusable row must not cost the thousands around it.
-    """
+    # One rowid at a time: a single scan stops at the first damaged page.
     source = _source_of(damaged, table)
     columns = [c for c in _columns(damaged, source) if c in _columns(fresh, table)]
     select = f'SELECT {", ".join(columns)} FROM "{source}" WHERE rowid = ?'
@@ -120,14 +83,6 @@ def _copy_table(damaged, fresh, table: str) -> int:
 
 
 def _source_of(damaged, table: str) -> str:
-    """The name ``table``'s rows are under in the damaged file.
-
-    The fresh file is built from the current schema, so the copy asks for the
-    current names; a file written before a table was renamed still holds them
-    under the old one. Both probes below swallow the error a missing table
-    raises, so without this the copy finds no columns and no rows and reports a
-    clean salvage of nothing.
-    """
     if _columns(damaged, table):
         return table
     return next((old for old, new in RENAMED_TABLES.items()
@@ -139,13 +94,7 @@ def _columns(conn, table: str) -> list[str]:
 
 
 def _highest_rowid(conn, table: str) -> int:
-    """How far to count, from whichever record of it survived.
-
-    ``max(rowid)`` walks the table to its rightmost leaf -- where the newest
-    rows live, and so exactly where damage is likeliest -- while
-    ``sqlite_sequence`` holds the same high-water mark in a one-row table of its
-    own that such damage leaves alone.
-    """
+    # max(rowid) walks to the rightmost leaf, where damage is likeliest; sqlite_sequence keeps the same mark apart.
     for sql, args in (
         (f'SELECT max(rowid) FROM "{table}"', ()),
         ("SELECT seq FROM sqlite_sequence WHERE name = ?", (table,)),

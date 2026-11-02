@@ -1,13 +1,3 @@
-"""A database that has been corrupted underneath the app still opens.
-
-SQLite guarantees its own writes, but nothing protects the file from a write
-that arrives from outside it. One did: a stray 922-byte block of ffmpeg's own
-stderr chatter landed in the middle of the database file, and from then on every
-full-table read raised ``database disk image is malformed`` -- which killed the
-running app from its poll timer and then killed every relaunch while the gallery
-was still being built. These tests reproduce that shape of damage and pin the
-behavior that answers it: open what is readable, keep the damaged file, carry on.
-"""
 from __future__ import annotations
 
 import shutil
@@ -16,8 +6,6 @@ import sqlite3
 from origenerator.db import Database
 
 PAGE = 4096
-# Big enough that each generation gets a leaf page to itself, as the real rows
-# (full workflow graphs) do -- so a clobbered page costs exactly one row.
 FILLER = "x" * 2500
 
 
@@ -51,12 +39,6 @@ def _set_journal_mode(path, mode):
 
 
 def _leave_a_hot_journal(path, rows):
-    """Fill ``path``, leaving the write-ahead log a crash mid-write leaves.
-
-    Copied out from under a connection that is still holding it open, which is
-    the only way to keep one: closing the last connection folds the log back
-    into the database and deletes it.
-    """
     staged = path.with_name("staged.db")
     _fill(staged, rows)
     _set_journal_mode(staged, "wal")
@@ -72,12 +54,6 @@ def _leave_a_hot_journal(path, rows):
 
 
 def _stray_write_over(path, marker):
-    """Land a stray write on the page holding ``marker``, as the real one did.
-
-    Overwriting the page header is what the real stray write did to a page whose
-    row occupied only the tail: the row's bytes survived, but the header saying
-    where they start did not, so the page is unreachable through the b-tree.
-    """
     data = bytearray(path.read_bytes())
     page = data.index(marker.encode()) // PAGE
     data[page * PAGE:page * PAGE + 10] = b"Input #0, "
@@ -86,7 +62,7 @@ def _stray_write_over(path, marker):
     try:
         assert conn.execute("PRAGMA quick_check").fetchall() != [("ok",)]
     except sqlite3.DatabaseError:
-        pass  # too malformed to even check -- the damage landed
+        pass
     finally:
         conn.close()
 
@@ -115,9 +91,6 @@ def test_the_damaged_file_is_kept_beside_the_rebuilt_one(tmp_path):
 
 
 def test_damage_to_the_newest_rows_does_not_cost_the_older_ones(tmp_path):
-    # The newest rows sit on the pages SQLite walks to answer max(rowid), so
-    # damage there hides how far the table counts -- and salvaging nothing would
-    # empty a gallery that was almost entirely readable.
     path = tmp_path / "origenerator.db"
     _fill(path, 12)
     _stray_write_over(path, "marker-11-")
@@ -128,9 +101,6 @@ def test_damage_to_the_newest_rows_does_not_cost_the_older_ones(tmp_path):
 
 
 def test_the_rebuilt_database_keeps_the_journal_mode_it_replaced(tmp_path):
-    # The live database runs in WAL, where a reader never waits on the writer --
-    # which the gallery's poll timer leans on. Coming back from a salvage in
-    # rollback-journal mode would be a quieter break than the one being fixed.
     path = tmp_path / "origenerator.db"
     _fill(path, 6)
     _set_journal_mode(path, "wal")
@@ -142,10 +112,6 @@ def test_the_rebuilt_database_keeps_the_journal_mode_it_replaced(tmp_path):
 
 
 def test_the_damaged_files_write_ahead_log_goes_aside_with_it(tmp_path):
-    # A write-ahead log names no database of its own -- it belongs to whatever
-    # file sits beside it. One left by the crash would be replayed into
-    # the rebuilt database that inherits the name, whose pages it knows nothing
-    # about.
     path = tmp_path / "origenerator.db"
     _leave_a_hot_journal(path, rows=6)
     _stray_write_over(path, "marker-3-")
@@ -167,13 +133,6 @@ def test_a_healthy_database_is_opened_untouched(tmp_path):
 
 
 def test_a_database_damaged_before_the_table_rename_keeps_its_folders(tmp_path):
-    """Salvage copies each table out of the damaged file BY NAME, and a file
-    written before the rename spells one of them the way it used to.
-
-    Both probes the copy leans on swallow OperationalError, so a table it
-    cannot find yields no columns and no rows -- every custom collection comes back
-    empty, and the salvage log agrees with itself. Nothing raises.
-    """
     path = tmp_path / "origenerator.db"
     _fill(path, 4)
     db = Database(path)

@@ -81,7 +81,6 @@ from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail
 
 @pytest.fixture
 def blank_panel(qtbot, tmp_path):
-    """A tab as it opens: the dropdown on its placeholder, nothing chosen yet."""
     db = Database(tmp_path / "test.db")
     p = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(p)
@@ -90,14 +89,6 @@ def blank_panel(qtbot, tmp_path):
 
 @pytest.fixture
 def app_chrome():
-    """The pane dressed the way the app dresses it.
-
-    A floor is a width against a width, and the app's sheet moves every one of
-    them -- a scene tile's bare ✕ is 61 px in stock dress and 39 under it. Read
-    bare, a floor test passes on its own and fails in a forward run, after some
-    launch has left the sheet on the application; read under the sheet it says
-    what the pane does in the app.
-    """
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -107,8 +98,6 @@ def app_chrome():
 
 @pytest.fixture
 def tab(blank_panel):
-    """A tab with its workflow answered — the state most of these tests are
-    about, where there is a form below the dropdown to poke at."""
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     return blank_panel
 
@@ -129,19 +118,12 @@ def _is_descendant(widget, ancestor) -> bool:
     return False
 
 
-# --- layout: one preview-over-form column ----------------------------------
-
 def test_the_panel_is_one_column_with_no_side_pane(tab):
-    """Still one column — the split between the preview and the settings is a
-    drag handle, not a second pane beside the tab."""
     assert tab.findChildren(QSplitter) == [tab._media_split]
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
 
 def test_the_column_reads_preview_then_generate_then_settings(tab):
-    """Generate heads the settings under the line below the preview, rather
-    than trailing them in the lower right corner, where Windows pops up its
-    messages over whatever is there."""
     tab.show()
     tab.resize(700, 800)
     QApplication.processEvents()
@@ -160,9 +142,6 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
 
 
 def test_a_thick_border_held_still_parts_generate_from_the_settings(tab):
-    """As thick as the border under the preview and as wide as the tab, but
-    no handle: dragging it could only move Generate the way the border above
-    it already does."""
     tab.show()
     tab.resize(700, 800)
     QApplication.processEvents()
@@ -196,9 +175,6 @@ def test_the_border_under_generate_wears_the_gray_of_the_one_above_it(app_chrome
 
 
 def test_the_preview_and_the_settings_share_the_column_by_what_each_asks_for(tab):
-    """Generate rides on top of the settings, so weighing them at four parts to
-    the preview's three, as when the button sat under them, took a tenth of
-    the preview's height away."""
     tab.show()
     tab.resize(700, 1000)
     QApplication.processEvents()
@@ -210,27 +186,17 @@ def test_the_preview_and_the_settings_share_the_column_by_what_each_asks_for(tab
 
 
 def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(tab):
-    """So a tall item can be given the room it wants without the form being
-    pinned to a ratio someone else chose — like every other pane boundary."""
     split = tab._media_split
 
     assert split.handleWidth() > 0
-    assert not split.childrenCollapsible()  # neither can be dragged away entirely
+    assert not split.childrenCollapsible()
     split.setSizes([500, 200])
     assert split.sizes()[0] > split.sizes()[1]
 
 
 def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(tab):
-    """The settings scroll never grows a horizontal bar: squeezed, the form gives
-    up width — the dropdowns and the labels shorten — rather than push the whole
-    column out of view sideways.
-
-    The failure this exists for: a model dropdown asked for its longest file name,
-    a section header for its whole title and the workflow dropdown for its
-    placeholder, so the pane could not be narrowed without a sideways scroll.
-    """
     for section in tab._param_form._sections.values():
-        section.set_collapsed(False)   # every field on show: the widest the form gets
+        section.set_collapsed(False)
     tab.show()
 
     for width in (600, 420, 300):
@@ -240,14 +206,6 @@ def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(tab):
 
 
 def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel):
-    """Squeezed, the settings shorten — none of them runs off the shape.
-
-    The failure this exists for: QFormLayout's WrapLongRows lays a wrapped label
-    out at its own full-line size hint without clamping it to the row, so a label
-    like "Noise Seed (Stage 1)" ran 50px past the edge of the column it was in.
-    Nothing on screen said what had been cut: not an ellipsis, and not the scroll
-    bar, which stayed away because the layout's stated minimum still fit.
-    """
     tab = blank_panel
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_i2v"))
     for section in tab._param_form._sections.values():
@@ -284,14 +242,6 @@ def _names_its_setting(label: ElidingLabel) -> bool:
 @pytest.mark.parametrize("workflow", [None, "sdxl_t2i", "wan22_i2v", "flux_t2i_upscaled"])
 def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
         app_chrome, blank_panel, workflow):
-    """Squeezed, every setting still names itself: its label ends in an ellipsis
-    rather than drawing nothing.
-
-    The failure this exists for: QFormLayout gives its labels the widest one's
-    width when a row fits beside its field and no width at all when none does, so
-    a narrow Generate tab showed whole sections of fields with nothing beside them
-    to say what they were (2026-10-28).
-    """
     tab = blank_panel
     if workflow is not None:
         tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, workflow))
@@ -313,14 +263,6 @@ def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
 @pytest.mark.parametrize("workflow", ["sdxl_t2i", "wan22_i2v", "wan22_animate"])
 def test_a_narrow_pane_shortens_a_label_before_it_squeezes_a_field(
         app_chrome, blank_panel, workflow):
-    """The labels are what give way: no field beside one is laid out narrower than
-    it asks to be, at any width down to the pane's floor.
-
-    The failure this exists for: QFormLayout kept a section's labels whole while
-    any one of its fields still fit beside them, and squeezed the rest, so the
-    Random checkbox beside a sound's seed was drawn at under half the width its word
-    needs (2026-10-28).
-    """
     tab = blank_panel
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, workflow))
     sections = tab._param_form._sections.values()
@@ -347,15 +289,6 @@ def test_a_narrow_pane_shortens_a_label_before_it_squeezes_a_field(
 
 
 def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, blank_panel):
-    """Its floor is what its contents need, so the scroll bar never has to appear.
-
-    Squeezing a form and scrolling it sideways is a bad trade for the drag it
-    allows, so the pane refuses to go there at all: the floor is read live off the
-    scroll's contents, which is why it rises when a wider workflow is chosen. The
-    workflow here tells a story in scenes, whose tiles carry a header of their
-    own beside the form's label column -- the row most able to push the floor
-    past its cap, where the drag would stop with room still to give.
-    """
     tab = blank_panel
     blank_floor = tab._contents_floor()
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_i2v"))
@@ -364,7 +297,6 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
     tab.show()
     QApplication.processEvents()
 
-    # A wider workflow is a wider floor: it is read off the contents, not fixed.
     assert tab._contents_floor() > blank_floor
     floor = tab.minimumSizeHint().width()
     assert floor >= tab._contents_floor()
@@ -376,15 +308,10 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
 
 
 def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
-    """Narrowed, the buttons drop onto further lines, each still at its full width.
-
-    The failure this exists for: a row layout squeezed them past their minimum and
-    clipped what was left, so the Gallery pane buttons read "o fo", "to E", "to G", "anc", "ner".
-    """
     tab._sent_note.setText(export_lane_module.KINO.sent_caption)
     buttons = [tab._sent_row, tab._cancel_btn, tab._generate_btn.parentWidget()]
     for button in buttons:
-        button.show()          # the busiest the Gallery pane buttons ever is: every button on
+        button.show()
     tab.show()
 
     tab.resize(340, 800)
@@ -392,8 +319,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
 
     for button in buttons:
         assert button.width() == button.sizeHint().width(), button
-    assert len({button.y() for button in buttons}) > 1        # it wrapped
-    # ...and every line still ends in the corner the Gallery pane buttons sits in.
+    assert len({button.y() for button in buttons}) > 1
     lines = {}
     for button in buttons:
         lines[button.y()] = max(lines.get(button.y(), 0), button.x() + button.width())
@@ -401,10 +327,6 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
 
 
 def test_the_pane_keeps_a_margin_round_its_contents(tab):
-    # Nothing sits flush against the tab's edge — not the preview at the top, not
-    # the form down either shape, not Generate on the right, not the settings at
-    # the foot. The width is written out: read from the constant that sets it,
-    # this test would pass at any margin at all.
     tab.show()
     tab.resize(700, 800)
 
@@ -413,8 +335,6 @@ def test_the_pane_keeps_a_margin_round_its_contents(tab):
     assert top_left.y() == 8
     form = tab._form_host
     assert form.mapTo(tab, form.rect().topLeft()).x() == 8
-    # On the right the gap is measured to the scroll's own edge, which is where
-    # its bar sits: the fields stop short of the bar rather than under it.
     viewport = tab._scroll.viewport()
     bar_side = viewport.mapTo(tab, viewport.rect().topRight()).x()
     assert bar_side - form.mapTo(tab, form.rect().topRight()).x() == 8
@@ -425,8 +345,6 @@ def test_the_pane_keeps_a_margin_round_its_contents(tab):
 
 
 def test_generate_and_the_top_setting_keep_clear_of_the_borders_round_them(tab):
-    """A thick border is a pane edge like any other, and the first field once
-    sat right against the one over the settings."""
     tab.show()
     tab.resize(700, 800)
     QApplication.processEvents()
@@ -445,9 +363,6 @@ def test_generate_and_the_top_setting_keep_clear_of_the_borders_round_them(tab):
 
 
 def test_the_settings_handle_reaches_the_panes_own_border(tab):
-    """The thick line over the settings runs the whole width of the tab, so it
-    meets the border of the pane the tab is in instead of stopping short of it
-    — which is how every other section of this app is parted from the next."""
     tab.show()
     tab.resize(700, 800)
 
@@ -459,7 +374,6 @@ def test_the_settings_handle_reaches_the_panes_own_border(tab):
 
 
 def _layout_containing(root, widget):
-    """DFS a layout tree for the layout directly holding ``widget``."""
     for i in range(root.count()):
         item = root.itemAt(i)
         if item.widget() is widget:
@@ -471,9 +385,6 @@ def _layout_containing(root, widget):
 
 
 def test_info_and_form_share_one_scroll(tab):
-    # The read-only info and the editable form live in one scroll, so they move
-    # together — not the form walled into its own cramped scroll while the info sits in
-    # a separate static footer.
     for widget in (tab._basic_section, tab._related._source_tile,
                    tab._related._animations, tab._param_form):
         assert _is_descendant(widget, tab._scroll)
@@ -497,31 +408,24 @@ def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(tab):
 
 
 def test_switching_workflow_detaches_the_old_form_at_once(tab):
-    # Changing workflow must remove the previous form from the host immediately, not
-    # leave it parented (and painting) under the new form until deleteLater runs.
     old_form = tab._param_form
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "flux_t2i_upscaled"))
 
-    assert tab._param_form is not old_form   # a new form is installed
-    assert old_form.parent() is None           # the old one is detached at once
+    assert tab._param_form is not old_form
+    assert old_form.parent() is None
     live = [f for f in tab._form_host.findChildren(ParamForm)
             if f.parent() is tab._form_host]
-    assert live == [tab._param_form]         # exactly one form in the host
+    assert live == [tab._param_form]
 
 
 def test_switching_workflow_carries_over_the_users_edits(blank_panel):
-    # Changing workflow must not wipe what the user already set up: any value
-    # they EDITED away from the departing workflow's defaults carries into the
-    # new form wherever the new workflow shares the param. Values still at the
-    # old defaults don't leak — flf2v's 4-step lightning default must not
-    # follow the user into a workflow tuned for 20.
     tab = blank_panel
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_flf2v_loop"))
     tab._param_form.set_values({
         "positive_prompt": "slow beta",
         "input_image": "start.png",
         "audio_prompt": "wet rhythm",
-        "steps": 7,  # an edit — flf2v's default is 4
+        "steps": 7,
     })
 
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_i2v"))
@@ -538,21 +442,17 @@ def test_switching_workflow_carries_over_the_users_edits(blank_panel):
 
 
 def test_i2v_workflow_form_gets_the_derived_size_deriver(blank_panel):
-    # Selecting an i2v workflow hands its form the size deriver, so the Dimensions
-    # section shows the input-image size in a locked, unlockable field.
     tab = blank_panel
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_i2v"))
     form = tab._param_form
     assert form._size_deriver is not None
     assert "width" in form._present_keys["Size"]
-    assert form._dim_stacks["width"].currentIndex() == 0   # locked: a plain value, not a spinner
+    assert form._dim_stacks["width"].currentIndex() == 0
     assert form._unlock_btn is not None
 
 
 def test_i2v_form_shows_the_measured_size_of_a_real_input_image(blank_panel, tmp_path,
                                                                monkeypatch):
-    # End to end: the tab hands the real derived_display_size to the form, which
-    # measures the picked image and shows its scaled size in the locked field.
     tab = blank_panel
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     Image.new("RGB", (1920, 1080), (128, 128, 128)).save(tmp_path / "wide.png")
@@ -566,42 +466,27 @@ def test_i2v_form_shows_the_measured_size_of_a_real_input_image(blank_panel, tmp
 
 
 def test_manual_size_workflow_form_has_no_deriver(tab):
-    # A T2I workflow sizes by hand, so its form gets no deriver and keeps
-    # its own editable width/height (and the swap button), nothing to unlock.
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "sdxl_t2i"))
     form = tab._param_form
     assert form._size_deriver is None
     assert form._unlock_btn is None
 
 
-# --- a read-only gallery (no client) ----------------------------------------
-
 def test_tolerates_a_missing_client(qtbot, tmp_path):
-    # A read-only gallery has no ComfyUI client. The tab still builds — the form
-    # shows for inspection — but Generate is disabled and no signals are wired.
     p = GenerateTab(None, Database(tmp_path / "t.db"))
     qtbot.addWidget(p)
     assert p._generate_btn.isEnabled() is False
-    p._on_generate()                      # no-op, no crash
+    p._on_generate()
 
-
-# --- Cancel the in-flight run from the tab -----------------------------------
 
 def test_cancel_button_sits_beside_generate_hidden_until_generating(tab):
-    # A Cancel shares the Generate button's row so the run a tab launched can be
-    # stopped from the tab, not only the folder's tile. It's hidden until the
-    # gallery marks the tab generating.
     assert isinstance(tab._cancel_btn, QPushButton)
-    assert _is_descendant(tab._cancel_btn, tab)  # in the tab's own column
+    assert _is_descendant(tab._cancel_btn, tab)
     assert tab._cancel_btn.parent() is tab._generate_btn.parentWidget().parent()
     assert tab._cancel_btn.isHidden()
 
 
 def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(tab):
-    # This flag is about the tab's own run: Cancel appears. Whether Generate is
-    # pressable is the folder's business, which the gallery answers separately
-    # (set_making_one_check), so one item at a time per folder holds however the
-    # run was started.
     tab.set_generating(True)
     assert tab._cancel_btn.isHidden() is False
     assert tab._generate_btn.isEnabled() is True
@@ -611,19 +496,15 @@ def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(tab):
 
 
 def test_the_cancel_hover_says_next_seed_while_the_folder_auto_generates(tab):
-    # With the folder auto-generating, the press discards this seed and
-    # Auto-Generate starts another — nothing stops.
     tab.set_generating(True, auto_generating=True)
     assert tab._cancel_btn.text() == "Cancel"
     assert tab._cancel_btn.toolTip() == "Throw away this seed and start the next"
 
-    tab.set_generating(True)  # Auto switched off mid-run: a plain cancel
+    tab.set_generating(True)
     assert tab._cancel_btn.toolTip() == "Cancel this generation"
 
 
 def test_set_generating_false_keeps_generate_disabled_without_a_client(qtbot, tmp_path):
-    # A read-only tab (no client) can never launch, so clearing the generating flag
-    # must not re-enable Generate.
     p = GenerateTab(None, Database(tmp_path / "t.db"))
     qtbot.addWidget(p)
     p.set_generating(False)
@@ -631,8 +512,6 @@ def test_set_generating_false_keeps_generate_disabled_without_a_client(qtbot, tm
 
 
 def test_cancel_button_click_emits_cancel_requested(tab):
-    # The tab doesn't cancel the job itself (the gallery owns it) — it relays the
-    # click, which the gallery turns into the folder's re-roll cancel.
     got = []
     tab.cancel_requested.connect(lambda: got.append(True))
     tab.set_generating(True)
@@ -726,16 +605,70 @@ def test_a_drawn_seed_is_kept_for_the_kind_of_item_the_tab_makes(tab):
 
 
 def test_use_random_seed_switches_the_seed_to_random(tab):
-    # After the user accepts "use a random seed", the choice sticks on the tab: the
-    # seed switches to Random, so a later Generate draws a fresh seed rather than
-    # reproducing the pinned one and re-asking.
     tab.prefill("sdxl_t2i", {"seed": 99})
     assert tab._param_form.seed_is_random() is False
     tab.use_random_seed()
     assert tab._param_form.seed_is_random() is True
 
 
-# --- Generate emits a request; the gallery runs it as a re-roll --------------
+def test_picking_a_workflow_by_hand_announces_a_user_edit(blank_panel):
+    edits = []
+    blank_panel.user_edited.connect(lambda: edits.append(True))
+
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
+
+    assert edits
+
+
+def test_a_prefill_announces_no_user_edit(tab):
+    edits = []
+    tab.user_edited.connect(lambda: edits.append(True))
+
+    tab.prefill("sdxl_t2i", {"seed": 99})
+
+    assert edits == []
+
+
+def test_the_generate_caption_is_re_read_on_a_timer_not_on_each_cue(tab):
+    tab._caption_timer.stop()
+
+    tab.refresh_generate_caption()
+
+    assert tab._caption_timer.isActive()
+    assert tab._caption_timer.isSingleShot()
+
+
+def test_the_outgoing_form_is_still_alive_when_the_prompt_fields_change_is_announced(tab):
+    from PyQt6 import sip
+    outgoing = tab._param_form
+    alive_when_announced = []
+    tab.prompt_fields_changed.connect(lambda: alive_when_announced.append(not sip.isdeleted(outgoing)))
+
+    other = next(i for i in range(tab._workflow_dropdown.count())
+                 if tab._workflow_dropdown.itemData(i) not in (None, "", "sdxl_t2i"))
+    tab._workflow_dropdown.setCurrentIndex(other)
+
+    assert alive_when_announced and all(alive_when_announced)
+
+
+def test_a_made_from_pair_already_on_show_is_not_painted_again(tab):
+    tab.show_combination = MagicMock()
+    pair = object()
+
+    tab.show_live_source(pair)
+    tab.show_live_source(pair)
+
+    tab.show_combination.assert_called_once_with(pair)
+
+
+def test_a_wait_text_already_on_show_is_not_painted_again(tab):
+    tab._preview.show_message = MagicMock()
+
+    tab.show_live_wait("Loading the model")
+    tab.show_live_wait("Loading the model")
+
+    tab._preview.show_message.assert_called_once()
+
 
 def test_generates_dropdown_offers_powers_of_two_up_to_32_and_rests_on_one(tab):
     how_many = tab._how_many
@@ -892,9 +825,6 @@ def test_generate_is_yellow_while_it_says_what_to_resolve_and_then_goes_back(app
 
 
 def test_generate_emits_generate_requested_with_workflow_and_params(tab):
-    # Clicking Generate no longer runs its own job — it asks the gallery to, by
-    # emitting the workflow and the form's values (which the gallery launches as a
-    # re-roll of the config's folder). Nothing is submitted or recorded here.
     tab._param_form.set_values({"positive_prompt": "a wizard", "seed": 42})
     requested = []
     tab.generate_requested.connect(lambda wf, batch: requested.append((wf, batch)))
@@ -906,7 +836,7 @@ def test_generate_emits_generate_requested_with_workflow_and_params(tab):
     assert workflow_name == "sdxl_t2i"
     assert params["positive_prompt"] == "a wizard"
     assert params["seed"] == 42
-    assert tab._db.list_generations() == []       # the tab submits nothing itself
+    assert tab._db.list_generations() == []
 
 
 def test_generate_sends_the_random_seed_on_show_and_then_shows_the_next_one(tab):
@@ -1083,12 +1013,7 @@ def test_a_fresh_tab_generates_nothing_until_its_start_image_is_picked(qtbot, tm
     assert tab._generate_btn.toolTip() == "Nothing to start from — pick a Start Image first"
 
 
-# --- show the newest matching generation instead of the blank placeholder -----
-
 def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
-    # The standalone image enhancer is launched by the gallery's enhance
-    # buttons, not picked by hand: it stays out of the dropdown. Reusing one of
-    # its rows still lands on its form — the entry is added on demand.
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(tab)
     dropdown = tab._workflow_dropdown
@@ -1154,9 +1079,6 @@ def _wiz_params():
     return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a wizard")
 
 
-# Rows a live Generate tab should match carry the workflow's current version, as a
-# run made by this app would — the settings signature folds the version in, so a
-# stale one would split the row from the tab's folder.
 _SDXL_VERSION = WORKFLOW_REGISTRY["sdxl_t2i"].version
 
 
@@ -1166,7 +1088,7 @@ def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
         prompt_id="wiz", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
-    db.insert_generation(  # a different prompt → a different settings folder
+    db.insert_generation(
         prompt_id="drg", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a dragon",
         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
@@ -1176,7 +1098,7 @@ def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab.prefill("sdxl_t2i", _wiz_params())
-    assert tab._recent_matching_row()["prompt_id"] == "wiz"  # the dragon isn't in this folder
+    assert tab._recent_matching_row()["prompt_id"] == "wiz"
 
 
 def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypatch):
@@ -1198,12 +1120,11 @@ def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypa
 
 
 def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
-    # Nothing generated with these settings yet → the placeholder, no crash.
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(tab)
     tab.show_recent_preview()
-    assert tab._preview._media is None  # a placeholder, not a resolved file
-    assert tab._preview._generation is None  # nothing shown, nothing to drag
+    assert tab._preview._media is None
+    assert tab._preview._generation is None
 
 
 def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
@@ -1215,9 +1136,9 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
-    tab.prefill("sdxl_t2i", _wiz_params())  # autoshows the folder's newest result
+    tab.prefill("sdxl_t2i", _wiz_params())
 
-    assert tab._preview._generation == "g1"  # its preview can be dragged onto combine
+    assert tab._preview._generation == "g1"
 
 
 def test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
@@ -1238,14 +1159,12 @@ def test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
     assert [row["prompt_id"] for row in announced if row][-1:] == ["g1"]
 
 
-# --- config snapshot / prefill / restore ------------------------------------
-
 def test_current_config_does_not_randomize_and_reports_random_flag(tab):
     snap1 = tab.current_config()
     snap2 = tab.current_config()
     assert snap1.workflow_name == "sdxl_t2i"
-    assert snap1.seed_is_random is True  # fresh tab: Random tick checked
-    assert snap1.params["seed"] == snap2.params["seed"]  # not re-randomized
+    assert snap1.seed_is_random is True
+    assert snap1.params["seed"] == snap2.params["seed"]
 
     tab.prefill("sdxl_t2i", {"seed": 99})
     snap3 = tab.current_config()
@@ -1260,9 +1179,6 @@ def test_prefill_selects_workflow_and_sets_values(tab):
 
 
 def test_prefilling_a_clip_keeps_random_and_shows_a_fresh_take_of_its_seeds(tab):
-    # Prefilling a still pins its seed; prefilling a video does not, so the next
-    # Generate is another take of the motion rather than this video's again --
-    # and the fields show the seeds that take will use.
     tab.prefill("wan22_i2v", {"noise_seed": 11, "audio_seed": 33})
 
     shown = tab._param_form.get_values()
@@ -1359,7 +1275,6 @@ def test_restore_config_reapplies_workflow_params_and_random_seed(tab):
     tab.restore_config(snap)
     assert tab._workflow_dropdown.currentData() == "wan22_i2v"
     assert tab._param_form.get_values()["positive_prompt"] == "a fox"
-    # A tab that was on Random comes back random, not frozen on a stale seed.
     assert tab._param_form.seed_is_random() is True
 
 
@@ -1377,25 +1292,18 @@ def test_restore_config_pins_concrete_seed_when_not_random(tab):
     assert snap.params["seed"] == 99
 
 
-# --- the resting state: a whole form, waiting on a workflow -----------------
-
 def test_a_fresh_panel_picks_no_workflow(blank_panel):
-    # The pane's resting tab asks which workflow to run rather than presenting
-    # whichever is registered first as a choice already made.
     assert blank_panel._workflow_dropdown.currentIndex() == -1
     assert blank_panel._workflow_dropdown.currentData() is None
     assert blank_panel._workflow_dropdown.placeholderText()
 
 
 def test_a_fresh_panel_lays_out_nothing_the_workflow_decides(blank_panel):
-    # Which params exist is the workflow's answer, and so is its typical time —
-    # neither can be shown before the dropdown is answered.
     assert blank_panel._param_form is None
     assert blank_panel._estimate_label.isHidden()
 
 
 def test_a_fresh_panel_cannot_generate(blank_panel):
-    # Greyed rather than silently inert: there is no graph to submit.
     assert blank_panel._generate_btn.isEnabled() is False
 
 
@@ -1407,21 +1315,16 @@ def test_picking_a_workflow_fills_in_everything_below(blank_panel):
 
 
 def test_a_fresh_panel_is_blank_and_a_used_one_is_not(blank_panel):
-    # What load_selection reads to decide whether a tab is free to be clicked into.
     assert blank_panel.is_blank() is True
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
     assert blank_panel.is_blank() is False
 
 
 def test_a_fresh_panel_shows_the_previews_placeholder_not_a_black_pane(blank_panel):
-    # Nothing has been generated with settings that don't exist yet, so the
-    # preview rests on its own "nothing selected" placeholder.
     assert blank_panel._displayed_row is None
 
 
 def test_a_fresh_panel_names_itself_for_what_it_is(blank_panel):
-    # "unknown" would read as a workflow the app failed to recognize, rather than
-    # a question nobody has answered yet.
     assert blank_panel.title() == "New generation"
 
 
@@ -1432,18 +1335,12 @@ def test_generate_on_a_workflowless_panel_asks_for_nothing(blank_panel):
     assert fired == []
 
 
-# --- title and mark ---------------------------------------------------------
-
 def _folder_name(tab):
-    """The name the gallery folder this config maps to wears in the tree."""
     return gallery.config_folder_name(*tab.workflow_and_signature(),
                                       tab._db.folder_meta_map())
 
 
 def test_a_config_with_no_result_is_named_by_its_folder(tab):
-    # Nothing has been generated with these settings, so there is no item to name
-    # the tab: it wears the name of the folder its output would land in — the
-    # same short code the tree shows over there.
     assert tab.title() == _folder_name(tab)
     assert tab.title() != "New generation"
 
@@ -1457,7 +1354,6 @@ def test_a_folder_the_user_named_gives_the_tab_that_name(tab):
 
 
 def _named(tab, row) -> str:
-    """Number *row* the way the gallery's rebuild does, and say what it is called."""
     tab._names.take([row], [], {})
     return f"{folder_id(settings_folder_key(row))} 000"
 
@@ -1495,13 +1391,10 @@ def test_the_mark_is_the_shown_items_own_thumbnail(tab, tmp_path):
 
     tab.show_saved_generation(row, [row])
 
-    # The item's own image, at its own size — not one of the drawn glyphs.
     assert tab.tab_icon().availableSizes() == [QSize(4, 4)]
 
 
 def test_the_mark_falls_back_to_what_the_config_makes(tab):
-    # No result yet, so no thumbnail: the plain photo/play mark says which kind
-    # of thing this tab would produce.
     assert tab.tab_icon().cacheKey() == icons.media_type_icon(MediaType.IMAGE).cacheKey()
 
 
@@ -1509,17 +1402,7 @@ def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
     assert blank_panel.tab_icon().isNull()
 
 
-# --- estimate label ---------------------------------------------------------
-
 class SpyDB:
-    """A minimal stand-in returning canned recent durations and no rows.
-
-    ``list_generations`` returns ``[]`` (the strip and recent-preview stay empty,
-    which these duration tests don't inspect), ``folder_meta_map`` no names (the
-    tab falls back to its folder's code), and ``recent_durations`` feeds the
-    estimate label.
-    """
-
     def __init__(self, durations=None):
         self._durations = durations or []
 
@@ -1562,22 +1445,17 @@ def test_estimate_label_when_no_history(qtbot):
     assert tab._estimate_label.text() == "Typical time: No timing data yet"
 
 
-# --- settings key -----------------------------------------------------------
-
 def test_the_two_parts_match_a_stored_generation_of_the_same_settings(tab):
     full = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params())
     full["positive_prompt"] = "a cat"
     tab.prefill("sdxl_t2i", full)
     workflow, signature = tab.workflow_and_signature()
     assert workflow == "sdxl_t2i"
-    # The same params at any seed share the signature; a different setting splits it.
     assert signature == gallery.settings_signature("sdxl_t2i", json.dumps({**full, "seed": 999}))
     assert signature != gallery.settings_signature("sdxl_t2i", json.dumps({**full, "steps": 7}))
 
 
 def test_a_config_that_has_generated_has_a_folder_to_go_to(qtbot, tmp_path):
-    # Something was made with these settings, so the gallery holds a folder of it
-    # — the one this tab's "Go to folder" opens.
     db = Database(tmp_path / "t.db")
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt="a wizard")
@@ -1595,20 +1473,14 @@ def test_a_config_that_has_generated_has_a_folder_to_go_to(qtbot, tmp_path):
 
 
 def test_a_config_that_has_generated_nothing_has_no_folder_yet(tab):
-    # These settings have made nothing, so the tree has no row for them and there
-    # is nowhere for a "Go to folder" to go.
     assert tab.settings_folder_key() is None
 
 
 def test_a_panel_still_on_the_picker_has_no_folder(blank_panel):
-    # No workflow, no settings, no folder — the question isn't answerable yet.
     assert blank_panel.settings_folder_key() is None
 
 
-# --- displaying a saved generation: the footer folded in from the inspect pane ---
-
 def _image_being_made(db, prompt_id="img1", prompt="a cat", **settings):
-    """An SDXL image ComfyUI is still making, with no file yet."""
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt=prompt, seed=1, **settings)
     db.insert_generation(
@@ -1621,7 +1493,6 @@ def _image_being_made(db, prompt_id="img1", prompt="a cat", **settings):
 
 
 def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png", **settings):
-    """A completed SDXL image whose output file an i2v can name as its source."""
     _image_being_made(db, prompt_id, prompt, **settings)
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": filename, "subfolder": "image"}]))
@@ -1630,7 +1501,6 @@ def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png", *
 
 def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i2v",
                **seeds):
-    """A completed WAN i2v video, optionally built on a named source image."""
     params = {"positive_prompt": "dance", "seed": 5, **seeds}
     if input_image is not None:
         params["input_image"] = input_image
@@ -1646,17 +1516,15 @@ def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i
 
 @pytest.fixture
 def saved_panel(qtbot, tmp_path, installed_models):
-    """A tab over a DB with an image and the video animated from it."""
     db = Database(tmp_path / "t.db")
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "sdxl_t2i"))
-    tab._preview.show_media = MagicMock()  # don't start real WMF playback
+    tab._preview.show_media = MagicMock()
     return tab, db
 
 
 def _metadata_texts(tab):
-    """Every label in the tab's Basic section, minus the wrapping zero-widths."""
     return [lbl.text().replace("\u200b", "")
             for lbl in tab._basic_section.findChildren(QLabel)]
 
@@ -1686,16 +1554,11 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
 
 
 def _enhanced_image_row(db, prompt_id="img1"):
-    """An image that has been enhanced once: the enhanced file leads, the
-    original stays listed, and the level's settings are recorded."""
     _image_row(db, prompt_id)
     return _fold_enhancement(db, prompt_id)
 
 
 def _fold_enhancement(db, prompt_id="img1"):
-    """Fold an enhancement onto an image already recorded — what the gallery does
-    to the row when a standalone enhance lands: the enhanced file leads, the
-    original stays listed under it, and the level's settings are recorded."""
     db.update_generation(
         prompt_id,
         output_files=json.dumps([
@@ -1717,7 +1580,6 @@ def _version_rows(tab):
 
 
 def _row_texts(row):
-    """Every label on one level's row, minus the wrapping zero-widths."""
     return [lbl.text().replace("\u200b", "") for lbl in row.findChildren(QLabel)]
 
 
@@ -1738,11 +1600,6 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
 
 
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_panel):
-    # This is where an image's versions live, so it has to be somewhere you can
-    # already see before the first enhancement makes a second one — not least
-    # because the enhance you just launched replaces the list's only other
-    # content while it runs.
-
     tab, db = saved_panel
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
@@ -1753,7 +1610,6 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_pan
 
 
 def test_a_video_has_no_version_strip(saved_panel):
-    # The enhancer takes images; a video has no versions and no row to press.
     tab, db = saved_panel
     video = _video_row(db, "vid1")
     tab.show_saved_generation(video, [])
@@ -1761,12 +1617,11 @@ def test_a_video_has_no_version_strip(saved_panel):
 
 
 def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
-    """A video on disk, and the upscale Evolver made of it filed in the library."""
     output = tmp_path / "out"
     video = output / "video" / f"{prompt_id}.mp4"
     video.parent.mkdir(parents=True)
     video.write_bytes(b"video")
-    os.utime(video, (1_000_000, 1_000_000))  # made well before its upscale
+    os.utime(video, (1_000_000, 1_000_000))
     library = tmp_path / "upscaled_by_orientation"
     upscale = library / "portrait" / EVOLVER_SOURCE / f"{prompt_id}_topaz.mp4"
     upscale.parent.mkdir(parents=True)
@@ -1786,7 +1641,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video(saved_panel, 
     rows = _version_rows(tab)
     assert [row._title.text() for row in rows] == ["Evolved", "Original"]
     assert upscale.name in _row_texts(rows[0])
-    assert tab._basic_section.isHidden()   # its file is listed with its versions
+    assert tab._basic_section.isHidden()
 
 
 def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkeypatch,
@@ -1828,11 +1683,6 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
 
 
 def test_each_level_carries_its_own_file_row(saved_panel):
-    # The file information is per enhancement, so it sits with the level that
-    # made it — the same File row a Basic section renders, copy button and all,
-    # with the version's trash can beside it, rather than a pooled block at the
-    # top labeled with a level's name.
-
     tab, db = saved_panel
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
@@ -1841,20 +1691,15 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     assert "image/image_enhance_00001_.png" in _row_texts(rows[0])
     assert "image/sdxl_img1.png" in _row_texts(rows[1])
     assert [[b.objectName() for b in row.findChildren(QPushButton)] for row in rows] == [
-        ["copyButton", "deleteButton", "revealButton"],   # the enhancement
-        ["copyButton", "revealButton"],                   # the original stays
+        ["copyButton", "deleteButton", "revealButton"],
+        ["copyButton", "revealButton"],
     ]
     for row in rows:
         assert "Created" in _row_texts(row)
-    # ...and the block at the top has no file of its own to repeat.
     assert "File" not in _metadata_texts(tab)
 
 
 def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
-    # Every version of an image is in the same folder, so going there is the
-    # image's act rather than any one file's: one button, in the block above
-    # the settings, and none among the file rows where Show in Explorer — which
-    # names a different file each time — belongs.
     tab, db = saved_panel
     tab.set_folder_check(lambda row: True)
     image = _enhanced_image_row(db)
@@ -1871,7 +1716,7 @@ def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
 
 def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     tab, db = saved_panel
-    image = _image_row(db, "img1")      # never enhanced: no levels of its own
+    image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
     assert not tab._versions._host.findChildren(_PendingRow)
 
@@ -1879,8 +1724,6 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
 
     assert not tab._versions.isHidden()
     assert tab._versions._host.findChildren(_PendingRow)
-    # The original stays beside it — the base render is out and worth looking at
-    # while its enhancement is made, which is the point of generating it first.
     assert _version_rows(tab)
 
     tab.set_pending_enhancement(None)
@@ -1889,10 +1732,6 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
 
 def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
                                                         monkeypatch):
-    # The pane at the top of the tab is where this app shows what is being made,
-    # and an enhancement of the image on display is being made — it used to be
-    # the one surface that sat on the old image while the little row streamed.
-
     tab, db = saved_panel
     output_dir = tmp_path / "out"
     (output_dir / "image").mkdir(parents=True)
@@ -1907,7 +1746,6 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     tab.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", "2x"))
     tab._preview.show_frame.assert_called_once_with(b"\x89PNG-ish", enhancing=True)
 
-    # ...and when the run ends the pane goes back to the image itself.
     tab.set_pending_enhancement(None)
     tab._preview.show_media.assert_called_once_with(
         output_dir / "image" / "sdxl_img1.png", "image", "img1"
@@ -1915,8 +1753,6 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
 
 
 def test_picked_levels_are_deleted_by_filename(saved_panel):
-    # Positions belong to the widget that produced them; the gallery does the
-    # deleting and has to be told which files.
     tab, db = saved_panel
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
@@ -1931,9 +1767,6 @@ def test_picked_levels_are_deleted_by_filename(saved_panel):
 def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,
                                                                           tmp_path,
                                                                           monkeypatch):
-    # The levels are versions of one image, not separate generations: picking
-    # one is a look, so the row on display, its form and its footer all stay put.
-
     tab, db = saved_panel
     output_dir = tmp_path / "out"
     (output_dir / "image").mkdir(parents=True)
@@ -1945,7 +1778,7 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     tab.show_saved_generation(image, [image])
     tab._preview.show_media.reset_mock()
 
-    tab._show_version(1)   # the original
+    tab._show_version(1)
 
     tab._preview.show_media.assert_called_once_with(
         output_dir / "image" / "sdxl_img1.png", "image", "img1"
@@ -1991,8 +1824,6 @@ def test_up_onto_the_enhance_row_and_enter_asks_for_an_enhance_of_the_image(save
 
 
 def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
-    # The acts on a generation belong on its image, not in a row of buttons under the
-    # settings — the same three corners a gallery thumbnail of it wears.
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
 
@@ -2044,7 +1875,6 @@ def test_a_deleted_images_version_says_how_long_it_has_been_in_the_trash(saved_p
 
 
 def _version_texts(tab):
-    """Every label in the tab's version list, minus the wrapping zero-widths."""
     return [lbl.text().replace("\u200b", "")
             for lbl in tab._versions.findChildren(QLabel)]
 
@@ -2061,19 +1891,15 @@ def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, monkeypat
 
 def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, monkeypatch):
     tab, db = saved_panel
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)  # file gone
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)
     image = _image_row(db, "img1")
 
     tab.show_saved_generation(image, [image])
 
-    assert tab._preview._generation is None  # nothing on screen to drag
+    assert tab._preview._generation is None
 
 
 def test_the_tab_watches_no_run_of_its_own(tab):
-    # Generate submits and is done with it. It used to fill with the tracked run's
-    # steps, which took a third telling of one run — differently worded from the
-    # Job Queue and the collection's tile — and wired the control that starts work
-    # to the state of work already going.
     tab.set_generating(True)
     assert tab._generate_btn.text() == "Generate"
     assert not hasattr(tab, "_on_progress")
@@ -2088,20 +1914,17 @@ def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
 
     assert not tab._basic_section.isHidden()
     texts = _metadata_texts(tab)
-    assert "video/vid1.mp4" in texts         # the filename — the reported regression
-    assert "completed" not in texts         # Details (status/source) dropped as not useful
+    assert "video/vid1.mp4" in texts
+    assert "completed" not in texts
     assert "generated" not in texts
 
 
 def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
         saved_panel, monkeypatch):
-    # Settings that have generated nothing put up no image, and the footer of
-    # whatever was on display before it must not be left stranded there — it
-    # names a file that is no longer on screen.
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     tab.show_saved_generation(image, [image])
-    assert not tab._versions.isHidden()   # where an image's file facts live
+    assert not tab._versions.isHidden()
 
     monkeypatch.setattr(tab, "_recent_matching_row", lambda: None)
     tab.show_recent_preview()
@@ -2113,9 +1936,6 @@ def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
 
 
 def _wizard_panel(qtbot, tmp_path, monkeypatch):
-    """A tab over one finished image, filed in the folder ``_wiz_params`` names
-    — its workflow version and all — with its file on disk, so the tab can put
-    it up."""
     output = tmp_path / "out"
     (output / "image").mkdir(parents=True)
     (output / "image" / "sdxl_g1.png").write_bytes(b"png")
@@ -2134,9 +1954,6 @@ def _wizard_panel(qtbot, tmp_path, monkeypatch):
 
 def test_an_image_the_tab_puts_up_itself_carries_its_own_file_row(
         qtbot, tmp_path, monkeypatch):
-    # The newest result of these settings is a real generation, not a peek: you
-    # reach its file from it exactly as from one you clicked — which is what
-    # opening a configuration by name puts on screen.
     tab, _db = _wizard_panel(qtbot, tmp_path, monkeypatch)
 
     tab.prefill("sdxl_t2i", _wiz_params())
@@ -2171,8 +1988,8 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
 
     assert not tab._related._animations.isHidden()
     assert len(tab._related._animations.findChildren(_VideoTile)) == 1
-    assert tab._related._source_tile.isHidden()   # an image has no source-image tile
-    assert tab._lane_button.isHidden()   # Evolver is for videos
+    assert tab._related._source_tile.isHidden()
+    assert tab._lane_button.isHidden()
     assert tab._displayed_row is image
 
 
@@ -2199,11 +2016,11 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
 
     tab.show_saved_generation(video, [image])
 
-    assert not tab._lane_button.isHidden()   # a video with a file → sendable
-    assert not tab._related._source_tile.isHidden()   # its start frame is a known generation
-    assert tab._related._source_tile._prompt_id == "img1"   # the tile points at that image
-    assert tab._related._source_tile._name.text() == name   # called by its name, not its file
-    assert tab._related._animations.isHidden()    # a video isn't animated into anything
+    assert not tab._lane_button.isHidden()
+    assert not tab._related._source_tile.isHidden()
+    assert tab._related._source_tile._prompt_id == "img1"
+    assert tab._related._source_tile._name.text() == name
+    assert tab._related._animations.isHidden()
 
 
 def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, monkeypatch,
@@ -2235,26 +2052,24 @@ def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeyp
     got = []
     tab.link_clicked.connect(got.append)
 
-    tab._related._source_tile.activated.emit("img1")   # what a click on the tile does
+    tab._related._source_tile.activated.emit("img1")
 
     assert got == ["img1"]
 
 
 def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
     tab, db = saved_panel
-    video = _video_row(db, "vid1", input_image="hand_placed.png")  # not a generation
+    video = _video_row(db, "vid1", input_image="hand_placed.png")
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
     tab.show_saved_generation(video, [])
 
     assert tab._related._source_tile.isHidden()
-    assert not tab._lane_button.isHidden()  # still a sendable video
+    assert not tab._lane_button.isHidden()
 
 
 def _script_for(video_path, output_dir=None):
-    """Write a script for ``video_path`` -- in the scripts folder under
-    ``output_dir``, or, with none named, in the old place beside the video."""
     actions = synthesize_actions(2.0, hz=1.0)
     dest = (video_path.with_suffix(".funscript") if output_dir is None
             else funscript_path_for(video_path, places=OutputPlaces.in_one_folder(output_dir)))
@@ -2273,13 +2088,10 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
     tab.show_saved_generation(video, [])
 
-    # The global driver (owned by the view) asks the front tab what to drive.
     assert tab.osr2_drive_target() == (vpath, tab._preview.player(), actions)
 
 
 def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
-    """The drive reads a video's script wherever it is, which for anything
-    generated from here on is the folder, not a file beside the video."""
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "video" / "vid1.mp4"
@@ -2297,7 +2109,7 @@ def test_osr2_drive_target_is_none_for_a_video_without_a_funscript(saved_panel, 
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
-    vpath.write_bytes(b"v")  # no .funscript beside it
+    vpath.write_bytes(b"v")
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
     tab.show_saved_generation(video, [])
 
@@ -2316,10 +2128,6 @@ def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
 def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
     saved_panel, monkeypatch, tmp_path
 ):
-    # A tab auto-showing its newest result (show_recent_preview) — not an explicit
-    # browsed selection — must still arm the drive: the scripted video is right there
-    # on screen, so the OSR2 follows it. This closed the "the strip shows a script
-    # but nothing drives" gap.
     tab, db = saved_panel
     vpath = tmp_path / "auto.mp4"
     vpath.write_bytes(b"v")
@@ -2328,13 +2136,12 @@ def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
                         lambda: {"prompt_id": "v", "workflow_name": "wan22_i2v"})
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
 
-    tab.show_recent_preview()  # the idle-autoshow path, not show_saved_generation
+    tab.show_recent_preview()
 
     assert tab.osr2_drive_target() == (vpath, tab._preview.player(), actions)
 
 
 def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, tmp_path):
-    # The view reconciles the global driver whenever the front tab's video changes.
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
@@ -2361,11 +2168,6 @@ def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch
 
 
 def test_completed_result_shows_output_and_footer_and_keeps_the_edit_in_flight(saved_panel):
-    # The reported bug: while a Generate runs the user keeps typing the next
-    # prompt; when the run finishes, its result must land in the tab — output in
-    # the preview, footer revealed — WITHOUT re-seeding the form. The tab already
-    # holds the settings that produced the result, so re-seeding only clobbers the
-    # in-progress edit (here "a wizard mid-edit" would snap back to the row's "a cat").
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat", filename="sdxl_img1.png")
     tab._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
@@ -2373,8 +2175,8 @@ def test_completed_result_shows_output_and_footer_and_keeps_the_edit_in_flight(s
     tab.show_completed_result(image, [image])
 
     assert tab._param_form.get_values()["positive_prompt"] == "a wizard mid-edit"
-    assert tab._displayed_row is image     # the finished output is on display
-    assert not tab._versions.isHidden()    # with its footer
+    assert tab._displayed_row is image
+    assert not tab._versions.isHidden()
 
 
 def test_a_seed_pinned_while_the_run_was_in_flight_stays_pinned_when_it_lands(saved_panel):
@@ -2402,13 +2204,11 @@ def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved
 
     tab.show_saved_generation(row, [])
 
-    assert not tab._lane_button.isHidden()               # footer still applies
+    assert not tab._lane_button.isHidden()
     assert tab._displayed_row is row
 
 
 def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_panel, monkeypatch):
-    # The form's recent-preview autoshow must not override the selection's output:
-    # show_media's last call is the selection, not the folder's newest match.
     tab, db = saved_panel
     video = _video_row(db, "vid1")
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
@@ -2421,10 +2221,6 @@ def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_pa
 
 
 def test_a_click_puts_up_only_the_image_it_was_on(qtbot, tmp_path, monkeypatch):
-    # Seeding the form from the clicked item used to put up the newest result of
-    # its settings on the way — its image, and its versions' images under the
-    # settings — for the click to replace all of it at once. Nobody saw that one;
-    # every click waited for it.
     tab, db = _wizard_panel(qtbot, tmp_path, monkeypatch)
     row = db.get_generation("g1")
 
@@ -2434,8 +2230,6 @@ def test_a_click_puts_up_only_the_image_it_was_on(qtbot, tmp_path, monkeypatch):
 
 
 def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
-    # A stretch between the form and the sections under it grew by exactly what
-    # each fold saved, so the closer the form got the further away they went.
     tab, db = saved_panel
     tab.show_saved_generation(_enhanced_image_row(db), [])
     tab.resize(480, 900)
@@ -2452,7 +2246,7 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
     tab._param_form.adjustSize()
     tab.layout().activate()
 
-    assert gap() == before   # the column closed up; the space did not move down
+    assert gap() == before
 
 
 def _gaps_between_sections(tab) -> dict[str, int]:
@@ -2524,10 +2318,7 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     assert corner(tab._action).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
 
 
-# --- the modified message: the preview no longer answers the form -------------
-
 def _message(tab):
-    """What the preview is saying over its image, or "" when it says nothing."""
     return "" if tab._preview._message.isHidden() else tab._preview._message.text()
 
 
@@ -2536,8 +2327,6 @@ def _set_prompt(tab, text):
 
 
 def test_a_browsed_generation_arrives_unmarked(saved_panel):
-    # The form was just seeded from this row, so the image is exactly what
-    # these settings make: nothing to warn about.
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     tab.show_saved_generation(image, [image])
@@ -2577,7 +2366,6 @@ def _video_of_a_workflow_the_app_lacks(db, workflow_name, prompt_id="old1"):
 
 
 def _note(tab):
-    """What the settings say under the Workflow dropdown, or "" when they say nothing."""
     note = tab._cannot_remake_note
     if note.isHidden():
         return ""
@@ -3005,8 +2793,6 @@ def test_showing_the_next_image_never_reaches_the_marks_as_typing(saved_panel, m
 
 
 def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
-    # The field already shows the next run's seed, so what just finished is not
-    # what Generate would make now.
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
 
@@ -3018,8 +2804,6 @@ def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
 
 
 def test_re_rolling_the_seed_marks_it_too(saved_panel):
-    # Same prompt, but the run would draw a different seed — so the image on
-    # screen is not what Generate would make either.
     tab, db = saved_panel
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
@@ -3030,8 +2814,6 @@ def test_re_rolling_the_seed_marks_it_too(saved_panel):
 
 
 def test_a_tab_with_nothing_on_display_is_never_marked(tab):
-    # No image, nothing to be modified away from — a fresh tab's form is
-    # edited constantly and must not carry a warning about an empty pane.
     _set_prompt(tab, "a dog")
     assert tab._displayed_row is None
     assert _message(tab) == ""
@@ -3048,8 +2830,6 @@ def _resting_on(tab, image, monkeypatch, tmp_path):
 def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
     saved_panel, monkeypatch, tmp_path
 ):
-    # The pane's resting image is this config's newest result, so it stops
-    # matching the moment the settings do.
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     tab._param_form.set_values({"seed": image["seed"]})
@@ -3073,8 +2853,6 @@ def test_the_idle_autoshow_is_marked_while_random_is_ticked(saved_panel, monkeyp
 
 
 def test_switching_workflow_leaves_no_stale_mark(saved_panel):
-    # The new workflow re-shows its own newest result (or nothing), so the mark
-    # doesn't carry over from the settings that were replaced wholesale.
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     tab.show_saved_generation(image, [image])
@@ -3087,8 +2865,6 @@ def test_switching_workflow_leaves_no_stale_mark(saved_panel):
 
 
 def _frame_bytes(tmp_path, size: int = 8) -> bytes:
-    """One encoded preview frame, as ComfyUI streams them over the websocket.
-    ``size`` only varies the image, so two calls make two distinct frames."""
     path = tmp_path / f"frame{size}.png"
     pixmap = QPixmap(size, 6)
     pixmap.fill()
@@ -3097,10 +2873,6 @@ def _frame_bytes(tmp_path, size: int = 8) -> bytes:
 
 
 def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_path):
-    # An enhancement is not a run of these settings — it is the coming state of
-    # the very image they are being edited away from — so the mark holds over
-    # its frames. Clearing it per frame left the two trading places several
-    # times a second while the form was typed in.
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     tab.show_saved_generation(image, [image])
@@ -3110,8 +2882,6 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
 
     assert _message(tab) == "(not yet generated with modifications)"
 
-    # ...and it goes on standing as the run streams, rather than blinking off
-    # with every frame that arrives.
     tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path, 10), "2x"))
 
     assert _message(tab) == "(not yet generated with modifications)"
@@ -3119,11 +2889,6 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
 
 def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
                                                           monkeypatch):
-    # The enhancement folds into the row the tab is showing — the image gains a
-    # version, and nothing about the settings moves. So the edits made while it
-    # cooked are still edits, and the mark saying so stays up rather than being
-    # wiped by the image arriving. Re-taking the mark here read those very
-    # edits as the new baseline.
     tab, db = saved_panel
     output_dir = tmp_path / "out"
     (output_dir / "image").mkdir(parents=True)
@@ -3138,14 +2903,12 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
 
     enhanced = _fold_enhancement(db, "img1")
     tab.refresh_displayed(enhanced, [enhanced])
-    tab.set_pending_enhancement(None)  # the run is over; the pane goes back
+    tab.set_pending_enhancement(None)
 
     assert _message(tab) == "(not yet generated with modifications)"
 
 
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
-    # Pressing Generate on modified settings streams the run into this pane; the
-    # frames are the answer, so the warning about the old image goes with them.
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     tab.show_saved_generation(image, [image])
@@ -3156,12 +2919,8 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
     assert _message(tab) == ""
 
 
-# --- the Request section: words the image on display is asked to change by --
-
 
 def _request_made(db, prompt_id, source="src", asked="no hat"):
-    """Record that a spoken request made ``prompt_id`` out of an image whose
-    prompts were "a cat, a hat" and "blurry"."""
     db.record_request(prompt_id=prompt_id, source_prompt_id=source,
                       heard=f"Request, {asked}, over.", asked=asked,
                       old_positive="a cat, a hat", old_negative="blurry",
@@ -3169,8 +2928,6 @@ def _request_made(db, prompt_id, source="src", asked="no hat"):
 
 
 def _rewriting(monkeypatch, answer=("two women on a couch", "blurry")):
-    """Stand a rewrite in for the local LLM, answering ``answer`` and keeping
-    every prompt pair and words it was asked about."""
     calls = []
 
     def rewrite(positive, negative, words, **_settings):
@@ -3359,7 +3116,6 @@ def test_new_words_for_a_requested_image_redo_the_request_on_what_it_was_asked_o
 
     _ask(tab, qtbot, "no cap")
 
-    # Asked of "a cat, a hat" / "blurry", the image the hat was taken off.
     qtbot.waitUntil(lambda: _positive(tab) == "a cat, a hat", timeout=5000)
 
 
@@ -3416,11 +3172,7 @@ def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtb
                     == ["a dog running, grass", "a dog asleep, grass"], timeout=5000)
 
 
-# --- Generate says when it will draw a fresh seed ---------------------------
-
 def _completed_generation(db, workflow_name, params):
-    """Record ``params`` as a finished generation of ``workflow_name``, output and
-    all — the past run a matching config would reproduce."""
     db.insert_generation(
         prompt_id="done", workflow_name=workflow_name,
         workflow_version=WORKFLOW_REGISTRY[workflow_name].version,
@@ -3432,9 +3184,6 @@ def _completed_generation(db, workflow_name, params):
 
 
 def test_generate_says_it_will_draw_a_random_seed_over_a_finished_run(tab, qtbot):
-    # Generating settings already generated, seed and all, would only re-create
-    # that same file — so the press draws a fresh seed instead, and the button says
-    # so before it's pressed rather than a dialog asking after it.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
     _completed_generation(tab._db, "sdxl_t2i", params)
@@ -3442,14 +3191,11 @@ def test_generate_says_it_will_draw_a_random_seed_over_a_finished_run(tab, qtbot
     tab.prefill("sdxl_t2i", params)
 
     qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
-    assert "already been generated" in tab._generate_btn.toolTip()  # and why
+    assert "already been generated" in tab._generate_btn.toolTip()
 
 
 def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(saved_panel,
                                                                            qtbot):
-    # A video saved before its workflow gained its later settings matches no saved
-    # row key for key, yet a tab showing it with both seeds put back makes that
-    # video: the button says what a press will do, as it does for an image.
     tab, db = saved_panel
     tab.show_saved_generation(_video_row(db, input_image="frame.png [output]", noise_seed=22, audio_seed=33), [])
 
@@ -3461,23 +3207,17 @@ def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(sav
 
 
 def test_a_video_just_clicked_says_generate_will_draw_a_random_seed(saved_panel, qtbot):
-    # Clicking a finished video fills the form with its settings and leaves its
-    # Random ticks on, so a press makes another take rather than that video
-    # again. The button read a plain "Generate" there, which offers the thing
-    # already on screen, and it took unticking Random to make it say otherwise.
     tab, db = saved_panel
 
     tab.show_saved_generation(
         _video_row(db, input_image="frame.png [output]", noise_seed=22, audio_seed=33), [])
 
-    assert tab._param_form.seed_is_random()  # which is what draws the fresh one
+    assert tab._param_form.seed_is_random()
     qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
 
 
 def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_random_seed(
         saved_panel, qtbot):
-    # Wherever the item on display came from, the message gone means these are
-    # the settings it was made with, and the button says so the same way.
     tab, db = saved_panel
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a cat",
                   seed=1)
@@ -3494,9 +3234,6 @@ def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_rand
 
 
 def test_editing_the_settings_takes_the_random_seed_caption_back_off(tab, qtbot):
-    # The caption follows the form: edit anything and these are no longer the
-    # settings already generated, so the button goes back to a plain Generate —
-    # a promise of a fresh seed it would no longer keep.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
     _completed_generation(tab._db, "sdxl_t2i", params)
@@ -3516,17 +3253,15 @@ def test_a_run_that_lands_after_its_tab_was_changed_leaves_generate_on_the_shown
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
     tab.prefill("sdxl_t2i", params)
-    _completed_generation(tab._db, "sdxl_t2i", params)  # the run this tab's press started
+    _completed_generation(tab._db, "sdxl_t2i", params)
 
-    tab._param_form._widgets[key].setCurrentText(picked)  # while that run was being made
+    tab._param_form._widgets[key].setCurrentText(picked)
     tab.show_completed_result(tab._db.get_generation("done"), [])
 
     qtbot.wait(generate_tab_module._CAPTION_DELAY_MS * 3)
     assert tab._generate_btn.text() == "Generate"
     assert _message(tab) == "(not yet generated with modifications)"
 
-
-# --- Modify (all seeds): a whole folder's prompt, rewritten ------------------
 
 _FOLDER_KEY = "image/sdxl_t2i/abcdef123456"
 _FOLDER_LABEL = "AB12CD34"
@@ -3548,7 +3283,6 @@ def _images(tmp_path, count):
 
 @pytest.fixture
 def modifying(blank_panel, tmp_path):
-    """A tab opened on a three-image folder's prompt, ready to be rewritten."""
     blank_panel.open_folder_modify(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
                                     _folder_params(), _images(tmp_path, 3))
     return blank_panel
@@ -3594,23 +3328,17 @@ def test_a_modify_names_itself_after_the_folder_it_asks_about():
 
 
 def test_a_modify_counts_its_runs_in_the_hover_rather_than_on_the_button():
-    # The button asks for one thing — this folder, said the way it now reads —
-    # so how many runs that costs is a hover away.
     assert _modify(count=3).caption() == "Modify (all seeds)"
     assert "all 3 images" in _modify(count=3).tooltip()
 
 
 def test_a_one_image_folder_gets_wording_of_its_own():
-    # Not the plural switched off, which read "Run all 1 image ... each with its
-    # own seed" on a folder holding one.
     tooltip = _modify(count=1).tooltip()
     assert "one image" in tooltip
     assert "1 image" not in tooltip
 
 
 def test_a_modify_knows_whether_anything_has_actually_been_rewritten():
-    # Unchanged, the press would run every seed in the folder to re-create the
-    # folder, which is the one thing the tab must never do by accident.
     opened_on = ConfigSnapshot("sdxl_t2i", _folder_params(), False)
     request = _modify(opened_on=opened_on)
 
@@ -3620,32 +3348,23 @@ def test_a_modify_knows_whether_anything_has_actually_been_rewritten():
 
 
 def test_a_modify_cannot_be_edited_after_the_tab_opens_on_it():
-    # What the tab opened on is how a press tells a rewrite from a re-run; a
-    # request that could be edited could quietly agree with whatever was typed.
-
     with pytest.raises(FrozenInstanceError):
         _modify().count = 9
 
 
 def test_a_modify_tab_shows_the_whole_folder_in_its_preview(modifying):
-    # Every image the press will re-run, tiled — not the newest one of them,
-    # which would say the edit was about that image.
     preview = modifying._preview
     assert preview._stack.currentWidget() is preview._sheet
     assert preview._sheet.count() == 3
 
 
 def test_the_press_asks_for_changes_and_counts_them_in_the_hover(modifying):
-    # The button asks for one thing — this folder, said the way it now reads —
-    # so how many runs that costs is a hover away rather than on its face.
     assert modifying._generate_btn.text() == "Modify (all seeds)"
     assert "all 3 images" in modifying._generate_btn.toolTip()
 
 
 def test_every_prompt_is_marked_against_what_it_says_now(modifying):
     fields = modifying._param_form.text_fields()
-    # Every one of them carries a tracker, each rewriting from its own text --
-    # a prompt is not a change to itself, so nothing is marked until one is typed in.
     assert all(w.findChildren(_Tracker) for w in fields)
     assert {w.toPlainText() for w in fields} == {"a cat on a couch", "blurry"}
 
@@ -3656,15 +3375,12 @@ def test_the_tab_is_named_after_the_folder_it_asks_about(modifying):
 
 def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
         saved_panel, tmp_path, monkeypatch):
-    # Audit §3 bug 15, signed off and fixed 2026-08-31: the wall used to keep
-    # the corners of whichever generation the tab had been showing, so trash
-    # there trashed an image the user was not looking at.
     tab, db = saved_panel
     image = _image_row(db, "img1")
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/img1.png"), "image"))
     tab.show_saved_generation(image, [image])
-    assert tab._preview._actions_id == "img1"      # armed on that generation
+    assert tab._preview._actions_id == "img1"
     fired = []
     tab.item_action_requested.connect(lambda pid, action: fired.append(pid))
 
@@ -3677,9 +3393,6 @@ def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
 
 
 def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(modifying):
-    # The corners are re-armed after every change to the image, and the
-    # gallery pushes enhance settings on a poll — so the fix has to hold past
-    # the next one rather than only at the moment the wall goes up.
     modifying.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
     assert modifying._preview._actions_id is None
@@ -3709,8 +3422,6 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
 
 
 def test_a_modify_tab_holds_no_generation_of_its_own(modifying):
-    # It is about a folder, so there is no file on display and nothing for the
-    # "not yet generated with modifications" message to be measured against.
     assert modifying.displayed_row() is None
     assert modifying._displayed_config is None
 
@@ -3752,8 +3463,6 @@ def test_a_canceled_modify_marks_its_prompts_against_the_folder_again(modifying,
 
 def test_a_modify_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(
         modifying, qtbot):
-    # Unchanged, the press would run every seed in the folder to re-create the
-    # folder — so it asks for the rewrite instead of filling the queue.
     fired = []
     modifying.modify_requested.connect(lambda *a: fired.append(a))
 
@@ -3801,8 +3510,6 @@ def test_picking_another_workflow_ends_the_modify(modifying):
 
 
 def test_a_landed_run_does_not_take_the_wall_of_images_away(modifying):
-    # The batch lands an image at a time; each one would otherwise swap the
-    # folder for whichever finished last.
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
            "params_json": json.dumps(_folder_params()), "output_files": "[]"}
 
@@ -3811,15 +3518,6 @@ def test_a_landed_run_does_not_take_the_wall_of_images_away(modifying):
     assert modifying.displayed_row() is None
     assert modifying._preview._stack.currentWidget() is modifying._preview._sheet
 
-
-# --- the two export lanes as one errand with a table of differences ----------
-#
-# Send-to-Evolver and Send-to-Genau were four methods that were two methods
-# copied: same visibility rule, same read of the persisted flag, same
-# try/except/warn, same re-read of the row afterwards, differing only in the
-# inbox sub-folder, the column, the words and the noun. These run over whatever
-# lanes the tab has, so a third one is a data entry and is covered the day it
-# is added rather than the day someone writes its tests.
 
 
 def _lanes():
@@ -3830,13 +3528,11 @@ _LOOP = "wan22_flf2v_loop"
 
 
 def _lane_video(db, lane, prompt_id="vid1"):
-    """A video of the kind *lane* carries."""
     return _video_row(db, prompt_id,
                       workflow_name=_LOOP if lane.carries_loops else "wan22_i2v")
 
 
 def _lane_offers(tab):
-    """The words of every button and line on show that name an app a video can go to."""
     names = tuple(f" {lane.name}" for lane in _lanes())
     return [re.sub(r"^<img[^>]*>&nbsp;", "\u2713 ", widget.text())
             for widget in tab.findChildren((QPushButton, QLabel))
@@ -3935,8 +3631,6 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
     tab.show_saved_generation(_lane_video(db, lane), [])
     _press(tab, lane.send_caption)
 
-    # The same inbox Evolver watches, under the name that says where the result
-    # belongs — the destination is the whole of what makes a lane a lane.
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
                                    funscript=None)
     assert tab._displayed_row[lane.flag]
@@ -3969,9 +3663,6 @@ def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alo
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
         qtbot, tmp_path, monkeypatch, lane):
-    """Nothing patched about where it goes: the inbox used to be a config
-    constant this module imported, so a test could only redirect a send by
-    reaching into the module. It is an object now, given at construction."""
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "somebody elses inbox"
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db,
@@ -4013,8 +3704,6 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane):
-    # Re-checked against the persisted flag rather than the button's disabled
-    # state, so a stale press cannot repeat the handoff.
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
@@ -4033,10 +3722,6 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
         saved_panel, monkeypatch, lane):
-    # The guard is the persisted column, not the button's disabled state. A
-    # button is only as fresh as the last time the footer was drawn; the column
-    # is what survives a restart. Where the two disagree the column wins, or a
-    # stale press repeats a handoff another app has already been given.
     tab, db = saved_panel
     _lane_video(db, lane)
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
@@ -4044,10 +3729,10 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
     export = MagicMock()
     monkeypatch.setattr(evolver_export, "export_video", export)
     tab.show_saved_generation(db.get_generation("vid1"), [])
-    assert _lane_offers(tab) == [lane.send_caption]   # drawn before the send
+    assert _lane_offers(tab) == [lane.send_caption]
 
     lane.mark(db, "vid1")
-    tab._displayed_row = db.get_generation("vid1")    # …and the row moved under it
+    tab._displayed_row = db.get_generation("vid1")
     tab._on_send(lane)
 
     export.assert_not_called()
@@ -4055,8 +3740,6 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lane):
-    # The copy lands in another app's inbox with no other visible result here, so
-    # a failure that only reached the log would look exactly like a success.
     tab, db = saved_panel
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
@@ -4066,7 +3749,7 @@ def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lan
     monkeypatch.setattr(generate_tab_module.QMessageBox, "warning", warn)
 
     tab.show_saved_generation(_lane_video(db, lane), [])
-    _press(tab, lane.send_caption)  # must not raise
+    _press(tab, lane.send_caption)
 
     warn.assert_called_once()
     assert warn.call_args.args[1] == f"Send to {lane.name} failed"
@@ -4075,8 +3758,6 @@ def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lan
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, lane):
-    # A send is a file copy into another app's folders, so the only way back is a
-    # delete there -- and it has to stay offered, however long ago the send was.
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
@@ -4093,9 +3774,6 @@ def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
                                                                  monkeypatch, lane):
-    # Nothing is deleted from here: the copy has been sorted, upscaled and
-    # re-filed since, and only the app holding it can still find it. The stamp
-    # is the whole of the ask, and the button returns to offering the send.
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
@@ -4114,9 +3792,6 @@ def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
         saved_panel, monkeypatch, lane):
-    # Withdrawn, the button reads exactly as it does for a video never sent, and
-    # nothing else on the tab mentions the other app at all -- so the one place
-    # left to say the deletion was taken down is the words under the cursor.
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
@@ -4133,9 +3808,6 @@ def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
                                                            monkeypatch, lane):
-    # The deletion waits for the other app's next run, so the send offered right
-    # after a withdrawal has to retract it -- otherwise the video just handed over
-    # is the one deleted.
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
@@ -4143,9 +3815,9 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     monkeypatch.setattr(evolver_export, "export_video", MagicMock())
     tab.show_saved_generation(db.get_generation("vid1"), [])
-    _press(tab, export_lane_module.UNSEND_CAPTION)   # take it back
+    _press(tab, export_lane_module.UNSEND_CAPTION)
 
-    _press(tab, lane.send_caption)     # and send it again
+    _press(tab, lane.send_caption)
 
     row = db.get_generation("vid1")
     assert row[lane.flag]
@@ -4155,9 +3827,6 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
                                                                   monkeypatch, lane):
-    # The mirror of the send's guard, and the same reason: the button is only as
-    # fresh as the last time the footer was drawn. Condemning a video that was
-    # never handed over would leave the row asking for a delete of nothing.
     tab, db = saved_panel
     _lane_video(db, lane)
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
@@ -4172,9 +3841,6 @@ def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
                                                                 monkeypatch, lane):
-    # The row moved under a button still offering the send -- a spoken animation
-    # landing on this very video. The press must do nothing at all: taking the
-    # send back is the opposite of what the words under the cursor promised.
     tab, db = saved_panel
     _lane_video(db, lane)
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
@@ -4192,10 +3858,6 @@ def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
 
 
 def test_every_lane_is_told_apart_by_its_folder_its_column_and_its_stamp():
-    # Held as an equality per field: two lanes sharing any of these four would
-    # be one lane under two names, and each is a name outside this repo —
-    # Evolver keys on the folder, and it reads all four columns off this app's
-    # database.
     lanes = _lanes()
     assert len({lane.source for lane in lanes}) == len(lanes)
     assert len({lane.flag for lane in lanes}) == len(lanes)
@@ -4204,9 +3866,6 @@ def test_every_lane_is_told_apart_by_its_folder_its_column_and_its_stamp():
 
 
 def test_every_lane_stamps_a_column_the_database_actually_writes(saved_panel):
-    # The stamp and the column are two halves of one fact and are spelled apart,
-    # so a lane could mark one and read the other and simply never look sent —
-    # or ask for a delete under a name nothing reads.
     tab, db = saved_panel
     _video_row(db, "vid1")
 
@@ -4218,9 +3877,6 @@ def test_every_lane_stamps_a_column_the_database_actually_writes(saved_panel):
 
 
 def test_generate_is_off_while_its_folder_is_already_making_one(tab, qtbot):
-    # His rule: one item at a time per folder. The app has been slow enough that
-    # he double-clicks Generate to be sure the press took, and the second press
-    # used to make a second image nobody asked for.
     tab.set_making_one_check(
         lambda config: config.params["positive_prompt"] == "a folder making one")
     prompt = _positive_field(tab)
@@ -4233,8 +3889,6 @@ def test_generate_is_off_while_its_folder_is_already_making_one(tab, qtbot):
     assert tab._generate_btn.isEnabled() is True
     qtbot.waitUntil(lambda: tab._generate_btn.toolTip() == "")
 
-
-# --- a model's recommended settings ------------------------------------------
 
 @pytest.fixture
 def recommended(monkeypatch):
@@ -4536,8 +4190,6 @@ def test_a_fresh_images_dropdowns_mark_what_its_models_page_recommends(blank_pan
               for key in ("sampler_name", "scheduler")}
     assert marked == {"sampler_name": {"euler_ancestral"}, "scheduler": {"normal"}}
 def test_saying_what_the_shown_image_shows_lands_on_its_row(saved_panel):
-    """The same column the sorting window writes, reachable from the tab the
-    image is being looked at on."""
     tab, db = saved_panel
     image = _image_row(db, "img9")
     states = tab._action.offered()

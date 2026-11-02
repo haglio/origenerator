@@ -1,13 +1,3 @@
-"""What is spoken, driven with no gallery around it.
-
-Every path an utterance takes used to be reachable only by building a 7,000-line
-widget: the caption's one promise and what takes it down, the Gallery pane buttons button a word
-presses and what it answers with, the collection a name stands you in, the bar a
-number puts where it says, and a request said over three breaths. Here the Gallery pane buttons
-is a handful of recorders and the host a handful of recorded calls.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import logging
@@ -56,8 +46,6 @@ class FakeSignal:
 
 
 class FakeListener:
-    """A CommandAndRequestListener reduced to what the router asks of one."""
-
     def __init__(self, **kwargs):
         self.built_with = kwargs
         self.heard = FakeSignal()
@@ -137,8 +125,6 @@ class FakeSlideshow:
 
 
 class FakeSlideshows:
-    """The slideshows reduced to what a spoken word asks of them."""
-
     def __init__(self, showing=None, by_shape=None):
         self.showing = showing
         self.by_shape = by_shape or {}
@@ -223,8 +209,6 @@ class FakeDB:
 
 
 class FakeHost:
-    """A gallery reduced to what the spoken words ask of one."""
-
     def __init__(self, *, collections=("__recents__",), selected=None):
         self.collections = set(collections)
         self.selected = selected
@@ -262,8 +246,6 @@ class FakeHost:
 
 
 class Spoken:
-    """One step of a dictated request, as the dictation hands it over."""
-
     def __init__(self, text="no hat", *, listening=False, state=COMPLETED,
                  heard="Request, no hat, over.", opened_at=None):
         self.text = text
@@ -274,9 +256,6 @@ class Spoken:
 
 
 class FakePool:
-    """The global pool, holding what it is handed rather than running it: what
-    it would run asks the local model."""
-
     def __init__(self):
         self.tasks = []
 
@@ -294,9 +273,6 @@ def starting(qtbot):
 
 @pytest.fixture
 def router(qtbot, monkeypatch, starting):
-    """A router under a parent this fixture keeps alive: a QObject whose parent is
-    collected takes its timers down with it. Its listener, buttons and motion are
-    all recorders."""
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
     monkeypatch.setattr(module, "QThreadPool", FakePool())
     built = []
@@ -329,8 +305,6 @@ def _row(prompt_id="g1", *, workflow_name="sdxl_t2i"):
     return {"prompt_id": prompt_id, "workflow_name": workflow_name, "params": "{}"}
 
 
-# --- the microphone ---------------------------------------------------------
-
 
 def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
     voice, _host, _slideshows = router()
@@ -343,8 +317,6 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
-    # It used to come on with Auto-Generate and again with a slideshow, which left
-    # "start slideshow" unhearable in the one state it is for.
     voice, _host, _slideshows = router(mic_on=False)
 
     voice.sync()
@@ -355,8 +327,6 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
     voice.sync()
     assert voice.listener.commands_on is True
 
-
-# --- the caption ------------------------------------------------------------
 
 
 def test_a_flashed_line_goes_back_to_the_idle_caption(router):
@@ -379,8 +349,6 @@ def test_a_line_said_with_no_mark_is_shown_as_it_is(router):
 
 
 def test_a_flash_over_a_promise_goes_back_to_the_promise(router):
-    # "Listening…" over an app still working out a request reads as a request
-    # that was dropped.
     voice, _host, _slideshows = router()
     voice.sync()
     voice._answer_request(None, "working out “no hat”…", Spoken(listening=False),
@@ -406,8 +374,6 @@ def test_only_that_requests_own_answer_takes_its_promise_down(router):
 
 
 def test_what_was_heard_reaches_the_caption_and_the_slideshows_corner(router):
-    # Different screens: someone watching a slideshow can see nothing of this
-    # window at all.
     slideshow = FakeSlideshow()
     voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
@@ -439,8 +405,6 @@ def test_a_transcription_with_no_letters_in_it_says_nothing(router):
     assert slideshows.said == []
 
 
-# --- where one word lands ---------------------------------------------------
-
 
 def test_a_collection_name_stands_you_in_that_collection(router):
     voice, host, slideshows = router()
@@ -469,8 +433,6 @@ def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(router):
-    # A spoken switch is the same event as a clicked one, so the Gallery pane buttons lights the
-    # same way and nothing has to be kept in step.
     radio = FakeButton(tip="Origenerator Radio")
     voice, _host, slideshows = router(buttons={"radio": radio})
 
@@ -510,8 +472,6 @@ def test_a_bar_word_moves_its_bar_the_way_its_key_does(router):
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(router):
-    # The nudges are for a motion that is nearly right; this is for one that is
-    # not, and the bar does its own clamping.
     motion = FakeMotion()
     voice, _host, _slideshows = router(motion=motion)
 
@@ -548,8 +508,6 @@ def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again
 
 
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
-    # Its tip already says what it will do to what is in front of you, which is
-    # what a speaker who is not looking at the Gallery pane buttons needs told back.
     pressed = []
     undo = FakeButton(tip="Undo: delete of 2 items")
     voice, _host, slideshows = router(
@@ -599,7 +557,6 @@ def test_a_word_about_the_slide_goes_with_when_it_was_said(router):
 
 
 def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
-    # Undoing a cull you regret is exactly a thing to do mid-show.
     pressed = []
     voice, _host, slideshows = router(
         slideshows=FakeSlideshows(showing=FakeSlideshow()),
@@ -639,8 +596,6 @@ def test_a_matched_kind_nobody_wired_through_is_logged_not_dropped(router, caplo
     assert "no arm for a matched" in caplog.text
 
 
-# --- orders about the image on screen -------------------------------------
-
 
 def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
     slideshow = FakeSlideshow(target="g7")
@@ -663,8 +618,6 @@ def test_an_order_said_over_an_image_since_left_is_about_that_image_put_back(rou
 
 
 def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(router):
-    # A refusal there would be a dead end where there is a perfectly good thing
-    # to do.
     pressed = []
     voice, host, slideshows = router(
         buttons={"enhance": (FakeButton(tip="Enhance 2 images"),
@@ -697,8 +650,6 @@ def test_an_animation_asked_for_with_no_image_on_screen_says_so(router):
     assert words(voice.status) == "an animation needs an image on screen"
 
 
-# --- a request said over several breaths ------------------------------------
-
 
 def test_an_opening_request_pauses_the_slideshow_and_says_so(router):
     slideshow = FakeSlideshow()
@@ -718,14 +669,10 @@ def test_an_open_request_reminds_the_speaker_that_over_submits_it(router):
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
-    # A slideshow holds still for the sentence, but the words take seconds and the
-    # item on screen when they end is not necessarily the one they were about.
     slideshow = FakeSlideshow(target="g1")
     voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
                                        db=FakeDB([_row("g1")]))
     begun = []
-    # The working-out itself goes to a pool thread, whose answer would land
-    # whenever it landed; what this is about is which image it is begun on.
     voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("no hat", listening=True))
     slideshow.target = "g2"
@@ -750,7 +697,6 @@ def test_a_request_is_about_the_image_it_was_opened_over_and_puts_it_back(router
 
 
 def test_words_in_a_request_are_a_request_even_when_they_name_a_fix(router):
-    # A fix is said on its own; inside "Request … over" its words are a request.
     slideshow = FakeSlideshow(target="g1")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
                                       db=FakeDB([_row("g1")]))
@@ -876,8 +822,6 @@ def test_a_microphone_that_fails_says_so_as_an_error(router):
     assert slideshows.said == ["mic unavailable"]
     assert slideshows.kinds == [ERROR]
 
-
-# --- words the hosting session heard ----------------------------------------
 
 
 def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):

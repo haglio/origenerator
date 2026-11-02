@@ -172,7 +172,7 @@ def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
     win.show()
 
-    _quit_shortcut(win).activated.emit()  # what pressing Ctrl+Alt+Q fires
+    _quit_shortcut(win).activated.emit()
 
     assert len(asked) == 1
     assert win.isVisible()
@@ -287,11 +287,11 @@ def test_a_window_a_session_handed_back_asks_again(qtbot, tmp_path, monkeypatch)
 def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     tabs = win._gallery_view._generate_pane
-    assert tabs.count() == 1  # the pane's resting tab to start
+    assert tabs.count() == 1
 
     tabs.open_config("wan22_i2v", {"positive_prompt": "hi"})
 
-    assert tabs.count() == 1  # taken over, not opened beside
+    assert tabs.count() == 1
     tab = tabs.currentWidget()
     assert tab._workflow_dropdown.currentData() == "wan22_i2v"
     assert tab._param_form.get_values()["positive_prompt"] == "hi"
@@ -323,7 +323,7 @@ def test_persists_the_osr2_control_state_on_close(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, state)
     win._gallery_view.osr2_control.set_state(OSR2_DRIVING)
 
-    win.close()  # closeEvent persists the session
+    win.close()
     assert state.get("osr2_enabled") == OSR2_DRIVING
 
 
@@ -425,8 +425,6 @@ def test_the_motion_reopens_human_inspired_when_it_was_left_human_inspired(qtbot
 
 
 def test_restores_the_radio_switch_from_app_state(qtbot, tmp_path):
-    # Left on, the radio comes back on at the next launch — the same standing
-    # preference the OSR2 and experiments switches are.
     state = AppState(tmp_path / "ui.json")
     state.set("audio_enabled", True)
     win = _window(qtbot, tmp_path, state)
@@ -438,22 +436,16 @@ def test_persists_the_radio_switch_on_close(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, state)
     win._gallery_view.set_radio_enabled(True)
 
-    win.close()  # closeEvent persists the session
+    win.close()
     assert state.get("audio_enabled") is True
 
 
 def test_the_app_opens_listening(qtbot, tmp_path):
-    # The one switch that starts on. Spoken commands are worth nothing unheard,
-    # and a switch you have to remember to flip before speaking is one you find
-    # out about by talking to an app that wasn't listening — so a session with
-    # nothing to say about the mic opens it.
     win = _window(qtbot, tmp_path)
     assert win._gallery_view.mic_enabled() is True
 
 
 def test_restores_a_closed_mic_from_app_state(qtbot, tmp_path):
-    # Switched off, it stays off at the next launch: on is the default, not a
-    # setting that reasserts itself over the user.
     state = AppState(tmp_path / "ui.json")
     state.set("mic_enabled", False)
     win = _window(qtbot, tmp_path, state)
@@ -465,13 +457,11 @@ def test_persists_the_mic_switch_on_close(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, state)
     win._gallery_view.set_mic_enabled(False)
 
-    win.close()  # closeEvent persists the session
+    win.close()
     assert state.get("mic_enabled") is False
 
 
 def test_restores_the_experiments_switch_from_app_state(qtbot, tmp_path):
-    # The background experimenter resumes across launches — "spend the time I'm
-    # not here" is a standing preference, not a per-session one.
     state = AppState(tmp_path / "ui.json")
     state.set("experiments_enabled", True)
     win = _window(qtbot, tmp_path, state)
@@ -483,18 +473,12 @@ def test_persists_the_experiments_switch_on_close(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, state)
     win._gallery_view.set_experiments_enabled(True)
 
-    win.close()  # closeEvent persists the session
+    win.close()
     assert state.get("experiments_enabled") is True
 
 
 @pytest.fixture
 def forget_prompt_heights():
-    """Leave the app-wide prompt-field heights as this test found them.
-
-    They live in one process-wide store (see ``prompt_field``), so a height set
-    here would otherwise be the starting size for every form the rest of the
-    suite builds.
-    """
     yield PROMPT_HEIGHTS
     PROMPT_HEIGHTS.restore({})
 
@@ -502,10 +486,6 @@ def forget_prompt_heights():
 def test_restores_the_dragged_prompt_heights_from_app_state(
     qtbot, tmp_path, forget_prompt_heights
 ):
-    # A prompt field dragged tall stays tall across launches — and the restore has
-    # to land before the first form is built, or the session's own tab comes up
-    # at the default size. (The resting tab lays out no form until a workflow is
-    # picked, so a restored tab is what makes a form at launch.)
     state = AppState(tmp_path / "ui.json")
     state.set("prompt_heights", {"positive_prompt": 260})
     state.set("generate_tabs", {"tabs": [
@@ -525,14 +505,12 @@ def test_persists_the_dragged_prompt_heights_on_close(
     win = _window(qtbot, tmp_path, AppState(path))
     forget_prompt_heights.set_height("positive_prompt", 300)
 
-    win.close()  # closeEvent persists the session
+    win.close()
 
     assert AppState(path).get("prompt_heights") == {"positive_prompt": 300}
 
 
 class _QueueSpyClient(ComfyUIClient):
-    """A real client whose queue operations are recorded instead of sent."""
-
     def __init__(self):
         super().__init__(folders=SUITE_FOLDERS)
         self.canceled = []
@@ -553,7 +531,6 @@ class _QueueSpyClient(ComfyUIClient):
 
 
 def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1, **params):
-    """One finished generation for the policy to build experiments on."""
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt=prompt, seed=seed,
@@ -591,8 +568,6 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
 
 
 def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):
-    # The switch is a standing "spend the time I'm not here": once the app is
-    # closed, its turn hands ComfyUI the batch, and ComfyUI works through it.
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
@@ -601,7 +576,7 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
     win._gallery_view.set_experiments_enabled(True)
     win.close()
     win.hand_comfyui_what_runs_while_closed()
-    assert client.submitted == []  # nothing while the app is open, or as it closes
+    assert client.submitted == []
 
     downtime.hand_comfyui_the_work_left(db, client, AppState(tmp_path / "ui.json"))
 
@@ -612,8 +587,6 @@ def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtb
 
 
 def _waiting_image(db, prompt_id):
-    """An image the queue was holding when the app last closed, which the next
-    window takes back into its line."""
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="sdxl_t2i",
         workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version, positive_prompt="a cat", seed=1,
@@ -626,10 +599,6 @@ def _waiting_image(db, prompt_id):
 
 def test_once_the_window_has_gone_comfyui_is_asked_with_nothing_of_the_windows_running(
         qtbot, tmp_path):
-    """While the window is up, a hand-over waits on a thread of its own and the
-    window's events run meanwhile, so it keeps answering. Once it has gone those
-    are a closed window's events -- a click on a toast would put it back
-    on screen -- so each hand-over waits for ComfyUI where it is."""
     db = Database(tmp_path / "t.db")
     for prompt_id in ("first", "second"):
         _waiting_image(db, prompt_id)
@@ -661,16 +630,12 @@ def test_with_the_switch_off_the_closed_apps_turn_runs_no_experiments(qtbot, tmp
 
 
 def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
-    # A preview's batch would outlive it in the shared ComfyUI as work the live
-    # app can neither see nor cancel — every Generate after it waits on jobs
-    # "from another app" that were the user's own preview. Only the production app
-    # schedules an absence.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
     state = AppState(tmp_path / "ui.json")
-    state.set("experiments_enabled", True)  # seeded on from the production app
+    state.set("experiments_enabled", True)
     win = Core(client, db, state)
     qtbot.addWidget(win)
 
@@ -682,8 +647,6 @@ def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
 
 
 def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_path):
-    # Experiments belong to the closed app: whatever ComfyUI hadn't got through
-    # is dropped as the window opens, so the GPU is the user's from the start.
     db = Database(tmp_path / "t.db")
     db.insert_generation(
         prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
@@ -697,16 +660,12 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     qtbot.addWidget(win)
 
     assert client.canceled == ["exp-1"]
-    assert client.interrupted == ["exp-1"]  # in case it is mid-render: dequeuing alone wouldn't stop it
+    assert client.interrupted == ["exp-1"]
     assert db.get_generation("exp-1") is None
-    assert win._gallery_view._live_jobs == {}  # and it is not adopted as a live job
+    assert win._gallery_view._live_jobs == {}
 
 
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
-    # The other half of leaving experiments to the production app: the rows a
-    # preview would "clear" are the production app's own experiments, running in the
-    # ComfyUI they share — dropping them (and interrupting the one mid-render)
-    # destroys the absence's work.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = Database(tmp_path / "t.db")
     db.insert_generation(
@@ -726,9 +685,6 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
 
 
 def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp_path):
-    # Where the user left off is where the app reopens. Experiments waiting for
-    # review used to hijack the launch into their collection; the count on the collection's
-    # row already says they're there, and it can be visited when the user wants it.
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_folder", "__recents__")
     db = Database(tmp_path / "t.db")
@@ -750,9 +706,6 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
-    # A re-roll left running by a prior session — owned by no restored tab — is
-    # picked back up by the gallery once the window builds. The window's own DB is
-    # the same file (tmp_path / "t.db"), so it sees the row inserted here.
     db = Database(tmp_path / "t.db")
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   seed=99, positive_prompt="a cat")
@@ -770,10 +723,6 @@ def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
 
 
 def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
-    # An i2v re-roll keys to its folder by the *config* of its start frame. The
-    # reconnect must resolve that from the DB (the first tree rebuild, which would
-    # populate the image rows, hasn't run yet), so the adopted job lands under the
-    # same key the gallery tree will later give it.
     db = Database(tmp_path / "t.db")
     img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                       seed=1, positive_prompt="a face")
@@ -803,12 +752,7 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
 
 
 def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
-    # The reported gap: after a restart the Job Queue resumed but the Generate
-    # button on the tab that started the run stayed idle. The session records which
-    # run each tab launched, and the state is re-asserted once the view is up.
     db = Database(tmp_path / "t.db")
-    # Rows a live tab must match carry the workflows' current versions, as runs
-    # made by this app would — the settings key folds the version in.
     img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                       seed=1, positive_prompt="a face")
     db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i",
@@ -830,16 +774,13 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
          "title": None, "launched_runs": ["rr"]},
     ], "current": 0})
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.refresh()  # reconnects the run, then re-asserts the button
+    win._gallery_view.refresh()
 
     tab = win._gallery_view._generate_pane.current_generate_tab()
     assert tab._generating is True
 
 
 def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_path):
-    # The user-visible payoff of persisting progress: after a restart the running-job
-    # bar (fed by the in-flight items) resumes at the saved position, rather than an
-    # indeterminate spin until ComfyUI's next per-step push.
     db = Database(tmp_path / "t.db")
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), seed=1, positive_prompt="a cat")
     db.insert_generation(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
@@ -867,15 +808,14 @@ def test_close_event_persists_session(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
     tabs = win._gallery_view._generate_pane
-    tabs.currentWidget().prefill("sdxl_t2i", {})              # the resting tab, used
-    tabs.open_config("wan22_i2v", {"positive_prompt": "x"})   # a second one beside it
+    tabs.currentWidget().prefill("sdxl_t2i", {})
+    tabs.open_config("wan22_i2v", {"positive_prompt": "x"})
     win._gallery_view.select_folder("image/sdxl_t2i")
 
-    win.close()  # fires closeEvent
+    win.close()
 
     reloaded = AppState(path)
     saved = reloaded.get("generate_tabs")["tabs"]
-    # Every tab is captured; there is no special or permanent tab left out.
     assert [t["config"]["workflow_name"] for t in saved] == ["sdxl_t2i", "wan22_i2v"]
     assert reloaded.get("gallery_folder") == "image/sdxl_t2i"
 
@@ -892,7 +832,7 @@ def test_close_event_persists_gallery_selection(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, AppState(path))
     win._gallery_view.select_generation("xyz")
 
-    win.close()  # fires closeEvent
+    win.close()
 
     assert AppState(path).get("gallery_selection") == "xyz"
 
@@ -931,16 +871,11 @@ def test_a_session_save_the_disk_refuses_is_tried_again_rather_than_ending_the_a
 
 
 def test_default_window_is_not_maximized(qtbot, tmp_path):
-    # With no saved state (a first launch), the window opens at its normal size.
     win = _window(qtbot, tmp_path)
     assert not win.isMaximized()
 
 
 def test_closing_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
-    # The queue holds work back for the sake of somebody watching, and closing the
-    # app ends every one of those reasons: ComfyUI outlives it and works through
-    # the rest alone.
-
     win = _window(qtbot, tmp_path)
     with patch.object(type(win._gallery_view._jobs), "flush_to_server") as flush:
         win.close()
@@ -968,16 +903,12 @@ def test_close_event_persists_window_geometry(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, AppState(path))
     win.showMaximized()
 
-    win.close()  # fires closeEvent
+    win.close()
 
-    # Geometry is stored as a base64 string (Qt's opaque saveGeometry blob),
-    # which also carries the window's screen and maximized state.
     assert isinstance(AppState(path).get("window_geometry"), str)
 
 
 def test_reopening_a_maximized_window_reopens_maximized(qtbot, tmp_path):
-    # The whole point: close it maximized, and the next launch is maximized —
-    # on the same monitor, since the geometry blob records the screen too.
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     first.showMaximized()
@@ -989,9 +920,6 @@ def test_reopening_a_maximized_window_reopens_maximized(qtbot, tmp_path):
 
 def test_a_geometry_blob_that_no_longer_decodes_costs_the_size_not_the_launch(
         qtbot, tmp_path):
-    # The state file is JSON a person can open and edit, and the geometry value is
-    # opaque base64 — the one field a stray keystroke turns into something that
-    # cannot be decoded at all. That must cost the saved size, not the window.
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     first.showMaximized()
@@ -1002,7 +930,7 @@ def test_a_geometry_blob_that_no_longer_decodes_costs_the_size_not_the_launch(
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert not reopened.isMaximized()  # opened at its default, and opened
+    assert not reopened.isMaximized()
 
 
 def test_reopening_a_normal_window_stays_normal(qtbot, tmp_path):
@@ -1016,25 +944,13 @@ def test_reopening_a_normal_window_stays_normal(qtbot, tmp_path):
 
 
 def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
-    """A tiling window manager snaps windows into fractional slots — a third of a
-    2560px monitor (~853px) or a half of a 1440px portrait monitor (~720px). The
-    window, frame included (~+16px), must fit the smallest of those, so its
-    effective minimum width has to stay under ~704px. Guards against a large
-    minimum — explicit or content-driven (a non-wrapping label, a dropdown sized to
-    its longest item) — that makes the window refuse to fit and breaks
-    monitor-to-monitor tiling."""
     win = _window(qtbot, tmp_path)
-    win.show()   # an unshown window has never laid out, and answers from nothing
+    win.show()
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704
 
 
 def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
-    # The version list is the widest thing the Generate pane holds — an image beside
-    # a file row with its copy and Show-in-Explorer buttons, per level. It has to
-    # scroll and wrap rather than widen the window, or displaying any enhanced
-    # image would knock the whole app out of a tiling slot.
-
     win = _window(qtbot, tmp_path)
     db = win._gallery_view._db
     db.insert_generation(prompt_id="img1", workflow_name="sdxl_t2i",
@@ -1052,7 +968,7 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
                                                 "enhance_steps": 20}}]),
     )
     row = db.get_generation("img1")
-    win.show()   # an unshown window has never laid out, and answers from nothing
+    win.show()
     win._gallery_view._generate_pane.current_generate_tab().show_saved_generation(row, [row])
 
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
@@ -1060,44 +976,34 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
 
 
 def test_window_still_tiles_with_a_generate_tab_open(qtbot, tmp_path):
-    # A Generate tab's preview-over-form column is wider than the Inspect page, so it
-    # governs the Generate pane's floor. Even with one open, the window must still fit a
-    # narrow tiling slot — its form scrolls rather than widening the window.
     win = _window(qtbot, tmp_path)
-    win.show()   # an unshown window has never laid out, and answers from nothing
+    win.show()
     win._gallery_view._generate_pane.open_config("wan22_i2v", {"positive_prompt": "x"})
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704
 
 
 def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_path):
-    # A tab's Generate launches a re-roll of its settings folder; that in-flight
-    # generation shows as a tile on Latest, and clicking the tile opens the folder
-    # it runs in (where its live tile shows), just like any re-roll's tile.
     win = _window(qtbot, tmp_path)
     gv = win._gallery_view
     tabs = gv._generate_pane
     tabs._client.submit_job = lambda payload, prompt_id: prompt_id
-    tabs._client.fetch_history = lambda prompt_id: {}  # reconcile finds nothing done
+    tabs._client.fetch_history = lambda prompt_id: {}
     tab = tabs.current_generate_tab()
     tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
     tab._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
-    tab._on_generate()               # emits generate_requested -> a folder re-roll
+    tab._on_generate()
     (folder_key,) = list(gv._live_jobs)
     pid = gv._live_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
-    assert pid in gv._gallery_pane._inflight_tiles   # the running generation shows as a tile
+    assert pid in gv._gallery_pane._inflight_tiles
 
-    gv._gallery_pane._on_inflight_clicked(pid)       # click that tile
-    assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
+    gv._gallery_pane._on_inflight_clicked(pid)
+    assert _selected_folder(gv) == folder_key
 
 
 def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
-    # The reported bug: a generation left running by a prior session (here an i2v
-    # video), with the gallery restored onto Latest. It must show as an in-flight
-    # tile — the collection reads the database's running rows, so a tile appears whether
-    # or not the re-roll controller has re-adopted the job this instant.
     db = Database(tmp_path / "t.db")
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
                       seed=7, positive_prompt="x", input_image="img.png")
@@ -1121,8 +1027,6 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
 
 
 def _seed_combine_db(tmp_path, videos=("vid",)):
-    """Put a completed image + i2v video in the window's DB so the Combine drop zones
-    can be filled from persisted ids."""
     db = Database(tmp_path / "t.db")
     db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
                          positive_prompt="a dog", seed=1,
@@ -1166,9 +1070,6 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
 
 def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot, tmp_path):
-    # Earlier sessions wrote the two drop zones as a bare list. A user updating into
-    # this build has one of those in their ui_state.json, and it must not read as
-    # nothing saved.
     _seed_combine_db(tmp_path)
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_combine", ["img", "vid"])
@@ -1338,16 +1239,12 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
-    # The end-to-end round trip: pick an image, drop a video in one lane, move
-    # to the other, close, and a fresh window restores all of it. The lane
-    # matters as much as the drop zones — it is which videos the next Generate is
-    # answered from, and which lane's dropped video the drop zone shows.
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view._combine.widget.image_zone.set_item("img")
     first._gallery_view._combine.widget.video_zone.set_item("vid")
-    first._gallery_view._combine.widget._genau_radio.setChecked(True)  # as a click does
+    first._gallery_view._combine.widget._genau_radio.setChecked(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
@@ -1386,7 +1283,6 @@ def _fun_time_session(main=(10, 20, 800, 600)):
 
 
 def _hosted_with_a_channel(tmp_path):
-    """A session on the monitors whose command file is real, so a verb reaches it."""
     return replace(_fun_time_session(), command_file=tmp_path / "origenerator_cmd.txt")
 
 
@@ -1401,8 +1297,6 @@ def _headset_session(tmp_path, main=(10, 20, 200, 100)):
 
 
 def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_path):
-    """Its frame is what the room shows, and a parked window has no frame:
-    Qt draws nothing for one Windows has unmapped."""
     win = _window(qtbot, tmp_path, fun_time=_headset_session(tmp_path))
 
     assert not win.isMinimized()
@@ -1436,9 +1330,6 @@ def _watched_sight(monkeypatch):
 
 def test_a_window_a_room_in_the_headset_has_is_off_the_monitors(
         qtbot, tmp_path, monkeypatch):
-    """It is shown rather than parked so that Windows goes on drawing it, and
-    he found it on his desktop -- by then as big as the desktop it is drawn
-    for.  Out of sight it is still drawn and he is not shown it."""
     win = _window(qtbot, tmp_path)
     seen = _watched_sight(monkeypatch)
 
@@ -1449,7 +1340,6 @@ def test_a_window_a_room_in_the_headset_has_is_off_the_monitors(
 
 def test_a_window_the_monitors_take_back_is_in_sight_again(
         qtbot, tmp_path, monkeypatch):
-    """Parked out of sight it would come back from the taskbar invisible."""
     win = _window(qtbot, tmp_path)
     win.become_hosted(_headset_session(tmp_path))
     seen = _watched_sight(monkeypatch)
@@ -1460,17 +1350,12 @@ def test_a_window_the_monitors_take_back_is_in_sight_again(
 
 
 def test_a_window_hosted_on_the_monitors_hands_no_frame_over(qtbot, tmp_path):
-    """There the window itself is what is seen, so a frame written every tick
-    would be work for nobody."""
     win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
 
     assert win.hands_its_window_over is None
 
 
 def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path):
-    """A window hosted on the monitors is kept across a crossing, and the
-    headset session that adopts it has no monitor to put it on: it asks for the
-    frame through the session's own channel instead of launching another."""
     win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
@@ -1485,8 +1370,6 @@ def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path
 
 
 def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tmp_path):
-    """And the desktop session that adopts it back puts it where it always was:
-    parked until the mode switch restores it, and no frame written for nobody."""
     win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
         fun_time=_hosted_with_a_channel(tmp_path),
@@ -1532,9 +1415,6 @@ def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
 
 
 def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_path):
-    """A desktop session parks it minimized, and Windows unmaps such a window:
-    the room's Origenerator screen stayed blank for his whole 2026-10-08
-    session.  The suite's Qt grabs one happily, so the state is what this pins."""
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     win.showMinimized()
     frames = tmp_path / "frame.bin"
@@ -1586,8 +1466,6 @@ def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot,
 
 
 def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):
-    """A standalone window a headset session takes over is in the same place as
-    one it launched, and the hand-back stops it again."""
     win = _window(qtbot, tmp_path)
 
     win.become_hosted(_headset_session(tmp_path))
@@ -1613,7 +1491,6 @@ def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, t
 
 def test_a_window_hosted_in_the_headset_opens_as_big_as_the_frame_can_carry(
         qtbot, tmp_path):
-    """At its size on a monitor the whole layout arrived squeezed small."""
     win = _window(qtbot, tmp_path)
     win.resize(400, 300)
     stood_alone_at = win.size()
@@ -1635,8 +1512,6 @@ def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path)
 
 
 def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
-    # A Fun Time session's window sits at the session's rect, so the geometry it
-    # would save is meaningless to the standalone launch that reads it back.
     path = tmp_path / "ui.json"
     state = AppState(path)
     state.set("window_geometry", "c3RhbmRhbG9uZQ==")
@@ -1668,12 +1543,6 @@ def test_a_fun_time_window_tells_the_next_launchs_loading_screen_nothing(qtbot, 
 
 
 def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, tmp_path):
-    # The boot used to build this bridge itself, reaching through the window for
-    # the private attribute holding the gallery -- the only cross-object private
-    # access in the core unit, and it made the window's internals part of the
-    # boot contract. The window owns the gallery and is already handed the
-    # session, so it is the one that can wire them without naming anything
-    # private, and the bridge is parented to it for lifetime either way.
     session = _fun_time_session()
     win = _window(qtbot, tmp_path, fun_time=session)
 
@@ -1683,14 +1552,10 @@ def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, t
 
 
 def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
-    # Nothing to wire: no command file to poll, no status to publish.
     assert _window(qtbot, tmp_path).findChildren(FunTimeBridge) == []
 
 
 def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
-    # The whole chain, because every link in it is one the app has no other
-    # reason to have: the queue's news leaves the gallery, the window hands it to
-    # the toasts, and Windows shows it wherever the user has got to.
     win = _window(qtbot, tmp_path)
     said = []
     monkeypatch.setattr(toast_raising, "show",
@@ -1728,8 +1593,6 @@ def test_a_video_watched_in_the_window_takes_its_toast_back(qtbot, tmp_path, mon
 
 def test_answering_a_toast_brings_the_window_forward_and_opens_the_item(
         qtbot, tmp_path, monkeypatch):
-    # The whole point of a toast being clickable: whatever the user was doing,
-    # the app comes up in front of it showing the thing that just landed.
     win = _window(qtbot, tmp_path)
     win.showMinimized()
     fronted, went = [], []
@@ -1745,8 +1608,6 @@ def test_answering_a_toast_brings_the_window_forward_and_opens_the_item(
 
 def test_answering_a_toast_for_an_item_that_has_since_gone_still_comes_forward(
         qtbot, tmp_path):
-    # A toast waits in Windows' notification center until it is answered, which
-    # can be after the thing it announced was deleted.
     win = _window(qtbot, tmp_path)
 
     win.go_to_generation("no-such-generation")
@@ -1756,9 +1617,6 @@ def test_answering_a_toast_for_an_item_that_has_since_gone_still_comes_forward(
 
 def test_answering_a_toast_in_a_session_asks_the_room_for_origenerator_mode(
         qtbot, tmp_path, monkeypatch):
-    # Hosted, this window is the session's to show: in video mode it sits
-    # parked under the players, so taking the foreground for itself would be a
-    # window over the room rather than a way to the item.
     session = replace(_fun_time_session(), dashboard_cmd_file=tmp_path / "dashboard.txt")
     win = Core(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
                AppState(tmp_path / "ui.json"), fun_time=session)
@@ -1776,8 +1634,6 @@ def test_answering_a_toast_in_a_session_asks_the_room_for_origenerator_mode(
 
 
 def test_a_session_that_named_no_channel_still_opens_the_item(qtbot, tmp_path, monkeypatch):
-    # An older session hands this app no way to ask the room for anything; the
-    # item is still opened, so it is there when the user switches over.
     win = Core(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
                AppState(tmp_path / "ui.json"), fun_time=_fun_time_session())
     qtbot.addWidget(win)
@@ -1790,8 +1646,6 @@ def test_a_session_that_named_no_channel_still_opens_the_item(qtbot, tmp_path, m
 
 
 def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path, caplog):
-    # Nothing said either transition, so a log could not tell a window a session
-    # had taken from one it had missed -- and those behave differently.
     win = _window(qtbot, tmp_path)
 
     with caplog.at_level("INFO", logger="origenerator.gui.core"):

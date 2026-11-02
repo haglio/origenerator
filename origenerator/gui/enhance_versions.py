@@ -1,41 +1,3 @@
-"""Every version of one image, a row each: its thumbnail, and the facts about it.
-
-An enhancement is a layer, not a replacement: the enhanced file leads the row's
-``output_files`` and each earlier one stays listed, so an image can carry several
-versions at once — usually one, more when the same image is enhanced again at
-different settings to compare them. The preview opens on the most-enhanced
-version; this is where the rest are, sitting at the foot of the Generate pane
-beside the other cross-links (a video's source image, an image's animations).
-
-One version per row, because each is a file with a file's worth to say about it:
-the enhancement that made it, where it is on disk (with the copy and
-Show-in-Explorer buttons a file row carries anywhere in this app), and when it
-was written. That information used to sit in one ``Basic`` block at the top,
-pooled under labels naming versions you then had to go and find; it is per
-enhancement, so it lives with the enhancement.
-
-A row can also be dragged onto the Enhance pane, which absorbs the settings
-it carries — the way to say "do that again" about a version you liked without
-reading its numbers off and typing them back in.
-
-Versions are deleted here by a version's trash can, by Delete or Backspace over
-picked rows, or by the right-click menu. A trashed version is a file, not a
-generation — the image keeps its folder, its star and its other versions — and
-the delete is undoable. Never deleted here: the original, and the last version,
-since an image with no file left is a deleted generation, the gallery's own.
-
-An enhancement still in flight takes the ``+ Enhance`` row's own place at the head
-of the list, mirroring the run's streamed frames the way the in-flight tiles do
-everywhere else — the row becomes the thing it asked for, and the version being
-made appears where the version will be.
-
-The list is up for every image, even one with nothing but its original: it is
-where an image's versions live, and a place that appears only once you already
-have versions is a place you never find. It also leads with a ``+ Enhance``
-row that makes another at the current settings — dimmed when the image already
-holds one made at exactly those, and hovering the dimmed row lights the version
-it would have duplicated.
-"""
 from __future__ import annotations
 
 import json
@@ -66,29 +28,14 @@ from origenerator.gui.generation_job import JobState
 from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
-# A dragged version carries the params that produced it under this
-# type; the Enhance pane reads it to absorb those settings.
 ENHANCE_VERSION_MIME = "application/x-origenerator-enhance-version"
 
 _PLUS = THUMBNAIL_BOX.width() * 2 // 3
-# The in-flight edge the Latest collection's tiles wear, so work in progress reads
-# the same wherever it shows.
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
-# The lit edge a version wears while the row that would duplicate it is hovered.
 _MATCH_BORDER = f"2px solid {palette.MATCH_BORDER}"
-# Which grid column a fact's value sits in: the one that stretches, and the one
-# cell of a line that fills its height rather than sitting at the top of it.
 _VALUE_COLUMN = 1
-# Every key a row can carry. Each row is its own grid, so its key column would
-# otherwise size to its own longest key — and the values would step in and out
-# down the list as rows gain or lose the Enhancement line (the original has
-# none). Sized to the widest of these, they line up all the way down.
 _FACT_KEYS = ("Enhancement", "File", "Created")
-# A picked row is filled the way a picked thumbnail is — same fill, so "this
-# one is selected" reads the same in both places. The labels have to be made
-# transparent for it to show at all: the app's global ``QWidget`` background
-# paints every one of them opaque over whatever the row fills with, and the fill
-# would otherwise appear only in the gaps between them.
+# The app's global QWidget background paints every label opaque over the row's fill.
 _ROW_CSS = "#versionRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
     f"#versionRow {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}"
@@ -98,11 +45,10 @@ _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
 _ADD_TILE_CSS = f"background-color: {YELLOW.name()}; border-radius: {BUTTON_RADIUS}px;"
 _ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
                 Qt.Key.Key_Down: 1, Qt.Key.Key_Right: 1}
-_ENHANCE_ROW = -1  # where the arrows stand on the row above the top version
+_ENHANCE_ROW = -1
 
 
 def enhance_version_mime(params: dict) -> QMimeData:
-    """The drag payload carrying one version's enhancement settings."""
     mime = QMimeData()
     mime.setData(ENHANCE_VERSION_MIME,
                  QByteArray(json.dumps(params).encode("utf-8")))
@@ -110,7 +56,6 @@ def enhance_version_mime(params: dict) -> QMimeData:
 
 
 def params_from_mime(mime) -> dict | None:
-    """The settings a dragged version carries, or ``None`` for any other drag."""
     if not mime.hasFormat(ENHANCE_VERSION_MIME):
         return None
     try:
@@ -121,61 +66,29 @@ def params_from_mime(mime) -> dict | None:
 
 
 def _pass_mouse_through(widget) -> None:
-    """Let clicks, hovers and right-clicks on this child reach the row it is in.
-
-    A row is one thing to click — anywhere on it picks that version — but its
-    thumbnail and its lines of text cover nearly all of it, and a child widget
-    takes the press by default. That left only the margins around them live.
-
-    It also settles which context menu a right-click gets. The value labels come
-    from the Basic section, where they are selectable text, and Qt gives
-    selectable text its own Copy / Select All menu; over a version that menu is
-    both meaningless (there is a Copy button on the row, for the one value worth
-    copying) and in the way of the row's own Delete.
-    """
+    # Qt gives selectable text its own Copy / Select All menu, which would sit over the row's Delete.
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
     widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
 
 
 class RunningEnhancement(NamedTuple):
-    """The enhancement in flight on the image on display, as its live row shows
-    it: what the run is doing, its latest frame if one has streamed, and the
-    settings it was launched with -- which name what is being made, since the
-    pane may have moved on since the press."""
-
     status: str
     frame: bytes | None
     settings: str = ""
 
 
 class EnhanceOffer(NamedTuple):
-    """The row that would start one: the settings it would run, and the version
-    those settings would duplicate (``None`` when they would make something new)."""
-
     settings: str
     duplicate_of: object = None
 
 
 class _Row(QWidget):
-    """The shape every entry in the list shares: a thumbnail, then a bold title
-    over a column of ``label: value`` facts.
-
-    One shape for the finished versions, the one being made, and the row that
-    would make another — so a run in flight sits in the list reading like the
-    version it is about to become rather than like a different kind of thing."""
-
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self.setObjectName("versionRow")
-        # Without this a stylesheet background on a plain QWidget paints nothing
-        # at all, so the selection fill would never show.
+        # A stylesheet background on a plain QWidget paints nothing without this.
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(_ROW_CSS)
-        # Two layouts, not one: the thumbnail and the facts sit side by side while
-        # there is room for both, and the facts drop underneath the thumbnail when
-        # there is not — see :meth:`_reflow`. A row that could only sit side by
-        # side would be the widest thing in the tab, and would decide how narrow
-        # the whole pane could be dragged before its settings scrolled sideways.
         self._column = QVBoxLayout(self)
         self._column.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
         self._column.setSpacing(GAP_MEDIUM)
@@ -191,13 +104,7 @@ class _Row(QWidget):
         self._thumbnail.setWordWrap(True)
         _pass_mouse_through(self._thumbnail)
         row.addWidget(self._thumbnail, 0, Qt.AlignmentFlag.AlignTop)
-        # A grid rather than a row of rows: a container widget per fact would
-        # take every click landing on it, and Qt's hit test skips a container
-        # marked transparent along with the buttons inside it — so there would be
-        # no arrangement of that shape where both the row and its buttons are
-        # clickable. Laid straight into the grid, the only children are labels
-        # (which pass clicks through) and the buttons themselves. The columns
-        # line the keys up across the facts for free.
+        # Straight into the grid: Qt's hit test skips a transparent container along with the buttons inside it.
         facts = QGridLayout()
         facts.setContentsMargins(0, 0, 0, 0)
         facts.setHorizontalSpacing(GAP_MEDIUM)
@@ -222,9 +129,6 @@ class _Row(QWidget):
             label.setStyleSheet(_PICKED_FACT_CSS if selected else resting)
 
     def minimumSizeHint(self):
-        """As narrow as the row gets — which is the wrapped arrangement's width,
-        whichever one it is in at the moment: the facts can always drop below the
-        thumbnail, so the pair's widths never add up."""
         hint = super().minimumSizeHint()
         margins = self._column.contentsMargins()
         widest = max(self._thumbnail.minimumSizeHint().width(),
@@ -237,7 +141,6 @@ class _Row(QWidget):
         self._reflow(event.size().width())
 
     def _reflow(self, width: int) -> None:
-        """Put the facts beside the thumbnail or underneath it, by whether both fit."""
         margins = self._column.contentsMargins()
         beside = (self._thumbnail.sizeHint().width() + self._beside.spacing()
                   + self._facts.minimumSize().width()
@@ -252,14 +155,10 @@ class _Row(QWidget):
             self._column.removeItem(self._facts)
             self._beside.addLayout(self._facts, 1)
         self._wrapped = wrapped
-        self.updateGeometry()   # the row is a different height in each shape
+        self.updateGeometry()
 
     def _show_facts(self, items: list[BasicItem],
                     beside_copy: QWidget | None = None) -> None:
-        """Lay this row's facts out as the same ``label: value`` cells a metadata
-        block builds — so the enhancement that made a version, the file it wrote
-        and when it was written all read alike, and the file line keeps its copy
-        and Show-in-Explorer buttons. Replaces whatever was there."""
         for widget in self._fact_cells:
             self._facts.removeWidget(widget)
             widget.setParent(None)
@@ -275,8 +174,6 @@ class _Row(QWidget):
                     continue
                 if isinstance(widget, QLabel):
                     _pass_mouse_through(widget)
-                # The value fills its cell so it can wrap; a key and a button sit
-                # at the top of a line the value has grown taller than.
                 if column == _VALUE_COLUMN:
                     self._facts.addWidget(widget, line, column)
                 else:
@@ -291,13 +188,6 @@ class _Row(QWidget):
 
 
 class _VersionRow(_Row):
-    """One version: its thumbnail, the enhancement that made it, its file and when
-    that file was written.
-
-    Clicking puts it in the preview and picks it; dragging it carries those
-    settings for the Enhance pane to absorb.
-    """
-
     clicked = pyqtSignal(int, Qt.KeyboardModifier)
     context_requested = pyqtSignal(int, QPoint)
     delete_pressed = pyqtSignal(int)
@@ -309,16 +199,10 @@ class _VersionRow(_Row):
         self._params = dict(version.params)
         self.drag_out = DragOut()
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
-        # The thumbnail that trails the cursor when this row is dragged, cut once
-        # from the file rather than from the 96px tile — the same size every other
-        # drag in the app trails.
         self._drag_thumbnail = fit_thumbnail(pixmap)
         if not pixmap.isNull():
             self._show_thumbnail(pixmap)
         else:
-            # The file is gone (trashed, or moved out from under us). The version
-            # still lists — its facts say which one it was — so the tile shows
-            # the em dash the rest of the app uses for "nothing to show here".
             self._thumbnail.setText("—")
             self._thumbnail.setToolTip("This version's file is no longer on disk")
         items = []
@@ -333,7 +217,7 @@ class _VersionRow(_Row):
                 lambda _checked=False: self.delete_pressed.emit(self._position))
         self._show_facts(items, beside_copy=trash)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # so Delete reaches the list
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(
@@ -348,8 +232,6 @@ class _VersionRow(_Row):
         return self._position
 
     def set_highlighted(self, on: bool) -> None:
-        """Light this version's thumbnail — what the ``+ Enhance`` row points at
-        when it is dimmed because this is the version it would duplicate."""
         self._thumbnail.setStyleSheet(
             f"border: {_MATCH_BORDER}; border-radius: {BUTTON_RADIUS}px;" if on else ""
         )
@@ -358,11 +240,8 @@ class _VersionRow(_Row):
         self.drag_out.note_press(event)
 
     def mouseMoveEvent(self, event):
-        # Only a version that knows its settings is worth dragging: the original
-        # was made by no enhancement, so there is nothing for the pane to take.
         if not self._params or not self.drag_out.should_start(event):
             return
-        # The version's image trails the cursor.
         self.drag_out.start(enhance_version_mime(self._params), self._drag_thumbnail)
 
     def mouseReleaseEvent(self, event):
@@ -372,23 +251,12 @@ class _VersionRow(_Row):
 
 
 class _PendingRow(_Row):
-    """The enhancement being made right now: its live frame, or the stage it's at.
-
-    Wears the same blue "in progress" edge as the Latest collection's in-flight
-    tiles, so a version under construction reads the same here as work in flight
-    reads anywhere else in the app.
-    """
-
     def __init__(self, parent=None):
         super().__init__("Enhancing", parent)
         self._thumbnail.setStyleSheet(
             f"background-color: transparent; border: {_PENDING_BORDER};"
             f" border-radius: {BUTTON_RADIUS}px;"
         )
-        # The settings row a finished version carries, in the same place: what is
-        # being made is as much a question of "at what" as the versions already
-        # there, and it is the only place to read it back before the run lands.
-        # No file and no timestamp yet — that is exactly what is still in flight.
         self._settings = ""
         self.setToolTip("An enhancement of this image is being generated")
 
@@ -400,8 +268,6 @@ class _PendingRow(_Row):
             self._thumbnail.setText(
                 "Generating…" if pending.status == JobState.RUNNING else "Queued…"
             )
-        # Only when the text actually moves: a run streams several frames a
-        # second and each would otherwise rebuild the row under the cursor.
         if pending.settings != self._settings:
             self._settings = pending.settings
             self._show_facts([BasicItem("Enhancement", pending.settings)] if pending.settings else [])
@@ -412,14 +278,6 @@ class _PendingRow(_Row):
 
 
 class _AddRow(_Row):
-    """The ``+ Enhance`` row that leads the list.
-
-    Live, it makes another version at whatever the Enhance pane currently says.
-    Dimmed, the image already holds one made at exactly those settings, and
-    hovering it lights that version rather than leaving you to compare numbers —
-    the answer to "why can't I press this" is the row it points at.
-    """
-
     clicked = pyqtSignal()
     hovered = pyqtSignal(bool)
 
@@ -430,9 +288,7 @@ class _AddRow(_Row):
         self._thumbnail.setPixmap(icon_pixmap("plus", _PLUS, BG_PRIMARY))
         if settings:
             self._show_facts([BasicItem("Enhancement", settings)])
-        # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse
-        # events to a disabled widget, and the hover is exactly what the dimmed
-        # state is for — it is how the row explains why it cannot be pressed.
+        # Opacity rather than setEnabled: Qt delivers no mouse events to a disabled widget, and the hover is the point.
         if not self._enabled:
             effect = QGraphicsOpacityEffect(self)
             effect.setOpacity(0.4)
@@ -462,30 +318,15 @@ class _AddRow(_Row):
 
 
 class EnhanceVersions(QWidget):
-    """The versions of one image, newest first, one per row.
-
-    ``show_versions`` takes :class:`~origenerator.gallery.enhance.EnhanceVersion`
-    objects (as :func:`~origenerator.gallery.enhance.displayed_versions` produces
-    them) paired with the on-disk file to draw, plus the ``(status, frame)`` of
-    an enhancement still running on this image. Clicking a version's row emits
-    ``version_selected`` with its position in that list, for the pane to put in
-    the preview; picking rows and pressing Delete (or the right-click menu's
-    Delete) emits ``delete_requested`` with those positions but the original's,
-    and a row's trash can emits it with that row's alone.
-    """
-
     version_selected = pyqtSignal(int)
-    enhance_requested = pyqtSignal()   # the "+ Enhance" row was pressed
-    delete_requested = pyqtSignal(list)  # positions of the versions to trash
+    enhance_requested = pyqtSignal()
+    delete_requested = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
-        # A foldable section like the form's above it: this pane is one column
-        # of collapsible groups, and a heading that cannot fold reads as the one
-        # thing you are not allowed to put away.
         self._section = CollapsibleSection("Enhancements")
         column.addWidget(self._section)
         self._host = QWidget()
@@ -510,32 +351,6 @@ class EnhanceVersions(QWidget):
     def show_versions(self, items: list[tuple], pending: RunningEnhancement | None = None,
                     add: EnhanceOffer | None = None, created_fallback: str = "",
                     held_days: int | None = None, deletable: bool = True):
-        """Rebuild the list from ``(version, image_path)`` pairs.
-
-        ``add`` is the :class:`EnhanceOffer` for the ``+ Enhance`` row, which
-        leads the list: that is where a new version arrives, since the list runs
-        newest first. ``duplicate_of`` names the version those settings would
-        duplicate, or ``None`` when they would make something new.
-
-        ``pending`` is the :class:`RunningEnhancement` of one still running, and
-        it takes that same leading place: the row becomes the thing it asked for
-        rather than sitting beside it.
-
-        ``created_fallback`` stands in on a version whose file is no longer on disk
-        to be asked when it was written — the row's own timestamp, which is the
-        closest true answer left.
-
-        ``held_days`` is set only for a deleted image, and each version's File line
-        leads with how long it has been in the trash.
-
-        ``deletable`` is ``False`` for versions that are not this list's to trash:
-        a video's, which are the video itself and the copy Evolver keeps.
-
-        Hidden only when there is nothing at all to show — no versions, nothing
-        running, and no row to press.
-        """
-        # Replace the host wholesale — the same delete-and-rebuild idiom the
-        # related-media rows use, so no row outlives the versions it described.
         form = self._section.content_form()
         form.removeRow(self._host)
         self._host = QWidget()
@@ -551,8 +366,6 @@ class EnhanceVersions(QWidget):
         self._versions_listed = len(items)
         self._originals = {position for position, (version, _path) in enumerate(items)
                            if version.is_original}
-        # One leading place, held by whichever of the two applies: the run in
-        # flight if there is one, else the row that would start it.
         if pending is not None:
             self._pending = _PendingRow()
             self._pending.update_pending(pending)
@@ -575,18 +388,10 @@ class EnhanceVersions(QWidget):
         form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
 
-    # --- picking versions, and binning the picked ones ------------------------
-
     def selected_positions(self) -> list[int]:
-        """The versions currently picked, in list order."""
         return self._picking.in_shown_order()
 
     def _on_row_clicked(self, position: int, modifiers):
-        """Pick a version as a click picks a thumbnail, and put it in the preview.
-
-        Ctrl and Shift leave the preview where it was — the gesture is "these
-        ones", aimed at the Delete that follows, and swapping the preview under
-        each click would fight it."""
         ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
         shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
         self._arrows_from = position
@@ -626,10 +431,6 @@ class EnhanceVersions(QWidget):
             self._pick_and_show(position)
 
     def _on_row_menu(self, position: int, global_pos: QPoint):
-        """The right-click menu: Delete, over whatever is picked.
-
-        A right-click on an unpicked row picks it first, so the menu always works
-        on what it appeared over — the same rule the thumbnail menu follows."""
         if position in self._originals:
             return
         if position not in self.selected_positions():
@@ -640,8 +441,6 @@ class EnhanceVersions(QWidget):
             f"Delete {len(doomed)} version{'s' if len(doomed) != 1 else ''}"
         )
         if not doomed:
-            # Grayed with the reason on it rather than absent: the answer to
-            # "why can't I delete this" is the only thing the menu can offer.
             action.setEnabled(False)
             action.setText("Delete (this is the image's only version)" if self._deletable
                            else "Delete (a video's versions can't be deleted here)")
@@ -649,23 +448,12 @@ class EnhanceVersions(QWidget):
             self.delete_requested.emit(doomed)
 
     def _deleted_by(self, positions: list[int]) -> list[int]:
-        """The versions a delete of ``positions`` trashes: all but the original, or
-        none when they are not this list's to trash or would leave the image none.
-
-        An image with no file left is a deleted generation, and deleting a
-        generation is the gallery's own action, reached from its thumbnail — a
-        version list quietly doing it would be a much bigger delete than the one
-        that was asked for."""
         doomed = [position for position in positions if position not in self._originals]
         if not self._deletable or not doomed or len(doomed) >= self._versions_listed:
             return []
         return doomed
 
     def keyPressEvent(self, event):
-        """Delete or Backspace trashes the picked versions — the keys that delete a
-        picked thumbnail, over the picked versions instead — an arrow picks
-        and shows the row over or under the one last clicked, and Enter presses
-        the Enhance row the arrows have reached."""
         step = _ARROW_STEPS.get(event.key())
         if step is not None and self._arrows_from is not None:
             self._step_to(self._arrows_from + step)
@@ -682,19 +470,11 @@ class EnhanceVersions(QWidget):
         super().keyPressEvent(event)
 
     def _highlight_version(self, position: int | None, on: bool) -> None:
-        """Light the version the dimmed ``+ Enhance`` row would have duplicated."""
         if position is None or not 0 <= position < len(self._rows):
             return
         self._rows[position].set_highlighted(on)
 
     def update_pending(self, pending: RunningEnhancement | None) -> bool:
-        """Feed a new frame to the row already standing, without rebuilding.
-
-        A run streams frames several times a second, and rebuilding the list on
-        each would thrash the layout under the cursor mid-drag. Returns whether
-        the update landed; ``False`` means the list's shape has to change (a run
-        started or ended) and the caller should rebuild.
-        """
         if (self._pending is None) != (pending is None):
             return False
         if pending is not None:

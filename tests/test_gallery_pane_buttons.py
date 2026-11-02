@@ -1,12 +1,3 @@
-"""The Gallery pane buttons, written from one state and read with no gallery around it.
-
-Every button's enabled state, tooltip and visibility used to be recomputed by a
-method of its own, and the only way to ask how the Gallery pane buttons stood was to build the
-app's central widget and read sixteen widgets off it. The state is a plain record
-now, so a test writes one by hand.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import pytest
@@ -30,15 +21,12 @@ from tests.lit_switches import lit_in
 
 
 def _handlers(**overrides) -> ButtonHandlers:
-    """Handlers that record rather than act, so a press is observable."""
     fields = {name: (lambda *a: None) for name in ButtonHandlers._fields}
     fields.update(overrides)
     return ButtonHandlers(**fields)
 
 
 def _state(**overrides) -> ButtonStates:
-    """A row of buttons standing wholly available, with the parts a test cares about
-    overridden."""
     fields = {name: Button(tip=name) for name in ButtonStates._fields
               if name != "auto_tip"}
     fields["auto_tip"] = ""
@@ -64,9 +52,6 @@ def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(buttons):
 
 
 def test_the_row_holds_no_osr2_switch_at_all(buttons):
-    # The Funestras' console carries the control-state group that switches the
-    # device now -- parked, retracted, driving, control off -- and a second
-    # switch for one device is what that group replaced.
     assert not hasattr(buttons(), "drive")
 
 
@@ -105,8 +90,6 @@ def test_the_radio_switch_turned_on_in_a_paused_room_is_lit_yellow_at_once(butto
 
 
 def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow(buttons):
-    """The family's yellow is light, so a mark on it takes the dark ink a lit yellow
-    control on a HUD does."""
     switch = buttons().radio
     omnipause.freeze(True)
 
@@ -128,8 +111,6 @@ def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_on
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(buttons):
-    # Auto-Generate runs until it is stopped, so Auto is never hidden; the slideshow and
-    # the grouping are offered only where they mean something.
     made = buttons()
 
     assert made.slideshow.isHidden()
@@ -155,8 +136,6 @@ def test_one_state_writes_every_button(buttons):
 
 
 def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(buttons):
-    # Blocked around the write, not around the press: a row of buttons re-aimed while
-    # Auto-Generate is running must not toggle it off.
     pressed = []
     made = buttons(_handlers(toggle_auto=pressed.append))
 
@@ -170,7 +149,7 @@ def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(b
     made = buttons()
     made.auto.setChecked(True)
 
-    made.apply(_state())  # auto's `checked` is None
+    made.apply(_state())
 
     assert made.auto.isChecked() is True
 
@@ -194,15 +173,13 @@ def test_the_tip_s_link_leads_wherever_auto_generate_is_now(buttons):
 
 
 def test_a_group_with_nothing_showing_wears_no_gap(buttons):
-    # A row whose optional buttons are away must never wear a stray or doubled
-    # gap, and must never start indented.
     made = buttons()
 
     made.apply(_state(group=Button(visible=False), slideshow=Button(visible=False)))
 
     gaps = [gap.isVisible() for gap, buttons in made._groups]
-    assert gaps[0] is False            # the leading group is never indented
-    assert gaps[2] is False            # the grouping is away, so its space is too
+    assert gaps[0] is False
+    assert gaps[2] is False
 
 
 def test_the_first_group_that_shows_is_the_one_left_unindented(buttons):
@@ -214,7 +191,7 @@ def test_the_first_group_that_shows_is_the_one_left_unindented(buttons):
     gaps = [gap.isVisible() for gap, buttons in made._groups]
     assert gaps[0] is False
     assert gaps[1] is False
-    assert gaps[3] is True                        # a space in front of the trio
+    assert gaps[3] is True
 
 
 def test_every_button_presses_its_own_handler(buttons):
@@ -282,7 +259,6 @@ def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_rows_do(but
 
 
 def _gaps(made: GalleryPaneButtons) -> tuple[int, int, int]:
-    """Between two buttons of a group, between wrapped rows, and between groups."""
     layout = made.layout()
     return layout.spacing(), layout.row_spacing(), made._groups[0][0].width()
 
@@ -334,7 +310,5 @@ def test_every_mark_on_the_row_stays_inside_the_familys_inset(buttons):
 
 
 def test_the_group_button_offers_a_collection_of_his_own(buttons):
-    # A folder he gathers himself is a custom collection (2026-10-30), and the
-    # button that makes one says collection where it used to say folder.
     made = buttons()
     assert made.group.toolTip() == "Group the selected folders into a collection of your own"

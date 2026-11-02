@@ -30,11 +30,6 @@ def test_between_tests_a_qt_message_still_has_a_python_handler_to_reach():
 
 @pytest.mark.no_qt_log
 def test_what_qt_says_lands_in_the_apps_log(caplog):
-    # Hosted by Fun Time this app's stderr goes nowhere, and faulthandler
-    # cannot see a fail-fast abort, so a Qt fatal -- the abort inside Qt6Core
-    # that Windows recorded about twenty times over four days -- left no line
-    # in any log of ours. Qt says why on its way down; routed through logging,
-    # that sentence lands in origenerator.log beside everything else.
     previous = install_qt_message_logging()
     try:
         with caplog.at_level(logging.WARNING, logger="qt"):
@@ -68,10 +63,7 @@ def test_a_new_install_never_reports_a_run_an_earlier_one_was_counting(caplog):
 
 
 def test_the_qt_this_app_asks_for_says_a_wildcard_disconnect_after_letting_go_of_its_lock():
-    # "QObject::disconnect: wildcard call disconnects from destroyed signal" comes in
-    # no category, so no filter rule keeps it from the handler above, and Qt 6.11.1
-    # says it holding the sender's pooled signal/slot lock: the handler then waits
-    # for Python with that lock held (QTBUG-145216). 6.11.2 says it after letting go.
+    # The wildcard-disconnect message has no category, so no filter rule keeps it from the handler; Qt 6.11.1 says it holding the signal/slot lock (QTBUG-145216), 6.11.2 after letting go.
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     qt = [Requirement(line) for line in project["dependencies"]
           if Requirement(line).name == "PyQt6-Qt6"]
@@ -86,8 +78,6 @@ def _collapser():
 
 
 def test_a_message_that_keeps_arriving_is_said_once_and_counted():
-    # 30,000 of one Qt warning in three minutes spent every rotation of the log
-    # and took every older line with it, so nothing could be asked of it after.
     collapse, said = _collapser()
 
     for _ in range(4):
@@ -102,8 +92,6 @@ def test_a_message_that_keeps_arriving_is_said_once_and_counted():
 
 
 def test_a_run_still_arriving_says_how_far_it_has_got_at_each_power_of_ten():
-    # The app can be killed mid-flood, and one line then says nothing about how
-    # much of the log went.
     collapse, said = _collapser()
 
     for _ in range(1000):

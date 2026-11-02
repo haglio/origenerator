@@ -144,7 +144,7 @@ def test_a_takeover_that_does_not_read_as_a_session_is_spent_unanswered(tmp_path
     assert not takeover.exists()
 
 
-@pytest.mark.parametrize("written, said", [
+@pytest.mark.parametrize(("written", "said"), [
     ("not json", "did not read as a session"),
     ('{"pid": 4321, "args": ["--fun-time", "--a-flag-from-a-newer-session"]}',
      "a flag this app does not know"),

@@ -765,7 +765,7 @@ def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):
         None, "hands already fixed as hard as a fix goes", WARNING)
 
 
-@pytest.mark.parametrize("part, folder", [
+@pytest.mark.parametrize(("part", "folder"), [
     (DetailPart("teeth", ("teeth",), ("teeth",)), "bbox"),
     (DetailPart("skin", ("skin",), ("skin",), outline=True), "segm"),
 ])

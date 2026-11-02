@@ -1960,7 +1960,7 @@ def _scene_negatives(payload, conditioning):
             for seg in _segments(payload, conditioning)]
 
 
-@pytest.mark.parametrize("name, conditioning", [
+@pytest.mark.parametrize(("name", "conditioning"), [
     ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
 ])
 def test_each_scene_keeps_out_its_own_negative(name, conditioning):
@@ -1975,7 +1975,7 @@ def test_each_scene_keeps_out_its_own_negative(name, conditioning):
     assert _scene_negatives(payload, conditioning) == ["blurry"] * 3
 
 
-@pytest.mark.parametrize("name, conditioning", [
+@pytest.mark.parametrize(("name", "conditioning"), [
     ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
 ])
 def test_each_scene_runs_for_its_own_frames_and_reads_its_own_prompt(name, conditioning):

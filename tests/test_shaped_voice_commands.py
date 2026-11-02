@@ -20,7 +20,7 @@ from origenerator.voice.commands import (
 from origenerator.voice.slideshow_commands import SlideshowCommand
 
 
-@pytest.mark.parametrize("text, shape", [
+@pytest.mark.parametrize(("text", "shape"), [
     ("fix teeth", None),
     ("landscape fix teeth", "landscape"),
     ("portrait fix her hands", "portrait"),
@@ -32,7 +32,7 @@ def test_a_fix_can_name_the_side_it_means(text, shape):
     assert command.shape == shape
 
 
-@pytest.mark.parametrize("text, key, shape", [
+@pytest.mark.parametrize(("text", "key", "shape"), [
     ("favorites", FAVORITES_KEY, None),
     ("landscape favorites", FAVORITES_KEY, "landscape"),
     ("portrait latest", LATEST_KEY, "portrait"),
@@ -75,7 +75,7 @@ def test_every_phrase_the_recognizer_is_asked_to_hear_means_something():
             if shaped_app_command(phrase) is None and match_voice_command(phrase) is None] == []
 
 
-@pytest.mark.parametrize("text, shape", [
+@pytest.mark.parametrize(("text", "shape"), [
     ("start slideshow", None),
     ("landscape start slideshow", "landscape"),
     ("portrait stop slideshow", "portrait"),
@@ -88,7 +88,7 @@ def test_a_slideshow_command_can_name_the_side_it_means(text, shape):
     assert isinstance(command.command, SlideshowCommand)
 
 
-@pytest.mark.parametrize("text, shape", [
+@pytest.mark.parametrize(("text", "shape"), [
     ("enhance it", None),
     ("landscape enhance", "landscape"),
     ("portrait animate as video alpha", "portrait"),
@@ -100,7 +100,7 @@ def test_the_other_image_commands_can_name_the_side_they_mean(text, shape):
     assert command.shape == shape
 
 
-@pytest.mark.parametrize("text, shape, rest", [
+@pytest.mark.parametrize(("text", "shape", "rest"), [
     ("landscape request no feet", "landscape", "request no feet"),
     ("portrait fix teeth", "portrait", "fix teeth"),
     ("request no feet", None, "request no feet"),

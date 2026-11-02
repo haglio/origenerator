@@ -1241,7 +1241,7 @@ _READ_AS = (
 )
 
 
-@pytest.mark.parametrize("node_types, expected", _READ_AS)
+@pytest.mark.parametrize(("node_types", "expected"), _READ_AS)
 def test_the_graphs_nodes_name_the_workflow(tmp_path, node_types, expected):
     path = tmp_path / "renamed_00001_.png"
     _make_png_with_metadata(path, _graph_of(*node_types))

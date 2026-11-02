@@ -29,7 +29,7 @@ from origenerator.prompt_edit import (
 from origenerator.workflows.base import story_of
 
 
-@pytest.mark.parametrize("request_text, polarity, term", [
+@pytest.mark.parametrize(("request_text", "polarity", "term"), [
     ("no silver earrings", REMOVE, "silver earrings"),
     ("without a hat", REMOVE, "hat"),
     ("remove her sunglasses", REMOVE, "sunglasses"),

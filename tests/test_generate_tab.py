@@ -1052,7 +1052,7 @@ def test_a_new_generation_tab_lists_the_workflows_of_both_kinds(blank_panel):
         *_offered(MediaType.IMAGE), *_offered(MediaType.VIDEO)}
 
 
-@pytest.mark.parametrize("picked, kind", [("wan22_i2v", MediaType.VIDEO),
+@pytest.mark.parametrize(("picked", "kind"), [("wan22_i2v", MediaType.VIDEO),
                                           ("sdxl_t2i", MediaType.IMAGE)])
 def test_a_workflow_picked_in_a_new_generation_tab_leaves_only_its_kind_listed(
         blank_panel, qtbot, picked, kind):
@@ -3259,7 +3259,7 @@ def test_editing_the_settings_takes_the_random_seed_caption_back_off(tab, qtbot)
     assert tab._generate_btn.toolTip() == ""
 
 
-@pytest.mark.parametrize("key, picked", [("sampler_name", "euler_ancestral"),
+@pytest.mark.parametrize(("key", "picked"), [("sampler_name", "euler_ancestral"),
                                          ("scheduler", "karras")])
 def test_a_run_that_lands_after_its_tab_was_changed_leaves_generate_on_the_shown_seed(
         tab, qtbot, key, picked):
@@ -4032,7 +4032,7 @@ def _drawn_in(prompt) -> set[str]:
     return colors
 
 
-@pytest.mark.parametrize("made_at, then, drawn", [(1.0, 5.0, TEXT_PRIMARY),
+@pytest.mark.parametrize(("made_at", "then", "drawn"), [(1.0, 5.0, TEXT_PRIMARY),
                                                    (5.0, 1.0, TEXT_MUTED)])
 def test_a_shown_images_negative_prompt_is_gray_exactly_while_the_run_ignores_it(
         app_chrome, saved_panel, made_at, then, drawn):

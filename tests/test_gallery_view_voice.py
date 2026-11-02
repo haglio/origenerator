@@ -1077,7 +1077,7 @@ def _listening(qtbot, tmp_path, db=None):
     return view
 
 
-@pytest.mark.parametrize("said, key", [
+@pytest.mark.parametrize(("said", "key"), [
     ("experiments", EXPERIMENTS_KEY),
     ("recents", LATEST_KEY),
     ("go to favorites", FAVORITES_KEY),

@@ -29,7 +29,7 @@ _KEYS = [
 ]
 
 
-@pytest.mark.parametrize("key, asked", _KEYS, ids=lambda v: getattr(v, "name", None))
+@pytest.mark.parametrize(("key", "asked"), _KEYS, ids=lambda v: getattr(v, "name", None))
 def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
     motion = _Motion()
 

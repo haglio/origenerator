@@ -15,7 +15,7 @@ from origenerator.voice.app_commands import (
 from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 
-@pytest.mark.parametrize("said, wanted", [
+@pytest.mark.parametrize(("said", "wanted"), [
     ("experiments", AppCommand.EXPERIMENTS),
     ("recents", AppCommand.LATEST),
 ])
@@ -57,7 +57,7 @@ def test_cruise_control_is_no_word_here(said):
     assert match_app_command(said) is None
 
 
-@pytest.mark.parametrize("said, wanted", [
+@pytest.mark.parametrize(("said", "wanted"), [
     ("amp fifty", BarSetting("amp", 50)),
     ("speed thirty", BarSetting("speed", 30)),
     ("center seventy", BarSetting("center", 70)),
@@ -68,7 +68,7 @@ def test_a_bar_takes_the_number_said(said, wanted):
     assert match_app_command(said) == wanted
 
 
-@pytest.mark.parametrize("said, wanted", [
+@pytest.mark.parametrize(("said", "wanted"), [
     ("min speed", BarSetting("speed", 0)),
     ("max speed", BarSetting("speed", 100)),
     ("min amp", BarSetting("amp", 0)),
@@ -95,7 +95,7 @@ def test_a_two_word_command_is_not_shadowed_by_its_first_word():
     assert match_app_command("next shape") is AppCommand.NEXT_SHAPE
 
 
-@pytest.mark.parametrize("said, wanted", [
+@pytest.mark.parametrize(("said", "wanted"), [
     ("undo", AppCommand.UNDO),
     ("redo", AppCommand.REDO),
     ("favorite", AppCommand.FAVORITE),

@@ -82,7 +82,7 @@ ARCH_CASES = [
 ]
 
 
-@pytest.mark.parametrize("expected,tensor_names", ARCH_CASES)
+@pytest.mark.parametrize(("expected", "tensor_names"), ARCH_CASES)
 def test_reads_the_architecture_off_the_tensor_names(tmp_path, expected, tensor_names):
     assert model_arch.describe(_write(tmp_path / "m.safetensors", tensor_names)).arch == expected
 

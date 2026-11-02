@@ -66,7 +66,7 @@ def test_the_hover_expands_the_abbreviated_estimate():
         "About 2 min on this workflow's recent runs")
 
 
-@pytest.mark.parametrize("kind,line", [
+@pytest.mark.parametrize(("kind", "line"), [
     ("Image", "An image"),
     ("Video", "A video made from a start image"),
     ("Enhance", "An enhancement of an image already made"),

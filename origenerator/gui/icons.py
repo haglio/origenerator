@@ -196,8 +196,8 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 
 @cache
 def item_type_icon(media_type: str) -> QPixmap:
-    glyph = "play" if media_type == MediaType.VIDEO else "photo"
-    return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, glyph, _ITEM_TYPE_ICON_INK))
+    icon = "play" if media_type == MediaType.VIDEO else "photo"
+    return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, icon, _ITEM_TYPE_ICON_INK))
 
 
 @cache
@@ -273,13 +273,13 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     return _same_when_dead(_painted(draw))
 
 
-def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
+def _corner_icon(icon: str, ink, armed: bool, *, arm_color=None) -> QIcon:
     color = (arm_color or _CORNER_ARMED) if armed else ink
-    return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
+    return _same_when_dead(_painted(lambda painter: _mark(painter, icon, color)))
 
 
-def _mark(painter: QPainter, glyph: str, ink):
-    draw_icon(painter, glyph, ink, size=_CORNER_MARK,
+def _mark(painter: QPainter, icon: str, ink):
+    draw_icon(painter, icon, ink, size=_CORNER_MARK,
               x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
 
 
@@ -343,9 +343,9 @@ def toc_initial_icon(level: str) -> QIcon:
     return icon
 
 
-def _render_on_ground(ground, glyph: str, ink) -> QPixmap:
+def _render_on_ground(ground, icon: str, ink) -> QPixmap:
     return _ground_pixmap(ground, lambda painter: draw_icon(
-        painter, glyph, ink, size=_GLYPH_ON_GROUND, x=_GROUND_INSET, y=_GROUND_INSET))
+        painter, icon, ink, size=_GLYPH_ON_GROUND, x=_GROUND_INSET, y=_GROUND_INSET))
 
 
 def _ground_pixmap(color, draw) -> QPixmap:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from funestra.console import OSR2_DRIVING, OSR2_PARKED
+from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
 
 from origenerator.gui.osr2_control import Osr2Control
 

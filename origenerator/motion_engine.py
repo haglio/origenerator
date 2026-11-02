@@ -19,7 +19,7 @@ from funestra.robot_hand import (
     position_fraction,
     set_amplitude,
     set_center,
-    set_dials,
+    set_bars,
     set_max_intensity,
     set_speed,
 )
@@ -105,7 +105,7 @@ def take_settings(motion: Motion, saved) -> None:
         return
     speed, amplitude, center = (saved.get(name) for name in ("speed", "amplitude", "center"))
     if all(type(number) is int for number in (speed, amplitude, center)):
-        set_dials(motion.state, speed=speed, amplitude=amplitude, center=center)
+        set_bars(motion.state, speed=speed, amplitude=amplitude, center=center)
     if saved.get("shape") in _SHAPES_BY_NAME:
         motion.state.shape = _SHAPES_BY_NAME[saved["shape"]]
     if saved.get("human_inspired") is True:

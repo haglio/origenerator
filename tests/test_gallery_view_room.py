@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from funestra.console import (
+from funestra.main_hud import (
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,

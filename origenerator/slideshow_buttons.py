@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from funestra.console import ROW_LABEL_W, VALUE_W
+from funestra.main_hud import ROW_LABEL_W, VALUE_W
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
 from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_controls import (
@@ -18,7 +18,7 @@ from funestra.hud_controls import (
     trash_button,
     versions_button,
 )
-from funestra.hud_marks import shared_mark
+from funestra.hud_icons import shared_icon
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import LATEST_LABEL
 
@@ -42,7 +42,7 @@ MODE_TOOLTIPS = {
         "Origenerator mode — Origenerator over the browser, its slideshows over the Funestras",
 }
 
-ENHANCED_ICON = shared_mark("enhance_filter")
+ENHANCED_ICON = shared_icon("enhance_filter")
 
 ENHANCED_TOOLTIP = "Enhanced only — play just the images that have been enhanced"
 RESET_TOOLTIPS = {
@@ -79,10 +79,10 @@ def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool =
 def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
     return (
         Button("", "Clip seconds", "", width=ROW_LABEL_W),
-        Button(f"{shape}_clip_seconds_down", shared_mark("minus"), "Move on sooner",
+        Button(f"{shape}_clip_seconds_down", shared_icon("minus"), "Move on sooner",
                group_break=True),
         Button("", f"{seconds}s", "", width=VALUE_W),
-        Button(f"{shape}_clip_seconds_up", shared_mark("plus"), "Leave each clip longer"),
+        Button(f"{shape}_clip_seconds_up", shared_icon("plus"), "Leave each clip longer"),
     )
 
 

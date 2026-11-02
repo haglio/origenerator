@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import replace
 
-from funestra.console import ModeHud
+from funestra.main_hud import ModeHud
 from funestra.file_channel import append_command
 from funestra.funestra_verbs import SPEED_DOWN, SPEED_UP
 from funestra.hud_placement import HudCorner

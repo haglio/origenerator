@@ -6,7 +6,7 @@ from itertools import pairwise
 
 import pytest
 from app_support.osr2_hold import PARK, RESUME, RETRACT
-from funestra.console import OSR2_PARKED, OSR2_RETRACTED
+from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.robot_hand import RobotHandState, set_max_intensity
 
@@ -498,7 +498,7 @@ def test_a_paused_room_lets_the_app_go_back_behind_background_work(qtbot, monkey
 
 def test_where_the_wave_stands_in_its_bars_is_a_fraction_of_the_way_up_from_the_floor_to_the_ceiling():
     motion = motion_engine.Motion()
-    motion_engine.set_dials(motion.state, speed=50, amplitude=60, center=50)
+    motion_engine.set_bars(motion.state, speed=50, amplitude=60, center=50)
 
     fractions = []
     for phase in (0.0, 0.25, 0.5):
@@ -510,6 +510,6 @@ def test_where_the_wave_stands_in_its_bars_is_a_fraction_of_the_way_up_from_the_
 
 def test_a_wave_with_no_amplitude_stands_at_the_floor_of_its_bars():
     motion = motion_engine.Motion()
-    motion_engine.set_dials(motion.state, speed=50, amplitude=0, center=50)
+    motion_engine.set_bars(motion.state, speed=50, amplitude=0, center=50)
 
     assert motion_engine._envelope_fraction(motion) == 0.0

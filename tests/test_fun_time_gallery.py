@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
-from funestra.console import OSR2_PARKED, OSR2_RETRACTED
+from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap

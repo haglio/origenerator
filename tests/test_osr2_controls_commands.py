@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 from funestra import drive_layout
-from funestra.console import OSR2_CONTROL_BUTTONS
-from funestra.drive_readout import CONTROL_TIPS, track_command
+from funestra.main_hud import OSR2_CONTROL_BUTTONS
+from funestra.osr2_visualizer import CONTROL_TIPS, track_command
 
 from origenerator.osr2_controls_commands import (
     ROBOT_HAND,

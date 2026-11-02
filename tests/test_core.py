@@ -12,7 +12,7 @@ from xml.etree import ElementTree
 import pytest
 from app_support import loading_screen as launchers_screen
 from app_support.frame_channel import _HEADER
-from funestra.console import OSR2_DRIVING, OSR2_PARKED
+from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from funestra.robot_hand import WaveformShape

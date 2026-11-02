@@ -11,12 +11,12 @@ from funestra.hud import (
     SYMBOL_FONT,
     button_ground,
     draw_button,
-    draw_mark,
+    draw_icon,
     load_font,
     text_width,
 )
 from funestra.hud_button import Button
-from funestra.hud_marks import shared_mark
+from funestra.hud_icons import shared_icon
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.satellite_hud import (
     BLOCK_GAP,
@@ -265,7 +265,7 @@ class QueueSection:
             self._say(draw, column, y + CTRL_BTN / 2, room, self.idle_note)
 
     def _paint_word(self, image, draw, right, y, pointer, targets, button) -> int:
-        word = _word_width(button.glyph)
+        word = _word_width(button.icon)
         _paint_button(image, draw, (right - word, y, word, CTRL_BTN), button, pointer, targets)
         return word
 
@@ -313,12 +313,12 @@ class QueueSection:
                     (UP, "chevron_up", MOVE_UP_TIP, line.can_move_up),
                     (DOWN, "chevron_down", MOVE_DOWN_TIP, line.can_move_down)):
                 _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
-                              Button(f"{verb}|{line.key}", shared_mark(mark), tooltip,
+                              Button(f"{verb}|{line.key}", shared_icon(mark), tooltip,
                                      width=CTRL_BTN, dim=not can_go),
                               pointer, targets)
                 cursor += CTRL_BTN + _GAP
             _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
-                          Button(f"{SHIELD}|{line.key}", shared_mark("shield"), SHIELD_TIP,
+                          Button(f"{SHIELD}|{line.key}", shared_icon("shield"), SHIELD_TIP,
                                  width=CTRL_BTN, lit=line.shielded, dim=not line.shieldable),
                           pointer, targets)
             cursor += CTRL_BTN + _GAP
@@ -370,7 +370,7 @@ def _paint_shield_all(image, draw, rect, pointer, targets, *, dim: bool) -> None
     x, y, width, height = rect
     ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, pointer), dim=dim)
     left = x + (width - _shield_all_width()) // 2 + _WORD_PAD
-    draw_mark(image, "shield", (left - BUTTON_ICON_INSET, y, height, height), ink)
+    draw_icon(image, "shield", (left - BUTTON_ICON_INSET, y, height, height), ink)
     draw.text((left + _SHIELD_MARK + _MARK_TO_WORD, y + height / 2), SHIELD_ALL_TEXT,
               font=_tiny(), anchor="lm", fill=ink)
     targets.append((rect, Button(SHIELD_ALL, SHIELD_ALL_TEXT, SHIELD_ALL_TIP, width=width,
@@ -379,7 +379,7 @@ def _paint_shield_all(image, draw, rect, pointer, targets, *, dim: bool) -> None
 
 def _paint_button(image, draw, rect, button, pointer, targets) -> None:
     draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
-                glyph_font=_glyphs(), word_font=_tiny())
+                icon_font=_glyphs(), word_font=_tiny())
     targets.append((rect, button))
 
 

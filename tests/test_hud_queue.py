@@ -139,7 +139,7 @@ def test_a_video_waiting_out_the_minute_offers_start_now_beside_its_countdown():
 
     _image, targets = _painted(section)
 
-    assert [button.glyph for _rect, button in targets
+    assert [button.icon for _rect, button in targets
             if button.command == START_NOW] == ["Start now"]
 
 
@@ -158,7 +158,7 @@ def test_a_row_carries_the_button_that_throws_its_job_away():
     _image, targets = _painted(section)
 
     assert "queue_cancel|j1" in _posted(targets)
-    assert [(button.glyph, button.tooltip) for _rect, button in targets
+    assert [(button.icon, button.tooltip) for _rect, button in targets
             if button.command == "queue_cancel|j2"] == [
         ("Cancel", "Throw away this seed and start the next")]
 
@@ -224,7 +224,7 @@ def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top
     assert below >= 0
     assert abs(above - below) <= 1
     assert image.getpixel((all_x - 1, frame_y + 1))[3] == 0
-    assert (shield_all.glyph, cancel_all.glyph) == ("All", "Cancel All")
+    assert (shield_all.icon, cancel_all.icon) == ("All", "Cancel All")
 
 
 def test_a_usual_line_reads_in_full_across_the_portrait_satellites_hud(monkeypatch):

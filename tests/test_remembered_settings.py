@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from funestra.console import BROKER_PRESS
+from funestra.main_hud import BROKER_PRESS
 from PyQt6 import sip
 from PyQt6.QtWidgets import (
     QAbstractButton,

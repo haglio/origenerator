@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from funestra.console import OSR2_CONTROL_UNANSWERED
-from funestra.console_hud import ConsolePainter
-from funestra.device_panel import DevicePanel
+from funestra.main_hud import OSR2_CONTROL_UNANSWERED
+from funestra.main_hud_painter import MainHudPainter
+from funestra.osr2_controls_host import Osr2ControlsHost
 from PyQt6.QtCore import QTimer
 from shared_ui.pressable_drawing import PressableDrawing
 
@@ -19,8 +19,8 @@ DEVICE_WATCH_MS = 1000
 
 class Osr2Controls(PressableDrawing):
     def __init__(self, motion, parent=None, device=None, control=None, trouble=None):
-        painter = ConsolePainter(device_only=True)
-        super().__init__(DevicePanel(post=self._post, painter=painter), parent)
+        painter = MainHudPainter(device_only=True)
+        super().__init__(Osr2ControlsHost(post=self._post, painter=painter), parent)
         self._painter = painter
         self._motion = motion
         self._control = control

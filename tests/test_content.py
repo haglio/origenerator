@@ -1,17 +1,3 @@
-"""The content overlay: which file answers, and how often it is read.
-
-Every value that describes the library rather than the code comes from here, so
-`load_content` is called from five module scopes across four packages — and
-before it was cached, importing `config` alone read and parsed the JSON, and
-importing config plus search plus action_settings plus workflows read the same file
-six times over.
-
-The count is a test rather than a comment because nothing else would show it:
-six reads and one read behave identically, so the number can only go back up
-silently.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -27,10 +13,6 @@ from origenerator import content
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Instrument `Path.read_text` and the two stat calls, then import the modules
-# that want the overlay, and report what the filesystem was asked for. In a
-# fresh interpreter, because every one of these is an import-time cost and this
-# one has already paid it.
 _PROBE = """
 import json
 from pathlib import Path
@@ -88,10 +70,16 @@ def test_the_local_overlay_answers_instead_when_it_is_there(tmp_path):
     assert content.load_content(local, example) == {"library_root": "D:/private"}
 
 
+def test_the_local_overlay_is_not_merged_over_the_example(tmp_path):
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps({"library_root": "D:/private"}), encoding="utf-8")
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"library_root": "C:/example", "extra": 1}), encoding="utf-8")
+
+    assert "extra" not in content.load_content(local, example)
+
+
 def test_two_callers_are_not_handed_the_same_dictionary(tmp_path):
-    """The read is cached; the parse is not. A shared dict would make one
-    module's edit of the overlay every other module's edit of it — the
-    cross-module mutable state this whole file exists to keep out."""
     example = tmp_path / "content.example.json"
     example.write_text(json.dumps({"library_root": "C:/example"}), encoding="utf-8")
     local = tmp_path / "content.local.json"
@@ -104,8 +92,6 @@ def test_two_callers_are_not_handed_the_same_dictionary(tmp_path):
 
 
 def test_the_overlay_is_read_once_however_many_modules_want_it():
-    """Five module scopes across four packages ask for it, and twenty-four
-    modules import `config` alone. One read."""
     seen = _import_in_a_fresh_interpreter(
         "origenerator.config", "origenerator.search",
         "origenerator.action_settings", "origenerator.workflows")
@@ -131,21 +117,10 @@ def test_a_workflow_imports_on_an_overlay_that_is_missing_what_it_wants(tmp_path
 
 @pytest.mark.parametrize("module", ["origenerator.search", "origenerator.action_settings"])
 def test_a_consumer_of_the_overlay_does_not_read_it_at_import(module):
-    """It reads `config`'s, which is the one read above; asking again at its own
-    import is what made the count six."""
     seen = _import_in_a_fresh_interpreter(module)
 
     assert seen["overlay_reads"] == ["content.example.json"]
 
-
-# --- the overlay is under the app ---------------------------------------------
-#
-# `content.local.json` is hand-maintained and git-ignored, so it does not gain a
-# key when the app does — and the committed example has gone from three keys to
-# nine in six weeks. Each of those six additions is a launch where a local
-# overlay written the day before is short of one, and three of the nine are read
-# with a bare subscript, which used to be a dead icon and a traceback in a log
-# nobody opens.
 
 
 def test_a_local_overlay_missing_a_key_the_example_documents_is_named(tmp_path):
@@ -168,8 +143,6 @@ def test_a_complete_overlay_is_missing_nothing(tmp_path):
 
 
 def test_a_key_present_but_empty_is_not_missing(tmp_path):
-    """How you switch a feature off: the key is there with nothing in it. Every
-    consumer of an optional key already reads it as `.get(key) or default`."""
     example = tmp_path / "content.example.json"
     example.write_text(json.dumps({"library_root": "C:/x", "search_synonyms": [["a"]]}),
                        encoding="utf-8")
@@ -181,8 +154,6 @@ def test_a_key_present_but_empty_is_not_missing(tmp_path):
 
 
 def test_no_local_overlay_at_all_is_missing_nothing(tmp_path):
-    """A fresh or public checkout: the example is not compared against itself,
-    it IS what loads."""
     example = tmp_path / "content.example.json"
     example.write_text(json.dumps({"library_root": "C:/x"}), encoding="utf-8")
 
@@ -200,8 +171,6 @@ def test_the_comment_the_example_carries_is_not_a_key_to_copy(tmp_path):
 
 
 def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
-    """No second list to keep in step: the file that documents the shape is the
-    one the check reads, so a key added to it is a key the overlay must carry."""
     documented = {k for k in json.loads(
         (REPO_ROOT / "content.example.json").read_text()) if k != "_comment"}
 

@@ -264,9 +264,8 @@ def _field_cell_of(form, key):
     for fl in form.findChildren(QFormLayout):
         for r in range(fl.rowCount()):
             item = fl.itemAt(r, QFormLayout.ItemRole.FieldRole)
-            if item is not None and item.layout() is not None:
-                if item.layout().indexOf(field) != -1:
-                    return item.layout()
+            if item is not None and item.layout() is not None and item.layout().indexOf(field) != -1:
+                return item.layout()
     return None
 
 

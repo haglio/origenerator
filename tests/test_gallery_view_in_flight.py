@@ -29,7 +29,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     LATEST_KEY,
 )
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_tab as generate_tab_module
@@ -2573,7 +2573,7 @@ def test_restoring_an_emptied_item_runs_it_again_in_its_own_folder_and_brings_it
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
     view = GalleryView(db, client=_reroll_client(),
-                       actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+                       actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                               Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()

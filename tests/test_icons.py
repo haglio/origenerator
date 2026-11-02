@@ -377,9 +377,7 @@ def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
     # second set of drawings kept for the tiles.
     white = QColor(255, 255, 255)
     for icon, name in ((icons.experiment_verdict_icon("up"), "check"),
-                       (icons.experiment_verdict_icon("down"), "cross"),
-                       (icons.trash_action_icon("restore"), "undo_arrow"),
-                       (icons.trash_action_icon("purge"), "trash")):
+                       (icons.experiment_verdict_icon("down"), "cross")):
         drawn = icon.pixmap(QSize(48, 48)).toImage()
         assert drawn == icon_pixmap(name, 48, white).toImage(), name
 

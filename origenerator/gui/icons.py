@@ -287,16 +287,6 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 
 
 @cache
-def trash_action_icon(action: str) -> QIcon:
-    """A Trash-collection tile's review hover-buttons: a circular arrow back
-    ("restore" — the item and its files return to where they were) or a trash can
-    ("purge" — end it for good; nothing else empties the Trash). White line art on
-    the buttons' own translucent ground, like the experiment verdict controls."""
-    name = "undo_arrow" if action == "restore" else "trash"
-    return QIcon(icon_pixmap(name, _SIZE, _REROLL_GLYPH))
-
-
-@cache
 def item_type_icon(media_type: str) -> QPixmap:
     """A small item type icon marking a Latest tile as an image or a video.
 
@@ -350,6 +340,7 @@ ENHANCE_MORE = "more"   # it holds one, and these settings would make another
 # the arming and the state it reports stay two separate readings of one mark.
 _CORNER_REST = TEXT_MUTED
 _CORNER_ARMED = TEXT_SECONDARY
+_CANNOT_ACT_OPACITY = 0.4
 # The mark is drawn a little inside its cell rather than filling it, which is what
 # leaves the enhance corner room to shift a second copy of itself down and right
 # without running off the canvas. _ENHANCE_SHADOW is that shift: far enough to
@@ -383,6 +374,19 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
     corner whose press takes something away, and it wears the very can, in the very
     red, that the Gallery pane buttons' Delete does."""
     return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
+
+
+def corner_restore_icon(*, can_restore: bool, armed: bool) -> QIcon:
+    if can_restore:
+        return _corner_icon("undo_arrow", _CORNER_REST, armed)
+
+    mark = _painted(lambda painter: _mark(painter, "undo_arrow", _CORNER_REST))
+
+    def draw(painter: QPainter):
+        painter.setOpacity(_CANNOT_ACT_OPACITY)
+        painter.drawPixmap(0, 0, mark)
+
+    return _same_when_dead(_painted(draw))
 
 
 @cache

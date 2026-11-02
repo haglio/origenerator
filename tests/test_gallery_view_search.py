@@ -31,6 +31,7 @@ from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
     _NO_MOD,
+    FakeActions,
     FakeDB,
     _alls,
     _at,
@@ -235,6 +236,21 @@ def test_the_trash_collection_searches_what_it_is_holding(qtbot):
     _search_for(view, "cat")
 
     assert view.listed_prompt_ids() == ["d1"]
+
+
+def test_a_trash_search_hit_wears_the_same_buttons_as_it_does_in_the_trash(qtbot):
+    actions = FakeActions()
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
+    _search_for(view, "cat")
+
+    restore = view._gallery_pane._thumb_widgets["d1"]._controls.buttons()[0]
+    assert restore.toolTip() == "Restore — put it and its files back where they were"
+    restore.click()
+
+    assert actions.restored == [["d1"]]
 
 
 def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):

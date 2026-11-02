@@ -15,7 +15,7 @@ def _image(path, size=(60, 40), color=(0, 0, 255)):
 
 def test_the_pair_is_two_halves_with_the_operator_between_them(qtbot, tmp_path):
     # The look every surface showing a waiting run stands: what is being
-    # animated, plus the clip whose settings came with it.
+    # animated, plus the video whose settings came with it.
     pair = combination_pixmap(Combination(_image(tmp_path / "frame.png"),
                                           _image(tmp_path / "clip.png", color=(255, 0, 0))),
                               QSize(172, 160))
@@ -43,14 +43,14 @@ def test_the_clip_beside_the_frame_is_drained_of_color(qtbot, tmp_path):
     # Gray because it is not what is being made: in full color beside the frame
     # it reads as a second subject.
     frame = _image(tmp_path / "frame.png", size=(80, 80), color=(0, 0, 255))
-    clip = _image(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
-    image = combination_pixmap(Combination(frame, clip), QSize(172, 160)).toImage()
+    video = _image(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
+    image = combination_pixmap(Combination(frame, video), QSize(172, 160)).toImage()
 
     side = image.height()
     left = image.pixelColor(side // 2, side // 2)
     right = image.pixelColor(image.width() - side // 2, side // 2)
     assert left.blue() > left.red()                      # the frame keeps its color
-    assert right.red() == right.green() == right.blue()  # the clip has lost its
+    assert right.red() == right.green() == right.blue()  # the video has lost its
 
 
 def _columns_of(image, color):
@@ -65,14 +65,14 @@ def _painted(image, left, right):
 
 def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses(qtbot, tmp_path):
     frame = _image(tmp_path / "frame.png", size=(80, 80))
-    clip = _image(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
+    video = _image(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
     size = QSize(400, 100)
-    as_made = combination_pixmap(Combination(frame, clip), size).toImage()
-    edited = combination_pixmap(Combination(frame, clip, prompt_edited=True),
+    as_made = combination_pixmap(Combination(frame, video), size).toImage()
+    edited = combination_pixmap(Combination(frame, video, prompt_edited=True),
                                 size).toImage()
-    gray_clip = as_made.pixelColor(as_made.width() - 1, as_made.height() // 2)
+    gray_video = as_made.pixelColor(as_made.width() - 1, as_made.height() // 2)
 
-    clip_as_made, clip_edited = _columns_of(as_made, gray_clip), _columns_of(edited, gray_clip)
-    assert clip_edited[0] > clip_as_made[0]
-    assert _painted(edited, clip_as_made[0], clip_edited[0])
-    assert _painted(edited, clip_edited[-1] + 1, edited.width())
+    video_as_made, video_edited = _columns_of(as_made, gray_video), _columns_of(edited, gray_video)
+    assert video_edited[0] > video_as_made[0]
+    assert _painted(edited, video_as_made[0], video_edited[0])
+    assert _painted(edited, video_edited[-1] + 1, edited.width())

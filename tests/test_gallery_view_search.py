@@ -24,17 +24,16 @@ from origenerator import (
 )
 from origenerator.gallery.collection import (
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE, SIDE_LABELS
+from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
     _NO_MOD,
     FakeDB,
     _alls,
     _at,
-    _bin_db,
     _children_by_prompt,
     _collection,
     _i2v_video,
@@ -50,6 +49,7 @@ from tests.gallery_view_support import (
     _subs,
     _tab_with_prompts,
     _top_level,
+    _trash_db,
     _video_workflow,
 )
 from tests.text_readers import clip_reader
@@ -79,7 +79,7 @@ def _find_next(view):
     step.click()
 
 
-def test_search_fills_the_browser_pane_with_the_matching_generations(qtbot):
+def test_search_fills_the_gallery_pane_with_the_matching_generations(qtbot):
     # The whole point of moving the search off the tree: the answer is the
     # thumbnails themselves, in the middle pane, not a narrowed list of folder
     # names whose labels are truncated prompt headlines.
@@ -91,7 +91,7 @@ def test_search_fills_the_browser_pane_with_the_matching_generations(qtbot):
     _search_for(view, "cat")
 
     assert view.listed_prompt_ids() == ["i1"]
-    assert view._browser.showing_search()
+    assert view._gallery_pane.showing_search()
 
 
 def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
@@ -129,7 +129,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     view._search.field.setText("")
 
     assert view.listed_prompt_ids() == ["i2"]   # back in the folder that was open
-    assert not view._browser.showing_search()
+    assert not view._gallery_pane.showing_search()
 
 
 def test_the_tree_selection_is_what_the_search_covers(qtbot):
@@ -161,7 +161,7 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
     assert view._search.field.text() == "cat"
-    assert view._browser.showing_search()
+    assert view._gallery_pane.showing_search()
     assert view.listed_prompt_ids() == ["i1"]
 
 
@@ -220,13 +220,13 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
 
     assert view.listed_prompt_ids() == ["i1"]
     assert view._search.field.placeholderText() == (
-        f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest…")
+        f"Search {SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest…")
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
-    # A deleted row is out of the gallery's own list and lives only in the bin,
-    # so a Trash search finds nothing at all unless the bin is indexed too.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    # A deleted row is out of the gallery's own list and lives only in the Trash,
+    # so a Trash search finds nothing at all unless the Trash is indexed too.
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -238,9 +238,9 @@ def test_the_trash_collection_searches_what_it_is_holding(qtbot):
 
 
 def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
-    # The bin shares the index so its collection can be searched; it must not leak
+    # The Trash shares the index so its collection can be searched; it must not leak
     # into a search of the gallery, where those items are gone.
-    view = GalleryView(_bin_db(rows=[_image("i1", "a dog", 50, 3)],
+    view = GalleryView(_trash_db(rows=[_image("i1", "a dog", 50, 3)],
                                held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -259,21 +259,21 @@ def test_the_field_says_what_it_would_search(qtbot):
     qtbot.addWidget(view)
     view._search.field.setFixedWidth(2000)  # room for any path, so nothing elides
     view.refresh()
-    # The side is part of the path: an All row is one half of the library.
+    # The shape is part of the path: an All row is one half of the library.
     assert view._search.field.placeholderText() == "Search Landscape  ›  All…"
 
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
-    assert view._search.field.placeholderText() ==         f"Search {view._tree_view.breadcrumb(videos)}…"
+    assert view._search.field.placeholderText() ==         f"Search {view._tree_view.folder_path(videos)}…"
 
     leaf = _at(videos, 0, 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     placeholder = view._search.field.placeholderText()
-    assert placeholder == f"Search {view._tree_view.breadcrumb(leaf)}…"
+    assert placeholder == f"Search {view._tree_view.folder_path(leaf)}…"
     assert leaf.text(0) in placeholder      # right down to the folder itself
     assert videos.text(0) in placeholder    # and every branch above it
 
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert view._search.field.placeholderText() == "Search Landscape  ›  All  ›  Latest…"
 
 
@@ -349,7 +349,7 @@ def test_search_stays_applied_across_a_rebuild(qtbot):
 
     # The results are still on screen, and the newcomer joined them.
     assert set(view.listed_prompt_ids()) == {"i1", "i3"}
-    assert view._browser.showing_search()
+    assert view._gallery_pane.showing_search()
 
 
 def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
@@ -467,14 +467,14 @@ def test_search_matches_a_generation_by_its_lora(qtbot):
 
 
 def _section_headers(view):
-    """The fold headers of the open search's model + LoRA bands, in shown order."""
+    """The fold headers of the open search's model + LoRA sections, in shown order."""
     return [w for w in view._scroll.widget().findChildren(QPushButton)
             if w.objectName() == "tileGroupHeading"]
 
 
 def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     # The other question a search answers: not "where is it" but "which
-    # model and LoRA was that" — so the hits are cut into a labelled band per
+    # model and LoRA was that" — so the hits are cut into a labelled section per
     # model + LoRA combination instead of interleaved.
     rows = [_i2v_video("v1", "styleA", prompt="a cat indoors"),
             _i2v_video("v2", "styleA", prompt="a cat outdoors"),
@@ -490,7 +490,7 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     assert len(headings) == 2
     assert any("styleA" in h and h.endswith("(2)") for h in headings)
     assert any("styleB" in h and h.endswith("(1)") for h in headings)
-    assert headings[0].endswith("(2)")   # the bigger band leads
+    assert headings[0].endswith("(2)")   # the bigger section leads
 
 
 def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
@@ -513,18 +513,18 @@ def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
     _search_for(view, "cat")
     view.set_search_sort(search.SORT_MODEL_LORA)
     header = _section_headers(view)[0]
-    band = view._scroll.widget().layout().itemAt(1).widget()
-    assert band.isVisible() or not view.isVisible()  # laid out open to begin with
+    section = view._scroll.widget().layout().itemAt(1).widget()
+    assert section.isVisible() or not view.isVisible()  # laid out open to begin with
 
     header.click()
 
-    assert band.isHidden()
+    assert section.isHidden()
     assert header.fold == "chevron_right"   # and the chevron says so
 
 
 def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     # A rebuild, a landing generation or a widening all redraw the pane; springing
-    # the bands you shut back open each time would make folding pointless.
+    # the sections you shut back open each time would make folding pointless.
     db = FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
                  _i2v_video("v2", "styleB", prompt="a cat")])
     view = GalleryView(db)
@@ -616,7 +616,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
 
     assert view.current_group() is None
     assert view._current_deletable_folders() == []
-    assert not view._bank.auto.isVisible()
+    assert not view._buttons.auto.isVisible()
 
 
 def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
@@ -650,7 +650,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
     _search_for(view, "cat")
 
     assert view.listed_prompt_ids() == []       # no loose thumbnails...
-    assert len(view._browser._listed_folders) == 1  # ...one folder standing for all three
+    assert len(view._gallery_pane._listed_folders) == 1  # ...one folder standing for all three
     assert "1 result" in view._search._count.text()
 
 
@@ -665,7 +665,7 @@ def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
     _search_for(view, "cat")
 
     assert view.listed_prompt_ids() == ["i1"]
-    assert view._browser._listed_folders == []
+    assert view._gallery_pane._listed_folders == []
 
 
 def test_opening_a_result_folder_puts_the_search_away(qtbot):
@@ -674,12 +674,12 @@ def test_opening_a_result_folder_puts_the_search_away(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    (key,) = view._browser._listed_folders
+    (key,) = view._gallery_pane._listed_folders
 
-    view._browser._drill_into(key)   # the path a folder tile's click takes
+    view._gallery_pane._drill_into(key)   # the path a folder tile's click takes
 
     assert view._search.field.text() == ""
-    assert not view._browser.showing_search()
+    assert not view._gallery_pane.showing_search()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}  # standing in the folder
 
 
@@ -693,7 +693,7 @@ def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
 
     view._search.field.setText("cat")
 
-    assert not view._browser.showing_search()   # typed, not yet searched
+    assert not view._gallery_pane.showing_search()   # typed, not yet searched
     assert view._search._timer.isActive()
 
     view._search._timer.stop()
@@ -714,13 +714,13 @@ def test_a_query_under_three_characters_searches_nothing(qtbot):
     view._search.field.setText("ca")
 
     assert not view._search._timer.isActive()
-    assert not view._browser.showing_search()
+    assert not view._gallery_pane.showing_search()
 
     _search_for(view, "cat")
-    assert view._browser.showing_search()
+    assert view._gallery_pane.showing_search()
 
     view._search.field.setText("ca")   # back under the floor: the search is over
-    assert not view._browser.showing_search()
+    assert not view._gallery_pane.showing_search()
 
 
 def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
@@ -735,7 +735,7 @@ def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
     _search_for(view, "cat")
 
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["i1", "i2"]
-    assert "these results" in view._bank.slideshow.toolTip()
+    assert "these results" in view._buttons.slideshow.toolTip()
 
 
 def test_ctrl_f_opens_the_find_over_the_front_tabs_prompts(qtbot, tmp_path, monkeypatch):
@@ -848,15 +848,15 @@ def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, 
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     first = _tab_with_prompts(view)
     first.prompt_fields()[0].setPlainText("a cat")
-    view._info_tabs._add_subtab()          # a second tab, its prompts still empty
+    view._generate_pane._add_subtab()          # a second tab, its prompts still empty
     second = _tab_with_prompts(view)
     second.prompt_fields()[0].setPlainText("a cat and a cat")
-    view._info_tabs.setCurrentWidget(first)
+    view._generate_pane.setCurrentWidget(first)
     _press_ctrl_f(view, monkeypatch)
     _find_query(view).setText("cat")
     assert _find_count(view) == "1 of 1"
 
-    view._info_tabs.setCurrentWidget(second)
+    view._generate_pane.setCurrentWidget(second)
 
     assert _find_count(view) == "1 of 2"
     assert not first.prompt_fields()[0].extraSelections()  # the old tab's paint is gone
@@ -870,7 +870,7 @@ def test_closing_the_searched_tab_puts_an_open_find_away(qtbot, tmp_path, monkey
     _press_ctrl_f(view, monkeypatch)
     assert view._find_bar.isVisible()
 
-    view._info_tabs._close_subtab(view._info_tabs.currentIndex())
+    view._generate_pane._close_subtab(view._generate_pane.currentIndex())
 
     assert not view._find_bar.isVisible()
 
@@ -881,7 +881,7 @@ def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front
     searched = _tab_with_prompts(view).prompt_fields()
     _press_ctrl_f(view, monkeypatch)
     view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
-    view._info_tabs._close_subtab(view._info_tabs.currentIndex())
+    view._generate_pane._close_subtab(view._generate_pane.currentIndex())
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(sip.isdeleted(field) for field in searched)
     in_front = _tab_with_prompts(view)
@@ -898,10 +898,10 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
     searched = _tab_with_prompts(view).prompt_fields()
     _press_ctrl_f(view, monkeypatch)
 
-    panel = _tab_with_prompts(view, "flux_t2i_upscaled")
+    tab = _tab_with_prompts(view, "flux_t2i_upscaled")
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(sip.isdeleted(field) for field in searched)
-    panel.prompt_fields()[0].setPlainText("a cat and a cat")
+    tab.prompt_fields()[0].setPlainText("a cat and a cat")
 
     _find_query(view).setText("cat")
     _find_next(view)

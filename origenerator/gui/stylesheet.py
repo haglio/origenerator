@@ -100,7 +100,7 @@ def build_stylesheet() -> str:
     QLabel {{
         color: {_h(TEXT_SECONDARY)};
     }}
-    /* A scene card's heading: set off from the form's keys around it, the way
+    /* A scene's heading: set off from the form's keys around it, the way
        a section's header is, so a story reads as scenes and not as more keys. */
     QLabel#sceneTitle {{
         color: {_h(TEXT_PRIMARY)};
@@ -325,7 +325,7 @@ def build_stylesheet() -> str:
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
-    /* A tab's close button, and a scene card's remove. Flat and bare, because
+    /* A tab's close button, and a scene's remove. Flat and bare, because
        all it is is the family's cross sitting on the tab: the default QToolButton
        look would wrap it in a raised, rounded, bordered frame that looks nothing
        like a tab's mark. */
@@ -358,7 +358,7 @@ def build_stylesheet() -> str:
         font-weight: bold;
         padding: {GAP_SMALL}px 0;
     }}
-    /* The fold header over each model+LoRA band of search results, and the
+    /* The fold header over each model+LoRA section of search results, and the
        time heading over each batch of tiles. Brighter
        than the muted captions and ruled off above, so it reads as the start of
        a section rather than as a label belonging to the tiles before it; left
@@ -376,7 +376,7 @@ def build_stylesheet() -> str:
     QPushButton#tileGroupHeading:hover {{
         color: {_h(BLUE)};
     }}
-    /* The picked row in the table of contents, marked by its ground alone.
+    /* The picked row in the tree of contents, marked by its ground alone.
        Left to the platform, a picked row also wears an accent bar down its left
        edge, which lands on the mark the row leads with and says nothing the
        blue ground has not said already. Naming the ground here is what takes a
@@ -402,20 +402,20 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
         font-weight: bold;
     }}
-    QLabel#dropSlot {{
+    QLabel#dropZone {{
         border: 1px dashed {_h(BORDER_PANEL)};
         border-radius: {drop_style.RADIUS}px;
         color: {_h(TEXT_MUTED)};
         padding: {MARGIN_STANDARD}px;
     }}
-    QLabel#dropSlot[{drop_style.LIT}="true"], QLabel#dropSlot[{drop_style.AIMED}="true"] {{
+    QLabel#dropZone[{drop_style.LIT}="true"], QLabel#dropZone[{drop_style.AIMED}="true"] {{
         border: 1px solid {_h(drop_style.EDGE)};
         color: {_h(TEXT_PRIMARY)};
     }}
     /* What fills a pane that takes drops is clear, so the pane's own ground
        shows through it when the drop zones' style lights the pane. */
-    BrowserScrollArea > QWidget#qt_scrollarea_viewport > .QWidget,
-    QWidget#enhancePanel .QWidget, QWidget#enhancePanel QLabel,
+    GalleryPaneScrollArea > QWidget#qt_scrollarea_viewport > .QWidget,
+    QWidget#enhancePane .QWidget, QWidget#enhancePane QLabel,
     QScrollArea#enhanceSettings {{
         background-color: transparent;
     }}{drop_style.ground_rules()}

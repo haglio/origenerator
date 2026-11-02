@@ -10,7 +10,7 @@ from tests.running_ahead_support import record_the_app_running_ahead
 
 class FakePlayer:
     """Only exposes position() — the driver follows the playhead and doesn't gate
-    on QMediaPlayer's playback state (the info-pane preview auto-plays and has no
+    on QMediaPlayer's playback state (the Generate pane preview auto-plays and has no
     pause control; the Drive OSR2 button is the on/off)."""
 
     def __init__(self, pos=0):
@@ -43,7 +43,7 @@ def test_poll_drives_from_the_playhead_without_a_playback_state(qapp):
     assert broker.positions == [(100, 500)]  # from the floor, head to the top at 500 ms
 
 
-def test_poll_wraps_position_onto_a_looping_clip(qapp):
+def test_poll_wraps_position_onto_a_looping_video(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
     # The preview loops, so a position past the script length maps back onto it.
@@ -96,7 +96,7 @@ def test_it_says_whether_it_has_the_device(qapp):
 
 
 def test_the_line_it_draws_is_the_script_from_the_playhead_forward(qapp):
-    """What the console draws in the motion's place while a script has the
+    """What the OSR2 controls draw in the motion's place while a script has the
     device: where the script puts it now, and where it is about to."""
     driver = Osr2Driver(broker=FakeBroker())
     driver.start(FakePlayer(pos=0), ACTIONS)

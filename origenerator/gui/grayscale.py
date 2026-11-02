@@ -1,6 +1,6 @@
 """Drain the color out of a thumbnail shown only for what it configures.
 
-A video dropped into the combine panel is not what is being made — it is the
+A video dropped into the Combine is not what is being made — it is the
 video whose settings the run will follow. In full color beside the frame it will animate it
 reads as a second subject, and a queue row showing it alone reads as a job that
 is that video. Gray says outright that it is a setting rather than a result, so

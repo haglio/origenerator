@@ -3,13 +3,13 @@ from __future__ import annotations
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QSizePolicy
 
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.no_wheel import NoWheelDropdown
 
 HOW_MANY = (1, 2, 4, 8, 16, 32)
 _HOW_MANY_TIP = "How many to make at once, each with its own seed"
 
 
-class HowManyPicker(NoWheelComboBox):
+class HowManyDropdown(NoWheelDropdown):
     chosen = pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -28,7 +28,7 @@ class HowManyPicker(NoWheelComboBox):
 
 
 class GenerateWithHowMany(QFrame):
-    def __init__(self, generate: QPushButton, how_many: HowManyPicker, parent=None):
+    def __init__(self, generate: QPushButton, how_many: HowManyDropdown, parent=None):
         super().__init__(parent)
         self.setObjectName("generateWithHowMany")
         self._how_many = how_many

@@ -4,7 +4,7 @@ A room in the headset has no monitor to put the gallery on, so the session asks
 for its frame instead (``origenerator.fun_time_mode``): every frame goes into
 a memory-mapped file the session names, the session draws it on a screen in the
 room, and its pointer's presses come back through a file as the words that
-module declares.  The same handover Fun Time's own library browser is shown by.
+module declares.  The same handover Fun Time's own Random Favs Browser is shown by.
 
 The pure half is here and is what the tests drive; the Qt half is the timer, the
 grab and the synthesized events.
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 _POLL_MS = 15
 
-#: Nothing asked for, nothing moving: a look this often is enough to notice a
+#: Nothing asked for, nothing moving: a look this often is enough to catch a
 #: tooltip or a spinner, and costs a grab of a window nobody is touching.
 _IDLE_LOOK_S = 0.1
 

@@ -2,7 +2,7 @@
 
 An enhancement is not a generation of its own: its result is an upgraded layer
 on an existing image. The standalone ``image_enhance`` workflow is machinery —
-its job runs under a transient row (so in-flight cards and restart reconnection
+its job runs under a transient row (so in-flight tiles and restart reconnection
 work), and the moment it completes :func:`fold_enhancement` moves its output
 onto the source row: the source keeps its folder, star and identity, its
 thumbnail and preview become the enhanced pixels, its pre-enhance file stays
@@ -11,7 +11,7 @@ listed (and on disk) as the original, and the transient row is deleted.
 completions that landed while the app was closed — and retroactively converting
 older rows recorded as ``image_enhance`` generations.
 
-:func:`disown_foreign_runs` is the third, and repairs the one thing a level can
+:func:`disown_foreign_runs` is the third, and repairs the one thing a version can
 carry that is not its own: a run id from a database that was never this one.
 
 **This module is the whole of the gallery package's persistence.** Everything
@@ -21,7 +21,7 @@ them; only these functions take a database and change what is in it, and
 the gallery can alter has one file to read, and a caller wanting the pure half
 can have it without a database at all.
 
-Its own home is beside the other top-level modules that touch the database
+Its own home is beside the other top-version modules that touch the database
 rather than inside this package, which would leave the gallery free of
 persistence outright — that move is the second half of the audit's
 `E_workflows_gallery_voice/design/002` and belongs with the root package's own
@@ -36,12 +36,12 @@ from pathlib import Path
 
 from origenerator.file_refs import reference_path
 from origenerator.gallery.enhance import (
-    enhance_level_params,
     enhance_target_id,
+    enhance_version_params,
     is_enhance_product_row,
     moves_its_image,
 )
-from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, level_settings
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, version_settings
 from origenerator.gallery.output import (
     media_type_of_row,
     parse_file_list,
@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list[dict]:
     """One ``enhance_history`` entry per file this enhance produced: the file's
-    name, the settings that made it — so a level can name its own settings even
+    name, the settings that made it — so a version can name its own settings even
     after the transient job row is gone — and ``run_id`` and ``finished_at``,
     the id that row had and when its run finished.
 
@@ -66,7 +66,7 @@ def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list
     said where this enhancement falls in the library's order, and the image it
     upgraded sorts in the collection by the newest one it has received
     (:func:`enhancement_recency`)."""
-    settings = level_settings(params)
+    settings = version_settings(params)
     return [
         {"filename": f.get("filename"), "params": settings,
          "run_id": enhance_row.get("id") if moves_its_image(enhance_row) else None,
@@ -86,8 +86,8 @@ def fold_enhancement(db, enhance_row: dict,
     block, and no later import scan finds an orphan — and ``original_files``
     records what the row held before its first enhance, which is also what
     marks it enhanced. The settings this run used are appended to
-    ``enhance_history``, so the level it just added can be told apart from the
-    ones already there (:func:`enhance_levels`). Which folder it is in, star,
+    ``enhance_history``, so the version it just added can be told apart from the
+    ones already there (:func:`enhancement_versions`). Which folder it is in, star,
     params and identity are untouched: enhancing never moves or duplicates a
     node. The transient enhance row is deleted (row only — its file now
     belongs to the source).
@@ -119,7 +119,7 @@ def fold_enhancement(db, enhance_row: dict,
     updates = {
         "output_files": json.dumps(new_files + source_files),
         "enhance_history": json.dumps(
-            _history_entries(new_files, enhance_level_params(enhance_row), enhance_row)
+            _history_entries(new_files, enhance_version_params(enhance_row), enhance_row)
             + parse_file_list(source.get("enhance_history"))
         ),
     }
@@ -190,12 +190,12 @@ def enhancements_of_images_gone(rows, *, places: OutputPlaces, input_dir: Path) 
 
 
 def disown_foreign_runs(db) -> int:
-    """Take the run id off every enhance level naming a run this database never
+    """Take the run id off every version naming a run this database never
     made, and say how many rows that repaired.
 
-    A level records the id of the transient row its enhancement ran under
-    (:func:`_history_entries`), and the Recents collection seats an enhanced image by
-    that number wherever the level does not also say when the run finished — the
+    A version records the id of the transient row its enhancement ran under
+    (:func:`_history_entries`), and the Latest collection seats an enhanced image by
+    that number wherever the version does not also say when the run finished — the
     image belongs where its newest enhancement falls in the library's order, not
     where its own generation does. So an id from somewhere else seats the image
     somewhere meaningless.
@@ -214,7 +214,7 @@ def disown_foreign_runs(db) -> int:
     which counts the rows that have been and gone — an enhancement deletes its
     own row the moment it folds, so an id missing from the table is the ordinary
     case and proves nothing). One at or below the mark is left alone: it may well
-    name a run this library really made, and a level's place in the order is not
+    name a run this library really made, and a version's place in the order is not
     worth guessing at.
     """
     ceiling = db.highest_id_issued()
@@ -222,15 +222,15 @@ def disown_foreign_runs(db) -> int:
         return 0
     repaired = 0
     for row in db.list_generations():
-        levels = parse_file_list(row.get("enhance_history"))
+        versions = parse_file_list(row.get("enhance_history"))
         owned = [
-            {**level, "run_id": None}
-            if isinstance(level, dict) and isinstance(level.get("run_id"), int)
-            and level["run_id"] > ceiling
-            else level
-            for level in levels
+            {**version, "run_id": None}
+            if isinstance(version, dict) and isinstance(version.get("run_id"), int)
+            and version["run_id"] > ceiling
+            else version
+            for version in versions
         ]
-        if owned != levels:
+        if owned != versions:
             db.update_generation(row["prompt_id"], enhance_history=json.dumps(owned))
             repaired += 1
     if repaired:

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # How many experiments one absence gets. ComfyUI runs them back to back with
 # nobody watching, so this is the whole night's output — and every one comes back
-# as a card to review, so a bigger batch buys more results at the price of a
+# as a tile to review, so a bigger batch buys more results at the price of a
 # longer collection. Enough to fill an evening, few enough to review in a sitting.
 BATCH_SIZE = 8
 # Consecutive launches that didn't take before the batch is abandoned. A refused

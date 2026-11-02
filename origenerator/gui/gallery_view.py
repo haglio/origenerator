@@ -25,8 +25,8 @@ from shared_ui.tick_control import TickControl
 from origenerator import (
     gallery,
     outside_videos,
-    recovery,
     timing,
+    trash_collection,
 )
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
@@ -50,44 +50,35 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
-    RECENTS_KEY as _RECENTS_KEY,
+    LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     LANDSCAPE as _LANDSCAPE,
 )
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     SEPARATE as _SEPARATE,
 )
-from origenerator.gallery.sides import (
+from origenerator.gallery.shapes import (
     TOGETHER as _TOGETHER,
 )
-from origenerator.gallery.sides import (
-    side_covers as _side_covers,
+from origenerator.gallery.shapes import (
+    shape_covers as _shape_covers,
 )
-from origenerator.gallery.sides import (
-    side_holding as _side_holding,
+from origenerator.gallery.shapes import (
+    shape_holding as _shape_holding,
 )
-from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
+from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
     randomize_seeds,
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, omnipause
+from origenerator.gui import corner_buttons, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
-from origenerator.gui.browser_pane import (
-    REROLL_VIDEO,
-    BrowserPane,
-    BrowserScrollArea,
-    LeadTiles,
-    PaneHost,
-    TreeNavigation,
-    play_once_made,
-)
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
@@ -95,10 +86,26 @@ from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS, EnhanceController, Offer
 from origenerator.gui.folder_modify_tile import FolderModifyTile
-from origenerator.gui.folder_path_header import FolderPathHeader
+from origenerator.gui.folder_path import FolderPath
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.folder_tree import offer_collapse_and_expand
 from origenerator.gui.gallery_navigation import NavigationController
+from origenerator.gui.gallery_pane import (
+    REROLL_VIDEO,
+    GalleryPane,
+    GalleryPaneScrollArea,
+    LeadTiles,
+    PaneHost,
+    TreeNavigation,
+    play_once_made,
+)
+from origenerator.gui.gallery_pane_buttons import (
+    AUTO_ELSEWHERE_TIP,
+    Button,
+    ButtonActs,
+    ButtonStates,
+    GalleryPaneButtons,
+)
 from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
@@ -106,9 +113,10 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_tree import (
     GalleryTree,
     PathStep,
-    SideModel,
+    ShapeModel,
     path_text,
 )
+from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.how_many import HOW_MANY
@@ -123,50 +131,42 @@ from origenerator.gui.inflight import (
     stop_auto_generate_text,
     stop_auto_generate_tooltip,
 )
-from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
+from origenerator.gui.message import ERROR, HEARD_MARK, INFO
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.moving_previews import MovingPreviews
-from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE
+from origenerator.gui.new_tile import NewTile
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
+from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
-from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.starting_rows import StartingRows
-from origenerator.gui.toolbar_bank import (
-    AUTO_ELSEWHERE_TIP,
-    BankActs,
-    BankState,
-    Button,
-    ToolbarBank,
-)
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.item_names import ItemNames
-from origenerator.media import MediaType
-from origenerator.orientation import (
+from origenerator.item_shape import (
     base_of as _base_of,
 )
-from origenerator.orientation import (
+from origenerator.item_shape import (
     filter_rows,
-    oriented_key,
-    requested_orientation,
-    row_orientation,
+    requested_shape,
+    row_shape,
+    shaped_key,
 )
-from origenerator.orientation import (
-    side_of as _side_of,
+from origenerator.item_shape import (
+    shape_of as _shape_of,
 )
-from origenerator.orientation import (
+from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
+from origenerator.media import MediaType
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
@@ -199,7 +199,7 @@ _SEARCH_MIN_CHARS = 3
 
 
 class _SearchScope(NamedTuple):
-    """What a search covers: the selected row's breadcrumb and the generations it
+    """What a search covers: the selected row's folder path and the generations it
     holds (``None`` for no restriction at all).
 
     The path rather than the folder's own name, everywhere it is said: a folder
@@ -232,7 +232,7 @@ def _offer_taking_out(menu: QMenu, open_custom, group):
 
 
 def _row_under(row, folder_key: str):
-    if row is None or _side_of(folder_key) is not None:
+    if row is None or _shape_of(folder_key) is not None:
         return None
     return next((child for child in (row.child(i) for i in range(row.childCount()))
                  if _base_of(child.data(0, _TREE_KEY_ROLE)) == folder_key), None)
@@ -240,15 +240,15 @@ def _row_under(row, folder_key: str):
 
 def _folder_of_your_own_above(rows):
     parent = rows[0].parent()
-    return _saved_custom_folder(parent.data(0, _GROUP_ROLE)) if parent is not None else None
+    return _saved_custom_collection(parent.data(0, _GROUP_ROLE)) if parent is not None else None
 
 
-def _saved_custom_folder(group):
-    return group if isinstance(group, gallery.CustomGroup) and group.folder_id is not None else None
+def _saved_custom_collection(group):
+    return group if isinstance(group, gallery.CustomCollection) and group.folder_id is not None else None
 
 
 def _takes_a_favorite(group) -> bool:
-    return group is not None and not isinstance(group, gallery.CustomGroup)
+    return group is not None and not isinstance(group, gallery.CustomCollection)
 
 
 def _offer_copy_names_above_a_line(menu: QMenu, names: list[str]) -> None:
@@ -271,10 +271,10 @@ def _is_deletable_folder(group) -> bool:
 
     Model, LoRA, source-image, and settings folders live within a workflow folder
     and are fair game; a whole workflow or media folder is off-limits, so a
-    workflow's entire history can never be wiped in one action. A custom folder is
+    workflow's entire history can never be wiped in one action. A custom collection is
     off-limits too, and for a stronger reason: deleting one must remove the
     grouping, never the generations it gathers, so it has its own path
-    (:meth:`GalleryView._remove_custom_folder`) rather than this one.
+    (:meth:`GalleryView._remove_custom_collection`) rather than this one.
     """
     return isinstance(
         group,
@@ -283,15 +283,15 @@ def _is_deletable_folder(group) -> bool:
 
 
 class GalleryView(QWidget):
-    # A run ended, as one :class:`~origenerator.run_notice.RunOutcome`. The view
+    # A run ended, as one :class:`~origenerator.run_toast.RunOutcome`. The view
     # has nowhere left to draw that news — the run's tile went with it — so it
     # passes it out to the window, which owns the tray icon Windows' own
-    # notifications come from (:mod:`origenerator.gui.desktop_notices`).
+    # toasts come from (:mod:`origenerator.gui.toasts`).
     run_ended = pyqtSignal(object)
 
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
-                 actions: GalleryActions | None = None,
+                 actions: GalleryEdits | None = None,
                  osr2_motion: Osr2MotionDriver | None = None,
                  radio: OrigeneratorRadio | None = None,
                  search_expander: SearchExpander | None = None,
@@ -307,7 +307,7 @@ class GalleryView(QWidget):
         # the layout goes vertical, the fullscreen surfaces land on the satellite
         # regions, and the OSR2 is Fun Time's alone (see origenerator.fun_time_mode).
         self._fun_time = fun_time
-        # Origenerator Radio, under the toolbar's switch of that name: several
+        # Origenerator Radio, under the Gallery pane buttons' switch of that name: several
         # library videos at once, sound only. Injectable so tests never open a
         # real engine. Built before _build_ui, whose switch drives it.
         self._radio = radio if radio is not None else OrigeneratorRadio()
@@ -341,36 +341,36 @@ class GalleryView(QWidget):
         # stopping the motion is something it does, not something it reacts to.
         self._reconciling_osr2 = False
         self._build_the_queue_of_runs(db, client)
-        self._actions = actions or GalleryActions(
+        self._edits = actions or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
             ),
         )
-        self._moving_previews = MovingPreviews(self._actions.places,
-                                               self._actions.thumb_dir, parent=self)
+        self._moving_previews = MovingPreviews(self._edits.places,
+                                               self._edits.thumb_dir, parent=self)
         self._moving_previews.made.connect(
-            lambda prompt_id, path: play_once_made(self._browser, prompt_id, path))
+            lambda prompt_id, path: play_once_made(self._gallery_pane, prompt_id, path))
         self._forget_the_listing()
         self._build_the_panes(db, client, search_expander)
         # What another app has on the shared ComfyUI, re-read on every poll so the
         # lower bar can say the server is busy before a Generate goes in after it.
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
-        self._voice.bind_the_bank(
-            auto=self._bank.auto, radio=self._bank.radio,
+        self._voice.bind_the_buttons(
+            auto=self._buttons.auto, radio=self._buttons.radio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
-            mic=self._bank.mic,
-            enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
+            mic=self._buttons.mic,
+            enhance=(self._buttons.enhance, self._enhance.enhance_the_selection),
             actions={
-                AppCommand.BACK: (self._bank.back, self._navigation.go_back),
-                AppCommand.FORWARD: (self._bank.forward, self._navigation.go_forward),
-                AppCommand.CULL: (self._bank.delete, self._delete_selection),
-                AppCommand.FAVORITE: (self._bank.favorite, self._favorite_selection),
-                AppCommand.UNDO: (self._bank.undo, self._undo),
-                AppCommand.REDO: (self._bank.redo, self._redo),
-                AppCommand.GROUP: (self._bank.group, self._group_selection),
+                AppCommand.BACK: (self._buttons.back, self._navigation.go_back),
+                AppCommand.FORWARD: (self._buttons.forward, self._navigation.go_forward),
+                AppCommand.CULL: (self._buttons.delete, self._delete_selection),
+                AppCommand.FAVORITE: (self._buttons.favorite, self._favorite_selection),
+                AppCommand.UNDO: (self._buttons.undo, self._undo),
+                AppCommand.REDO: (self._buttons.redo, self._redo),
+                AppCommand.GROUP: (self._buttons.group, self._group_selection),
             },
         )
         self._re_aim()
@@ -419,13 +419,13 @@ class GalleryView(QWidget):
         # tile lit in the middle column), and that tile. Which tab shows the
         # run's frames full size is the tabs' own affair: a tab follows the
         # folder it launched into or was pointed at (see
-        # :meth:`GenerateConfigPanel.watch_folder`), and the frames are routed
+        # :meth:`GenerateTab.watch_folder`), and the frames are routed
         # to it by folder key, never to "the tab in front".
         self._selected_reroll_key: str | None = None
         self._generating_tile: GeneratingTile | None = None
 
     def _forget_the_listing(self):
-        """Empty every slot a rebuild fills in.
+        """Empty every place a rebuild fills in.
 
         Called once at construction and never again: a rebuild replaces what is
         here rather than clearing it first, so these are the values a gallery has
@@ -442,7 +442,7 @@ class GalleryView(QWidget):
 
     def _build_the_panes(self, db, client, search_expander):
         """The three panes' own objects, in the order they need each other: the
-        search over the tree, the browser in the middle, the trail across both,
+        search over the tree, the Gallery pane in the middle, the trail across both,
         then the slideshows, the combine, the enhance and the spoken words that all
         read those.
 
@@ -455,20 +455,20 @@ class GalleryView(QWidget):
         # are built before _build_ui, whose field drives them.
         self._search = GallerySearchController(
             self, parent=self, expander=search_expander)
-        # The held deletions the Trash collection lists, as gallery rows re-pointed at
+        # The trashed items the Trash collection lists, as gallery rows re-pointed at
         # their files in the trash — the rows under everything a deleted item can
         # still do (see :meth:`row_for`).
         self._held_rows: list[dict] = []
-        self._selected_row: dict | None = None  # the saved generation on display in the info pane
+        self._selected_row: dict | None = None  # the saved generation on display in the Generate pane
         self._item_names = ItemNames(db)
-        # The browser pane renders the middle column (tiles / thumbnails / collections)
-        # and owns the thumbnail multi-selection and in-flight cards. Its signals
+        # The Gallery pane renders the middle column (tiles / thumbnails / collections)
+        # and owns the thumbnail multi-selection and in-flight tiles. Its signals
         # carry every gesture made on a tile; the handlers here answer them. The
         # scroll area is its canvas — built here so it can be handed over, placed
         # into the layout by _build_ui.
-        self._scroll = BrowserScrollArea()
-        DropTarget(self._scroll, self._landing_in_the_open_custom_folder, self._on_dropped)
-        self._browser = BrowserPane(
+        self._scroll = GalleryPaneScrollArea()
+        DropTarget(self._scroll, self._landing_in_the_open_custom_collection, self._on_dropped)
+        self._gallery_pane = GalleryPane(
             self._scroll, db, self._jobs, self._auto,
             TreeNavigation(
                 selected_folder_key=self.selected_folder_key,
@@ -488,21 +488,21 @@ class GalleryView(QWidget):
                 item_name=self._item_names.of,
             ),
         )
-        self._browser.pane_reset.connect(self._forget_generating_tile)
-        self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
-        self._browser.tab_pin_requested.connect(self.pin_config_tab)
-        self._browser.item_jump_requested.connect(self.follow_link)
-        self._browser.folder_open_requested.connect(self._go_to_folder)
-        self._browser.reveal_reroll_requested.connect(self._reveal_reroll)
-        self._browser.folder_menu_requested.connect(self._folder_context_menu)
-        self._browser.menu_requested.connect(self.generation_menu)
-        self._browser.trash_menu_requested.connect(self._trash_menu)
-        self._browser.item_action_triggered.connect(self.run_item_action)
-        self._browser.seed_reroll_requested.connect(self._reroll_item_seed)
-        self._browser.experiment_verdict.connect(self._on_experiment_verdict)
-        self._browser.trash_action_triggered.connect(self._on_trash_action)
-        self._browser.cancel_requested.connect(self._cancel_job)
-        self._browser.selection_changed.connect(self._re_aim)
+        self._gallery_pane.pane_reset.connect(self._forget_generating_tile)
+        self._gallery_pane.thumbnail_activated.connect(self._on_thumbnail_clicked)
+        self._gallery_pane.tab_pin_requested.connect(self.pin_generate_tab)
+        self._gallery_pane.item_jump_requested.connect(self.follow_link)
+        self._gallery_pane.folder_open_requested.connect(self._go_to_folder)
+        self._gallery_pane.reveal_reroll_requested.connect(self._reveal_reroll)
+        self._gallery_pane.folder_menu_requested.connect(self._folder_context_menu)
+        self._gallery_pane.menu_requested.connect(self.generation_menu)
+        self._gallery_pane.trash_menu_requested.connect(self._trash_menu)
+        self._gallery_pane.item_action_triggered.connect(self.run_item_action)
+        self._gallery_pane.seed_reroll_requested.connect(self._reroll_item_seed)
+        self._gallery_pane.experiment_verdict.connect(self._on_experiment_verdict)
+        self._gallery_pane.trash_action_triggered.connect(self._on_trash_action)
+        self._gallery_pane.cancel_requested.connect(self._cancel_job)
+        self._gallery_pane.selection_changed.connect(self._re_aim)
         self._fingerprint = (None, None)
         self._folder_meta: dict = {}
         self._drawn_version = 0
@@ -513,54 +513,54 @@ class GalleryView(QWidget):
         self._pending_combine_key: str | None = None
         # The user's own folders, resolved against the live tree on each rebuild,
         # and the throwaway one a multi-selection stands up (None with 0 or 1 row
-        # picked). Both are CustomGroups, so the pane, breadcrumb, and slideshow
+        # picked). Both are CustomCollections, so the pane, folder path, and slideshow
         # treat them exactly as they treat a derived folder.
-        self._custom_folders: list = []
-        self._custom_folders_by_side: dict[str, list] = {}
+        self._custom_collections: list = []
+        self._custom_collections_by_shape: dict[str, list] = {}
         self._lists_built_from = None
-        self._lists_by_side: dict[str, list] = {}
+        self._lists_by_shape: dict[str, list] = {}
         self._start_frames: dict = {}
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
-        # What the trail allows right now, as it last told us: the bank is written
+        # What the trail allows right now, as it last told us: the Gallery pane buttons are written
         # from one state, so Back and Forward read it there rather than being set
         # on their own (see :meth:`nav_state_changed`).
         self._trail = (False, False)
         # The fullscreen slideshows: the one in front, the two a hosting session
         # runs on its satellite regions, and everything that keeps them
-        # current. Built after the browser it reads and before _build_ui,
+        # current. Built after the Gallery pane it reads and before _build_ui,
         # whose slideshow button starts one.
         self._slideshows = SlideshowDirector(
-            self, db=db, browser=self._browser, jobs=self._jobs,
+            self, db=db, gallery_pane=self._gallery_pane, jobs=self._jobs,
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
             names=self._item_names, radio=self._radio,
-            turn_the_radio_on=lambda: self._bank.turn_the_radio_on())
+            turn_the_radio_on=lambda: self._buttons.turn_the_radio_on())
         self._starting = StartingRows(self)
         self._starting.changed.connect(self._update_queue)
         # Combine: a video's settings run again on a dropped image, and the
         # spoken "animate as" that asks for the same thing out loud
-        # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
+        # (:mod:`origenerator.gui.combine_controller`). It builds its own tab,
         # which _build_ui places under the tree.
         self._combine = CombineController(
             self, parent=self, db=db, jobs=self._jobs, client=client,
-            info_tabs_of=lambda: self._info_tabs, slideshows=self._slideshows,
+            info_tabs_of=lambda: self._generate_pane, slideshows=self._slideshows,
             starting=self._starting, names=self._item_names)
-        # The standalone enhance: its settings panel, what the Enhance button
+        # The standalone enhance: its Enhance pane, what the Enhance button
         # would run on, and the live run's appearance on every surface showing
         # the image it improves
-        # (:mod:`origenerator.gui.enhance_controller`). It builds its own panel,
+        # (:mod:`origenerator.gui.enhance_controller`). It builds its own tab,
         # which _build_ui seats in the footer.
         self._enhance = EnhanceController(
-            self, db=db, jobs=self._jobs, browser=self._browser,
-            slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
+            self, db=db, jobs=self._jobs, gallery_pane=self._gallery_pane,
+            slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane)
         self._jobs.enhance_images_with(
             lambda image: self._enhance.enhance_items([image["prompt_id"]]))
         self._look_training = LookTrainingController(
-            self._jobs, panels=lambda: self._info_tabs.config_panels(),
-            show_panel=lambda panel: self._info_tabs.setCurrentWidget(panel), parent=self)
+            self._jobs, tabs=lambda: self._generate_pane.generate_tabs(),
+            show_tab=lambda tab: self._generate_pane.setCurrentWidget(tab), parent=self)
         # Everything spoken: the microphone, the caption that says what it heard,
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
-        # caption is placed by _build_ui, and the bank it presses is bound to it
+        # caption is placed by _build_ui, and the Gallery pane buttons it presses are bound to it
         # once _build_ui has built one.
         self._voice = VoiceRouter(self, parent=self, db=db, slideshows=self._slideshows,
                                   client=client, motion=self._osr2_motion,
@@ -621,11 +621,11 @@ class GalleryView(QWidget):
             # The OSR2 motion keys work right here in Core too — not
             # only in the fullscreen slideshow — whatever was clicked last, unless it
             # is a text field taking the key as a character.
-            if (self._gallery_owns_keys(even_from_the_info_pane=True)
+            if (self._gallery_owns_keys(even_from_the_generate_pane=True)
                     and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
                     and apply_motion_key(self._osr2_motion, event.key(),
                                          on_drive_toggle=self.toggle_osr2_drive)):
-                self._motion_panel.refresh()
+                self._osr2_controls.refresh()
                 return True
         # Not the base class's answer, which is this one anyway: this filter is
         # on the whole application, so it is handed events about objects that
@@ -656,19 +656,19 @@ class GalleryView(QWidget):
         active = QApplication.activeWindow()
         return active is not None and active is not self.window()
 
-    def _gallery_owns_keys(self, *, even_from_the_info_pane: bool = False) -> bool:
+    def _gallery_owns_keys(self, *, even_from_the_generate_pane: bool = False) -> bool:
         """True when a gallery key should act rather than pass through: the view
         is on screen, nothing else owns the keystroke (no dialog/popup and no other
         active window), and the focus isn't in a text field typing it. Delete and
-        Undo also yield to the info-pane config tabs, so editing a form cannot wipe
+        Undo also yield to the Generate pane Generate tabs, so editing a form cannot wipe
         a thumbnail; the device's keys are asked for even from there."""
         if not self.isVisible() or self._other_window_owns_keys():
             return False
         focus = QApplication.focusWidget()
         if isinstance(focus, _TEXT_FIELDS):
             return False
-        return even_from_the_info_pane or not (
-            focus is not None and self._info_tabs.isAncestorOf(focus))
+        return even_from_the_generate_pane or not (
+            focus is not None and self._generate_pane.isAncestorOf(focus))
 
     def _build_ui(self):
         """Put the three panes on screen, in the order their contents need.
@@ -681,10 +681,10 @@ class GalleryView(QWidget):
         """
         layout = QVBoxLayout(self)
         toc = self._build_toc_pane()
-        browser = self._build_browser_pane()
+        gallery_pane = self._build_gallery_pane()
         # The Job Queue under those two lists every generation in flight — the app hands
         # ComfyUI one at a time, so a batch of Generates is a queue — reachable
-        # from any folder or config tab. Fed on every rebuild and poll; a row
+        # from any folder or Generate tab. Fed on every rebuild and poll; a row
         # dragged to a new place asks the controller to re-line the queue. Its top
         # edge is this column's splitter handle, so a long queue can be dragged
         # open at the cost of the folder listing above it.
@@ -695,8 +695,8 @@ class GalleryView(QWidget):
         self._queue.start_now_requested.connect(self.start_now)
         self._queue.cancel_all_requested.connect(self.cancel_all)
         self._arrangement = PaneArrangement(
-            toc=toc, browser=browser, info_pane=self._build_info_pane(),
-            info_tabs=self._info_tabs, queue=self._queue)
+            toc=toc, gallery_pane=gallery_pane, generate_column=self._build_generate_pane(),
+            generate_pane=self._generate_pane, queue=self._queue)
         folded = self._fun_time is not None and not self._fun_time.in_a_headset
         layout.addWidget(self._arrangement.hosted() if folded
                          else self._arrangement.standalone(), 1)
@@ -705,18 +705,18 @@ class GalleryView(QWidget):
     def _build_toc_pane(self):
         """The left pane's sections: the OSR2 HUD of a window that drives the
         device, what voice heard, the search field over the folder list, and the
-        combine panel."""
+        Combine."""
         # The folder list: media -> workflow -> model -> LoRA -> [source image]
         # -> settings, the LoRA level collapsing to one "(no LoRA)" folder for a
         # LoRA-less workflow and the source-image level showing only for an
         # image-conditioned one.
-        # One tree per side, each under a standing label and each scrolling on
-        # its own: the table of contents exists once per side, and which one you
+        # One tree per shape, each under a standing label and each scrolling on
+        # its own: the tree of contents exists once per shape, and which one you
         # are in is what decides the screen a slideshow goes to.
-        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_folder_takes,
+        self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_collection_takes,
                                      takes_folder=self._collecting_row_takes_folder)
         self._tree.offer_separate_and_together(self._fun_time is None)
-        self._tree.sides_changed.connect(self._on_sides_changed)
+        self._tree.shapes_changed.connect(self._on_shapes_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
         self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
@@ -728,7 +728,7 @@ class GalleryView(QWidget):
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.dropped.connect(self._on_dropped)
         # What voice heard, the search field over the folder list, and the
-        # combine panel: three sections under handles of their own, the same
+        # Combine: three sections under handles of their own, the same
         # handle the folder list's own sections are parted by — so the sections
         # outside the list read as sections too rather than as loose rows above
         # and below it.
@@ -743,24 +743,24 @@ class GalleryView(QWidget):
         self._voice.caption_shown.connect(listening.setVisible)
         finding, toc_column = pane()
         # The gallery search: its field over the tree, its results bar over the
-        # browser pane below (:mod:`origenerator.gui.gallery_search`).
+        # Gallery pane below (:mod:`origenerator.gui.gallery_search`).
         toc_column.addWidget(self._search.field)
         toc_column.addWidget(self._tree, 1)  # the trees take this section's height
         combining, combining_column = pane()
-        combining_column.addWidget(self._combine.panel)
-        # With no ComfyUI there is nothing to combine, and the panel says so by
+        combining_column.addWidget(self._combine.widget)
+        # With no ComfyUI there is nothing to combine, and the tab says so by
         # hiding; its section says the same rather than framing the gap.
-        if self._combine.panel.isHidden():
+        if self._combine.widget.isHidden():
             combining.hide()
         sections = [listening, finding, combining]
-        self._motion_panel = None
+        self._osr2_controls = None
         self._motion_pane = None
         if self._osr2_motion is not None:
-            self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
-            self._motion_panel.setToolTip(f"{self._motion_panel.toolTip()} · Esc pauses")
+            self._osr2_controls = Osr2Controls(self._osr2_motion, control=self.osr2_control)
+            self._osr2_controls.setToolTip(f"{self._osr2_controls.toolTip()} · Esc pauses")
             hud_scroll = QScrollArea()
             hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            hud_scroll.setWidget(self._motion_panel)
+            hud_scroll.setWidget(self._osr2_controls)
             self._motion_pane, hud_column = pane()
             hud_column.addWidget(hud_scroll)
             sections.insert(0, self._motion_pane)
@@ -770,20 +770,20 @@ class GalleryView(QWidget):
         toc.setStretchFactor(sections.index(finding), 1)  # the folder list takes the height
         return toc
 
-    def _build_browser_pane(self):
-        """The middle pane: the folder's path, the button bank under it, the
+    def _build_gallery_pane(self):
+        """The middle pane: the folder's path, the Gallery pane buttons under it, the
         collection's own bars, and the flowing contents -- with the Enhance settings
         standing at its foot, under a handle of their own.
         """
-        browser, browser_column = pane()
-        self._folder_path = FolderPathHeader()
+        gallery_pane, gallery_column = pane()
+        self._folder_path = FolderPath()
         self._folder_path.folder_chosen.connect(self._go_to_folder)
-        browser_column.addWidget(self._folder_path)
-        # The button bank over this pane (:mod:`origenerator.gui.toolbar_bank`).
+        gallery_column.addWidget(self._folder_path)
+        # The Gallery pane buttons over this pane (:mod:`origenerator.gui.gallery_pane_buttons`).
         # It builds and lays out every button and is written from one state; what
-        # each button depends on is gathered in :meth:`bank_state`.
-        self._bank = ToolbarBank(
-            BankActs(
+        # each button depends on is gathered in :meth:`button_states`.
+        self._buttons = GalleryPaneButtons(
+            ButtonActs(
                 go_back=self._navigation.go_back,
                 go_forward=self._navigation.go_forward,
                 undo=self._undo,
@@ -800,7 +800,7 @@ class GalleryView(QWidget):
             ),
             hosted=self._fun_time is not None,
         )
-        browser_column.addWidget(self._bank)
+        gallery_column.addWidget(self._buttons)
         # The Experiments collection's controls: the background experimenter's on/off
         # switch and a one-line status. Rides under the header, and appears only
         # while that collection is open.
@@ -819,49 +819,49 @@ class GalleryView(QWidget):
         experiments_row.addStretch(1)
         self._experiments_bar.hide()  # shown only in the Experiments collection
         self._sync_experiments_bar()
-        browser_column.addWidget(self._experiments_bar)
-        browser_column.addWidget(self._search.bar)
+        gallery_column.addWidget(self._experiments_bar)
+        gallery_column.addWidget(self._search.bar)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
-        browser_column.addWidget(self._avg_label)
+        gallery_column.addWidget(self._avg_label)
         self._scroll.setWidgetResizable(True)
         # A click on the background between the tiles puts the selection down,
-        # as it does in a file browser — and here it is also the only way back
+        # as it does in a file manager — and here it is also the only way back
         # to aiming Favorite / Enhance / Delete at the whole folder once a tile has
         # been picked.
         self._scroll.background_clicked.connect(
-            self._browser.clear_thumbnail_selection)
-        browser_column.addWidget(self._scroll, 1)
-        # The foot of the center (browser) pane, under a handle of its own: what
+            self._gallery_pane.clear_thumbnail_selection)
+        gallery_column.addWidget(self._scroll, 1)
+        # The foot of the Gallery pane, under a handle of its own: what
         # an enhancement runs at — the Enhance All button, a single image's
-        # Enhance, and (with its tick on) each image the app newly generates.
+        # Enhance, and (with its checkbox on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
         # moment, not a property of the folder you happen to be standing in, so
         # it shows in the collections as readily as on a settings folder. Deliberately
         # not on the Generate form: every setting there picks the folder a run
         # lands in, and this one doesn't.
         enhance, enhance_column = pane()
-        enhance_column.addWidget(self._enhance.panel)
+        enhance_column.addWidget(self._enhance.pane)
         browsing = FootSplitter("browser_and_enhance")
-        browsing.addWidget(browser)
+        browsing.addWidget(gallery_pane)
         browsing.addWidget(enhance)
         browsing.setStretchFactor(0, 1)
         browsing.setStretchFactor(1, 0)
         return browsing
 
-    def _build_info_pane(self):
-        """The right pane: the tabbed workspace of generate panels, with the
-        find strip riding under it.
+    def _build_generate_pane(self):
+        """The right pane: the tabbed workspace of Generate tabs, with the
+        find bar riding under it.
         """
-        # Info pane: a tabbed workspace of identical editable generate panels
+        # Generate pane: a tabbed workspace of identical editable Generate tabs
         # (form + Generate). No special or permanent tab — the first opens on
         # construction, and more fork via the "+" or a thumbnail double-click, all
-        # sharing one run queue. Clicking a browser thumbnail loads that generation
+        # sharing one run queue. Clicking a Gallery pane thumbnail loads that generation
         # into a tab (its output in the preview, its settings in the form, a footer
-        # for its media type). Each panel's source-image link and animation clicks
+        # for its media type). Each tab's source-image link and animation clicks
         # surface here as a source link the view follows.
-        self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time,
+        self._generate_pane = GeneratePane(self._client, self._db, fun_time=self._fun_time,
                                        heights=self._prompt_heights, names=self._item_names,
                                        previews=self._moving_previews)
         # One OSR2 driver for the whole view, under the one global switch
@@ -871,22 +871,22 @@ class GalleryView(QWidget):
         # Switching tabs/videos or opening/closing a slideshow re-aims it; with
         # nothing to drive it stops. self._osr2_driving is the (video, player) currently
         # driven, so a redundant reconcile doesn't churn the device. Built before the
-        # panels are wired, since wiring connects their displayed_changed here.
+        # tabs are wired, since wiring connects their displayed_changed here.
         # None where this app may not touch the device at all (hosted by Fun
         # Time, whose Main Funestra owns the OSR2).
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
         if self._osr2_driver is not None:
             omnipause.holds(self._osr2_driver)
-        # The switch answers "what is the OSR2 doing" for every console over it,
+        # The switch answers "what is the OSR2 doing" for every OSR2 controls drawing over it,
         # so it holds both drivers rather than only the motion.
         self.osr2_control.script = self._osr2_driver
         self._osr2_driving = None
         self._find_bar = FindBar("Find in prompts:", "a word you wrote…",
                                  dismiss_key="Esc", reveal=reveal_prompt)
-        self._info_tabs.tab_added.connect(self._wire_config_panel)
-        for panel in self._info_tabs.config_panels():
-            self._wire_config_panel(panel)  # the initial tab predates the connection
-        self._info_tabs.currentChanged.connect(self._on_front_tab_changed)
+        self._generate_pane.tab_added.connect(self._wire_generate_tab)
+        for tab in self._generate_pane.generate_tabs():
+            self._wire_generate_tab(tab)  # the initial tab predates the connection
+        self._generate_pane.currentChanged.connect(self._on_front_tab_changed)
         # Quitting mid-drive still releases the device — park it and restore genau —
         # so a closed app doesn't leave the OSR2 held and genau silently disabled.
         app = QApplication.instance()
@@ -898,20 +898,20 @@ class GalleryView(QWidget):
             app.aboutToQuit.connect(self._radio.stop)
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder and navigate there, its generating tile and all.
-        self._info_tabs.generate_requested.connect(self._on_generate_requested)
-        self._info_tabs.modify_requested.connect(self._on_modify_requested)
+        self._generate_pane.generate_requested.connect(self._on_generate_requested)
+        self._generate_pane.modify_requested.connect(self._on_modify_requested)
         # ...and its right-click's "Go to folder" goes the other way: from a
         # tab's settings across to the items they have made.
-        self._info_tabs.folder_requested.connect(self._go_to_folder)
-        info_pane = QWidget()
-        info_column = QVBoxLayout(info_pane)
+        self._generate_pane.folder_requested.connect(self._go_to_folder)
+        generate_pane = QWidget()
+        info_column = QVBoxLayout(generate_pane)
         info_column.setContentsMargins(0, 0, 0, 0)
-        info_column.addWidget(self._info_tabs, 1)
+        info_column.addWidget(self._generate_pane, 1)
         info_column.addWidget(self._find_bar)
-        return info_pane
+        return generate_pane
 
     def become_hosted(self, session) -> None:
-        for switch in (self._bank.radio, self._bank.mic):
+        for switch in (self._buttons.radio, self._buttons.mic):
             if switch is not None:
                 switch.setChecked(False)
         self.osr2_control.drive_with(None, None)
@@ -920,13 +920,13 @@ class GalleryView(QWidget):
         self._fun_time = session
         self._tree.offer_separate_and_together(False)
         self._slideshows.become_hosted(session)
-        self._info_tabs.become_hosted(session)
+        self._generate_pane.become_hosted(session)
         self._voice.become_hosted()
-        self._bank.become_hosted()
+        self._buttons.become_hosted()
         if self._motion_pane is not None:
             self._motion_pane.hide()
-        self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
-        self._osr2_motion = self._osr2_driver = self._motion_panel = None
+        self._kept_device = (self._osr2_motion, self._osr2_driver, self._osr2_controls)
+        self._osr2_motion = self._osr2_driver = self._osr2_controls = None
         self.wear_the_room(session)
 
     def wear_the_room(self, session) -> None:
@@ -942,61 +942,61 @@ class GalleryView(QWidget):
 
     def become_standalone(self) -> None:
         self.set_room_paused(False)
-        self._osr2_motion, self._osr2_driver, self._motion_panel = self._kept_device
+        self._osr2_motion, self._osr2_driver, self._osr2_controls = self._kept_device
         self.osr2_control.drive_with(self._osr2_motion, self._osr2_driver)
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
         self._tree.offer_separate_and_together(True)
         self._slideshows.become_standalone(self._osr2_motion)
-        self._info_tabs.become_standalone()
-        self._bank.become_standalone()
+        self._generate_pane.become_standalone()
+        self._buttons.become_standalone()
         self._voice.become_standalone(
-            self._osr2_motion, radio=self._bank.radio,
+            self._osr2_motion, radio=self._buttons.radio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
-            mic=self._bank.mic)
+            mic=self._buttons.mic)
         self.wear_the_room(None)
 
-    def _wire_config_panel(self, panel):
-        """Route a config tab's footer links to the gallery: its "from source
+    def _wire_generate_tab(self, tab):
+        """Route a Generate tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source link,
-        and its preview's corner controls and right-click menu act on the shown
-        generation exactly as a browser thumbnail's do.
+        and its preview's corner buttons and right-click menu act on the shown
+        generation exactly as a Gallery pane thumbnail's do.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
         and re-reads whether the tab still owns a run in flight, a double-click on
         its preview opens the folder under it as a slideshow standing on it,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
-        panel.link_clicked.connect(self.follow_link)
-        panel.go_to_folder_requested.connect(self.follow_link)
-        panel.set_folder_check(self._can_open_containing_folder)
-        panel.set_making_one_check(
+        tab.link_clicked.connect(self.follow_link)
+        tab.go_to_folder_requested.connect(self.follow_link)
+        tab.set_folder_check(self._can_open_containing_folder)
+        tab.set_making_one_check(
             lambda config: self._config_folder_key(config) in self._live_jobs)
         # Its preview's corners and its right-click are the same acts, on the same
-        # generation, as a browser thumbnail's — so they land in the same places.
-        panel.item_action_requested.connect(self.run_item_action)
-        panel.context_menu_requested.connect(
+        # generation, as a Gallery pane thumbnail's — so they land in the same places.
+        tab.item_action_requested.connect(self.run_item_action)
+        tab.context_menu_requested.connect(
             lambda prompt_id, pos: self.generation_menu([prompt_id], pos))
-        panel.displayed_changed.connect(self.reconcile_osr2)
+        tab.displayed_changed.connect(self.reconcile_osr2)
         # A tab that just changed which image it shows needs the live enhance
         # tile for THAT image, not the one it was showing a moment ago.
-        panel.displayed_changed.connect(lambda: self._enhance.reconcile())
+        tab.displayed_changed.connect(lambda: self._enhance.reconcile())
         # Pointing a tab at another generation drops its claim on the run it
         # launched, so its Generate button has to be re-read straight away.
-        panel.displayed_changed.connect(self._reconcile_generating)
+        tab.displayed_changed.connect(self._reconcile_generating)
         # Its version list's "+ Enhance" row runs through the same queue the
         # folder button and the context menu use, and its Delete goes through
         # the same undo stack as every other delete in the gallery.
-        panel.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
-        panel.levels_delete_requested.connect(self.delete_enhance_levels)
-        panel.set_enhance_settings(self._enhance.settings)
-        panel.set_fullscreen_factory(self._slideshows.open_on_preview)
-        panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
-        panel.prompt_fields_changed.connect(self._retarget_find)
+        tab.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
+        tab.versions_delete_requested.connect(self.delete_enhance_versions)
+        tab.set_enhance_settings(self._enhance.settings)
+        tab.set_fullscreen_factory(self._slideshows.open_on_preview)
+        tab.cancel_requested.connect(lambda p=tab: self._cancel_tab_reroll(p))
+        tab.prompt_fields_changed.connect(self._retarget_find)
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.
-        panel.form_edited.connect(self._find_bar.refresh)
-        self._look_training.wire(panel)
+        tab.form_edited.connect(self._find_bar.refresh)
+        self._look_training.wire(tab)
 
     # --- Drive OSR2: one switch, the app picking funscript or motion ----------
 
@@ -1019,7 +1019,7 @@ class GalleryView(QWidget):
         front is, or it would drive straight through the park.
         Otherwise the surface in front picks: a funscript when what it has on
         screen carries one, and the self-generated motion every other moment,
-        which is most of them — a folder of images, a clip with no script, an
+        which is most of them — a folder of images, a video with no script, an
         empty tab.
 
         Idempotent, so tab switches, browsing, completions and opening or closing
@@ -1050,14 +1050,14 @@ class GalleryView(QWidget):
                     self._osr2_driving = None
             else:
                 video_path, player, actions = target
-                # Same clip, new player (a slideshow opened over it) still re-aims.
+                # Same video, new player (a slideshow opened over it) still re-aims.
                 driving = (video_path, player)
                 if self._osr2_driving != driving:
                     self._osr2_driver.start(player, actions)
                     self._osr2_driving = driving
             if wants_motion and not self._osr2_motion.active:
                 self._osr2_motion.start()
-            # Said inside the guard, so a console redrawing on it cannot land
+            # Said inside the guard, so the OSR2 controls redrawing on it cannot land
             # back in here mid-flight.
             self.osr2_control.settled.emit()
         finally:
@@ -1072,15 +1072,15 @@ class GalleryView(QWidget):
         slideshow = self._slideshows.surface_for(None)
         if slideshow is not None:
             return slideshow
-        return self._info_tabs.current_config_panel()
+        return self._generate_pane.current_generate_tab()
 
     def group_for_key(self, key: str):
-        """The folder ``key`` names, as the side it is being looked at holds it."""
+        """The folder ``key`` names, as the shape it is being looked at holds it."""
         item = self._tree_item_for(key)
         return item.data(0, _GROUP_ROLE) if item is not None else None
 
     def _on_front_tab_changed(self, _index):
-        """The front config tab changed: re-aim the OSR2 drive at its video,
+        """The front Generate tab changed: re-aim the OSR2 drive at its video,
         re-evaluate whether that tab's folder is generating (its Cancel button),
         and point an open find at the prompts now in front."""
         self.reconcile_osr2()
@@ -1128,14 +1128,14 @@ class GalleryView(QWidget):
 
     def radio_enabled(self) -> bool:
         """Whether Origenerator Radio's switch is on (for session persistence)."""
-        return self._bank.radio is not None and self._bank.radio.isChecked()
+        return self._buttons.radio is not None and self._buttons.radio.isChecked()
 
     def set_radio_enabled(self, enabled):
         """Restore Origenerator Radio's switch from a saved session.  With no
         switch (hosted by Fun Time, where each Satellite Funestra plays its own
         stations) a stale saved value has nothing to restore."""
-        if self._bank.radio is not None:
-            self._bank.radio.setChecked(bool(enabled))  # drives _on_radio_toggle → start
+        if self._buttons.radio is not None:
+            self._buttons.radio.setChecked(bool(enabled))  # drives _on_radio_toggle → start
 
     # --- the microphone -------------------------------------------------------
 
@@ -1147,7 +1147,7 @@ class GalleryView(QWidget):
         AttributeError raised inside closeEvent takes the whole process down
         with it rather than surfacing anywhere.
         """
-        return self._bank.mic is not None and self._bank.mic.isChecked()
+        return self._buttons.mic is not None and self._buttons.mic.isChecked()
 
     def set_mic_enabled(self, enabled):
         """Restore the mic switch from a saved session — on when the session has
@@ -1157,8 +1157,8 @@ class GalleryView(QWidget):
         GPU, the device, the room's sound. Listening spends nothing until it hears
         something, so off is a state to be chosen, not one to be arrived at.
         """
-        if self._bank.mic is not None:  # hosted, the session owns the microphone
-            self._bank.mic.setChecked(True if enabled is None else bool(enabled))
+        if self._buttons.mic is not None:  # hosted, the session owns the microphone
+            self._buttons.mic.setChecked(True if enabled is None else bool(enabled))
 
     # --- background experiments: the closing batch and the collection's controls ---
 
@@ -1210,7 +1210,7 @@ class GalleryView(QWidget):
         else:
             row = self._db.get_generation(prompt_id)
             if row is not None:
-                self._actions.reject_experiment(row)
+                self._edits.reject_experiment(row)
             self._re_aim()
         self.refresh()
 
@@ -1240,7 +1240,7 @@ class GalleryView(QWidget):
         return self.folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Point every config tab's discard button at the run *it* launched, and
+        """Point every Generate tab's discard button at the run *it* launched, and
         have its Generate ask again whether its folder is making one.
 
         A tab follows the *oldest still alive* of its own runs — the one nearest to
@@ -1253,15 +1253,15 @@ class GalleryView(QWidget):
         front tab. Every tab is reconciled, not just the front one, so a run
         launched from a tab that is now under another still shows there.
         """
-        for panel in self._info_tabs.config_panels():
-            live = [(origin, job) for origin in panel.launched_runs()
+        for tab in self._generate_pane.generate_tabs():
+            live = [(origin, job) for origin in tab.launched_runs()
                     if (job := self._jobs.job_for_origin(origin)) is not None]
-            panel.forget_launched({origin for origin in panel.launched_runs()
+            tab.forget_launched({origin for origin in tab.launched_runs()
                                    if origin not in {o for o, _ in live}})
             job = live[0][1] if live else None  # the oldest still alive: nearest done
-            panel.set_generating(job is not None,
+            tab.set_generating(job is not None,
                                  auto_generating=self._auto_generating(job))
-            panel.reread_generate_button()
+            tab.reread_generate_button()
         self._combine.reconcile_generating()
 
     def _auto_generating(self, job) -> bool:
@@ -1283,7 +1283,7 @@ class GalleryView(QWidget):
 
     def _claim_launch(self, key: str):
         """Give a run launched outside any tab — the folder tile's "+",
-        Auto-Generate — to the front config tab when that tab is showing the same folder.
+        Auto-Generate — to the front Generate tab when that tab is showing the same folder.
 
         Unclaimed, such a run belonged to no tab at all, so the tab looking
         straight at it showed neither the discard button nor a filling Generate
@@ -1296,22 +1296,22 @@ class GalleryView(QWidget):
         a folder puts the pane's italic tab on that folder, the claimer usually is
         that tab.
         """
-        panel = self._info_tabs.current_config_panel()
+        tab = self._generate_pane.current_generate_tab()
         job = self._jobs.newest_job_for(key)
-        if panel is None or job is None or panel.workflow_and_signature() is None:
+        if tab is None or job is None or tab.workflow_and_signature() is None:
             return
-        if self._config_folder_key(panel.current_config()) == key:
-            panel.note_launched(job.origin)
-            self._info_tabs.pin_tab(panel)
+        if self._config_folder_key(tab.current_config()) == key:
+            tab.note_launched(job.origin)
+            self._generate_pane.pin_tab(tab)
             self._reconcile_generating()  # the launch's own reconcile ran before this
 
-    def _cancel_panel_reroll(self, panel):
+    def _cancel_tab_reroll(self, tab):
         """Discard the run this tab's bar is showing — its Cancel button.
 
         The oldest of the tab's own still alive, so the press acts on the thing on
         screen rather than something queued after it.
         """
-        for origin in panel.launched_runs():
+        for origin in tab.launched_runs():
             job = self._jobs.job_for_origin(origin)
             if job is not None:
                 self._cancel_job(job.prompt_id)
@@ -1319,7 +1319,7 @@ class GalleryView(QWidget):
 
     def would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a
-        byte-identical past generation — the cue to re-roll rather than waste a slot.
+        byte-identical past generation — the cue to re-roll rather than waste a run.
 
         The form sends the seed its field shows, so the seed is taken as pinned
         here; a freshly drawn seed would simply never match.
@@ -1329,9 +1329,9 @@ class GalleryView(QWidget):
 
     def _on_generate_requested(self, workflow_name: str, batch: list[dict]):
         """A tab's Generate: launch each of ``batch`` as a re-roll of its settings
-        folder and land the browser there, its live tile showing the run.
+        folder and land the Gallery pane there, its live tile showing the run.
 
-        Identical in outcome to clicking the folder's re-roll "+": the jobs land in
+        Identical in outcome to clicking the folder's New tile: the jobs land in
         that folder (its :class:`GeneratingTile` shows the leading run's live frame), so
         an edited config's brand-new folder appears and is navigated to at once —
         the running row it inserts gives the folder a tree node immediately (see
@@ -1350,10 +1350,10 @@ class GalleryView(QWidget):
             return  # one press at a time per folder
         # A pinned seed that would reproduce a past run draws a fresh one instead of
         # launching a copy — the press was made against a button already reading
-        # "Generate with Random seed" (:meth:`GenerateConfigPanel._apply_generate_caption`),
+        # "Generate with Random seed" (:meth:`GenerateTab._apply_generate_caption`),
         # so this is what it said it would do, not a question worth stopping for.
         # The tab keeps the Random seed, so its form goes on saying the same thing.
-        launching = self._info_tabs.current_config_panel()
+        launching = self._generate_pane.current_generate_tab()
         if self.would_reproduce_a_completed_run(wf, batch[0]):
             batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
@@ -1387,7 +1387,7 @@ class GalleryView(QWidget):
         saying whether the tree had a row to open at all.
 
         The ways here are one move — a Generate, a folder's prompt rewrite, a
-        combine's launch, the Auto-Generate tip's link, a click on an in-flight card —
+        combine's launch, the Auto-Generate tip's link, a click on an in-flight tile —
         and in all of them the open is a step on the way to that run's tile rather
         than somewhere browsed to. So it lands on no saved item of its own
         (:meth:`_land_on_the_first_item`): one loaded here would paint an item
@@ -1528,11 +1528,11 @@ class GalleryView(QWidget):
                 self._fingerprint = fingerprint
                 self._rebuild(rows, meta)
             else:
-                # No DB change, but the in-flight cards still need each running
+                # No DB change, but the in-flight tiles still need each running
                 # re-roll's live frame pushed in — it advances between rebuilds.
-                # Wherever they were drawn: the Recents collection, or a folder with
+                # Wherever they were drawn: the Latest collection, or a folder with
                 # a batch of them in flight.
-                self._browser.refresh_inflight(rows=rows, requests=requests)
+                self._gallery_pane.refresh_inflight(rows=rows, requests=requests)
             # The Job Queue is always on screen, so refresh it every tick —
             # its rows' live frames and progress advance between rebuilds. The
             # listing already in hand feeds it, so the Job Queue costs the tick no
@@ -1568,7 +1568,7 @@ class GalleryView(QWidget):
         self._folder_meta = meta
         self._drawn_version += 1
         standing = self._tree_view.selected_folder_key()
-        place = self._browser.place()
+        place = self._gallery_pane.place()
         # Pending restore targets stand in until the user makes a live choice.
         selected_key = standing or self._pending_key
         # A live multi-selection is a folder the user is composing, so a rebuild
@@ -1587,21 +1587,21 @@ class GalleryView(QWidget):
         self._pending_selection = None
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
-        self._combine.offer_the_acts(rows)
+        self._combine.offer_the_actions(rows)
         self._listed_rows = rows
-        self._held_rows = recovery.bin_items(self._bin_records())
+        self._held_rows = trash_collection.trash_items(self._trash_records())
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`) — and kept as the
         # index every folder key is derived against until the next rebuild.
-        start_frames, trees = self._lists_for(rows, meta, self._tree.sides)
+        start_frames, trees = self._lists_for(rows, meta, self._tree.shapes)
         self._image_index = start_frames
         unreviewed = self._review_queue(rows)
         held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_folders_by_side = _custom_folders_by_side(
-            trees, self._db.list_custom_folders())
-        self._custom_folders = [folder for folders in self._custom_folders_by_side.values()
+        self._custom_collections_by_shape = _custom_collections_by_shape(
+            trees, self._db.list_custom_collections())
+        self._custom_collections = [folder for folders in self._custom_collections_by_shape.values()
                                 for folder in folders]
         # Re-index for the search field while the rows are in hand: tokenizing every
         # prompt belongs to the rebuild, so a keystroke costs only lookups. Rows
@@ -1615,15 +1615,15 @@ class GalleryView(QWidget):
         #
         # The trash's held rows are indexed alongside the gallery's own, because
         # standing in the Trash collection and searching it has to find something —
-        # a deleted row is out of ``list_generations`` and lives only in the bin.
+        # a deleted row is out of ``list_generations`` and lives only in the Trash.
         # They are reachable only from that collection: every other scope is a set of
         # ids drawn from the live tree (see :meth:`search_scope`).
         self._search.index.update(rows + held, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
-            self._custom_folders), item_name=self._item_names.of)
+            self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()
         bumped = gallery.enhancement_recency(rows)
-        self._browser.set_model(
+        self._gallery_pane.set_model(
             gallery.recent_generations(rows, bumped=bumped),
             trees,
             rows,
@@ -1647,11 +1647,11 @@ class GalleryView(QWidget):
         # variation Auto-Generate makes. Only what has actually gone (a deleted or
         # trashed item) is taken off a tab now.
         self._selected_row = None
-        self._info_tabs.reconcile_previews(self._live_ids)
-        self._info_tabs.reread_names()
+        self._generate_pane.reconcile_previews(self._live_ids)
+        self._generate_pane.reread_names()
         self._combine.reread_names()
         # _tree_item_for rather than a bare lookup, so a restore target saved as
-        # a folder key — a session from before the tree grew sides — still lands
+        # a folder key — a session from before the tree grew shapes — still lands
         # on that folder instead of falling back to the default.
         target = (self._tree_item_for(selected_key) if selected_key
                   else None) or self._tree_view.default_item()
@@ -1664,7 +1664,7 @@ class GalleryView(QWidget):
             else:
                 self._folder_path.set_display("")
                 self._avg_label.setText("")
-                self._browser.show_empty()
+                self._gallery_pane.show_empty()
                 self._selected_row = None  # nothing selected
             self._restore_multi_selection(multi_keys)
             self._restore_reroll_selection(reroll_key)
@@ -1677,7 +1677,7 @@ class GalleryView(QWidget):
         if self._search.query:
             self._search.run()
         if standing is not None and self._tree_view.selected_folder_key() == standing:
-            self._browser.return_to(place)
+            self._gallery_pane.return_to(place)
         self._update_queue(self._inflight_items(rows=rows, requests=requests))
         # Re-assert the front tab's Generate-as-progress state against the live jobs.
         # Keying off the freshly rebuilt image rows is what lets a reconnected re-roll
@@ -1687,44 +1687,44 @@ class GalleryView(QWidget):
         # A generation landing or leaving can make an open tab's pinned seed one that
         # would reproduce it — or stop it being one — with nothing on the form having
         # moved, so every tab re-reads what its Generate would now do.
-        for panel in self._info_tabs.config_panels():
-            panel.refresh_generate_caption()
+        for tab in self._generate_pane.generate_tabs():
+            tab.refresh_generate_caption()
 
-    def _lists_for(self, rows, meta, sides):
-        """The start frames, every item's name and a table of contents for each
-        of *sides*, kept against the library they were read off; only the drawn
-        sides are built."""
+    def _lists_for(self, rows, meta, shapes):
+        """The start frames, every item's name and a tree of contents for each
+        of *shapes*, kept against the library they were read off; only the drawn
+        shapes are built."""
         library = _fingerprint(rows, meta)
         if library != self._lists_built_from:
             self._lists_built_from = library
             self._start_frames = gallery.start_frame_index(rows)
             self._item_names.take(rows, self._held_rows, self._start_frames)
-            self._lists_by_side = {}
-        for side in sides:
-            if side not in self._lists_by_side:
-                self._lists_by_side[side] = _side_list(
-                    rows, meta, self._start_frames, side, self._item_names.of)
-        return self._start_frames, {side: self._lists_by_side[side] for side in sides}
+            self._lists_by_shape = {}
+        for shape in shapes:
+            if shape not in self._lists_by_shape:
+                self._lists_by_shape[shape] = _side_list(
+                    rows, meta, self._start_frames, shape, self._item_names.of)
+        return self._start_frames, {shape: self._lists_by_shape[shape] for shape in shapes}
 
     def _build_sides(self, trees):
-        """The sides the pane is drawing, in the order it draws them.
+        """The shapes the pane is drawing, in the order it draws them.
 
-        A side is the whole table of contents over the rows it holds: its own
+        A shape is the whole tree of contents over the rows it holds: its own
         hierarchy, its own copies of the folders the user composed, and collections
-        whose counts are its own — a number covering more than the side draws
+        whose counts are its own — a number covering more than the shape draws
         would send you to a collection that then showed you nothing.
 
-        Only the drawn sides are built. The radio's other answer is a section
+        Only the drawn shapes are built. The radio's other answer is a section
         nobody can see, and filling it would cost every rebuild a table of
         contents for nothing.
         """
-        return [SideModel(
-            side=side,
-            tree_model=trees[side],
-            custom_folders=gallery.outermost(self._custom_folders_by_side[side]),
-            show_recents=bool(trees[side]),
-            collection_counts=self._browser.collection_counts(side),
-        ) for side in self._tree.sides]
+        return [ShapeModel(
+            shape=shape,
+            tree_model=trees[shape],
+            custom_collections=gallery.outermost(self._custom_collections_by_shape[shape]),
+            show_latest=bool(trees[shape]),
+            collection_counts=self._gallery_pane.collection_counts(shape),
+        ) for shape in self._tree.shapes]
 
     def open_folders(self) -> list[str]:
         return sorted(self._tree_view.folders_left_open())
@@ -1733,24 +1733,24 @@ class GalleryView(QWidget):
         if isinstance(saved, list):
             self._tree_view.leave_folders_open(key for key in saved if isinstance(key, str))
 
-    def toc_sides(self) -> list[str]:
+    def toc_shapes(self) -> list[str]:
         return list(self._tree.chosen_sides)
 
     def set_toc_sides(self, saved) -> None:
-        self._tree.choose_sides(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
+        self._tree.choose_shapes(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
 
-    def _on_sides_changed(self):
-        """The radio over the list moved: draw the list again on the new sides.
+    def _on_shapes_changed(self):
+        """The radio over the list moved: draw the list again on the new shapes.
 
         A full rebuild rather than a redraw, because each side's table of
-        contents is built from the rows that side holds — the one list of both
+        contents is built from the rows that shape holds — the one list of both
         shapes is a different hierarchy, not the two stacked.
         """
         if not self._tree_view.built:
             return
         with working():
             self.refresh()
-        # The row that was selected is on a side nobody draws now, so the
+        # The row that was selected is on a shape nobody draws now, so the
         # folder-selected signal that normally re-syncs the slideshow button never
         # fires for the row the rebuild landed on instead.
         self._re_aim()
@@ -1762,11 +1762,11 @@ class GalleryView(QWidget):
         across a rebuild — one happens whenever anything lands, once per
         variation Auto-Generate makes — and a tab is repainted only when the
         generation it shows changes under it or goes (see
-        :meth:`InfoPaneTabs.refresh_displayed` and
-        :meth:`InfoPaneTabs.reconcile_previews`). Painting the selection
+        :meth:`GeneratePane.refresh_displayed` and
+        :meth:`GeneratePane.reconcile_previews`). Painting the selection
         into whichever tab was in front is how a tab came to show an item that
         was not its own."""
-        if not prompt_id or prompt_id not in self._browser.listed_prompt_ids():
+        if not prompt_id or prompt_id not in self._gallery_pane.listed_prompt_ids():
             return
         row = self.row_for(prompt_id)
         if row:
@@ -1775,7 +1775,7 @@ class GalleryView(QWidget):
     # --- find in the open tab's prompts (Ctrl+F) ------------------------------
 
     def _open_find(self):
-        """Ctrl+F: open the find strip over the front tab's prompt fields, its
+        """Ctrl+F: open the find bar over the front tab's prompt fields, its
         standing query re-run against them.
 
         With no prompts in front — the resting tab, whose form waits on a workflow
@@ -1789,9 +1789,9 @@ class GalleryView(QWidget):
         self._find_bar.open_find(fields)
 
     def _prompt_fields(self) -> list:
-        """The prompt inputs of the config tab in front — what a find searches."""
-        panel = self._info_tabs.current_config_panel()
-        return panel.prompt_fields() if panel is not None else []
+        """The prompt inputs of the Generate tab in front — what a find searches."""
+        tab = self._generate_pane.current_generate_tab()
+        return tab.prompt_fields() if tab is not None else []
 
     def _retarget_find(self):
         typing = QApplication.focusWidget()
@@ -1823,7 +1823,7 @@ class GalleryView(QWidget):
         self._experiments_bar.hide()
 
     def show_search_results(self, tiles, **terms) -> None:
-        self._browser.show_search_results(tiles, **terms)
+        self._gallery_pane.show_search_results(tiles, **terms)
 
     def search_results_drawn(self) -> None:
         """Results are up: the buttons that fit what the pane holds are re-read,
@@ -1842,14 +1842,14 @@ class GalleryView(QWidget):
         return self._selected["prompt_id"] if self._selected else None
 
     def pane_holds(self, prompt_id: str) -> bool:
-        return prompt_id in self._browser.listed_prompt_ids()
+        return prompt_id in self._gallery_pane.listed_prompt_ids()
 
     def show_folder(self, key: str) -> bool:
         """Draw the folder or collection ``key`` names, saying whether the tree had a
         row for it at all.
 
         ``_tree_item_for`` rather than a bare lookup: a stop recorded before the
-        tree grew sides names a folder key with no side on it, and that key still
+        tree grew shapes names a folder key with no shape on it, and that key still
         has to find its row. Standing on the row already fires no signal, and the
         pane would go on holding the search results or the tile highlight the
         stop was recorded without, so that case is drawn by hand.
@@ -1865,20 +1865,20 @@ class GalleryView(QWidget):
 
     def reveal(self, prompt_id: str) -> bool:
         """Pick and scroll to the tile where the pane stands, and put the item
-        back in the info pane; a pane of folders marks the square holding it.
+        back in the Generate pane; a pane of folders marks the square holding it.
         Whether anything the pane shows held it."""
-        if self._browser.reveal_tile(prompt_id):
+        if self._gallery_pane.reveal_tile(prompt_id):
             self._on_thumbnail_clicked(prompt_id)
             return True
         row = self._db.get_generation(prompt_id)
-        return row is not None and self._browser.reveal_folder(
+        return row is not None and self._gallery_pane.reveal_folder(
             gallery.settings_folder_key(row, self.image_config_index()))
 
     def clear_selection(self) -> None:
         self._clear_metadata()
 
     def nav_state_changed(self, can_go_back: bool, can_go_forward: bool) -> None:
-        """The trail moved: hold what it now allows, and re-aim the bank."""
+        """The trail moved: hold what it now allows, and re-aim the Gallery pane buttons."""
         self._trail = (can_go_back, can_go_forward)
         self._re_aim()
 
@@ -1890,17 +1890,17 @@ class GalleryView(QWidget):
         """What the search covers: the path it is scoped to, and what is under it.
 
         The tree's selection is the scope, whatever kind of row it is. A collection
-        counts: Recents, Favorites, Experiments and Trash are each a set of
+        counts: Latest, Favorites, Experiments and Trash are each a set of
         generations, and standing in one and searching it is the obvious thing to
         try. The All row is what covers the library entire, since every other
         folder narrows the answer before the query does.
 
-        ``path`` is the row's breadcrumb — what the field, the header and the
+        ``path`` is the row's folder path — what the field, the header and the
         empty-result message all name the scope by.
         """
         item = self._tree.currentItem()
         if self._current_collection_key() is not None:
-            rows = self._browser.selected_collection_rows() or []
+            rows = self._gallery_pane.selected_collection_rows() or []
             return _SearchScope(tuple(self._tree_view.path_steps(item)),
                                 {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
@@ -1931,13 +1931,13 @@ class GalleryView(QWidget):
             self._slideshows.remember(saved)
 
     def how_many(self) -> int:
-        return self._info_tabs.how_many()
+        return self._generate_pane.how_many()
 
     def set_how_many(self, count) -> None:
-        self._info_tabs.set_how_many(count if count in HOW_MANY else HOW_MANY[0])
+        self._generate_pane.set_how_many(count if count in HOW_MANY else HOW_MANY[0])
 
     def _showing_search(self) -> bool:
-        return self._browser.showing_search()
+        return self._gallery_pane.showing_search()
 
     def _on_folder_selected(self, current, _previous):
         if self._selection_group is not None:
@@ -1951,21 +1951,21 @@ class GalleryView(QWidget):
             self._search.run()
             return
         self._re_aim()
-        base, side = _split_collection_key(self._tree_view.selected_folder_key())
+        base, shape = _split_collection_key(self._tree_view.selected_folder_key())
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
                                          and collection.which == _EXPERIMENTS_KEY)
         if current is None:
             self._folder_path.set_display("")
             self._avg_label.setText("")
-            self._browser.show_empty()
+            self._gallery_pane.show_empty()
             self._re_aim()
             return
         if collection is not None:
-            self._open_collection(collection, side, current)
+            self._open_collection(collection, shape, current)
             return
         group = current.data(0, _GROUP_ROLE)
-        # A folder's place in the tree is where the user is standing, side and
+        # A folder's place in the tree is where the user is standing, shape and
         # all, so that — not the folder's own key — is what history and the
         # return-after-delete trail record.
         here = self._tree_view.selected_folder_key()
@@ -1996,39 +1996,39 @@ class GalleryView(QWidget):
         """
         if self._navigation.suppressed:
             return None
-        first = next(iter(self._browser.listed_prompt_ids()), None)
+        first = next(iter(self._gallery_pane.listed_prompt_ids()), None)
         if first is None or not self._show_generation(first):
             return None
         # Picked rather than revealed: the first tile leads a pane just drawn, so
         # there is nothing to scroll to, and the highlight is the whole of what
         # "selected" means here.
-        self._browser.apply_selection(first, Qt.KeyboardModifier.NoModifier)
+        self._gallery_pane.apply_selection(first, Qt.KeyboardModifier.NoModifier)
         return first
 
-    def _open_collection(self, collection: FolderCollection, side: str | None, item):
+    def _open_collection(self, collection: FolderCollection, shape: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
         self._folder_path.show_folder(self._tree_view.path_steps(item),
                                       mark=_PATH_MARK_OF.get(collection.which, ""))
         self._avg_label.setText("")
         self._clear_metadata()
-        self._browser.show_collection(collection.key, side)
+        self._gallery_pane.show_collection(collection.key, shape)
         self._navigation.record()
 
     def _show_group_contents(self, group, item):
         if isinstance(group, gallery.SettingsGroup):
-            self._browser.show_thumbnails(group)
-        elif isinstance(group, gallery.CustomGroup):
-            self._browser.show_custom_folder(group)
+            self._gallery_pane.show_thumbnails(group)
+        elif isinstance(group, gallery.CustomCollection):
+            self._gallery_pane.show_custom_collection(group)
         else:
-            self._browser.show_folder_tiles(gallery.child_groups(group),
+            self._gallery_pane.show_folder_tiles(gallery.child_groups(group),
                                             collections=self._tree_view.collections_in(item))
 
     def _go_to_folder(self, key: str):
         """Go to a folder: select its tree row, which draws it.
 
         The one move under every gesture that names a folder to open — a folder
-        tile's click, a config tab's "Go to folder", a step of the path — as
+        tile's click, a Generate tab's "Go to folder", a step of the path — as
         :meth:`_go_to_generation` is the one under every gesture that names an
         item. Each is a decision to go there, so a running search is put away
         first: a search's results are folder tiles too, and this is how they
@@ -2044,7 +2044,7 @@ class GalleryView(QWidget):
 
     def _on_tree_selection_changed(self):
         """Picking several folders shows them together — the same view a saved
-        custom folder gets, since that selection is exactly an unsaved one. Falling
+        custom collection gets, since that selection is exactly an unsaved one. Falling
         back to a single row hands the panes to :meth:`_on_folder_selected`."""
         groups = self._selected_groups()
         if len(groups) > 1:
@@ -2065,12 +2065,12 @@ class GalleryView(QWidget):
 
     def _show_selection(self):
         """Render the picked folders as the folder they would make: their tiles in
-        the browser pane, and the toolbar offering to save the grouping."""
+        the Gallery pane, and the Gallery pane buttons offering to save the grouping."""
         group = self._selection_group
         self._experiments_bar.hide()
         self._folder_path.set_display(group.label)
         self._update_folder_average(group)
-        self._browser.show_custom_folder(group)
+        self._gallery_pane.show_custom_collection(group)
         self._re_aim()
 
     def _restore_multi_selection(self, keys: list[str]):
@@ -2099,15 +2099,15 @@ class GalleryView(QWidget):
             return
         folders = gallery.child_groups(group)
         name, ok = QInputDialog.getText(
-            self, "New Folder",
-            f"Name for a folder holding these {len(folders)} folders:",
+            self, "New Collection",
+            f"Name for a collection holding these {len(folders)} folders:",
         )
         if not ok or not name.strip():
             return
-        folder_id = self._actions.custom_folders.create(
-            name.strip(), [self._folder_identity(f) for f in folders], self.side_in_view()
+        folder_id = self._edits.custom_collections.create(
+            name.strip(), [self._folder_identity(f) for f in folders], self.shape_in_view()
         )
-        self._open_custom_folder(folder_id)
+        self._open_custom_collection(folder_id)
 
     def _folder_identity(self, group) -> tuple:
         """A gathered folder as ``(key, level, ref_prompt_id)`` — its key plus the
@@ -2116,20 +2116,20 @@ class GalleryView(QWidget):
         return (group.key, gallery.group_level(group),
                 rows[0]["prompt_id"] if rows else None)
 
-    def _open_custom_folder(self, folder_id: int):
+    def _open_custom_collection(self, folder_id: int):
         """Rebuild so the folder has a row, then land on it — the end of every
         action that makes or fills one."""
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
         self._re_aim()
-        item = self._tree_item_for(gallery.custom_folder_key(folder_id))
+        item = self._tree_item_for(gallery.custom_collection_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
 
     def _on_dropped(self, target_key: str, keys: list, prompt_ids: list = ()):
         """Folders or an item dragged onto a collecting row: Favorites favorites the
-        folders (the drag-and-drop way to bookmark), a custom folder gathers them
+        folders (the drag-and-drop way to favorite), a custom collection gathers them
         and takes the item."""
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _FAVORITES_KEY:
@@ -2141,60 +2141,60 @@ class GalleryView(QWidget):
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
             return
-        self._actions.custom_folders.add_to(
+        self._edits.custom_collections.add_to(
             folder_id, [self._folder_identity(g) for g in groups], prompt_ids
         )
-        self._open_custom_folder(folder_id)
+        self._open_custom_collection(folder_id)
 
-    def _custom_folder_takes(self, row_key: str, prompt_id: str) -> bool:
-        """Whether the TOC row ``row_key`` is a folder of your own that an item
-        dragged over it can go in: one the gallery shows, on the row's own side."""
+    def _custom_collection_takes(self, row_key: str, prompt_id: str) -> bool:
+        """Whether the TOC row ``row_key`` is a collection of your own that an item
+        dragged over it can go in: one the gallery shows, on the row's own shape."""
         folder = self.group_for_key(row_key)
         leaf = self._leaf_by_id.get(prompt_id)
-        return (isinstance(folder, gallery.CustomGroup) and leaf is not None
-                and _side_of(leaf.data(0, _TREE_KEY_ROLE)) == _side_of(row_key))
+        return (isinstance(folder, gallery.CustomCollection) and leaf is not None
+                and _shape_of(leaf.data(0, _TREE_KEY_ROLE)) == _shape_of(row_key))
 
     def _collecting_row_takes_folder(self, row_key: str, folder_key: str) -> bool:
-        """Favorites takes any folder that takes a star, a folder of your own any
+        """Favorites takes any folder that takes a star, a collection of your own any
         folder but one that would end up inside itself."""
         target, dragged = self.group_for_key(row_key), self.group_for_key(folder_key)
         if dragged is None:
             return False
-        if isinstance(target, gallery.CustomGroup):
+        if isinstance(target, gallery.CustomCollection):
             return not gallery.holds(dragged, target)
         return _takes_a_favorite(dragged)
 
-    def _landing_in_the_open_custom_folder(self, mime, source):
-        if _saved_custom_folder(self.current_group()) is None:
+    def _landing_in_the_open_custom_collection(self, mime, source):
+        if _saved_custom_collection(self.current_group()) is None:
             return None
         return self._tree.landing_on(self._tree.currentItem(), mime, source)
 
-    def _new_custom_folder(self, side: str):
+    def _new_custom_collection(self, shape: str):
         """Make an empty folder of the user's own — the tree's right-click action,
         for when the folders to fill it with are easier dragged in than picked."""
-        name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+        name, ok = QInputDialog.getText(self, "New Collection", "Collection name:")
         if ok and name.strip():
-            self._open_custom_folder(
-                self._actions.custom_folders.create(name.strip(), [], side))
+            self._open_custom_collection(
+                self._edits.custom_collections.create(name.strip(), [], shape))
 
-    def _remove_custom_folder(self, group):
+    def _remove_custom_collection(self, group):
         """Delete a folder the user made. Only the grouping goes — what it gathers
         is untouched — so the confirmation says so rather than reading like the
         delete that trashes files."""
         if not self._confirm(f"Remove the folder “{group.label}”?\n\n{_kept_on_removal(group)}"):
             return
-        self._actions.custom_folders.delete(group.folder_id)
+        self._edits.custom_collections.delete(group.folder_id)
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
         self._re_aim()
 
-    def _remove_from_custom_folder(self, group, folder_keys=(), items=()):
-        """Take gathered folders and items out of the custom folder on screen."""
+    def _remove_from_custom_collection(self, group, folder_keys=(), items=()):
+        """Take gathered folders and items out of the custom collection on screen."""
         folders = [self._folder_identity(gathered)
                    if (gathered := self.group_for_key(key)) is not None else (key, None, None)
                    for key in folder_keys]
-        self._actions.custom_folders.remove_from(group.folder_id, folders, items)
+        self._edits.custom_collections.remove_from(group.folder_id, folders, items)
         self.refresh()
         self._re_aim()
 
@@ -2237,13 +2237,13 @@ class GalleryView(QWidget):
     @property
     def _live_jobs(self) -> dict:
         """The live re-roll jobs, keyed by settings-folder key. Owned by the
-        controller; surfaced here for the Recents collection and the info pane."""
+        controller; surfaced here for the Latest collection and the Generate pane."""
         return self._jobs.jobs
 
     @property
     def _selected(self) -> dict | None:
-        """The saved generation on display in the info pane, or ``None`` — read
-        here for navigation, delete, and the Recents "containing folder" jump. Set
+        """The saved generation on display in the Generate pane, or ``None`` — read
+        here for navigation, delete, and the Latest "containing folder" jump. Set
         by :meth:`_on_thumbnail_clicked`, cleared when a re-roll or nothing is
         showing."""
         return self._selected_row
@@ -2263,60 +2263,60 @@ class GalleryView(QWidget):
         """The selected row's tree key (or a collection's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
 
-    def side_in_view(self) -> str:
-        """Which side of the list the tree is standing on.
+    def shape_in_view(self) -> str:
+        """Which shape of the list the tree is standing on.
 
         Every row lives under one, so this is only ever a fallback: nothing
         selected at all (a fresh window, a rebuild that found no target) reads
-        as the side holding landscape, the roomier shape and the one an
+        as the shape holding landscape, the roomier shape and the one an
         unmeasurable item files under everywhere else.
         """
-        return (_side_of(self.selected_folder_key())
-                or _side_holding(_LANDSCAPE, self._tree.sides))
+        return (_shape_of(self.selected_folder_key())
+                or _shape_holding(_LANDSCAPE, self._tree.shapes))
 
     def _tree_item_for(self, key: str):
         """The tree row for ``key`` — a tree key resolves to its own row, and a
-        folder's own key to the copy of it on the side being browsed.
+        folder's own key to the copy of it on the shape being browsed.
 
         A folder key names a folder, not a place: a re-roll, a combine, a folder
-        tile and a delete's return target all hold one, and each side draws its
-        own row for it. Staying on the side already open is the answer that
+        tile and a delete's return target all hold one, and each shape draws its
+        own row for it. Staying on the shape already open is the answer that
         doesn't teleport the user across the tree; a folder only the other side
         holds is followed there rather than dropped.
 
-        A key naming a side the pane draws is answered by that side alone.
+        A key naming a shape the pane draws is answered by that shape alone.
         Falling back across the split would hand a portrait region a landscape
         library the moment the portrait one happened to be empty, which is the
-        whole of what the split exists to prevent. A key naming a side the pane
+        whole of what the split exists to prevent. A key naming a shape the pane
         is *not* drawing — the radio has moved, or a window reopened in the
         other arrangement — has no row of its own anywhere, so its folder is
-        looked for among the sides that are drawn.
+        looked for among the shapes that are drawn.
         """
         item = self._item_by_key.get(key)
         if item is not None:
             return item
         folder = _base_of(key)
         drawn = self._tree_view.keys_for_folder(folder)
-        if _side_of(key) in self._tree.sides:
+        if _shape_of(key) in self._tree.shapes:
             return next((self._item_by_key[row] for row in drawn
-                         if _side_of(row) == _side_of(key)), None)
+                         if _shape_of(row) == _shape_of(key)), None)
         if not drawn:
             return None
-        here = oriented_key(folder, self.side_in_view())
+        here = shaped_key(folder, self.shape_in_view())
         return self._item_by_key[here if here in drawn else drawn[0]]
 
-    def _collection_item(self, collection_key: str, side: str | None = None):
-        """One side's copy of a collection row — the side being browsed by default."""
-        return self._tree_view.collection_item(collection_key, side or self.side_in_view())
+    def _collection_item(self, collection_key: str, shape: str | None = None):
+        """One side's copy of a collection row — the shape being browsed by default."""
+        return self._tree_view.collection_item(collection_key, shape or self.shape_in_view())
 
     def _folder_context(self, key: str) -> str:
-        """Where folder ``key`` lives: the breadcrumb of its parent, or "" at the
+        """Where folder ``key`` lives: the folder path of its parent, or "" at the
         top of the tree. The caption a tile drawn far from the tree wears
-        (see :class:`~origenerator.gui.browser_pane.TreeNavigation`)."""
+        (see :class:`~origenerator.gui.gallery_pane.TreeNavigation`)."""
         item = self._tree_item_for(key)
         if item is None or item.parent() is None:
             return ""
-        return self._tree_view.breadcrumb(item.parent())
+        return self._tree_view.folder_path(item.parent())
 
     def current_group(self):
         """The folder on screen, or ``None`` (a collection, a search, or an empty
@@ -2341,11 +2341,11 @@ class GalleryView(QWidget):
         """A settings folder's own tiles — the re-roll tile, its mirror (the same
         seeds again, said differently) and the run in front of its line — where
         the folder has each, for the pane to place
-        (:attr:`~origenerator.gui.browser_pane.PaneHost.lead_tiles`)."""
+        (:attr:`~origenerator.gui.gallery_pane.PaneHost.lead_tiles`)."""
         if not self._can_reroll(group):
             return LeadTiles()
         job = self._jobs.job_for(group.key)
-        plus = RerollTile(making_one=job is not None)
+        plus = NewTile(making_one=job is not None)
         plus.add_requested.connect(lambda: self._start_reroll(group.key))
         return LeadTiles(
             reroll=plus,
@@ -2374,7 +2374,7 @@ class GalleryView(QWidget):
         """Right-click a folder's live tile: throw away the run it is showing.
 
         The same act as the button on its face, on the gesture the rest of the
-        grid answers — a right-click that worked on every other card and died on
+        grid answers — a right-click that worked on every other tile and died on
         this one read as a tile that wasn't listening. The wording is the
         button's, so both say the same thing about the same press.
 
@@ -2432,11 +2432,11 @@ class GalleryView(QWidget):
     def _open_folder_modify(self, group):
         """Open this folder's prompt in a tab, ready to be rewritten.
 
-        Nothing is launched: the card is the start of an edit made by hand, which
+        Nothing is launched: the tile is the start of an edit made by hand, which
         is the whole reason it is typed rather than spoken. The tab carries the
         folder's settings, its prompts marked against themselves, and its images
         tiled in the preview — see
-        :meth:`GenerateConfigPanel.open_folder_modify`.
+        :meth:`GenerateTab.open_folder_modify`.
         """
         rows = self._folder_modify_rows(group)
         workflow = WORKFLOW_REGISTRY.get(rows[0].get("workflow_name") or "") if rows else None
@@ -2446,7 +2446,7 @@ class GalleryView(QWidget):
         # in the hover is the number of images and not of readable files.
         thumbnails = [row.get("thumbnail_path") for row in rows]
         self._clear_reroll_selection()  # the tab is about the folder, not a live run
-        self._info_tabs.open_folder_modify(group.key, group.label, workflow.name,
+        self._generate_pane.open_folder_modify(group.key, group.label, workflow.name,
                                       filled_params(rows[0], workflow), thumbnails)
 
     def _on_modify_requested(self, folder_key: str, workflow_name: str, params: dict):
@@ -2465,8 +2465,8 @@ class GalleryView(QWidget):
         leaves (:meth:`Database.record_request`).
         """
         wf = WORKFLOW_REGISTRY.get(workflow_name)
-        # _tree_item_for, not a bare lookup: a folder has a row per side now and
-        # the key a tab carries is the folder's own, with no side on it.
+        # _tree_item_for, not a bare lookup: a folder has a row per shape now and
+        # the key a tab carries is the folder's own, with no shape on it.
         item = self._tree_item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         rows = self._folder_modify_rows(group) if group is not None else []
@@ -2474,7 +2474,7 @@ class GalleryView(QWidget):
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
         key = self.folder_key_for(workflow_name, params)
-        launching = self._info_tabs.current_config_panel()
+        launching = self._generate_pane.current_generate_tab()
         seed_keys = wf.seed_keys()
         # Oldest first. A folder lists newest first, and a row's place in that
         # list is the order it was made in, so launching in reading order would
@@ -2528,13 +2528,13 @@ class GalleryView(QWidget):
 
     def _job_made_from(self, job, source_video_media) -> Combination:
         """What ``job`` was made from, for a surface with no frame of it yet: the
-        image, and the clip whose settings it follows as ``source_video_media`` shows
-        that clip — a still on the folder's tile, a loop in a config tab.
+        image, and the video whose settings it follows as ``source_video_media`` shows
+        that video — a still on the folder's tile, a loop in a Generate tab.
 
-        The clip only where a *video* was dropped: an act picked off the Combine
-        dropdown names what the run will do rather than a clip, and a thumbnail of
+        The video only where a *video* was dropped: an act picked off the Combine
+        dropdown names what the run will do rather than a video, and a thumbnail of
         some video the user never chose reads as a job that is that video — the
-        same reason the queue's rows leave it out (see BrowserPane).
+        same reason the queue's rows leave it out (see GalleryPane).
         """
         row = self._db.get_generation(job.prompt_id) if job is not None else None
         source_video = (None if row is None or row.get("act")
@@ -2555,10 +2555,10 @@ class GalleryView(QWidget):
 
     def _start_auto_reroll(self, key: str) -> bool:
         """Auto-Generate's own launch: the variation the tile's "+" would start,
-        except that nothing about it reaches a config tab.
+        except that nothing about it reaches a Generate tab.
 
         Auto-Generate is left running while the user works, so what it is making is not
-        what they are looking at. Its frames used to fill the info pane — that is,
+        what they are looking at. Its frames used to fill the Generate pane — that is,
         the preview of whichever tab was open, over the item the user had put
         there — and its results landed in a tab too. Both belong to the folder's
         own live tile in the middle column, which streams the run whether or not
@@ -2568,7 +2568,7 @@ class GalleryView(QWidget):
 
     def _start_reroll(self, key: str, *, from_auto: bool = False) -> bool:
         """Start a fresh variation for the folder ``key`` names and select it, so
-        its live preview fills the info pane at once. Returns whether a variation
+        its live preview fills the Generate pane at once. Returns whether a variation
         is now running for the folder — Auto-Generate's cue that a launch
         took hold, and its cue to stop when one can't.
 
@@ -2578,12 +2578,12 @@ class GalleryView(QWidget):
         showing its progress or offering to discard it.
 
         ``from_auto`` is Auto-Generate's launch (:meth:`_start_auto_reroll`), and the
-        one that goes up in no tab of its own: it takes the info pane only where the
+        one that goes up in no tab of its own: it takes the Generate pane only where the
         user already had it on this folder's Auto-Generate — watching one variation
         is watching the next — and otherwise leaves there whatever they put there.
 
         Skips a folder already re-rolling (or a missing client) without stealing
-        the info pane — the same guard the controller enforces before launching.
+        the Generate pane — the same guard the controller enforces before launching.
         """
         if self._client is None:
             return False
@@ -2678,7 +2678,7 @@ class GalleryView(QWidget):
 
     def _sync_cancel_buttons(self):
         """Re-word the hover of every Cancel that throws a run away — the
-        folder's live tile, the Job Queue's rows, each config tab's — after
+        folder's live tile, the Job Queue's rows, each Generate tab's — after
         Auto-Generate started or ended.
 
         Nothing else repaints them at that moment: switching Auto on over a folder
@@ -2701,10 +2701,10 @@ class GalleryView(QWidget):
         """A collection's plain name, for a spoken word to be answered in."""
         return COLLECTION_LABELS[key]
 
-    def stand_in_collection(self, key: str, side: str | None) -> bool:
+    def stand_in_collection(self, key: str, shape: str | None) -> bool:
         """Select a collection's row, exactly as clicking it does, and say whether the
-        tree had one — Recents and Favorites appear only once there is one."""
-        item = self._tree_item_for(oriented_key(key, side) if side else key)
+        tree had one — Latest and Favorites appear only once there is one."""
+        item = self._tree_item_for(shaped_key(key, shape) if shape else key)
         if item is None:
             return False
         self._tree.setCurrentItem(item)  # whose signal draws it
@@ -2737,7 +2737,7 @@ class GalleryView(QWidget):
         folder.  All of it: narrowing a slideshow to its favorites or its enhanced
         images is the slideshow's own doing, from the two switches on its HUD.
         """
-        rows = self._browser.collection_rows()
+        rows = self._gallery_pane.collection_rows()
         if rows is None:
             group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
@@ -2748,14 +2748,14 @@ class GalleryView(QWidget):
         if self._showing_search():
             return "these results"
         if self._current_collection_key() is not None:
-            return self._tree_view.breadcrumb(self._tree.currentItem())
+            return self._tree_view.folder_path(self._tree.currentItem())
         return "this folder"
 
-    # --- standalone enhance: the bank button, the selection action, the queue ---
+    # --- standalone enhance: the Gallery pane button, the selection action, the queue ---
 
     def _re_aim(self) -> None:
         """Re-aim everything that follows what is in front of the user: the whole
-        bank, the Enhance settings beside it, each tab's "Go to folder", and the
+        Gallery pane buttons, the Enhance settings beside it, each tab's "Go to folder", and the
         trash cans on picked rows.
 
         One call rather than nine. Which buttons an event moves is not something
@@ -2764,41 +2764,41 @@ class GalleryView(QWidget):
         handler asks for all of it and the state says how it stands.
         """
         enhance = self._enhance.offer()
-        self._bank.apply(self.bank_state(enhance))
-        self._enhance.sync_panel(enhance)
-        self._info_tabs.reread_folder_buttons()
+        self._buttons.apply(self.button_states(enhance))
+        self._enhance.sync_pane(enhance)
+        self._generate_pane.reread_folder_buttons()
         self._tree.offer_delete_on_picked_rows(
             self._selection_group is None or bool(self._current_deletable_folders()))
 
-    def bank_state(self, enhance: Offer) -> BankState:
-        """How the bank stands right now, gathered from the seams the buttons
+    def button_states(self, enhance: Offer) -> ButtonStates:
+        """How the Gallery pane buttons stand right now, gathered from the seams the buttons
         belong to: the trail, the undo stack, the tree's selection, the items
         picked, the enhance settings, the slideshows, and Auto-Generate.
 
         Assembled here because here is where those meet. Everything it reads is
         a question already asked by name, so the record can be written by hand in
-        a test and the bank written from it with no gallery at all.
+        a test and the buttons written from it with no gallery at all.
         """
         can_go_back, can_go_forward = self._trail
-        undo_label = self._actions.undo_label()
-        redo_label = self._actions.redo_label()
+        undo_label = self._edits.undo_label()
+        redo_label = self._edits.redo_label()
         auto_generate_folder = self._auto.active_key()
         group = self.current_group()
         can_auto_generate = (isinstance(group, gallery.SettingsGroup)
                              and self._can_reroll(group))
         elsewhere = (auto_generate_folder is not None
                      and auto_generate_folder != getattr(group, "key", None))
-        return BankState(
+        return ButtonStates(
             back=Button(enabled=can_go_back, tip="Back"),
             forward=Button(enabled=can_go_forward, tip="Forward"),
-            undo=Button(enabled=self._actions.can_undo(),
+            undo=Button(enabled=self._edits.can_undo(),
                         tip=f"Undo: {undo_label}" if undo_label else "Nothing to undo"),
-            redo=Button(enabled=self._actions.can_redo(),
+            redo=Button(enabled=self._edits.can_redo(),
                         tip=f"Redo: {redo_label}" if redo_label else "Nothing to redo"),
             # Several folders picked ARE the grouping, unsaved; one folder is not
             # a grouping, and the button would only ask what it meant.
             group=Button(visible=self._selection_group is not None,
-                         tip="Group the selected folders into a folder of your own"),
+                         tip="Group the selected folders into a collection of your own"),
             favorite=self._favorite_offer(),
             enhance=Button(enabled=enhance.available, tip=enhance.tip),
             delete=self._delete_offer(),
@@ -2837,11 +2837,11 @@ class GalleryView(QWidget):
         folder on screen. It toggles, so the tip says which way it will go — a set
         already favorited all over unfavorites.
 
-        Dark where a star means nothing: a collection, or a deleted item in the bin,
-        which has no folder to be bookmarked in.
+        Dark where a star means nothing: a collection, or a deleted item in the Trash,
+        which has no folder to be favorited in.
         """
-        pids = self.selected_prompt_ids() if self._browser.selected_ids else []
-        if pids and not self._browser.showing_trash():
+        pids = self.selected_prompt_ids() if self._gallery_pane.selected_ids else []
+        if pids and not self._gallery_pane.showing_trash():
             favoriting = not self._all_favorites(pids)
             return Button(tip=f"{'Favorite' if favoriting else 'Unfavorite'} {len(pids)} "
                               f"item{'s' if len(pids) != 1 else ''}")
@@ -2855,11 +2855,11 @@ class GalleryView(QWidget):
         """Delete, aimed the same way: the picked thumbnails, else the folder or
         the picked folders on screen, with the tip saying which.
 
-        In the bin the button's one remaining meaning is "for good", and the tip
+        In the Trash the button's one remaining meaning is "for good", and the tip
         has to say so before it is clicked.
         """
-        count = len(self._browser.selected_ids)
-        if self._browser.showing_trash():
+        count = len(self._gallery_pane.selected_ids)
+        if self._gallery_pane.showing_trash():
             return Button(
                 enabled=bool(count),
                 tip=f"Permanently delete {count} item{'s' if count != 1 else ''}"
@@ -2888,10 +2888,10 @@ class GalleryView(QWidget):
         return all(row and row.get("starred") for row in rows)
 
     def _favorite_selection(self):
-        """The bank button's action: bookmark the picked thumbnails, or the
-        folder on screen — and un-bookmark them when they already are, so the one
+        """The Gallery pane button's action: favorite the picked thumbnails, or the
+        folder on screen — and un-favorite them when they already are, so the one
         button is the whole of the toggle."""
-        if self._browser.selected_ids and not self._browser.showing_trash():
+        if self._gallery_pane.selected_ids and not self._gallery_pane.showing_trash():
             pids = self.selected_prompt_ids()
             self.set_items_favorite(pids, not self._all_favorites(pids))
             return
@@ -2905,11 +2905,11 @@ class GalleryView(QWidget):
         """
         self._slideshows.close_the_slideshows()
 
-    def fill_the_region(self, side: str) -> None:
-        self._slideshows.fill_the_region(side)
+    def fill_the_region(self, shape: str) -> None:
+        self._slideshows.fill_the_region(shape)
 
-    def close_the_slideshow(self, side: str) -> None:
-        self._slideshows.close_the_slideshow(side)
+    def close_the_slideshow(self, shape: str) -> None:
+        self._slideshows.close_the_slideshow(shape)
 
     # --- a spoken request's own generation -----------------------------------
 
@@ -2939,24 +2939,24 @@ class GalleryView(QWidget):
             new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
         )
         self.refresh()  # the queue marks the job as a request the moment it is spoken
-        return "Request submitted", NOTICE
+        return "Request submitted", INFO
 
-    def delete_enhance_levels(self, prompt_id: str, filenames: list):
-        """Bin some of one image's versions, from the info pane's version list.
+    def delete_enhance_versions(self, prompt_id: str, filenames: list):
+        """Trash some of one image's versions, from the Generate pane's version list.
 
         Undoable like every other delete here, and only ever a delete of files:
         the generation keeps its row, its folder, its star and its other
-        versions. The rebuild after is what redraws the tile — a binned top
+        versions. The rebuild after is what redraws the tile — a trashed top
         version means a new thumbnail and, once the last enhancement goes, no more
-        green badge."""
+        yellow plus."""
         row = self._db.get_generation(prompt_id)
-        if row is None or not self._actions.delete_enhance_levels(row, filenames):
+        if row is None or not self._edits.delete_enhance_versions(row, filenames):
             return
         self._re_aim()
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
-            self._info_tabs.refresh_displayed(updated, self._image_rows)
+            self._generate_pane.refresh_displayed(updated, self._image_rows)
         self._re_aim()  # an image with no enhancement left awaits one
 
     def slideshow_location(self):
@@ -2965,12 +2965,12 @@ class GalleryView(QWidget):
 
         A key rather than the rows themselves, because the point of holding it
         is to ask again later — after a generation lands in that folder, when
-        the rows are new objects and the browser is somewhere else entirely.
+        the rows are new objects and the Gallery pane is somewhere else entirely.
         """
         collection = self._current_collection_key()
         if collection is not None:
             return collection
-        # The row's own key, not the folder's: which side the folder is being
+        # The row's own key, not the folder's: which shape the folder is being
         # looked at from is what decides the screen a slideshow of it goes to.
         return (self.selected_folder_key()
                 if self.current_group() is not None else None)
@@ -2995,20 +2995,20 @@ class GalleryView(QWidget):
         self._slideshows.set_room_paused(paused)
         omnipause.freeze(paused)
 
-    def hud_place(self, side: str) -> tuple:
-        return self._slideshows.hud_place(side)
+    def hud_place(self, shape: str) -> tuple:
+        return self._slideshows.hud_place(shape)
 
-    def place_a_hud(self, side: str, action: str, argument: str) -> None:
-        self._slideshows.place_a_hud(side, action, argument)
+    def place_a_hud(self, shape: str, action: str, argument: str) -> None:
+        self._slideshows.place_a_hud(shape, action, argument)
 
-    def region_slideshow(self, side: str):
-        """The slideshow occupying satellite region *side*, or None. The hosting
+    def region_slideshow(self, shape: str):
+        """The slideshow occupying satellite region *shape*, or None. The hosting
         session's bridge asks this window for it."""
-        return self._slideshows.region_slideshow(side)
+        return self._slideshows.region_slideshow(shape)
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True):
-        """Bookmark a generation from a fullscreen slideshow (its Down key) — the same
-        star the gallery's own control sets — or take the bookmark back (its Up
+        """Favorite a generation from a fullscreen slideshow (its Down key) — the same
+        star the gallery's own control sets — or take the favorite back (its Up
         key over a favorite, the Funestras' "weird" on one)."""
         self.set_items_favorite([prompt_id], favorite)
 
@@ -3020,7 +3020,7 @@ class GalleryView(QWidget):
         collection plays as a slideshow, so Up there is the collection's own Reject, and
         that keeps the row whose params the policy learns to steer away from.
 
-        An item already in the bin has no row to delete, so Up does nothing over
+        An item already in the Trash has no row to delete, so Up does nothing over
         the Trash collection's slideshow. Deliberate: the only delete left there is the
         permanent one, and that is not a thing to do on a keystroke — it is asked
         for from the tile, and confirmed.
@@ -3029,10 +3029,10 @@ class GalleryView(QWidget):
         if row is None:
             return
         if gallery.unreviewed_experiments([row]):
-            self._actions.reject_experiment(row)
+            self._edits.reject_experiment(row)
             self._re_aim()
         else:
-            self._actions.delete_rows([row])
+            self._edits.delete_rows([row])
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         """Re-roll one i2v item, randomizing a single seed (its top-left hover
@@ -3104,11 +3104,11 @@ class GalleryView(QWidget):
         QMessageBox.information(self, title, message)
 
     def combine_selection(self) -> dict:
-        """What the combine panel is holding, for session save."""
+        """What the Combine is holding, for session save."""
         return self._combine.selection()
 
     def restore_combine_selection(self, saved) -> None:
-        """Put the combine panel back the way a session left it."""
+        """Put the Combine back the way a session left it."""
         self._combine.restore(saved)
 
     def animate_it(self, image_id: str | None,
@@ -3119,31 +3119,31 @@ class GalleryView(QWidget):
     def reveal_launch(self, key: str):
         """Show a just-launched combine. If its (image × settings) folder already
         exists, open it and mirror the live tile; otherwise it's a brand-new
-        combination with no folder yet, so park on Recents — where its in-flight
-        card shows — and remember the key for :meth:`_on_reroll_finished` to drill
+        combination with no folder yet, so park on Latest — where its in-flight
+        tile shows — and remember the key for :meth:`_on_reroll_finished` to drill
         into once the finished row gives the folder a node."""
         if self._stand_on_the_run_in(key):
             return  # an existing folder: watch the live tile there
-        if (recents := self._collection_item(_RECENTS_KEY, self._launched_side(key))) is not None:
+        if (latest := self._collection_item(_LATEST_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
-            self._tree.setCurrentItem(recents)
+            self._tree.setCurrentItem(latest)
 
     def _launched_side(self, key: str) -> str:
-        """Which side a job just launched in folder ``key`` will land on.
+        """Which shape a job just launched in folder ``key`` will land on.
 
         Read off the size it asked for, since it has no result to measure yet —
-        the same thing that puts its in-flight card in one Recents collection rather
-        than the other. With no job to ask, the side being browsed.
+        the same thing that puts its in-flight tile in one Latest collection rather
+        than the other. With no job to ask, the shape being browsed.
         """
         job = self._jobs.job_for(key)
-        asked = requested_orientation(job.params) if job is not None else None
-        return _side_holding(asked, self._tree.sides) or self.side_in_view()
+        asked = requested_shape(job.params) if job is not None else None
+        return _shape_holding(asked, self._tree.shapes) or self.shape_in_view()
 
-    # --- re-roll as the info-pane source ----------------------------------
+    # --- re-roll as the Generate pane source ----------------------------------
 
     def _reveal_reroll(self, key: str):
         """Open the folder a re-roll runs in and select its live tile — an
-        in-flight card's click, relayed by the browser pane.
+        in-flight tile's click, relayed by the Gallery pane.
 
         Leaves a running search first: results take the pane over, and picking
         a tree row underneath them re-scopes the search rather than showing the
@@ -3168,12 +3168,12 @@ class GalleryView(QWidget):
         is landed the way a clicked thumbnail is: in the front tab when its
         settings are this very folder, else in the pane's preview tab, seeded
         from the run's own settings
-        (:meth:`GenerateConfigPanel.show_running_generation`) so the tab is *for*
+        (:meth:`GenerateTab.show_running_generation`) so the tab is *for*
         this run — its form is the run's settings, its bar fills with the run's
         progress, its button discards it, and its preview follows the run's
         frames to the item they land as
-        (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the
-        tile or on the collection's card asks for, and the tab comes to the front as a
+        (:meth:`GenerateTab.watch_folder`). That is what a click on the
+        tile or on the collection's tile asks for, and the tab comes to the front as a
         clicked thumbnail's does.
 
         The folder tile's "+" lands its run the same way: that press is a press
@@ -3185,25 +3185,25 @@ class GalleryView(QWidget):
         if job is None:
             return
         self._enter_reroll_selection(key)
-        tabs = self._info_tabs
-        panel = tabs.panel_watching(key) or tabs.panel_that_launched(job.origin)
-        if panel is None:
-            front = tabs.current_config_panel()
+        tabs = self._generate_pane
+        tab = tabs.tab_watching(key) or tabs.tab_that_launched(job.origin)
+        if tab is None:
+            front = tabs.current_generate_tab()
             if (front is not None and front.workflow_and_signature() is not None
                     and self._config_folder_key(front.current_config()) == key):
-                panel = front
+                tab = front
             else:
-                panel = tabs.landing_panel()
+                tab = tabs.landing_tab()
                 row = self._db.get_generation(job.prompt_id)
                 if row is not None:
-                    panel.show_running_generation(row)
-            if job.origin not in panel.launched_runs():
-                panel.note_launched(job.origin)  # its Cancel and progress are this run's now
-            tabs.pin_tab(panel)  # ...so a later click opens beside it, not over it
+                    tab.show_running_generation(row)
+            if job.origin not in tab.launched_runs():
+                tab.note_launched(job.origin)  # its Cancel and progress are this run's now
+            tabs.pin_tab(tab)  # ...so a later click opens beside it, not over it
             self._reconcile_generating()
-        panel.watch_folder(key, job.last_preview, self._wait_note(key),
+        tab.watch_folder(key, job.last_preview, self._wait_note(key),
                            self._job_made_from(job, self.animated_preview))
-        tabs.setCurrentWidget(panel)
+        tabs.setCurrentWidget(tab)
 
     def _restore_reroll_selection(self, key: str | None):
         """After a rebuild, re-assert a still-running re-roll as the selected
@@ -3224,7 +3224,7 @@ class GalleryView(QWidget):
         any saved generation."""
         self._selected_reroll_key = key
         self._selected_row = None  # a running re-roll isn't a saved generation
-        self._browser.clear_thumbnail_selection()
+        self._gallery_pane.clear_thumbnail_selection()
         if self._generating_tile is not None:
             self._generating_tile.set_selected(True)
 
@@ -3241,18 +3241,18 @@ class GalleryView(QWidget):
         one. The count falls as the queue drains, and a pane frozen on a stale
         number is the mystery this is here to end. Only while the followed run
         has streamed no frame — once it has, the frame itself is the answer."""
-        for panel in self._info_tabs.config_panels():
-            key = panel.watched_key()
-            if key is not None and panel.is_awaiting_frame():
-                panel.show_live_wait(self._wait_note(key))
+        for tab in self._generate_pane.generate_tabs():
+            key = tab.watched_key()
+            if key is not None and tab.is_awaiting_frame():
+                tab.show_live_wait(self._wait_note(key))
 
     def _on_reroll_preview(self, key: str, prompt_id: str, data: bytes):
         """A run streamed a frame: put it in every tab following its folder — and
         nowhere else. A tab that isn't following the folder is showing something
         of its own, and a frame painted over that is the one nobody asked for.
         """
-        for panel in self._info_tabs.watchers_of(key):
-            panel.show_live_frame(data)
+        for tab in self._generate_pane.watchers_of(key):
+            tab.show_live_frame(data)
         # An enhance's frames show on the tile of the image being enhanced and in
         # the version list of any tab displaying it — an enhancement isn't a
         # generation taking a preview over.
@@ -3288,7 +3288,7 @@ class GalleryView(QWidget):
         self._after_a_job_ended_unfinished(key)
 
     def _cancel_job(self, prompt_id: str):
-        """Throw away one named run — a queue row's button, and a config tab's.
+        """Throw away one named run — a queue row's button, and a Generate tab's.
 
         A folder can hold several runs at once, so the one to drop is named rather
         than inferred from its folder; the redraw afterwards is the same.
@@ -3318,12 +3318,12 @@ class GalleryView(QWidget):
             self._clear_reroll_selection()
             self._selected_row = None
         if not self._jobs.has(key):
-            for panel in self._info_tabs.watchers_of(key):
-                panel.stop_watching()
+            for tab in self._generate_pane.watchers_of(key):
+                tab.stop_watching()
 
     def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         """A re-roll saved its result (finalized by the controller): drop it as the
-        info-pane source, rebuild so it shows as a normal thumbnail, and load it into
+        Generate pane source, rebuild so it shows as a normal thumbnail, and load it into
         the tab that launched it so a Generate ends on its finished output, not the
         placeholder."""
         # Which tab that is, read now: the rebuild below reconciles the finish, and
@@ -3333,7 +3333,7 @@ class GalleryView(QWidget):
         # working on, so it never takes a tab's preview over.
         run = origin or prompt_id
         launcher = (None if run in self._auto_origins
-                    else self._info_tabs.panel_that_launched(run))
+                    else self._generate_pane.tab_that_launched(run))
         self._auto_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if (finished_row is not None
@@ -3348,7 +3348,7 @@ class GalleryView(QWidget):
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             # A standalone enhance is an upgrade, not a generation: fold its
             # output onto the image it enhanced — same row, same folder, same
-            # star, now wearing the enhanced pixels and badge — and let the
+            # star, now wearing the enhanced pixels and plus — and let the
             # upgraded image be what the front tab shows.
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
@@ -3368,14 +3368,14 @@ class GalleryView(QWidget):
         self._slideshows.note_finished(finished_row)  # a slideshow of its folder gains it
         self._show_reroll_result_in_tab(finished_row, launcher)
         if folded:
-            # The image itself changed — it now holds a level it did not a
+            # The image itself changed — it now holds a version it did not a
             # moment ago — and a tab holds the row it was handed, not a live
             # view of the database. Without this the new version reaches the
             # list only when the tab is next opened, which is a tab away and
             # back.
-            self._info_tabs.refresh_displayed(finished_row, self._image_rows)
+            self._generate_pane.refresh_displayed(finished_row, self._image_rows)
         self._show_landed_to_watchers(key, finished_row, launcher)
-        # A combine whose brand-new folder we parked off (on Recents) now has a
+        # A combine whose brand-new folder we parked off (on Latest) now has a
         # finished row, so the rebuild above gave that folder a node: drill in.
         if key == self._pending_combine_key:
             self._pending_combine_key = None
@@ -3387,7 +3387,7 @@ class GalleryView(QWidget):
         self._auto.note_finished(key)  # if auto-generating in this folder, launch the next
         self._enhance.enhance_when_wanted(finished_row)  # while the Auto switch is on
         self._re_aim()  # a landed enhance may retire the button
-        self._enhance.reconcile()  # the live tile gives way to the level
+        self._enhance.reconcile()  # the live tile gives way to the version
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
         """After a re-roll finishes, load its result into the tab that launched it
@@ -3416,9 +3416,9 @@ class GalleryView(QWidget):
         """
         if finished_row is None or not gallery.produced_output(finished_row):
             return
-        for panel in self._info_tabs.watchers_of(key):
-            if panel is not launcher:
-                panel.show_finished_media(finished_row)
+        for tab in self._generate_pane.watchers_of(key):
+            if tab is not launcher:
+                tab.show_finished_media(finished_row)
 
     def _on_reroll_failed(self, key: str, message: str = ""):
         """A re-roll failed (recorded by the controller): let go of it wherever it
@@ -3431,10 +3431,10 @@ class GalleryView(QWidget):
         """Redraw the open settings folder so its tiles reflect the job."""
         group = self.current_group()
         if isinstance(group, gallery.SettingsGroup):
-            self._browser.show_thumbnails(group)
+            self._gallery_pane.show_thumbnails(group)
 
     def listed_prompt_ids(self) -> list[str]:
-        return self._browser.listed_prompt_ids()
+        return self._gallery_pane.listed_prompt_ids()
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
@@ -3447,7 +3447,7 @@ class GalleryView(QWidget):
 
     def _inflight_items(self, rows=None, requests=None) -> list:
         return self._starting.placed_among(
-            self._browser.inflight_items(rows=rows, requests=requests), self._jobs)
+            self._gallery_pane.inflight_items(rows=rows, requests=requests), self._jobs)
 
     def _update_queue(self, inflight=None):
         """Feed the Job Queue every in-flight job, in the order ComfyUI will
@@ -3459,7 +3459,7 @@ class GalleryView(QWidget):
         covers, and once for the slides themselves, since a run that has begun to
         look like something is a slide of that slideshow.
 
-        ``inflight`` is the already-built card list, when the caller (the poll)
+        ``inflight`` is the already-built tile list, when the caller (the poll)
         holds one; every other caller lets it be built fresh here.
         """
         items = self._inflight_items() if inflight is None else inflight
@@ -3568,29 +3568,29 @@ class GalleryView(QWidget):
         """
         self._pending_selection = prompt_id or None
 
-    def capture_config_tabs(self) -> dict:
-        """Snapshot the open editable config tabs (and which is active), for the
-        session. Delegates to the info pane's tab strip."""
-        return self._info_tabs.capture_state()
+    def capture_generate_tabs(self) -> dict:
+        """Snapshot the open editable Generate tabs (and which is active), for the
+        session. Delegates to the Generate pane's tab row."""
+        return self._generate_pane.capture_state()
 
-    def restore_config_tabs(self, state):
-        """Reopen the config tabs saved from a previous session — their
+    def restore_generate_tabs(self, state):
+        """Reopen the Generate tabs saved from a previous session — their
         configurations only; any still-running re-roll is reconnected separately by
         :meth:`reconnect_running_jobs`."""
-        self._info_tabs.restore_state(state)
+        self._generate_pane.restore_state(state)
 
     # --- selection ---------------------------------------------------------
 
     def selected_prompt_ids(self) -> list[str]:
-        return self._browser.selected_prompt_ids()
+        return self._gallery_pane.selected_prompt_ids()
 
     # --- deletion & undo ---------------------------------------------------
 
     def generation_menu(self, prompt_ids: list[str], global_pos):
         """The right-click menu a generation offers, wherever it is shown.
 
-        One menu rather than one per surface: a thumbnail in the browser pane and
-        the preview in a config tab are looking at the same generation, so a
+        One menu rather than one per surface: a thumbnail in the Gallery pane and
+        the preview in a Generate tab are looking at the same generation, so a
         right-click has to reach the same acts either way.
 
         "Go to folder" is left off when the pane already IS that folder, which is
@@ -3604,11 +3604,11 @@ class GalleryView(QWidget):
         the whole selection to the opposite state.
 
         Another act appears only while something is being made of a picked image:
-        cancel the enhancement in flight. An enhancement has no card of its own —
+        cancel the enhancement in flight. An enhancement has no tile of its own —
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
         it the run had to be hunted down among the Job Queue's rows. It sits
-        beside Enhance, the act that started it. And inside a custom folder, what
+        beside Enhance, the act that started it. And inside a custom collection, what
         it holds on its own can be taken back out of it, as its folders can.
         """
         rows = [row for pid in prompt_ids
@@ -3625,7 +3625,7 @@ class GalleryView(QWidget):
             menu, [self._item_names.of(row["prompt_id"]) for row in rows])
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
-        open_custom = _saved_custom_folder(self.current_group())
+        open_custom = _saved_custom_collection(self.current_group())
         held = {row["prompt_id"] for row in open_custom.rows} if open_custom else set()
         held_here = [row["prompt_id"] for row in rows if row["prompt_id"] in held]
         remove_action = (menu.addAction(f"Remove from “{open_custom.label}”")
@@ -3656,7 +3656,7 @@ class GalleryView(QWidget):
         elif chosen is favorite_action:
             self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
         elif remove_action is not None and chosen is remove_action:
-            self._remove_from_custom_folder(open_custom, items=held_here)
+            self._remove_from_custom_collection(open_custom, items=held_here)
         elif enhance_action is not None and chosen is enhance_action:
             self._enhance.enhance_items(to_enhance)
         elif cancel_action is not None and chosen is cancel_action:
@@ -3677,20 +3677,20 @@ class GalleryView(QWidget):
         return leaf is not None and leaf is not self._tree.currentItem()
 
     def run_item_action(self, prompt_id: str, action: str):
-        """Run one corner control's act on one generation.
+        """Run one corner button's act on one generation.
 
-        The corner controls are drawn on a particular item, so unlike the menu
-        they never act on a selection: pressing the star on a tile bookmarks THAT
+        The corner buttons are drawn on a particular item, so unlike the menu
+        they never act on a selection: pressing the star on a tile favorites THAT
         tile, whichever tiles happen to be picked.
         """
         row = self._db.get_generation(prompt_id)
         if row is None:
             return
-        if action == corner_controls.STAR:
+        if action == corner_buttons.STAR:
             self.set_items_favorite([prompt_id], not row.get("starred"))
-        elif action == corner_controls.TRASH:
+        elif action == corner_buttons.TRASH:
             self._delete_rows([row])
-        elif action == corner_controls.ENHANCE:
+        elif action == corner_buttons.ENHANCE:
             self._enhance.enhance_items([prompt_id])
 
     def set_items_favorite(self, prompt_ids, favorite: bool):
@@ -3703,24 +3703,24 @@ class GalleryView(QWidget):
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0
         if not self._redrew_the_favorites_collection():
-            self._browser.refresh_corners()
-        self._info_tabs.reconcile_previews(self._live_ids)
-        if ids & self._browser.selected_ids:
+            self._gallery_pane.refresh_corners()
+        self._generate_pane.reconcile_previews(self._live_ids)
+        if ids & self._gallery_pane.selected_ids:
             self._re_aim()
 
     def _recount_the_collections(self) -> None:
-        for side in self._tree.sides:
-            self._tree_view.set_collection_counts(side, self._browser.collection_counts(side))
+        for shape in self._tree.shapes:
+            self._tree_view.set_collection_counts(shape, self._gallery_pane.collection_counts(shape))
 
     def _redrew_the_favorites_collection(self) -> bool:
         self._recount_the_collections()
-        base, side = _split_collection_key(self.selected_folder_key())
+        base, shape = _split_collection_key(self.selected_folder_key())
         collection = folder_collection(base)
         if collection is None or collection.which != _FAVORITES_KEY:
             return False
-        place = self._browser.place()
-        self._browser.show_collection(collection.key, side)
-        self._browser.return_to(place)
+        place = self._gallery_pane.place()
+        self._gallery_pane.show_collection(collection.key, shape)
+        self._gallery_pane.return_to(place)
         return True
 
     def _delete_selection(self):
@@ -3731,17 +3731,17 @@ class GalleryView(QWidget):
         one meaning it can have where it is standing — rather than a control that
         looks live and quietly does nothing.
         """
-        if self._browser.showing_trash():
+        if self._gallery_pane.showing_trash():
             self.purge_from_trash(self.selected_prompt_ids())
             return
-        if self._browser.selected_ids:
+        if self._gallery_pane.selected_ids:
             rows = [self._db.get_generation(pid) for pid in self.selected_prompt_ids()]
             self._delete_rows([r for r in rows if r])
             return
         self._delete_folders(self._current_deletable_folders())
 
     def _copy_names_of_the_selection(self):
-        if self._browser.selected_ids:
+        if self._gallery_pane.selected_ids:
             copy_names([self._item_names.of(pid) for pid in self.selected_prompt_ids()])
         elif self._selection_group is not None:
             copy_names(_names_of_the_picked_folders(self._selection_group))
@@ -3750,9 +3750,9 @@ class GalleryView(QWidget):
 
     # --- the Trash collection: restoring a delete, or ending it --------------
 
-    def _bin_records(self) -> list[dict]:
-        """The held deletions the Trash collection offers."""
-        return self._db.list_deletions()
+    def _trash_records(self) -> list[dict]:
+        """The trashed items the Trash collection offers."""
+        return self._db.list_trashed()
 
     def _on_trash_action(self, prompt_id: str, action_id: str):
         """A Trash tile's hover control: restore this item, or end it now."""
@@ -3782,7 +3782,7 @@ class GalleryView(QWidget):
         if not prompt_ids:
             return
         try:
-            restored = self._actions.restore_deleted(prompt_ids)
+            restored = self._edits.restore_deleted(prompt_ids)
         except Exception as e:
             logger.exception("Failed to restore %d deleted item(s)", len(prompt_ids))
             QMessageBox.warning(
@@ -3790,7 +3790,7 @@ class GalleryView(QWidget):
                 f"Could not restore the selected item(s):\n\n{e}",
             )
             return
-        self._browser.clear_selection()
+        self._gallery_pane.clear_selection()
         self.refresh()
         if restored:
             self._go_to_generation(restored)
@@ -3808,7 +3808,7 @@ class GalleryView(QWidget):
         ):
             return
         try:
-            self._actions.purge_deleted(prompt_ids)
+            self._edits.purge_deleted(prompt_ids)
         except Exception as e:
             logger.exception("Failed to permanently delete %d item(s)", count)
             QMessageBox.warning(
@@ -3816,7 +3816,7 @@ class GalleryView(QWidget):
                 f"Could not permanently delete the selected item(s):\n\n{e}",
             )
             return
-        self._browser.clear_selection()
+        self._gallery_pane.clear_selection()
         self.refresh()
 
     def _current_deletable_folders(self) -> list:
@@ -3863,7 +3863,7 @@ class GalleryView(QWidget):
         under those — what a delete of ``group`` takes off the tree, so a return
         target can avoid them.
 
-        Both sides, because a folder holding both shapes is drawn twice and the
+        Both shapes, because a folder holding both shapes is drawn twice and the
         delete takes both copies.
         """
         keys, stack = set(), [self._item_by_key[key] for key
@@ -3879,21 +3879,21 @@ class GalleryView(QWidget):
         """Drop every on-screen view of ``paths`` — the files a delete is about to
         move — so nothing in this app is still holding one open.
 
-        Wired into :class:`GalleryActions` itself, so it runs for every delete
+        Wired into :class:`GalleryEdits` itself, so it runs for every delete
         there is: a picked tile, a whole folder, a rejected experiment, a
         slideshow's Up key. Windows won't move a file while any handle on it is
         open, and a video preview holds one for as long as it's loaded — so an
         item still showing anywhere blocks its own deletion. Panes showing
         something else keep it.
         """
-        self._info_tabs.release_media(paths)
+        self._generate_pane.release_media(paths)
         self._slideshows.release_media(paths)
 
     def _delete_rows(self, rows):
         if not rows:
             return
         try:
-            self._actions.delete_rows(rows)
+            self._edits.delete_rows(rows)
         except Exception as e:
             # A delete that throws (a locked file, a vanished path) must not fail
             # silently — show what went wrong rather than appearing to do nothing.
@@ -3903,15 +3903,15 @@ class GalleryView(QWidget):
                 f"Could not delete the selected item(s):\n\n{e}",
             )
             return
-        self._browser.clear_selection()
+        self._gallery_pane.clear_selection()
         self.refresh()
         self._re_aim()
 
     def _undo(self):
-        if not self._actions.can_undo():
+        if not self._edits.can_undo():
             return
-        focus = self._actions.undo()  # a restored generation to return to, if any
-        self._browser.clear_selection()
+        focus = self._edits.undo()  # a restored generation to return to, if any
+        self._gallery_pane.clear_selection()
         self.refresh()
         # After undoing a delete, go back to the folder it emptied (now restored),
         # rather than leaving the user on the parent we'd navigated to.
@@ -3922,10 +3922,10 @@ class GalleryView(QWidget):
     def _redo(self):
         """Re-apply what Undo took back. There is nothing to navigate to — a redo
         takes something away rather than restoring it — so this only rebuilds."""
-        if not self._actions.can_redo():
+        if not self._edits.can_redo():
             return
-        self._actions.redo()
-        self._browser.clear_selection()
+        self._edits.redo()
+        self._gallery_pane.clear_selection()
         self.refresh()
         self._re_aim()
 
@@ -3938,9 +3938,9 @@ class GalleryView(QWidget):
 
     # --- right-click menus & star --------------------------------------------
 
-    def _on_tree_context_menu(self, item, global_pos: QPoint, side: str):
+    def _on_tree_context_menu(self, item, global_pos: QPoint, shape: str):
         if item is None:
-            self._empty_tree_context_menu(global_pos, side)
+            self._empty_tree_context_menu(global_pos, shape)
             return
         # Right-clicking inside a multi-selection offers what to do with the whole
         # set; right-clicking outside it is about the one row under the cursor.
@@ -3953,19 +3953,19 @@ class GalleryView(QWidget):
             self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos,
                                       toc_rows=[item])
 
-    def _empty_tree_context_menu(self, global_pos: QPoint, side: str):
+    def _empty_tree_context_menu(self, global_pos: QPoint, shape: str):
         """Below the last row there is no folder to act on, so the only thing on
-        offer is starting a new folder of your own."""
+        offer is starting a new collection of your own."""
         menu = QMenu(self)
-        new_action = menu.addAction("New folder…")
+        new_action = menu.addAction("New collection…")
         if menu.exec(global_pos) == new_action:
-            self._new_custom_folder(side)
+            self._new_custom_collection(shape)
 
     def _selection_context_menu(self, global_pos: QPoint):
         names = _names_of_the_picked_folders(self._selection_group)
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, names)
-        group_action = menu.addAction(f"Group {len(names)} folders into a new folder…")
+        group_action = menu.addAction(f"Group {len(names)} folders into a new collection…")
         doomed = self._current_deletable_folders()
         delete_action = None
         if doomed:
@@ -3985,9 +3985,9 @@ class GalleryView(QWidget):
         if group is None:
             return
         holder = (_folder_of_your_own_above(toc_rows) if toc_rows
-                  else _saved_custom_folder(self.current_group()))
-        if isinstance(group, gallery.CustomGroup):
-            self._custom_folder_context_menu(group, global_pos, holder, toc_rows)
+                  else _saved_custom_collection(self.current_group()))
+        if isinstance(group, gallery.CustomCollection):
+            self._custom_collection_context_menu(group, global_pos, holder, toc_rows)
             return
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
@@ -4003,7 +4003,7 @@ class GalleryView(QWidget):
         if chosen == favorite_action:
             self._toggle_favorite(key)
         elif remove_action is not None and chosen == remove_action:
-            self._remove_from_custom_folder(holder, [group.key])
+            self._remove_from_custom_collection(holder, [group.key])
         elif chosen in add_menu:
             self._on_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
@@ -4014,32 +4014,32 @@ class GalleryView(QWidget):
     def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
         """An "Add to" sub-menu naming each of the user's folders — the menu route
         to what a drag onto its row does, for when dragging is awkward (a long tree,
-        a folder scrolled out of sight). Returns ``{action: custom folder key}``,
+        a folder scrolled out of sight). Returns ``{action: custom collection key}``,
         empty when there are no folders of the user's own yet."""
-        side = _side_of(key) or self.side_in_view()
-        targets = [f for f in self._custom_folders_by_side.get(side, ())
+        shape = _shape_of(key) or self.shape_in_view()
+        targets = [f for f in self._custom_collections_by_shape.get(shape, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
-        submenu = menu.addMenu("Add to folder")
+        submenu = menu.addMenu("Add to collection")
         return {submenu.addAction(folder.label): folder.key for folder in targets}
 
-    def _custom_folder_context_menu(self, group, global_pos: QPoint, holder, toc_rows):
+    def _custom_collection_context_menu(self, group, global_pos: QPoint, holder, toc_rows):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
         take_out_action = _offer_taking_out(menu, holder, group)
-        remove_action = menu.addAction("Remove folder…")
+        remove_action = menu.addAction("Remove collection…")
         collapse_and_expand = offer_collapse_and_expand(menu, toc_rows)
         chosen = menu.exec(global_pos)
         if take_out_action is not None and chosen == take_out_action:
-            self._remove_from_custom_folder(holder, [group.key])
+            self._remove_from_custom_collection(holder, [group.key])
         elif chosen == remove_action:
-            self._remove_custom_folder(group)
+            self._remove_custom_collection(group)
         elif chosen in collapse_and_expand:
             collapse_and_expand[chosen]()
 
     def _toggle_favorite(self, key: str):
-        # A star is the folder's, not the row's: both sides draw the same folder,
+        # A star is the folder's, not the row's: both shapes draw the same folder,
         # so favoriting it on one is favoriting it.
         group = self.group_for_key(key)
         if _takes_a_favorite(group):
@@ -4057,7 +4057,7 @@ class GalleryView(QWidget):
                              _folder_meta_fingerprint(self._folder_meta))
         self._drawn_version += 1
         if not self._redrew_the_favorites_collection():
-            self._browser.mark_folder_favorite(key, favorite)
+            self._gallery_pane.mark_folder_favorite(key, favorite)
 
     def _delete_folder_by_key(self, key: str):
         """Delete what a row's trash can names: its folder, or every picked folder."""
@@ -4067,14 +4067,14 @@ class GalleryView(QWidget):
         elif group is not None:
             self._delete_folders([group])
 
-    # --- the selected generation drives a config tab -----------------------
+    # --- the selected generation drives a Generate tab -----------------------
 
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation under a tile: the gallery's own row, else a held
         deletion's.
 
         A deleted item's row is out of the ``generations`` table — that is what
-        deleting is — but the recovery bin kept it whole, and its files are all
+        deleting is — but the Trash kept it whole, and its files are all
         still there in the trash. So a Trash tile is a generation like any other
         to look at: it previews, it plays, it opens full size, it fills a config
         tab with the settings that made it. Only the actions that would change it
@@ -4099,11 +4099,11 @@ class GalleryView(QWidget):
         self._navigation.record(prompt_id)
 
     def _show_generation(self, prompt_id: str) -> bool:
-        """Make a generation the selected item and load it into a config tab —
+        """Make a generation the selected item and load it into a Generate tab —
         its output in the preview, its settings in the form, a footer for its
         media type — saying whether the gallery still has a row for it.
 
-        Which tab is :meth:`InfoPaneTabs.load_selection`'s to say — the one
+        Which tab is :meth:`GeneratePane.load_selection`'s to say — the one
         already on this row's folder, else the pane's preview tab — and a tab is
         only ever painted through there: no tab's preview is repainted from the
         outside, so what a tab shows is always what that tab is for.
@@ -4116,7 +4116,7 @@ class GalleryView(QWidget):
         if not row:
             return False
         self._select_saved_generation(row)
-        self._info_tabs.load_selection(row, self._image_rows)
+        self._generate_pane.load_selection(row, self._image_rows)
         return True
 
     def _select_saved_generation(self, row: dict):
@@ -4128,8 +4128,8 @@ class GalleryView(QWidget):
     def animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` once one is made — until then
         ``None``, and the tile shows its still while one is made off the window's
-        thread and starts playing it when it is. Feeds the grid tiles, the Recents
-        collection and Combine's slots; the info pane's strip asks the same maker."""
+        thread and starts playing it when it is. Feeds the grid tiles, the Latest
+        collection and Combine's drop zones; the Generate pane's Animations ask the same maker."""
         return self._moving_previews.of(row)
 
     def follow_link(self, prompt_id: str):
@@ -4156,7 +4156,7 @@ class GalleryView(QWidget):
 
     def _go_to_generation(self, prompt_id: str):
         """Go to a generation: open the folder holding it, draw that folder, pick
-        the item's own tile in it, and show the item in the info pane.
+        the item's own tile in it, and show the item in the Generate pane.
 
         The single move under every "take me to this item" — a link, a
         right-click "Go to folder", Back and Forward, a hosted slideshow's lock, an
@@ -4184,10 +4184,10 @@ class GalleryView(QWidget):
                 if not drawn_by_the_signal:
                     self._on_folder_selected(item, None)
         self._on_thumbnail_clicked(prompt_id)   # the arrival: its tab, and its stop
-        revealed = self._browser.reveal_tile(prompt_id)
+        revealed = self._gallery_pane.reveal_tile(prompt_id)
         logger.info("Went to %s: folder %s, %d items listed, tile shown %s",
                     prompt_id, self.selected_folder_key(),
-                    len(self._browser.listed_prompt_ids()), revealed)
+                    len(self._gallery_pane.listed_prompt_ids()), revealed)
 
     def _folder_row_for(self, prompt_id: str):
         """The tree row of the folder a generation lives in: its settings row, or
@@ -4198,7 +4198,7 @@ class GalleryView(QWidget):
         ``None`` only when the tree has nowhere at all to put it, which is the
         one case a move has no folder to open. Answering ``None`` for anything
         less than that is what left a move opening no folder while the item it
-        named went on to fill the info pane, so the click read as having done
+        named went on to fill the Generate pane, so the click read as having done
         nothing.
         """
         leaf = self._leaf_by_id.get(prompt_id)
@@ -4207,7 +4207,7 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None:
             held = self.row_for(prompt_id)
-            return self._tree_item_for(oriented_key(_TRASH_KEY, row_orientation(held))) if held else None
+            return self._tree_item_for(shaped_key(_TRASH_KEY, row_shape(held))) if held else None
         key = self.folder_key_of(row)
         return self._tree_item_for(key) if key else None
 
@@ -4223,23 +4223,23 @@ class GalleryView(QWidget):
         nothing about the selection going was about any of them."""
         self._selected_row = None
 
-    def pin_config_tab(self):
-        """Keep the front config tab — the double-click half of the pane's
-        preview-tab rule. Relayed here because the browser owns the gesture and
-        the info pane owns the tabs."""
-        self._info_tabs.pin_current_tab()
+    def pin_generate_tab(self):
+        """Keep the front Generate tab — the double-click half of the pane's
+        preview-tab rule. Relayed here because the Gallery pane owns the gesture and
+        the Generate pane owns the tabs."""
+        self._generate_pane.pin_current_tab()
 
 
-def _side_list(rows, meta, start_frames, side, name_of):
-    return gallery.build_gallery_tree(filter_rows(rows, side), meta,
+def _side_list(rows, meta, start_frames, shape, name_of):
+    return gallery.build_gallery_tree(filter_rows(rows, shape), meta,
                                       image_index=start_frames, name_of=name_of)
 
 
-def _custom_folders_by_side(trees, records) -> dict[str, list]:
-    return {side: gallery.build_custom_folders(
+def _custom_collections_by_shape(trees, records) -> dict[str, list]:
+    return {shape: gallery.build_custom_collections(
                 tree, [record for record in records
-                       if _side_covers(side, record["side"] or _LANDSCAPE)])
-            for side, tree in trees.items()}
+                       if _shape_covers(shape, record["side"] or _LANDSCAPE)])
+            for shape, tree in trees.items()}
 
 
 def _group_workflow(group) -> str | None:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from origenerator.fun_time_mode import (
     MODE_FLAG,
-    SIDES,
+    SHAPES,
     funestra_flags,
     headset_flags,
     required_flags,
@@ -32,8 +32,8 @@ def hosted_launch(
         if flag != MODE_FLAG:
             argv += [flag, named.get(flag, _ANYTHING)]
     if funestras:
-        for side in SIDES:
-            for flag in funestra_flags(side):
+        for shape in SHAPES:
+            for flag in funestra_flags(shape):
                 argv += [flag, named.get(flag, _ANYTHING)]
     if headset:
         for flag in headset_flags():

@@ -8,7 +8,7 @@ from origenerator.media import MediaType, video_frame_size
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
-    LONGEST_CLIP_FRAMES,
+    LONGEST_VIDEO_FRAMES,
     ParamDef,
     ParamType,
     WorkflowTemplate,
@@ -19,7 +19,7 @@ from origenerator.workflows.driving_video import driven_actions, frames_within, 
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import WAN, WAN_ANIMATE
-from origenerator.workflows.model_pickers import model_picker
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
 
@@ -85,14 +85,14 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
                      min_val=0.0, step=1.0),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5,
-                     max_val=LONGEST_CLIP_FRAMES, step=4, options=DURATION_OPTIONS, unit="s",
+                     max_val=LONGEST_VIDEO_FRAMES, step=4, options=DURATION_OPTIONS, unit="s",
                      rate=NATIVE_FPS, good=(81, 161)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(4, 8)),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1,
                      good=(1.0, 1.0)),
             ParamDef("shift", "Composition Focus", ParamType.FLOAT, defaults["shift"], min_val=0.0, max_val=20.0,
                      step=0.5, good=(5, 12)),
-            model_picker("unet", "Model", defaults["unet"], "diffusion_models",
+            model_dropdown("unet", "Model", defaults["unet"], "diffusion_models",
                          accepts=(WAN_ANIMATE,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(WAN,)),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
@@ -112,7 +112,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
             return None
         params = self._within_the_video(params)
         return driven_actions(actions, start_ms=_ms(start_frame(params["video_start"])),
-                              length_ms=_ms(self.clip_frames(self.scene_plan(params))))
+                              length_ms=_ms(self.video_frames(self.scene_plan(params))))
 
     @staticmethod
     def _within_the_video(params: dict) -> dict:

@@ -45,7 +45,7 @@ def test_each_scene_speaks_its_own_line_for_its_own_seconds():
 
 
 def test_a_lone_scene_speaks_for_the_clip_length_whatever_its_own_entry_says():
-    # The graph runs a lone scene for the clip length (scene_plan), so its
+    # The graph runs a lone scene for the video length (scene_plan), so its
     # line lasts that long too.
     spoken = scene_speech(_params(frame_count=121, scene_frames=[81], scene_lines=["hi"]))
     assert spoken[0].frames == 121

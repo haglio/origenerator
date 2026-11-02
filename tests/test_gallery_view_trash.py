@@ -27,11 +27,11 @@ from origenerator import (
 from origenerator.branch_session import ENV_FLAG
 from origenerator.db import Database
 from origenerator.gallery.collection import (
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.output_places import OutputPlaces
@@ -46,7 +46,6 @@ from tests.gallery_view_support import (
     _answer_confirmation,
     _answer_menu,
     _at,
-    _bin_db,
     _click_beside_the_mark_of,
     _click_off,
     _click_tile,
@@ -64,6 +63,7 @@ from tests.gallery_view_support import (
     _shown_view_with_one_image,
     _top_level,
     _trash_collection_view,
+    _trash_db,
     _video_workflow,
     _workflow_rows,
 )
@@ -75,11 +75,11 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
-# --- the Trash collection: deleted items, still recoverable -----------------
+# --- the Trash collection: deleted items, still in the Trash -----------------
 
 
 def test_the_trash_collection_is_always_reachable(qtbot):
-    # A bin you can only find once you have something to recover is no use: the
+    # A Trash you can only find once you have something to recover is no use: the
     # point is knowing, before you delete, that deleting is not the end.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
@@ -90,7 +90,7 @@ def test_the_trash_collection_is_always_reachable(qtbot):
 
 
 def test_the_trash_collection_label_counts_what_it_holds(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -99,7 +99,7 @@ def test_the_trash_collection_label_counts_what_it_holds(qtbot):
 
 
 def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
-    view = GalleryView(_bin_db(held=[("old", _image("old", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("old", _image("old", "a cat", 50, 1)),
                                      ("new", _image("new", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -109,25 +109,25 @@ def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
 
 
 def test_following_a_link_to_an_item_in_the_trash_opens_the_trash_on_it(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view.follow_link("d1")
 
-    assert view._browser.showing_trash()
+    assert view._gallery_pane.showing_trash()
     assert view.listed_prompt_ids() == ["d1"]
 
 
 def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, tmp_path):
-    # End to end through the real GalleryActions: delete a tile, and the item is
+    # End to end through the real GalleryEdits: delete a tile, and the item is
     # standing in the Trash collection rather than gone.
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -139,12 +139,12 @@ def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, t
 
 
 def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    tooltips = [b.toolTip() for b in view._browser._thumb_widgets["d1"]._corner_buttons]
+    tooltips = [b.toolTip() for b in view._gallery_pane._thumb_widgets["d1"]._corner_buttons]
     assert any("Restore" in t for t in tooltips)
     assert any("permanently" in t for t in tooltips)
 
@@ -153,28 +153,28 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
     # Nothing counts down any more, so the caption has no deadline to carry and
     # says only what the item is.
     held = _image("d1", "a cat", 50, 1)
-    view = GalleryView(_bin_db(held=[("d1", held)]))
+    view = GalleryView(_trash_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    caption = view._browser._thumb_widgets["d1"]._text_label.text()
+    caption = view._gallery_pane._thumb_widgets["d1"]._text_label.text()
     assert caption == f"{gallery.folder_id(gallery.settings_folder_key(held))} 000"
 
 
 def test_an_old_version_the_backfill_sent_to_the_trash_says_so_on_its_tile(qtbot):
     held = {**_image("d1", "a cat", 50, 1), "old_version_of": "the video it was made again as"}
-    view = GalleryView(_bin_db(held=[("d1", held)]))
+    view = GalleryView(_trash_db(held=[("d1", held)]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    caption = view._browser._thumb_widgets["d1"]._text_label.text()
+    caption = view._gallery_pane._thumb_widgets["d1"]._text_label.text()
     assert caption == f"Old version · {gallery.folder_id(gallery.settings_folder_key(held))} 000"
 
 
 def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -188,19 +188,19 @@ def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    assert "as long as you leave them" in view._browser._trash_empty_hint()
+    assert "as long as you leave them" in view._gallery_pane._trash_empty_hint()
     assert view._avg_label.text() == ""  # the hint already says it; don't say it twice
 
 
 def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "restore")
+    view._gallery_pane._thumb_widgets["d1"].corner_button_triggered.emit("d1", "restore")
 
     assert actions.restored == [["d1"]]
 
@@ -212,7 +212,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
                          params_json=json.dumps({"steps": 20}), workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -223,13 +223,13 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     assert "SDXL T2I" in _workflow_rows(view._tree)      # back in the tree...
     assert view.listed_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
-    assert view._db.list_deletions() == []
+    assert view._db.list_trashed() == []
 
 
 def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     # The one gallery action with no undo and no second copy under it.
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -237,13 +237,13 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     asked = []
     monkeypatch.setattr(view, "_confirm", lambda text: asked.append(text) or False)
 
-    view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "purge")
+    view._gallery_pane._thumb_widgets["d1"].corner_button_triggered.emit("d1", "purge")
 
     assert actions.purged == []                      # declined: nothing ended
     assert "cannot be undone" in asked[0]
 
     monkeypatch.setattr(view, "_confirm", lambda text: True)
-    view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "purge")
+    view._gallery_pane._thumb_widgets["d1"].corner_button_triggered.emit("d1", "purge")
     assert actions.purged == [["d1"]]
 
 
@@ -276,7 +276,7 @@ def test_a_trash_tiles_menu_offers_the_names_and_the_two_acts_a_deleted_item_has
     # The hover corners act on the one tile under the pointer; the menu acts on
     # the whole pick, which is the only way to answer for a batch at once.
     view = _trash_collection_view(qtbot, FakeActions(), held=_TWO_HELD)
-    view._browser.apply_selection("d2", _CTRL)
+    view._gallery_pane.apply_selection("d2", _CTRL)
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -287,7 +287,7 @@ def test_a_trash_tiles_menu_offers_the_names_and_the_two_acts_a_deleted_item_has
 
 def test_a_trash_tiles_menu_copies_the_names_the_picked_items_had(qtbot, monkeypatch):
     view = _trash_collection_view(qtbot, FakeActions(), held=_TWO_HELD)
-    view._browser.apply_selection("d2", _CTRL)
+    view._gallery_pane.apply_selection("d2", _CTRL)
     QApplication.clipboard().clear()
     _answer_menu(monkeypatch, "Copy 2 names")
 
@@ -302,7 +302,7 @@ def test_a_trash_tiles_menu_copies_the_names_the_picked_items_had(qtbot, monkeyp
 def test_restoring_from_a_trash_tiles_menu_brings_the_whole_pick_back(qtbot, monkeypatch):
     actions = FakeActions()
     view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
-    view._browser.apply_selection("d2", _CTRL)
+    view._gallery_pane.apply_selection("d2", _CTRL)
     picked = view.selected_prompt_ids()
     _answer_menu(monkeypatch, "Restore 2 items")
 
@@ -316,7 +316,7 @@ def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch
     # take files with nothing under them, so the menu's wiring is not a detail.
     actions = FakeActions()
     view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
-    view._browser.apply_selection("d2", _CTRL)
+    view._gallery_pane.apply_selection("d2", _CTRL)
     picked = view.selected_prompt_ids()
     _answer_menu(monkeypatch, "Delete 2 items permanently")
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
@@ -384,15 +384,15 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
     # The picked items are already deleted, so the button's one remaining
     # meaning is "for good" — rather than a live-looking control doing nothing.
     actions = FakeActions()
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    view._browser.apply_selection("d1", _NO_MOD)
+    view._gallery_pane.apply_selection("d1", _NO_MOD)
     monkeypatch.setattr(view, "_confirm", lambda text: True)
 
-    assert "Permanently delete 1 item" in view._bank.delete.toolTip()
+    assert "Permanently delete 1 item" in view._buttons.delete.toolTip()
     view._delete_selection()
 
     assert actions.purged == [["d1"]]
@@ -400,13 +400,13 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
 
 
 def test_the_delete_button_is_dark_on_an_unpicked_trash_collection(qtbot):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    assert not view._bank.delete.isEnabled()
+    assert not view._buttons.delete.isEnabled()
 
 
 def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch):
@@ -415,7 +415,7 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -426,27 +426,27 @@ def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view.listed_prompt_ids() == []
-    assert db.list_deletions() == []
+    assert db.list_trashed() == []
 
 
 def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
-    view = GalleryView(_bin_db([_image("i1", "a cat", 50, 1)],
+    view = GalleryView(_trash_db([_image("i1", "a cat", 50, 1)],
                                held=[("d1", _image("d1", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     view._navigation.go_back()
 
     assert view._tree.currentItem() is _collection(view, TRASH_KEY)
 
 
-def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypatch):
+def test_a_preview_offers_every_trashed_item_like_the_live_app(qtbot, monkeypatch):
     # One library, one trash: what any instance deleted, any instance can put
     # back, so the collection holds the same items whichever app is looking at it.
     monkeypatch.setenv(ENV_FLAG, "1")
-    db = _bin_db(held=[("mine", _image("mine", "a dog", 50, 2))],
+    db = _trash_db(held=[("mine", _image("mine", "a dog", 50, 2))],
                  inherited=[("live", _image("live", "a cat", 50, 1))])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -454,22 +454,22 @@ def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypat
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert sorted(view.listed_prompt_ids()) == ["live", "mine"]
-    assert "preview" not in view._browser._trash_empty_hint()
+    assert "preview" not in view._gallery_pane._trash_empty_hint()
 
     view.restore_from_trash(["mine"])
 
     assert db.get_generation("mine") is not None
-    assert db.get_deletion("live") is not None  # still offered, untouched
+    assert db.get_trashed("live") is not None  # still offered, untouched
 
 
 # --- a deleted item is still a generation you can look at -------------------
 
 
 def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
-    # Its row left the gallery, but the bin kept it whole and its files are all
-    # in the trash — so it fills a config tab with the settings that made it,
+    # Its row left the gallery, but the Trash kept it whole and its files are all
+    # in the trash — so it fills a Generate tab with the settings that made it,
     # which is the whole point of being able to look before you decide.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
@@ -477,36 +477,36 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     _click_tile(view, "d1")
 
     assert view._selected_row["prompt_id"] == "d1"
-    shown = view._info_tabs.current_config_panel().displayed_row()
+    shown = view._generate_pane.current_generate_tab().displayed_row()
     assert shown["prompt_id"] == "d1"
 
 
 def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
     # The gesture a folder's tiles carry, since the one a collection's carry — jump to
     # its folder — is the single thing a deleted item hasn't got.
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    view._browser._thumbnail_double_clicked("d1")
+    view._gallery_pane._thumbnail_double_clicked("d1")
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel.displayed_row()["prompt_id"] == "d1"
-    assert view._info_tabs._preview_panel is not panel  # pinned: it stays
+    tab = view._generate_pane.current_generate_tab()
+    assert tab.displayed_row()["prompt_id"] == "d1"
+    assert view._generate_pane._preview_tab is not tab  # pinned: it stays
 
 
 def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
-    # Deciding what to keep out of a bin of sixty days' deletions is exactly what
+    # Deciding what to keep out of a Trash of sixty days' deletions is exactly what
     # a slideshow is for — one at a time, full size, rather than a grid of stamps.
     _resolve_by_id(monkeypatch)
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    assert not view._bank.slideshow.isHidden()
+    assert not view._buttons.slideshow.isHidden()
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
@@ -518,7 +518,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
     # Left/Right work here for the same reason they work in a folder: the collection's
     # items resolve to real files, so there is a set to step through.
     _resolve_by_id(monkeypatch)
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
@@ -534,7 +534,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
 
 def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     # End to end through the real delete: what the collection hands the preview is the
-    # clip where it now sits, not the folder it was taken out of.
+    # video where it now sits, not the folder it was taken out of.
     db = Database(tmp_path / "test.db")
     out = tmp_path / "out" / "video"
     out.mkdir(parents=True)
@@ -543,7 +543,7 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
                          workflow_version="v1", params_json="{}", workflow_json="{}")
     db.update_generation("v1", status="completed", output_files=json.dumps(
         [{"filename": "clip.mp4", "subfolder": "video"}]))
-    view = GalleryView(db, actions=GalleryActions(db, OutputPlaces.in_one_folder(tmp_path / "out"),
+    view = GalleryView(db, actions=GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"),
                                                   Trash(tmp_path / "trash")))
     qtbot.addWidget(view)
     view.refresh()
@@ -581,7 +581,7 @@ def test_delete_key_deletes_the_selected_thumbnail(qtbot):
     view.refresh()
     _open_leaf(view)
 
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
 
     assert len(actions.deleted) == 1
@@ -606,7 +606,7 @@ def test_a_branch_session_deletes_into_the_shared_trash(qtbot, monkeypatch, tmp_
     view.refresh()
     _open_leaf(view)
 
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
 
     assert db.get_generation("i1") is None
@@ -623,8 +623,8 @@ def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
     view.refresh()
     _open_leaf(view)
 
-    view._browser.apply_selection("i1", _NO_MOD)
-    view._browser.apply_selection("i3", _CTRL)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i3", _CTRL)
     assert set(view.selected_prompt_ids()) == {"i1", "i3"}
 
     view._delete_selection()
@@ -638,9 +638,9 @@ def test_ctrl_click_again_deselects_a_tile(qtbot):
     view.refresh()
     _open_leaf(view)
 
-    view._browser.apply_selection("i1", _NO_MOD)
-    view._browser.apply_selection("i2", _CTRL)
-    view._browser.apply_selection("i2", _CTRL)  # toggle i2 back off
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i2", _CTRL)
+    view._gallery_pane.apply_selection("i2", _CTRL)  # toggle i2 back off
     assert view.selected_prompt_ids() == ["i1"]
 
 
@@ -652,8 +652,8 @@ def test_shift_click_selects_the_contiguous_range(qtbot):
     _open_leaf(view)
     order = view.listed_prompt_ids()  # newest-first display order
 
-    view._browser.apply_selection(order[0], _NO_MOD)
-    view._browser.apply_selection(order[2], _SHIFT)
+    view._gallery_pane.apply_selection(order[0], _NO_MOD)
+    view._gallery_pane.apply_selection(order[2], _SHIFT)
     assert view.selected_prompt_ids() == order[:3]
 
 
@@ -664,9 +664,9 @@ def test_plain_click_replaces_the_whole_selection(qtbot):
     view.refresh()
     _open_leaf(view)
 
-    view._browser.apply_selection("i1", _NO_MOD)
-    view._browser.apply_selection("i2", _CTRL)     # now both selected
-    view._browser.apply_selection("i2", _NO_MOD)   # plain click collapses to one
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i2", _CTRL)     # now both selected
+    view._gallery_pane.apply_selection("i2", _NO_MOD)   # plain click collapses to one
     assert view.selected_prompt_ids() == ["i2"]
 
 
@@ -676,7 +676,7 @@ def test_changing_folders_clears_the_selection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     cat_leaf = _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     assert view.selected_prompt_ids() == ["i1"]
 
     # Drilling to the sibling settings folder must not carry the pick over: what
@@ -694,7 +694,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     assert view.selected_prompt_ids() == ["i1"]
 
     pane = view._scroll.widget()
@@ -703,7 +703,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
 
     assert view.selected_prompt_ids() == []
     # And the buttons re-aimed with it: Enhance is the folder's again.
-    assert "folder" in view._bank.enhance.toolTip()
+    assert "folder" in view._buttons.enhance.toolTip()
 
 
 def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
@@ -713,14 +713,14 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
 
     pane = view._scroll.widget()
     pane.resize(600, 600)
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
-    assert not any(w._selected for w in view._browser._thumb_widgets.values())
+    assert not any(w._selected for w in view._gallery_pane._thumb_widgets.values())
 
 
 def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
@@ -731,7 +731,7 @@ def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
     view.refresh()
     _open_leaf(view)
 
-    qtbot.mouseClick(view._browser._thumb_widgets["i1"], Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(view._gallery_pane._thumb_widgets["i1"], Qt.MouseButton.LeftButton)
     assert view.selected_prompt_ids() == ["i1"]
 
 
@@ -742,7 +742,7 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
 
     pane = view._scroll.widget()
     pane.resize(600, 600)
@@ -805,7 +805,7 @@ def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     warned = []
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMessageBox.warning",
@@ -825,7 +825,7 @@ def test_right_clicking_an_unpicked_thumbnail_selects_it(qtbot, monkeypatch):
     _open_leaf(view)
     monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
 
-    view._browser._thumbnail_context_menu("i2", QPoint(0, 0))
+    view._gallery_pane._thumbnail_context_menu("i2", QPoint(0, 0))
 
     assert view.selected_prompt_ids() == ["i2"]
 
@@ -842,7 +842,7 @@ def test_right_click_delete_removes_the_picked_thumbnails(qtbot, monkeypatch):
         "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
     )
 
-    view._browser._thumbnail_context_menu("i1", QPoint(0, 0))
+    view._gallery_pane._thumbnail_context_menu("i1", QPoint(0, 0))
 
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
@@ -855,14 +855,14 @@ def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
-    view._browser.apply_selection("i3", _CTRL)  # i1 + i3 selected
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i3", _CTRL)  # i1 + i3 selected
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
     )
 
     # Right-clicking a tile already in the selection keeps the whole set.
-    view._browser._thumbnail_context_menu("i3", QPoint(0, 0))
+    view._gallery_pane._thumbnail_context_menu("i3", QPoint(0, 0))
 
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i3"}
 
@@ -874,12 +874,12 @@ def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, mon
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
-    view._browser.apply_selection("i3", _CTRL)  # i1 + i3
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i3", _CTRL)  # i1 + i3
     monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
 
     # A real right-press on a selected tile must not collapse the selection to one.
-    qtbot.mouseClick(view._browser._thumb_widgets["i3"], Qt.MouseButton.RightButton)
+    qtbot.mouseClick(view._gallery_pane._thumb_widgets["i3"], Qt.MouseButton.RightButton)
 
     assert set(view.selected_prompt_ids()) == {"i1", "i3"}
 
@@ -900,7 +900,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
             pid, status="completed",
             output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
         )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -933,7 +933,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
             pid, status="completed",
             output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
         )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -968,7 +968,7 @@ def test_delete_folder_refuses_a_workflow_group(qtbot):
 
 def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatch):
     # A tree row's own trash control, which reaches a delete without passing
-    # through the toolbar button or any menu.
+    # through the Gallery pane buttons button or any menu.
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows), actions=actions)
@@ -1022,17 +1022,17 @@ def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._bank.undo.isEnabled()  # nothing to undo at rest
+    assert not view._buttons.undo.isEnabled()  # nothing to undo at rest
 
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
-    assert view._bank.undo.isEnabled()
-    assert "Delete" in view._bank.undo.toolTip()
+    assert view._buttons.undo.isEnabled()
+    assert "Delete" in view._buttons.undo.toolTip()
 
-    view._bank.undo.click()
+    view._buttons.undo.click()
     assert actions.undo_count == 1
-    assert not view._bank.undo.isEnabled()
+    assert not view._buttons.undo.isEnabled()
 
 
 def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
@@ -1040,20 +1040,20 @@ def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._bank.redo.isEnabled()  # nothing undone, so nothing to redo
-    assert view._bank.redo.toolTip() == "Nothing to redo"
+    assert not view._buttons.redo.isEnabled()  # nothing undone, so nothing to redo
+    assert view._buttons.redo.toolTip() == "Nothing to redo"
 
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
-    view._bank.undo.click()
+    view._buttons.undo.click()
 
-    assert view._bank.redo.isEnabled()
-    assert "Delete" in view._bank.redo.toolTip()
-    view._bank.redo.click()
+    assert view._buttons.redo.isEnabled()
+    assert "Delete" in view._buttons.redo.toolTip()
+    view._buttons.redo.click()
     assert actions.redo_count == 1
-    assert not view._bank.redo.isEnabled()
-    assert view._bank.undo.isEnabled()
+    assert not view._buttons.redo.isEnabled()
+    assert view._buttons.undo.isEnabled()
 
 
 def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
@@ -1063,7 +1063,7 @@ def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
     view.refresh()
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: True)
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
 
     ctrl = Qt.KeyboardModifier.ControlModifier
@@ -1089,13 +1089,13 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
 
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
     assert db.get_generation("i1") is None
     assert not file_path.exists()
@@ -1112,7 +1112,7 @@ def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
     # experiment, a slideshow's Up key.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    assert view._actions._environment.release_files == view._release_held_media
+    assert view._edits._environment.release_files == view._release_held_media
 
 
 def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_path):
@@ -1120,9 +1120,9 @@ def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_pa
     qtbot.addWidget(view)
     doomed = tmp_path / "doomed.png"
     doomed.write_bytes(b"x")
-    covered = view._info_tabs.current_config_panel()
+    covered = view._generate_pane.current_generate_tab()
     covered._preview.show_image(doomed)
-    view._info_tabs._add_subtab()  # a second tab takes the front
+    view._generate_pane._add_subtab()  # a second tab takes the front
 
     view._release_held_media([doomed])
 
@@ -1145,7 +1145,7 @@ def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
 def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
     view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    thumb = view._browser._thumb_widgets["i1"]
+    thumb = view._gallery_pane._thumb_widgets["i1"]
 
     qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)  # select, the way a user does
     qtbot.keyClick(thumb, Qt.Key.Key_Delete)            # the event filter catches it
@@ -1171,7 +1171,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(out), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     win = QMainWindow()
     win.setCentralWidget(view)
@@ -1180,24 +1180,24 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
         win.show()
     view.refresh()
     view._tree.setCurrentItem(_at(_image_workflow(view._tree), 0, 0, 0))
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
 
     qtbot.keyClick(view, Qt.Key.Key_Delete)
 
     assert db.get_generation("i1") is None
 
 
-def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_path):
+def test_delete_after_a_click_in_the_generate_pane_wipes_no_thumbnail(qtbot, tmp_path):
     # The grid and an editable config form are visible together, so the app-wide
-    # Delete/Undo filter must disarm while a config control has focus — its combos
+    # Delete/Undo filter must disarm while a config control has focus — its dropdowns
     # and buttons aren't text fields, so without this it would wipe a thumbnail.
     view, db, _file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
     with qtbot.waitActive(view):
         view.activateWindow()
-    thumb = view._browser._thumb_widgets["i1"]
+    thumb = view._gallery_pane._thumb_widgets["i1"]
     gestures.click(thumb, thumb.rect().center())
-    form = view._info_tabs.current_config_panel()._param_form
+    form = view._generate_pane.current_generate_tab()._param_form
     header = next(iter(form._sections.values()))._header
     # The row saying what the image shows sits above the form, so in a window
     # this short the first section header hangs below the fold, where a click
@@ -1216,7 +1216,7 @@ def test_delete_works_without_a_thumbnail_holding_focus(qtbot, tmp_path):
     # must still delete because the Gallery tab is the one on screen.
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
 
     qtbot.keyClick(view, Qt.Key.Key_Delete)
 
@@ -1228,7 +1228,7 @@ def test_insert_key_also_deletes(qtbot, tmp_path):
     # both the same (see the event filter).
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
 
     qtbot.keyClick(view, Qt.Key.Key_Insert)
 
@@ -1238,7 +1238,7 @@ def test_insert_key_also_deletes(qtbot, tmp_path):
 def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):
     view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     qtbot.keyClick(view, Qt.Key.Key_Delete)
     assert db.get_generation("i1") is None
 
@@ -1261,7 +1261,7 @@ def test_delete_on_a_tree_folder_removes_it_via_the_keyboard(qtbot, tmp_path):
 def test_delete_is_ignored_when_the_gallery_tab_is_not_showing(qtbot, tmp_path):
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     view.hide()  # another tab is active
 
     qtbot.keyClick(view, Qt.Key.Key_Delete)
@@ -1272,7 +1272,7 @@ def test_delete_is_ignored_when_the_gallery_tab_is_not_showing(qtbot, tmp_path):
 def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypatch):
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view._browser.apply_selection("i1", _NO_MOD)
+    view._gallery_pane.apply_selection("i1", _NO_MOD)
     # A text field (the search, say) has focus: Delete edits text.
     editor = QLineEdit()
     monkeypatch.setattr(

@@ -163,7 +163,7 @@ class ComfyUIClient(QThread):
 
         Flipping ``_running`` alone is not enough: the loop spends most of its
         time awaiting a websocket message or parked in the reconnect sleep, and
-        would only notice the flag once that await returns (up to 3s later).
+        would only see the flag once that await returns (up to 3s later).
         Cancelling the task interrupts whatever it is awaiting right now, so the
         thread — and the process closing under it — exits at once.
         """

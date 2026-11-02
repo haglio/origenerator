@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
 
 _ORDER = [
@@ -33,7 +33,7 @@ class _Store:
         return None if held is None else {"workflow": held[0], "params": held[1]}
 
 
-def _clip(prompt_id, *, positive="a scene", negative="flaws", steps=8):
+def _video(prompt_id, *, positive="a scene", negative="flaws", steps=8):
     return {
         "prompt_id": prompt_id, "workflow_name": "wan22_i2v",
         "positive_prompt": positive, "negative_prompt": negative,
@@ -53,11 +53,11 @@ def session():
 
 
 def test_it_opens_on_the_first_animation_with_its_example(session):
-    clip = _clip("one")
-    made = session({(VIDEO, "alpha", "state one"): [clip]})
+    video = _video("one")
+    made = session({(VIDEO, "alpha", "state one"): [video]})
 
     assert made.path == (VIDEO, "alpha", "state one")
-    assert made.sample is clip
+    assert made.sample is video
     assert made.position == (1, 3)
 
 
@@ -70,7 +70,7 @@ def test_an_animation_with_no_example_comes_up_blank_rather_than_skipped(session
 
 def test_accepting_records_the_samples_settings_and_moves_on(session):
     store = _Store()
-    made = session({(VIDEO, "alpha", "state one"): [_clip("one")]}, store)
+    made = session({(VIDEO, "alpha", "state one"): [_video("one")]}, store)
 
     made.accept(positive="a better scene", negative="flaws")
 
@@ -81,7 +81,7 @@ def test_accepting_records_the_samples_settings_and_moves_on(session):
 
 
 def test_rejecting_an_example_brings_up_the_next_one_for_the_same_animation(session):
-    first, second = _clip("one"), _clip("two")
+    first, second = _video("one"), _video("two")
     made = session({(VIDEO, "alpha", "state one"): [first, second]})
 
     made.next_sample()
@@ -91,7 +91,7 @@ def test_rejecting_an_example_brings_up_the_next_one_for_the_same_animation(sess
 
 
 def test_rejecting_the_last_example_leaves_the_animation_blank(session):
-    made = session({(VIDEO, "alpha", "state one"): [_clip("one")]})
+    made = session({(VIDEO, "alpha", "state one"): [_video("one")]})
 
     made.next_sample()
 
@@ -101,7 +101,7 @@ def test_rejecting_the_last_example_leaves_the_animation_blank(session):
 
 def test_going_forward_leaves_the_animation_as_it_was_and_shows_the_next(session):
     store = _Store()
-    made = session({(VIDEO, "alpha", "state one"): [_clip("one")]}, store)
+    made = session({(VIDEO, "alpha", "state one"): [_video("one")]}, store)
 
     made.forward()
 
@@ -200,7 +200,7 @@ def test_an_animation_he_has_assigned_opens_on_what_he_assigned():
     when the walk reaches it again -- not the sample's own prompts."""
     store = _Store()
     store.accepted[_ORDER[0]] = ("wan22_i2v", {"positive_prompt": "what he typed"})
-    session = AnimationCheckSession(_ORDER, {_ORDER[0]: [_clip("kept")]}, store)
+    session = AnimationCheckSession(_ORDER, {_ORDER[0]: [_video("kept")]}, store)
 
     assert session.starting_point == {
         "workflow": "wan22_i2v", "params": {"positive_prompt": "what he typed"}}

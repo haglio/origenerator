@@ -33,7 +33,7 @@ def _wearing_the_apps_own_chrome():
 
 def test_it_does_not_hold_a_pane_open_at_its_label(qtbot):
     # The failure this exists for: a button's own minimum is its whole label, so
-    # one sitting in a file row set a floor under the info pane and the settings
+    # one sitting in a file row set a floor under the Generate pane and the settings
     # scroll grew a horizontal bar rather than let the row shrink.
     stock = QPushButton(_LONG)
     qtbot.addWidget(stock)
@@ -54,7 +54,7 @@ def test_it_asks_for_its_whole_label_when_there_is_room(qtbot):
     assert button.sizeHint() == stock.sizeHint()
 
 
-def test_a_squeezed_label_elides_rather_than_clips(qtbot):
+def test_a_squeezed_label_elides_rather_than_cuts_off(qtbot):
     button = ElidingButton(_LONG)
     qtbot.addWidget(button)
     whole = button.fontMetrics().horizontalAdvance(_LONG)
@@ -110,13 +110,13 @@ def test_a_dropdowns_list_keeps_room_for_its_longest_entry_and_a_scroll_bar(qtbo
     """What widens the list is a minimum on it, and the scroll bar is why the
     minimum is not simply the longest entry: nineteen entries scroll, and the bar
     takes its width out of the room the names are read in."""
-    combo = QComboBox()
-    combo.addItems(["short", "an entry far longer than the field is ever given"])
-    qtbot.addWidget(combo)
-    bar = combo.view().verticalScrollBar().sizeHint().width()
-    longest = combo.fontMetrics().horizontalAdvance(combo.itemText(1))
-    assert combo.view().minimumWidth() < longest  # nothing asks for it yet
+    dropdown = QComboBox()
+    dropdown.addItems(["short", "an entry far longer than the field is ever given"])
+    qtbot.addWidget(dropdown)
+    bar = dropdown.view().verticalScrollBar().sizeHint().width()
+    longest = dropdown.fontMetrics().horizontalAdvance(dropdown.itemText(1))
+    assert dropdown.view().minimumWidth() < longest  # nothing asks for it yet
 
-    open_the_list_in_full(combo)
+    open_the_list_in_full(dropdown)
 
-    assert combo.view().minimumWidth() >= longest + bar
+    assert dropdown.view().minimumWidth() >= longest + bar

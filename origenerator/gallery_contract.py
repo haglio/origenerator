@@ -67,7 +67,7 @@ PARAMS_MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 #: from, as ComfyUI's LoadImage recorded it.
 PARAMS_INPUT_IMAGE_KEY = "input_image"
 
-#: Each lane a clip is handed down, and the pair of stamps that records its
+#: Each lane a video is handed down, and the pair of stamps that records its
 #: send: ``sent`` while the copy is over there, ``unsent`` once it has been
 #: taken back.  The reader deletes what it holds for a row whose ``unsent`` is
 #: set, so these two names are the whole of what passes back.

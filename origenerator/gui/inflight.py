@@ -1,7 +1,7 @@
 """What every surface knows about a generation that is still in flight.
 
-Three widgets show queued and running work — the Recents collection's cards
-(:mod:`origenerator.gui.inflight_card`), the Job Queue
+Three widgets show queued and running work — the Latest collection's tiles
+(:mod:`origenerator.gui.inflight_tile`), the Job Queue
 (:mod:`origenerator.gui.job_queue_view`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
@@ -10,7 +10,7 @@ builds per job, carrying what to draw, how to stop it, and how to go to it.
 How the run itself is going — what it is doing, its latest frame, how far along
 it is, how long it has left — is :class:`RunReading`, which an item carries and
 which is also all the tile of an image being enhanced is handed
-(:mod:`origenerator.gui.thumbnail_widget`): that tile has a thumbnail, a name and
+(:mod:`origenerator.gui.item_tile`): that tile has a thumbnail, a name and
 a click of its own already.
 
 :func:`queue_wait_text` is here for the same reason: how a wait reads is one
@@ -39,7 +39,7 @@ class InFlightItem:
     caption: str                 # what a surface labels the job (workflow › prompt)
     reading: RunReading          # how the run itself is going
     reveal: Callable[[], None]   # go to its folder and live tile, or to the image it enhances
-    media_type: str | None = None  # "image"/"video" for the corner badge, if known
+    media_type: str | None = None  # "image"/"video" for the item type icon, if known
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     shield: Callable[[bool], None] | None = None  # put its shield on or off, where cancel can stop it
     shielded: bool = False
@@ -73,7 +73,7 @@ class InFlightItem:
     # under the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
     # where the run came from nothing, which is most images.
     source_file: str | None = None
-    # The act picked in the Combine panel's dropdown, for a run launched from
+    # The act picked in the Combine's dropdown, for a run launched from
     # there — "" for every other run, and for a combine that was given a dropped
     # video instead of a picked act. It is the one word saying what this video
     # will *do*, and nothing else on the row carries it.
@@ -83,7 +83,7 @@ class InFlightItem:
     # gray beside the start frame: it lends the settings, not the result, and a row
     # showing it alone reads as a job that is that video. Empty where an act was
     # picked instead: :attr:`act` already says what was chosen, and
-    # the clip its settings were mined out of was never the user's pick.
+    # the video its settings were mined out of was never the user's pick.
     source_video_thumbnail: str | None = None
     prompt_edited: bool = False
     # Up to four thumbnail files from the folder this job will land in — what a
@@ -108,7 +108,7 @@ def queue_lead_text(item: InFlightItem) -> str:
     added up out of, and because it is the one figure that makes a queue of four
     videos read differently from a queue of four images.
 
-    The act follows the kind, for a run the Combine panel launched from its
+    The act follows the kind, for a run the Combine launched from its
     dropdown: the kind says a video is being made, and the act says
     which video — the whole of what the user chose, and the one thing separating
     two runs on the same image. It rides through "Edit…" too, so a
@@ -185,8 +185,8 @@ class RunReading:
     status: str                              # JobState.RUNNING, QUEUED or SPEAKING
     frame: bytes | None = None               # latest live frame, if one has arrived
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps
-    # The pass running right now, on its own count, for the band along the foot
-    # of the bar. An enhancement is the run that most needs it: the upscale and
+    # The pass running right now, on its own count, for the substep progress bar
+    # along the foot of the bar. An enhancement is the run that most needs it: the upscale and
     # each detail fix is a pass of its own, and one bar between them can only
     # restart per fix.
     pass_progress: tuple[int, int] | None = None
@@ -209,7 +209,7 @@ class RunReading:
                                                             compact=compact)
 
     def bars(self) -> tuple:
-        """What the bar and its band show — nothing at all while the run is still
+        """What the overall and substep progress bars show — nothing at all while the run is still
         waiting, which has no progress to report and no time to count down."""
         return (self.progress, self.pass_progress) if self.rendering else (None, None)
 
@@ -282,7 +282,7 @@ def stop_auto_generate_text() -> str:
     A button carries one act, so while Auto-Generate is on its Cancel only
     throws the seed away, and there is nowhere left on that surface to ask for
     a stop: the only one was the Auto switch, which is in the header rather
-    than on the card you are looking at. A menu has room for both, and this is
+    than on the tile you are looking at. A menu has room for both, and this is
     the other one.
 
     It says Auto-Generate goes off rather than reading "Cancel", because switching a

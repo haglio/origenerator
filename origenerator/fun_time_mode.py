@@ -3,20 +3,20 @@
 Launched with ``--fun-time``, Origenerator stops being a free-floating desktop
 app and becomes one of the session's managed windows: Core occupies
 the rect Fun Time names (the Random Favs Browser's), each slideshow goes to the
-portrait or landscape side by its subject's orientation, and everything OSR2 is
+portrait or landscape shape by its subject's shape, and everything OSR2 is
 left to Fun Time's Main Funestra.  Fun Time drives the slideshows through a command
-file and reads back which sides are occupied through a status file — the same
+file and reads back which shapes are occupied through a status file — the same
 file-channel idioms its own Satellite Funestras speak
 (``funestra.file_channel``).
 
-What a side IS depends on what the session hands over.  A session that names
+What a shape IS depends on what the session hands over.  A session that names
 each Funestra's own channel (:class:`FunestraChannel`) is handing this app its
 Funestras: a slideshow is then a playlist written for one, a few verbs, and the HUD
 this app publishes for it.  One that names none is an older session, whose
 slideshows open a window of this app's over each region instead.
 
 This module is the pure half: the argv contract, the session dataclass, and the
-orientation policy that picks a region.  The Qt half — placing windows, polling
+shape policy that picks a region.  The Qt half — placing windows, polling
 the channels — lives in :mod:`origenerator.fun_time_bridge`.
 """
 
@@ -34,10 +34,10 @@ from app_support import origenerator_handoff as handoff
 from app_support.file_channel import read_key_values
 from funestra.file_channel import append_command
 from funestra.playlist import write_playlist
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 
-from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
+from origenerator.osr2_controls_commands import spelled_filter, spelled_for
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import (
     HUD_PLACES,
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 # package, and used below to BUILD the parser -- so the flags a host writes,
 # the flags this app reads and the document a host checks itself against are
 # all one thing.  They were three hand-kept copies with nothing comparing them,
-# which is how a flag renamed on one side could become a window that never
+# which is how a flag renamed on one shape could become a window that never
 # appeared on the other (audit cross/boundaries/cross/017).
 
 #: The module a host runs.
@@ -68,19 +68,19 @@ MODE_FLAG = "--fun-time"
 
 #: Core's rect -- the Random Favs Browser's, which it covers -- and
 #: the two satellite regions a slideshow of this app's opens over when the session
-#: hands no Funestra for that side.
+#: hands no Funestra for that shape.
 RECT_FIELDS = ("x", "y", "width", "height")
 MAIN_RECT_PREFIX = ""
-REGION_RECT_PREFIXES = {side: f"{side}-" for side in ("portrait", "landscape")}
+REGION_RECT_PREFIXES = {shape: f"{shape}-" for shape in ("portrait", "landscape")}
 
 #: The session's own channel to this app: how it drives it and reads it back.
 SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-file")
 
 #: The two Satellite Funestras a session hands over, and the four files each
 #: Funestra contract trades through (see :class:`FunestraChannel`).  All four of a
-#: side or none of it: a session that names none for a side still wants a
+#: shape or none of it: a session that names none for a shape still wants a
 #: window of this app's over that region instead.
-SIDES = ("portrait", "landscape")
+SHAPES = ("portrait", "landscape")
 FUNESTRA_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
 
 #: Where a session in the headset asks for this window's frames instead: the
@@ -147,7 +147,7 @@ def required_flags() -> tuple[str, ...]:
 
     Required in the strict sense: :func:`parse_app_args` refuses a hosted
     launch missing one.  argparse already refuses a flag this app does not
-    know, so a rename on the host's side fails at its launch with a message --
+    know, so a rename on the host's shape fails at its launch with a message --
     and this is the other half of the same drift, a host that stopped SENDING
     one, which used to fall through to a default of nothing at all.
     """
@@ -159,18 +159,18 @@ def required_flags() -> tuple[str, ...]:
     )
 
 
-def region_flags(side: str) -> tuple[str, ...]:
+def region_flags(shape: str) -> tuple[str, ...]:
     """One region's rect, for the slideshow this app opens over it itself.
 
-    Not required: a host that names a Funestra for the side opens no window of
+    Not required: a host that names a Funestra for the shape opens no window of
     ours there at all, so the rect it would take is beside the point.
     """
-    return _rect_flags(REGION_RECT_PREFIXES[side])
+    return _rect_flags(REGION_RECT_PREFIXES[shape])
 
 
-def funestra_flags(side: str) -> tuple[str, ...]:
+def funestra_flags(shape: str) -> tuple[str, ...]:
     """One side's Funestra channel: all four of them, or none of them."""
-    return tuple(f"--{side}-{name}" for name in FUNESTRA_FILES)
+    return tuple(f"--{shape}-{name}" for name in FUNESTRA_FILES)
 
 
 def headset_flags() -> tuple[str, ...]:
@@ -186,20 +186,20 @@ def command_lines() -> tuple[str, ...]:
         *SESSION_VERBS,
         f"{HAND_OVER}|{{frames}}|{{input}}",
         f"{GO_TO}|{{file}}",
-        *(line for side in SIDES for line in _lines_said_to(side)),
+        *(line for shape in SHAPES for line in _lines_said_to(shape)),
     )
 
 
-def _lines_said_to(side: str) -> tuple[str, ...]:
+def _lines_said_to(shape: str) -> tuple[str, ...]:
     return (
-        *(spelled_for(side, verb) for verb in SIDE_VERBS),
-        *(spelled_for(side, press) for press in PRESSES),
-        *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
-        *(f"{spelled_for(side, press)}|{where}" for press, where in PRESSES_ON_THE_QUEUE.items()),
-        *(f"{spelled_for(side, place)}|{payload}"
+        *(spelled_for(shape, verb) for verb in SIDE_VERBS),
+        *(spelled_for(shape, press) for press in PRESSES),
+        *(f"{spelled_for(shape, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
+        *(f"{spelled_for(shape, press)}|{where}" for press, where in PRESSES_ON_THE_QUEUE.items()),
+        *(f"{spelled_for(shape, place)}|{payload}"
           for place, payload in HUD_PLACES.items()),
-        spelled_filter(side, "{row}"),
-        f"{spelled_for(side, SAY)}:{{words}}",
+        spelled_filter(shape, "{row}"),
+        f"{spelled_for(shape, SAY)}:{{words}}",
     )
 
 
@@ -222,15 +222,15 @@ def declaration() -> dict:
         "check_launch_flag": CHECK_LAUNCH_FLAG,
         "spoken_phrases_module": SPOKEN_PHRASES_MODULE,
         "required_flags": list(required_flags()),
-        "region_flags": {side: list(region_flags(side)) for side in SIDES},
-        "player_flags": {side: list(funestra_flags(side)) for side in SIDES},
+        "region_flags": {shape: list(region_flags(shape)) for shape in SHAPES},
+        "player_flags": {shape: list(funestra_flags(shape)) for shape in SHAPES},
         "headset_flags": list(headset_flags()),
         "headset_words": list(HEADSET_WORDS),
         "command_case_blind": True,
         "command_lines": list(command_lines()),
         "command_patterns": list(command_patterns()),
         "said_at_suffix": f"{SAID_AT}{{said_at_epoch_seconds}}",
-        "request_lines": [spelled_for(side, line) for side in SIDES
+        "request_lines": [spelled_for(shape, line) for shape in SHAPES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
         "fix_phrases": list(published_fix_phrases()),
     }
@@ -300,7 +300,7 @@ class FunTimeSession:
     status_file: Path | None
     dashboard_cmd_file: Path | None
     # Each Satellite Funestra's own channel, where the session hands its Funestras
-    # over — ``None`` for a side it named none for, which is a session that
+    # over — ``None`` for a shape it named none for, which is a session that
     # still wants a window of this app's over that region instead.
     portrait_funestra: FunestraChannel | None = None
     landscape_funestra: FunestraChannel | None = None
@@ -315,12 +315,12 @@ class FunTimeSession:
         """Whether this window is shown in the headset rather than on a monitor."""
         return self.frames_file is not None and self.input_file is not None
 
-    def region_rect(self, side: str) -> Rect:
-        return self.portrait_rect if side == "portrait" else self.landscape_rect
+    def region_rect(self, shape: str) -> Rect:
+        return self.portrait_rect if shape == "portrait" else self.landscape_rect
 
-    def funestra(self, side: str) -> FunestraChannel | None:
-        """The Funestra holding *side*, or ``None`` where the session named none."""
-        return self.portrait_funestra if side == "portrait" else self.landscape_funestra
+    def funestra(self, shape: str) -> FunestraChannel | None:
+        """The Funestra holding *shape*, or ``None`` where the session named none."""
+        return self.portrait_funestra if shape == "portrait" else self.landscape_funestra
 
 
 @dataclass(frozen=True)
@@ -352,9 +352,9 @@ def build_parser() -> argparse.ArgumentParser:
         _add_rect_arguments(parser, prefix)
     for name in (*SESSION_FILES, *HEADSET_FILES):
         parser.add_argument(f"--{name}", type=Path, default=None)
-    for side in SIDES:
+    for shape in SHAPES:
         for name in FUNESTRA_FILES:
-            parser.add_argument(f"--{side}-{name}", type=Path, default=None)
+            parser.add_argument(f"--{shape}-{name}", type=Path, default=None)
     parser.add_argument(TASKBAR_IDENTITY_FLAG, default=None)
     # Boot far enough to prove this launch works, then exit 0 without opening
     # anything.  A hosting session's integration suite runs the REAL launch
@@ -373,14 +373,14 @@ def region_for_size(width: int, height: int) -> str:
 
     A square subject goes to the landscape region — the roomier of the two.
     """
-    return orientation_of_size(width, height)
+    return shape_of_size(width, height)
 
 
 def _measured_size(slide: Slide) -> tuple[int, int] | None:
     """(width, height) of *slide*, or ``None`` when nothing about it measures.
 
     The stored thumbnail is preferred — bounded to 256px but aspect-preserving,
-    so it answers orientation without opening the full-size file.  An image
+    so it answers shape without opening the full-size file.  An image
     with no thumbnail is measured directly; a video without one is passed over
     rather than decoded, since a frame grab costs seconds on HEVC.
     """
@@ -425,7 +425,7 @@ def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
 def region_for_items(items) -> str:
     """The region a set of slides plays in, however the caller assembled them.
 
-    Majority orientation over what measures — stills first, one decoded video
+    Majority shape over what measures — stills first, one decoded video
     frame as the backstop when no still answered.  A tie, or a set in which
     nothing measures at all, goes to landscape, the roomier region.
     """
@@ -435,12 +435,12 @@ def region_for_items(items) -> str:
     if not shapes:
         probed = _probed_video_size(slides)
         shapes = [region_for_size(*probed)] if probed is not None else []
-    side = majority_shape(shapes)
+    shape = majority_shape(shapes)
     logger.info(
         "Slideshow routed to %s (portrait=%d landscape=%d of %d items)",
-        side, shapes.count("portrait"), shapes.count("landscape"), len(slides),
+        shape, shapes.count("portrait"), shapes.count("landscape"), len(slides),
     )
-    return side
+    return shape
 
 
 def majority_shape(shapes) -> str:
@@ -448,15 +448,15 @@ def majority_shape(shapes) -> str:
     return "portrait" if votes["portrait"] > votes["landscape"] else "landscape"
 
 
-def _funestra(args: argparse.Namespace, side: str) -> FunestraChannel | None:
-    """*side*'s Funestra channel, or ``None`` where the session named no Funestra.
+def _funestra(args: argparse.Namespace, shape: str) -> FunestraChannel | None:
+    """*shape*'s Funestra channel, or ``None`` where the session named no Funestra.
 
     All four files or none: half a channel is a Funestra this app could write a
     list for and never hear back from, which is worse than the window it would
     otherwise open.
     """
     files = [getattr(args, flag.removeprefix("--").replace("-", "_"))
-             for flag in funestra_flags(side)]
+             for flag in funestra_flags(shape)]
     return FunestraChannel(*files) if all(files) else None
 
 

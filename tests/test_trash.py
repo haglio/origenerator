@@ -139,7 +139,7 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
 
 
 def test_purge_orphans_clears_only_the_batches_nothing_names(tmp_path):
-    # The recovery bin names the batches it still holds; everything else in the
+    # The Trash names the batches it still holds; everything else in the
     # trash is unreachable and is what this reclaims.
     trash = Trash(tmp_path / "trash")
     held = trash.store([_file(tmp_path / "out" / "held.png")])
@@ -156,7 +156,7 @@ def test_purge_orphans_on_an_untouched_trash_is_a_harmless_noop(tmp_path):
 
 
 def test_a_batch_survives_the_session_that_made_it(tmp_path):
-    # The bin stores a batch as plain data and re-makes it launches later, so a
+    # The Trash stores a batch as plain data and re-makes it launches later, so a
     # delete stays undoable long after the objects that performed it are gone.
     src = _file(tmp_path / "out" / "a.png", b"hello")
     trash = Trash(tmp_path / "trash")

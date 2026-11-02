@@ -29,7 +29,7 @@ def rows_for(count: int, width: int, height: int) -> int:
 
     Chosen by trying every row count and keeping the one whose cells come out
     least oblong — which is what makes a wall of thumbnails read as a wall rather
-    than as a row of slivers or a stack of bands. A rect with no area, or nothing
+    than as a row of slivers or a stack of rows. A rect with no area, or nothing
     to put in it, is ``0``.
 
     The rows are the whole answer: how many cells each one holds is

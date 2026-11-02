@@ -8,8 +8,8 @@ with the media type, the workflow and a letter for the level.
 
 A folder's generic *name* falls out of that key: :func:`folder_id` renders it as
 a short code. The settings leaves used to be named after their prompt, and a
-prompt is a paragraph where a folder name is a line — the breadcrumb over the
-browser pane ran to a dozen lines and squeezed the thumbnails it sits above. A code
+prompt is a paragraph where a folder name is a line — the folder path over the
+Gallery pane ran to a dozen lines and squeezed the thumbnails it sits above. A code
 is one line, is the same code in the tree, the header and a branch preview, and
 lasts exactly as long as the folder does. Nothing is lost by it: what the prompt
 said is on every generation inside the folder, and the settings that set it
@@ -27,7 +27,7 @@ import hashlib
 FOLDER_ID_CHARS = 8
 
 # How much of the digest a *key* carries. Wider than the name on purpose: the key
-# is the identity a bookmark is stored under, so it is sized against every folder
+# is the identity a favorite is stored under, so it is sized against every folder
 # that has ever existed rather than against the ones on screen together.
 _KEY_DIGEST_CHARS = 12
 

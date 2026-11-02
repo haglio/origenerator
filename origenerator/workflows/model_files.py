@@ -1,12 +1,12 @@
 """List the model files ComfyUI has on disk, to populate the form's dropdowns.
 
-A workflow's checkpoint/LoRA/etc. picker offers whatever is actually installed
+A workflow's checkpoint/LoRA/etc. dropdown offers whatever is actually installed
 under ``ComfyUI/models/<category>``, so the user chooses from real files rather
 than typing a filename. Shared by every workflow that exposes such a dropdown.
 
 A category directory is a folder, not a catalogue — ``checkpoints`` holds WAN and
 LTX video models beside the SDXL ones, ``loras`` holds a LoRA for every
-architecture at once — so a picker also says what its graph can *run*, and only
+architecture at once — so a dropdown also says what its graph can *run*, and only
 those are offered. See :mod:`origenerator.workflows.model_arch` for how a file's
 architecture is read.
 
@@ -37,8 +37,8 @@ _MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 _DETECTOR_CATEGORY = "ultralytics/bbox"
 _OUTLINE_DETECTOR_CATEGORY = "ultralytics/segm"
 
-# The picker option that means "no LoRA": choosing it builds the graph with no
-# LoraLoader for that slot (see the workflows' ``build_api_payload``), so the
+# The dropdown option that means "no LoRA": choosing it builds the graph with no
+# LoraLoader for that dropdown (see the workflows' ``build_api_payload``), so the
 # base model runs unmodified. Never a real filename — a file's option always
 # carries its extension — so it is safe as a sentinel.
 NO_LORA = "None"
@@ -46,7 +46,7 @@ NO_LORA = "None"
 # ``accepts=ANY``: this category is architecture-neutral, so list all of it. The
 # ESRGAN upscalers are the real case — they resample pixels and neither know nor
 # care which model made them. Spelled out at the call site so an unfiltered
-# picker is a decision on the record, not an omission.
+# dropdown is a decision on the record, not an omission.
 ANY = "any"
 
 
@@ -80,7 +80,7 @@ def _catalogue(directory: Path) -> list[tuple[str, model_arch.ModelFile]]:
 
 def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
            want_lora: bool) -> bool:
-    """Whether a file read as *described* belongs in a picker with these terms.
+    """Whether a file read as *described* belongs in a dropdown with these terms.
 
     Each test drops a file only on a positive finding — an architecture that is
     recognized and wrong, a name that names the other expert. A file we could not
@@ -114,11 +114,11 @@ def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> 
 def list_model_files(
     category: str, fallback: list[str], *, accepts, expert: str | None = None,
 ) -> list[str]:
-    """The model files in ``ComfyUI/models/<category>`` this picker can run.
+    """The model files in ``ComfyUI/models/<category>`` this dropdown can run.
 
     *accepts* is an architecture from :mod:`~origenerator.workflows.model_arch`,
     a tuple of them, or :data:`ANY`. *expert* is ``"high"`` or ``"low"`` for a
-    picker that fills one half of WAN 2.2's expert pair, which drops the files
+    dropdown that fills one half of WAN 2.2's expert pair, which drops the files
     whose names claim the other half.
 
     Names are given relative to the category directory (e.g.
@@ -134,9 +134,9 @@ def list_model_files(
 def list_lora_files(
     fallback: list[str], *, accepts, expert: str | None = None, fix: str | None = "",
 ) -> list[str]:
-    """The LoRA picker's options: the "None" sentinel first, then the installed
-    LoRAs this picker can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
-    every LoRA picker can opt out of applying one.
+    """The LoRA dropdown's options: the "None" sentinel first, then the installed
+    LoRAs this dropdown can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
+    every LoRA dropdown can opt out of applying one.
 
     Takes the same *accepts*/*expert* terms as :func:`list_model_files`, against
     the architecture each LoRA was *trained for* — and drops the occasional full
@@ -150,9 +150,9 @@ def list_lora_files(
 def list_detector_files() -> list[str]:
     """The face/hand detectors installed for the enhance graph's detail pass.
 
-    No fallback, unlike every other picker here: a checkpoint the app names but
+    No fallback, unlike every other dropdown here: a checkpoint the app names but
     ComfyUI lacks is a rare accident, whereas an install with no detector at all
-    is the ordinary starting state — and the Enhance panel has to be able to see
+    is the ordinary starting state — and the Enhance pane has to be able to see
     it, so it can dim the detail pass rather than offer a run that would be
     rejected on submit.
 

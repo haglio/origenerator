@@ -12,7 +12,7 @@ freed lands in the interpreter's own frame setup, reading the freed function's
 closure out of reused memory -- an access violation, no traceback, the process
 simply gone. Seven of those on 2026-09-03/04 all faulted on the same
 instruction: the free-variable copy at the entry of a closure, reached from a
-queued Qt metacall through PyQt's slot proxy, which is this shape and no other.
+queued Qt metacall through PyQt's pyqtSlot proxy, which is this shape and no other.
 
 :func:`defer` gives the wait an owner. The timer is parented to the object that
 asked, holds the callable itself, and calls a bound method of that same timer --

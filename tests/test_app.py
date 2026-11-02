@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 
-from origenerator import app_link, config, content, evolver_agreement, gallery, recovery
+from origenerator import app_link, config, content, evolver_agreement, gallery, trash_collection
 from origenerator.app import (
     MAINTENANCE,
     Library,
@@ -275,7 +275,7 @@ def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
 
 
 def test_client_id_is_stable_across_launches(tmp_path, qtbot):
-    # The crux of restart recovery: two launches (two AppStates over the same file)
+    # The crux of restart trash_collection: two launches (two AppStates over the same file)
     # give ComfyUIClients the same id, so ComfyUI keeps routing a running job's live
     # progress/preview/completion messages to the reconnecting session.
     path = tmp_path / "ui.json"
@@ -765,8 +765,8 @@ def test_the_window_is_watched_before_the_app_runs(qapp, monkeypatch):
 
 
 def test_main_reclaims_unreachable_trash_on_startup(qapp):
-    """The trash folders no held deletion names are reclaimed before the window
-    opens. Nothing the bin holds is touched, however old it is."""
+    """The trash folders no trashed item names are reclaimed before the window
+    opens. Nothing the Trash holds is touched, however old it is."""
     trash = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
@@ -776,7 +776,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash", return_value=trash), \
-         patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
+         patch("origenerator.trash_collection.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
@@ -1012,7 +1012,7 @@ def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_b
     assert window not in [fronting.args[0] for fronting in fronted.call_args_list]
 
 
-def test_a_boot_answers_a_clicked_notice_with_the_window_it_just_built(qapp):
+def test_a_boot_answers_a_clicked_toast_with_the_window_it_just_built(qapp):
     # The listening starts before the window does (a launch here is slow enough
     # to click into twice), so the window has to be handed to it once there is
     # one -- with anything that arrived meanwhile still waiting.
@@ -1044,7 +1044,7 @@ def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
 # The tests above hand main a MagicMock database, whose every query answers with
 # an empty iterable — so the boot phases their patch chain does not name run over
 # nothing at all and are asserted by nothing. Four separate mutations to main
-# survived them: the folder-bookmark reconcile deleted, and the duration
+# survived them: the folder-favorite reconcile deleted, and the duration
 # backfill's result thrown away. These boot the same main over a real database
 # under tmp_path and read each phase's effect off it afterwards.
 
@@ -1135,7 +1135,7 @@ def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library)
         qapp.setPalette(prior)  # every later test renders in the chrome it expected
 
 
-def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
+def test_the_launch_heals_a_favorite_whose_folder_key_drifted(qapp, library):
     # The reconcile is why a star survives a change to the key formula. Deleting
     # both its calls left the boot tests green, and the star would simply be gone
     # from the folder the user put it on.
@@ -1177,12 +1177,12 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
     assert db.get_generation("p1")["duration_seconds"] == 15.26
 
 
-def _held_deletion(library_path, prompt_id, *, days_ago):
-    """A deletion the bin has been holding for ``days_ago`` days."""
+def _held_trashed(library_path, prompt_id, *, days_ago):
+    """A deletion the Trash has been holding for ``days_ago`` days."""
     db = Database(library_path)
     row = _completed_image(db, prompt_id)
     db.delete_generation(prompt_id)
-    db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+    db.record_trashed(prompt_id, row, {"moves": [], "subdir": None})
     then = (datetime.now(UTC).replace(tzinfo=None)
             - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
     with closing(sqlite3.connect(library_path)) as conn:
@@ -1190,18 +1190,18 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
         conn.commit()
 
 
-def test_the_launch_keeps_a_deletion_however_long_it_has_been_held(qapp, library):
-    # Nothing ages out. The bin holds what it holds until the user restores it
+def test_the_launch_keeps_a_trashed_item_however_long_it_has_been_held(qapp, library):
+    # Nothing ages out. The Trash holds what it holds until the user restores it
     # or ends it from the Trash collection, and two years is no different from two
     # minutes.
-    _held_deletion(library, "p1", days_ago=730)
+    _held_trashed(library, "p1", days_ago=730)
 
     db = _boot(library)
 
-    assert [record["prompt_id"] for record in db.list_deletions()] == ["p1"]
+    assert [record["prompt_id"] for record in db.list_trashed()] == ["p1"]
 
 
-def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
+def test_the_launch_reclaims_a_trash_folder_no_trashed_item_names(qapp, library):
     # The one thing launch still clears: a batch nothing can reach, left over
     # by a crash between the move and the record. Without it the trash only ever
     # grows.
@@ -1247,7 +1247,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
     ("origenerator.provenance", "stamp_unstamped"),
-    ("origenerator.bookmark_reconcile", "reconcile_bookmarks"),
+    ("origenerator.favorite_reconcile", "reconcile_favorites"),
 )
 
 
@@ -1279,7 +1279,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
-        "origenerator.recovery.reclaim_orphans": 0,
+        "origenerator.trash_collection.reclaim_orphans": 0,
         "origenerator.comfyui_client.ComfyUIClient": DEFAULT,
         "PyQt6.QtWidgets.QApplication.exec": 0,
     }
@@ -1323,7 +1323,7 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
 
     assert "import_comfyui_output" not in ran
     # ...and everything after it still ran, up to and including the window.
-    assert ran[-1] == "reconcile_bookmarks"
+    assert ran[-1] == "reconcile_favorites"
     window.show.assert_called_once()
 
 
@@ -1335,7 +1335,7 @@ def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qap
     ran = []
 
     with _a_faked_boot(ran) as _, \
-         patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
+         patch("origenerator.trash_collection.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.branch_session.is_branch_session", return_value=True):
         assert main([]) == 0
 
@@ -1397,7 +1397,7 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old
     assert db.get_generation("first")["starred"]
     assert db.get_generation("again") is None
     assert (output / "video" / "first_00001.mp4").read_bytes() == b"made again"
-    [old] = recovery.bin_items(db.list_deletions())
+    [old] = trash_collection.trash_items(db.list_trashed())
     assert old["old_version_of"] == "first"
     [held] = gallery.row_output_files(old)
     assert gallery.output_file_path(held, library.places).read_bytes() == b"first made"
@@ -1444,7 +1444,7 @@ def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path
     assert _fold_enhancements(library) == 1
 
     assert db.get_generation("enhancement") is None
-    assert db.get_deletion("enhancement") is not None
+    assert db.get_trashed("enhancement") is not None
     assert not (output / "image" / "image_enhance_00001_.png").exists()
 
 
@@ -1471,7 +1471,7 @@ def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_start
     _tidy_video_previews(library)
 
     assert db.get_generation("first-frame") is None
-    assert db.get_deletion("first-frame") is not None
+    assert db.get_trashed("first-frame") is not None
     assert db.get_generation("video") is not None
     assert (output / "video" / "scene_one_00001.mp4").exists()
 
@@ -1701,9 +1701,9 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
 
 
 class TestWhenEvolverHasBeenRenamedUnderUs:
-    """Four values decide where a sent clip lands and whether Evolver picks it
-    up, and each is written down in both apps. A rename on either side used to
-    leave clips arriving nowhere with both apps silent, and the test that holds
+    """Four values decide where a sent video lands and whether Evolver picks it
+    up, and each is written down in both apps. A rename on either shape used to
+    leave videos arriving nowhere with both apps silent, and the test that holds
     the two together skips wherever there is no Evolver beside the checkout --
     which is every run of this repo's gate. So the app asks at startup.
 
@@ -1779,7 +1779,7 @@ class TestASecondCopy:
         comfyui.assert_not_called()
         window.assert_not_called()
 
-    def test_one_started_by_a_click_on_a_notice_leaves_it_to_that_copy_without_a_word(
+    def test_one_started_by_a_click_on_a_toast_leaves_it_to_that_copy_without_a_word(
             self, qapp, monkeypatch):
         # The click only had to see that some copy opens to show what it is
         # about, and the copy already open or on its loading screen has done it.
@@ -1885,7 +1885,7 @@ def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_sayin
 def test_a_click_that_waited_in_vain_for_a_closing_copy_is_told_why_nothing_opened(
         qapp, monkeypatch):
     # The copy it waited a minute for is stuck closing, not open, so nothing
-    # will show what the notice was about.
+    # will show what the toast was about.
     monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
     copies = _the_copies(monkeypatch, None, closing=True)
     copies.claim_the_library_once_the_closing_one_lets_go.return_value = None

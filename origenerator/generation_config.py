@@ -1,7 +1,7 @@
 """Pure helpers for reasoning about a generation's configuration.
 
 Qt-free so the logic stays unit-testable without a widget toolkit. Shared by
-the gallery (reuse) and the generate view (subtab prefill + strip-click compare).
+the gallery (reuse) and the generate view (subtab prefill + version-list-click compare).
 """
 from __future__ import annotations
 
@@ -18,10 +18,10 @@ _SEED_MAX = (1 << 63) - 1
 
 @dataclass
 class ConfigSnapshot:
-    """A generate panel's live settings, captured for comparison.
+    """A Generate tab's live settings, captured for comparison.
 
-    ``seed_is_random`` records whether the seed's "Random" tick is checked (in
-    which case the panel can never match a concrete past generation), so a
+    ``seed_is_random`` records whether the seed's "Random" checkbox is checked (in
+    which case the tab can never match a concrete past generation), so a
     reopened tab comes back the way it was left.
     """
 
@@ -120,7 +120,7 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     """Return the first already-completed generation ``snapshot`` would reproduce.
 
     Re-running a config whose seed isn't randomized re-creates a byte-identical
-    output, so this lets the caller warn before wasting a slot. A row counts only
+    output, so this lets the caller warn before wasting a run. A row counts only
     when it is a reproducible generation of ours whose full parameters match:
 
     * ``completed`` -- a failed or canceled attempt is a legitimate retry.
@@ -170,7 +170,7 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
     ``params`` is filled from the workflow's defaults first: a stored row carries
     every param, and :func:`find_duplicate_generation` matches only on identical
     key sets, so a caller passing just the fields it edited would otherwise never
-    match. ``seed_is_random`` is the form's Random tick — a seed drawn per run
+    match. ``seed_is_random`` is the form's Random checkbox — a seed drawn per run
     reproduces nothing, whatever the field it was last pinned to says.
     """
     snapshot = ConfigSnapshot(workflow.name,
@@ -202,9 +202,9 @@ def filled_params(row: dict, workflow) -> dict:
     The enhance layer is taken from the workflow's defaults rather than the row,
     so a new run never inherits an enhancement from the one it varies. Every
     other param is part of the settings, and a variation reproduces them; enhancement is not
-    — it is what the gallery's Enhance subpanel applies, deliberately and
+    — it is what the gallery's Enhance pane applies, deliberately and
     app-wide. Inheriting it silently is what made a re-roll come out enhanced
-    with the subpanel's tick unticked.
+    with the Enhance pane's checkbox unchecked.
     """
     defaults = workflow.default_params()
     params = merge_denormalized(row)

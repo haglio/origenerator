@@ -3,7 +3,7 @@
 One of the gallery's screen concerns, lifted out of the view that used to hold
 all of them. What lives here is the whole of a search's life — the debounce and
 the widening's longer one, the query and its expansions, the outcome, the tiles
-the pane draws and the Model / LoRA bands folded shut, the sort and the count line.
+the pane draws and the Model / LoRA sections folded shut, the sort and the count line.
 
 What stays with the host is what a search is *of*: which folder the tree has
 selected, what rows the gallery is holding, and what the pane and the header do
@@ -22,8 +22,8 @@ from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from origenerator import gallery, search
-from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
-from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
+from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
 
@@ -49,7 +49,7 @@ class SearchHost(Protocol):
     """What a search needs of the gallery around it, and nothing else."""
 
     def search_scope(self):
-        """The selected row's breadcrumb and the generations under it — what
+        """The selected row's folder path and the generations under it — what
         this query covers, and what the field and the header name it by."""
 
     def image_config_index(self) -> dict:
@@ -78,7 +78,7 @@ class SearchHost(Protocol):
 
 
 class GallerySearchController(QObject):
-    """The search field and the results it fills the browser pane with."""
+    """The search field and the results it fills the Gallery pane with."""
 
     def __init__(self, host: SearchHost, *, parent: QObject,
                  expander: SearchExpander | None = None):
@@ -91,7 +91,7 @@ class GallerySearchController(QObject):
         self._outcome = search.SearchOutcome((), ())
         self._tiles: list = []      # its hits as the pane draws them
         self._sort = search.SORT_RECENT
-        self._collapsed: set[str] = set()   # Model / LoRA bands folded shut
+        self._collapsed: set[str] = set()   # Model / LoRA sections folded shut
         self._expander = expander or SearchExpander(self)
         self._expander.expanded.connect(self._on_expanded)
         self._timer = QTimer(self)
@@ -104,12 +104,12 @@ class GallerySearchController(QObject):
         self._expand_timer.timeout.connect(self._request_expansion)
 
         # The gallery search. It sits over the tree but no longer narrows it: what
-        # it fills is the browser pane, with the matching generations themselves
+        # it fills is the Gallery pane, with the matching generations themselves
         # (see :meth:`run`), because a thumbnail is what the user recognizes and a
         # folder name — a short code — is not. Matching is by meaning rather than
         # by letters, so "two women" reaches "a pair of dolls" and "two tall
         # ladies" alike; a model name, a LoRA's name and a seed are searchable too.
-        # Its counterpart is the find strip below the info pane, which searches
+        # Its counterpart is the find bar below the Generate pane, which searches
         # *inside* the open tab's prompts.
         self.field = ScopeSearchEdit()
         # Its placeholder names the scope — the whole path down to the selected
@@ -131,26 +131,26 @@ class GallerySearchController(QObject):
         # it is showing a slice; beside it, the order the results are laid out in.
         # Recency is one question ("the one I made recently"); model + LoRA is the
         # other ("which model and LoRA was that"), and picking it cuts the results into a
-        # labelled band per combination rather than interleaving them.
+        # labelled section per combination rather than interleaving them.
         self._count = QLabel("")
         self._count.setObjectName("estimateLabel")
         # No-wheel: it rides directly over the scrolling results, and a wheel
         # notch that lands on it must scroll them rather than re-sort them.
-        self._sort_combo = NoWheelComboBox()
+        self._sort_dropdown = NoWheelDropdown()
         for label, mode in _SORTS:
-            self._sort_combo.addItem(label, mode)
-        self._sort_combo.setToolTip(
+            self._sort_dropdown.addItem(label, mode)
+        self._sort_dropdown.setToolTip(
             "Order the results: newest first, or banded under a heading per "
             "model + LoRA combination — click a heading to fold its band away"
         )
-        self._sort_combo.currentIndexChanged.connect(self._on_sort_changed)
+        self._sort_dropdown.currentIndexChanged.connect(self._on_sort_changed)
         self.bar = QWidget()
         row = QHBoxLayout(self.bar)
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self._count)
         row.addStretch(1)
         row.addWidget(QLabel("Sort:"))
-        row.addWidget(self._sort_combo)
+        row.addWidget(self._sort_dropdown)
         self.bar.hide()  # shown only while a search is running
 
     # --- what the gallery asks of a search -----------------------------------
@@ -172,9 +172,9 @@ class GallerySearchController(QObject):
     def set_sort(self, mode: str | None) -> None:
         """Restore the remembered results order (ignoring anything unrecognized,
         so a state file from a version that offered a different one still opens)."""
-        index = self._sort_combo.findData(search.saved_sort(mode))
+        index = self._sort_dropdown.findData(search.saved_sort(mode))
         if index >= 0:
-            self._sort_combo.setCurrentIndex(index)  # its signal sets the mode
+            self._sort_dropdown.setCurrentIndex(index)  # its signal sets the mode
 
     def focus_field(self) -> None:
         """Put the caret in the field with whatever it holds selected — where a
@@ -191,7 +191,7 @@ class GallerySearchController(QObject):
         self.field.set_scope(self._host.search_scope().path)
 
     def run(self) -> None:
-        """Fill the browser pane with what the standing query matches, within the
+        """Fill the Gallery pane with what the standing query matches, within the
         folder the tree has selected.
 
         Takes the pane over from that folder — the tree keeps its selection while
@@ -317,7 +317,7 @@ class GallerySearchController(QObject):
 
     def _on_sort_changed(self, _index=0) -> None:
         """Re-lay the results in the newly picked order (a no-op off a search)."""
-        self._sort = self._sort_combo.currentData() or search.SORT_RECENT
+        self._sort = self._sort_dropdown.currentData() or search.SORT_RECENT
         if self._query:
             self.run()
 
@@ -376,8 +376,8 @@ class GallerySearchController(QObject):
         return tiles
 
     def _on_section_toggled(self, heading: str, collapsed: bool) -> None:
-        """Remember a Model / LoRA band's fold state, so a redraw — a rebuild, a landing
-        generation, a widening — doesn't spring open the bands you shut."""
+        """Remember a Model / LoRA section's fold state, so a redraw — a rebuild, a landing
+        generation, a widening — doesn't spring open the sections you shut."""
         if collapsed:
             self._collapsed.add(heading)
         else:

@@ -219,7 +219,7 @@ def _vocab_and_merges(folder: Path) -> tuple[Path, Path]:
     return folder / "vocab.json", folder / "merges.txt"
 
 
-def _clip(vocab: Path, merges: Path) -> Tokenizer:
+def _clip_tokenizer(vocab: Path, merges: Path) -> Tokenizer:
     words, pairs = models.BPE.read_file(str(vocab), str(merges))
     tokenizer = Tokenizer(models.BPE(words, pairs, unk_token="<|endoftext|>",
                                      continuing_subword_prefix="", end_of_word_suffix="</w>",
@@ -334,7 +334,7 @@ def _hub_file(repo: str, name: str) -> Path | None:
 
 _READERS = {
     CLIP: _Reader(lambda _params: _vocab_and_merges(_shipped_with_comfyui("sd1_tokenizer")),
-                  _clip, _CLIP_PIECE, READ_IN_PIECES, weighted=True),
+                  _clip_tokenizer, _CLIP_PIECE, READ_IN_PIECES, weighted=True),
     T5: _Reader(lambda _params: (_shipped_with_comfyui("text_encoders", "t5_tokenizer",
                                                          "tokenizer.json"),),
                 _from_file, 511, READ_WHOLE, weighted=True),

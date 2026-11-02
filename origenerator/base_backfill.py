@@ -71,7 +71,7 @@ TARGET_KEY = "_base_render_of"
 def rows_missing_their_base(rows: list[dict]) -> list[dict]:
     """Enhanced images that kept no original and whose settings can be rebuilt.
 
-    The badge says an enhancement happened; the absence of an original says the
+    The yellow plus says an enhancement happened; the absence of an original says the
     tail baked it in. Those two together are exactly the rows this can help. A
     row whose workflow isn't registered (an import) is passed over: there are no
     settings to re-run, and guessing them would produce a "base" that is not this
@@ -210,7 +210,7 @@ def render_base_now(client, workflow, params: dict, *,
     (:func:`rows_missing_their_base`), what settings reproduce it
     (:func:`base_params_for`), and how the result is attached
     (:func:`attach_base`). A submit loop kept alone in ``tools/`` is the one
-    piece nothing here would notice going out of step.
+    piece nothing here would catch going out of step.
 
     ``now`` and ``sleep`` are injected so the wait can be tested without one.
     """
@@ -241,7 +241,7 @@ def attach_base(db, target_id: str, files: list[dict]) -> bool:
 
     The enhanced file keeps its place at the head of the target's
     ``output_files`` — it is still what the row shows — and the base joins it
-    there as the version the info pane offers as ``Original``. ``False`` when there
+    there as the version the Generate pane offers as ``Original``. ``False`` when there
     is nothing to attach it to: the target was deleted meanwhile, or something
     else repaired it first.
     """

@@ -170,7 +170,7 @@ class ElidingTabBar(QTabBar):
     def minimumTabSizeHint(self, index):
         size = super().minimumTabSizeHint(index)
         # Let a tab shrink to no more than an equal share of the bar, so every
-        # tab keeps a slot as more are opened — the row packs them tighter rather
+        # tab keeps a place as more are opened — the row packs them tighter rather
         # than pushing the overflow off the edge (there are no scroll buttons).
         if self.count() > 0 and self.width() > 0:
             size.setWidth(min(size.width(), self.width() // self.count()))
@@ -193,7 +193,7 @@ class ElidingTabBar(QTabBar):
         button.setIconSize(QSize(mark, mark))
         button.setFixedSize(mark + _CLOSE_PADDING, mark)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setToolTip("Close this configuration")
+        button.setToolTip("Close this tab")
         button.clicked.connect(lambda _=False, b=button: self._close_clicked(b))
         return button
 

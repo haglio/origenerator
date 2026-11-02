@@ -10,8 +10,8 @@ from origenerator.workflows.base import (
 )
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import SDXL
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
-from origenerator.workflows.model_pickers import model_picker
 from origenerator.workflows.prompt_readers import CLIP
 
 
@@ -27,9 +27,9 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     (its default), the graph ends at the plain decode.
 
     The toggle defaults off because enhancement is now a *layer* the gallery
-    applies afterward — its Enhance subpanel, per folder, with the original
-    kept and every level listed. Baking the tail in here would produce an
-    enhanced image with no original to compare against and no level to name.
+    applies afterward — its Enhance pane, per folder, with the original
+    kept and every version listed. Baking the tail in here would produce an
+    enhanced image with no original to compare against and no version to name.
     The param stays (an old run reproduces exactly what it recorded), but
     nothing sets it by hand any more.
     """
@@ -77,7 +77,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+            model_dropdown("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
                          accepts=(SDXL,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(SDXL,)),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
@@ -87,7 +87,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5, good=(3, 8)),
             *sampler_params(defaults),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
-            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+            model_dropdown("upscale_model", "Upscaler", defaults["upscale_model"],
                          "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
@@ -113,8 +113,8 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"ckpt_name": params["checkpoint"]},
             },
             **loras.nodes,
-            **prompt_conditioning("2", loras.clip, params["positive_prompt"]),
-            **prompt_conditioning("3", loras.clip, params["negative_prompt"]),
+            **prompt_conditioning("2", loras.clip_ref, params["positive_prompt"]),
+            **prompt_conditioning("3", loras.clip_ref, params["negative_prompt"]),
             "4": {
                 "class_type": "EmptyLatentImage",
                 "inputs": {

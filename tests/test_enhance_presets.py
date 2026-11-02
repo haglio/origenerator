@@ -1,4 +1,4 @@
-"""Enhancement settings saved under a name: what the Enhance panel's dropdown
+"""Enhancement settings saved under a name: what the Enhance pane's dropdown
 lists, and the most common enhancements a library starts it with."""
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from origenerator.enhance_presets import Preset
 from origenerator.gallery.enhance import most_used_enhancements
 from origenerator.gallery.enhance_fold import fold_enhancement
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL, default_enhance_params
-from origenerator.gui import enhance_panel
+from origenerator.gui import enhance_pane
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import fix_prompts_of, part_named
 from tests.test_core import _window
@@ -79,7 +79,7 @@ def test_an_image_that_recorded_no_model_was_enhanced_matching_the_source_by_the
 
 def test_a_fix_from_before_fixes_had_prompts_counts_with_the_one_the_panel_would_run_for_it(
         tmp_path):
-    """The panel cannot run a fix without its part's own prompts any more, so the
+    """The pane cannot run a fix without its part's own prompts any more, so the
     two would be one setting on it, and one preset."""
     rows = _library_of_one_image(
         tmp_path, {},
@@ -175,14 +175,14 @@ def test_a_preset_saved_in_the_window_is_the_one_its_dropdown_shows_after_a_rest
         qtbot, tmp_path, monkeypatch):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    panel = first._gallery_view._enhance.panel
-    panel._steps.setValue(44)
-    monkeypatch.setattr(enhance_panel.QInputDialog, "getText",
+    pane = first._gallery_view._enhance.pane
+    pane._steps.setValue(44)
+    monkeypatch.setattr(enhance_pane.QInputDialog, "getText",
                         staticmethod(lambda *_args, **_kwargs: ("Crisp", True)))
-    panel._preset_button.click()
+    pane._preset_button.click()
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    picker = reopened._gallery_view._enhance.panel._preset_picker
-    assert picker.currentText() == "Crisp"
+    dropdown = reopened._gallery_view._enhance.pane._preset_dropdown
+    assert dropdown.currentText() == "Crisp"

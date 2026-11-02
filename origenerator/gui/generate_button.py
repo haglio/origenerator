@@ -1,13 +1,13 @@
 """The Generate button: it submits a run to the queue, and nothing more.
 
 Pressing it launches what was asked for and it is done — the Job Queue and
-the browser pane's in-flight cards are where a run in flight is watched, each
+the Gallery pane's in-flight tiles are where a run in flight is watched, each
 showing the same reading of it (:func:`origenerator.timing.progress_status_label`).
 The button does not fill with that run's progress: that would put a third,
 differently-worded account of one run on screen and tie the control that starts
 work to the state of work already going.
 
-Its resting caption is the panel's to set: settings that would re-create a past
+Its resting caption is the tab's to set: settings that would re-create a past
 generation exactly make the press draw a fresh seed instead, and the button says
 so ("Generate with Random seed") rather than a dialog asking after the click.
 """

@@ -22,7 +22,7 @@ from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 @pytest.mark.parametrize("said, wanted", [
     ("experiments", AppCommand.EXPERIMENTS),
-    ("recents", AppCommand.RECENTS),
+    ("recents", AppCommand.LATEST),
     ("trash", AppCommand.TRASH),
 ])
 def test_a_collection_answers_to_its_own_bare_name(said, wanted):
@@ -55,7 +55,7 @@ def test_the_motion_bars_keep_fun_times_phrases():
 
 
 def test_human_inspired_motion_answers_a_flip_and_an_explicit_on_and_off():
-    # It is reached for without looking at the panel, so a speaker who wants it
+    # It is reached for without looking at the OSR2 controls, so a speaker who wants it
     # ON must not have to find out which way it is standing first.
     assert match_app_command("human inspired") is AppCommand.LEARNED
     assert match_app_command("human inspired on") is AppCommand.LEARNED_ON
@@ -114,7 +114,7 @@ def test_a_two_word_command_is_not_shadowed_by_its_first_word():
     assert match_app_command("next shape") is AppCommand.NEXT_SHAPE
 
 
-# --- the bank, and the app-wide switches ------------------------------------
+# --- the Gallery pane buttons, and the app-wide switches ------------------------------------
 
 @pytest.mark.parametrize("said, wanted", [
     ("undo", AppCommand.UNDO),
@@ -141,7 +141,7 @@ def test_a_switch_takes_a_flip_and_an_explicit_way():
     "OSR2 off", "OSR 2 off", "O.S.R. 2 off", "OSR two off", "O S R two off",
 ])
 def test_the_osr2_is_let_go_of_in_fun_times_words(said):
-    """Fun Time's spoken word for the console's control-off button, heard here
+    """Fun Time's spoken word for the OSR2 controls' control-off button, heard here
     however the transcriber writes the letters and the number."""
     assert match_app_command(said) is AppCommand.DRIVE_OFF
 
@@ -170,7 +170,7 @@ def test_the_enhanced_filter_answers_to_upscales_as_well():
 
 
 def test_the_slideshow_filter_is_said_either_way_round_not_toggled():
-    # A speaker mid-show is not looking at the console to see which way it is
+    # A speaker mid-show is not looking at the OSR2 controls to see which way it is
     # set, so a single word that flipped it would do the opposite half the time.
     assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED
     assert match_app_command("enhanced only") is AppCommand.FILTER_ENHANCED

@@ -1,9 +1,9 @@
-"""A folder's enhancement settings, and the levels an image accumulates.
+"""A folder's enhancement settings, and the versions an image accumulates.
 
 Enhancement configuration belongs to the FOLDER — it is not one of the params
 that decide which folder a run lands in — so it is stored beside the folder's
 name and star, and met with a particular image only when an enhance is launched.
-Each enhance folds in as another level, recording what made it, so an image that
+Each enhance folds in as another version, recording what made it, so an image that
 has been enhanced twice at different settings can show which is which.
 """
 from __future__ import annotations
@@ -15,13 +15,13 @@ import pytest
 from origenerator import gallery
 from origenerator.db import Database
 from origenerator.gallery.enhance import (
-    displayed_levels,
-    enhance_levels,
+    displayed_versions,
     enhance_params_for,
+    enhancement_versions,
     fix_params_for,
-    level_matching_params,
-    level_matching_settings,
-    remove_enhance_levels,
+    remove_enhance_versions,
+    version_matching_params,
+    version_matching_settings,
 )
 from origenerator.gallery.enhance_fold import fold_enhancement
 from origenerator.gallery.enhance_settings import (
@@ -30,7 +30,7 @@ from origenerator.gallery.enhance_settings import (
     default_enhance_params,
     describe_enhance_params,
     full_settings,
-    level_settings,
+    version_settings,
 )
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import detail_parts
@@ -65,7 +65,7 @@ def test_an_unconfigured_folder_reads_as_the_defaults_with_the_tick_off():
 
 @pytest.mark.parametrize("raw", ["", "not json", "[]", "null"])
 def test_unreadable_stored_settings_fall_back_to_the_defaults(raw):
-    # A folder's settings must never be able to break the panel that shows them.
+    # A folder's settings must never be able to break the pane that shows them.
     assert EnhanceSettings.parse(raw) == EnhanceSettings.parse(None)
 
 
@@ -83,7 +83,7 @@ def test_settings_round_trip_through_json():
 
 
 def test_stored_settings_cannot_smuggle_in_params_outside_the_panel():
-    # Only the settings the subpanel offers are honored: a stored blob naming, say,
+    # Only the settings the Enhance pane offers are honored: a stored blob naming, say,
     # the input image must not be able to redirect what an enhance runs on.
     back = EnhanceSettings.parse(json.dumps(
         {"auto": True, "params": {"input_image": "elsewhere.png", "enhance_steps": 12}}
@@ -113,7 +113,7 @@ def test_enhance_params_take_the_folders_settings_over_the_workflow_defaults():
 
 def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
     # It is part of what an enhancement IS, not a property of one image, so it
-    # is set once on the panel and every enhance launched from there carries it.
+    # is set once on the pane and every enhance launched from there carries it.
     settings = EnhanceSettings(params={"enhance_detail_fixes": {"teeth": 0.5}})
     params = enhance_params_for(_source_row(), settings)
     assert params["enhance_detail_fixes"] == {"teeth": 0.5}
@@ -124,7 +124,7 @@ def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
 
 
 def test_the_default_model_leaves_the_source_image_its_own_checkpoint():
-    # An enhanced image should stay in its own style, so the panel's default
+    # An enhanced image should stay in its own style, so the pane's default
     # defers to whichever checkpoint made the image rather than pinning one.
     params = enhance_params_for(_source_row(), EnhanceSettings())
     assert params["checkpoint"] == "anemone_v3.safetensors"
@@ -145,7 +145,7 @@ def test_no_settings_at_all_still_yields_the_workflow_defaults():
     assert params["enhance_steps"] == defaults["enhance_steps"]
 
 
-# --- the levels an image accumulates ---------------------------------------
+# --- the versions an image accumulates ---------------------------------------
 
 
 def _enhance_row(prompt_id, filename, **settings):
@@ -182,28 +182,28 @@ def _add_and_fold(db, prompt_id, filename, **settings):
     return fold_enhancement(db, db.get_generation(prompt_id))
 
 
-def test_an_unenhanced_image_has_no_levels():
+def test_an_unenhanced_image_has_no_versions():
     # Nothing has been applied, so there is nothing to list or choose between.
-    assert enhance_levels(_source_row()) == []
+    assert enhancement_versions(_source_row()) == []
 
 
 def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
-    # Every image the green badge marks lists here — including the ones the
+    # Every image the yellow plus marks lists here — including the ones the
     # inline tail finished, which kept no original. There is one file and no
     # "before", so the list is that single enhancement, named by the settings the
-    # tail ran at so it can still be dragged onto the panel and reused.
+    # tail ran at so it can still be dragged onto the pane and reused.
     row = dict(_source_row(), params_json=json.dumps({
         "positive_prompt": "a lantern on a jetty",
         "enhance": True, "enhance_scale": 2.0, "enhance_steps": 20,
         "enhance_denoise": 0.15,
     }))
-    (level,) = enhance_levels(row)
-    assert level.label == "Enhancement 1/1"
-    assert level.settings == "2x · 20 steps · 0.15 redraw"
-    assert level.file["filename"] == "sdxl_t2i_src.png"
+    (version,) = enhancement_versions(row)
+    assert version.label == "Enhancement 1/1"
+    assert version.settings == "2x · 20 steps · 0.15 redraw"
+    assert version.file["filename"] == "sdxl_t2i_src.png"
 
 
-def test_a_batch_the_tail_finished_lists_one_level_not_one_per_file():
+def test_a_batch_the_tail_finished_lists_one_version_not_one_per_file():
     # A batch's files are siblings of each other, not versions of each other,
     # however many the run saved.
     row = dict(
@@ -214,20 +214,20 @@ def test_a_batch_the_tail_finished_lists_one_level_not_one_per_file():
             {"filename": "sdxl_t2i_b.png", "subfolder": "image", "type": "output"},
         ]),
     )
-    assert [lvl.label for lvl in enhance_levels(row)] == ["Enhancement 1/1"]
+    assert [lvl.label for lvl in enhancement_versions(row)] == ["Enhancement 1/1"]
 
 
-def test_a_batch_of_several_files_is_not_mistaken_for_levels():
+def test_a_batch_of_several_files_is_not_mistaken_for_versions():
     # A batch generation saves several files from one run, and none of them is a
-    # level of any other — only original_files says a row has been enhanced.
+    # version of any other — only original_files says a row has been enhanced.
     batch = dict(_source_row(), output_files=json.dumps([
         {"filename": "sdxl_t2i_a.png", "subfolder": "image", "type": "output"},
         {"filename": "sdxl_t2i_b.png", "subfolder": "image", "type": "output"},
     ]))
-    assert enhance_levels(batch) == []
+    assert enhancement_versions(batch) == []
 
 
-def test_each_fold_adds_a_level_naming_the_settings_that_made_it(tmp_path):
+def test_each_fold_adds_a_version_naming_the_settings_that_made_it(tmp_path):
     db = Database(tmp_path / "t.db")
     _seed_source(db)
     _add_and_fold(db, "e1", "image_enhance_00001_.png",
@@ -235,14 +235,14 @@ def test_each_fold_adds_a_level_naming_the_settings_that_made_it(tmp_path):
     _add_and_fold(db, "e2", "image_enhance_00002_.png",
                   enhance_scale=3.0, enhance_steps=40, enhance_denoise=0.35)
 
-    levels = enhance_levels(db.get_generation("src"))
+    versions = enhancement_versions(db.get_generation("src"))
     # Most-enhanced first — which is also what the preview opens on.
-    assert [lvl.label for lvl in levels] == ["Enhancement 2/2", "Enhancement 1/2", "Original"]
-    assert levels[0].file["filename"] == "image_enhance_00002_.png"
-    assert levels[0].settings == "3x · 40 steps · 0.35 redraw"
-    assert levels[1].settings == "2x · 20 steps · 0.15 redraw"
-    assert levels[2].settings == ""      # an original was not enhanced at anything
-    assert levels[2].is_original
+    assert [lvl.label for lvl in versions] == ["Enhancement 2/2", "Enhancement 1/2", "Original"]
+    assert versions[0].file["filename"] == "image_enhance_00002_.png"
+    assert versions[0].settings == "3x · 40 steps · 0.35 redraw"
+    assert versions[1].settings == "2x · 20 steps · 0.15 redraw"
+    assert versions[2].settings == ""      # an original was not enhanced at anything
+    assert versions[2].is_original
 
 
 def test_each_enhancement_is_counted_out_of_the_enhancements_and_the_original_is_not(tmp_path):
@@ -251,25 +251,25 @@ def test_each_enhancement_is_counted_out_of_the_enhancements_and_the_original_is
     _add_and_fold(db, "e1", "image_enhance_00001_.png", enhance_scale=2.0)
     _add_and_fold(db, "e2", "image_enhance_00002_.png", enhance_scale=3.0)
 
-    assert [lvl.label for lvl in enhance_levels(db.get_generation("src"))] == [
+    assert [lvl.label for lvl in enhancement_versions(db.get_generation("src"))] == [
         "Enhancement 2/2", "Enhancement 1/2", "Original"]
 
 
-def test_a_level_folded_before_settings_were_recorded_still_lists(tmp_path):
+def test_a_version_folded_before_settings_were_recorded_still_lists(tmp_path):
     # Rows enhanced by an earlier version of the app have no enhance_history;
-    # their levels must still appear, just without settings to name.
+    # their versions must still appear, just without settings to name.
     db = Database(tmp_path / "t.db")
     _seed_source(db)
     _add_and_fold(db, "e1", "image_enhance_00001_.png", enhance_scale=2.0)
     db.update_generation("src", enhance_history=None)
 
-    levels = enhance_levels(db.get_generation("src"))
-    assert [lvl.label for lvl in levels] == ["Enhancement 1/1", "Original"]
-    assert levels[0].settings == ""
+    versions = enhancement_versions(db.get_generation("src"))
+    assert [lvl.label for lvl in versions] == ["Enhancement 1/1", "Original"]
+    assert versions[0].settings == ""
 
 
 def test_enhance_history_survives_capture_and_restore(tmp_path):
-    # The undoable-delete path restores rows verbatim; the levels' settings must
+    # The undoable-delete path restores rows verbatim; the versions' settings must
     # come back with them or a restored image forgets what it was enhanced at.
     db = Database(tmp_path / "t.db")
     _seed_source(db)
@@ -280,10 +280,10 @@ def test_enhance_history_survives_capture_and_restore(tmp_path):
     assert db.get_generation("src")["enhance_history"] == row["enhance_history"]
 
 
-def test_a_level_recorded_before_a_setting_existed_still_reads_as_a_duplicate(tmp_path):
-    # The setting list grows, and a level recorded before one existed was made with
+def test_a_version_recorded_before_a_setting_existed_still_reads_as_a_duplicate(tmp_path):
+    # The setting list grows, and a version recorded before one existed was made with
     # it at its default — so it still matches settings that leave it there, and
-    # the + Enhance card still knows it would only be making the same thing
+    # the + Enhance row still knows it would only be making the same thing
     # twice. Turning the new setting on is a different enhancement, and does not.
     db = Database(tmp_path / "t.db")
     _seed_source(db)
@@ -295,8 +295,8 @@ def test_a_level_recorded_before_a_setting_existed_still_reads_as_a_duplicate(tm
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "checkpoint": "anemone_v3.safetensors",
     })
-    assert level_matching_settings(row, settings) == 0
-    assert level_matching_settings(
+    assert version_matching_settings(row, settings) == 0
+    assert version_matching_settings(
         row, EnhanceSettings(params=dict(settings.params,
                                          enhance_detail_fixes={"faces": 0.45}))
     ) is None
@@ -328,22 +328,22 @@ def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_
     assert describe_enhance_params({}) == ""
 
 
-# --- what the info pane lists, and what deleting a level leaves ------
+# --- what the Generate pane lists, and what deleting a version leaves ------
 
 
 def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
     # This is where an image's versions live, so it has to be somewhere you can
     # already see before the first enhancement makes a second one.
-    (level,) = displayed_levels(_source_row())
-    assert level.is_original
-    assert level.file["filename"] == "sdxl_t2i_src.png"
+    (version,) = displayed_versions(_source_row())
+    assert version.is_original
+    assert version.file["filename"] == "sdxl_t2i_src.png"
 
 
 def test_a_video_lists_no_versions():
     # The enhancer takes images, so a video's file stays in the block at the top.
     video = dict(_source_row(), output_files=json.dumps(
         [{"filename": "wan_00001.mp4", "subfolder": "video", "type": "output"}]))
-    assert displayed_levels(video) == []
+    assert displayed_versions(video) == []
 
 
 def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video_itself(tmp_path):
@@ -351,12 +351,12 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video_itself(tmp_pa
     video = dict(_source_row(), output_files=json.dumps(
         [{"filename": "wan_00001.mp4", "subfolder": "video", "type": "output"}]))
 
-    evolved, original = displayed_levels(video, upscale)
+    evolved, original = displayed_versions(video, upscale)
 
     assert (evolved.label, original.label) == ("Evolved", "Original")
     assert gallery.output_file_path(evolved.file, OutputPlaces.in_one_folder(tmp_path / "output")) == upscale
     assert original.file["filename"] == "wan_00001.mp4"
-    assert evolved.params == {}  # nothing Evolver ran for the Enhance panel to take
+    assert evolved.params == {}  # nothing Evolver ran for the Enhance pane to take
 
 
 def _folded(tmp_path, count=1):
@@ -370,12 +370,12 @@ def _folded(tmp_path, count=1):
 
 def test_removing_an_enhancement_leaves_the_others(tmp_path):
     row = _folded(tmp_path, count=2)
-    updates = remove_enhance_levels(row, ["image_enhance_00002_.png"])
+    updates = remove_enhance_versions(row, ["image_enhance_00002_.png"])
     after = dict(row, **updates)
-    assert [lvl.label for lvl in enhance_levels(after)] == ["Enhancement 1/1", "Original"]
-    # The surviving level keeps its own settings, its own run id and its own
-    # finish — they ride with the level they belong to, so binning the newer
-    # enhancement takes the place in the Recents collection it had lifted the image
+    assert [lvl.label for lvl in enhancement_versions(after)] == ["Enhancement 1/1", "Original"]
+    # The surviving version keeps its own settings, its own run id and its own
+    # finish — they ride with the version they belong to, so binning the newer
+    # enhancement takes the place in the Latest collection it had lifted the image
     # to along with it.
     older = json.loads(row["enhance_history"])[1]
     assert older["filename"] == "image_enhance_00001_.png"
@@ -386,22 +386,22 @@ def test_removing_an_enhancement_leaves_the_others(tmp_path):
 def test_removing_the_last_enhancement_leaves_a_plain_image(tmp_path):
     # An original still marked as one would read as an enhancement of itself.
     row = _folded(tmp_path, count=1)
-    after = dict(row, **remove_enhance_levels(row, ["image_enhance_00001_.png"]))
+    after = dict(row, **remove_enhance_versions(row, ["image_enhance_00001_.png"]))
     assert after["original_files"] is None
     assert after["enhance_history"] is None
     assert not gallery.is_enhanced_row(after)
-    assert enhance_levels(after) == []
+    assert enhancement_versions(after) == []
 
 
 def test_removing_the_original_keeps_every_enhancement_named(tmp_path):
     # Binning the pre-enhance file is a fair thing to want; what is left is
     # still two enhancements, and each still says what made it.
     row = _folded(tmp_path, count=2)
-    after = dict(row, **remove_enhance_levels(row, ["sdxl_t2i_src.png"]))
-    levels = enhance_levels(after)
-    assert [lvl.label for lvl in levels] == ["Enhancement 2/2", "Enhancement 1/2"]
-    assert levels[0].params == {"enhance_scale": 3.0}
-    assert gallery.is_enhanced_row(after)   # still an enhanced image, badge and all
+    after = dict(row, **remove_enhance_versions(row, ["sdxl_t2i_src.png"]))
+    versions = enhancement_versions(after)
+    assert [lvl.label for lvl in versions] == ["Enhancement 2/2", "Enhancement 1/2"]
+    assert versions[0].params == {"enhance_scale": 3.0}
+    assert gallery.is_enhanced_row(after)   # still an enhanced image, plus and all
 
 
 def test_removing_an_inline_tails_enhancement_untags_its_base_render():
@@ -415,7 +415,7 @@ def test_removing_an_inline_tails_enhancement_untags_its_base_render():
             {"filename": "base.png", "subfolder": "image", "role": "original"},
         ]),
     )
-    after = dict(row, **remove_enhance_levels(row, ["enhanced.png"]))
+    after = dict(row, **remove_enhance_versions(row, ["enhanced.png"]))
     assert json.loads(after["output_files"]) == [
         {"filename": "base.png", "subfolder": "image"}
     ]
@@ -426,15 +426,15 @@ def test_removing_every_version_changes_nothing(tmp_path):
     # A generation with no file is a generation deleted, which is a bigger
     # delete than a version list should make.
     row = _folded(tmp_path, count=1)
-    assert remove_enhance_levels(
+    assert remove_enhance_versions(
         row, ["image_enhance_00001_.png", "sdxl_t2i_src.png"]) == {}
 
 
 def test_removing_a_name_the_row_never_held_changes_nothing(tmp_path):
-    assert remove_enhance_levels(_folded(tmp_path), ["someone_elses.png"]) == {}
+    assert remove_enhance_versions(_folded(tmp_path), ["someone_elses.png"]) == {}
 
 
-def test_describe_still_names_a_level_recorded_the_old_way():
+def test_describe_still_names_a_version_recorded_the_old_way():
     # Every enhancement in the library predates the per-part numbers, and its
     # caption must go on reading as what it did — a targeted fix by its part,
     # the generic pass as the pair it ran.
@@ -476,7 +476,7 @@ def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
     params = fix_params_for(row, _spoken("fix teeth"),
                             EnhanceSettings(params={"enhance_scale": 1.5}))
 
-    # Equivalent to the LATEST enhancement — not to whatever the panel says now.
+    # Equivalent to the LATEST enhancement — not to whatever the pane says now.
     assert params["enhance_scale"] == 3.0
     assert params["enhance_steps"] == 40
     assert params["checkpoint"] == "driftwood_v1.safetensors"
@@ -497,17 +497,17 @@ def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
         monkeypatch):
     # The bug this is here for: a folder set to fix every part turned a spoken
     # "fix teeth" into a pass over all of them — a redraw of the whole image
-    # in answer to a command about one part of it. The panel's ticks configure
+    # in answer to a command about one part of it. The pane's ticks configure
     # what an *enhancement* fixes; a spoken fix says its own parts out loud.
     _install_detectors(monkeypatch, "teeth_yolov8n.pt", "face_yolov8m.pt",
                        "hand_yolov8s.pt", "eyes_yolov8n.pt")
-    panel = EnhanceSettings(params={"enhance_detail_fixes": {
+    pane = EnhanceSettings(params={"enhance_detail_fixes": {
         "faces": 0.4, "hands": 0.5, "teeth": 0.6, "eyes": 0.3}})
 
-    params = fix_params_for(_source_row(), _spoken("fix teeth"), panel)
+    params = fix_params_for(_source_row(), _spoken("fix teeth"), pane)
 
     # Its own number for that part, since nobody says a denoise out loud — and
-    # nothing else the panel happens to have ticked.
+    # nothing else the pane happens to have checked.
     assert params["enhance_detail_fixes"] == {"teeth": 0.6}
 
 
@@ -531,8 +531,8 @@ def test_a_part_with_nothing_to_find_it_is_dropped_from_a_combination(monkeypatc
 
 
 def test_a_spoken_fix_runs_the_part_at_the_number_the_panel_gives_it(monkeypatch):
-    # Nobody says a denoise out loud, so the panel's own number for that part is
-    # what the command means — its default only where the panel leaves it alone.
+    # Nobody says a denoise out loud, so the pane's own number for that part is
+    # what the command means — its default only where the pane leaves it alone.
     _install_detectors(monkeypatch, "hand_yolov8s.pt")
     params = fix_params_for(
         _source_row(), _spoken("fix hands"),
@@ -550,7 +550,7 @@ def test_a_spoken_fix_with_no_detector_for_the_part_declines(monkeypatch):
 def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
         tmp_path, monkeypatch):
     # Every enhance re-derives from the original, so a "fix eyes" that dropped
-    # the teeth pass would undo the mended teeth on screen. The latest level's
+    # the teeth pass would undo the mended teeth on screen. The latest version's
     # passes ride along instead.
     _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
     db = Database(tmp_path / "t.db")
@@ -564,9 +564,9 @@ def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
         "teeth": 0.5, "eyes": DEFAULT_FIX_DENOISE}
 
 
-def test_a_spoken_fix_accumulates_onto_a_level_recorded_the_old_way(
+def test_a_spoken_fix_accumulates_onto_a_version_recorded_the_old_way(
         tmp_path, monkeypatch):
-    # The level being added to is whatever the library already holds, and that
+    # The version being added to is whatever the library already holds, and that
     # is the old shape everywhere: its passes must ride along all the same.
     _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
     db = Database(tmp_path / "t.db")
@@ -607,27 +607,27 @@ def test_a_part_fixed_as_hard_as_a_fix_goes_reads_as_the_duplicate_it_is(
                   **{k: first[k] for k in gallery.ENHANCE_SETTING_KEYS})
     row = db.get_generation("src")
 
-    # Asking again would remake the level it already has; a different part is a
+    # Asking again would remake the version it already has; a different part is a
     # different enhancement and runs.
-    assert level_matching_params(row, fix_params_for(row, _spoken("fix teeth"))) == 0
-    assert level_matching_params(row, fix_params_for(row, _spoken("fix eyes"))) is None
+    assert version_matching_params(row, fix_params_for(row, _spoken("fix teeth"))) == 0
+    assert version_matching_params(row, fix_params_for(row, _spoken("fix eyes"))) is None
 
 
-def test_the_prompts_a_fix_ran_with_are_part_of_what_its_level_is():
+def test_the_prompts_a_fix_ran_with_are_part_of_what_its_version_is():
     hands = next(part for part in detail_parts.part_table() if part.name == "hands")
     ran = {"enhance_detail_fixes": {"hands": 0.45}, "enhance_fix_prompts": {}}
     edited = dict(ran, enhance_fix_prompts={"hands": {"prompt": "open palms", "avoid": "fists"}})
 
-    assert level_settings(ran)["enhance_fix_prompts"] == {
+    assert version_settings(ran)["enhance_fix_prompts"] == {
         "hands": {"prompt": hands.prompt, "avoid": hands.avoid, "lora": "", "strength": 1.0}}
-    assert level_settings(ran) != level_settings(edited)
+    assert version_settings(ran) != version_settings(edited)
 
 
-def test_a_level_made_before_fixes_had_prompts_of_their_own_records_none():
-    assert "enhance_fix_prompts" not in level_settings({"enhance_detail_fixes": {"hands": 0.45}})
+def test_a_version_made_before_fixes_had_prompts_of_their_own_records_none():
+    assert "enhance_fix_prompts" not in version_settings({"enhance_detail_fixes": {"hands": 0.45}})
 
 
-def test_a_level_made_before_fixes_had_prompts_is_the_one_that_gives_each_part_its_own():
+def test_a_version_made_before_fixes_had_prompts_is_the_one_that_gives_each_part_its_own():
     before = {"enhance_detail_fixes": {"hands": 0.45}}
 
     assert full_settings(before) == full_settings(dict(before, enhance_fix_prompts={}))
@@ -642,10 +642,10 @@ def test_a_folders_prompts_for_a_fix_are_kept_with_its_settings():
 
 def test_a_spoken_fix_redraws_toward_the_prompts_the_panel_gives_that_part(monkeypatch):
     _install_detectors(monkeypatch, "hand_yolov8s.pt", "teeth_yolov8n.pt")
-    panel = EnhanceSettings(params={"enhance_fix_prompts": {
+    pane = EnhanceSettings(params={"enhance_fix_prompts": {
         "hands": {"prompt": "open palms", "avoid": "fists"},
         "teeth": {"prompt": "even teeth", "avoid": "gaps"}}})
 
-    params = fix_params_for(_source_row(), _spoken("fix hands"), panel)
+    params = fix_params_for(_source_row(), _spoken("fix hands"), pane)
 
     assert params["enhance_fix_prompts"] == {"hands": {"prompt": "open palms", "avoid": "fists"}}

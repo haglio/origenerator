@@ -1,8 +1,8 @@
-"""One in-flight generation, tracked independently of any Generate panel.
+"""One in-flight generation, tracked independently of any Generate tab.
 
 The gallery re-rolls a folder's settings in place, so it needs to submit a
 workflow to ComfyUI and follow it — progress, live preview, completion, cancel —
-without a panel or a Generate subtab. This wraps that lifecycle: it filters the
+without a tab or a Generate subtab. This wraps that lifecycle: it filters the
 shared client's multiplexed signals down to its own job and reports them as
 plain Qt signals. It owns no database or widget state; the caller decides what
 to persist and how to display it.
@@ -217,7 +217,7 @@ class GenerationJob(QObject):
         """The sampler pass running right now, on its own count — or ``None``
         for a single-pass run, which has nothing the whole-run reading doesn't.
 
-        What a bar draws in the band along its foot, so a job made of several
+        What a bar draws in the substep progress bar along its foot, so a job made of several
         passes shows how far through *this* fix it is without the reading above
         it having to restart per fix."""
         return self._last_pass_progress
@@ -296,7 +296,7 @@ class GenerationJob(QObject):
             # what it is doing from its first repaint rather than staying mute
             # until ComfyUI's next push.
             self._note_stage(tracker.get("node") or "")
-            # The band along the bar's foot comes back with the ramp, so a
+            # The substep progress bar along the foot comes back with the ramp, so a
             # reconnected multi-pass job shows which pass it is in rather than a
             # whole bar until its next tick.
             self._last_pass_progress = self._progress_tracker.current_pass()
@@ -503,7 +503,7 @@ class GenerationJob(QObject):
         self._client.job_error.connect(self._on_error)
 
     def _detach(self):
-        for signal, slot in (
+        for signal, handler in (
             (self._client.progress, self._on_progress),
             (self._client.node_executing, self._on_node_executing),
             (self._client.preview_image, self._on_preview),
@@ -511,7 +511,7 @@ class GenerationJob(QObject):
             (self._client.job_error, self._on_error),
         ):
             try:
-                signal.disconnect(slot)
+                signal.disconnect(handler)
             except TypeError:
                 pass
 

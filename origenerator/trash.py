@@ -6,11 +6,11 @@ subdirectory, keyed by a unique token, so items never tread on one another and
 ending one is a single ``rmtree``.
 
 How long a batch is held is not decided here, and nothing decides it anywhere:
-the recovery bin records each one alongside the row it belonged to and holds it
-until the user restores it or ends it (see :mod:`origenerator.recovery`), so a
+the Trash records each one alongside the row it belonged to and holds it
+until the user restores it or ends it (see :mod:`origenerator.trash_collection`), so a
 batch outlives the session that made it for as long as it is left alone.
 :meth:`Trash.purge_orphans` is the other half of that — it clears whatever the
-bin does *not* name, which is the only thing left that nothing can reach.
+Trash does *not* name, which is the only thing left that nothing can reach.
 """
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ class TrashedBatch:
     def record(self) -> dict:
         """This batch as plain data, so it can be stored and re-made later.
 
-        What the recovery bin keeps in the database beside the deleted row: the
+        What the Trash keeps in the database beside the deleted row: the
         moves are how to put the files back, the subdir is what to remove when
         the item is ended instead.
         """
@@ -124,11 +124,11 @@ class Trash:
     def purge_orphans(self, keep) -> int:
         """Delete every batch folder not named in ``keep``, and say how many went.
 
-        The recovery bin holds a batch indefinitely, so clearing the trash
+        The Trash holds a batch indefinitely, so clearing the trash
         wholesale (what a launch used to do) would destroy exactly what is now
-        recoverable. What is left over once the bin's own folders are spared is
+        recoverable. What is left over once the Trash's own folders are spared is
         genuinely unreachable: a rejected experiment's batch that fell off the
-        undo stack, a batch from before the bin existed, or a folder left over
+        undo stack, a batch from before the Trash existed, or a folder left over
         by a crash between the move and the record. Without this the trash only
         ever grows.
         """
@@ -162,7 +162,7 @@ def _move(src: Path, dest: Path) -> None:
     would fail where a second or two of retries succeeds. What retrying can't
     outlast is a pane still *showing* the file: that handle never goes away on
     its own, which is why the release runs first (see
-    ``GalleryActions._trash_files``).
+    ``GalleryEdits._trash_files``).
     """
     retried_while_held(lambda: shutil.move(str(src), str(dest)),
                        attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)

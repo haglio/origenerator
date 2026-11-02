@@ -12,11 +12,11 @@ import pytest
 from PIL import Image
 
 from origenerator import outside_videos
-from origenerator.act_settings import CATEGORIES
+from origenerator.action_settings import CATEGORIES
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.gui.info_pane_tabs import parse_tabs_state
+from origenerator.gui.generate_pane import parse_tabs_state
+from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
 from origenerator.media import MediaType
 from origenerator.outside_videos import Made, OutsideVideo, Record, rows_bringing_in
@@ -49,27 +49,27 @@ def library(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     image, video = _brought_in(db, tmp_path, "c1_topaz.mp4", Record(
         video=Made(_VIDEO), image=Made(_IMAGE), act="Wave"))
-    panel =GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
-    qtbot.addWidget(panel)
-    panel._preview.show_media = MagicMock()
-    return panel, db, video, image
+    tab =GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
+    qtbot.addWidget(tab)
+    tab._preview.show_media = MagicMock()
+    return tab, db, video, image
 
 
-def _shown(panel, keys) -> dict:
-    values = panel._param_form.get_values()
+def _shown(tab, keys) -> dict:
+    values = tab._param_form.get_values()
     return {key: values[key] for key in keys}
 
 
 def test_an_ai_video_shows_its_own_settings_under_its_site(library):
-    panel, _db, video, image = library
+    tab, _db, video, image = library
 
-    panel.show_saved_generation(video, [image])
+    tab.show_saved_generation(video, [image])
 
-    assert panel._workflow_combo.currentText() == "a-site"
-    assert _shown(panel, ("positive_prompt", "model", "style", "resolution", "aspect_ratio",
+    assert tab._workflow_dropdown.currentText() == "a-site"
+    assert _shown(tab, ("positive_prompt", "model", "style", "resolution", "aspect_ratio",
                           "quality", "creativity")) == {key: value for key, value in _VIDEO.items()
                                                         if key != "seed"}
-    assert panel._param_form.get_values()["seed"] == 11
+    assert tab._param_form.get_values()["seed"] == 11
 
 
 def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site_and_kind(
@@ -78,34 +78,34 @@ def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site
     image, video = _brought_in(db, tmp_path, "c1_topaz.mp4", Record(
         video=Made(_VIDEO), image=Made(_IMAGE), act="Wave"),
         kind=VideoKind.IMAGE_TO_VIDEO)
-    panel = GenerateConfigPanel(ComfyUIClient(folders=SUITE_FOLDERS), db)
-    qtbot.addWidget(panel)
-    panel._preview.show_media = MagicMock()
+    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
+    qtbot.addWidget(tab)
+    tab._preview.show_media = MagicMock()
 
-    panel.show_saved_generation(video, [image])
+    tab.show_saved_generation(video, [image])
 
-    assert panel._workflow_combo.currentText() == "a-site I2V"
+    assert tab._workflow_dropdown.currentText() == "a-site I2V"
 
 
 def test_the_image_an_ai_video_was_made_from_shows_its_own_settings(library):
-    panel, _db, _video, image = library
+    tab, _db, _video, image = library
 
-    panel.show_saved_generation(image, [image])
+    tab.show_saved_generation(image, [image])
 
-    assert panel._workflow_combo.currentText() == "a-site"
-    assert _shown(panel, ("positive_prompt", "negative_prompt", "model", "style")) == {
+    assert tab._workflow_dropdown.currentText() == "a-site"
+    assert _shown(tab, ("positive_prompt", "negative_prompt", "model", "style")) == {
         "positive_prompt": "a quiet shore", "negative_prompt": "rain",
         "model": "Image Model", "style": "Image Style"}
-    assert panel._param_form.get_values()["seed"] == 22
+    assert tab._param_form.get_values()["seed"] == 22
 
 
 def test_an_ai_video_shows_its_sites_video_fields_and_its_image_its_image_fields(library):
-    panel, _db, video, image = library
+    tab, _db, video, image = library
 
-    panel.show_saved_generation(video, [image])
-    video_fields = set(panel._param_form._widgets)
-    panel.show_saved_generation(image, [image])
-    image_fields = set(panel._param_form._widgets)
+    tab.show_saved_generation(video, [image])
+    video_fields = set(tab._param_form._widgets)
+    tab.show_saved_generation(image, [image])
+    image_fields = set(tab._param_form._widgets)
 
     assert (video_fields, image_fields - video_fields) == (
         {"positive_prompt", "seed", "model", "style", "creativity", "resolution",
@@ -114,34 +114,34 @@ def test_an_ai_video_shows_its_sites_video_fields_and_its_image_its_image_fields
 
 def test_a_setting_an_ai_videos_record_lacks_shows_empty_rather_than_the_last_items(
         library, tmp_path):
-    panel, db, video, image = library
+    tab, db, video, image = library
     _frame, bare = _brought_in(db, tmp_path, "c2_topaz.mp4", Record(video=Made({"seed": "33"})))
-    panel.show_saved_generation(video, [image])
+    tab.show_saved_generation(video, [image])
 
-    panel.show_saved_generation(bare, [])
+    tab.show_saved_generation(bare, [])
 
     unrecorded = ("positive_prompt", "model", "style", "resolution", "aspect_ratio", "quality",
                   "creativity")
-    assert _shown(panel, unrecorded) == dict.fromkeys(unrecorded, "")
+    assert _shown(tab, unrecorded) == dict.fromkeys(unrecorded, "")
 
 
 def test_a_seed_the_site_did_not_record_reads_as_a_dash_and_one_it_recorded_as_0_as_0(
         library, tmp_path):
-    panel, db, _video, _image = library
+    tab, db, _video, _image = library
     _frame, unseeded = _brought_in(db, tmp_path, "c2_topaz.mp4",
                                    Record(video=Made({"positive_prompt": "a slow turn"})))
     _frame, zero = _brought_in(db, tmp_path, "c3_topaz.mp4", Record(video=Made({"seed": "0"})))
 
-    panel.show_saved_generation(unseeded, [])
-    unrecorded = panel._param_form._widgets["seed"].currentText()
-    panel.show_saved_generation(zero, [])
+    tab.show_saved_generation(unseeded, [])
+    unrecorded = tab._param_form._widgets["seed"].currentText()
+    tab.show_saved_generation(zero, [])
 
-    assert (unrecorded, panel._param_form._widgets["seed"].currentText()) == ("—", "0")
+    assert (unrecorded, tab._param_form._widgets["seed"].currentText()) == ("—", "0")
 
 
 def test_an_ai_video_after_an_image_made_here_shows_none_of_that_images_prompts(
         library, tmp_path):
-    panel, db, _video, _image = library
+    tab, db, _video, _image = library
     _frame, bare = _brought_in(db, tmp_path, "c2_topaz.mp4", Record(video=Made({"seed": "33"})))
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                   positive_prompt="a red door", negative_prompt="fog", seed=1)
@@ -151,46 +151,46 @@ def test_an_ai_video_after_an_image_made_here_shows_none_of_that_images_prompts(
     db.update_generation("made-here", status="completed",
                          output_files=json.dumps([{"filename": "door.png", "subfolder": "image"}]))
     made_here = db.get_generation("made-here")
-    panel.show_saved_generation(made_here, [made_here])
+    tab.show_saved_generation(made_here, [made_here])
 
-    panel.show_saved_generation(bare, [])
+    tab.show_saved_generation(bare, [])
 
-    assert _shown(panel, ("positive_prompt",)) == {"positive_prompt": ""}
-    assert "negative_prompt" not in panel._param_form.get_values()
+    assert _shown(tab, ("positive_prompt",)) == {"positive_prompt": ""}
+    assert "negative_prompt" not in tab._param_form.get_values()
 
 
 def test_an_ai_videos_settings_can_be_edited_and_an_edit_counts_as_one(library, qtbot):
-    panel, _db, video, image = library
-    panel.show_saved_generation(video, [image])
+    tab, _db, video, image = library
+    tab.show_saved_generation(video, [image])
     edits = []
-    panel.user_edited.connect(lambda: edits.append(True))
+    tab.user_edited.connect(lambda: edits.append(True))
 
-    panel._param_form.set_values({"positive_prompt": "a fast walk on the shore"})
+    tab._param_form.set_values({"positive_prompt": "a fast walk on the shore"})
 
-    assert panel._param_form.get_values()["positive_prompt"] == "a fast walk on the shore"
+    assert tab._param_form.get_values()["positive_prompt"] == "a fast walk on the shore"
     assert edits
 
 
 @pytest.mark.parametrize("shown", ["video", "image"])
 def test_generate_is_grayed_on_an_ai_item_and_says_why(library, qtbot, shown):
-    panel, _db, video, image = library
+    tab, _db, video, image = library
 
-    panel.show_saved_generation({"video": video, "image": image}[shown], [image])
-    qtbot.waitUntil(lambda: not panel._caption_timer.isActive())
+    tab.show_saved_generation({"video": video, "image": image}[shown], [image])
+    qtbot.waitUntil(lambda: not tab._caption_timer.isActive())
 
-    assert not panel._generate_pair.isEnabled()
-    assert panel._generate_btn.toolTip() == "Another site made this — Origenerator can't remake it"
+    assert not tab._generate_pair.isEnabled()
+    assert tab._generate_btn.toolTip() == "Another site made this — Origenerator can't remake it"
 
 
 def test_picking_an_act_on_an_ai_videos_tab_goes_where_its_star_goes(library, monkeypatch):
-    panel, _db, video, image = library
+    tab, _db, video, image = library
     places, picks = object(), []
     monkeypatch.setattr(outside_videos, "places_here", lambda: places)
-    monkeypatch.setattr(outside_videos, "pick_act",
+    monkeypatch.setattr(outside_videos, "pick_action",
                         lambda db, where, row, act: picks.append((where, row["prompt_id"], act)))
-    panel.show_saved_generation(video, [image])
+    tab.show_saved_generation(video, [image])
 
-    panel._action.pick(CATEGORIES[1])
+    tab._action.pick(CATEGORIES[1])
 
     assert picks == [(places, video["prompt_id"], CATEGORIES[1])]
 
@@ -204,9 +204,9 @@ def test_every_setting_another_site_records_sits_in_a_section_of_the_form(made):
 
 
 def test_a_tab_left_on_an_ai_video_comes_back_after_a_restart(library):
-    panel, _db, video, image = library
-    panel.show_saved_generation(video, [image])
-    state = {"tabs": [{"config": json.loads(json.dumps(panel.current_config().to_dict()))}],
+    tab, _db, video, image = library
+    tab.show_saved_generation(video, [image])
+    state = {"tabs": [{"config": json.loads(json.dumps(tab.current_config().to_dict()))}],
              "current": 0}
 
     [tab], _current = parse_tabs_state(state)

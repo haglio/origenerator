@@ -45,23 +45,23 @@ from origenerator.funscript import funscript_of
 from origenerator.gui import omnipause
 from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
-from origenerator.gui.corner_controls import CornerControls
+from origenerator.gui.corner_buttons import CornerButtons
 from origenerator.gui.drag_thumbnail import (
     DragOut,
     fit_thumbnail,
     label_thumbnail,
 )
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import VideoSurface
-from origenerator.gui.video_timeline import VideoTimeline
 from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
 
-_NOTICE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
+_MESSAGE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
                  f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px;"
                  f" border-radius: {NOTICE_RADIUS}px;")
-_NOTICE_MARGIN = NOTICE_TOP_MARGIN  # how far the plate floats from the media's top-left corner
+_MESSAGE_MARGIN = NOTICE_TOP_MARGIN  # how far the plate floats from the media's top-left corner
 
 
 def _path_key(path) -> str:
@@ -72,11 +72,11 @@ def _path_key(path) -> str:
 
 class PreviewWidget(QWidget):
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
-    action_triggered = pyqtSignal(str, str)  # a corner control: prompt_id, action
+    action_triggered = pyqtSignal(str, str)  # a corner button: prompt_id, action
     context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 show_timeline: bool = False):
+                 show_scrubber: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -131,7 +131,7 @@ class PreviewWidget(QWidget):
         # Rescale the media whenever the label itself resizes — see eventFilter for
         # why this can't ride on the widget's own resizeEvent.
         self._image_label.installEventFilter(self)
-        # The media area itself resizes when the timeline appears or goes, whichever
+        # The media area itself resizes when the scrubber appears or goes, whichever
         # page is up -- and a video's page is not the label -- so what is placed
         # against the media's rect re-places off the host too (see eventFilter).
         media_host.installEventFilter(self)
@@ -146,7 +146,7 @@ class PreviewWidget(QWidget):
         self._player.setVideoOutput(self._video.video_sink())
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
-        # Until a clip's resolution arrives, media_rect can only answer "the whole
+        # Until a video's resolution arrives, media_rect can only answer "the whole
         # pane"; the corners have to move to the real item once it can.
         self._player.metaDataChanged.connect(self._place_controls)
         self._stack.addWidget(self._video)
@@ -166,21 +166,21 @@ class PreviewWidget(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
-        self._notice = QLabel(media_host)
-        self._notice.setStyleSheet(_NOTICE_PLATE)
-        self._notice.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._notice.hide()
+        self._message = QLabel(media_host)
+        self._message.setStyleSheet(_MESSAGE_PLATE)
+        self._message.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._message.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._message.hide()
 
-        self._controls = CornerControls(self)
+        self._controls = CornerButtons(self)
         self._controls.triggered.connect(self._on_control)
 
-        self._timeline = VideoTimeline() if show_timeline else None
-        if self._timeline is not None:
-            outer.addWidget(self._timeline)
-            self._timeline.hide()
-            self._player.durationChanged.connect(self._timeline.set_duration)
-            self._player.positionChanged.connect(self._timeline.set_position)
+        self._scrubber = Scrubber() if show_scrubber else None
+        if self._scrubber is not None:
+            outer.addWidget(self._scrubber)
+            self._scrubber.hide()
+            self._player.durationChanged.connect(self._scrubber.set_duration)
+            self._player.positionChanged.connect(self._scrubber.set_position)
 
         # The real WMF backend can deadlock during Qt/Python shutdown if a player
         # is still active, so release it before the app quits. Injected test
@@ -200,25 +200,25 @@ class PreviewWidget(QWidget):
 
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
-        combination and the wall), the timeline drops, the playback stops,
-        the notice and the corner controls — both of which are about the item
+        combination and the wall), the scrubber drops, the playback stops,
+        the message and the corner buttons — both of which are about the item
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
         anything that is not a file on disk).
 
         The two switches are the deliberate exceptions, one caller each.
-        ``stop_player`` — a clip does not stop the player it is about to hand a
+        ``stop_player`` — a video does not stop the player it is about to hand a
         new source to. ``enhancing`` — frames of an enhancement of the item
-        on screen are the coming state of that item, so its notice and its
+        on screen are the coming state of that item, so its message and its
         corners are as true of them and stay.
         """
         self._set_movie(None)
         self._pixmap = None
-        self._hide_timeline()
+        self._hide_scrubber()
         if stop_player:
             self._stop_playback()
         if not enhancing:
-            self.set_notice(None)
+            self.set_message(None)
             self.set_actions(None)
         self._media, self._generation = media, generation
         self._live = live
@@ -252,8 +252,8 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._video)
         self._player.play()
         if omnipause.frozen():
-            self._player.pause()  # a clip loaded into a frozen room opens held
-        self._show_timeline(path)
+            self._player.pause()  # a video loaded into a frozen room opens held
+        self._show_scrubber(path)
 
     def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
@@ -266,7 +266,7 @@ class PreviewWidget(QWidget):
 
         ``enhancing`` marks the frames as the coming state of the item
         already on display — an enhancement of it — rather than a run of the
-        settings beside it. Whatever a notice says about that item is just as
+        settings beside it. Whatever a message says about that item is just as
         true of the version being made, so it stays where it is: cleared by each
         frame and re-asserted by each keystroke, it flickers at the rate the run
         streams while the form is being typed in. The corners stay for the same
@@ -277,11 +277,11 @@ class PreviewWidget(QWidget):
             return
         self._take_the_pane(None, enhancing=enhancing, live=True)
         self._show_image(pixmap)
-        self._raise_notice()  # a kept notice, back over the frame that just landed
+        self._raise_message()  # a kept message, back over the frame that just landed
 
     def show_combination(self, combination) -> None:
         """Show a combination waiting to be run: the frame on the left, a plus,
-        and the gray looping clip whose settings go with it
+        and the gray looping video whose settings go with it
         (:class:`~origenerator.gui.combination_view.CombinationView`).
 
         What "Edit…" leaves a tab holding. Nothing has been generated
@@ -304,7 +304,7 @@ class PreviewWidget(QWidget):
         the rewrite a folder's Modify (all seeds) opens. There is no one file on display, so
         nothing here is draggable, openable fullscreen, or scripted; the wall is
         the folder, and the folder is what the settings below it are about — and
-        no one of them is what the corner controls would act on, which is why
+        no one of them is what the corner buttons would act on, which is why
         they come down here as they do everywhere else.
         """
         self._take_the_pane(None)
@@ -326,26 +326,26 @@ class PreviewWidget(QWidget):
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
 
-    def set_notice(self, text: str | None) -> None:
-        """Write ``text`` over the media, or take the notice away (``None``).
+    def set_message(self, text: str | None) -> None:
+        """Write ``text`` over the media, or take the message away (``None``).
 
         For a pane whose item no longer answers the settings beside it: the
         media stays on screen — it is still the last thing generated — but is
         plainly marked as not what those settings would now make. Anything that
-        changes what's on screen clears it, so a notice can never outlive the
+        changes what's on screen clears it, so a message can never outlive the
         item it was about; the owner re-asserts it if it still applies.
         """
         if not text:
-            self._notice.hide()
+            self._message.hide()
             return
-        if not self._notice.isHidden() and self._notice.text() == text:
+        if not self._message.isHidden() and self._message.text() == text:
             return  # already saying exactly this — don't re-raise it mid-typing
-        self._notice.setText(text)
-        self._notice.show()
-        self._place_notice()
-        self._raise_notice()
+        self._message.setText(text)
+        self._message.show()
+        self._place_message()
+        self._raise_message()
 
-    def _place_notice(self) -> None:
+    def _place_message(self) -> None:
         """Float the message plate in the media's top-left corner.
 
         The plate stays one line wherever the pane is wide enough for it, and
@@ -353,18 +353,18 @@ class PreviewWidget(QWidget):
         squarish block instead, which turns a one-line message into a slab.
         """
         host = self._media_host
-        limit = max(1, host.width() - 2 * _NOTICE_MARGIN)
-        self._notice.setWordWrap(False)
-        self._notice.adjustSize()
-        if self._notice.width() > limit:
-            self._notice.setWordWrap(True)
-            self._notice.resize(limit, self._notice.heightForWidth(limit))
-        self._notice.move(_NOTICE_MARGIN, _NOTICE_MARGIN)
+        limit = max(1, host.width() - 2 * _MESSAGE_MARGIN)
+        self._message.setWordWrap(False)
+        self._message.adjustSize()
+        if self._message.width() > limit:
+            self._message.setWordWrap(True)
+            self._message.resize(limit, self._message.heightForWidth(limit))
+        self._message.move(_MESSAGE_MARGIN, _MESSAGE_MARGIN)
 
-    def _raise_notice(self) -> None:
+    def _raise_message(self) -> None:
         """A stacked layout raises the widget it switches to above every sibling
-        it has, the notice included."""
-        self._notice.raise_()
+        it has, the message included."""
+        self._message.raise_()
 
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
@@ -404,8 +404,8 @@ class PreviewWidget(QWidget):
         slideshows' neighbor stills) needs to know to keep clear of the item.
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
-        screen at all -- and never to the timeline along the foot, which is no
-        part of the item: a corner chip laid over it, attached to the video's lower edge.
+        screen at all -- and never to the scrubber along the foot, which is no
+        part of the item: a corner button laid over it, attached to the video's lower edge.
         """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():
@@ -413,8 +413,8 @@ class PreviewWidget(QWidget):
         rect = QRect(QPoint(0, 0), drawn)
         # Centered on the media area itself, not on the label: a stacked layout
         # sizes only the page it is showing, so while a video is up the label
-        # keeps whatever geometry it last had -- the pane's before the timeline
-        # took its rows -- and a rect centered on it sits low by half the timeline.
+        # keeps whatever geometry it last had -- the pane's before the scrubber
+        # took its rows -- and a rect centered on it sits low by half the scrubber.
         rect.moveCenter(self._media_host.geometry().center())
         return rect
 
@@ -475,18 +475,18 @@ class PreviewWidget(QWidget):
 
     def set_actions(self, prompt_id: str | None, *, favorite: bool = False,
                     enhance: str | None = None) -> None:
-        """Arm the corner controls and the right-click menu over the shown media.
+        """Arm the corner buttons and the right-click menu over the shown media.
 
         ``prompt_id`` is the saved generation on screen — the row every act here
         lands on — with the state its corners report beside it: whether it is
-        bookmarked, and what its enhance corner has to say
-        (:func:`~origenerator.gui.corner_controls.enhance_state`). ``None`` leaves
+        favorited, and what its enhance corner has to say
+        (:func:`~origenerator.gui.corner_buttons.enhance_state`). ``None`` leaves
         the item inert, which is what everything transient is: a live frame is
         a file that does not exist yet, and a message is not an item at all.
 
         Re-armed rather than remembered, because the answers move under the
         item — a star toggled from the menu, an enhancement landing, a setting
-        turned on the Enhance panel — and the owner is what hears about that.
+        turned on the Enhance pane — and the owner is what hears about that.
         """
         self._actions_id = prompt_id
         if prompt_id is None:
@@ -507,7 +507,7 @@ class PreviewWidget(QWidget):
             self.context_requested.emit(self._actions_id, self.mapToGlobal(pos))
 
     def _place_controls(self) -> None:
-        """Put the corner controls back in the corners of the item.
+        """Put the corner buttons back in the corners of the item.
 
         Re-run on every resize and every refit rather than once: what the corners
         are pinned to is the media's own rectangle, which moves whenever the pane
@@ -520,18 +520,18 @@ class PreviewWidget(QWidget):
         self._place_controls()
         super().resizeEvent(event)
 
-    def _show_timeline(self, video_path) -> None:
-        if self._timeline is None:
+    def _show_scrubber(self, video_path) -> None:
+        if self._scrubber is None:
             return
         actions = (read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
                    if video_path else [])
-        self._timeline.set_actions(actions)
-        self._timeline.setVisible(bool(video_path))
+        self._scrubber.set_actions(actions)
+        self._scrubber.setVisible(bool(video_path))
 
-    def _hide_timeline(self) -> None:
-        if self._timeline is not None:
-            self._timeline.set_actions([])
-            self._timeline.hide()
+    def _hide_scrubber(self) -> None:
+        if self._scrubber is not None:
+            self._scrubber.set_actions([])
+            self._scrubber.hide()
 
     def mousePressEvent(self, event) -> None:
         # The media children are transparent to the mouse, so a press over the
@@ -541,7 +541,7 @@ class PreviewWidget(QWidget):
             self.drag_out.note_press(event)
 
     def mouseMoveEvent(self, event) -> None:
-        # Drag the shown generation out to a combine slot, but only once the press
+        # Drag the shown generation out to a Combine drop zone, but only once the press
         # has travelled far enough to read as a drag rather than a click — so a
         # plain click still just opens fullscreen on the following double-click.
         if self._generation is None or not self.drag_out.should_start(event):
@@ -550,7 +550,7 @@ class PreviewWidget(QWidget):
 
     def _start_drag(self, prompt_id: str) -> None:
         """Carry the shown generation out under the shared drag type, so a combine
-        slot can read its prompt_id — the same payload a gallery thumbnail drags."""
+        drop zone can read its prompt_id — the same payload a gallery thumbnail drags."""
         self.drag_out.start(generation_mime(prompt_id),
                             self._drag_thumbnail())  # what is shown trails the cursor
 
@@ -602,7 +602,7 @@ class PreviewWidget(QWidget):
         if Python drops the wrapper before the next paint.
 
         Every ``show_*`` passes through here, so it is also where the other pages
-        are put down — a combination's clip would otherwise keep looping under
+        are put down — a combination's video would otherwise keep looping under
         whatever replaced it, and a folder's wall would hold every one of its
         items in memory. Both :meth:`show_combination` and
         :meth:`show_folder` call this before laying their own out, so neither
@@ -657,14 +657,14 @@ class PreviewWidget(QWidget):
                 self._scale_movie()
             elif self._pixmap is not None:
                 self._rescale()
-            if not self._notice.isHidden():
-                self._place_notice()
+            if not self._message.isHidden():
+                self._place_message()
             # The label lags this widget going fullscreen, so anything placed
             # against the media's rect has to re-place when the refit lands.
             self._place_controls()
             self.media_resized.emit()
         elif obj is self._media_host and event.type() == QEvent.Type.Resize:
-            if not self._notice.isHidden():
-                self._place_notice()
+            if not self._message.isHidden():
+                self._place_message()
             self._place_controls()
         return super().eventFilter(obj, event)

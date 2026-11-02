@@ -10,7 +10,7 @@ one a row gets is decided by what the job is:
   apart. A combine given a dropped video adds a second cell beside it: that
   video, in gray (:mod:`origenerator.gui.grayscale`). Gray because it is not
   what is being made — drawn in full color, and worse drawn alone, the row reads
-  as a job that *is* that clip.
+  as a job that *is* that video.
 * **What its folder already holds** — for everything else, up to four of the
   folder's own thumbnails. It says nothing about this run in particular; it says
   which collection of the gallery the run is headed for, which is what a thumbnail-less
@@ -26,7 +26,7 @@ Fitted whole into its square cell rather than cover-cropped to fill it: a crop
 takes the edges off, and a thumbnail whose subject is not dead center comes out as
 a thumbnail of something else. Fitted, every cell shows the whole frame and the
 proportions it was made in, with the rest of the square left clear. A folder view
-draws its unfilled cells as faint slots, so a folder holding one item reads as a
+draws its unfilled cells as faint empty cells, so a folder holding one item reads as a
 folder with room in it rather than as a thumbnail that failed to load; a start
 frame leaves the rest of the block empty, having nothing to say about how many
 thumbnails there might have been.
@@ -85,7 +85,7 @@ def fitted_cell(path, side: int, gray: bool = False) -> QPixmap | None:
 
     A missing or unreadable file is an ordinary case here, not an error: a start
     frame can be a library file that has since moved, and a thumbnail can be
-    mid-write. The caller draws an empty slot for it.
+    mid-write. The caller draws an empty cell for it.
 
     ``gray`` drains the color out for a thumbnail shown only for what it configures;
     it is part of the cache key, so one file can be held both ways at once.
@@ -126,8 +126,8 @@ def _fitted(pixmap: QPixmap, side: int, squared: bool) -> QPixmap | None:
     return centered_in_square(scaled, side) if squared else scaled
 
 
-def _slot_color() -> QColor:
-    """The faint fill of a cell with nothing in it — a slot, not a thumbnail."""
+def _empty_cell_color() -> QColor:
+    """The faint fill of an empty cell — a cell with nothing in it, not a thumbnail."""
     color = QColor(BORDER_SUBTLE)
     color.setAlpha(110)
     return color
@@ -147,12 +147,12 @@ def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
     ``None`` only when neither file loads, so the caller can fall back rather than
     show an empty block; either alone still draws, each in its own cell, so the
     two read as one column down the line however few a row has. The cells past
-    them stay empty rather than becoming slots: this is not a folder and there is
+    them stay empty rather than becoming empty cells: this is not a folder and there is
     no third thumbnail missing from it.
 
     The source video is drained of color because it is not what is being made. Beside
     the frame in full color it reads as a second subject, and the row of a job
-    whose frame hasn't rendered yet would read as a job that *is* that clip.
+    whose frame hasn't rendered yet would read as a job that *is* that video.
     """
     frame = fitted_cell(made_from.image, cell)
     source_video = fitted_cell(made_from.source_video, cell, gray=True)
@@ -183,7 +183,7 @@ def folder_pixmap(paths, cell: int) -> QPixmap:
         x = index * (cell + _GAP)
         image = fitted_cell(paths[index], cell) if index < len(paths) else None
         if image is None:
-            painter.fillRect(x, 0, cell, cell, _slot_color())
+            painter.fillRect(x, 0, cell, cell, _empty_cell_color())
         else:
             painter.drawPixmap(x, 0, image)
     painter.end()

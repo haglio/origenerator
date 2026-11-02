@@ -304,18 +304,18 @@ def _fold_enhancements(library: Library):
 
 def _scrap(library: Library, rows: list[dict]) -> int:
     from origenerator import config
-    from origenerator.gallery_actions import GalleryActions
+    from origenerator.gallery_edits import GalleryEdits
     from origenerator.trash import Trash
 
-    GalleryActions(library.db, library.places, Trash(config.TRASH_DIR)).delete_rows(rows)
+    GalleryEdits(library.db, library.places, Trash(config.TRASH_DIR)).delete_rows(rows)
     return len(rows)
 
 
 def _disown_foreign_runs(library: Library):
-    """And take off the run ids a preview's own database left on the levels it
+    """And take off the run ids a preview's own database left on the versions it
     made back when it kept one: numbers from a counter that ran ahead of this
     table's, which seat those images above everything this app has made since.
-    After the fold, which is what writes a level's run id in the first place."""
+    After the fold, which is what writes a version's run id in the first place."""
     from origenerator.gallery import disown_foreign_runs
 
     return disown_foreign_runs(library.db)
@@ -340,21 +340,21 @@ def _recover_generation_times(library: Library):
 
 def _record_workflow_versions(library: Library):
     """Stamp every row that has no provenance yet: the rows from before launches
-    were stamped, a row the bin gives back, and whatever this launch imported."""
+    were stamped, a row the Trash gives back, and whatever this launch imported."""
     from origenerator.provenance import stamp_unstamped
 
     return stamp_unstamped(library.db)
 
 
-def _reconcile_bookmarks(library: Library):
+def _reconcile_favorites(library: Library):
     """Heal stars, custom names and hand-composed folders whose folder key
     drifted after a key formula change, and stamp identity onto live ones so the
     next change is handled automatically. Runs after the backfills above -- they
     can move a generation's folder by filling in its workflow/model/LoRA -- so
     the tree it reconciles against is final, and it is read once for both."""
-    from origenerator.bookmark_reconcile import reconcile_bookmarks
+    from origenerator.favorite_reconcile import reconcile_favorites
 
-    reconcile_bookmarks(library.db)
+    reconcile_favorites(library.db)
 
 
 #: The library maintenance every launch performs, in order -- a branch session's
@@ -413,7 +413,7 @@ MAINTENANCE = (
     BootPass("Recording workflow versions...", _record_workflow_versions,
              counted="Recorded the workflow version of %d generation(s)",
              failure="Recording workflow versions failed: %s"),
-    BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
+    BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )
 
@@ -515,16 +515,16 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
 
 
 def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
-    """Reclaim any trash folder no held deletion names (see origenerator.recovery).
+    """Reclaim any trash folder no trashed item names (see origenerator.trash_collection).
 
-    Nothing the recovery bin is holding is touched: a deletion stays until the
+    Nothing the Trash is holding is touched: a trashed item stays until the
     user restores it or ends it from the Trash collection. This clears only what
     nothing can reach.
     """
-    from origenerator import recovery
+    from origenerator import trash_collection
     from origenerator.trash import Trash
     try:
-        reclaimed = recovery.reclaim_orphans(db, Trash(trash_dir))
+        reclaimed = trash_collection.reclaim_orphans(db, Trash(trash_dir))
         if reclaimed:
             logger.info("Trash: reclaimed %d unreachable batch folder(s)", reclaimed)
     except Exception as e:
@@ -647,10 +647,10 @@ def _refuse_a_library_of_its_own(checkout: Path, fun_time) -> int:
 def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
     """Name every value the two apps have stopped spelling the same, and open.
 
-    A send copies a clip into a folder of Evolver's and the gallery reads its
+    A send copies a video into a folder of Evolver's and the gallery reads its
     upscale back out of another; four values decide where, and each is written
     down in both apps (:mod:`origenerator.evolver_agreement`). A rename on
-    either side left clips arriving nowhere with both apps silent, and the test
+    either side left videos arriving nowhere with both apps silent, and the test
     that holds the two together skips wherever no Evolver sits beside the
     checkout -- which is every run of this repo's gate, so on the one machine
     with both apps installed nothing compared anything.
@@ -679,7 +679,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
 class Boot:
     """The launch's steps between the overlay checks and the window -- the claim on
     the library, the loading screen, the offer to Fun Time, the crash log and the
-    listener for clicked notices -- each taken once and undone by a cancel or a
+    listener for clicked toasts -- each taken once and undone by a cancel or a
     close. MAINTENANCE is what runs over the library in between."""
 
     app: object
@@ -692,7 +692,7 @@ class Boot:
     loading: object = None
     claim: object = None
     crash_log: object = None
-    clicked_notices: object = None
+    clicked_toasts: object = None
     watch: object = None
     freeze_watch: object = None
 
@@ -742,13 +742,13 @@ class Boot:
     def arm_the_crash_log(self) -> None:
         self.crash_log = _arm_the_crash_log(self.state_dir, self.logger)
 
-    def listen_for_clicked_notices(self, checkout: Path) -> None:
+    def listen_for_clicked_toasts(self, checkout: Path) -> None:
         """From here rather than from the window: a launch takes a minute, and a
-        notice clicked during one would otherwise find nobody listening and start
+        toast clicked during one would otherwise find nobody listening and start
         a second copy (origenerator.app_link)."""
         from origenerator.gui.link_listener import LinkListener
 
-        self.clicked_notices = LinkListener(checkout=checkout, parent=self.app)
+        self.clicked_toasts = LinkListener(checkout=checkout, parent=self.app)
 
     def show(self, window) -> None:
         """The window up, the loading screen down, then the window in front, since
@@ -764,7 +764,7 @@ class Boot:
         if still_offered:
             from shared_ui.foreground import bring_to_front
             bring_to_front(window)
-        self.clicked_notices.answer_with(window.go_to_generation)
+        self.clicked_toasts.answer_with(window.go_to_generation)
 
     def run(self) -> int:
         from origenerator.freeze_watch import watch_the_window
@@ -881,7 +881,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         return refused
     boot.offer_to_fun_time()
     boot.arm_the_crash_log()
-    boot.listen_for_clicked_notices(PRODUCTION_CHECKOUT)
+    boot.listen_for_clicked_toasts(PRODUCTION_CHECKOUT)
 
     from origenerator.app_state import AppState
     app_state = AppState(UI_STATE_PATH)

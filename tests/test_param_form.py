@@ -22,7 +22,7 @@ from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
 from origenerator.box_breaks import BOX_BREAK
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gui import (
     diff_text,
     file_pick,
@@ -32,7 +32,7 @@ from origenerator.gui import (
     training_controls,
 )
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_form import (
@@ -42,7 +42,7 @@ from origenerator.gui.param_form import (
     ParamForm,
 )
 from origenerator.gui.param_help import definition_help, option_help, param_help
-from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
@@ -102,7 +102,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
 
     The form runs at the app's heading font, and labels like "LoRA Strength
     (High)" are wider than the old fixed 120px column; right-aligned, the
-    overflow used to clip the *start* of the text. The label column must size
+    overflow used to cut off the *start* of the text. The label column must size
     itself to the widest label wherever the row has room for it.
     """
     label_text = "LoRA Strength (High)"
@@ -134,7 +134,7 @@ def test_browse_button_fits_its_caption(qtbot):
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form.resize(800, 200)  # a roomy panel, as the form has in the real window
+    form.resize(800, 200)  # a roomy tab, as the form has in the real window
     with qtbot.waitExposed(form):
         form.show()
 
@@ -255,8 +255,8 @@ def test_a_written_seed_pins_itself_by_default(qtbot):
 
 def test_a_form_that_does_not_pin_keeps_random_and_shows_a_fresh_seed_over_a_loaded_one(
         qtbot):
-    # The clip's deal: Random stays ticked, so the next press is another take of
-    # the motion rather than this clip's again, and the field shows that take's seed.
+    # The video's deal: Random stays ticked, so the next press is another take of
+    # the motion rather than this video's again, and the field shows that take's seed.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
     qtbot.addWidget(form)
 
@@ -788,7 +788,7 @@ def _dimension_defs():
 
 def _size_heading_wears(form, orientation) -> bool:
     mark = form._sections["Size"]._header._mark
-    return mark is not None and mark.toImage() == icons.side_mark(orientation).toImage()
+    return mark is not None and mark.toImage() == icons.shape_mark(orientation).toImage()
 
 
 def test_the_size_heading_wears_the_frame_of_the_shape_the_size_makes(qtbot):
@@ -829,7 +829,7 @@ def test_no_swap_button_when_workflow_has_no_dimensions(qtbot):
 
 
 def test_swapping_dimensions_emits_changed(qtbot):
-    # The panel refreshes its title from the form's ``changed`` signal, so a swap
+    # The tab refreshes its title from the form's ``changed`` signal, so a swap
     # must announce itself just as a manual edit does.
     form = ParamForm(_dimension_defs())
     qtbot.addWidget(form)
@@ -841,7 +841,7 @@ def test_swapping_dimensions_emits_changed(qtbot):
 
 def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     # The button reads as linking the pair: vertically midway between the width
-    # and height rows, and in a gutter of its own to the left of the labels —
+    # and height rows, and in a margin of its own to the left of the labels —
     # squeezing it into whatever space the labels left over put it on top of the
     # words. A wide label ("Positive Prompt") gives the left column real room.
     form = ParamForm([
@@ -947,7 +947,7 @@ def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):
 
 def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     # Vertically midway between the width and height rows, and entirely within the
-    # reserved left gutter — so it never sits on top of the "Width"/"Height" labels.
+    # reserved left margin — so it never sits on top of the "Width"/"Height" labels.
     form = _sized_form(qtbot)
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
@@ -1058,7 +1058,7 @@ def sample_defs():
         ParamDef("prompt", "Prompt", "str", "hello", multiline=True),
         ParamDef("steps", "Steps", "int", 50, min_val=1, max_val=200),
         ParamDef("cfg", "CFG", "float", 7.5, min_val=0.0, max_val=30.0, step=0.5),
-        ParamDef("sampler", "Sampler", "combo", "euler", options=["euler", "dpm"]),
+        ParamDef("sampler", "Sampler", "dropdown", "euler", options=["euler", "dpm"]),
     ]
 
 
@@ -1102,7 +1102,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     (ParamDef("seed", "Seed", "seed", 0), 680387713615965, 680387713615965),
     (ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=200), 42, 42),
     (ParamDef("cfg", "CFG", "float", 7.5, min_val=0.0, max_val=30.0, step=0.5), 0.85, 0.85),
-    (ParamDef("sampler", "Sampler", "combo", "euler", options=["euler", "dpm"]), "dpm", "dpm"),
+    (ParamDef("sampler", "Sampler", "dropdown", "euler", options=["euler", "dpm"]), "dpm", "dpm"),
     (ParamDef("input_image", "Input Image", "image", ""), "  frame.png ", "frame.png"),
     (ParamDef("voice_sample", "Voice Sample", "audio", ""), " sample.wav ", "sample.wav"),
     (ParamDef("video", "Video to Perform", "video", ""), " scene one.mp4 ", "scene one.mp4"),
@@ -1164,20 +1164,20 @@ def test_set_values_replaces_stale_passthrough(qtbot, sample_defs):
 
 def test_set_values_keeps_a_combo_value_absent_from_the_options(qtbot):
     # Reusing a past generation can carry a choice (a LoRA) whose file is no
-    # longer on disk, so it isn't among the combo's scanned options. The form
+    # longer on disk, so it isn't among the dropdown's scanned options. The form
     # must still show and return it rather than snapping to a default — that
     # would re-drop the very reused value it is meant to reproduce.
-    form = ParamForm([ParamDef("lora", "LoRA", "combo", "a", options=["a", "b"])])
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", "a", options=["a", "b"])])
     qtbot.addWidget(form)
     form.set_values({"lora": "gone.safetensors"})
     assert form.get_values()["lora"] == "gone.safetensors"
 
 
 def test_combo_default_absent_from_options_is_still_selected(qtbot):
-    # A workflow's default LoRA may not be among the installed files the combo
+    # A workflow's default LoRA may not be among the installed files the dropdown
     # lists. A fresh tab must still start on that default (and generate with it),
     # not silently snap to whatever file sorts first.
-    form = ParamForm([ParamDef("lora", "LoRA", "combo", "default.safetensors",
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", "default.safetensors",
                                options=["a.safetensors", "b.safetensors"])])
     qtbot.addWidget(form)
     assert form.get_values()["lora"] == "default.safetensors"
@@ -1186,7 +1186,7 @@ def test_combo_default_absent_from_options_is_still_selected(qtbot):
 def test_a_model_dropdown_shows_each_files_title_and_the_form_keeps_its_name(
         qtbot, titled_models):
     titled_models({"example_model": "Example Model v2"})
-    form = ParamForm([ParamDef("checkpoint", "Model", "combo", "example_model.safetensors",
+    form = ParamForm([ParamDef("checkpoint", "Model", "dropdown", "example_model.safetensors",
                                options=["example_model.safetensors",
                                         "example_other.safetensors"])])
     qtbot.addWidget(form)
@@ -1303,7 +1303,7 @@ def test_param_form_browse_defaults_to_input_dir(qtbot, monkeypatch):
 
 def test_param_form_browse_opens_in_the_folder_the_param_names(qtbot, monkeypatch, tmp_path):
     # A workflow whose source images live outside ComfyUI's input folder names
-    # that folder on its ParamDef, and the picker opens there instead.
+    # that folder on its ParamDef, and the dropdown opens there instead.
     poses = tmp_path / "custom_poses"
     poses.mkdir()
     captured = {}
@@ -1323,7 +1323,7 @@ def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
 ):
     # A checkout without the media library has no such folder; opening the dialog
     # on a path that isn't there drops it wherever the process happens to sit, so
-    # the picker falls back to ComfyUI's input folder.
+    # the dropdown falls back to ComfyUI's input folder.
 
     captured = {}
     _stub_file_dialog(monkeypatch, "", captured)
@@ -1363,7 +1363,7 @@ def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, 
 
 
 def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
-    # The metadata panel inserts zero-width spaces into displayed paths so long
+    # The Basic section inserts zero-width spaces into displayed paths so long
     # names wrap on screen. Pasting such a path back into the field would carry
     # those invisible characters (and any stray whitespace) into ComfyUI's
     # LoadImage, which then can't match the file. The form must return a clean
@@ -1498,7 +1498,7 @@ def test_a_pages_recommendation_takes_the_good_ranges_place_until_it_goes(qtbot)
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     # Loading an old enhanced run into a tab must not arm its enhancement for
-    # the next Generate: enhancement is the Enhance subpanel's, applied
+    # the next Generate: enhancement is the Enhance pane's, applied
     # deliberately, so the form pins these at the workflow's own defaults.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
@@ -1535,19 +1535,19 @@ def _rate_def(default=24.0):
 def test_a_numeric_param_with_presets_is_an_editable_dropdown_that_emits_the_number(qtbot):
     form = ParamForm([_rate_def()])
     qtbot.addWidget(form)
-    combo = form._widgets["frame_rate"]
-    assert isinstance(combo, PresetComboBox)
-    assert combo.currentText() == "24 fps"
+    dropdown = form._widgets["frame_rate"]
+    assert isinstance(dropdown, PresetDropdown)
+    assert dropdown.currentText() == "24 fps"
     assert form.get_values()["frame_rate"] == 24.0
 
     changes = []
     form.changed.connect(lambda: changes.append(1))
-    combo.setCurrentText("30")
+    dropdown.setCurrentText("30")
     assert form.get_values()["frame_rate"] == 30.0
     assert changes
 
     form.set_values({"frame_rate": 60})
-    assert combo.currentText() == "60 fps"
+    assert dropdown.currentText() == "60 fps"
     assert form.get_values()["frame_rate"] == 60.0
 
 
@@ -1556,12 +1556,12 @@ def test_a_typed_number_past_the_range_is_clamped_and_shown_clamped_once_the_edi
     qtbot.addWidget(form)
     with qtbot.waitExposed(form):
         form.show()
-    combo = form._widgets["frame_rate"]
-    combo.lineEdit().setFocus()
-    combo.setCurrentText("500")
+    dropdown = form._widgets["frame_rate"]
+    dropdown.lineEdit().setFocus()
+    dropdown.setCurrentText("500")
     assert form.get_values()["frame_rate"] == 120.0
-    qtbot.keyClick(combo.lineEdit(), Qt.Key.Key_Return)
-    assert combo.currentText() == "120 fps"
+    qtbot.keyClick(dropdown.lineEdit(), Qt.Key.Key_Return)
+    assert dropdown.currentText() == "120 fps"
 
 
 def _video_defs(max_frames=161):
@@ -1575,15 +1575,15 @@ def _video_defs(max_frames=161):
     ]
 
 
-def _preset_states(combo) -> dict:
-    model = combo.model()
-    return {combo.itemText(i): model.item(i).isEnabled() for i in range(combo.count())}
+def _preset_states(dropdown) -> dict:
+    model = dropdown.model()
+    return {dropdown.itemText(i): model.item(i).isEnabled() for i in range(dropdown.count())}
 
 
 def test_a_duration_this_model_cannot_render_is_offered_grayed_out(qtbot):
     # The same lengths are offered on every video form, and the models stop at
     # different places. Picking one past the end doesn't fail, it quietly
-    # becomes the longest clip the model does render — so the list says which
+    # becomes the longest video the model does render — so the list says which
     # ones those are, and how far this one actually goes.
     form = ParamForm(_video_defs(max_frames=81))
     qtbot.addWidget(form)
@@ -1620,7 +1620,7 @@ def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtb
 
 
 def test_the_frames_a_duration_asks_for_dont_move_when_the_frame_rate_does(qtbot):
-    # The rate decides how smooth the clip looks, not how much of it there is:
+    # The rate decides how smooth the video looks, not how much of it there is:
     # the extra frames are filled in afterwards, so five seconds is 81 frames of
     # sampling whether it is played at 16 fps or 48.
     form = ParamForm(_video_defs())
@@ -1660,7 +1660,7 @@ def test_a_duration_the_model_cannot_render_settles_to_what_it_can_once_the_edit
 def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbot):
     # Between two multiples there are no frames to show, and writing the file at
     # the rate asked for anyway would skew its speed. The field says so by
-    # landing on the rate the clip will really be written at.
+    # landing on the rate the video will really be written at.
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
     with qtbot.waitExposed(form):
@@ -1674,7 +1674,7 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
     assert rate.currentText() == "64 fps"
 
 
-# --- a story: a card per scene, its prompts and its length -----------------------
+# --- a story: a tile per scene, its prompts and its length -----------------------
 
 def _scene_defs():
     return [
@@ -1688,7 +1688,7 @@ def _scene_defs():
     ]
 
 
-def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
+def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
@@ -1698,14 +1698,14 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
     # One row stands for the four, labeled as the scenes: a prompt row of the
-    # form's own beside the cards would read as the clip's where the cards' are
+    # form's own beside the tiles would read as the video's where the tiles' are
     # the scenes'.
     assert form._present_keys["Prompts"] == ["scene_frames"]
 
 
 def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(qtbot):
     # Every scene after the first starts on the frame before it, so 5 s and
-    # 10 s of scenes make 81 + 160 frames of clip, and the story is stored as
+    # 10 s of scenes make 81 + 160 frames of video, and the story is stored as
     # one prompt with a scene break between the two texts.
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1743,7 +1743,7 @@ def test_a_stored_story_fills_one_field_per_scene(qtbot):
     editor = form._widgets["scene_frames"]
     assert [field.toPlainText() for field in editor.fields("positive_prompt")] == ["a", "b", "c"]
     assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["x", "y", "z"]
-    assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
+    assert [dropdown.currentText() for dropdown in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
     assert [field.toPlainText() for field in editor.fields("scene_lines")] == ["hi", "", "bye"]
     assert form.get_values() == stored
 
@@ -1755,15 +1755,15 @@ def test_settings_from_before_scenes_load_as_one_scene_of_the_clips_length(qtbot
     editor = form._widgets["scene_frames"]
     assert [field.toPlainText() for field in editor.fields("positive_prompt")] == ["one shot"]
     assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["blurry"]
-    assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["7.6 s"]
+    assert [dropdown.currentText() for dropdown in [scene.length for scene in editor._scenes]] == ["7.6 s"]
     values = form.get_values()
     assert (values["scene_frames"], values["frame_count"]) == ([121], 121)
     assert values["negative_prompt"] == "blurry"
 
 
 def test_a_whole_clip_negative_carries_on_into_every_scene_of_a_story(qtbot):
-    # A story made when the negative was the clip's has one text for three
-    # scenes; the graph keeps it out of every scene, and so the cards show it
+    # A story made when the negative was the video's has one text for three
+    # scenes; the graph keeps it out of every scene, and so the tiles show it
     # on every scene -- what is seen is what renders.
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1813,8 +1813,8 @@ def test_scene_prompts_are_text_fields_for_find_and_read_back_as_one_story(qtbot
     assert form.get_values()["negative_prompt"] == "\n---\nn"
 
 
-def test_each_box_on_a_card_says_what_it_is(qtbot):
-    # Three fields to a card, so each is captioned and carries its param's help;
+def test_each_box_on_a_tile_says_what_it_is(qtbot):
+    # Three fields to a tile, so each is captioned and carries its param's help;
     # the lines field says as well that what goes in it is spoken.
 
     form = ParamForm(_scene_defs())
@@ -1891,7 +1891,7 @@ def test_stored_spoken_settings_open_with_their_prompts_already_shut_down(qtbot)
 
 def test_a_shut_down_prompt_actually_renders_dim(qtbot):
     # The dimming is a stylesheet property selector, which Qt only re-reads on a
-    # repolish -- so without one the card would go read-only while still looking
+    # repolish -- so without one the tile would go read-only while still looking
     # like an ordinary field. Rendered rather than asserted on the property:
     # that is the half a missing repolish breaks.
 
@@ -1926,7 +1926,7 @@ def test_a_shut_down_prompt_actually_renders_dim(qtbot):
 
 
 def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
-    # The loop has no lines param, so its cards carry no field for one: a field
+    # The loop has no lines param, so its tiles carry no field for one: a field
     # that nothing reads would be an invitation to type into the void.
 
     form = ParamForm([pd for pd in _scene_defs() if pd.key != "scene_lines"])
@@ -1940,15 +1940,15 @@ def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     assert "scene_lines" not in form.get_values()
 
 
-def test_settings_whose_lone_scene_disagrees_with_the_clip_follow_the_clip(qtbot):
-    # Settings from the overlay carry the clip length over the workflow's
-    # default scene list; the clip length is what the graph runs a lone scene
+def test_settings_whose_lone_scene_disagrees_with_the_video_follow_the_video(qtbot):
+    # Settings from the overlay carry the video length over the workflow's
+    # default scene list; the video length is what the graph runs a lone scene
     # for, so it is what the form shows and emits.
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     form.set_values({"positive_prompt": "x", "frame_count": 121, "scene_frames": [81]})
     editor = form._widgets["scene_frames"]
-    assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["7.6 s"]
+    assert [dropdown.currentText() for dropdown in [scene.length for scene in editor._scenes]] == ["7.6 s"]
     assert form.get_values()["frame_count"] == 121
 
 
@@ -1957,7 +1957,7 @@ def test_settings_whose_lone_scene_disagrees_with_the_clip_follow_the_clip(qtbot
 
 def _voice_defs():
     return [
-        ParamDef("voice", "Voice", "combo", "Vivian", options=list(VOICE_OPTIONS)),
+        ParamDef("voice", "Voice", "dropdown", "Vivian", options=list(VOICE_OPTIONS)),
         ParamDef("voice_sample", "Voice Sample", "audio", ""),
         ParamDef("voice_sample_text", "Voice Sample Says", "str", "", multiline=True),
     ]
@@ -1970,7 +1970,7 @@ def _row_visible(form, key):
 
 def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
     form = ParamForm(_scene_defs() + _voice_defs() + [
-        ParamDef("unet_s2v", "Speaking Model", "combo", "example_s2v.safetensors",
+        ParamDef("unet_s2v", "Speaking Model", "dropdown", "example_s2v.safetensors",
                  options=["example_s2v.safetensors"]),
     ])
     qtbot.addWidget(form)
@@ -2109,7 +2109,7 @@ def test_a_speaking_scene_keeps_the_speaking_help_at_prompt_strength_one(qtbot):
 def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot, key):
     strength = strength_key_of(key)
     form = ParamForm([
-        ParamDef(key, "LoRA", "combo", "None", options=["None", "example_style.safetensors"]),
+        ParamDef(key, "LoRA", "dropdown", "None", options=["None", "example_style.safetensors"]),
         ParamDef(strength, "LoRA Strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
     ])
     qtbot.addWidget(form)
@@ -2161,11 +2161,11 @@ def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
 
 
 def test_each_sampler_in_the_dropdown_explains_itself_on_hover(qtbot):
-    form = ParamForm([ParamDef("sampler_name", "Sampler", "combo", "euler",
+    form = ParamForm([ParamDef("sampler_name", "Sampler", "dropdown", "euler",
                                options=["euler", "euler_ancestral"])])
     qtbot.addWidget(form)
-    combo = form._widgets["sampler_name"]
-    tips = [combo.itemData(row, Qt.ItemDataRole.ToolTipRole) for row in range(combo.count())]
+    dropdown = form._widgets["sampler_name"]
+    tips = [dropdown.itemData(row, Qt.ItemDataRole.ToolTipRole) for row in range(dropdown.count())]
     assert tips == [option_help("sampler_name", "euler"),
                     option_help("sampler_name", "euler_ancestral")]
     assert all(tips)
@@ -2478,9 +2478,9 @@ def test_every_warning_mark_sits_in_one_column_whether_or_not_its_row_can_warn(q
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
                                       size_deriver=lambda values: (464, 912)))
 
-    outside_the_size_gutter = [key for key in _shown_keys(form)
+    outside_the_size_margin = [key for key in _shown_keys(form)
                                if param_sections.section_title(key) != "Size"]
-    lefts = {key: _left(form, form._warning_marks[key]) for key in outside_the_size_gutter}
+    lefts = {key: _left(form, form._warning_marks[key]) for key in outside_the_size_margin}
 
     assert {"steps", "noise_seed", "lora_strength_high", "scene_frames"} <= set(lefts)
     assert len(set(lefts.values())) == 1, lefts
@@ -2555,11 +2555,11 @@ class _Lends:
         return (None, None)
 
 
-def _let_go(slot, prompt_id):
+def _let_go(zone, prompt_id):
     mime = generation_mime(prompt_id)
     event = QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                        Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
-    slot.dropEvent(event)
+    zone.dropEvent(event)
 
 
 @pytest.mark.parametrize("kind", ["image", "video"])
@@ -2567,7 +2567,7 @@ def test_an_image_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qt
     form = ParamForm([ParamDef("source", "Source", kind, "")])
     qtbot.addWidget(form)
     zone = form._widgets["source"]
-    assert isinstance(zone, DropSlot)
+    assert isinstance(zone, DropZone)
     assert form.get_values()["source"] == ""
     assert "source" not in form._browse_buttons
     assert [action.text() for action in zone.menu().actions()] == ["Paste Origenerator name",
@@ -2625,22 +2625,22 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
     for name in ("example_look", "example_style"):
         installed_models.add("loras", f"{name}.safetensors", arch="krea2", lora=True,
                              metadata={"ss_training_finished_at": "1792851468.891"})
-    form = ParamForm([ParamDef("lora", "LoRA", "combo", NO_LORA, options=[
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA, options=[
         NO_LORA, "example_look.safetensors", "example_style.safetensors"])], lora_keys=("lora",))
     qtbot.addWidget(form)
-    combo = form._widgets["lora"]
+    dropdown = form._widgets["lora"]
     trained = f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}."
-    assert combo.toolTip() == param_help("lora")
+    assert dropdown.toolTip() == param_help("lora")
 
-    combo.setCurrentIndex(combo.findData("example_look.safetensors"))
-    assert combo.toolTip() == f"{param_help('lora')} {trained}"
+    dropdown.setCurrentIndex(dropdown.findData("example_look.safetensors"))
+    assert dropdown.toolTip() == f"{param_help('lora')} {trained}"
 
     form.set_values({"lora": "example_style.safetensors"})
-    assert combo.toolTip() == param_help("lora")
+    assert dropdown.toolTip() == param_help("lora")
 
 
 def _lora_form(qtbot, **options):
-    form = ParamForm([ParamDef("lora", "LoRA", "combo", NO_LORA,
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA,
                                options=[NO_LORA, "example_look.safetensors"])], **options)
     qtbot.addWidget(form)
     return form
@@ -2650,16 +2650,16 @@ _FILED = {"raw_model": "Krea 2", "turbo_model": "Krea 2 Turbo", "speed_up": "Kre
           "a_look": "Krea 2"}
 
 
-def _offered(combo) -> list:
-    return [combo.itemData(row) for row in range(combo.count())]
+def _offered(dropdown) -> list:
+    return [dropdown.itemData(row) for row in range(dropdown.count())]
 
 
 def _model_and_its_lora(qtbot, recorded_base_models, model):
     recorded_base_models(_FILED)
     form = ParamForm([
-        ParamDef("unet", "Model", "combo", model,
+        ParamDef("unet", "Model", "dropdown", model,
                  options=["raw_model.safetensors", "turbo_model.safetensors"]),
-        ParamDef("lora", "LoRA", "combo", "None", beside_model="unet",
+        ParamDef("lora", "LoRA", "dropdown", "None", beside_model="unet",
                  options=["None", "speed_up.safetensors", "a_look.safetensors"]),
     ])
     qtbot.addWidget(form)

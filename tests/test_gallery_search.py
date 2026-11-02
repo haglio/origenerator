@@ -17,7 +17,7 @@ import pytest
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
-from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
+from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_search import MIN_CHARS, GallerySearchController
 from origenerator.gui.search_expander import SearchExpander
 
@@ -351,7 +351,7 @@ def test_the_field_says_what_a_query_typed_in_it_would_search(controller):
 def test_the_sort_menu_names_the_model_lora_order_the_way_the_forms_do(controller):
     found = controller()
 
-    orders = [found._sort_combo.itemText(i) for i in range(found._sort_combo.count())]
+    orders = [found._sort_dropdown.itemText(i) for i in range(found._sort_dropdown.count())]
 
     assert orders == ["Recent", "Model / LoRA"]
 

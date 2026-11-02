@@ -36,7 +36,7 @@ class Section:
 #
 # There is deliberately no Enhance section: everything in this form defines the
 # settings folder a run lands in, and an enhancement does not — it is a finish
-# applied to an image afterward, which the gallery's Enhance subpanel owns per
+# applied to an image afterward, which the gallery's Enhance pane owns per
 # folder. The enhance params stay on their workflows (the tail still builds from
 # them) but the form hides them; see ParamForm's ``hidden_keys``.
 SECTIONS: tuple[Section, ...] = (

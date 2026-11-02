@@ -22,7 +22,7 @@ say where the work has been.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
-``DROP_KEY_ROLE``: the Favorites collection, or a custom folder — and so can an
+``DROP_KEY_ROLE``: the Favorites collection, or a custom collection — and so can an
 item dragged from anywhere in the window, onto a row the view says takes it. A
 drop emits ``dropped`` and is never applied to the tree itself, so nothing is ever
 reparented; what a collecting row does with what lands on it is the view's
@@ -47,9 +47,9 @@ _DOT = 6     # diameter of the lately-worked-in mark
 # folder). Rows without it refuse a drop, so a folder can never be dragged into
 # the derived hierarchy, whose shape belongs to the generations' settings.
 DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
-# A row's own key in the tree: its folder's key with the side it is drawn on
+# A row's own key in the tree: its folder's key with the shape it is drawn on
 # appended, so the two copies of one folder are tellable apart (see
-# origenerator.orientation). What a folder key alone can't say is which of
+# origenerator.item_shape). What a folder key alone can't say is which of
 # them you picked, hovered, or dragged.
 TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
 COUNT_ROLE = Qt.ItemDataRole.UserRole + 4
@@ -133,11 +133,11 @@ class FolderTree(QTreeWidget):
         # tree is six levels deep by the time it reaches a settings folder and it
         # lives in the window's narrowest column, so the platform default spends
         # most of that column on empty margin: at Qt's 20px a leaf's label starts
-        # 120px in, leaving a thin strip for the label itself.
+        # 120px in, leaving a thin sliver for the label itself.
         self.setIndentation(_ICON)
         self.setMouseTracking(True)  # so hover is tracked without a button held
         # Several folders at once: Shift takes a run, Ctrl a scattered set — the
-        # gesture that composes a custom folder.
+        # gesture that composes a custom collection.
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         # Folders drag out; only a collecting row takes them (see landing_on).
         self.setDragEnabled(True)
@@ -183,7 +183,7 @@ class FolderTree(QTreeWidget):
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         index = self.indexAt(event.pos())
-        # The row's key, not the folder's: both sides draw the folder, and only
+        # The row's key, not the folder's: both shapes draw the folder, and only
         # the row under the mouse should light up.
         hovered = index.data(TREE_KEY_ROLE) if self._group_with_actions(index) else None
         self._set_hover(hovered)
@@ -267,11 +267,11 @@ class FolderTree(QTreeWidget):
 
     def selected_folder_keys(self) -> list[str]:
         """The tree keys of the picked folder rows, top-down. Collection rows that hold
-        no folder of their own (Recents, Experiments) contribute nothing.
+        no folder of their own (Latest, Experiments) contribute nothing.
 
-        Tree keys rather than folder keys so a set picked across both sides
+        Tree keys rather than folder keys so a set picked across both shapes
         stays two distinct folders: composing one out of a folder key alone
-        would resolve every folder onto whichever side happened to be open, and
+        would resolve every folder onto whichever shape happened to be open, and
         a grouping of mixed shapes is the one thing the split exists to stop.
         """
         keys = []
@@ -337,7 +337,7 @@ class FolderTree(QTreeWidget):
         where the folders or the item can go."""
         super().dragMoveEvent(event)  # scrolls the tree while a drag is held at its foot
         if event.position().y() < self.autoScrollMargin():
-            self.scrollToTop()  # the folders of your own are there, where a drag nearly always goes
+            self.scrollToTop()  # the collections of your own are there, where a drag nearly always goes
         row, landing = self._row_and_landing(event)
         self._aim(row if landing is not None else None)
         if landing is None:

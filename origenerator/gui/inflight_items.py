@@ -1,4 +1,4 @@
-"""The queue's view-model: every generation in flight, as a card.
+"""The queue's view-model: every generation in flight, as a tile.
 
 Not rendering, and it had grown into the pane's largest function by nearly three
 to one -- it joins the generations table, the requests table, the controller's
@@ -36,9 +36,9 @@ TRAINING_KEY = "fix training"
 
 
 class InFlightItems:
-    """The queue's cards, built from the tables and the controller under them.
+    """The queue's tiles, built from the tables and the controller under them.
 
-    ``on_cancel``, ``on_reveal`` and ``on_go_to_item`` are what a card's buttons
+    ``on_cancel``, ``on_reveal`` and ``on_go_to_item`` are what a tile's buttons
     do -- the pane passes its own signals -- so nothing here needs to be a widget.
     """
 
@@ -59,15 +59,15 @@ class InFlightItems:
         self._on_shield = on_shield
 
     def build(self, rows=None, requests=None) -> list[InFlightItem]:
-        """Every queued/running generation as a card model, in the order the queue
+        """Every queued/running generation as a tile model, in the order the queue
         will work through them.
 
         The database's running/pending rows are the source of truth for what's in
         flight — every generation is a gallery re-roll (a tab's Generate launches
-        one too) — so a card shows even when no live job object is tracking a row
+        one too) — so a tile shows even when no live job object is tracking a row
         (after a restart that hasn't re-adopted it, say). A re-roll tracked this
         session grafts on its live frame, progress, cancel and start time from its
-        :class:`GenerationJob`; an untracked running row shows a plain card.
+        :class:`GenerationJob`; an untracked running row shows a plain tile.
 
         The queue's own line orders them (:attr:`JobQueue.queue_order`):
         nothing a row records says whether an image jumped ahead of a video, or
@@ -75,7 +75,7 @@ class InFlightItems:
         hasn't re-adopted — sorts to the back rather than jumping the queue on
         screen.
 
-        The Job Queue's rows carry more than the collection's cards do — a price, a kind, a
+        The Job Queue's rows carry more than the collection's tiles do — a price, a kind, a
         thumbnail of what the job is made from or of the folder it will land in —
         and all of it is read off the row and the tree already in hand, so a poll
         costs one listing whatever the queue is showing. ``rows``/``requests``
@@ -108,7 +108,7 @@ class InFlightItems:
             if tracked is not None:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
-                pass_progress = job.last_pass_progress  # the band along the bar's foot
+                pass_progress = job.last_pass_progress  # the substep progress bar along the foot
                 stage = job.last_stage                   # and what it is doing
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 starts_at = self._jobs.starts_at(pid)
@@ -141,7 +141,7 @@ class InFlightItems:
                 reveal = partial(self._on_reveal, folder_key)
             items.append(InFlightItem(
                 key=pid,
-                caption=gallery.config_tab_title(workflow_name, params),
+                caption=gallery.generate_tab_title(workflow_name, params),
                 reading=RunReading(
                     status=display_status(state),
                     frame=frame,
@@ -152,7 +152,7 @@ class InFlightItems:
                     typical_seconds=self._typical_seconds(workflow_name, typical),
                 ),
                 reveal=reveal,
-                media_type=gallery.media_type_of_row(row),  # image/video corner badge
+                media_type=gallery.media_type_of_row(row),  # image/video item type icon
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,
@@ -177,11 +177,11 @@ class InFlightItems:
                 source_file=source_file_of(
                     row_by_id.get((records.get(pid) or {}).get("source_prompt_id")),
                     params, kind),
-                # What the Combine panel was asked for, when this run came from
+                # What the Combine was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, lending the settings
                 # rather than the result. Never both. An act names what the video
-                # will do, which is the whole of what was chosen; the clip its
+                # will do, which is the whole of what was chosen; the video its
                 # settings were mined out of is an answer to a question the user
                 # never asked, and a thumbnail of a video they did not pick reads
                 # as a job that is that video. A dropped video *is* the choice,

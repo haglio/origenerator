@@ -35,12 +35,12 @@ CREATE TABLE IF NOT EXISTS generations (
     -- current output_files). Presence marks the row enhanced-in-place.
     original_files  TEXT,
     -- One entry per enhancement folded into this row, newest first: the file it
-    -- produced and the settings that produced it. What lets the info pane list
-    -- every level an image has received rather than just "enhanced".
+    -- produced and the settings that produced it. What lets the Generate pane list
+    -- every version an image has received rather than just "enhanced".
     enhance_history TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
-    -- The user's per-item bookmark: a starred image or video, independent of the
+    -- The user's per-item favorite: a favorited image or video, independent of the
     -- folder-level star in folder_meta.
     starred         INTEGER NOT NULL DEFAULT 0,
     -- Last live progress of a still-running job (a ProgressTracker snapshot), so a
@@ -58,29 +58,29 @@ CREATE TABLE IF NOT EXISTS generations (
     -- the same write: the pair is one fact, and half-written it would either hide
     -- a copy Evolver still holds or condemn one just sent. Evolver reads this
     -- column out of this table (it reads no other app's), and deletes every copy
-    -- of the clip it is holding -- the send is a file copy, so undoing it has to
+    -- of the video it is holding -- the send is a file copy, so undoing it has to
     -- be a file delete, and only the app whose folders they are can find them.
     -- It stays set afterwards rather than being cleared, because nothing on this
     -- side learns when Evolver has finished; it is the standing answer to "should
-    -- this clip be in the library", not a request that drains.
+    -- this video be in the library", not a request that drains.
     evolver_unsent_at TEXT,
-    -- The twin of evolver_exported_at for the Genau lane: a clip sent to be
+    -- The twin of evolver_exported_at for the Genau lane: a video sent to be
     -- upscaled and delivered to Genau's folder. Separate because the two sends
     -- go to different source folders and mean different things, so a video can
     -- have had one, the other, or both.
     genau_exported_at TEXT,
-    -- The Genau lane's twin of evolver_unsent_at, and read the same way: a clip
+    -- The Genau lane's twin of evolver_unsent_at, and read the same way: a video
     -- withdrawn here is deleted from Genau's own folder as well as from the
     -- pipeline that put it there.
     genau_unsent_at TEXT,
     -- Set at launch on a run a spoken animation started, so its completion hands
-    -- the clip on without being asked again. On the row rather than in memory
+    -- the video on without being asked again. On the row rather than in memory
     -- because a restart mid-generation is routine, and it is the only thing
     -- separating such a run from the identical loop workflow started by hand,
     -- which must stay put until Send-to-Genau is pressed.
     genau_requested_at TEXT,
     -- Where a combine launch got its settings: the act picked in the Combine
-    -- panel's dropdown, and the video whose settings the run re-uses. Either can
+    -- Combine's dropdown, and the video whose settings the run re-uses. Either can
     -- stand alone — a dropped video names no act, and an act the overlay pins
     -- settings for is answered from no past video. Nothing else about the run
     -- records it: the params carry the settings' values, never which video they
@@ -98,17 +98,17 @@ CREATE TABLE IF NOT EXISTS generations (
     -- origenerator.gallery.enhance.enhance_target_id). NULL on a row from
     -- before this was recorded, which falls back to matching the file.
     enhance_of TEXT,
-    -- The clip this row is one cycle of, by that clip's prompt_id. Nothing
-    -- writes it any more: cutting a finished clip down was how a Genau flick was
+    -- The video this row is one cycle of, by that video's prompt_id. Nothing
+    -- writes it any more: cutting a finished video down was how a Genau flick was
     -- made for one afternoon, until the lane learned to ask the sampler for a
     -- loop one cycle long instead (origenerator.gallery.combine.cycle_shaped),
     -- which is the same answer without a second file. The cuts that were made
     -- are still here and still in Genau's folder, so the column stays and the
-    -- Generate tab still follows it back to the clip each came out of. An
+    -- Generate tab still follows it back to the video each came out of. An
     -- identity rather than a filename, for the reason enhance_of is one, and the
     -- whole of what the two rows know about each other: a cut's params are its
     -- source's, so it sits in the same settings folder and nothing else on it
-    -- says which of that folder's clips it was cut from.
+    -- says which of that folder's videos it was cut from.
     trimmed_from TEXT,
     -- What made the row, as a JSON block (origenerator.provenance): stamped at
     -- launch, or worked out later for a row from before launches were stamped.
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS folder_meta (
     folder_key    TEXT PRIMARY KEY,
     custom_name   TEXT,
     starred       INTEGER NOT NULL DEFAULT 0,
-    -- A bookmark's identity: the tree tier it sits at and a generation under it, so
+    -- A favorite's identity: the tree tier it sits at and a generation under it, so
     -- its key can be recomputed under any future key formula (see reconcile).
     level         TEXT,
     ref_prompt_id TEXT
@@ -163,11 +163,11 @@ CREATE TABLE IF NOT EXISTS custom_folders (
 CREATE TABLE IF NOT EXISTS custom_folder_items (
     folder_id     INTEGER NOT NULL REFERENCES custom_folders(id) ON DELETE CASCADE,
     -- The gathered folder, by tree key, plus the same identity a folder_meta
-    -- bookmark carries so the reconcile can re-point it when a key formula moves.
+    -- favorite carries so the reconcile can re-point it when a key formula moves.
     folder_key    TEXT    NOT NULL,
     level         TEXT,
     ref_prompt_id TEXT,
-    -- The order they were added, so a custom folder lists what it holds that way.
+    -- The order they were added, so a custom collection lists what it holds that way.
     position      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (folder_id, folder_key)
 );
@@ -209,9 +209,9 @@ CREATE TABLE IF NOT EXISTS requests (
     asked            TEXT
 );
 
--- A deleted generation the recovery bin is still holding: the whole row the
+-- A deleted generation the Trash is still holding: the whole row the
 -- delete dropped, and where in the trash its files went, so the Trash collection can
--- list it, put both back, or end it for good (see origenerator.recovery). The
+-- list it, put both back, or end it for good (see origenerator.trash_collection). The
 -- record goes away when the item is restored or purged, and not otherwise --
 -- nothing ages out; the generations row itself is gone the moment it is deleted,
 -- which is why the row travels here rather than staying gated by a flag.
@@ -240,9 +240,9 @@ CREATE TABLE IF NOT EXISTS seed_uses (
     media_type     TEXT
 );
 
--- A video put in Combine's (custom) slot by hand, under the lane showing then,
+-- A video put in Combine's (custom) drop zone by hand, under the lane showing then,
 -- and a generation launched from one, by that generation's prompt_id. One made
--- from the slot that no row here names was launched before anything was written
+-- from the drop zone that no row here names was launched before anything was written
 -- here, so which lane it was for is not known.
 CREATE TABLE IF NOT EXISTS combine_video_uses (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -304,7 +304,7 @@ ADDED_COLUMNS = {
 # Tables under a name this app has stopped using, and the name they carry now.
 # History, like FIRST_SHIPPED in tests/test_db_schema.py: an entry stays here
 # for as long as a database written before the rename might still be opened.
-RENAMED_TABLES = {"custom_folder_members": "custom_folder_items"}
+RENAMED_TABLES = {"custom_collection_members": "custom_folder_items"}
 
 # Every column of the generations table, in declaration order. Used to restore a
 # previously-captured row verbatim (see ``restore_generation``).
@@ -354,7 +354,7 @@ def rename_tables(conn) -> None:
 
     Before the schema script, not after: CREATE TABLE IF NOT EXISTS would
     otherwise stand an empty table up beside the user's populated one, and every
-    row in it -- every custom folder they have ever composed -- would read as
+    row in it -- every custom collection they have ever composed -- would read as
     gone while still sitting in the file.
     """
     have = {row[0] for row in conn.execute(
@@ -377,7 +377,7 @@ def migrate(conn) -> None:
             if column not in existing:
                 conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
-    # What each worktree's copied database had bookmarked, kept for adoption at
+    # What each worktree's copied database had favorited, kept for adoption at
     # the next live launch; a branch session runs on this database now.
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     give_old_seed_uses_their_kind(conn)

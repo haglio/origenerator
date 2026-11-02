@@ -25,7 +25,7 @@ where its row says, by name, across every place outputs are kept:
   one is this row's. Broken is visible; repointed at another generation's file
   is not.
 
-A record with a place of its own -- a file the bin moved to the trash, a starting
+A record with a place of its own -- a file the Trash moved to the trash, a starting
 frame, a video in the library -- is skipped: none of them is in the output tree.
 """
 
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 #: The row columns holding a list of output-file records. ``enhance_history``
 #: is not among them: it names its files by name alone, so a move cannot
-#: invalidate it -- and the levels it describes are resolved through
+#: invalidate it -- and the versions it describes are resolved through
 #: ``output_files``/``original_files`` anyway.
 FILE_LISTS = ("output_files", "original_files")
 

@@ -36,16 +36,16 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     TRASH_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery.shapes import LANDSCAPE
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.folder_tree import _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
+from origenerator.gui.new_tile import NewTile
 from origenerator.gui.request_worker import RevisionWorker
-from origenerator.gui.reroll_tile import RerollTile
+from origenerator.item_shape import base_of, shaped_key
 from origenerator.motion_engine import Motion
-from origenerator.orientation import base_of, oriented_key
 from origenerator.output_places import OutputPlaces
 from origenerator.prompt_edit import request_applier
 from origenerator.slideshow_buttons import MODE_BUTTONS
@@ -111,7 +111,7 @@ class FakeActions:
     def purge_deleted(self, prompt_ids):
         self.purged.append(list(prompt_ids))
 
-    def delete_enhance_levels(self, row, filenames):
+    def delete_enhance_versions(self, row, filenames):
         return True
 
     def reject_experiment(self, row):
@@ -237,22 +237,22 @@ class FakeDB:
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
 
-    # --- the recovery bin (deletions held for the Trash collection) --------
+    # --- the Trash (deletions held for the Trash collection) --------
 
-    def record_deletion(self, prompt_id, row, batch):
+    def record_trashed(self, prompt_id, row, batch):
         self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
         self._deletions[prompt_id] = {
             "prompt_id": prompt_id, "row": row, "batch": batch,
             "deleted_at": "2026-08-15 03:00:00",
         }
 
-    def list_deletions(self):
+    def list_trashed(self):
         return list(reversed(self._deletions.values()))  # newest first
 
-    def get_deletion(self, prompt_id):
+    def get_trashed(self, prompt_id):
         return self._deletions.get(prompt_id)
 
-    def forget_deletion(self, prompt_id):
+    def forget_trashed(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
     # --- spoken requests, and the folder-wide one typed on a tab -----------
@@ -275,38 +275,38 @@ class FakeDB:
         return [record for record in self.list_requests()
                 if record["source_prompt_id"] == source_prompt_id]
 
-    # --- custom folders (the groupings the user composes) ------------------
+    # --- custom collections (the groupings the user composes) ------------------
 
-    def create_custom_folder(self, name, folder_id=None, side=None):
+    def create_custom_collection(self, name, folder_id=None, shape=None):
         if folder_id is None:
             folder_id = self._next_custom
         self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "side": side, "folders": {}, "items": {}}
+        self._custom[folder_id] = {"name": name, "side": shape, "folders": {}, "items": {}}
         return folder_id
 
-    def delete_custom_folder(self, folder_id):
+    def delete_custom_collection(self, folder_id):
         self._custom.pop(folder_id, None)
 
-    def add_folders_to_custom_folder(self, folder_id, folders):
+    def add_folders_to_custom_collection(self, folder_id, folders):
         for folder_key, level, ref in folders:
             self._custom[folder_id]["folders"][folder_key] = (level, ref)
 
-    def remove_folder_from_custom_folder(self, folder_id, folder_key):
+    def remove_folder_from_custom_collection(self, folder_id, folder_key):
         self._custom[folder_id]["folders"].pop(folder_key, None)
 
-    def add_items_to_custom_folder(self, folder_id, prompt_ids):
+    def add_items_to_custom_collection(self, folder_id, prompt_ids):
         self._custom[folder_id]["items"].update(dict.fromkeys(prompt_ids))
 
-    def remove_items_from_custom_folder(self, folder_id, prompt_ids):
+    def remove_items_from_custom_collection(self, folder_id, prompt_ids):
         for prompt_id in prompt_ids:
             self._custom[folder_id]["items"].pop(prompt_id, None)
 
-    def list_custom_folders(self):
+    def list_custom_collections(self):
         return [{"id": fid, "name": f["name"], "side": f["side"], "folders": list(f["folders"]),
                  "items": list(f["items"])}
                 for fid, f in sorted(self._custom.items())]
 
-    def folders_in_custom_folders(self):
+    def folders_in_custom_collections(self):
         return [{"folder_id": fid, "folder_key": key, "level": level, "ref_prompt_id": ref}
                 for fid, f in self._custom.items()
                 for key, (level, ref) in f["folders"].items()]
@@ -360,47 +360,47 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
-def _side(tree, side=LANDSCAPE):
+def _shape(tree, shape=LANDSCAPE):
     """One section of the TOC pane — the Portrait tree, the Landscape one, or
     the one list of both shapes the radio over them collapses to (see
-    :mod:`origenerator.gallery.sides`)."""
-    return tree._trees[side]
+    :mod:`origenerator.gallery.shapes`)."""
+    return tree._trees[shape]
 
 
-def _top_level(tree, side=LANDSCAPE):
-    """One half's rows: its collections, its custom folders, its All.
+def _top_level(tree, shape=LANDSCAPE):
+    """One half's rows: its collections, its custom collections, its All.
 
     Landscape by default because that is where these fixtures land — a row with
     no thumbnail, no file on disk and no size in its params has no shape to
     read, and an unmeasurable item files under the roomier region everywhere in
-    this app. A test about the split itself names the side it means.
+    this app. A test about the split itself names the shape it means.
     """
-    half = _side(tree, side)
+    half = _shape(tree, shape)
     return {half.topLevelItem(i).text(0): half.topLevelItem(i)
             for i in range(half.topLevelItemCount())}
 
 
-def _alls(tree, side=LANDSCAPE):
+def _alls(tree, shape=LANDSCAPE):
     """What one half's All row holds: its collections, then Images and Videos."""
-    all_row = _top_level(tree, side)["All"]
+    all_row = _top_level(tree, shape)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
 
 def _selected_folder(view):
-    """Which folder the tree has open, with the side stripped — what a test that
+    """Which folder the tree has open, with the shape stripped — what a test that
     is not about the split itself means by "the selected folder"."""
     return base_of(view.selected_folder_key())
 
 
-def _collection(view, key, side=LANDSCAPE):
+def _collection(view, key, shape=LANDSCAPE):
     """One side's copy of a collection row. Landscape by default, like _top_level."""
-    return view._tree_item_for(oriented_key(key, side))
+    return view._tree_item_for(shaped_key(key, shape))
 
 
-def _side_rows(view, side):
-    """The prompt ids one side of the tree holds, from its All row down."""
+def _shape_rows(view, shape):
+    """The prompt ids one shape of the tree holds, from its All row down."""
     return [row["prompt_id"]
-            for row in view._slideshows.rows_at(oriented_key(gallery.ALL_KEY, side))]
+            for row in view._slideshows.rows_at(shaped_key(gallery.ALL_KEY, shape))]
 
 
 def _key(item):
@@ -419,19 +419,19 @@ def _at(item, *path):
     return item
 
 
-def _workflow_rows(tree, media=None, side=LANDSCAPE):
+def _workflow_rows(tree, media=None, shape=LANDSCAPE):
     """The workflow rows, which hang under Images and Videos, by label — one
     kind's alone ("image"/"video") when ``media`` says so."""
-    all_row = _top_level(tree, side).get("All")
+    all_row = _top_level(tree, shape).get("All")
     if all_row is None:
         return {}
     kinds = [kind for kind in _subs(all_row) if media in (None, _key(kind))]
     return {row.text(0): row for kind in kinds for row in _subs(kind)}
 
 
-def _image_workflow(tree, side=LANDSCAPE):
+def _image_workflow(tree, shape=LANDSCAPE):
     """The sole image workflow's row — where a one-workflow gallery starts."""
-    (row,) = _workflow_rows(tree, "image", side).values()
+    (row,) = _workflow_rows(tree, "image", shape).values()
     return row
 
 
@@ -458,11 +458,11 @@ def _children_by_prompt(item):
 
 
 def _preview_of(view):
-    """The preview of the tab in front — reached through the panel that owns it,
+    """The preview of the tab in front — reached through the tab that owns it,
     since the gallery no longer keeps a handle on another class's private widget
     (C/design/004)."""
-    panel = view._info_tabs.current_config_panel()
-    return panel._preview if panel is not None else None
+    tab = view._generate_pane.current_generate_tab()
+    return tab._preview if tab is not None else None
 
 
 def _frame_shown(preview, frame: bytes) -> bool:
@@ -514,13 +514,13 @@ def _press_ctrl_f(view, monkeypatch):
 
 
 def _tab_with_prompts(view, key="sdxl_t2i"):
-    """Answer the front tab's workflow picker, so it has prompt fields to find in.
+    """Answer the front tab's workflow dropdown, so it has prompt fields to find in.
 
     The resting tab lays out no form until a workflow is chosen — and a find over
     no fields is the tree-find fallback, which has its own test below."""
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData(key))
-    return panel
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData(key))
+    return tab
 
 
 def _click_beside_the_mark_of(qtbot, view, key, *, which):
@@ -540,7 +540,7 @@ def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, *
                 source="experiment", experiment_verdict=verdict, **extra)
 
 
-def _bin_db(rows=(), held=(), inherited=()):
+def _trash_db(rows=(), held=(), inherited=()):
     """A gallery whose bin already holds ``held`` — ``(prompt_id, row)`` pairs,
     oldest first — the way a previous session's deletes would have left it.
 
@@ -549,9 +549,9 @@ def _bin_db(rows=(), held=(), inherited=()):
     """
     db = FakeDB(list(rows))
     for prompt_id, row in held:
-        db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+        db.record_trashed(prompt_id, row, {"moves": [], "subdir": None})
     for prompt_id, row in inherited:
-        db.record_deletion(prompt_id, row, {
+        db.record_trashed(prompt_id, row, {
             "moves": [[f"out/{prompt_id}.png", f"trash/{prompt_id}/0_{prompt_id}.png"]],
             "subdir": f"trash/{prompt_id}",
         })
@@ -562,25 +562,25 @@ def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
     """The Trash collection open over the deletions given as ``(prompt_id, prompt)``,
     with the first of them picked."""
     view = GalleryView(
-        _bin_db(held=[(pid, _image(pid, prompt, 50, n))
+        _trash_db(held=[(pid, _image(pid, prompt, 50, n))
                       for n, (pid, prompt) in enumerate(held, start=1)]),
         actions=actions,
     )
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    view._browser.apply_selection(held[0][0], _NO_MOD)
+    view._gallery_pane.apply_selection(held[0][0], _NO_MOD)
     return view
 
 
 def _click_tile(view, prompt_id):
-    QTest.mouseClick(view._browser._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
+    QTest.mouseClick(view._gallery_pane._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
 
 
 def _right_click(view, prompt_id):
     """Right-click a tile the way Qt does — through the widget's own custom-context
     signal — so a menu the pane never connected registers as no menu at all."""
-    view._browser._thumb_widgets[prompt_id].customContextMenuRequested.emit(QPoint(0, 0))
+    view._gallery_pane._thumb_widgets[prompt_id].customContextMenuRequested.emit(QPoint(0, 0))
 
 
 def _answer_menu(monkeypatch, label):
@@ -643,7 +643,7 @@ def _scroll_bar(view):
 
 def _drawn(view):
     """The items whose tiles the pane has drawn so far, in the order drawn."""
-    return list(view._browser._thumb_widgets)
+    return list(view._gallery_pane._thumb_widgets)
 
 
 def _write_looping_webp(path, size=(64, 48)):
@@ -667,7 +667,7 @@ def _click_off(view):
     a folder opens on its first item is how Favorite, Enhance and Delete come to be
     aimed at the whole folder again (see
     test_clicking_the_pane_background_drops_the_selection)."""
-    view._browser.clear_thumbnail_selection()
+    view._gallery_pane.clear_thumbnail_selection()
 
 
 def _reroll_client():
@@ -690,8 +690,8 @@ def _png_bytes() -> bytes:
     return buf.getvalue()
 
 
-def _reroll_tile(view):
-    tiles = view._scroll.widget().findChildren(RerollTile)
+def _new_tile(view):
+    tiles = view._scroll.widget().findChildren(NewTile)
     return tiles[0] if tiles else None
 
 
@@ -705,9 +705,9 @@ def _tile_kinds_in_order(view):
     return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
 
 
-def _select_first_leaf(view, side=LANDSCAPE):
+def _select_first_leaf(view, shape=LANDSCAPE):
     # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
-    leaf = _at(_image_workflow(view._tree, side), 0, 0, 0)
+    leaf = _at(_image_workflow(view._tree, shape), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -736,13 +736,13 @@ def _seeded_db(tmp_path, seed=7):
 
 
 def _generate_in_current_tab(view, positive_prompt, seed):
-    """Prefill the front config tab with a full sdxl config and click Generate,
+    """Prefill the front Generate tab with a full sdxl config and click Generate,
     returning the settings folder the launched re-roll runs in."""
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     params = dict(_SDXL.default_params(), positive_prompt=positive_prompt, seed=seed)
-    panel.prefill("sdxl_t2i", params)
-    panel._param_form.set_seed_random(False)  # a fixed seed, so the config is concrete
-    panel._on_generate()
+    tab.prefill("sdxl_t2i", params)
+    tab._param_form.set_seed_random(False)  # a fixed seed, so the config is concrete
+    tab._on_generate()
     return gallery.settings_folder_key(
         {"workflow_name": "sdxl_t2i", "params_json": json.dumps(params)},
         gallery.build_image_config_index(view._image_rows),
@@ -760,15 +760,15 @@ MODE_VERBS = frozenset(action for action, _label, _lit in MODE_BUTTONS)
 
 
 def _in_view(view, prompt_id) -> bool:
-    tile = view._browser._thumb_widgets[prompt_id]
+    tile = view._gallery_pane._thumb_widgets[prompt_id]
     viewport = view._scroll.viewport()
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
 
-def _running_reroll(view, side=LANDSCAPE):
+def _running_reroll(view, shape=LANDSCAPE):
     """Start a re-roll and return (key, job) for the freshly launched job."""
-    key = _select_first_leaf(view, side)
-    _reroll_tile(view).add_requested.emit()
+    key = _select_first_leaf(view, shape)
+    _new_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
 
 
@@ -800,7 +800,7 @@ def _shown_view_with_one_image(qtbot, tmp_path):
         "i1", status="completed",
         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
     )
-    actions = GalleryActions(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(output_dir), Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):
@@ -820,7 +820,7 @@ class _FakeRerollJob:
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
-        self.last_pass_progress = pass_progress  # the pass in hand, for the bar's band
+        self.last_pass_progress = pass_progress  # the pass in hand, for the substep progress bar
         self.last_stage = stage                  # and what the caption calls it
         self.foreign_ahead = foreign_ahead  # another app's jobs ahead of it, if any
         self.started_at = started_at        # when ComfyUI began it; None while queued
@@ -843,13 +843,13 @@ class _FakeRerollJob:
         self.state = "canceled"
 
 
-def _open_recents(view):
+def _open_latest(view):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
 
 def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
     """A running generation row, as a re-roll or a Generate job inserts up front —
-    no output yet, so it never enters the tree, only the in-flight cards."""
+    no output yet, so it never enters the tree, only the in-flight tiles."""
     return _row(prompt_id, workflow, {"positive_prompt": prompt}, f"{prompt_id}.png",
                 status="running", output_files="[]")
 
@@ -910,7 +910,7 @@ def _combine_db(tmp_path, *, enhanced=True):
 
 
 def _front_panel(view):
-    return view._info_tabs.current_config_panel()
+    return view._generate_pane.current_generate_tab()
 
 
 _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
@@ -937,7 +937,7 @@ def _enhanceable_db(tmp_path, count=2):
 
 
 def _set_enhance(view, **fields):
-    """Put the panel where an edit would, the way the gallery stores it."""
+    """Put the tab where an edit would, the way the gallery stores it."""
     settings = gallery.EnhanceSettings(**fields)
     view.set_enhance_settings(settings.to_json())
     return settings
@@ -974,7 +974,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
     ``media`` is what the pane was showing — ``None`` for a generation still
     running under it — and the generation it names is the tile these tests
     clicked, which is what the tab shows.
-    ``target`` stands in for the OSR2 drive target the clip on screen would
+    ``target`` stands in for the OSR2 drive target the video on screen would
     offer, since these tests carry no real scripted video.
     """
     shown = view.selected_prompt_id() if media is not None else None
@@ -986,7 +986,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
 
 
 def _aim_slideshow(view, slideshow, target):
-    """Say what the clip on screen offers the device, and reconcile as a step
+    """Say what the video on screen offers the device, and reconcile as a step
     onto it would."""
     slideshow.osr2_drive_target = lambda: target
     view.reconcile_osr2()
@@ -1161,8 +1161,8 @@ def _pick(view, *keys):
 
 
 def _make_folder(view, name, keys):
-    folder_id = view._db.create_custom_folder(name)
-    view._db.add_folders_to_custom_folder(
+    folder_id = view._db.create_custom_collection(name)
+    view._db.add_folders_to_custom_collection(
         folder_id, [(key, "settings", None) for key in keys]
     )
     view.refresh()
@@ -1173,7 +1173,7 @@ def _make_folder(view, name, keys):
 # Every test below raises a real menu and answers it by the words the user reads,
 # because the menu is where the label is wired to the handler. Calling the handler
 # instead — which is what the rest of this file does — leaves that wiring covered
-# by nothing at all: swapping two arms of the custom folder's menu, so that its
+# by nothing at all: swapping two arms of the custom collection's menu, so that its
 # harmless entry deleted the folder, used to pass all 657 tests.
 
 def _tall_on_screen(view):
@@ -1193,12 +1193,12 @@ def _below_the_last_row(tree) -> QPoint:
     return below
 
 
-def _tree_menu(view, key=None, side=LANDSCAPE):
+def _tree_menu(view, key=None, shape=LANDSCAPE):
     """Right-click a folder's row in the list, or the empty space below the last
-    row of ``side`` when no key is given, through the window as a mouse does."""
+    row of ``shape`` when no key is given, through the window as a mouse does."""
     _tall_on_screen(view)
     if key is None:
-        tree = view._tree._trees[side]
+        tree = view._tree._trees[shape]
         at = _below_the_last_row(tree)
     else:
         row = view._tree_item_for(key)
@@ -1236,7 +1236,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
             request_applier(in_scenes)(positive, negative, request),
         parent=view)
     view._voice._revision.revised.connect(view._voice._on_revised)
-    view._bank.mic.setChecked(True)  # the switch, as the user flips it
+    view._buttons.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)
     view._slideshows.start()
@@ -1251,7 +1251,7 @@ def _finish_reroll(view, job):
 
 
 def _genau_db(tmp_path):
-    """The combine DB plus a looping clip launched as the "alpha" act to mine.
+    """The combine DB plus a looping video launched as the "alpha" act to mine.
 
     The long-form video the fixture already carries was launched as the same act,
     so this also pins that the Genau lane picks the loop over it. "state two" is
@@ -1275,16 +1275,16 @@ def _genau_db(tmp_path):
     # A second image, sorted, so a spoken animation has a state to go by. The
     # fixture's original "img" has not been sorted at all.
     db.insert_generation(
-        prompt_id="img_act", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        prompt_id="img_action", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="an image by the window", seed=2,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=2,
                                     positive_prompt="an image by the window")),
         workflow_json="{}",
     )
-    db.update_generation("img_act", status="completed", output_files=json.dumps(
+    db.update_generation("img_action", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_act.png", "subfolder": ""},
          {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))
-    db.set_image_state("img_act", "state two")
+    db.set_image_state("img_action", "state two")
     return db
 
 

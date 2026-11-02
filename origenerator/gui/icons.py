@@ -4,23 +4,22 @@ The marks themselves live in :mod:`shared_ui.icons` now.  They used to be drawn
 here, and Fun Time drew its own copies of the ones it shares -- which is how the
 two apps ended up with microphones of different shapes on one screen.  What
 stays here is what is genuinely this app's: which button wears which mark, what
-color it wears it in, and the chips the badges sit on.
+color it wears it in, and the grounds the TOC initials and item type icons sit on.
 
-The toolbar-button icons each return a QIcon carrying a normal and a muted
+The Gallery pane buttons' icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
-folder-level badges (:func:`level_badge_icon`) are lettered chips marking which
-of workflow/model/LoRA a folder is; the media-type badges
-(:func:`media_type_badge`) are corner chips marking a Recents tile as an image
-or a video.
+TOC initials (:func:`toc_initial_icon`) mark which
+of workflow/model/LoRA a folder is; the item type icons
+(:func:`item_type_icon`) mark a Latest tile as an image or a video.
 
 :func:`recent_mark_icon` is the dot at the start of the row of a folder lately
 worked in, drawn here because it is a color saying one thing, not a mark anyone
 reads.
 
-The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
+The corner buttons (:func:`corner_star_icon`, :func:`corner_trash_icon`,
 :func:`corner_enhance_icon`) are the marks an item wears in its
 own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
-with the cursor on it -- because each is a badge and a button at once: the mark
+with the cursor on it -- because each is a sign and a button at once: the mark
 says which state the item is in, and pressing it is what changes that state.
 
 :func:`tab_close_icon` is the family's cross, so a button that closes tabs wears
@@ -54,51 +53,51 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
 from origenerator.gallery.labels import MEDIA_LABELS
 from origenerator.gallery.output import media_type_of_row
-from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 
-# Hierarchy level badges. Every gallery folder above a settings leaf sits at one
-# of these levels, and a small lettered chip in the level's own color names
-# which, so a tree row or a browser tile is self-describing without the reader
+# TOC initials. Every gallery folder above a settings leaf sits at one
+# of these levels, and a small TOC initial in the level's own color names
+# which, so a tree row or a Gallery pane tile is self-describing without the reader
 # counting indentation.
 LEVEL_LABELS = {
     "workflow": "Workflow", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
 }
-_LEVEL_BADGES = {
+_TOC_INITIALS = {
     "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", YELLOW),
     "source_image": ("I", GREEN),
 }
 
-# The Recents collection mixes images and videos in one flow, so each tile wears a
-# small corner badge naming its kind. A white glyph on a translucent dark chip,
+# The Latest collection mixes images and videos in one flow, so each tile wears a
+# small item type icon naming its kind. A white glyph on a translucent dark ground,
 # so it reads over a thumbnail of any color.
-_BADGE_CHIP = QColor(*palette.BLACK, 160)
-_BADGE_GLYPH = WHITE
-_BADGE_DISPLAY = 22  # the badge's on-screen size, in px
-_BADGE_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
+_ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
+_ITEM_TYPE_ICON_INK = WHITE
+_ITEM_TYPE_ICON_SIZE = 22  # the icon's on-screen size, in px
+_TOC_INITIAL_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 
-# Every chip carries its mark at one size, whichever mark it is. A star badge and
-# a media badge can sit on the same tile, and the two only read as one system if
+# Every ground carries its mark at one size, whichever mark it is. A corner star and
+# an item type icon can sit on the same tile, and the two only read as one system if
 # they are drawn to one scale — which they were not while each glyph was sized
 # for itself.
-_CHIP_GLYPH = 44
-_CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
+_GLYPH_ON_GROUND = 44
+_GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
 
 # A favorited item's star, in the green Fun Time paints its favorite ★ with: one
-# color means "bookmarked" across both apps, so a star learned in one reads in
+# color means "favorited" across both apps, so a star learned in one reads in
 # the other. Worn by every star that says something IS favorited — the tile's
-# corner badge and a favorited folder's row alike. The plus marking an enhanced
+# corner button and a favorited folder's row alike. The plus marking an enhanced
 # tile is yellow (YELLOW, this palette's yellow): green is spoken for and the two
-# badges can sit on one tile, and blue is genau's across this family.
+# corner buttons can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
 _REROLL_GLYPH = WHITE
 
@@ -123,7 +122,7 @@ def undo_icon() -> QIcon:
 
 def redo_icon() -> QIcon:
     """Undo's mirror image, head to the right — redo. The pair is a mirror on
-    purpose: side by side in the bank, two arrowheads pointing opposite ways say
+    purpose: side by side among the Gallery pane buttons, two arrowheads pointing opposite ways say
     which is which faster than any difference in the arc could."""
     return qt_icon("redo_arrow", size=_SIZE)
 
@@ -163,7 +162,7 @@ def mic_icon() -> QIcon:
     """A microphone — say a command or a request.
 
     The family's one microphone: Fun Time's dashboard paints this same drawing
-    into its voice panel, so the two apps side by side show one control rather
+    into its voice controls, so the two apps side by side show one control rather
     than two marks that merely mean the same thing."""
     return qt_icon("mic", size=_SIZE)
 
@@ -185,7 +184,7 @@ def trash_icon(*, color=None) -> QIcon:
 
 
 def delete_icon() -> QIcon:
-    """The button-bank trash can, in red — the one control in the bank that
+    """The Gallery pane buttons' trash can, in red — the one control among them that
     takes something away, and the only one worth stopping on before clicking."""
     return trash_icon(color=RED)
 
@@ -194,10 +193,10 @@ def star_icon(*, filled: bool) -> QIcon:
     """A five-pointed star — solid when the folder is favorited, an outline when
     not, so the hover control shows the state it will toggle.
 
-    A favorited one is green (:data:`_STAR_GLYPH`), the color the corner badge and
+    A favorited one is green (:data:`_STAR_GLYPH`), the color the corner button and
     Fun Time's favorite ★ both wear; the outline stays the chrome's own gray,
     because it is an offer to favorite rather than a thing that is favorited. The
-    button bank's Favorite wears the filled one, so the control and the mark it
+    Gallery pane buttons' Favorite wears the filled one, so the control and the mark it
     leaves on a tile are one symbol in one color."""
     if filled:
         icon = qt_icon("star", color=_STAR_GLYPH, size=_SIZE)
@@ -234,12 +233,12 @@ def flask_icon() -> QIcon:
 @cache
 def collection_icon(collection: str) -> QIcon:
     return {
-        RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
+        LATEST_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
         ENHANCED_KEY: enhance_icon, EXPERIMENTS_KEY: flask_icon, TRASH_KEY: trash_icon,
     }[collection]()
 
 
-def collection_badge(collection: str) -> tuple[QIcon, str]:
+def collection_kind_icon(collection: str) -> tuple[QIcon, str]:
     return collection_icon(collection), COLLECTION_LABELS[collection]
 
 
@@ -247,8 +246,8 @@ def all_icon() -> QIcon:
     return qt_icon("database", size=_SIZE)
 
 
-def custom_folder_icon() -> QIcon:
-    """A folder — the mark on a folder the user composed, and the toolbar button
+def custom_collection_icon() -> QIcon:
+    """A folder — the mark on a folder the user composed, and the Gallery pane button
     that composes one out of the picked folders."""
     return qt_icon("folder", size=_SIZE)
 
@@ -281,55 +280,55 @@ def _disc(color):
 def experiment_verdict_icon(verdict: str) -> QIcon:
     """An experiment tile's review hover-buttons: a check ("up" — keep it, it
     joins the gallery) or a cross ("down" — reject it and teach the experimenter
-    what to avoid). White line art on the buttons' own translucent chip, like the
+    what to avoid). White line art on the buttons' own translucent ground, like the
     per-seed re-roll controls."""
     return QIcon(icon_pixmap("check" if verdict == "up" else "cross",
                              _SIZE, _REROLL_GLYPH))
 
 
 @cache
-def recovery_action_icon(action: str) -> QIcon:
+def trash_action_icon(action: str) -> QIcon:
     """A Trash-collection tile's review hover-buttons: a circular arrow back
     ("restore" — the item and its files return to where they were) or a trash can
-    ("purge" — end it for good; nothing else empties the bin). White line art on
-    the buttons' own translucent chip, like the experiment verdict controls."""
+    ("purge" — end it for good; nothing else empties the Trash). White line art on
+    the buttons' own translucent ground, like the experiment verdict controls."""
     name = "undo_arrow" if action == "restore" else "trash"
     return QIcon(icon_pixmap(name, _SIZE, _REROLL_GLYPH))
 
 
 @cache
-def media_type_badge(media_type: str) -> QPixmap:
-    """A small corner badge marking a Recents tile as an image or a video.
+def item_type_icon(media_type: str) -> QPixmap:
+    """A small item type icon marking a Latest tile as an image or a video.
 
     A white glyph — a play triangle for a video, a framed photo for an image — on
-    a translucent dark chip, so it reads over a thumbnail of any color. Cached and
-    pre-scaled to its on-screen size; the same two badges decorate every tile.
+    a translucent dark ground, so it reads over a thumbnail of any color. Cached and
+    pre-scaled to its on-screen size; the same two icons decorate every tile.
     """
     glyph = "play" if media_type == MediaType.VIDEO else "photo"
-    return _display_size(_render_chip(_BADGE_CHIP, glyph, _BADGE_GLYPH))
+    return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, glyph, _ITEM_TYPE_ICON_INK))
 
 
 @cache
 def media_type_icon(media_type: str) -> QIcon:
-    """The same play/photo mark as :func:`media_type_badge`, bare.
+    """The same play/photo mark as :func:`item_type_icon`, bare.
 
-    The badge sits over a thumbnail, so it needs its dark chip to read against
-    any thumbnail; this one sits in a row of text — a config tab's label, where it
+    The item type icon sits over a thumbnail, so it needs its dark ground to read against
+    any thumbnail; this one sits in a row of text — a Generate tab's label, where it
     stands in for the thumbnail a tab has no result to show yet, or the row of a
-    folder of images or videos — so the chip would be a black square among words.
+    folder of images or videos — so the ground would be a black square among words.
     """
     return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
-# --- the shape a side of the table of contents holds ------------------------
+# --- the shape a shape of the tree of contents holds ------------------------
 
 MARK_BESIDE_A_WORD = 15  # on-screen size, for a mark that sits level with a word
 _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}
 
 
 @cache
-def side_mark(side: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
-    return icon_pixmap(_SIDE_MARKS[side], size, TEXT_PRIMARY)
+def shape_mark(shape: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
+    return icon_pixmap(_SIDE_MARKS[shape], size, TEXT_PRIMARY)
 
 
 @cache
@@ -346,7 +345,7 @@ ENHANCE_OPEN = "open"   # nothing made of it yet: the offer of a first one
 ENHANCE_HELD = "held"   # it already holds the very version these settings make
 ENHANCE_MORE = "more"   # it holds one, and these settings would make another
 
-# A corner control at rest is there without shouting; under the cursor it goes
+# A corner button at rest is there without shouting; under the cursor it goes
 # the light gray that says "this is a button" — whatever it is filled with, so
 # the arming and the state it reports stay two separate readings of one mark.
 _CORNER_REST = TEXT_MUTED
@@ -363,14 +362,14 @@ _ENHANCE_SHADOW = 5.0
 
 @cache
 def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
-    """The star in an item's top-left corner: bookmark it, or take the
-    bookmark away.
+    """The star in an item's top-left corner: favorite it, or take the
+    favorite away.
 
-    Filled and green once it is bookmarked — the green Fun Time paints its
+    Filled and green once it is favorited — the green Fun Time paints its
     favorite ★ with, so one color means one thing across both apps — and a
     hollow outline while it is not. The mark is therefore the state and the
     button at once, which is why a favorited item keeps it up with nothing
-    hovering: there is no separate badge left to disagree with it.
+    hovering: there is no separate sign left to disagree with it.
     """
     return _corner_icon("star" if favorite else "star_outline",
                         _STAR_GLYPH if favorite else _CORNER_REST, armed)
@@ -382,7 +381,7 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
 
     Red under the cursor rather than the other two's light gray — it is the one
     corner whose act takes something away, and it wears the very can, in the very
-    red, that the button bank's Delete does."""
+    red, that the Gallery pane buttons' Delete does."""
     return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
 
 
@@ -393,16 +392,16 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     :data:`ENHANCE_OPEN` is a hollow plus — nothing has been made of this image
     and pressing would make the first. :data:`ENHANCE_HELD` is the solid yellow
     one: it already holds exactly the version the Enhance settings describe, so
-    there is nothing here to press and the mark is a badge alone.
+    there is nothing here to press and the mark is a sign alone.
 
     :data:`ENHANCE_MORE` is both at once, which is the state that needs saying:
-    the image holds an enhancement AND the settings on the panel would make a
+    the image holds an enhancement AND the settings on the Enhance pane would make a
     different one. So the solid yellow plus goes down first, shifted a little,
     and is then cleared back out under the hollow one — leaving the enhancement
     it has as a yellow shadow under the offer of another. The clear is safe here
     in the one way it is anywhere: this pixmap is ours and the only thing under
     the mark is the shadow just drawn, so what shows through the hollow is the
-    chip the button paints under it.
+    ground the button paints under it.
     """
     if state == ENHANCE_HELD:
         return _corner_icon("plus", YELLOW, armed=False)
@@ -421,15 +420,15 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
 
 
 def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
-    """One corner control's mark, at rest or armed — bare line art, since the
-    button paints the translucent chip under it that the badges draw into
+    """One corner button's mark, at rest or armed — bare line art, since the
+    button paints the translucent ground under it that the corner buttons draw into
     themselves."""
     color = (arm_color or _CORNER_ARMED) if armed else ink
     return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
 
 
 def _mark(painter: QPainter, glyph: str, ink):
-    """Paint one corner control's glyph where every corner control's glyph goes."""
+    """Paint one corner button's glyph where every corner button's glyph goes."""
     draw_icon(painter, glyph, ink, size=_CORNER_MARK,
               x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
 
@@ -460,8 +459,8 @@ def _same_when_dead(pixmap: QPixmap) -> QIcon:
     return icon
 
 
-def _display_size(pixmap: QPixmap, size: int = _BADGE_DISPLAY) -> QPixmap:
-    """A rendered chip scaled down to the size a tile shows it at."""
+def _display_size(pixmap: QPixmap, size: int = _ITEM_TYPE_ICON_SIZE) -> QPixmap:
+    """A rendered ground scaled down to the size a tile shows it at."""
     return pixmap.scaled(
         size, size,
         Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
@@ -473,7 +472,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     """A thumbnail hover-button glyph: a regenerate ring around a small play/photo
     mark — "re-roll this video" (its motion) or "this image" (its start frame).
 
-    White line art; the button paints its own translucent chip under it, so the
+    White line art; the button paints its own translucent ground under it, so the
     glyph reads over a thumbnail of any color. The two differ by their inner mark,
     so a video seed control is never mistaken for an image seed one.
     """
@@ -495,10 +494,10 @@ def tab_close_icon() -> QIcon:
     return qt_icon("cross", size=_SIZE)
 
 
-def folder_badge(group) -> tuple[QIcon, str] | None:
+def folder_kind_icon(group) -> tuple[QIcon, str] | None:
     level = folder_level(group)
     if level is not None:
-        return level_badge_icon(level), LEVEL_LABELS[level]
+        return toc_initial_icon(level), LEVEL_LABELS[level]
     if isinstance(group, (MediaGroup, SettingsGroup)):
         media = media_type_of_row(rows_under(group)[0])
         return media_type_icon(media), MEDIA_LABELS[media]
@@ -506,28 +505,28 @@ def folder_badge(group) -> tuple[QIcon, str] | None:
 
 
 @cache
-def level_badge_icon(level: str) -> QIcon:
-    """The chip marking a folder's place in the hierarchy (see LEVEL_LABELS).
+def toc_initial_icon(level: str) -> QIcon:
+    """The TOC initial marking a folder's place in the hierarchy (see LEVEL_LABELS).
 
     Its level's letter, in that level's own color.
 
-    Cached: the same few chips decorate many tree rows and tiles, so they're
+    Cached: the same few TOC initials decorate many tree rows and tiles, so they're
     rendered once and shared rather than re-drawn per folder.
     """
     icon = QIcon()
-    letter, color = _LEVEL_BADGES[level]
-    icon.addPixmap(_render_badge(letter, color))
+    letter, color = _TOC_INITIALS[level]
+    icon.addPixmap(_render_toc_initial(letter, color))
     return icon
 
 
-def _render_chip(chip, glyph: str, ink) -> QPixmap:
-    """A rounded chip filled with *chip*, carrying *glyph* in *ink*."""
-    return _chip_pixmap(chip, lambda painter: draw_icon(
-        painter, glyph, ink, size=_CHIP_GLYPH, x=_CHIP_INSET, y=_CHIP_INSET))
+def _render_on_ground(ground, glyph: str, ink) -> QPixmap:
+    """A rounded ground filled with *ground*, carrying *glyph* in *ink*."""
+    return _ground_pixmap(ground, lambda painter: draw_icon(
+        painter, glyph, ink, size=_GLYPH_ON_GROUND, x=_GROUND_INSET, y=_GROUND_INSET))
 
 
-def _chip_pixmap(color, draw) -> QPixmap:
-    """A rounded chip filled with ``color``, with ``draw`` painting its mark."""
+def _ground_pixmap(color, draw) -> QPixmap:
+    """A rounded ground filled with ``color``, with ``draw`` painting its mark."""
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -540,19 +539,19 @@ def _chip_pixmap(color, draw) -> QPixmap:
     return pixmap
 
 
-def _render_badge(letter: str, color) -> QPixmap:
-    """A chip with ``letter`` centered in readable contrast — dark on a light
-    chip, light on a saturated one."""
+def _render_toc_initial(letter: str, color) -> QPixmap:
+    """A ground with ``letter`` centered in readable contrast — dark on a light
+    ground, light on a saturated one."""
     def draw(painter: QPainter):
         font = QFont(FONT_UI)
         font.setBold(True)
-        font.setPixelSize(_BADGE_LETTER)
+        font.setPixelSize(_TOC_INITIAL_LETTER)
         painter.setFont(font)
         painter.setPen(_readable_on(color))
         painter.drawText(QRectF(0, 0, _SIZE, _SIZE),
                          Qt.AlignmentFlag.AlignCenter, letter)
 
-    return _chip_pixmap(color, draw)
+    return _ground_pixmap(color, draw)
 
 
 _READS_AS_LIGHT = 150

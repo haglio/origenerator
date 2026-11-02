@@ -17,18 +17,18 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.icons import qt_icon
-from shared_ui.orientation import orientation_of_size
+from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
 from origenerator.base_models import loras_offered_beside
 from origenerator.box_breaks import unboxed
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
-from origenerator.gallery.sides import SIDE_LABELS
+from origenerator.gallery.shapes import SHAPE_LABELS
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
@@ -41,7 +41,7 @@ from origenerator.gui.param_help import (
     param_help,
     with_training_date,
 )
-from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
 from origenerator.gui.request_field import RequestField
 from origenerator.gui.scenes_editor import ScenesEditor
@@ -62,7 +62,7 @@ from origenerator.workflows.lora_rows import lora_key_of, strength_without_its_l
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive
 # prompt), what each scene keeps out (stored as the negative prompt), each
-# scene's length, each scene's lines, and the clip's length they add up to.
+# scene's length, each scene's lines, and the video's length they add up to.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines",
                "frame_count")
 
@@ -131,15 +131,15 @@ class ParamForm(QWidget):
     are pinned at the workflow's own defaults, so what the form emits for them
     is always the same. This is how the enhance params stay off a form whose
     every other setting decides which gallery folder a run lands in. They belong
-    to the Enhance subpanel, which applies enhancement as a separate layer — and
+    to the Enhance pane, which applies enhancement as a separate layer — and
     pinning them is what stops a Generate seeded from an old enhanced run coming
-    out enhanced again with the subpanel's tick unticked.
+    out enhanced again with the Enhance pane's checkbox unchecked.
 
     ``pins_reused_seed`` is the workflow's answer to
     :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
-    whether a seed written in by :meth:`set_values` also clears its Random tick.
-    False (video) leaves the tick ticked and a fresh seed in the field, so the
-    settings of a clip loaded into a tab don't quietly pin every later run to its
+    whether a seed written in by :meth:`set_values` also clears its Random checkbox.
+    False (video) leaves the checkbox checked and a fresh seed in the field, so the
+    settings of a video loaded into a tab don't quietly pin every later run to its
     seed.
     """
 
@@ -252,11 +252,11 @@ class ParamForm(QWidget):
         if size is None:
             self._sections["Size"].set_mark(None, "")
             return
-        orientation = orientation_of_size(*size)
-        tip = SIDE_LABELS[orientation]
+        shape = shape_of_size(*size)
+        tip = SHAPE_LABELS[shape]
         if size[0] == size[1]:
             tip = f"Square, so it goes under {tip}"
-        self._sections["Size"].set_mark(icons.side_mark(orientation), tip)
+        self._sections["Size"].set_mark(icons.shape_mark(shape), tip)
 
     def _wire_row_rules(self):
         self.changed.connect(self._refresh_row_rules)
@@ -321,7 +321,7 @@ class ParamForm(QWidget):
                 if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, widget)
                 continue
-            if isinstance(widget, PresetComboBox):
+            if isinstance(widget, PresetDropdown):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, widget, self._make_extras(pd))
         for pd in self._param_defs:
@@ -373,7 +373,7 @@ class ParamForm(QWidget):
     def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
         """Insert one row (an input or a read-only value, then its ``extras``)
         into its section at the canonical position among the rows already there,
-        its label after the slot its warning mark shows in.
+        its label after the place its warning mark shows in.
 
         The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
         as well as its input: the label is what you are looking at when you
@@ -400,7 +400,7 @@ class ParamForm(QWidget):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
             return
         label.setToolTip(help_text or label.text())
-        if widget is not None and help_text and not isinstance(widget, DropSlot):
+        if widget is not None and help_text and not isinstance(widget, DropZone):
             if key in self._lora_keys:
                 help_text = with_training_date(help_text, self._read_field(self._defs[key]))
             widget.setToolTip(help_text)  # a zone's tooltip names what it holds
@@ -451,11 +451,11 @@ class ParamForm(QWidget):
     def _field_cell(self, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:
         """The input, then its trailing controls.
 
-        The copy button leads (just right of the input), then the Random tick
+        The copy button leads (just right of the input), then the Random checkbox
         (seed) or the Browse button (image). Each sits in a shared cell so the
         label column stays aligned across every row. Next to a tall multiline
         prompt the copy button hugs the top corner; next to a single-line seed
-        it centers so it lines up with the tick beside it.
+        it centers so it lines up with the checkbox beside it.
         """
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
@@ -616,8 +616,8 @@ class ParamForm(QWidget):
         return scenes + [box for widget in self._widgets.values()
                          if isinstance(widget, PromptBoxes) for box in widget.boxes()]
 
-    def drop_slots(self) -> tuple[DropSlot, ...]:
-        return tuple(w for w in self._widgets.values() if isinstance(w, DropSlot))
+    def drop_zones(self) -> tuple[DropZone, ...]:
+        return tuple(w for w in self._widgets.values() if isinstance(w, DropZone))
 
     def _has_param(self, key: str) -> bool:
         return key in self._defs
@@ -625,7 +625,7 @@ class ParamForm(QWidget):
     def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
 
-        It floats in a gutter opened to the left of the two labels, midway between
+        It floats in a margin opened to the left of the two labels, midway between
         their rows, so it reads as linking the pair rather than trailing either
         field. As a free child of the Dimensions section's content (not a form
         cell) it folds away with the section and needs manual placement — see
@@ -646,10 +646,10 @@ class ParamForm(QWidget):
         content.installEventFilter(self)
 
     def _center_between_dimension_rows(self, btn, top_row, lower_row):
-        """Center ``btn`` between the width and height rows, inside a left gutter
+        """Center ``btn`` between the width and height rows, inside a left margin
         reserved for it so it sits clear of the "Width"/"Height" labels.
 
-        The gutter is the section's left margin, sized to the button here (its
+        The margin is the section's left margin, sized to the button here (its
         final width isn't known until its font and stylesheet apply, after
         construction). Squeezing the button into whatever space the labels
         happened to leave is what put it on top of the words. In the Dimensions
@@ -664,16 +664,16 @@ class ParamForm(QWidget):
         if self._sections["Size"].is_collapsed():
             return
         btn.adjustSize()
-        gutter = btn.width() + 10  # room for the button plus a gap to the labels
+        margin = btn.width() + 10  # room for the button plus a gap to the labels
         form = self._sections["Size"].content_form()
-        if form.contentsMargins().left() != gutter:
-            # Push the labels over to open the gutter; the relayout re-invokes us
+        if form.contentsMargins().left() != margin:
+            # Push the labels over to open the margin; the relayout re-invokes us
             # with the rows in their new positions.
-            form.setContentsMargins(gutter, GAP_SMALL, 0, GAP_SMALL)
+            form.setContentsMargins(margin, GAP_SMALL, 0, GAP_SMALL)
             return
         top, lower = top_row.geometry(), lower_row.geometry()
         y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
-        btn.move(max(0, (gutter - btn.width()) // 2), y)
+        btn.move(max(0, (margin - btn.width()) // 2), y)
         btn.raise_()
 
     def _position_swap_button(self):
@@ -722,7 +722,7 @@ class ParamForm(QWidget):
         section that reads as plain values while locked (like the read-only
         passthrough rows — "864", not an input field) and turns into editable
         spinners when unlocked. A floating padlock toggle, centered between the
-        two rows in a reserved left gutter so it clears the labels, does the
+        two rows in a reserved left margin so it clears the labels, does the
         unlocking. A no-op for a workflow that sets its size by hand (its own
         width/height params already fill this section) or has none.
         """
@@ -791,7 +791,7 @@ class ParamForm(QWidget):
     def _on_dimensions_unlock_toggled(self, unlocked: bool):
         """Flip the padlock and swap each dimension between its plain locked value
         and its editable spinner, re-locking back onto the derived size. Announces
-        the change so the panel refreshes with it."""
+        the change so the tab refreshes with it."""
         self._unlock_btn.setIcon(qt_icon(_PADLOCK[unlocked]))
         self._unlock_btn.setToolTip(self._unlock_tip(unlocked))
         for stack in self._dim_stacks.values():
@@ -872,7 +872,7 @@ class ParamForm(QWidget):
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
         widget = self._kind(pd).make(pd)
-        if isinstance(widget, DropSlot):
+        if isinstance(widget, DropZone):
             widget.activated.connect(self.item_activated)
         if isinstance(widget, PromptBoxes):
             widget.boxes_changed.connect(self.text_fields_changed)
@@ -893,14 +893,14 @@ class ParamForm(QWidget):
                 self._sections[title].set_collapsed(collapsed)
 
     def seed_is_random(self) -> bool:
-        """True if any seed param's Random tick is checked."""
+        """True if any seed param's Random checkbox is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
 
     def set_seed_random(self, is_random: bool):
         for pd in self._seed_defs():
-            tick = self._randomize_checks[pd.key]
-            if tick.isChecked() != is_random:
-                tick.setChecked(is_random)
+            checkbox = self._randomize_checks[pd.key]
+            if checkbox.isChecked() != is_random:
+                checkbox.setChecked(is_random)
                 self._follow_random(pd, is_random)
 
     def put_seeds(self, params: dict, *, is_random: bool) -> None:
@@ -921,7 +921,7 @@ class ParamForm(QWidget):
         return (int(width), int(height)) if width and height else None
 
     def random_seed_keys(self) -> set[str]:
-        return {key for key, tick in self._randomize_checks.items() if tick.isChecked()}
+        return {key for key, checkbox in self._randomize_checks.items() if checkbox.isChecked()}
 
     def _seed_defs(self) -> list[ParamDef]:
         return [pd for pd in self._param_defs if pd.key in self._randomize_checks]
@@ -986,9 +986,9 @@ class ParamForm(QWidget):
             w.carry(str(value))
             return
         self._kind(pd).write(pd, w, value)
-        tick = self._randomize_checks.get(pd.key)
-        if tick is not None and self._pins_reused_seed:
-            tick.setChecked(False)
+        checkbox = self._randomize_checks.get(pd.key)
+        if checkbox is not None and self._pins_reused_seed:
+            checkbox.setChecked(False)
 
     def _settle(self, pd: ParamDef) -> None:
         """Show a field the value it will emit, once an edit of it has ended."""
@@ -1021,7 +1021,7 @@ class ParamForm(QWidget):
         }
         if (self._scenes is not None and "frame_count" in params
                 and len(params.get("scene_frames") or []) <= 1):
-            # A lone scene is the whole clip and runs for the clip length, which
+            # A lone scene is the whole video and runs for the video length, which
             # is all that settings from before scenes (or from the overlay) carry.
             params = {**params, "scene_frames": [params["frame_count"]]}
         # The story first: it sets how many scenes there are, and every other

@@ -85,7 +85,7 @@ def _stored(db: Database, row: dict) -> dict:
 def test_read_straight_from_the_database_the_trash_keeps_its_place_too(db):
     trashed = _stored(db, _image("gen-one", 1))
     kept = _stored(db, _image("gen-two", 2))
-    db.record_deletion("gen-one", trashed, {"moves": [], "subdir": None})
+    db.record_trashed("gen-one", trashed, {"moves": [], "subdir": None})
     db.delete_generation("gen-one")
 
     names = ItemNames.from_library(db)

@@ -14,8 +14,8 @@ was submitted to — matched by the shared prompt_id — and:
 Never raises: if ComfyUI can't be read, in-flight rows are left untouched for a
 later launch to resolve.
 
-The only startup reconcile that needs to reach ComfyUI at all; the bookmark
-reconciles are :mod:`origenerator.bookmark_reconcile`, and share nothing with
+The only startup reconcile that needs to reach ComfyUI at all; the favorite
+reconciles are :mod:`origenerator.favorite_reconcile`, and share nothing with
 this but the word. What it needs is the REST surface --
 :class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt -- and a
 ``ComfyUIClient`` forwards every call of it, so either can be handed in.

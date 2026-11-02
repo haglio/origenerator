@@ -19,8 +19,8 @@ def _video(tmp_path):
     return _file(tmp_path / "output" / "video" / "clip_00001_.mp4")
 
 
-def _upscale(tmp_path, orientation="landscape"):
-    return _file(tmp_path / "upscaled_by_orientation" / orientation / "origenerator"
+def _upscale(tmp_path, shape="landscape"):
+    return _file(tmp_path / "upscaled_by_orientation" / shape / "origenerator"
                  / "clip_00001__topaz.mp4")
 
 

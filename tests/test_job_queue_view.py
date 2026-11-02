@@ -15,7 +15,7 @@ from shared_ui.colors import BLUE, BORDER_SUBTLE
 from origenerator.gui.combination import Combination
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 from origenerator.gui.job_queue_view import (
-    _STRIP_HEIGHT,
+    _ROW_HEIGHT,
     QUEUE_ROW_MIME,
     JobQueueView,
     QueueRow,
@@ -214,7 +214,7 @@ def test_a_queue_of_any_length_is_one_progress_bar_tall(queue):
 
 def test_the_clock_is_written_across_the_bar_it_measures(queue):
     # One object, not a line of text with a separate stripe under it: the numbers
-    # are read off the face of the bar they measure, the way an in-flight card's
+    # are read off the face of the bar they measure, the way an in-flight tile's
     # are.
 
     queue.set_items([_item(status="running", progress=(10, 20),
@@ -250,13 +250,13 @@ def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
     queue.resize(800, 400)
     QApplication.processEvents()
 
-    assert queue._running._frame.height() == _STRIP_HEIGHT
-    assert queue._scroll.height() > _STRIP_HEIGHT
+    assert queue._running._frame.height() == _ROW_HEIGHT
+    assert queue._scroll.height() > _ROW_HEIGHT
 
 
 def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
-    assert queue.minimumHeight() == _STRIP_HEIGHT
-    assert queue.maximumHeight() > _STRIP_HEIGHT  # not pinned to its opening height
+    assert queue.minimumHeight() == _ROW_HEIGHT
+    assert queue.maximumHeight() > _ROW_HEIGHT  # not pinned to its opening height
 
 
 def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
@@ -273,7 +273,7 @@ def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
 def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_path):
     # The complaint this answers: a WAN run spends over a minute loading models
     # before ComfyUI streams a preview, and this corner was blank for all of it.
-    # It shows what the config tab shows for the same job — the frame being
+    # It shows what the Generate tab shows for the same job — the frame being
     # animated — until there is a frame of the run itself.
 
     frame = _image(tmp_path / "frame.png")
@@ -287,9 +287,9 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
 
 
 def test_the_corner_stands_the_source_video_beside_the_frame_where_there_is_one(queue, tmp_path):
-    # A combine's job is an image and a past clip's settings, and that is what
-    # the config tab shows above the form. The corner says the same thing, the
-    # clip drawn gray beside the frame — so it needs the room for two.
+    # A combine's job is an image and a past video's settings, and that is what
+    # the Generate tab shows above the form. The corner says the same thing, the
+    # video drawn gray beside the frame — so it needs the room for two.
 
     frame = _image(tmp_path / "frame.png")
     video = _image(tmp_path / "source.png", color=(255, 0, 0))
@@ -1401,7 +1401,7 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
 
 
 def test_a_combine_row_shows_the_frame_and_the_source_video_it_follows(queue, tmp_path):
-    # Not the source video alone: that reads as a job that IS that clip. The
+    # Not the source video alone: that reads as a job that IS that video. The
     # frame being animated leads, and the video whose settings are being reused
     # sits beside it (drawn gray, see queue_thumbs).
     frame = _image(tmp_path / "frame.png")

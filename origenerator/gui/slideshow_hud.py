@@ -1,8 +1,8 @@
 """What a slideshow tells the Funestras' HUD to draw, and which presses it answers itself.
 
 Every slideshow wears the Funestras' own HUD: the set and its map
-(:mod:`origenerator.gui.slideshow_map`), the device where this app's window drives
-one (:class:`~origenerator.gui.console.SlideshowDevice`), and at its foot the
+(:mod:`origenerator.gui.hud_nav_map`), the device where this app's window drives
+one (:class:`~origenerator.gui.osr2_controls_state.Osr2ControlsState`), and at its foot the
 Job Queue (:mod:`origenerator.gui.hud_queue`).  A slideshow on a session's
 Funestra publishes the model for the session to draw; a slideshow on this app's own
 Funestra hands it over in process, and the Funestra draws it.
@@ -38,7 +38,7 @@ def _cell(slide, label: str = "") -> HudCell:
                    label=label)
 
 
-def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
+def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
                         own_window: bool = True, device=None, foot=None) -> HudModel | None:
     """The slideshow's state as the Funestras' HUD model, or ``None`` for a slideshow
     with nothing to map (``hud_map`` unanswered).
@@ -47,7 +47,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
     (:func:`~origenerator.slideshow_buttons.slideshow_rows`) and what reset goes back to;
     both default to what a region slideshow wants.  *foot* is the Job Queue
     (:mod:`origenerator.gui.hud_queue`) and *device* what this window is doing
-    to the OSR2 (:class:`~origenerator.gui.console.SlideshowDevice`) -- each None
+    to the OSR2 (:class:`~origenerator.gui.osr2_controls_state.Osr2ControlsState`) -- each None
     where there is none, which is what a slideshow on a session's Funestra answers.
     """
     shown = slideshow.hud_map()
@@ -57,9 +57,9 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
     favorites_filter = slideshow.hud_favorites_filter
     enhanced = slideshow.hud_enhanced_mode
     order_label = slideshow.hud_order_label
-    act_filter = slideshow.hud_act_filter
+    action_filter = slideshow.hud_action_filter
     return HudModel(
-        funestra=side,
+        funestra=shape,
         locked=locked,
         # The title says what the map's light says, in the words a satellite
         # says it in -- the two HUDs are one HUD in two places.  Nothing
@@ -71,14 +71,14 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         title=hud_title(playing_set=looping_label(shown.loop) if shown.loop else "",
                         locked=locked, order=order_label,
                         f_mode=favorites_filter, enhanced=enhanced,
-                        filters=(act_filter,)),
+                        filters=(action_filter,)),
         # The Funestras' favorite star, over the same items the Favorites
         # collection lists: it lights when the item on screen is a favorite.
         is_favorite=slideshow.hud_is_favorite,
         item_note=slideshow.hud_item_note,
-        # The buttons this slideshow answers, in the bands the HUD draws them in —
+        # The buttons this slideshow answers, in the rows the HUD draws them in —
         # which ones depends on what is drawing it.
-        rows=slideshow_rows(side, locked=locked, favorites_filter=favorites_filter,
+        rows=slideshow_rows(shape, locked=locked, favorites_filter=favorites_filter,
                             enhanced=enhanced, order=order_label, hosted=hosted,
                             own_window=own_window,
                             has_other_versions=slideshow.has_other_versions,
@@ -102,7 +102,7 @@ def slideshow_hud_model(side: str, slideshow, *, hosted: bool = True,
         # lifts it, exactly as on a satellite.  With no filter on, a seed
         # loop lights the row it is playing, which is what the button on
         # that row says about it.
-        filter_query=act_filter or (shown.label if shown.loop == SEED else ""),
+        filter_query=action_filter or (shown.label if shown.loop == SEED else ""),
         seed_count=len(shown.seeds) + 1,
         action_count=len(shown.column) + 1,
         playing=shown.playing,

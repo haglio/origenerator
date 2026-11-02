@@ -18,14 +18,14 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
 )
-from origenerator.gallery.sides import LANDSCAPE
+from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.motion_panel import MotionPanel
+from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import slideshow_hud_model
-from origenerator.orientation import key_holds, oriented_key
+from origenerator.item_shape import key_holds, shaped_key
 from origenerator.slideshow import LIVE
 from origenerator.voice.app_commands import AppCommand
 from tests import gestures
@@ -54,8 +54,8 @@ from tests.gallery_view_support import (
     _key,
     _keys_are_the_gallerys,
     _on_screen,
+    _open_latest,
     _open_leaf,
-    _open_recents,
     _press_enter,
     _reroll_client,
     _resolve_by_id,
@@ -99,7 +99,7 @@ def test_the_slideshow_begins_on_whichever_item_is_picked_in_the_folder(qtbot, m
     _open_leaf(view)
 
     for picked in view.listed_prompt_ids():
-        view._browser.apply_selection(picked, _NO_MOD)
+        view._gallery_pane.apply_selection(picked, _NO_MOD)
         view._slideshows.start()
         slideshow = view._slideshows.showing
         qtbot.addWidget(slideshow.shown)
@@ -114,15 +114,15 @@ def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_beg
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
     minimized = view._slideshows.showing
     qtbot.addWidget(minimized.shown)
     minimized.shown.showMinimized()
     picked = next(pid for pid in view.listed_prompt_ids()
                   if pid != minimized._set.playlist.current().prompt_id)
-    view._browser.apply_selection(picked, _NO_MOD)
+    view._gallery_pane.apply_selection(picked, _NO_MOD)
 
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
     assert view._slideshows.showing._set.playlist.current().prompt_id == picked
     view._slideshows.showing.close()
@@ -141,8 +141,8 @@ def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_cl
     closed_on = last._set.playlist.current().prompt_id
     last.close()
     elsewhere = [pid for pid in view.listed_prompt_ids() if pid != closed_on]
-    view._browser.apply_selection(elsewhere[0], _NO_MOD)
-    view._browser.apply_selection(elsewhere[1], _CTRL)
+    view._gallery_pane.apply_selection(elsewhere[0], _NO_MOD)
+    view._gallery_pane.apply_selection(elsewhere[1], _CTRL)
 
     view._slideshows.start()
 
@@ -190,7 +190,7 @@ def _standalone_slideshow(qtbot, monkeypatch):
 
 def test_a_standalone_slideshow_wears_the_funestras_own_hud(qtbot, monkeypatch):
     # Nothing about a slideshow is different for not being inside a session: it is
-    # the same set played the same way, so it wears the same panel a region
+    # the same set played the same way, so it wears the same tab a region
     # slideshow wears — and the view's own furnishings come off, because the map
     # says all of it.
 
@@ -219,13 +219,13 @@ def test_a_standalone_huds_transport_lands_on_the_slideshow_itself(qtbot, monkey
     # the press reaches the slideshow directly instead of being swallowed.
 
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
-    side = slideshow.shown.hud_side
+    shape = slideshow.shown.hud_shape
     opened = slideshow._set.playlist.current()
 
-    slideshow.shown.press(f"{side}_next")
+    slideshow.shown.press(f"{shape}_next")
     assert slideshow._set.playlist.current() != opened
 
-    slideshow.shown.press(f"{side}_lock")
+    slideshow.shown.press(f"{shape}_lock")
     assert slideshow.locked is True
     slideshow.close()
 
@@ -239,7 +239,7 @@ def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_
     slideshow.shown.showMinimized()   # from the taskbar, which still minimizes any window
     assert slideshow.shown.isMinimized()
 
-    gestures.click(view._bank.slideshow, view._bank.slideshow.rect().center())
+    gestures.click(view._buttons.slideshow, view._buttons.slideshow.rect().center())
 
     assert view._slideshows.showing is slideshow
     assert not slideshow.shown.isMinimized()
@@ -263,7 +263,7 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
     played = []
 
     for order in ("latest", "shuffle"):
-        slideshow.shown.press(f"{slideshow.shown.hud_side}_{order}")
+        slideshow.shown.press(f"{slideshow.shown.hud_shape}_{order}")
         playlist = slideshow._set.playlist
         played.append((slideshow.hud_order_label,
                        sorted(playlist.items[index][2] for index in playlist.order)))
@@ -322,7 +322,7 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    assert view._bank.slideshow.isHidden()
+    assert view._buttons.slideshow.isHidden()
 
 
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
@@ -333,20 +333,20 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._bank.slideshow.isHidden()          # a folder with media offers it
-    assert "this folder" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()          # a folder with media offers it
+    assert "this folder" in view._buttons.slideshow.toolTip()
 
     # The collections hold media too, so each plays as a folder does...
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
-    assert not view._bank.slideshow.isHidden()
-    assert "Latest" in view._bank.slideshow.toolTip()
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    assert not view._buttons.slideshow.isHidden()
+    assert "Latest" in view._buttons.slideshow.toolTip()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
-    assert not view._bank.slideshow.isHidden()
-    assert "Favorites" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()
+    assert "Favorites" in view._buttons.slideshow.toolTip()
 
     # ...while a collection holding nothing at all doesn't offer one.
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert view._bank.slideshow.isHidden()
+    assert view._buttons.slideshow.isHidden()
 
 
 def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_favorites(qtbot,
@@ -411,7 +411,7 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     closed_on = last._set.playlist.current().prompt_id
     last.close()
     picked = next(pid for pid in view.listed_prompt_ids() if pid != closed_on)
-    view._browser.apply_selection(picked, _NO_MOD)
+    view._gallery_pane.apply_selection(picked, _NO_MOD)
 
     view._slideshows.start()
 
@@ -422,12 +422,12 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
+def test_slideshow_plays_the_latest_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
 
     view._slideshows.start()
 
@@ -455,9 +455,9 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     newest, older = view.listed_prompt_ids()
-    view._browser.apply_selection(older, _NO_MOD)
+    view._gallery_pane.apply_selection(older, _NO_MOD)
 
     view._slideshows.start()
 
@@ -476,7 +476,7 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -499,20 +499,20 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     names = hud_button_names(slideshow.shown)
     assert names.index("enhanced") == names.index("fmode") + 1
 
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_enhanced")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhanced")
 
     assert slideshow.hud_enhanced_mode is True
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
-    model = slideshow_hud_model(slideshow.shown.hud_side, slideshow, hosted=False)
+    model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.shown.hud_side}_enhanced"]
+    assert lit[f"{slideshow.shown.hud_shape}_enhanced"]
     assert "Enhanceds" in model.title
     slideshow.close()
 
@@ -524,7 +524,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -552,7 +552,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
                                     "sdxl_t2i_i2.png", favorite=1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -573,7 +573,7 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -595,7 +595,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -614,23 +614,23 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_recents(view)
+    _open_latest(view)
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
     assert "needs a slideshow" in words(view._voice.status)
-    assert not view._bank.slideshow.isHidden()   # everything is still there to play
+    assert not view._buttons.slideshow.isHidden()   # everything is still there to play
 
 
 def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
     # A slideshow used to float two: the Funestras' HUD over the set, and Genau's whole
-    # console under it for the device.  Between them the status was said twice
-    # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
+    # OSR2 controls under it for the device.  Between them the status was said twice
+    # and disagreed, and prev/next/lock/trash were drawn on both.  One tab
     # now -- the HUD, carrying the device's line, the readout and the two rows
     # that aim them.
 
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
-    assert slideshow.findChildren(MotionPanel) == []
+    assert slideshow.findChildren(Osr2Controls) == []
     posted = [button.command for _rect, button in hud_targets(slideshow.shown).buttons]
     assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
     assert any(command.endswith("_clip_seconds_up") for command in posted)  # and the pace's
@@ -650,8 +650,8 @@ def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert not view._bank.slideshow.isHidden()
-    assert "Experiments" in view._bank.slideshow.toolTip()
+    assert not view._buttons.slideshow.isHidden()
+    assert "Experiments" in view._buttons.slideshow.toolTip()
 
     view._slideshows.start()
 
@@ -691,7 +691,7 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
-    # The item, plus what the bookmarked folder's tile stands for.
+    # The item, plus what the favorited folder's tile stands for.
     assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"i1", "i2"}
     view._slideshows.showing.close()
 
@@ -701,7 +701,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -710,11 +710,11 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
 
     assert view._slideshows.showing is None               # out of the slideshow...
-    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)  # ...still in the collection
-    assert view._browser.selected_ids == {shown}     # with that image picked
+    assert view._tree.currentItem() is _collection(view, LATEST_KEY)  # ...still in the collection
+    assert view._gallery_pane.selected_ids == {shown}     # with that image picked
     # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
-    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == shown
 
 
 def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
@@ -736,8 +736,8 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
 
     assert view._slideshows.showing is None
     assert held in view.listed_prompt_ids()       # its own folder in the pane...
-    assert view._browser.selected_ids == {held}    # ...with it picked...
-    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
+    assert view._gallery_pane.selected_ids == {held}    # ...with it picked...
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == held
 
 
 def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
@@ -758,7 +758,7 @@ def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played
     slideshow.close()
 
     assert view._tree.currentItem() is _alls(view._tree)["Latest"]
-    assert view._browser.selected_ids == {shown}
+    assert view._gallery_pane.selected_ids == {shown}
 
 
 def _laid_out_folder(qtbot, count=60):
@@ -792,7 +792,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
     slideshow.close()
     qtbot.wait(1)
 
-    assert view._browser.selected_ids == {shown}
+    assert view._gallery_pane.selected_ids == {shown}
     assert _in_view(view, shown)
 
 
@@ -829,12 +829,12 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
     slideshow.close()
 
     assert view._tree.currentItem() is all_row
-    assert view._browser.selected_ids == set()
+    assert view._gallery_pane.selected_ids == set()
     picked = [tile.key for tile in _folder_squares(view) if tile._selected]
     assert picked == [_folder_square_holding(view, shown)]
 
 
-def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_came_from(
+def test_leaving_a_favorites_slideshow_picks_the_favorited_folder_its_slide_came_from(
         qtbot, monkeypatch):
     # A star on a folder puts the folder in the Favorites collection, not the images
     # inside it, so a slide that came out of one has no image of its own there.
@@ -842,8 +842,8 @@ def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_cam
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     _on_screen(qtbot, view, 1800, 1300)
     lora = _at(_image_workflow(view._tree), 0, 0)
-    bookmarked = _key(_at(lora, 0))
-    view._toggle_favorite(bookmarked)
+    favorited = _key(_at(lora, 0))
+    view._toggle_favorite(favorited)
     collection = _collection(view, FAVORITES_KEY)
     view._tree.setCurrentItem(collection)
     view._slideshows.start()
@@ -856,7 +856,7 @@ def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_cam
 
     assert view._tree.currentItem() is collection
     picked = [tile.key for tile in _folder_squares(view) if tile._selected]
-    assert picked == [bookmarked]
+    assert picked == [favorited]
 
 
 def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_library_moves(
@@ -878,14 +878,14 @@ def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_li
     view.refresh()
     qtbot.wait(1)
 
-    assert view._browser._thumb_widgets[far]._selected
+    assert view._gallery_pane._thumb_widgets[far]._selected
     assert _in_view(view, far)
 
 
 def test_a_picked_image_holds_its_place_as_new_ones_land_above_it(qtbot):
     view, db = _laid_out_folder(qtbot)
     far = view.listed_prompt_ids()[-3]
-    view._browser.reveal_tile(far)
+    view._gallery_pane.reveal_tile(far)
     qtbot.wait(1)
     assert _in_view(view, far)
 
@@ -918,13 +918,13 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     qtbot.wait(1)
     far = view.listed_prompt_ids()[-3]
-    view._browser.reveal_tile(far)
+    view._gallery_pane.reveal_tile(far)
     qtbot.wait(1)
 
     view.set_items_favorite([view.listed_prompt_ids()[0]], False)
     qtbot.wait(1)
 
-    assert view._browser._thumb_widgets[far]._selected
+    assert view._gallery_pane._thumb_widgets[far]._selected
     assert _in_view(view, far)
 
 
@@ -1005,24 +1005,24 @@ def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
     _keys_are_the_gallerys(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id[image])
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_play_video|{image}.png")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_play_video|{image}.png")
     return view, slideshow
 
 
 def _looping_actions_on_a_video(qtbot, monkeypatch, *, elsewhere=()):
     """A folder of two images, the first animated twice, looping that image's
-    actions from the panel's loop button and standing on the first video."""
+    actions from the tab's loop button and standing on the first video."""
     view, slideshow = _slideshow_of_the_folder_of(
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
                              _animated_from("v1", "p1", 1), _animated_from("v2", "p1", 2),
                              *elsewhere],
         "p1")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_action_loop")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_next")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_action_loop")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_next")
     return view, slideshow
 
 
@@ -1033,20 +1033,20 @@ def _widened_onto_a_seed_from_another_folder(qtbot, monkeypatch):
         qtbot, monkeypatch, [_image("p1", "a cat", 50, 1), _image("p2", "a cat", 50, 2),
                              _image("p3", "a cat sitting", 50, 3)],
         "p1")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_more_seeds")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_next")
-    slideshow.shown.press(f"{slideshow.shown.hud_side}_next")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_more_seeds")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_next")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_next")
     return view, slideshow
 
 
 def _left_by_enter_then_the_slideshow_button(view, slideshow):
     _press_enter(slideshow)
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
 
 def _minimized_then_the_slideshow_button(view, slideshow):
     slideshow.shown.showMinimized()
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
 
 _LEFT_AND_COME_BACK_TO = pytest.mark.parametrize(
@@ -1098,7 +1098,7 @@ def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_l
 
     _press_enter(slideshow)
     view._tree.setCurrentItem(view._leaf_by_id["q1"])
-    view._bank.slideshow.click()
+    view._buttons.slideshow.click()
 
     reopened = view._slideshows.showing
     qtbot.addWidget(reopened.shown)
@@ -1113,13 +1113,13 @@ def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on
     # image's videos has to put that video's own folder on screen, picked --
     # not the folder of the image the slideshow was started from.
     view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
-    folder_of_the_video = oriented_key(gallery.settings_folder_key(
+    folder_of_the_video = shaped_key(gallery.settings_folder_key(
         view._db.get_generation("v1"), view.image_config_index()), LANDSCAPE)
 
     _press_enter(slideshow)
 
     assert view.selected_folder_key() == folder_of_the_video
-    assert view._browser.selected_ids == {"v1"}
+    assert view._gallery_pane.selected_ids == {"v1"}
 
 
 def test_giving_the_slideshows_back_as_the_window_closes_moves_the_gallery_nowhere(
@@ -1256,8 +1256,8 @@ def test_a_run_in_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_run_being_made_joins_a_recents_slideshow_too(qtbot, monkeypatch):
-    # Recents is a collection of results and a run has none yet, so it cannot answer
+def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
+    # Latest is a collection of results and a run has none yet, so it cannot answer
     # off its own list — but every generation this app makes lands there.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
@@ -1359,7 +1359,7 @@ def test_locking_a_slide_enhances_it_unless_one_is_already_in_flight(qtbot, tmp_
 
 
 def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
-    # A hold is made with no view of the Enhance panel, so an image that already
+    # A hold is made with no view of the Enhance pane, so an image that already
     # carries an enhancement must not be re-derived at whatever the settings happen
     # to say now — however far those settings have moved since. Re-enhancing is
     # the thumbnail menu's job, pressed while looking at the settings it uses.
@@ -1434,12 +1434,12 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
     # the slideshow's did — and asking the slideshow for it proves it took them.
     (key, computed), = view._slideshows.versions_of(
         [view.row_for(pid) for pid in view.listed_prompt_ids()]).items()
-    levels = slideshow._levels.levels(base=key)
-    assert levels == computed
-    assert [version.path.name for version in levels] == \
+    versions = slideshow._versions_stepper.versions(base=key)
+    assert versions == computed
+    assert [version.path.name for version in versions] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     # Each carries its label, so the note can say which version is on screen.
-    assert [version.label for version in levels] == ["Enhancement 1/1", "Original"]
+    assert [version.label for version in versions] == ["Enhancement 1/1", "Original"]
     # And Down asks through the gallery, which holds the settings.
     assert slideshow._actions.enhance == view.enhance_from_slideshow
     slideshow.close()
@@ -1462,7 +1462,7 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
     slideshow = _double_click_slideshow(view, qtbot, media=None)
 
     assert [item[2] for item in slideshow._set.playlist._items] == \
-        view._browser.listed_prompt_ids()
+        view._gallery_pane.listed_prompt_ids()
     assert slideshow._set.playlist.index == 0
     slideshow.close()
 
@@ -1489,7 +1489,7 @@ def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
 
 
 def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
-    # Most video folders here hold a single clip, so skipping the arming for a
+    # Most video folders here hold a single video, so skipping the arming for a
     # lone item is what made "fullscreen on a video" look like a different mode.
     rows = [_i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))

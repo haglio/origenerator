@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from origenerator import downtime, gallery, recovery
+from origenerator import downtime, gallery, trash_collection
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -29,7 +29,7 @@ from origenerator.enhanced_start_backfill import (
 from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import EXPORT_LANES, KINO
 from origenerator.funscript import funscript_path_for
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
@@ -85,7 +85,7 @@ def _backfilled(db):
             for video, image in videos_to_backfill(db.list_generations())]
 
 
-def test_a_starred_video_from_an_image_never_enhanced_is_backfilled(tmp_path):
+def test_a_favorite_video_from_an_image_never_enhanced_is_backfilled(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     _video(db, "video", made_from="image", starred=True)
@@ -192,7 +192,7 @@ def test_a_sent_video_sharing_its_name_with_another_is_left_alone(tmp_path):
     assert _backfilled(db) == []
 
 
-def test_a_video_only_starred_is_backfilled_whatever_shares_its_name(tmp_path):
+def test_a_favorite_video_alone_is_backfilled_whatever_shares_its_name(tmp_path):
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     _video(db, "video", made_from="image", starred=True)
@@ -386,14 +386,14 @@ def _thumbnails(tmp_path):
 
 
 def _fold(db, tmp_path):
-    trash = GalleryActions(db, _places(tmp_path), Trash(tmp_path / "trash")).delete_rows
+    trash = GalleryEdits(db, _places(tmp_path), Trash(tmp_path / "trash")).delete_rows
     folded = fold_completed_backfill(db, _places(tmp_path), _thumbnails(tmp_path), trash=trash)
-    return folded, [record["prompt_id"] for record in db.list_deletions()
+    return folded, [record["prompt_id"] for record in db.list_trashed()
                     if not record["row"].get("old_version_of")]
 
 
 def _old_versions_in_trash(db, tmp_path):
-    return [row for row in recovery.bin_items(db.list_deletions()) if row.get("old_version_of")]
+    return [row for row in trash_collection.trash_items(db.list_trashed()) if row.get("old_version_of")]
 
 
 def test_a_finished_backfill_run_becomes_its_old_video_which_keeps_its_star_and_sends(

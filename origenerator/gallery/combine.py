@@ -18,8 +18,8 @@ from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 _CONTENT = load_content()
 
 # How long a Genau flick is generated for, in frames at the native rate. Genau
-# steers a clip as ONE cycle — see :func:`cycle_shaped` — so the ideal is the
-# shortest clip that holds exactly one, and 13 frames is where the arithmetic
+# steers a video as ONE cycle — see :func:`cycle_shaped` — so the ideal is the
+# shortest video that holds exactly one, and 13 frames is where the arithmetic
 # lands (a cycle at the app's own cadence is 0.83 s, and 13/16 is 0.81).
 #
 # It is 29 because the model cannot close a loop that short. First-last-frame
@@ -105,10 +105,10 @@ def cycle_words(category: str = "") -> tuple[str, str]:
 def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
     """``params`` re-cut so the loop portrays ONE deep cycle, and plays smoothly.
 
-    The Genau lane's whole problem: Genau does not play a clip, it scrubs it
+    The Genau lane's whole problem: Genau does not play a video, it scrubs it
     against the device's phase — so it steers whatever it is given as a single
-    cycle running out to one extreme and back. A clip that holds two stumbles;
-    a clip that holds four looks like a machine.
+    cycle running out to one extreme and back. A video that holds two stumbles;
+    a video that holds four looks like a machine.
 
     Three settings answer that, and each was arrived at by measuring:
 
@@ -117,7 +117,7 @@ def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
     * The words, chosen by the act (:func:`cycle_words`). At 29 frames the model
       fits about two cycles on its own, so the prompt asks for one outright —
       naming the cycle in stages rather than saying "one cycle", which does
-      nothing. The same wording doubled the travel, so the clip reads as a
+      nothing. The same wording doubled the travel, so the video reads as a
       deliberate cycle rather than a wiggle. It rides the content overlay rather
       than this file, like every other phrase the library speaks in.
     * The top playback rate, because 29 frames of one cycle is too coarse to

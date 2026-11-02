@@ -12,8 +12,8 @@ from shared_ui.icons import icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_FILLING_ICON
 
 import origenerator
-from origenerator.gallery.collection import RECENTS_KEY
-from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
+from origenerator.gallery.collection import LATEST_KEY
+from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
 from origenerator.media import MediaType
 
@@ -38,54 +38,54 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
             == qt_icon("cross").pixmap(16).toImage())
 
 
-def test_level_badge_icons_render_for_each_level(qtbot):
-    # Every badged level maps to a rendered chip: the four folder levels,
+def test_toc_initial_icons_render_for_each_level(qtbot):
+    # Every level maps to a rendered ground: the four folder levels,
     # workflow -> model -> LoRA -> source image.
     assert set(icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
     assert icons.LEVEL_LABELS["lora"] == "LoRA"
     assert icons.LEVEL_LABELS["source_image"] == "Source Image"
     for level in icons.LEVEL_LABELS:
-        icon = icons.level_badge_icon(level)
+        icon = icons.toc_initial_icon(level)
         assert not icon.isNull()
         assert not icon.pixmap(QSize(16, 16)).isNull()
 
 
 def test_a_lora_folder_wears_an_l(qtbot):
-    drawn = icons.level_badge_icon("lora").pixmap(48, 48).toImage()
-    assert drawn == QIcon(icons._render_badge("L", YELLOW)).pixmap(48, 48).toImage()
+    drawn = icons.toc_initial_icon("lora").pixmap(48, 48).toImage()
+    assert drawn == QIcon(icons._render_toc_initial("L", YELLOW)).pixmap(48, 48).toImage()
 
 
-def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
-    # The chips sit in one slot down the tree, so no two levels may draw the
+def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
+    # The grounds sit in one slot down the tree, so no two levels may draw the
     # same mark — that slot is the whole of what says which level a row is.
-    drawn = [icons.level_badge_icon(level).pixmap(48, 48).toImage()
+    drawn = [icons.toc_initial_icon(level).pixmap(48, 48).toImage()
              for level in icons.LEVEL_LABELS]
     for i, one in enumerate(drawn):
         for other in drawn[i + 1:]:
             assert one != other
 
 
-def test_media_type_badges_render_for_image_and_video(qtbot):
-    # The Recents collection marks each tile image-or-video with a small corner badge;
+def test_item_type_icons_render_for_image_and_video(qtbot):
+    # The Latest collection marks each tile image-or-video with a small item type icon;
     # both types must draw a non-blank pixmap so neither shows an empty square.
-    image_badge = icons.media_type_badge(MediaType.IMAGE)
-    video_badge = icons.media_type_badge(MediaType.VIDEO)
-    assert not image_badge.isNull()
-    assert image_badge.width() > 0
-    assert not video_badge.isNull()
-    assert video_badge.width() > 0
+    image_icon = icons.item_type_icon(MediaType.IMAGE)
+    video_icon = icons.item_type_icon(MediaType.VIDEO)
+    assert not image_icon.isNull()
+    assert image_icon.width() > 0
+    assert not video_icon.isNull()
+    assert video_icon.width() > 0
     # The two glyphs differ, so an image is never mistaken for a video.
-    assert image_badge.toImage() != video_badge.toImage()
+    assert image_icon.toImage() != video_icon.toImage()
 
 
 def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
-    # The pair over the table of contents' two halves says which shape each half
+    # The pair over the tree of contents' two halves says which shape each half
     # holds, and it says it by BEING that shape: an upright frame and a
     # lying-down one, each the other transposed. Both are drawn on one square
     # canvas, so the words beside them start at the same x.
-    portrait = icons.side_mark("portrait")
-    landscape = icons.side_mark("landscape")
+    portrait = icons.shape_mark("portrait")
+    landscape = icons.shape_mark("landscape")
     assert portrait.size() == landscape.size()
     assert portrait.width() == portrait.height()
 
@@ -100,10 +100,10 @@ def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
     # a region an image goes in. Filled, it would read as a swatch, and the
     # rounded corners that say "screen" would be lost against the heading's word.
 
-    image = icons.side_mark("portrait").toImage()
+    image = icons.shape_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
     assert middle.alpha() == 0                       # hollow through the center
-    assert _dominant_color(icons.side_mark("portrait")) == TEXT_PRIMARY.rgb()
+    assert _dominant_color(icons.shape_mark("portrait")) == TEXT_PRIMARY.rgb()
 
 
 def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
@@ -118,7 +118,7 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
 
     for side, mark in marks.items():
         for size in (icons.MARK_BESIDE_A_WORD, BUTTON_FILLING_ICON):
-            assert (icons.side_mark(side, size).toImage()
+            assert (icons.shape_mark(side, size).toImage()
                     == icon_pixmap(mark, size, TEXT_PRIMARY).toImage()), (side, size)
     assert (icons.separate_mark(BUTTON_FILLING_ICON).toImage()
             == icon_pixmap("portrait_beside_landscape", BUTTON_FILLING_ICON, TEXT_PRIMARY).toImage())
@@ -127,7 +127,7 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
 def test_a_collection_mark_is_drawn_once():
     """One redraw of the folder list asked for these 1,280 times -- every collection
     of every folder of folders, on every side -- and drew each one afresh."""
-    assert icons.collection_icon(RECENTS_KEY) is icons.collection_icon(RECENTS_KEY)
+    assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY)
 
 
 def _ink_at_the_edges(pixmap) -> bool:
@@ -157,7 +157,7 @@ def _corner_image(icon):
 
 def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
-    # the value its HUD paints), so one color means "bookmarked" in both apps —
+    # the value its HUD paints), so one color means "favorited" in both apps —
     # which leaves the enhanced image's plus this palette's yellow, since the
     # two can sit on one tile and blue is genau's across this family. Both marks
     # are solid at their center, so the middle pixel is the color.
@@ -168,7 +168,7 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
 
 
 def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
-    # The mark is the badge and the button at once, so what is filled says what
+    # The mark is the sign and the button at once, so what is filled says what
     # is true: an unfavorited item's star is an outline with nothing in the middle,
     # and an image with no enhancement yet wears the hollow plus.
     unfavorited = _corner_image(icons.corner_star_icon(favorite=False, armed=False))
@@ -194,7 +194,7 @@ def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
     assert max(y for _x, y in yellows) > 24 + 12          # …and below
 
 
-def test_arming_a_corner_control_changes_its_mark(qtbot):
+def test_arming_a_corner_button_changes_its_icon(qtbot):
     # Hovering says "this is a button" — the trash can in the red every delete in
     # this app wears, the others in the light gray that only means "armed".
     rest = _corner_image(icons.corner_trash_icon(armed=False))
@@ -218,7 +218,7 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
 
 def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
     # The tree paints a favorited leaf (and the Favorites collection) with the filled star,
-    # so it wears the badge's green: one color for "favorited", tile or folder row.
+    # so it wears the corner star's green: one color for "favorited", tile or folder row.
     filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
     assert filled.toImage().pixelColor(24, 25) == GREEN
     # The outline is the offer to favorite, not a thing that is favorited, so it stays
@@ -239,11 +239,11 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
     assert video.pixmap(size).toImage() != image.pixmap(size).toImage()
 
 
-def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
+def test_gallery_pane_button_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
               icons.delete_icon, icons.latest_icon, icons.radio_icon,
               icons.auto_generate_icon, icons.slideshow_icon, icons.enhance_icon,
-              icons.custom_folder_icon,
+              icons.custom_collection_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
     for make in makers:
         icon = make()
@@ -264,7 +264,7 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
             ("auto", icons.auto_generate_icon), ("slideshow", icons.slideshow_icon),
             ("enhance", icons.enhance_icon), ("delete", icons.delete_icon),
             ("radio", icons.radio_icon),
-            ("group", icons.custom_folder_icon),
+            ("group", icons.custom_collection_icon),
             ("star", lambda: icons.star_icon(filled=True)),
         )
     }
@@ -302,7 +302,7 @@ def _top_corner_ink(pixmap) -> tuple[int, int]:
 
 
 def test_the_bank_colors_its_act_on_this_trio(qtbot):
-    # Star green, enhance yellow, delete red — the colors the corner badges wear,
+    # Star green, enhance yellow, delete red — the colors the corner buttons wear,
     # so a button and the mark it leaves on a tile are one symbol. And every one
     # of them still dims to the same muted gray when it has nothing to act on, so
     # a dead button never reads as a dimmer shade of its color.
@@ -340,7 +340,7 @@ def test_experiment_icons_render_and_verdicts_differ(qtbot):
     assert keep.pixmap(size).toImage() != reject.pixmap(size).toImage()
 
 
-def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
+def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
     # The reason the glyphs left this module: a drawing kept here is a drawing
     # that can drift from Fun Time's copy of it, and the two apps' microphones
     # had already drifted into different shapes on one screen. So every button's
@@ -363,7 +363,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.star_icon(filled=False), "star_outline", TEXT_PRIMARY),
         (icons.latest_icon(), "latest", TEXT_PRIMARY),
         (icons.flask_icon(), "flask", TEXT_PRIMARY),
-        (icons.custom_folder_icon(), "folder", TEXT_PRIMARY),
+        (icons.custom_collection_icon(), "folder", TEXT_PRIMARY),
         (icons.all_icon(), "database", TEXT_PRIMARY),
     )
     for icon, name, color in cases:
@@ -373,13 +373,13 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
 
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
     # The white line art on a thumbnail's hover buttons is the same family mark
-    # the toolbar wears, in the white these read in over an image -- not a
+    # the Gallery pane buttons wears, in the white these read in over an image -- not a
     # second set of drawings kept for the tiles.
     white = QColor(255, 255, 255)
     for icon, name in ((icons.experiment_verdict_icon("up"), "check"),
                        (icons.experiment_verdict_icon("down"), "cross"),
-                       (icons.recovery_action_icon("restore"), "undo_arrow"),
-                       (icons.recovery_action_icon("purge"), "trash")):
+                       (icons.trash_action_icon("restore"), "undo_arrow"),
+                       (icons.trash_action_icon("purge"), "trash")):
         drawn = icon.pixmap(QSize(48, 48)).toImage()
         assert drawn == icon_pixmap(name, 48, white).toImage(), name
 

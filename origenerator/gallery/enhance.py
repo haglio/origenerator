@@ -8,21 +8,21 @@ the only module in this package that touches a database. Everything here takes
 rows and answers questions about them.
 
 Enhancement is a *layer*, and a row can carry several: each fold prepends its
-file and records the settings that made it (:func:`enhance_levels`), so an image
-shows its most-enhanced version by default while every level it has received
+file and records the settings that made it (:func:`enhancement_versions`), so an image
+shows its most-enhanced version by default while every version it has received
 stays listed and reachable.
 
 What an enhancement is configured with is a property of the FOLDER, not of any
-one image: :class:`EnhanceSettings` is what the gallery's Enhance subpanel edits
+one image: :class:`EnhanceSettings` is what the gallery's Enhance pane edits
 and stores per settings folder, and :func:`enhance_params_for` is where it meets
-a particular row. The thumbnail badge, the folder's Enhance All button, and the
+a particular row. The tile's yellow plus, the folder's Enhance All button, and the
 selection's Enhance action all decide off the helpers here, so "enhanced" means
 one thing everywhere: the row went through the upscale + low-denoise re-sample
 tail — inline (its workflow's ``enhance`` toggle) or folded in from a standalone
 run. ``enhance_detail_fixes`` adds a second stage past that tail, re-sampling
 one named part at a time — the faces, the hands, the teeth — each at its own
 denoise, one the whole-frame pass could never survive; it is one of the settings a
-level records, so an image can carry both a plain enhancement and a detail-fixed
+version records, so an image can carry both a plain enhancement and a detail-fixed
 one and show which is which.
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from origenerator.gallery.enhance_graph import graph_level_params
+from origenerator.gallery.enhance_graph import graph_version_params
 from origenerator.gallery.enhance_settings import (
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
@@ -43,7 +43,7 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     describe_enhance_params,
     full_settings,
-    level_settings,
+    version_settings,
 )
 from origenerator.gallery.groups import rows_under
 from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
@@ -75,15 +75,15 @@ logger = logging.getLogger(__name__)
 _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")
 
 @dataclass(frozen=True)
-class EnhanceLevel:
+class EnhanceVersion:
     """One version of an image or a video: its file, and how it came to be.
 
     ``index`` counts enhancements from the original (0), so the labels read
     "Original", "Enhancement 1/2", "Enhancement 2/2"… ``params`` are the settings that produced
-    it — empty for the original, and for any level folded in before the settings
+    it — empty for the original, and for any version folded in before the settings
     were recorded — and ``settings`` is those settings as a line of text. Both:
     the string captions the tile, the dict is what a tile dragged onto the
-    Enhance subpanel hands over.
+    Enhance pane hands over.
     """
 
     index: int
@@ -121,29 +121,29 @@ def original_files_of(row: dict) -> list[dict]:
     return [f for f in row_output_files(row) if f.get("role") == "original"]
 
 
-def enhance_levels(row: dict) -> list[EnhanceLevel]:
+def enhancement_versions(row: dict) -> list[EnhanceVersion]:
     """The enhancement(s) this image has received, newest first, with its
     pre-enhance original last when it kept one. ``[]`` for an unenhanced image.
 
-    Every image the green badge marks lists here, because the badge and this
+    Every image the yellow plus marks lists here, because the plus and this
     answer the same question — what enhancement did this receive? Two shapes:
 
     * it kept an original (:func:`original_files_of`), so whatever sits ahead of
       that is the enhancements, newest first — each fold prepends the file it
-      produced — and the original closes the list as level 0;
+      produced — and the original closes the list as version 0;
     * it kept none, which is every image the inline tail finished before the
       enhancement became a layer. There is one file and no "before" to compare
       it against, so the list is that single enhancement.
 
-    Each level names the settings that made it: a folded enhance recorded its
+    Each version names the settings that made it: a folded enhance recorded its
     own (``enhance_history``), an inline one is described by the row's params,
-    which are the very settings its tail ran at. That is what makes a level worth
-    dragging onto the Enhance panel even when it stands alone.
+    which are the very settings its tail ran at. That is what makes a version worth
+    dragging onto the Enhance pane even when it stands alone.
 
-    A third shape appears once levels can be deleted (:func:`remove_enhance_levels`):
-    the original binned out from under two or more enhancements. There is no
+    A third shape appears once versions can be deleted (:func:`remove_enhance_versions`):
+    the original trashed out from under two or more enhancements. There is no
     "before" left to count back from, so the files the history names are the
-    levels — which is also why the history entry, not the file's position, is
+    versions — which is also why the history entry, not the file's position, is
     what identifies one.
     """
     files = row_output_files(row)
@@ -158,36 +158,36 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     # a folded standalone enhance ran at its own settings, which live in the
     # history, and the source row's settings would be a plausible-looking lie.
     inline = ({} if row.get("original_files")
-              else level_settings(parse_params(row.get("params_json"))))
+              else version_settings(parse_params(row.get("params_json"))))
 
-    def levels_of(enhanced: list[dict]) -> list[EnhanceLevel]:
+    def versions_of(enhanced: list[dict]) -> list[EnhanceVersion]:
         count = len(enhanced)
-        return [level(count - i, count, f) for i, f in enumerate(enhanced)]
+        return [version(count - i, count, f) for i, f in enumerate(enhanced)]
 
-    def level(index: int, count: int, f: dict) -> EnhanceLevel:
+    def version(index: int, count: int, f: dict) -> EnhanceVersion:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        return EnhanceLevel(index, f"Enhancement {index}/{count}", f, level_settings(params))
+        return EnhanceVersion(index, f"Enhancement {index}/{count}", f, version_settings(params))
 
     originals = original_files_of(row)
     if originals and len(files) > len(originals):
-        levels = levels_of(files[:len(files) - len(originals)])
-        # The pre-enhance file, level 0 — the one a re-enhance runs from, and
+        versions = versions_of(files[:len(files) - len(originals)])
+        # The pre-enhance file, version 0 — the one a re-enhance runs from, and
         # the one the list offers as "what this looked like before".
-        levels.append(EnhanceLevel(0, "Original", originals[0]))
-        return levels
+        versions.append(EnhanceVersion(0, "Original", originals[0]))
+        return versions
     if not originals and history:
         # The original was deleted out from under the enhancements: what is left
-        # is levels all the way down, named by the history rather than by how
+        # is versions all the way down, named by the history rather than by how
         # many files sit ahead of a "before" that no longer exists.
         enhanced = [f for f in files if f.get("filename") in history]
         if enhanced:
-            return levels_of(enhanced)
+            return versions_of(enhanced)
     if is_enhanced_row(row):
         # Enhanced with nothing kept under it: the row's leading file IS the
         # enhancement. Only that one — a batch's other files are its siblings,
         # not versions of it.
-        return levels_of(files[:1])
+        return versions_of(files[:1])
     return []
 
 
@@ -201,7 +201,7 @@ def enhanced_version_of(image_ref: str | None, image: dict) -> str | None:
 
 def is_enhanced_row(row: dict) -> bool:
     """Whether this generation carries enhanced pixels — what the green
-    thumbnail badge marks. A folded-in standalone enhance (``original_files``
+    tile's yellow plus marks. A folded-in standalone enhance (``original_files``
     set) counts, as does an inline run that kept its base render beside the
     enhanced one; a recorded ``enhance_history`` counts on its own, which is the
     row whose original has since been deleted; an explicit ``enhance`` param is
@@ -222,8 +222,8 @@ def is_enhanced_row(row: dict) -> bool:
     return workflow in _ALWAYS_ENHANCED and "enhance_denoise" in params
 
 
-def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLevel]:
-    """The versions the info pane lists for ``row`` — what :func:`enhance_levels`
+def displayed_versions(row: dict, upscale: Path | None = None) -> list[EnhanceVersion]:
+    """The versions the Generate pane lists for ``row`` — what :func:`enhancement_versions`
     finds, or the row's one file as ``Original`` when it has received no
     enhancement yet.
 
@@ -233,7 +233,7 @@ def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLeve
     while it runs. A video has no enhancer, so it lists versions only once
     Evolver has upscaled it — that ``upscale`` over the video itself.
 
-    Each version carries its own file, so the file rows live beside the level
+    Each version carries its own file, so the file rows live beside the version
     that produced them rather than in one undifferentiated block at the top —
     which is why :mod:`origenerator.generation_metadata` asks this what it no
     longer has to list.
@@ -242,18 +242,18 @@ def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLeve
     if media_type_of_row(row) != MediaType.IMAGE:
         if upscale is None or not files:
             return []
-        return [EnhanceLevel(1, "Evolved", {"filename": upscale.name, "path": str(upscale)}),
-                EnhanceLevel(0, "Original", files[0])]
-    levels = enhance_levels(row)
-    if levels:
-        return levels
-    return [EnhanceLevel(0, "Original", files[0])] if files else []
+        return [EnhanceVersion(1, "Evolved", {"filename": upscale.name, "path": str(upscale)}),
+                EnhanceVersion(0, "Original", files[0])]
+    versions = enhancement_versions(row)
+    if versions:
+        return versions
+    return [EnhanceVersion(0, "Original", files[0])] if files else []
 
 
-def remove_enhance_levels(row: dict, filenames) -> dict:
+def remove_enhance_versions(row: dict, filenames) -> dict:
     """The column updates that drop the named versions from ``row``.
 
-    Deleting a level is a file-level edit of one image, not a delete of the
+    Deleting a version is a file-version edit of one image, not a delete of the
     generation: the row keeps its folder, star, params and identity, and only
     the versions it lists change. So the file leaves ``output_files``, and its
     ``original_files`` / ``enhance_history`` bookkeeping goes with it.
@@ -330,7 +330,7 @@ def enhance_run_targets_row(enhance_of: str | None, input_image: str | None,
     (:func:`enhance_targets_row`).
 
     The one predicate every live surface asks — the tile under its scrim, the
-    tab's version list, the slideshow's notice — so they all point the same run at
+    tab's version list, the slideshow's message — so they all point the same run at
     the same image.
     """
     if enhance_of:
@@ -357,36 +357,36 @@ def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
     return ids, names
 
 
-def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int | None:
-    """The position in :func:`enhance_levels` of the version this row already
+def version_matching_settings(row: dict, settings: EnhanceSettings | None) -> int | None:
+    """The position in :func:`enhancement_versions` of the version this row already
     holds at ``settings``, or ``None`` when it holds none.
 
     Compared against the params an enhance would actually run with
-    (:func:`enhance_params_for`), not against the panel's raw values, so the
+    (:func:`enhance_params_for`), not against the pane's raw values, so the
     source-matched model resolves to this row's own checkpoint before the
     comparison — otherwise "the same settings" would read as different for every
     image the default is left on.
 
-    Both sides are read as the FULL set of settings, a level's missing ones filled
+    Both sides are read as the FULL set of settings, a version's missing ones filled
     from the workflow defaults: :data:`ENHANCE_SETTING_KEYS` grows over time, and
-    a level recorded before a setting existed was made with that setting at its
+    a version recorded before a setting existed was made with that setting at its
     default — so it still matches settings that leave it there, and turning the
     new setting on correctly reads as a different enhancement.
 
-    What tells the ``+ Enhance`` card it would only be making a duplicate.
+    What tells the ``+ Enhance`` row it would only be making a duplicate.
     """
-    return level_matching_params(row, enhance_params_for(row, settings))
+    return version_matching_params(row, enhance_params_for(row, settings))
 
 
-def level_matching_params(row: dict, wanted: dict | None) -> int | None:
-    """The position in :func:`enhance_levels` of the version already made at
+def version_matching_params(row: dict, wanted: dict | None) -> int | None:
+    """The position in :func:`enhancement_versions` of the version already made at
     the launch params ``wanted``, or ``None`` when the row holds none — the
-    same duplicate check as :func:`level_matching_settings`, for a run built
+    same duplicate check as :func:`version_matching_settings`, for a run built
     directly (a spoken targeted fix) rather than from folder settings."""
     if wanted is None:
         return None
-    for position, level in enumerate(enhance_levels(row)):
-        if level.params and same_enhancement(level.params, wanted):
+    for position, version in enumerate(enhancement_versions(row)):
+        if version.params and same_enhancement(version.params, wanted):
             return position
     return None
 
@@ -396,16 +396,16 @@ def same_enhancement(params: dict, other: dict) -> bool:
 
 
 def most_used_enhancements(rows, count: int) -> list[dict]:
-    uses = Counter(json.dumps(_settings_as_offered(row, level.params), sort_keys=True)
-                   for row in rows for level in enhance_levels(row) if level.params)
+    uses = Counter(json.dumps(_settings_as_offered(row, version.params), sort_keys=True)
+                   for row in rows for version in enhancement_versions(row) if version.params)
     return [json.loads(settings) for settings, _uses in uses.most_common(count)]
 
 
 def _settings_as_offered(row: dict, params: dict) -> dict:
-    held_on_the_panel = full_settings(params)
-    if held_on_the_panel["checkpoint"] == model_matching_the_source(row):
-        held_on_the_panel["checkpoint"] = MATCH_SOURCE_MODEL
-    return full_settings(held_on_the_panel)
+    held_on_the_pane = full_settings(params)
+    if held_on_the_pane["checkpoint"] == model_matching_the_source(row):
+        held_on_the_pane["checkpoint"] = MATCH_SOURCE_MODEL
+    return full_settings(held_on_the_pane)
 
 
 def model_matching_the_source(row: dict) -> str:
@@ -454,7 +454,7 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
     not where its own generation does (:func:`~origenerator.gallery.tree.
     recent_generations`). When the run finished and the id it ran under are that
     place, and both are available at both ends of the run — in flight on the
-    transient enhance row still among ``rows``, and once folded on the level the
+    transient enhance row still among ``rows``, and once folded on the version the
     run left.
 
     An image enhanced before even the id was recorded has no place here and
@@ -529,15 +529,15 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     folder pins a model — the checkpoint that made the source (the SDXL
     workflows record one), so an enhanced image stays in its own style.
 
-    ``settings`` is the Enhance subpanel's current, app-wide configuration: the
+    ``settings`` is the Enhance pane's current, app-wide configuration: the
     settings it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the workflow
     defaults, so Enhance All, a single enhance, and an auto-enhance of a newly
-    generated image all run at whatever the panel says. Omitted, the workflow's
+    generated image all run at whatever the pane says. Omitted, the workflow's
     own defaults apply.
 
     An already-enhanced row re-enhances from its ORIGINAL file, not the
     enhanced one, so a deliberate re-enhance re-derives at a fresh seed rather
-    than compounding upscale upon upscale — and lands as another level beside
+    than compounding upscale upon upscale — and lands as another version beside
     the ones already there. ``None`` when the row has no output file to
     enhance. The seed is left at the default; the launcher re-rolls it like any
     variation."""
@@ -564,17 +564,17 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     """The ``image_enhance`` params for a spoken "fix <part>": the row's latest
     enhancement done again, with a detail pass aimed at each part named.
 
-    The base is the newest level's own recorded settings — the ask is "the same
+    The base is the newest version's own recorded settings — the ask is "the same
     enhancement, plus the fix", so it must not quietly change the scale or
     model the image was finished at. An image never enhanced runs at
     ``settings`` the way any first enhance would.
 
     **The passes are what was asked for and what the image already carries —
-    never what the panel happens to have ticked.** A spoken fix is a targeted
-    act made with no view of the Enhance panel, so a folder configured to fix
+    never what the pane happens to have checked.** A spoken fix is a targeted
+    act made with no view of the Enhance pane, so a folder configured to fix
     every part must not turn "fix teeth" into a pass over all of them: that is
     a redraw of the whole image in answer to a command about one part of it.
-    The panel is still read for the *number* each part runs at, since nobody
+    The pane is still read for the *number* each part runs at, since nobody
     says a denoise out loud —
     :data:`~origenerator.workflows.detail_parts.DEFAULT_FIX_DENOISE` where it
     has none.
@@ -593,7 +593,7 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     wanted = fixable_parts(parts)
     if not wanted:
         return None
-    newest = next((lvl for lvl in enhance_levels(row)
+    newest = next((lvl for lvl in enhancement_versions(row)
                    if not lvl.is_original and lvl.params), None)
     base = EnhanceSettings(params=dict(newest.params)) if newest is not None else settings
     params = enhance_params_for(row, base)
@@ -659,15 +659,15 @@ def is_enhance_product_row(row: dict) -> bool:
     return all((f.get("filename") or "").startswith(f"{stem}_") for f in files)
 
 
-def enhance_level_params(row: dict) -> dict:
-    """The settings one enhancement ran at, as the keys a level records.
+def enhance_version_params(row: dict) -> dict:
+    """The settings one enhancement ran at, as the keys a version records.
 
     The row's own params first — a standalone ``image_enhance`` row names every
     one of them — then the stored graph for whatever they leave out, which is
     everything but the sampler numbers on a row the import scan reconstructed.
     """
     params = parse_params(row.get("params_json"))
-    level = level_settings(params)
-    for key, value in graph_level_params(row, ENHANCE_SETTING_KEYS).items():
-        level.setdefault(key, value)
-    return level
+    version = version_settings(params)
+    for key, value in graph_version_params(row, ENHANCE_SETTING_KEYS).items():
+        version.setdefault(key, value)
+    return version

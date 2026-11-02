@@ -3,7 +3,7 @@
 Also everything the retired second full-screen viewer used to do on its own, which
 this view now covers: paging a folder in order, stepping an image's versions,
 following a generation that is still being made, and driving the OSR2 off the
-clip on screen.
+video on screen.
 """
 from __future__ import annotations
 
@@ -27,9 +27,9 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.notice_overlay import ERROR, FAVORITE, HEARD_MARK, WARNING, NoticeOverlay
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
+from origenerator.gui.message import ERROR, FAVORITE, HEARD_MARK, WARNING, Message
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -93,13 +93,13 @@ def _media_on_screen(view) -> str:
     return str(engine.on_screen)
 
 
-def _clip_up(view) -> bool:
-    """Whether a clip, rather than an image or a run's frames, is on screen."""
-    return view.slideshow._clip_on_screen() is not None
+def _video_up(view) -> bool:
+    """Whether a video, rather than an image or a run's frames, is on screen."""
+    return view.slideshow._video_on_screen() is not None
 
 
 def _runs_out(view):
-    """The item on screen ran out -- a clip played through, or an image's
+    """The item on screen ran out -- a video played through, or an image's
     pace expired -- and the Funestra rolled onto what it had staged next, if
     anything; the slideshow follows a frame later."""
     _engine(view).run_out()
@@ -320,7 +320,7 @@ def _fade(view):
 def test_opens_on_the_first_item(qtbot):
     view = _view(qtbot)
     assert view.slideshow._set.playlist.current() == Slide("a.png", "image")
-    assert _clip_up(view) is False
+    assert _video_up(view) is False
 
 
 @_ARROW_KEYS_OR_WASD
@@ -328,7 +328,7 @@ def test_right_and_left_navigate(qtbot, arrows):
     view = _view(qtbot)
     _press(view, arrows.right)
     assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video")
-    assert _clip_up(view) is True
+    assert _video_up(view) is True
     _press(view, arrows.left)
     assert view.slideshow._set.playlist.current() == Slide("a.png", "image")
 
@@ -375,10 +375,10 @@ def test_stepping_away_releases_the_lock(qtbot):
     assert view.slideshow._set.playlist.current() == Slide("a.png", "image")
 
 
-def test_the_consoles_transport_releases_the_lock_too(qtbot):
+def test_the_osr2_controls_transport_releases_the_lock_too(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
-    view.slideshow.slideshow_step(1)                     # the console's transport, not the key
+    view.slideshow.slideshow_step(1)                     # the OSR2 controls' transport, not the key
     _settle(view)
     assert not view.slideshow.locked
     assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video")
@@ -537,7 +537,7 @@ def test_closing_a_slideshow_twice_hands_over_once(qtbot):
 
 
 def test_culling_the_last_slide_hands_nothing_over(qtbot):
-    # The slideshow empties and closes itself, and the item it ended on is in the bin —
+    # The slideshow empties and closes itself, and the item it ended on is in the Trash —
     # nowhere to land.
     deleted = []
     view = SlideshowView([("a.png", "image", "id-a")], engine=FakeEngine(),
@@ -640,7 +640,7 @@ def test_releasing_the_lock_asks_for_nothing(qtbot):
 
 def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     # It already has a version at these settings, or it is a video: the refusal
-    # comes from the side that holds the settings, and the corner stays quiet.
+    # comes from the shape that holds the settings, and the corner stays quiet.
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: False))
     _press(view, Qt.Key.Key_Down)
     assert view.slideshow.hud_item_note == ""
@@ -667,11 +667,11 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
 
 def _around(prompt_id):
     if prompt_id != "id-a":
-        return MapNeighbors()
-    other_act = Slide("c.png", "image", "id-c")
-    return MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
-                        column=(MapRow(other_act, "dawn"),), label="fox",
-                        group=(other_act,))
+        return NavMapNeighbors()
+    other_action = Slide("c.png", "image", "id-c")
+    return NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
+                        column=(NavMapRow(other_action, "dawn"),), label="fox",
+                        group=(other_action,))
 
 
 def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot):
@@ -713,7 +713,7 @@ def test_an_image_taken_away_leaves_the_map_of_the_row_it_was_playing(qtbot):
 def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot):
     """A row holding only the image on screen cannot be looped, and the press
     still means "this one" — so it locks the image, the way a satellite's loop
-    button locks a clip whose group holds only it, rather than refusing."""
+    button locks a video whose group holds only it, rather than refusing."""
     view = _view(qtbot, _KEYED)                  # no neighbors: every row is one image
 
     view.slideshow.slideshow_loop("seed")
@@ -810,7 +810,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_act_without_redrawing_what_
     view.slideshow.slideshow_filter("source_image,_alpha")
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
     assert shown == []
     assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
@@ -832,27 +832,27 @@ def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
     view.slideshow.slideshow_filter("gamma")
     _settle(view)
 
-    assert (shown, view.slideshow.hud_act_filter) == ([], "")
+    assert (shown, view.slideshow.hud_action_filter) == ([], "")
     assert words(view._note) == "Filter: no matches for 'gamma'"
 
 
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(acts=_acts))
 
-    view.slideshow.slideshow_filter_to_the_act_on_screen()
+    view.slideshow.slideshow_filter_to_the_action_on_screen()
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
     assert words(view._note) == "Filter: 'source image, alpha' (1)"
 
 
 def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot):
     view = _view(qtbot, _KEYED)
 
-    view.slideshow.slideshow_filter_to_the_act_on_screen()
+    view.slideshow.slideshow_filter_to_the_action_on_screen()
     _settle(view)
 
-    assert (view.slideshow.hud_act_filter, words(view._note)) == ("", "No act for this one")
+    assert (view.slideshow.hud_action_filter, words(view._note)) == ("", "No act for this one")
 
 
 def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
@@ -862,7 +862,7 @@ def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
 
     assert view.slideshow.clear_modes() is True
 
-    assert (view.slideshow.hud_act_filter, view.slideshow.pass_size()) == ("", 2)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("", 2)
 
 
 def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
@@ -881,9 +881,9 @@ def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
 
 def _a_column_of_two(prompt_id):
     if prompt_id != "id-a":
-        return MapNeighbors()
+        return NavMapNeighbors()
     dawn, dusk = Slide("c.png", "image", "id-c"), Slide("d.png", "image", "id-d")
-    return MapNeighbors(column=(MapRow(dawn, "dawn"), MapRow(dusk, "dusk")), label="fox",
+    return NavMapNeighbors(column=(NavMapRow(dawn, "dawn"), NavMapRow(dusk, "dusk")), label="fox",
                         group=(dawn, dusk))
 
 
@@ -931,8 +931,8 @@ def test_a_folder_played_as_a_slideshow_opens_with_its_seed_loop_lit(qtbot):
 def _seeds_only(prompt_id):
     """A folder's row and nothing else made of it — so the loop key's next stop
     is off rather than the act column."""
-    return (MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
-            if prompt_id == "id-a" else MapNeighbors())
+    return (NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
+            if prompt_id == "id-a" else NavMapNeighbors())
 
 
 def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library(qtbot):
@@ -1088,7 +1088,7 @@ def test_a_slideshow_with_no_enhancer_still_locks_on_down(qtbot):
     assert view.slideshow.hud_item_note == ""
 
 
-def test_a_spoken_answer_is_a_notice_across_the_top(qtbot):
+def test_a_spoken_answer_is_a_message_across_the_top(qtbot):
     view = _view(qtbot, _KEYED)
     view.resize(800, 600)
 
@@ -1110,7 +1110,7 @@ def test_a_press_is_answered_plain_and_a_spoken_word_after_the_mic(qtbot):
                                                size=view._note.fontMetrics().height())
 
 
-def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):
+def test_what_is_being_made_of_the_slide_is_no_message_across_the_top(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)
     _fade(view)
@@ -1121,22 +1121,22 @@ def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):
     assert view._note.isHidden()
 
 
-def test_the_notice_wears_the_color_of_what_it_says(qtbot):
+def test_the_message_wears_the_color_of_what_it_says(qtbot):
     # Red only for an error, yellow for a warning, green for the favorites, white
-    # for the rest: the colors Fun Time's own notices read in, since this is
+    # for the rest: the colors Fun Time's own messages read in, since this is
     # the same overlay.
     host = QWidget()
     qtbot.addWidget(host)
-    notice = NoticeOverlay(host)
+    message = Message(host)
 
-    notice.say("a plain line")
-    assert TEXT_PRIMARY.name() in notice.styleSheet()
-    notice.say("nothing to do", kind=WARNING)
-    assert YELLOW.name() in notice.styleSheet()
-    notice.say("it broke", kind=ERROR)
-    assert RED.name() in notice.styleSheet()
-    notice.say("starred", kind=FAVORITE)
-    assert GREEN.name() in notice.styleSheet()
+    message.say("a plain line")
+    assert TEXT_PRIMARY.name() in message.styleSheet()
+    message.say("nothing to do", kind=WARNING)
+    assert YELLOW.name() in message.styleSheet()
+    message.say("it broke", kind=ERROR)
+    assert RED.name() in message.styleSheet()
+    message.say("starred", kind=FAVORITE)
+    assert GREEN.name() in message.styleSheet()
 
 
 # --- the queue, which rides on the one HUD this view wears -----------------
@@ -1284,12 +1284,12 @@ def test_favoriting_the_slide_on_screen_without_locking_it(qtbot):
     assert view.slideshow.favorite() is True
 
     assert favorite == ["gen-a"]
-    assert not view.slideshow.locked  # bookmarked, still moving on
+    assert not view.slideshow.locked  # favorited, still moving on
 
 
 def test_favoriting_says_no_when_there_is_nothing_to_favorite(qtbot):
     # A slideshow whose items carry no generation id — or a live one with no row of
-    # its own yet — has nothing to bookmark, and says so rather than seeming to.
+    # its own yet — has nothing to favorite, and says so rather than seeming to.
     assert _view(qtbot).slideshow.favorite() is False
 
 
@@ -1424,7 +1424,7 @@ def test_closing_announces_itself(qtbot):
 # --- the Clip seconds: one number, app-wide ---------------------------------
 
 
-def test_the_consoles_clip_seconds_are_the_app_wide_ones(qtbot):
+def test_the_osr2_controls_clip_seconds_are_the_app_wide_ones(qtbot):
     pace = SlideshowPace(parent=None)
     view = _view(qtbot, pace=pace)
 
@@ -1574,7 +1574,7 @@ def test_a_request_released_under_the_rooms_freeze_leaves_it_frozen(qtbot):
 
 
 def test_a_request_leaves_a_clip_playing_and_only_stops_the_slideshow_moving_on(qtbot):
-    """The request is about what is on screen; a clip that stopped mid-sentence
+    """The request is about what is on screen; a video that stopped mid-sentence
     would be answering a question nobody asked."""
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Right)          # -> the video
@@ -1672,7 +1672,7 @@ def test_a_folder_walked_in_its_order_wraps_at_either_end(qtbot):
 def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
 
     _shift(view, Qt.Key.Key_Right)
@@ -1689,7 +1689,7 @@ def test_versions_that_arrive_with_places_hand_the_funestra_the_image_on_screens
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
 
-    view.slideshow.set_levels({enhanced: [(enhanced, "image", "Enhance 1", FACE), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image", "Enhance 1", FACE), (original, "image")]})
     _settle(view)
 
     assert _engine(view).points_told == [FACE]
@@ -1698,7 +1698,7 @@ def test_versions_that_arrive_with_places_hand_the_funestra_the_image_on_screens
 def test_a_version_stepped_to_goes_up_with_its_own_places(qtbot, tmp_path):
     newest, older = (_png(tmp_path / n) for n in ("e2.png", "e1.png"))
     view = _view(qtbot, [(newest, "image", "id-a")])
-    view.slideshow.set_levels({newest: [(newest, "image", "Enhance 2", FACE),
+    view.slideshow.set_versions({newest: [(newest, "image", "Enhance 2", FACE),
                               (older, "image", "Enhance 1", ((0.0, 0.0, 0.5, 0.5),))]})
 
     _shift(view, Qt.Key.Key_Right)
@@ -1711,7 +1711,7 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
         qtbot, tmp_path, arrows):
     newest, middle, original = (_png(tmp_path / n) for n in ("e2.png", "e1.png", "src.png"))
     view = _view(qtbot, [(newest, "image", "id-a")])
-    view.slideshow.set_levels({newest: [(newest, "image", "Enhancement 2/2"),
+    view.slideshow.set_versions({newest: [(newest, "image", "Enhancement 2/2"),
                               (middle, "image", "Enhancement 1/2"),
                               (original, "image", "Original")]})
 
@@ -1726,7 +1726,7 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
 def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a"), ("b.png", "image", "id-b")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
 
     _shift(view, Qt.Key.Key_Right)
@@ -1741,7 +1741,7 @@ def test_a_plain_arrow_after_comparing_versions_sets_the_slideshow_going_again(
         qtbot, tmp_path, arrow):
     enhanced, original, other = (_png(tmp_path / n) for n in ("e1.png", "src.png", "b.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a"), (other, "image", "id-b")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
     _shift(view, Qt.Key.Key_Right)
 
@@ -1756,7 +1756,7 @@ def test_a_pace_set_while_versions_are_compared_waits_for_the_arrow_that_moves_o
         qtbot, tmp_path):
     enhanced, original, other = (_png(tmp_path / n) for n in ("e1.png", "src.png", "b.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a"), (other, "image", "id-b")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
     _shift(view, Qt.Key.Key_Right)
     opened = list(_engine(view).opened)
@@ -1774,7 +1774,7 @@ def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
         qtbot, tmp_path):
     a, a_base, better = (_png(tmp_path / n) for n in ("a.png", "a0.png", "a2.png"))
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")])
-    view.slideshow.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
+    view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
     _shift(view, Qt.Key.Key_Right)
 
@@ -1787,7 +1787,7 @@ def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
 
 def test_comparing_a_videos_versions_holds_the_slideshow_on_them_too(qtbot):
     view = _view(qtbot, [("clip.mp4", "video", "id-a"), ("b.png", "image", "id-b")])
-    view.slideshow.set_levels({"clip.mp4": [("clip_evolved.mp4", "video", "Evolved"),
+    view.slideshow.set_versions({"clip.mp4": [("clip_evolved.mp4", "video", "Evolved"),
                                   ("clip.mp4", "video", "Original")]})
 
     _shift(view, Qt.Key.Key_Left)
@@ -1801,7 +1801,7 @@ def test_an_image_being_enhanced_is_not_moved_on_early_while_its_versions_are_co
         qtbot, tmp_path):
     a, a_base = (_png(tmp_path / n) for n in ("a.png", "a0.png"))
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")], enhancing={"id-a": "running"})
-    view.slideshow.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
+    view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
     _shift(view, Qt.Key.Key_Right)
 
@@ -1813,7 +1813,7 @@ def test_an_image_being_enhanced_is_not_moved_on_early_while_its_versions_are_co
 def test_shift_arrows_do_nothing_for_an_image_with_one_version(qtbot, tmp_path):
     lone = _png(tmp_path / "only.png")
     view = _view(qtbot, [(lone, "image", "id-a")])
-    view.slideshow.set_levels({})
+    view.slideshow.set_versions({})
     _settle(view)
 
     _shift(view, Qt.Key.Key_Right)
@@ -1828,7 +1828,7 @@ def test_stepping_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_p
     first, second, second_base = (_png(tmp_path / n) for n in
                                   ("a.png", "b.png", "b_base.png"))
     view = _view(qtbot, [(first, "image", "id-a"), (second, "image", "id-b")])
-    view.slideshow.set_levels({second: [(second, "image"), (second_base, "image")]})
+    view.slideshow.set_versions({second: [(second, "image"), (second_base, "image")]})
     _settle(view)
 
     _press(view, Qt.Key.Key_Right)   # onto the second image
@@ -1840,7 +1840,7 @@ def test_stepping_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_p
 def test_the_hud_says_which_version_is_on_screen(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image", "Enhancement 1/1"),
+    view.slideshow.set_versions({enhanced: [(enhanced, "image", "Enhancement 1/1"),
                                 (original, "image", "Original")]})
 
     assert view.slideshow.hud_item_note == "Enhancement 1/1"
@@ -1851,7 +1851,7 @@ def test_the_hud_says_which_version_is_on_screen(qtbot, tmp_path):
 
 def test_an_image_with_one_version_says_nothing(qtbot, tmp_path):
     view = _view(qtbot, [(_png(tmp_path / "only.png"), "image", "id-a")])
-    view.slideshow.set_levels({})
+    view.slideshow.set_versions({})
     _settle(view)
     assert view.slideshow.hud_item_note == ""
 
@@ -1861,7 +1861,7 @@ def test_a_version_step_keeps_the_item_as_the_enhance_target(qtbot, tmp_path):
     # asked about is still the item's — read off the playlist, not off the file.
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
 
     _shift(view, Qt.Key.Key_Right)
@@ -1872,7 +1872,7 @@ def test_a_version_step_keeps_the_item_as_the_enhance_target(qtbot, tmp_path):
 def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
-    view.slideshow.set_levels({enhanced: [(enhanced, "image"), (original, "image")]})
+    view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
     changed = []
     view.slideshow.media_changed.connect(lambda: changed.append(True))
@@ -1990,7 +1990,7 @@ def test_a_live_slideshow_drives_no_device(qtbot):
 # --- what a fullscreen slideshow is, as media -------------------------------
 
 def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
-    # Filling the screen with a clip is deliberate, so it's heard.
+    # Filling the screen with a video is deliberate, so it's heard.
     view = _view(qtbot)
     assert _engine(view).muted is False
 
@@ -2037,10 +2037,10 @@ def test_a_slideshow_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):
 
 
 def test_releasing_a_condemned_file_lets_go_of_it(qtbot, tmp_path):
-    clip = str(tmp_path / "c.mp4")
-    view = _view(qtbot, [(clip, "video")])
+    video = str(tmp_path / "c.mp4")
+    view = _view(qtbot, [(video, "video")])
 
-    view.slideshow.release_media([clip])
+    view.slideshow.release_media([video])
     _settle(view)
 
     assert _media_on_screen(view) == ""
@@ -2057,7 +2057,7 @@ def test_releasing_another_file_leaves_the_slideshow_alone(qtbot, tmp_path):
     assert _media_on_screen(view) == kept
 
 
-# --- the OSR2 drive target: the clip on screen ------------------------------
+# --- the OSR2 drive target: the video on screen ------------------------------
 
 def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
@@ -2072,7 +2072,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     assert target is not None
     path, tgt_player, actions = target
     # The pane itself is what the drive follows: it is what knows where the
-    # clip has got to, the way the config panel's media Funestra is there.
+    # video has got to, the way the Generate tab's media Funestra is there.
     assert path == str(vid)
     assert tgt_player is view._pane
     assert actions
@@ -2161,7 +2161,7 @@ def test_the_slide_stays_put_while_a_request_is_being_said(qtbot):
     view.slideshow.pause_for_request(True, "Request…")
     _settle(view)
 
-    _runs_out(view)  # the clip on screen ran out mid-sentence
+    _runs_out(view)  # the video on screen ran out mid-sentence
 
     assert view.slideshow.voice_target() == "id-a"
 
@@ -2194,7 +2194,7 @@ def test_a_finished_request_answers_in_the_corner(qtbot):
 
 
 def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_path):
-    """A video carries no dwell timer — its own length is its dwell — so a clip
+    """A video carries no dwell timer — its own length is its dwell — so a video
     that never reports an end is a black screen for the rest of the session.
     One this backend has no codec for is exactly that, and browsing the whole
     library is where it turns up.  It gets stepped past instead."""
@@ -2215,7 +2215,7 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_p
 
 
 def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
-    """A lock replays the clip it holds, which would hold a clip that cannot
+    """A lock replays the video it holds, which would hold a video that cannot
     play forever.  So this one step happens regardless: the item stays in the
     set, but the screen does not stay black."""
 
@@ -2348,12 +2348,12 @@ def test_a_reopened_slideshow_shows_the_version_that_was_on_screen(qtbot, tmp_pa
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     levels = {enhanced: [(enhanced, "image"), (original, "image")]}
     closed = _view(qtbot, [(enhanced, "image", "id-a")])
-    closed.slideshow.set_levels(levels)
+    closed.slideshow.set_versions(levels)
     _settle(closed)
     _shift(closed, Qt.Key.Key_Left)    # stepped down to the original
 
     reopened = _view(qtbot, [(enhanced, "image", "id-a")])
-    reopened.slideshow.set_levels(levels)        # armed before the resume, as the gallery does
+    reopened.slideshow.set_versions(levels)        # armed before the resume, as the gallery does
     _settle(reopened)
     reopened.slideshow.resume(closed.slideshow.state())
     _settle(reopened)
@@ -2568,8 +2568,8 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     """The other half of the column: its rows are gone to and looped, where an
     act's row narrows the slideshow instead."""
     a_configuration = Slide("c.png", "image", "id-c")
-    around = lambda pid: MapNeighbors(  # noqa: E731
-        column=(MapRow(a_configuration, "E629425B", configuration=True),)
+    around = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=(NavMapRow(a_configuration, "E629425B", configuration=True),)
         if pid == "id-a" else (),
         seeds=(Slide("d.png", "image", "id-d"),) if pid == "id-c" else ())
     view = _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=around, acts=_acts))
@@ -2579,7 +2579,7 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     _settle(view)
 
     assert shown == ["id-c"]
-    assert (view.slideshow.hud_act_filter, view.slideshow.hud_map().loop) == ("", "seed")
+    assert (view.slideshow.hud_action_filter, view.slideshow.hud_map().loop) == ("", "seed")
 
 
 class TestMovingTheSlideshowsHud:
@@ -2707,11 +2707,11 @@ def test_the_version_the_last_slideshow_was_on_is_not_stepped_on_what_is_being_m
     levels = {a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")],
               c: [(c, "image", "Enhancement 1/1"), (c_base, "image", "Original")]}
     closed = _view(qtbot, items)
-    closed.slideshow.set_levels(levels)
+    closed.slideshow.set_versions(levels)
     _settle(closed)
     _shift(closed, Qt.Key.Key_Right)
     reopened = _view(qtbot, items, enhancing={"id-c": "running"})
-    reopened.slideshow.set_levels(levels)
+    reopened.slideshow.set_versions(levels)
     _settle(reopened)
 
     reopened.slideshow.resume(closed.slideshow.state())
@@ -2736,12 +2736,12 @@ def test_an_image_enhanced_during_the_slideshow_steps_its_versions_without_reope
         qtbot, tmp_path):
     a, better, b = (_png(tmp_path / n) for n in ("a.png", "a_enhanced.png", "b.png"))
     view = _view(qtbot, [(a, "image", "id-a"), (b, "image", "id-b")])
-    view.slideshow.set_levels({})
+    view.slideshow.set_versions({})
     _settle(view)
     view.slideshow.note_enhanced("id-a", better)
     _settle(view)
 
-    view.slideshow.add_levels({better: [(better, "image", "Enhancement 1/1"), (a, "image", "Original")]})
+    view.slideshow.add_versions({better: [(better, "image", "Enhancement 1/1"), (a, "image", "Original")]})
     _settle(view)
     _shift(view, Qt.Key.Key_Right)
 
@@ -2880,7 +2880,7 @@ def test_an_image_whose_enhancement_is_waiting_shows_as_itself(qtbot):
 def test_a_version_stepped_to_while_the_image_is_enhanced_stays_up(qtbot, tmp_path):
     a, a_base = (_png(tmp_path / n) for n in ("a.png", "a0.png"))
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")])
-    view.slideshow.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
+    view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
     view.slideshow.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
     _settle(view)
@@ -2990,13 +2990,13 @@ def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_n
         qtbot, tmp_path):
     a, a_base, better = (_png(tmp_path / n) for n in ("a.png", "a0.png", "a2.png"))
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")])
-    view.slideshow.set_levels({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
+    view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
     _shift(view, Qt.Key.Key_Right)
 
     view.slideshow.note_enhanced("id-a", better)
     _settle(view)
-    view.slideshow.add_levels({better: [(better, "image", "Enhancement 2/2"),
+    view.slideshow.add_versions({better: [(better, "image", "Enhancement 2/2"),
                               (a, "image", "Enhancement 1/2"), (a_base, "image", "Original")]})
 
     assert _media_on_screen(view) == better

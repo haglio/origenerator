@@ -56,7 +56,7 @@ def frames_for_seconds(seconds: float, rate: float, pd: ParamDef) -> int:
 def seconds_for_frames(frames: int, rate: float, pd: ParamDef) -> float:
     """The roundest number of seconds that asks for exactly ``frames``.
 
-    Measured against the grid UNCAPPED on purpose: a clip cut short by the
+    Measured against the grid UNCAPPED on purpose: a video cut short by the
     model's own limit reads back at the length it really runs, not at the longer
     one that only lands on it by being trimmed.
     """

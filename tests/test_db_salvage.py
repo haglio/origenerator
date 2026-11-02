@@ -171,23 +171,23 @@ def test_a_database_damaged_before_the_table_rename_keeps_its_folders(tmp_path):
     written before the rename spells one of them the way it used to.
 
     Both probes the copy leans on swallow OperationalError, so a table it
-    cannot find yields no columns and no rows -- every custom folder comes back
+    cannot find yields no columns and no rows -- every custom collection comes back
     empty, and the salvage log agrees with itself. Nothing raises.
     """
     path = tmp_path / "origenerator.db"
     _fill(path, 4)
     db = Database(path)
-    folder_id = db.create_custom_folder("Mine")
-    db.add_folders_to_custom_folder(folder_id, [("key-a", "L1", "job-0"),
+    folder_id = db.create_custom_collection("Mine")
+    db.add_folders_to_custom_collection(folder_id, [("key-a", "L1", "job-0"),
                                                 ("key-b", "L1", "job-1")])
     conn = sqlite3.connect(path)
     try:
-        conn.execute("ALTER TABLE custom_folder_items RENAME TO custom_folder_members")
+        conn.execute("ALTER TABLE custom_folder_items RENAME TO custom_collection_members")
         conn.commit()
     finally:
         conn.close()
     _stray_write_over(path, "marker-2-")
 
-    folders = Database(path).list_custom_folders()
+    folders = Database(path).list_custom_collections()
 
     assert [f["folders"] for f in folders] == [["key-a", "key-b"]]

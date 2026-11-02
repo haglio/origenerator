@@ -71,12 +71,12 @@ from origenerator import (
     config,
     enhance_presets,
     gallery,
-    notice_toast,
     osr2_driver,
     osr2_motion_driver,
     running_ahead,
+    toast_raising,
 )
-from origenerator.gui import desktop_notices, job_queue, motion_panel, omnipause, voice_router
+from origenerator.gui import job_queue, omnipause, osr2_controls, toasts, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
@@ -120,7 +120,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 # One recognizable tensor name per architecture, matching the signatures in
 # origenerator.workflows.model_arch. Fabricated, not lifted from a real file —
-# a header is all the pickers read, so a stand-in needs nothing else.
+# a header is all the dropdowns read, so a stand-in needs nothing else.
 ARCH_TENSOR_NAMES = {
     "sdxl": ["conditioner.embedders.0.transformer.x", "model.diffusion_model.input_blocks.0.y"],
     "sd15": ["cond_stage_model.transformer.x", "model.diffusion_model.input_blocks.0.y"],
@@ -151,7 +151,7 @@ class ModelTree:
 
         With *arch*, the file gets a real safetensors header naming that
         architecture's tensors — plus the LoRA suffixes when *lora* — which is
-        what the pickers classify it by, and *metadata* goes into that header
+        what the dropdowns classify it by, and *metadata* goes into that header
         as the trainer's own notes would. With *body*, the raw bytes are
         written instead, for the unreadable-file cases.
         """
@@ -394,19 +394,19 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "_TickThread", _NoTicker)
-    # And off the broker's serial stamps, which the console reads to say whether
+    # And off the broker's serial stamps, which the OSR2 controls read to say whether
     # the device is answering: those are live files whose freshness depends on
     # whether the OSR2 happens to be switched on right now, so a suite reading
     # them would pass or fail with the hardware. The stand-in says it is there —
-    # the console's own state before it could tell — and the tests about the
+    # the OSR2 controls' own state before they could tell — and the tests about the
     # device being off inject their own.
-    setattr(motion_panel.osr2, "device_mode",
-            lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
-    setattr(motion_panel.osr2, "device_trouble", lambda **_kw: None)
+    setattr(osr2_controls.osr2, "device_mode",
+            lambda **_kw: osr2_controls.osr2.osr2_device.Osr2Mode.CONTROLLED)
+    setattr(osr2_controls.osr2, "device_trouble", lambda **_kw: None)
     # The Broker's heartbeat is as live as those stamps, and a press on its
     # button would start or stop the machine's own Broker.
-    setattr(motion_panel.osr2, "broker_running", lambda **_kw: True)
-    setattr(motion_panel.osr2, "press_the_broker", lambda **_kw: None)
+    setattr(osr2_controls.osr2, "broker_running", lambda **_kw: True)
+    setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)
 
 
 @pytest.fixture(autouse=True)
@@ -417,20 +417,20 @@ def _never_take_the_real_device(monkeypatch):
 def keep_out_of_windows(setattr) -> None:
     """Keep the suite out of the registry and off the user's screen.
 
-    Every window this suite builds builds the desktop notices with it, and those
+    Every window this suite builds builds the desktop toasts with it, and those
     name the app to Windows: two values under HKEY_CURRENT_USER — what to call
-    this app over a notification, and what a click on one runs — and a mark
+    this app over a toast, and what a click on one runs — and a mark
     written beside them, all of which belong to a real launch rather than to a
-    test's fiftieth throwaway window. And a notice raised here would be a
-    notification on the user's desktop and a line in their notification center,
+    test's fiftieth throwaway window. And a toast raised here would be a
+    toast on the user's desktop and a line in their notification center,
     from a run that never happened. All three are replaced; the test that
     covers any of them supplies its own stand-in over these.
     """
     setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
-    setattr(desktop_notices, "register_notification_identity", lambda *_a, **_kw: None)
-    setattr(desktop_notices, "register_link_handler", lambda *_a, **_kw: None)
-    setattr(notice_toast, "show", lambda *_a, **_kw: None)
-    setattr(notice_toast, "take_back", lambda *_a, **_kw: None)
+    setattr(toasts, "register_toast_identity", lambda *_a, **_kw: None)
+    setattr(toasts, "register_link_handler", lambda *_a, **_kw: None)
+    setattr(toast_raising, "show", lambda *_a, **_kw: None)
+    setattr(toast_raising, "take_back", lambda *_a, **_kw: None)
 
 
 @pytest.fixture(scope="session")
@@ -448,7 +448,7 @@ def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
 
 @pytest.fixture(autouse=True)
 def _never_name_this_app_to_the_real_windows(monkeypatch, _this_tests_own_folder):
-    """keep_out_of_windows, with the notices' marks in an AppData of the run's own."""
+    """keep_out_of_windows, with the toasts' marks in an AppData of the run's own."""
     appdata = _this_tests_own_folder / "appdata"
     appdata.mkdir()
     monkeypatch.setenv("LOCALAPPDATA", str(appdata))
@@ -593,7 +593,7 @@ def _deliver_the_deletions_already_scheduled():
 @pytest.fixture(autouse=True, scope="session")
 def _the_live_widget_count_stays_flat():
     """The per-test reap's acceptance criterion, asserted: widgets from the
-    run's thousands of built-and-discarded panels must not accumulate.
+    run's thousands of built-and-discarded widgets must not accumulate.
 
     Sampled after the pending deletions are delivered and the cycles collected,
     so what it counts is what something still *holds* — a widget already
@@ -638,7 +638,7 @@ def _widgets_registered_this_test():
 def _collect_widgets_between_tests(_widgets_registered_this_test):
     """Reap each test's widgets before the next one builds its own.
 
-    The GUI widgets (a config panel's param form, the gallery's panes) form Python
+    The GUI widgets (a Generate tab's param form, the gallery's panes) form Python
     reference cycles — a widget owns a signal whose slot closes back over it — so
     their C++ objects linger until Python's cyclic collector runs. Left to chance,
     hundreds of galleries' worth pile up across a full run and eventually corrupt

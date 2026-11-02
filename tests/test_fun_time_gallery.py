@@ -2,7 +2,7 @@
 
 Fun Time's Main Funestra owns the OSR2 for the whole session, so a hosted
 Origenerator must offer no way to reach the device — no toggle, no motion, no
-console — and its layout folds to fit the Random Favs Browser's upright rect.
+OSR2 controls — and its layout folds to fit the Random Favs Browser's upright rect.
 """
 from __future__ import annotations
 
@@ -20,12 +20,12 @@ from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 from origenerator import gallery
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.collection import RECENTS_KEY
-from origenerator.gallery.sides import SEPARATE, TOGETHER
+from origenerator.gallery.collection import LATEST_KEY
+from origenerator.gallery.shapes import SEPARATE, TOGETHER
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.gui.info_pane_tabs import InfoPaneTabs
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.generate_pane import GeneratePane
+from origenerator.gui.generate_tab import GenerateTab
+from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.pane_arrangement import TOC_OPENING_WIDTH
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_hud import slideshow_hud_model
@@ -51,7 +51,7 @@ from tests.slideshow_hud_support import (
     engine_of,
     funestra_of,
     hud_button_names,
-    open_both_sides,
+    open_both_shapes,
     speaker_on_screen,
 )
 
@@ -95,8 +95,8 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     switch for either would be a switch over something this window does not
     hold."""
     view = _fun_time_view(qtbot)
-    assert view._bank.radio is None
-    assert view._bank.mic is None
+    assert view._buttons.radio is None
+    assert view._buttons.mic is None
     view.set_radio_enabled(True)   # a stale standalone session key must not crash
     assert view.radio_enabled() is False
 
@@ -107,7 +107,7 @@ def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     assert view._osr2_driver is None
     assert view.osr2_control.isEnabled() is False
     assert view.osr2_control.state() == OSR2_PARKED
-    assert view._motion_panel is None
+    assert view._osr2_controls is None
 
 
 def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
@@ -132,18 +132,18 @@ def test_fun_time_gallery_carries_the_standalone_osr2_state_through(qtbot):
     assert view.osr2_state() == OSR2_RETRACTED
 
 
-def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):
+def test_fun_time_gallery_stacks_the_generate_tabs_over_the_gallery_pane(qtbot):
     # The RFB rect is an upright column, so the side-by-side panes fold into one
-    # vertical stack: generate tabs on top, the tree-and-browser row under them,
+    # vertical stack: generate tabs on top, the tree-and-Gallery-pane row under them,
     # the queue across the foot.
     view = _fun_time_view(qtbot)
     stack = view._arrangement.stack
     assert isinstance(stack, QSplitter)
     assert stack.orientation() == Qt.Orientation.Vertical
     assert stack.count() == 3
-    # Top floor: the info-pane wrapper (tabs + the find bar).
-    assert stack.widget(0).findChild(type(view._info_tabs)) is view._info_tabs
-    # Middle floor: the tree beside the browser.
+    # Top floor: the Generate pane wrapper (tabs + the find bar).
+    assert stack.widget(0).findChild(type(view._generate_pane)) is view._generate_pane
+    # Middle floor: the tree beside the Gallery pane.
     assert stack.widget(1) is view._arrangement.panes
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
@@ -195,15 +195,15 @@ def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_li
 
 
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
-    """Standalone the folder column and the info pane sit beside each other,
+    """Standalone the folder column and the Generate pane sit beside each other,
     with the tree inside that column rather than out on the window's edge."""
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
-    # The second pane is the info-pane wrapper (tabs + the find bar).
-    assert view._arrangement.panes.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
-    assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
+    # The second pane is the Generate pane wrapper (tabs + the find bar).
+    assert view._arrangement.panes.widget(1).findChild(type(view._generate_pane)) is view._generate_pane
+    assert view._arrangement.folder_panes.count() == 2  # the tree, then the Gallery pane
 
 
 def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
@@ -214,7 +214,7 @@ def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
 
     assert view._arrangement.stack is None, "the headset got the upright fold"
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
-    assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
+    assert view._arrangement.folder_panes.count() == 2  # the tree, then the Gallery pane
 
 
 def _row_of(item) -> dict:
@@ -444,24 +444,24 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     # in the Funestras' HUD, as a real SlideshowView answers.
     stub.set_audio_muted = lambda muted: None
     stub.slideshow = SimpleNamespace(set_paused=lambda paused: None)
-    stub.wear_the_hud = lambda side, **how: None  # told whose HUD it wears, and where
+    stub.wear_the_hud = lambda shape, **how: None  # told whose HUD it wears, and where
     view._slideshows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 
 
 def test_a_preview_double_click_opens_the_slideshow_on_a_region(qtbot, tmp_path):
-    # End to end from the gesture: the info-pane preview's double-click, hosted,
+    # End to end from the gesture: the Generate pane preview's double-click, hosted,
     # lands the slideshow it opens on the region matching the media.
     view = _fun_time_view(qtbot)
     view.show()
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
-    panel._preview.show_media(str(wide), "image")
+    tab._preview.show_media(str(wide), "image")
 
-    qtbot.mouseDClick(panel._preview, Qt.MouseButton.LeftButton,
-                      pos=QPoint(panel._preview.width() // 2,
-                                 panel._preview.height() // 2))
+    qtbot.mouseDClick(tab._preview, Qt.MouseButton.LeftButton,
+                      pos=QPoint(tab._preview.width() // 2,
+                                 tab._preview.height() // 2))
 
     slideshow = view.region_slideshow("landscape")
     assert slideshow is not None
@@ -473,7 +473,7 @@ def test_a_preview_double_click_opens_the_slideshow_on_a_region(qtbot, tmp_path)
 
 def test_a_presented_slideshow_wears_the_funestras_own_hud(qtbot, tmp_path, monkeypatch):
     """The slideshow covers the Satellite Funestra's HUD, so it wears the Funestras'
-    own — the same panel from the same shared code: mode pair, transport, and
+    own — the same tab from the same shared code: mode pair, transport, and
     the nav map speaking the set as a seed family.  The view's own furnishings
     come off; the map says all of it."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
@@ -590,9 +590,9 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
 
     assert model.corner.path == "g1.png"
     assert [cell.path for cell in model.seeds] == ["g2.png"]
-    a_configuration, an_act = model.actions
-    assert (a_configuration.path, an_act.path) == ("g3.png", "v1.png")
-    assert an_act.label == "alpha"
+    a_configuration, an_action = model.actions
+    assert (a_configuration.path, an_action.path) == ("g3.png", "v1.png")
+    assert an_action.label == "alpha"
     assert a_configuration.label
     assert a_configuration.label != "alpha"
     assert model.current_action == "Source image"
@@ -600,7 +600,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     assert model.playing == ("corner", 0)
     assert model.active_loop == ""
     assert model.title == "Unlocked · Shuffle"
-    # And the mode pair leads the panel, with this mode lit: the way back to
+    # And the mode pair leads the tab, with this mode lit: the way back to
     # the Funestra under the slideshow.
     assert [(button.command, button.lit) for button in model.rows[0]] == [
         ("satellites_kino_activate", False), ("origenerator_activate", True)]
@@ -646,7 +646,7 @@ def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, t
 
 
 def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monkeypatch):
-    """A thumbnail click switches a Funestra to that clip; on a slideshow it jumps the
+    """A thumbnail click switches a Funestra to that video; on a slideshow it jumps the
     set to that item — and the double-click's lock holds it there."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -670,13 +670,13 @@ def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monke
     assert slideshow.locked
 
 
-def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypatch):
-    """Recents is the Funestras' Latest: the collection lists newest first and its
+def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, monkeypatch):
+    """Latest is the Funestras' Latest: the collection lists newest first and its
     slideshow plays that order, where every other set shuffles — and the
     slideshow's HUD title says which."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_current_collection_key", lambda: RECENTS_KEY)
+    monkeypatch.setattr(view, "_current_collection_key", lambda: LATEST_KEY)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
@@ -716,14 +716,14 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
 
 def test_a_hosted_slideshow_keeps_up_with_its_own_folder(qtbot, tmp_path, monkeypatch):
     """A slideshow plays on a satellite region while Core goes on being
-    used, so by the time an auto-generated item lands the browser is usually
+    used, so by the time an auto-generated item lands the Gallery pane is usually
     elsewhere — and both regions may be playing different folders.  Each slideshow
     is fed from the location IT opened at, not from the view on screen."""
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     portrait = view.region_slideshow("portrait")
     qtbot.addWidget(portrait.shown)
-    # The slideshow opened from a folder; the browser has since moved off it.
+    # The slideshow opened from a folder; the Gallery pane has since moved off it.
     view._slideshows._live_slideshows = [(portrait, "folder-a")]
     landed = {"prompt_id": "new-1"}
     monkeypatch.setattr(view._slideshows, "rows_at",
@@ -765,13 +765,13 @@ def test_a_landing_reaches_only_the_slideshow_playing_its_folder(qtbot, tmp_path
 def test_a_spoken_side_and_collection_plays_it_on_that_region(qtbot, tmp_path, monkeypatch):
     """"landscape latest": that collection's landscape items, on the landscape
     region — a slideshow STARTED by voice, with nothing up beforehand and the
-    browser left wherever it was.  Latest plays newest-first, and its HUD says
+    Gallery pane left wherever it was.  Latest plays newest-first, and its HUD says
     so, exactly as the collection's own slideshow button opens it."""
     view = _fun_time_view(qtbot)
     still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(still)
     rows = [{"prompt_id": "new-1", "thumbnail_path": str(still)}]
-    monkeypatch.setattr(view._browser, "rows_for_collection",
+    monkeypatch.setattr(view._gallery_pane, "rows_for_collection",
                         lambda key: rows if key == "__recents__::landscape" else [])
     monkeypatch.setattr(view._slideshows, "items_of",
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))
@@ -853,7 +853,7 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
                                      if key == "__all__::portrait" else []))
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    open_both_sides(view)
+    open_both_shapes(view)
 
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow.shown)
@@ -878,7 +878,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
                                      if key == "__all__::portrait" else []))
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    open_both_sides(view)          # asked for too early: nothing to play yet
+    open_both_shapes(view)          # asked for too early: nothing to play yet
     assert view.region_slideshow("portrait") is None
 
     library["rows"] = base
@@ -919,7 +919,7 @@ def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkey
 
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two slideshows run and NEITHER is the active
-    window, so the side word is the only thing that says which image."""
+    window, so the shape word is the only thing that says which image."""
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
@@ -931,7 +931,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
         view, "fix_parts",
         lambda prompt_id, parts: (prompt_id,
                                   "fixing " + " ".join(p.name for p in parts),
-                                  NOTICE))
+                                  INFO))
     for slideshow in (portrait, landscape):
         monkeypatch.setattr(slideshow, "note_voice_run",
                             lambda pid, msg, *, kind, s=slideshow: fixed.append((s, pid, msg)))
@@ -954,7 +954,7 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     view = GalleryView(FakeDB([row]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     opened, navigated = [], []
-    monkeypatch.setattr(view._info_tabs, "load_selection",
+    monkeypatch.setattr(view._generate_pane, "load_selection",
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
     # Landing on the item is what opens its tab, so the link is spied on rather
     # than swallowed: it has to run for the tab to come of it.
@@ -976,7 +976,7 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     # The item held, not a sibling of it: every seed of one set of settings shares a
     # settings folder, so a tab picked by folder came up on the wrong image.
     assert opened == ["id-tall-0"]
-    assert navigated == ["id-tall-0"]  # and the browser went there too
+    assert navigated == ["id-tall-0"]  # and the Gallery pane went there too
 
     slideshow.slideshow_toggle_lock()  # release: no second tab
     assert len(opened) == 1
@@ -1009,7 +1009,7 @@ def test_a_standalone_slideshow_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([row]))
     qtbot.addWidget(view)
     opened = []
-    monkeypatch.setattr(view._info_tabs, "load_selection",
+    monkeypatch.setattr(view._generate_pane, "load_selection",
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     slideshow = view._slideshows.showing
@@ -1076,7 +1076,7 @@ def _a_library_of_each_shape(view, tmp_path, monkeypatch) -> dict:
 def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         qtbot, tmp_path, monkeypatch):
     """The base state of origenerator mode: each region shuffling every item of
-    its own orientation, the way each Satellite Funestra shuffles the whole
+    its own shape, the way each Satellite Funestra shuffles the whole
     library of its own.
 
     It opened on the Latest collection before this — a recent slice rather than the
@@ -1085,15 +1085,15 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
     view = _fun_time_view(qtbot)
     library = _a_library_of_each_shape(view, tmp_path, monkeypatch)
 
-    open_both_sides(view)
+    open_both_shapes(view)
 
-    for side in ("portrait", "landscape"):
-        slideshow = view.region_slideshow(side)
+    for shape in ("portrait", "landscape"):
+        slideshow = view.region_slideshow(shape)
         assert slideshow is not None
         assert slideshow.shown.isVisible()
         assert slideshow.hud_order_label == "Shuffle"
         assert [str(item.path) for item in slideshow._set.playlist.items] == \
-            [library[f"__all__::{side}"][0]["thumbnail_path"]]
+            [library[f"__all__::{shape}"][0]["thumbnail_path"]]
         qtbot.addWidget(slideshow.shown)
     # And each remembers WHERE it plays from, so what lands in the library
     # reaches a region sitting in its base state.
@@ -1107,9 +1107,9 @@ def test_a_video_asked_for_in_origenerator_mode_is_made_while_both_regions_play(
     view = GalleryView(Database(tmp_path / "test.db"), fun_time=_session(), client=client)
     qtbot.addWidget(view)
     _a_library_of_each_shape(view, tmp_path, monkeypatch)
-    open_both_sides(view)
-    for side in ("portrait", "landscape"):
-        qtbot.addWidget(view.region_slideshow(side).shown)
+    open_both_shapes(view)
+    for shape in ("portrait", "landscape"):
+        qtbot.addWidget(view.region_slideshow(shape).shown)
 
     i2v = WORKFLOW_REGISTRY["wan22_i2v"]
     video = view._jobs.start_prepared("k", i2v, i2v.default_params())
@@ -1146,7 +1146,7 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
 def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
         qtbot, tmp_path, monkeypatch):
     """Reset means on a slideshow what it means on a Funestra: the narrowing comes off
-    and the side goes back to browsing its whole library.  A slideshow started on
+    and the shape goes back to browsing its whole library.  A slideshow started on
     one folder therefore leaves that folder — restarting it would be the one
     thing reset is not."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
@@ -1217,7 +1217,7 @@ def test_reset_stays_local_when_a_slideshow_holds_no_region(qtbot, tmp_path, mon
     assert slideshow.pass_size() == 3
 
 
-def _a_looping_clip(tmp_path):
+def _a_looping_video(tmp_path):
     webp = tmp_path / "loop.webp"
     frames = [Image.new("RGB", (64, 32), shade) for shade in ((10, 10, 10), (220, 220, 220))]
     frames[0].save(webp, save_all=True, append_images=frames[1:], duration=100, loop=0)
@@ -1238,8 +1238,8 @@ def _moving_thumbnails(view):
 
 def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
     """Swept rather than listed: after the freeze, no movie under this window is
-    running — the grid tiles, the collections, a tab's history strip, the "Animated
-    in" strip, the info pane's own animated still.
+    running — the grid tiles, the collections, a tab's version list, the
+    Animations, the Generate pane's own animated still.
 
     Written this way because the listed version was wrong three times over: the
     tiles were wired to OmniPause and the other three kinds of looping preview
@@ -1247,7 +1247,7 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     A sweep cannot miss the fourth one, and it fails the moment someone adds a
     fifth that does not go through looping_preview.
     """
-    rows, webp = _a_looping_clip(tmp_path)
+    rows, webp = _a_looping_video(tmp_path)
     view = _fun_time_view(qtbot, rows)
     view.animated_preview = lambda row: str(webp)
     view.refresh()
@@ -1276,7 +1276,7 @@ def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     slideshow = view._slideshows._live_slideshows[0][0]
     qtbot.addWidget(slideshow.shown)
-    monkeypatch.setattr(view, "region_slideshow", lambda side: None)
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: None)
 
     view.set_room_paused(True)
 
@@ -1284,8 +1284,8 @@ def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
     assert not _will_move_on(slideshow)
 
 
-def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, monkeypatch):
-    """Stepping past a clip that will not play is right while the slideshow is
+def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_video(qtbot, tmp_path, monkeypatch):
+    """Stepping past a video that will not play is right while the slideshow is
     running and wrong while the room is held: a slideshow hunting through its set for
     something playable is the room moving during OmniPause."""
     view = _fun_time_view(qtbot)
@@ -1305,79 +1305,79 @@ def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
     """In the RFB's upright column a portrait image stacked over the settings
     pushes every prompt field off the foot, so the two go side by side —
     settings left, image right, the order they are read in."""
-    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
-    qtbot.addWidget(panel)
-    assert panel._media_split.orientation() == Qt.Orientation.Vertical
+    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(tab)
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
-    panel._preview._pixmap = QPixmap(400, 900)   # taller than it is wide
-    panel._reflow_for_the_media()
+    tab._preview._pixmap = QPixmap(400, 900)   # taller than it is wide
+    tab._reflow_for_the_media()
 
-    assert panel._media_split.orientation() == Qt.Orientation.Horizontal
-    assert panel._media_split.indexOf(panel._settings_pane) == 0    # settings lead
-    assert panel._media_split.indexOf(panel._preview_pane) == 1
+    assert tab._media_split.orientation() == Qt.Orientation.Horizontal
+    assert tab._media_split.indexOf(tab._settings_pane) == 0    # settings lead
+    assert tab._media_split.indexOf(tab._preview_pane) == 1
 
 
 def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
     """A wide image beside a form gets a column too narrow to show it, and the
     form loses the width its prompt fields need."""
-    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
-    qtbot.addWidget(panel)
+    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(tab)
 
-    panel._preview._pixmap = QPixmap(1200, 700)
-    panel._reflow_for_the_media()
+    tab._preview._pixmap = QPixmap(1200, 700)
+    tab._reflow_for_the_media()
 
-    assert panel._media_split.orientation() == Qt.Orientation.Vertical
-    assert panel._media_split.indexOf(panel._preview_pane) == 0
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical
+    assert tab._media_split.indexOf(tab._preview_pane) == 0
 
 
 def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(qtbot):
-    panel = GenerateConfigPanel(None, FakeDB([]))
-    qtbot.addWidget(panel)
-    panel._preview._pixmap = QPixmap(400, 900)
-    panel._reflow_for_the_media()
+    tab = GenerateTab(None, FakeDB([]))
+    qtbot.addWidget(tab)
+    tab._preview._pixmap = QPixmap(400, 900)
+    tab._reflow_for_the_media()
 
-    panel.become_hosted(_session())
+    tab.become_hosted(_session())
 
-    assert panel._media_split.orientation() == Qt.Orientation.Horizontal
-    assert panel._media_split.indexOf(panel._settings_pane) == 0
+    assert tab._media_split.orientation() == Qt.Orientation.Horizontal
+    assert tab._media_split.indexOf(tab._settings_pane) == 0
 
 
 def test_a_panel_handed_back_from_a_session_stacks_its_portrait_image_over_the_form(qtbot):
-    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
-    qtbot.addWidget(panel)
-    panel._preview._pixmap = QPixmap(400, 900)
-    panel._reflow_for_the_media()
+    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(tab)
+    tab._preview._pixmap = QPixmap(400, 900)
+    tab._reflow_for_the_media()
 
-    panel.become_standalone()
-    panel.refresh_media_layout()
+    tab.become_standalone()
+    tab.refresh_media_layout()
 
-    assert panel._media_split.orientation() == Qt.Orientation.Vertical
-    assert panel._media_split.indexOf(panel._preview_pane) == 0
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical
+    assert tab._media_split.indexOf(tab._preview_pane) == 0
 
 
 def test_an_image_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
     """A landscape image after a portrait one in the same tab came back with
     a third of the column where a fresh tab gives it two thirds, and so did
     every portrait tab a session handed back."""
-    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
-    qtbot.addWidget(panel)
-    panel.resize(600, 1000)
-    panel._preview._pixmap = QPixmap(1200, 700)
-    panel.show()
+    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(tab)
+    tab.resize(600, 1000)
+    tab._preview._pixmap = QPixmap(1200, 700)
+    tab.show()
     qtbot.wait(1)
 
-    panel._preview._pixmap = QPixmap(400, 900)
-    panel._reflow_for_the_media()
-    panel._preview._pixmap = QPixmap(1200, 700)
-    panel._reflow_for_the_media()
+    tab._preview._pixmap = QPixmap(400, 900)
+    tab._reflow_for_the_media()
+    tab._preview._pixmap = QPixmap(1200, 700)
+    tab._reflow_for_the_media()
     qtbot.wait(1)
 
-    media, settings = panel._media_split.sizes()
+    media, settings = tab._media_split.sizes()
     assert media > settings
 
 
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
-    tabs = InfoPaneTabs(None, FakeDB([]))
+    tabs = GeneratePane(None, FakeDB([]))
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
     first._preview._pixmap = QPixmap(400, 900)
@@ -1392,7 +1392,7 @@ def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opene
 
 
 def test_tabs_handed_back_from_a_session_stack_the_tabs_they_have_and_the_ones_opened_after(qtbot):
-    tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
+    tabs = GeneratePane(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
     first._preview._pixmap = QPixmap(400, 900)
@@ -1414,15 +1414,15 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     view.become_hosted(_session())
 
     built = _fun_time_view(qtbot)
-    assert (view._bank.radio, view._bank.mic) == (None, None)
-    assert (view._osr2_motion, view._osr2_driver, view._motion_panel) == (None, None, None)
+    assert (view._buttons.radio, view._buttons.mic) == (None, None)
+    assert (view._osr2_motion, view._osr2_driver, view._osr2_controls) == (None, None, None)
     assert not view.osr2_control.isEnabled()
     assert not built.osr2_control.isEnabled()
     assert view._motion_pane.isHidden()
     stack = view._arrangement.stack
     assert stack.orientation() == Qt.Orientation.Vertical
     assert stack.count() == built._arrangement.stack.count() == 3
-    assert stack.widget(0).findChild(type(view._info_tabs)) is view._info_tabs
+    assert stack.widget(0).findChild(type(view._generate_pane)) is view._generate_pane
     assert stack.widget(1) is view._arrangement.panes
     assert stack.widget(2) is view._queue
     assert view._arrangement.panes.count() == built._arrangement.panes.count()
@@ -1486,9 +1486,9 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
     assert arrangement.stack is None
     assert arrangement.panes.count() == built._arrangement.panes.count() == 2
     assert arrangement.panes.widget(0) is arrangement.left_column
-    info_pane = arrangement.panes.widget(1)
-    assert info_pane.findChild(type(view._info_tabs)) is view._info_tabs
-    assert info_pane.minimumWidth() == view._info_tabs.minimumWidth() == 0
+    generate_pane = arrangement.panes.widget(1)
+    assert generate_pane.findChild(type(view._generate_pane)) is view._generate_pane
+    assert generate_pane.minimumWidth() == view._generate_pane.minimumWidth() == 0
     assert arrangement.left_column.widget(0) is arrangement.folder_panes
     assert arrangement.left_column.widget(1) is view._queue
     assert arrangement.folder_panes.count() == built._arrangement.folder_panes.count() == 2
@@ -1513,10 +1513,10 @@ def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot
     view._tree.together_button.click()
 
     view.become_hosted(_session())
-    hosted = view._tree.sides
+    hosted = view._tree.shapes
     view.become_standalone()
 
-    assert (hosted, view._tree.sides) == (SEPARATE, TOGETHER)
+    assert (hosted, view._tree.shapes) == (SEPARATE, TOGETHER)
 
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):
@@ -1529,7 +1529,7 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
     view.osr2_control.setChecked(True)
 
     assert motion.active
-    assert view._motion_panel is not None
+    assert view._osr2_controls is not None
     assert not view._motion_pane.isHidden()
 
 
@@ -1542,7 +1542,7 @@ def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_ag
     view.become_standalone()
     view._voice.on_command(AppCommand.RADIO_ON)
 
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
     assert radio.starts == 1
 
 
@@ -1562,7 +1562,7 @@ def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_
 
 
 def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_again(qtbot, tmp_path):
-    rows, webp = _a_looping_clip(tmp_path)
+    rows, webp = _a_looping_video(tmp_path)
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.animated_preview = lambda row: str(webp)
@@ -1580,9 +1580,9 @@ def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qt
     radio, motion = _FakeRadio(), _SignalMotion()
     view = GalleryView(FakeDB([]), radio=radio, osr2_motion=motion)
     qtbot.addWidget(view)
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
     view.osr2_control.setChecked(True)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     listener = view._voice.listener
     assert motion.active
     assert listener.commands_on
@@ -1618,7 +1618,7 @@ def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
-    open_both_sides(view._slideshows)
+    open_both_shapes(view._slideshows)
 
     carried = view.region_slideshow("portrait")
     assert carried is not None
@@ -1639,7 +1639,7 @@ def test_a_slideshow_moved_onto_a_set_of_the_other_shape_goes_on_as_that_set_in_
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
-    open_both_sides(view._slideshows)
+    open_both_shapes(view._slideshows)
 
     carried = view.region_slideshow("portrait")
     assert carried is not None
@@ -1671,9 +1671,9 @@ def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satelli
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])
-    open_both_sides(view._slideshows)
+    open_both_shapes(view._slideshows)
 
-    carried = {side: view.region_slideshow(side) for side in ("portrait", "landscape")}
+    carried = {shape: view.region_slideshow(shape) for shape in ("portrait", "landscape")}
     for slideshow in carried.values():
         qtbot.addWidget(slideshow.shown)
     assert [slide.prompt_id for slide in carried["portrait"].whole_set()] == [
@@ -1764,7 +1764,7 @@ def test_a_hosted_gallery_holds_its_borders_through_the_headset_and_back(qtbot):
 def test_a_tab_opened_in_a_session_holds_its_border_still(qtbot):
     view = _fun_time_view(qtbot)
 
-    opened = view._info_tabs._add_subtab()
+    opened = view._generate_pane._add_subtab()
 
     assert not opened._media_split.handle(1).isEnabled()
 
@@ -1772,7 +1772,7 @@ def test_a_tab_opened_in_a_session_holds_its_border_still(qtbot):
 def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_form(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    tab = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     tab._preview._pixmap = QPixmap(400, 900)
 
     view.become_hosted(_session())
@@ -1783,7 +1783,7 @@ def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_
 def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    tab = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     tab._preview._pixmap = QPixmap(400, 900)
     view.become_hosted(_session())
 
@@ -1794,20 +1794,20 @@ def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again
 
 def test_standalone_never_stands_them_side_by_side(qtbot):
     """The pane is wide there; stacking is right at any shape."""
-    panel = GenerateConfigPanel(None, FakeDB([]))
-    qtbot.addWidget(panel)
+    tab = GenerateTab(None, FakeDB([]))
+    qtbot.addWidget(tab)
 
-    panel._preview._pixmap = QPixmap(400, 900)
-    panel._reflow_for_the_media()
+    tab._preview._pixmap = QPixmap(400, 900)
+    tab._reflow_for_the_media()
 
-    assert panel._media_split.orientation() == Qt.Orientation.Vertical
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
 
 def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
     """The shape belongs to the tab, so switching to one holding a landscape
     image stands the panes back up — without waiting for something else to
     nudge the splitter, which is all that used to bring them back."""
-    tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
+    tabs = GeneratePane(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
     portrait_tab = tabs.currentWidget()
     portrait_tab._preview._pixmap = QPixmap(400, 900)
@@ -1829,7 +1829,7 @@ def _hud_label_for(view):
     worn = {}
 
     class _Slideshow:
-        def wear_the_hud(self, side, **furnishings):
+        def wear_the_hud(self, shape, **furnishings):
             worn.update(furnishings)
 
     view._slideshows._wear_the_hud(_Slideshow(), "landscape")
@@ -1837,7 +1837,7 @@ def _hud_label_for(view):
 
 
 def test_the_slideshows_hud_names_the_item_the_way_this_app_does(qtbot):
-    """By the name its tile in the browser and its tab both wear, never the
+    """By the name its tile in the Gallery pane and its tab both wear, never the
     disk's "image / ComfyUI_00123_", a media type and a counter that appear
     nowhere in this UI."""
     row = _image("p1", "a cat", 50, 1)
@@ -1909,7 +1909,7 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
 
 
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
-    """Reset puts the side back how it started, and the new switch is one more
+    """Reset puts the shape back how it started, and the new switch is one more
     thing it drops — a reset that left the slideshow narrowed would not be one."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)

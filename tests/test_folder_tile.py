@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QLabel
 
 from origenerator import gallery
-from origenerator.gui import grid_card, icons
+from origenerator.gui import icons, tile_shape
 from origenerator.gui.folder_tile import FolderTile
 
 
@@ -11,19 +11,19 @@ def _label_texts(tile):
     return [w.text() for w in tile.findChildren(QLabel)]
 
 
-def test_folder_tile_shows_its_breadcrumb_context(qtbot):
+def test_folder_tile_shows_its_folder_path_context(qtbot):
     # The Favorites collection captions each tile with where the folder lives, alongside
     # the folder's own name, so two same-named folders stay tellable apart.
     tile = FolderTile("k", "a dog", [], 3, context="Images › SDXL")
     qtbot.addWidget(tile)
 
     texts = _label_texts(tile)
-    assert any("SDXL" in t for t in texts)   # the breadcrumb line is shown
+    assert any("SDXL" in t for t in texts)   # the folder path line is shown
     assert "a dog" in texts                  # and the folder's own name
 
 
-def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
-    # A normal drill-down tile has no breadcrumb — its siblings share a parent.
+def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
+    # A normal drill-down tile has no folder path — its siblings share a parent.
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)
 
@@ -32,46 +32,46 @@ def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
     assert all("›" not in t for t in texts)
 
 
-def test_folder_tile_shows_its_folder_level_badge(qtbot):
-    # A model/LoRA/workflow tile wears the same lettered chip the tree does, so a
+def test_folder_tile_shows_its_toc_initial(qtbot):
+    # A model/LoRA/workflow tile wears the same TOC initial the tree does, so a
     # folder's place in the hierarchy reads even in the mixed Favorites collection.
     tile = FolderTile("k", "wan model", [], 3,
-                      badge=icons.folder_badge(gallery.ModelGroup("k", "wan model", [])))
+                      kind_icon=icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", [])))
     qtbot.addWidget(tile)
 
-    badges = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
-    assert badges
-    assert not badges[0].pixmap().isNull()
+    initials = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
+    assert initials
+    assert not initials[0].pixmap().isNull()
 
 
-def test_folder_tile_without_a_level_shows_no_badge(qtbot):
+def test_folder_tile_without_a_level_shows_no_toc_initial(qtbot):
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)
 
     assert all(w.toolTip() != "Model" for w in tile.findChildren(QLabel))
 
 
-def test_a_folder_tile_is_the_same_card_as_the_ones_it_stands_beside(qtbot):
-    # Folder tiles and generation cards are laid into one flow, so a folder takes
+def test_a_folder_tile_is_the_same_tile_as_the_ones_it_stands_beside(qtbot):
+    # Folder tiles and generation tiles are laid into one flow, so a folder takes
     # the grid's width, thumbnail area, margins and frame rather than numbers of its
     # own -- which is what had them standing a different height and a different
     # shade of border beside each other.
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)
 
-    assert (tile.width(), tile.height()) == grid_card.folder_card_size()
-    assert tile._collage.size() == grid_card.thumbnail_size()
-    assert tile.layout().contentsMargins().left() == grid_card.CARD_MARGIN
-    assert grid_card.idle_css("folderTile") in tile.styleSheet()
+    assert (tile.width(), tile.height()) == tile_shape.folder_tile_size()
+    assert tile._thumbnails.size() == tile_shape.thumbnail_size()
+    assert tile.layout().contentsMargins().left() == tile_shape.TILE_MARGIN
+    assert tile_shape.idle_css("folderTile") in tile.styleSheet()
 
 
-def test_the_breadcrumb_line_is_the_whole_of_what_makes_a_collection_tile_taller(qtbot):
+def test_the_folder_path_line_is_the_whole_of_what_makes_a_collection_tile_taller(qtbot):
     # The Favorites collection's tiles carry one line the others do not, so their height
-    # is the same card plus exactly that line.
+    # is the same tile plus exactly that line.
     tile = FolderTile("k", "a dog", [], 3, context="Images > SDXL")
     qtbot.addWidget(tile)
 
-    assert tile.height() == grid_card.folder_card_size(breadcrumb=True)[1]
+    assert tile.height() == tile_shape.folder_tile_size(folder_path=True)[1]
 
 
 def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):
@@ -85,9 +85,9 @@ def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):
     tile.set_selected(True)
 
     assert tile._selected
-    assert grid_card.selected_css("folderTile") in tile.styleSheet()
+    assert tile_shape.selected_css("folderTile") in tile.styleSheet()
 
     tile.set_selected(False)
 
     assert not tile._selected
-    assert grid_card.idle_css("folderTile") in tile.styleSheet()
+    assert tile_shape.idle_css("folderTile") in tile.styleSheet()

@@ -47,10 +47,10 @@ _POLL_TIMEOUT_S = 2.0
 # A submit whose POST timed out is not yet a failed submit. ComfyUI logs "got
 # prompt" the moment the request lands and only then validates it, on its event
 # loop: while that takes long -- fifty seconds on 2026-09-05, for a two-scene
-# clip whose one-scene twin took a tenth of one -- it answers nothing, the
+# video whose one-scene twin took a tenth of one -- it answers nothing, the
 # websocket's keepalive dies, and the POST's answer comes after the client has
 # stopped listening; the job runs all the same. Declared failed, that job ran
-# untracked and its clip never reached the gallery. So a late submit goes on
+# untracked and its video never reached the gallery. So a late submit goes on
 # asking, for this long in all, whether the server lists the prompt.
 _ACCEPTANCE_WAIT_S = 120.0
 # Once the server is answering and does not list it, this much longer for the
@@ -300,7 +300,7 @@ class ComfyUIApi:
 
         ComfyUI keeps the last run's models resident between prompts, which is
         right when the next prompt is its own and wrong when another program
-        needs the card first -- the voice that speaks a story's lines, run
+        needs the graphics card first -- the voice that speaks a story's lines, run
         before the video that lip-syncs to them is submitted. ComfyUI takes the
         request as a flag it acts on before its next prompt, so the call returns
         at once.

@@ -1,6 +1,6 @@
-"""Read what a model file *is* off its own header, so a picker can offer only
+"""Read what a model file *is* off its own header, so a dropdown can offer only
 the files the graph under it can actually run -- never off its name, and never
-guessing: an unrecognized file reads as ``None``, which every picker keeps.
+guessing: an unrecognized file reads as ``None``, which every dropdown keeps.
 """
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ FLUX = "flux"
 QWEN = "qwen"
 WAN = "wan"
 # WAN 2.2's speech-to-video model: the WAN layout plus the audio injector that
-# lets it lip-sync, and a family of its own because it is one -- an i2v slot
-# that took it would run without the audio it needs, and the speech slot must
+# lets it lip-sync, and a family of its own because it is one -- an i2v dropdown
+# that took it would run without the audio it needs, and the speech dropdown must
 # not offer the i2v experts, which have no ear.
 WAN_S2V = "wan_s2v"
 # WAN 2.2 Animate: WAN with the pose embedding that follows a video's person.
@@ -171,7 +171,7 @@ def _expert_from_name(name: str) -> str | None:
     """Which WAN 2.2 expert the filename claims, or ``None`` when it says nothing.
 
     A name carrying both markers claims nothing usable, so it reads as unmarked
-    and stays offered in either slot.
+    and stays offered in either dropdown.
     """
     found = {
         match.group(0).lower().strip("-_. ")
@@ -319,7 +319,7 @@ def safetensors_metadata(path: Path) -> dict:
 
 
 # GGUF's metadata values are typed; every type but string and array is a fixed
-# width, so skipping the metadata block to reach the tensor index is a matter of
+# width, so skipping the GGUF metadata to reach the tensor index is a matter of
 # stepping over the right number of bytes per value.
 _GGUF_FIXED_WIDTHS = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 _GGUF_STRING = 8
@@ -327,7 +327,7 @@ _GGUF_ARRAY = 9
 
 
 def _gguf_names(path: Path) -> list[str] | None:
-    """GGUF: magic and counts, then a metadata block, then the tensor index."""
+    """GGUF: magic and counts, then its metadata, then the tensor index."""
     with path.open("rb") as handle:
         if handle.read(4) != b"GGUF":
             return None

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-# The console's pair steps by this, and will not walk past these ends.
+# The OSR2 controls' pair steps by this, and will not walk past these ends.
 STEP_S = 1
 MIN_S, MAX_S = 1, 60
 DEFAULT_S = 4

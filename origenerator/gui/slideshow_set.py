@@ -2,7 +2,7 @@
 the slide on screen.
 
 A slideshow is handed a set of generations and deals a pass from it — shuffled, or
-in the browser's own order — narrows it to the favorites or to the images it
+in the Gallery pane's own order — narrows it to the favorites or to the images it
 has enhanced, and grows it as generations land in the folder it is playing.
 None of that is about a window: a slideshow drawn full screen by this app and a slideshow
 handed to one of a Fun Time session's Funestras keep exactly this set and differ
@@ -16,7 +16,7 @@ re-renders; a Funestra is handed a new playlist), so it arrives as
 ``on_pass_change(kept)``: whether the slide that was on screen survived into
 the new pass.
 
-The map is the Funestras' own (:mod:`origenerator.gui.slideshow_map`): the slide's
+The map is the Funestras' own (:mod:`origenerator.gui.hud_nav_map`): the slide's
 act under other seeds runs right, what else was made of its image runs
 down, and a
 loop along either axis deals THAT row or column as the pass, the way a
@@ -32,13 +32,13 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
 from funestra.satellite_hud import label_is_filtered
 
-from origenerator.gui.slideshow_map import (
+from origenerator.gui.hud_nav_map import (
     NO_NEIGHBORS,
     Loop,
-    MapNeighbors,
-    SlideshowMap,
-    acts_posted,
-    build_map,
+    NavMap,
+    NavMapNeighbors,
+    actions_posted,
+    build_nav_map,
     step_in_ring,
 )
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -52,7 +52,7 @@ from origenerator.slideshow import (
     in_order,
 )
 
-NO_ACT_ON_SCREEN = "No act for this one"
+NO_ACTION_ON_SCREEN = "No act for this one"
 ENHANCEMENT_RUNNING = "running"
 ENHANCEMENT_QUEUED = "queued"
 _ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
@@ -80,10 +80,10 @@ class SlideshowSet:
         # slide alone.
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen
-        self._known: dict[str, MapNeighbors] = {}
+        self._known: dict[str, NavMapNeighbors] = {}
         # What each generation's map row is named for, by id -- the acts an
-        # act filter matches it on.  None for a slideshow with no library under it.
-        self._acts_of = actions.acts
+        # action filter matches it on.  None for a slideshow with no library under it.
+        self._actions_of = actions.acts
         self._named: dict[str, str] = {}
         self._slides_of = actions.slides
         self._on_filters_change = actions.filters_changed
@@ -204,7 +204,7 @@ class SlideshowSet:
         if self._on_filters_change is not None:
             self._on_filters_change(self.filters)
 
-    def set_act_filter(self, query: str) -> bool:
+    def set_action_filter(self, query: str) -> bool:
         return self.set_filters(replace(self.filters, act=query))
 
     def drop_the_filters(self) -> bool:
@@ -264,12 +264,12 @@ class SlideshowSet:
         """The act(s) *prompt_id*'s map row is named for.  The whole set is
         asked about at once, the first time anything is: the answer costs a
         walk of the library, and a filter asks it of every item."""
-        if prompt_id is None or self._acts_of is None:
+        if prompt_id is None or self._actions_of is None:
             return ""
         if prompt_id not in self._named:
             asked = [prompt_id, *(item.prompt_id for item in self.all_items
                                   if item.prompt_id is not None)]
-            self._named = {**dict.fromkeys(asked, ""), **self._acts_of(asked)}
+            self._named = {**dict.fromkeys(asked, ""), **self._actions_of(asked)}
         return self._named[prompt_id]
 
     # --- keeping the whole set current -------------------------------------
@@ -351,7 +351,7 @@ class SlideshowSet:
         self._known.clear()
         self._named.clear()
 
-    def neighbors(self, prompt_id) -> MapNeighbors:
+    def neighbors(self, prompt_id) -> NavMapNeighbors:
         """What the library says about *prompt_id*, asked once per item: the
         answer costs a walk of the library, and the map asks on every beat."""
         if prompt_id is None or self._neighbors_of is None:
@@ -361,12 +361,12 @@ class SlideshowSet:
             found = self._known[prompt_id] = self._neighbors_of(prompt_id)
         return found
 
-    def map(self) -> SlideshowMap | None:
-        """The gamma around the slide on screen, or ``None`` with nothing on it."""
+    def map(self) -> NavMap | None:
+        """The nav map around the slide on screen, or ``None`` with nothing on it."""
         current = self.playlist.current()
         if current is None:
             return None
-        return build_map(current, self.loop, self.neighbors)
+        return build_nav_map(current, self.loop, self.neighbors)
 
     def loop_pool(self, axis: str) -> list[Slide]:
         """The slides a loop along *axis* would play, the slide on screen first."""
@@ -439,11 +439,11 @@ class SlideshowSet:
             return False
         return self.start_loop(SEED, [*self.loop_pool(SEED), *additions])
 
-    def state(self, *, locked: bool, level_index: int) -> SlideshowState:
+    def state(self, *, locked: bool, version_index: int) -> SlideshowState:
         loop = self.loop or Loop("", ())
         return SlideshowState(order=tuple(self.playlist.order_ids()),
                               current=self.current_prompt_id(), locked=locked,
-                              level_index=level_index, loop=loop.axis,
+                              version_index=version_index, loop=loop.axis,
                               loop_pool=tuple(slide.prompt_id for slide in loop.pool))
 
     def resume(self, state: SlideshowState, *, lead: bool = True) -> bool:
@@ -471,7 +471,7 @@ class SlideshowSet:
         if shown is None:
             return None
         return next((row.slide for row in shown.column
-                     if row.configuration and acts_posted(row.label) == acts_posted(query)),
+                     if row.configuration and actions_posted(row.label) == actions_posted(query)),
                     None)
 
     def slide_for_path(self, path) -> Slide | None:
@@ -582,7 +582,7 @@ class SlideshowSet:
         item = self.playlist.current()
         return item.prompt_id if item is not None else None
 
-    def act_on_screen(self) -> str:
+    def action_on_screen(self) -> str:
         return self._named_for(self.current_prompt_id())
 
     @property
@@ -604,29 +604,29 @@ class SlideshowSet:
         return True
 
 
-def narrow_to_acts(slideshow_set: SlideshowSet, posted: str) -> tuple[str, bool]:
+def narrow_to_actions(slideshow_set: SlideshowSet, posted: str) -> tuple[str, bool]:
     """Narrow *slideshow_set* to the act(s) a row's button or a spoken act *posted*
     — or lift the filter, for nothing posted — and answer with what a slideshow
     says about it, the way a satellite says it, and whether that is a dead
     end: an act nothing here is named for leaves the pass alone."""
-    acts = acts_posted(posted)
-    if not (slideshow_set.set_act_filter(acts) or acts == slideshow_set.filters.act):
+    acts = actions_posted(posted)
+    if not (slideshow_set.set_action_filter(acts) or acts == slideshow_set.filters.act):
         return f"Filter: no matches for '{acts}'", False
     summary = f"'{acts}'" if acts else "cleared"
     return f"Filter: {summary} ({len(slideshow_set.playlist)})", True
 
 
-def narrow_to_the_act_on_screen(slideshow_set: SlideshowSet) -> tuple[str, bool]:
-    act = slideshow_set.act_on_screen()
+def narrow_to_the_action_on_screen(slideshow_set: SlideshowSet) -> tuple[str, bool]:
+    act = slideshow_set.action_on_screen()
     if not act:
-        return NO_ACT_ON_SCREEN, False
-    return narrow_to_acts(slideshow_set, act)
-def item_note(slideshow_set: SlideshowSet, *, levels, level_index: int) -> str:
+        return NO_ACTION_ON_SCREEN, False
+    return narrow_to_actions(slideshow_set, act)
+def item_note(slideshow_set: SlideshowSet, *, versions, version_index: int) -> str:
     if slideshow_set.playlist.current_is_live():
         return GENERATING
     parts = []
-    if len(levels) > 1:
-        parts.append(levels[level_index][2])
+    if len(versions) > 1:
+        parts.append(versions[version_index][2])
     enhancement = slideshow_set.enhancement_of(slideshow_set.current_prompt_id())
     if enhancement:
         parts.append(_ENHANCEMENT_WORDS[enhancement])

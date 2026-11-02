@@ -11,7 +11,7 @@ from PyQt6.QtCore import (
 )
 
 from origenerator import (
-    act_settings,
+    action_settings,
     evolver_export,
 )
 from origenerator.db import Database
@@ -22,9 +22,9 @@ from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
-from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.orientation import base_of
+from origenerator.gui.item_tile import ItemTile
+from origenerator.gui.new_tile import NewTile
+from origenerator.item_shape import base_of
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
@@ -37,11 +37,11 @@ from tests.gallery_view_support import (
     _generating_tile,
     _image,
     _image_workflow,
+    _new_tile,
     _on_screen,
     _open_leaf,
     _png_bytes,
     _reroll_client,
-    _reroll_tile,
     _row,
     _search_for,
     _seeded_db,
@@ -61,7 +61,7 @@ def test_leaf_shows_add_tile_when_client_present(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is not None
+    assert _new_tile(view) is not None
 
 
 def test_main_view_reflows_to_fill_extra_width(qtbot):
@@ -88,7 +88,7 @@ def test_add_tile_leads_the_folders_images(qtbot):
     _select_first_leaf(view)
     layout = view._scroll.widget().layout()
     kinds = [type(layout.itemAt(index).widget()) for index in range(layout.count())]
-    assert kinds.index(RerollTile) < kinds.index(ThumbnailWidget)
+    assert kinds.index(NewTile) < kinds.index(ItemTile)
 
 
 def test_leaf_has_no_add_tile_without_a_client(qtbot):
@@ -96,7 +96,7 @@ def test_leaf_has_no_add_tile_without_a_client(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _new_tile(view) is None
 
 
 def test_no_add_tile_for_unknown_workflow(qtbot):
@@ -105,7 +105,7 @@ def test_no_add_tile_for_unknown_workflow(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _new_tile(view) is None
 
 
 def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
@@ -114,7 +114,7 @@ def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _new_tile(view) is None
 
 
 def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
@@ -125,7 +125,7 @@ def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is not None
+    assert _new_tile(view) is not None
 
 
 def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
@@ -146,7 +146,7 @@ def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     job = view._live_jobs[key]
     assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
@@ -161,7 +161,7 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     assert key in view._live_jobs
     job = view._live_jobs[key]
@@ -170,7 +170,7 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
-def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_request_card(
+def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_request_tile(
         qtbot, tmp_path):
     # Reported: the press that started a run turned the + itself into the run,
     # with the run's Cancel where the + had been -- so on a slow app, a second
@@ -182,11 +182,11 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
     view.refresh()
     _select_first_leaf(view)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
-    assert not _reroll_tile(view).isEnabled()
+    assert not _new_tile(view).isEnabled()
     kinds = _tile_kinds_in_order(view)
-    assert kinds.index(FolderModifyTile) == kinds.index(RerollTile) + 1
+    assert kinds.index(FolderModifyTile) == kinds.index(NewTile) + 1
     assert kinds.index(GeneratingTile) == kinds.index(FolderModifyTile) + 1
 
 
@@ -205,7 +205,7 @@ def test_a_second_press_where_the_runs_cancel_was_starts_no_new_run(qtbot, tmp_p
     view = GalleryView(_seeded_db(tmp_path), client=client)
     _on_screen(qtbot, view, 1200, 800)
     key = _select_first_leaf(view)
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
     cancel = _generating_tile(view)._cancel
     spot = cancel.mapTo(view._scroll.widget(), cancel.rect().center())
 
@@ -233,9 +233,9 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
 # --- Modify (all seeds): same seeds, changed words --------------------------
 
 
-def _request_card(view):
-    cards = view._scroll.widget().findChildren(FolderModifyTile)
-    return cards[0] if cards else None
+def _request_tile(view):
+    tiles = view._scroll.widget().findChildren(FolderModifyTile)
+    return tiles[0] if tiles else None
 
 
 def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
@@ -266,14 +266,14 @@ def _rewritten(view, key, prompt="a dog on a couch"):
     view._on_modify_requested(key, "sdxl_t2i", params)
 
 
-def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
+def test_a_folder_offers_a_request_tile_beside_its_new_tile(qtbot, tmp_path):
     view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
 
-    assert _request_card(view) is not None
-    assert _reroll_tile(view) is not None  # the pair: new seed, and new words
+    assert _request_tile(view) is not None
+    assert _new_tile(view) is not None  # the pair: new seed, and new words
 
 
 def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
@@ -286,21 +286,21 @@ def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    assert _request_card(view) is None
+    assert _request_tile(view) is None
 
 
-def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot, tmp_path):
+def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_folder_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
 
-    _request_card(view).clicked.emit()
+    _request_tile(view).clicked.emit()
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel._folder_modify.folder_key == key
-    assert panel._preview._stack.currentWidget() is panel._preview._sheet
+    tab = view._generate_pane.current_generate_tab()
+    assert tab._folder_modify.folder_key == key
+    assert tab._preview._stack.currentWidget() is tab._preview._sheet
     client.submit_job.assert_not_called()  # an edit to make, not a run to start
 
 
@@ -393,7 +393,7 @@ def test_the_folders_live_tile_stands_the_image_it_was_asked_of_behind_the_wait(
 
 
 def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
-    # Every run is being made, so the folder shows every run — not one card the
+    # Every run is being made, so the folder shows every run — not one tile the
     # images then arrive through one at a time.
     view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
     qtbot.addWidget(view)
@@ -405,10 +405,10 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
     queued = [job.prompt_id for job in view._jobs.all_jobs]
     # The one in front -- the last asked for, since each image takes the
     # machine from the one before -- is the folder's generating tile; the rest
-    # each get their own card.
+    # each get their own tile.
     assert _generating_tile(view) is not None
     in_front = view._jobs.queue_order[0]
-    assert set(view._browser._inflight_cards) == set(queued) - {in_front}
+    assert set(view._gallery_pane._inflight_tiles) == set(queued) - {in_front}
     assert len(queued) == 3
 
 
@@ -420,8 +420,8 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    # _tree_item_for: a folder has a row per side now, and this key has no
-    # side on it.
+    # _tree_item_for: a folder has a row per shape now, and this key has no
+    # shape on it.
     was = [row["seed"] for row in view._tree_item_for(key).data(0, _GROUP_ROLE).rows]
 
     _rewritten(view, key)
@@ -444,12 +444,12 @@ def test_toggling_auto_starts_auto_generate(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._bank.auto.click()  # the header's Auto toggle, switched on
+    view._buttons.auto.click()  # the header's Auto toggle, switched on
 
     assert view._auto.is_active(key)
     assert key in view._live_jobs          # a first variation is running
     client.submit_job.assert_called_once()
-    assert view._bank.auto.isChecked()
+    assert view._buttons.auto.isChecked()
 
 
 def test_auto_generating_in_a_folder_favorites_it(qtbot, tmp_path):
@@ -459,7 +459,7 @@ def test_auto_generating_in_a_folder_favorites_it(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._bank.auto.click()
+    view._buttons.auto.click()
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
@@ -473,7 +473,7 @@ def test_auto_generating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_pa
     key = _select_first_leaf(view)
     view._toggle_favorite(key)
 
-    view._bank.auto.click()
+    view._buttons.auto.click()
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
@@ -523,7 +523,7 @@ def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path
 
     assert view._auto.is_active(second)
     assert not view._auto.is_active(first)
-    assert view._bank.auto.isChecked()  # the switch follows the folder in front
+    assert view._buttons.auto.isChecked()  # the switch follows the folder in front
 
 
 def test_toggling_auto_off_stops_auto_generate(qtbot, tmp_path):
@@ -569,13 +569,13 @@ def test_cancelling_a_reroll_keeps_auto_generate_on_and_tries_another_seed(qtbot
     view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
 
     assert view._auto.is_active(key)          # Auto-Generate is still on
-    assert view._bank.auto.isChecked()         # and the toggle still says so
+    assert view._buttons.auto.isChecked()         # and the toggle still says so
     assert client.submit_job.call_count == 2  # a fresh seed went out at once
     assert view._live_jobs[key].prompt_id != canceled
 
 
 def test_cancelling_an_auto_folders_job_by_name_keeps_auto_generate_going(qtbot, tmp_path):
-    # The queue row's Cancel and a config tab's, which name the run to stop.
+    # The queue row's Cancel and a Generate tab's, which name the run to stop.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -599,13 +599,13 @@ def test_a_tab_watching_auto_generate_follows_it_onto_the_next_seed(qtbot, tmp_p
     key = _select_first_leaf(view)
     view._toggle_auto(True)
     _generating_tile(view).selected.emit()
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
 
-    panel._cancel_btn.click()
+    tab._cancel_btn.click()
     client.preview_image.emit(view._live_jobs[key].prompt_id, _png_bytes())
 
-    assert panel.watched_key() == key
-    assert _frame_shown(panel._preview, _png_bytes())
+    assert tab.watched_key() == key
+    assert _frame_shown(tab._preview, _png_bytes())
 
 
 def test_only_the_auto_toggle_ends_auto_generate_not_a_string_of_cancels(qtbot, tmp_path):
@@ -627,11 +627,11 @@ def test_only_the_auto_toggle_ends_auto_generate_not_a_string_of_cancels(qtbot, 
 
 
 def _folder_tab(view, db):
-    """Put the front config tab on the seeded folder's settings, as clicking that
+    """Put the front Generate tab on the seeded folder's settings, as clicking that
     folder's thumbnail does — where the user is when they press the tile or Auto."""
     row = db.get_generation("orig")
-    view._info_tabs.load_selection(row, [row])
-    return view._info_tabs.current_config_panel()
+    view._generate_pane.load_selection(row, [row])
+    return view._generate_pane.current_generate_tab()
 
 
 def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
@@ -653,7 +653,7 @@ def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     assert _generating_tile(view)._cancel.toolTip() == next_seed
     assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
     assert [row._cancel.toolTip() for row in view._queue.rows()] == [next_seed]
-    assert view._info_tabs.current_config_panel()._cancel_btn.toolTip() == next_seed
+    assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == next_seed
 
 
 def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flight(
@@ -674,7 +674,7 @@ def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flig
     plain = "Cancel this generation"
     assert _generating_tile(view)._cancel.toolTip() == plain
     assert [row._cancel.toolTip() for row in view._queue.rows()] == [plain]
-    assert view._info_tabs.current_config_panel()._cancel_btn.toolTip() == plain
+    assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == plain
 
 
 def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
@@ -689,12 +689,12 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     _select_first_leaf(view)
     _folder_tab(view, db)
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
-    panel = view._info_tabs.current_config_panel()
+    tab = view._generate_pane.current_generate_tab()
     job = next(iter(view._live_jobs.values()))
-    assert panel._cancel_btn.isHidden() is False
-    assert panel.launched_runs() == [job.origin]
+    assert tab._cancel_btn.isHidden() is False
+    assert tab.launched_runs() == [job.origin]
 
 
 def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
@@ -710,13 +710,13 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
 
     view._toggle_auto(True)
     first = view._live_jobs[key]
-    assert view._info_tabs.current_config_panel().launched_runs() == [first.origin]
+    assert view._generate_pane.current_generate_tab().launched_runs() == [first.origin]
 
     client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # Auto-Generate moves on
 
-    panel = view._info_tabs.current_config_panel()
-    assert panel._cancel_btn.isHidden() is False
-    assert panel.launched_runs() == [view._live_jobs[key].origin]
+    tab = view._generate_pane.current_generate_tab()
+    assert tab._cancel_btn.isHidden() is False
+    assert tab.launched_runs() == [view._live_jobs[key].origin]
 
 
 def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
@@ -736,15 +736,15 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
     for _ in range(3):  # three variations land while the user watches
         client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
-    assert view._info_tabs.count() == 1
-    panel = view._info_tabs.current_config_panel()
+    assert view._generate_pane.count() == 1
+    tab = view._generate_pane.current_generate_tab()
     # Still holding the item the folder opened on, not a variation Auto-Generate made.
-    assert panel.displayed_row()["prompt_id"] == "orig"
+    assert tab.displayed_row()["prompt_id"] == "orig"
 
     landed = next(r for r in db.list_generations() if r["status"] == "completed")
     view._on_thumbnail_clicked(landed["prompt_id"])
 
-    assert view._info_tabs.count() == 1  # it filled that tab instead of forking one
+    assert view._generate_pane.count() == 1  # it filled that tab instead of forking one
 
 
 def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
@@ -761,19 +761,19 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    panel = _folder_tab(view, db)
-    showing = panel._displayed_row
-    panel._preview.show_frame = MagicMock()
-    panel._preview.show_media = MagicMock()
+    tab = _folder_tab(view, db)
+    showing = tab._displayed_row
+    tab._preview.show_frame = MagicMock()
+    tab._preview.show_media = MagicMock()
 
     view._toggle_auto(True)
     job = view._live_jobs[key]
     client.preview_image.emit(job.prompt_id, b"a frame")   # the run streams
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # ...and lands
 
-    panel._preview.show_frame.assert_not_called()
-    panel._preview.show_media.assert_not_called()
-    assert panel._displayed_row is showing  # still the user's own generation
+    tab._preview.show_frame.assert_not_called()
+    tab._preview.show_media.assert_not_called()
+    assert tab._displayed_row is showing  # still the user's own generation
     assert view._selected_reroll_key is None  # the pane was never taken over
 
 
@@ -790,14 +790,14 @@ def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtb
     key = _select_first_leaf(view)
     view._toggle_auto(True)
     _generating_tile(view).selected.emit()  # the user points the pane at Auto-Generate
-    panel = view._info_tabs.current_config_panel()
-    panel._preview.show_frame = MagicMock()
+    tab = view._generate_pane.current_generate_tab()
+    tab._preview.show_frame = MagicMock()
 
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
     client.preview_image.emit(view._live_jobs[key].prompt_id, b"the next one")
 
     assert view._selected_reroll_key == key
-    panel._preview.show_frame.assert_called_with(b"the next one")
+    tab._preview.show_frame.assert_called_with(b"the next one")
 
 
 def test_auto_generate_ending_lets_the_pane_go(qtbot, tmp_path):
@@ -827,14 +827,14 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    panel = _folder_tab(view, db)
-    panel._param_form.set_values({"positive_prompt": "an entirely different subject"})
+    tab = _folder_tab(view, db)
+    tab._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
     assert view._live_jobs                       # the run started
-    assert panel._cancel_btn.isHidden() is True    # but this tab isn't its home
-    assert panel._generating is False
+    assert tab._cancel_btn.isHidden() is True    # but this tab isn't its home
+    assert tab._generating is False
 
 
 def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
@@ -849,9 +849,9 @@ def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
     parked = _folder_tab(view, db)
     parked._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
-    opened = view._info_tabs.current_config_panel()
+    opened = view._generate_pane.current_generate_tab()
     assert opened is not parked
     assert opened.watched_key() == key
     assert parked.watched_key() is None
@@ -869,9 +869,9 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
     parked = _folder_tab(view, db)
     parked._param_form.set_values({"positive_prompt": "an entirely different subject"})
 
-    _reroll_tile(view).add_requested.emit()
+    _new_tile(view).add_requested.emit()
 
-    assert view._info_tabs._preview_panel is None
+    assert view._generate_pane._preview_tab is None
 
 
 def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
@@ -881,14 +881,14 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._bank.auto.isHidden()
-    assert view._bank.auto.isEnabled()
+    assert not view._buttons.auto.isHidden()
+    assert view._buttons.auto.isEnabled()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
 
-    assert not view._bank.auto.isHidden()   # still there
-    assert not view._bank.auto.isEnabled()  # with nothing to do from here
-    assert "open a settings folder" in view._bank.auto.toolTip()
+    assert not view._buttons.auto.isHidden()   # still there
+    assert not view._buttons.auto.isEnabled()  # with nothing to do from here
+    assert "open a settings folder" in view._buttons.auto.toolTip()
 
 
 def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtbot, tmp_path):
@@ -903,7 +903,7 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtb
     view._tree.setCurrentItem(_image_workflow(view._tree))  # look somewhere else
     assert _selected_folder(view) != key
 
-    view._bank.auto_tip.link_activated.emit("auto")
+    view._buttons.auto_tip.link_activated.emit("auto")
 
     assert _selected_folder(view) == key
 
@@ -913,7 +913,7 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtb
 
 def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_path):
     # Change 1: Generate in a tab whose settings match an existing folder launches a
-    # re-roll there and lands the browser in that folder, its live tile selected.
+    # re-roll there and lands the Gallery pane in that folder, its live tile selected.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -925,7 +925,7 @@ def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_pa
     assert folder == orig_folder                    # same settings folder as 'orig'
     assert folder in view._live_jobs              # a re-roll now runs in it
     assert _selected_folder(view) == folder    # and the view jumped there
-    assert view._selected_reroll_key == folder      # its live tile drives the info pane
+    assert view._selected_reroll_key == folder      # its live tile drives the Generate pane
 
 
 def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
@@ -955,12 +955,12 @@ def test_a_tabs_go_to_folder_opens_the_folder_its_settings_have_made(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     folder = _select_first_leaf(view)            # the folder 'orig' lives in
-    panel = view._info_tabs.current_config_panel()
-    panel.prefill("sdxl_t2i",
+    tab = view._generate_pane.current_generate_tab()
+    tab.prefill("sdxl_t2i",
                   dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
     view._tree.setCurrentItem(_image_workflow(view._tree))  # navigate away first
 
-    view._info_tabs.folder_requested.emit(panel.settings_folder_key())
+    view._generate_pane.folder_requested.emit(tab.settings_folder_key())
 
     assert _selected_folder(view) == folder
 
@@ -971,12 +971,12 @@ def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel.prefill("sdxl_t2i",
+    tab = view._generate_pane.current_generate_tab()
+    tab.prefill("sdxl_t2i",
                   dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
     _search_for(view, "cat")
 
-    view._info_tabs.folder_requested.emit(panel.settings_folder_key())
+    view._generate_pane.folder_requested.emit(tab.settings_folder_key())
 
     assert view._search.field.text() == ""
 
@@ -987,8 +987,8 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("orig")
-    panel = view._info_tabs.current_config_panel()
-    panel._param_form.request_field()._words.setText("two cats")
+    tab = view._generate_pane.current_generate_tab()
+    tab._param_form.request_field()._words.setText("two cats")
 
     view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
 
@@ -1039,12 +1039,12 @@ def test_generate_from_a_tab_back_on_its_videos_own_seeds_draws_a_fresh_one(qtbo
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = _front_panel(view)
-    panel._preview.show_media = MagicMock()
-    panel.show_saved_generation(db.get_generation("vid"), [])
-    panel._param_form.set_seed_random(False)
+    tab = _front_panel(view)
+    tab._preview.show_media = MagicMock()
+    tab.show_saved_generation(db.get_generation("vid"), [])
+    tab._param_form.set_seed_random(False)
 
-    panel._on_generate()
+    tab._on_generate()
 
     job = next(iter(view._live_jobs.values()))
     assert job.params["noise_seed"] != 22
@@ -1067,26 +1067,26 @@ def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_pat
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
-    panel._how_many.set_how_many(4)
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
+    tab._how_many.set_how_many(4)
 
-    panel._on_generate()
+    tab._on_generate()
 
     (folder,) = view._jobs.jobs_by_folder.values()
     assert len({job.params["seed"] for job in folder}) == 4
     client.interrupt.assert_not_called()
-    assert len(panel.launched_runs()) == 4
-    assert panel._generate_btn.isEnabled() is False
+    assert len(tab.launched_runs()) == 4
+    assert tab._generate_btn.isEnabled() is False
 
 
-# --- the Genau lane: a looping clip, made but not sent anywhere ---------------
+# --- the Genau lane: a looping video, made but not sent anywhere ---------------
 
 
 def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    view._combine.generate_category("img", "alpha", act_settings.GENAU)
+    view._combine.generate_category("img", "alpha", action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     # The act has a long-form video too; the Genau lane can only use the loop.
@@ -1098,16 +1098,16 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
     view = _genau_view(qtbot, tmp_path)
     asked = []
 
-    def spy(category, candidates, intent=act_settings.VIDEO):
+    def spy(category, candidates, intent=action_settings.VIDEO):
         asked.append(intent)
         return "vid"
 
-    monkeypatch.setattr(combine_controller.act_settings, "most_used_video", spy)
+    monkeypatch.setattr(combine_controller.action_settings, "most_used_video", spy)
 
     view._combine.generate_category("img", "dancing")
-    view._combine.generate_category("img", "dancing", act_settings.GENAU)
+    view._combine.generate_category("img", "dancing", action_settings.GENAU)
 
-    assert asked == [act_settings.VIDEO, act_settings.GENAU]
+    assert asked == [action_settings.VIDEO, action_settings.GENAU]
 
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
@@ -1120,7 +1120,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
 
-    view._combine.generate_category("img", "alpha", act_settings.GENAU)
+    view._combine.generate_category("img", "alpha", action_settings.GENAU)
     job = next(iter(view._live_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 
@@ -1136,14 +1136,14 @@ def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
-    assert panel._generate_btn.isEnabled() is True
-    config = panel.current_config()
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
+    assert tab._generate_btn.isEnabled() is True
+    config = tab.current_config()
 
     view._on_generate_requested(config.workflow_name, [config.params])
 
-    assert panel._generate_btn.isEnabled() is False
+    assert tab._generate_btn.isEnabled() is False
 
 
 def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tmp_path):
@@ -1154,9 +1154,9 @@ def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tm
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    panel = view._info_tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
-    config = panel.current_config()
+    tab = view._generate_pane.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
+    config = tab.current_config()
 
     view._on_generate_requested(config.workflow_name, [config.params])
     view._on_generate_requested(config.workflow_name, [config.params])

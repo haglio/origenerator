@@ -3,7 +3,7 @@
 Every value that describes the library rather than the code comes from here, so
 `load_content` is called from five module scopes across four packages — and
 before it was cached, importing `config` alone read and parsed the JSON, and
-importing config plus search plus act_settings plus workflows read the same file
+importing config plus search plus action_settings plus workflows read the same file
 six times over.
 
 The count is a test rather than a comment because nothing else would show it:
@@ -108,7 +108,7 @@ def test_the_overlay_is_read_once_however_many_modules_want_it():
     modules import `config` alone. One read."""
     seen = _import_in_a_fresh_interpreter(
         "origenerator.config", "origenerator.search",
-        "origenerator.act_settings", "origenerator.workflows")
+        "origenerator.action_settings", "origenerator.workflows")
 
     assert seen["overlay_reads"] == ["content.example.json"]
 
@@ -129,7 +129,7 @@ def test_a_workflow_imports_on_an_overlay_that_is_missing_what_it_wants(tmp_path
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("module", ["origenerator.search", "origenerator.act_settings"])
+@pytest.mark.parametrize("module", ["origenerator.search", "origenerator.action_settings"])
 def test_a_consumer_of_the_overlay_does_not_read_it_at_import(module):
     """It reads `config`'s, which is the one read above; asking again at its own
     import is what made the count six."""

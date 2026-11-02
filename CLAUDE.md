@@ -21,7 +21,7 @@ backstop for names already known; it cannot see the next one.
 So fabricate fully. Use `Jane Doe`, `Sample Studio`, `scene one`, the
 `alpha`/`beta`/`gamma` act placeholders the committed `content.example.json`
 already uses. The near miss that still counts: taking a real filename and
-changing a character or two — it is still that clip, still that performer. Make
+changing a character or two — it is still that video, still that performer. Make
 it up from scratch, don't lightly edit a real one.
 
 ## One word per thing, and the two that keep their second
@@ -32,14 +32,15 @@ for one thing cost four. So:
 - A submitted piece of work is a **job** (`JobQueue`, `GenerationJob`,
   `job_for`, `held_jobs`), from the press to the saved row. **Re-roll** is kept
   for the act it names -- a fresh variation of a settings folder, or a fresh
-  seed on one row (`start_reroll`, `reroll_image_seed`, `reroll_video_seed`,
-  `RerollTile`) -- and for nothing else; the class that owns every generation
+  seed on one row (`start_reroll`, `reroll_image_seed`, `reroll_video_seed`)
+  -- and for nothing else, the "+" that asks for one being the New tile
+  (`NewTile`); the class that owns every generation
   the app makes was called `RerollController` for years, and its own docstring
   had to say "it also *is* the queue" to undo the name. **Run** is only a
   chained job pair taken as a whole, which is what `origin` stamps. A
   **generation** is the saved row.
 - Work started and not finished is **in flight** (`InFlightItem`,
-  `InFlightCard`, `inflight_items`). "Cooking" said the same thing in fifty
+  `InFlightTile`, `inflight_items`). "Cooking" said the same thing in fifty
   comments and is gone.
 - On disk a waiting row's status is **pending**; on screen the line calls it
   **queued**. Both are right and `display_status()` is the one place that says
@@ -47,7 +48,7 @@ for one thing cost four. So:
 - The **folder key** is the value; `gallery.keys.settings_key` builds one from
   its three parts and `gallery.tree.settings_folder_key` derives one from a
   row. Those are two questions with one answer, not two names for it. What was
-  a real collision -- `GenerateConfigPanel.settings_key()` returning the *pair*
+  a real collision -- `GenerateTab.settings_key()` returning the *pair*
   a folder key is built from, one word from its own `settings_folder_key()`
   returning the key -- is `workflow_and_signature()`.
 - **Settings** and **config** are two things and keep two words: the
@@ -71,9 +72,9 @@ for one thing cost four. So:
   audit's vocabulary pass above made each thing one word and never held the
   words against the screen, which is how "clip" passed it. Names that belong
   to something else keep theirs: CLIP the text model and its ComfyUI nodes,
-  and the clipboard. Genau's own videos are flicks in the code, and on
-  screen they take the word the settings all of Haglio share give them,
-  genau_flick_words.
+  the clipboard, and Fun Time's Clip seconds. Genau's own videos are flicks
+  in the code, and on screen they take the word the settings all of Haglio
+  share give them, genau_flick_words.
 - **An item is an image or a video, and neither is a picture or a record.**
   This code said "picture" all through it where it meant an image, and still
   says "record" where it means an item or the row behind one. Neither is the
@@ -84,7 +85,7 @@ for one thing cost four. So:
   picture that was no image took a name of its own: the small one on a tile,
   a row or a card is a **thumbnail**, one frame of a video or of this window
   sent to the headset is a **frame**, his drawings on the sorting window's
-  buttons and the OSR2 console's drawing are **drawings**, and what a run is
+  buttons and the OSR2 controls' drawing are **drawings**, and what a run is
   making, in the help for its settings, is the **result**. Saved names keep
   the old word and are read under the new one in one place each, as the
   recipe ones are: the `picture_state` column is `image_state`
@@ -97,10 +98,10 @@ for one thing cost four. So:
   `HOLD_PICTURE`, a verb every running Funestra speaks, and app_support's
   loading screen's `pictures.json`.
 - **Where the screen names nothing, the code takes the user's word.** The
-  list of folders down the left of the gallery is the **TOC** (table of
-  contents), and the marks that open and shut its folders are its
-  **carets**: no label names either, and those are the words the user and
-  the app's designers use. So the code says `toc` and `caret`, an agent
+  list of folders down the left of the gallery is the **TOC** (tree of
+  contents, his word since 2026-10-30; table of contents before that), and
+  the marks that open and shut its folders are its **carets**: no label
+  names either, and those are the words the user and the app's designers use. So the code says `toc` and `caret`, an agent
   writing to the user says TOC and caret, and other names for the same two
   things -- tree, folder list, folder tree, arrow, chevron -- take nothing
   new. The back and forward buttons' chevrons and the text cursor's caret
@@ -124,11 +125,23 @@ for one thing cost four. So:
   The code says the same four: `hud` (`gui/slideshow_hud.py`, `Hud`), the
   Job Queue (`JobQueueView` in Core and `gui/hud_queue.py` on a HUD, with
   `JobQueue` the controller behind both), `core` (`gui/core.py`, `Core`) and
-  `standalone`, and "panel" is left to the Generate, Enhance and Combine
-  forms and the OSR2 console at Core's top left. So no agent reaches for
+  `standalone`, and no part of this app is a panel: a Generate tab, the Enhance
+  pane, the Combine and the OSR2 controls each have their own word. So no agent reaches for
   another word: an audit that called the HUD a "panel", the Job Queue
   "the list of pictures and videos being made or waiting" and Standalone
   "on its own" left him asking whether each meant his word.
+- **`glossary.json` lists the things on this app's screen and their words, and
+  `tests/test_glossary.py` holds the code to it.** One row per thing: the word
+  on the screen, the word the user says, the words the code says today, the one
+  word the code is to say, and whether he has ruled. A noun the code reaches
+  for to name a drawn thing (tile, card, badge, chip, scrim, plate, strip, cell,
+  slot, pane, panel, console, band, toast, and the rest the test names) is a
+  row there before it is a word in the code, so a new name is a row he rules
+  on rather than a word an agent invents. A rename moves the old word from the
+  row's `code_today` to its `retired`, which the test then holds at zero, and a
+  row naming a code word the code no longer says is stale, which the test says
+  too. A thing with no word of his yet has a row that says so, and the next
+  piece of work on that thing asks him for one.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 
@@ -161,7 +174,7 @@ them as choices the user is being asked to make. That is exactly how the SDXL
 T2I form came to show WAN 2.2's high/low expert pairs, with nothing to
 say which one to pick or that neither belonged.
 
-So every picker states what its graph runs: `model_picker(key, label, default,
+So every picker states what its graph runs: `model_dropdown(key, label, default,
 folder, accepts=…)`, which lists that folder with `list_model_files(category,
 fallback, accepts=…)` and keeps it on the picker, and `list_lora_files(fallback,
 accepts=…)`, with `accepts` a family
@@ -201,7 +214,7 @@ model, where the honest shrug only leaves it listed.
 
 ## A model is shown by its title, and installing one gives it its title
 
-The dropdowns, the TOC and the Enhancement Levels name a model or LoRA file by
+The dropdowns, the TOC and the Enhancements name a model or LoRA file by
 its title (`model_titles.model_title`): the name its page on Civitai or Hugging
 Face gives it, tidied, with the version, the expert half and the precision where
 two files would otherwise read alike. Titles live in `model_titles.json` beside
@@ -237,10 +250,10 @@ then leaves as it is.
 
 Two columns answer it and nothing else does: an image's `image_state`, set in
 the sorting window or the Action list on a Generate tab, and a video's
-`act`, the act picked when it was launched. `act_settings.act_of`
+`act`, the act picked when it was launched. `action_settings.action_of`
 reads those two and returns "" for a row nobody has said one for, which a
 slideshow's map draws as a row with no act name, in its gutter and on its filter
-button (`nav_map.act_of`).
+button (`nav_map.action_of`).
 
 It used to be worked out from the prompt, by matching each act's keywords in
 `acts` against the stored text. That answer named every map row and
@@ -340,7 +353,7 @@ claim in the production copy's `state/` as well, which is where every session
 writes one; a preview that read only its own went on driving beside Fun Time
 (2026-09-26).
 
-One-sided, none of them fails loudly. The console's enhanced-only switch shipped
+One-sided, none of them fails loudly. The OSR2 controls' enhanced-only switch shipped
 on the shared side with nothing on fun_time's side answering the verb it posts,
 so the button lit and the slideshows played on unchanged — a control that looks live
 and does nothing, found by an audit rather than by a red test (bug 90). Pointed
@@ -399,7 +412,7 @@ would be lost. `tests/test_launcher_contract.py` holds both to that.
   as one thing only: the starting position the window offers for an animation
   nobody ever kept a video of, which is the last place `starting_point` looks.
 
-Neither can answer anything the other has not: an animation's samples are clips
+Neither can answer anything the other has not: an animation's samples are videos
 made from images already sorted, so the sorting window comes first and a fresh
 library shows every animation blank.
 
@@ -478,12 +491,12 @@ is the two hooks that call the guard, below.
   stop, his hand training scripts beside the library take and honor the same
   file, and a claim whose pid has died is stale: two trainings each yielding
   only to ComfyUI's line took the card together on 2026-10-29 and both crawled.
-- `tools/open_from_notification.py` — what Windows runs when a notification of
+- `tools/open_from_toast.py` — what Windows runs when a toast of
   this app's is clicked, registered as the command for the `origenerator:` link
-  every notice carries. It hands the generation to the copy that has the
+  every toast carries. It hands the generation to the copy that has the
   library if one is open, a preview included, and starts production
   Origenerator on it if none is; `origenerator.app_link` is all of the
-  deciding, and the registering is `DesktopNotices`. Every copy registers the
+  deciding, and the registering is `Toasts`. Every copy registers the
   production checkout's, his decision (2026-10-18): a toast opened the preview
   that had raised it, and he wants toasts to open production. So a change to
   what this handler decides reaches a click only once it ships, and a preview
@@ -533,14 +546,14 @@ window's session, saved in `state/ui_state.json` through one table,
 on the way out, what it is told on the way back in. A control added without a
 line there is forgotten at every launch with nothing failing, which is how
 Separate and Together, Images / Videos / Both, the folders left open in the
-TOC, the console's Speed, Amp, Center, shape and Human inspired, every
+TOC, the OSR2 controls' Speed, Amp, Center, shape and Human inspired, every
 dragged border and each tab's folded sections went unremembered until the
 user noticed one of them.
 
 `tests/test_remembered_settings.py` holds the window to it the way Fun
 Time's `test_session_resume.py` holds the session: it builds the window,
 counts every control a person can set and every press and bar on the
-console, and fails on one that neither a key of the table nor its short list
+OSR2 controls, and fails on one that neither a key of the table nor its short list
 of things that are no setting accounts for. So a new control is finished
 when it has its key, or its line there saying why it is no setting -- what is
 being searched for, what one image shows, a nudge, and Auto-generate, which
@@ -620,7 +633,7 @@ A change a Fun Time session could show differently gets its hosted half judged
 too. A session draws this same window at its own smaller scale, reaches it with
 its own keys and spoken commands, and runs code only a hosted window runs, so a
 change to a size, to a key or a command, or to hosted-only code owes a Fun Time
-launcher beside the standalone one: bigger toolbar marks handed over in a
+launcher beside the standalone one: bigger Gallery pane button icons handed over in a
 standalone preview alone were sent back for exactly that. A change that looks
 and works the same at any size and in either host, such as taking the dim off a
 image under the not-yet-generated line, goes out with the standalone preview

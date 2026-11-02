@@ -11,7 +11,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.content import load_content
 from origenerator.db_connection import SqliteFile
-from origenerator.db_deletions import DeletionStore
+from origenerator.db_trash import TrashStore
 from origenerator.output_places import OutputPlaces
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -138,7 +138,7 @@ OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=C
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, places=OUTPUT_PLACES, temp=COMFYUI_TEMP_DIR,
-                               trashed=DeletionStore(SqliteFile(DB_PATH)).trashed_file)
+                               trashed=TrashStore(SqliteFile(DB_PATH)).trashed_file)
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
 # the "Prompt executed in N seconds" lines feed duration backfill.
 COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
@@ -164,10 +164,10 @@ EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 # A Genau flick goes to the same inbox under its own source name. Evolver routes by
-# that name, so the folder is the whole signal: it upscales the clip on its usual
+# that name, so the folder is the whole signal: it upscales the video on its usual
 # schedule and then delivers the result to Genau's flicks folder rather than leaving
 # it in the outbox. Sending straight to Genau's folder instead would skip the
-# upscale, and a loop straight out of the graph is visibly softer than the clips
+# upscale, and a loop straight out of the graph is visibly softer than the videos
 # already there.
 #
 # From the settings all of Haglio shares, not from source, because naming a folder
@@ -177,7 +177,7 @@ EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 GENAU_SOURCE = haglio_settings.value("genau_source")
 
 # The curated pose references the SDXL Pose Transfer workflow is steered by. Its
-# Structure Image picker opens here rather than in ComfyUI's input folder, which
+# Structure Image file dialog opens here rather than in ComfyUI's input folder, which
 # collects generated frames instead. Built from the library root because that
 # root is private and must stay out of source.
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"

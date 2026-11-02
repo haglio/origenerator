@@ -17,7 +17,7 @@ from origenerator.win32 import (
     place_window_in_device_pixels,
     raise_window_without_activating,
     register_link_handler,
-    register_notification_identity,
+    register_toast_identity,
 )
 
 
@@ -160,13 +160,13 @@ class TestOutOfSight:
 
 class TestNotificationIdentity:
     def test_it_registers_the_name_and_the_mark_under_the_apps_own_id(self):
-        # Windows heads a notification with whatever is registered under the id
+        # Windows heads a toast with whatever is registered under the id
         # the process claims. With nothing there it prints the id itself and
         # draws a generic glyph, which is what a finished run's first
-        # notification came out looking like.
+        # toast came out looking like.
         written = {}
 
-        register_notification_identity(
+        register_toast_identity(
             "Origenerator", name="Origenerator", icon=Path("C:/marks/o.png"),
             write=lambda key, values: written.update({key: values}))
 
@@ -181,14 +181,14 @@ class TestNotificationIdentity:
         def refuse(key, values):
             raise OSError("access denied")
 
-        register_notification_identity("Origenerator", name="Origenerator",
+        register_toast_identity("Origenerator", name="Origenerator",
                                        icon=Path("C:/marks/o.png"), write=refuse)
 
 
 class TestLinkHandler:
     def test_it_registers_the_command_windows_runs_for_this_apps_links(self):
-        # What makes a clicked notification reach the app at all: Windows follows
-        # the link the notification carries, and follows it by running whatever
+        # What makes a clicked toast reach the app at all: Windows follows
+        # the link the toast carries, and follows it by running whatever
         # stands here for its scheme.
         written = {}
 

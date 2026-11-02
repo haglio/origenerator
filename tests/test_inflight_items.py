@@ -1,4 +1,4 @@
-"""The queue's cards, built with no widget anywhere.
+"""The queue's tiles, built with no widget anywhere.
 
 Which is what the move buys: this is a join over four sources — the generations
 table, the requests table, the controller's live jobs with its queue order, the
@@ -147,7 +147,7 @@ def build():
     return make
 
 
-def test_only_the_rows_still_being_made_get_a_card(build):
+def test_only_the_rows_still_being_made_get_a_tile(build):
     items = build([_row("g1", status="completed"), _row("g2", status="pending"),
                    _row("g3", status="running"), _row("g4", status="error")])
 
@@ -166,16 +166,16 @@ def test_a_running_row_no_live_job_holds_is_placed_by_the_gallery_s_own_index(
     assert [item.key for item in items] == ["g1"]
 
 
-def test_a_running_row_no_live_job_holds_still_gets_a_plain_card(build):
+def test_a_running_row_no_live_job_holds_still_gets_a_plain_tile(build):
     # After a restart that has not re-adopted its runs, the database is the only
-    # thing that knows the work exists -- a card with no frame, no progress and
+    # thing that knows the work exists -- a tile with no frame, no progress and
     # nothing to cancel is still the honest answer.
     items = build([_row("g1", status="running")])
 
-    card, = items
-    assert (card.reading.frame, card.reading.progress, card.cancel, card.shield) == (
+    tile, = items
+    assert (tile.reading.frame, tile.reading.progress, tile.cancel, tile.shield) == (
         None, None, None, None)
-    assert card.reading.status == "running"
+    assert tile.reading.status == "running"
 
 
 def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
@@ -183,9 +183,9 @@ def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
     items = build([_row("g1", status="running")],
                   jobs_by_folder={"image/sdxl_t2i/aaa": [job]})
 
-    card, = items
-    assert (card.reading.frame, card.reading.progress, card.reading.stage) == (b"frame", (5, 20), "Render")
-    assert card.cancel is not None
+    tile, = items
+    assert (tile.reading.frame, tile.reading.progress, tile.reading.stage) == (b"frame", (5, 20), "Render")
+    assert tile.cancel is not None
 
 
 def test_a_video_waiting_out_the_minute_after_an_image_carries_when_it_starts(build):
@@ -193,8 +193,8 @@ def test_a_video_waiting_out_the_minute_after_an_image_carries_when_it_starts(bu
     items = build([_row("g1", status="pending")],
                   jobs_by_folder={"video/wan22_i2v/aaa": [job]})
 
-    card, = items
-    assert card.starts_at == 1060.0
+    tile, = items
+    assert tile.starts_at == 1060.0
 
 
 def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):
@@ -218,7 +218,7 @@ def test_a_run_comfyui_holds_but_has_not_started_says_queued(build):
     assert items[0].reading.status == "queued"
 
 
-def test_a_card_moves_its_job_up_and_down_the_queues_own_line(build):
+def test_a_tile_moves_its_job_up_and_down_the_queues_own_line(build):
     jobs = FakeJobQueue({"image/sdxl_t2i/aaa": [FakeJob("g1"), FakeJob("g2", state="queued")]},
                         order=["g1", "g2"], stuck={("g1", "up"), ("g2", "down")})
     head, behind = build([_row("g1", status="running"), _row("g2")], jobs=jobs)
@@ -236,7 +236,7 @@ def test_a_run_no_live_job_holds_cannot_be_moved(build):
     assert (item.move_up, item.move_down) == (None, None)
 
 
-def test_the_queues_own_line_orders_the_cards(build):
+def test_the_queues_own_line_orders_the_tiles(build):
     # Nothing a row records says whether an image jumped ahead of a video, or
     # whether a drag moved one.
     rows = [_row("g1"), _row("g2"), _row("g3")]
@@ -282,7 +282,7 @@ def test_an_auto_generating_folders_run_offers_next_seed_rather_than_stop(build)
     assert items[0].stop_auto is not None
 
 
-def test_a_cards_cancel_and_reveal_are_the_callers_own(build):
+def test_a_tiles_cancel_and_reveal_are_the_callers_own(build):
     cancelled, revealed = [], []
     key = "image/sdxl_t2i/aaa"
     items = build([_row("g1", status="running")],
@@ -294,7 +294,7 @@ def test_a_cards_cancel_and_reveal_are_the_callers_own(build):
     assert (cancelled, revealed) == (["g1"], [key])
 
 
-def test_an_enhancements_card_goes_nowhere_once_its_image_is_gone(build):
+def test_an_enhancements_tile_goes_nowhere_once_its_image_is_gone(build):
     went_to, revealed = [], []
     enhancement = _row("e1", workflow="image_enhance", enhance_of="deleted",
                        params={"input_image": "sdxl_t2i_deleted.png [output]"})
@@ -305,7 +305,7 @@ def test_an_enhancements_card_goes_nowhere_once_its_image_is_gone(build):
     assert (went_to, revealed) == ([], [])
 
 
-def test_a_cards_shield_is_its_jobs_and_is_set_through_the_caller(build):
+def test_a_tiles_shield_is_its_jobs_and_is_set_through_the_caller(build):
     shielded = []
     job = FakeJob("g1")
     job.shielded = True
@@ -325,10 +325,10 @@ def test_a_run_a_folders_modify_queued_stands_under_the_image_it_rewrites(build)
     items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": ""}])
 
-    card = next(item for item in items if item.key == "g1")
-    assert card.modified
-    assert not card.requested
-    assert card.source_file == "asked-of.jpg"
+    tile = next(item for item in items if item.key == "g1")
+    assert tile.modified
+    assert not tile.requested
+    assert tile.source_file == "asked-of.jpg"
 
 
 def test_a_run_a_typed_request_queued_is_marked_as_one(build):
@@ -336,9 +336,9 @@ def test_a_run_a_typed_request_queued_is_marked_as_one(build):
     items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": "", "asked": "two women"}])
 
-    card = next(item for item in items if item.key == "g1")
-    assert card.requested
-    assert not card.modified
+    tile = next(item for item in items if item.key == "g1")
+    assert tile.requested
+    assert not tile.modified
 
 
 def test_a_run_a_request_queued_is_marked_as_one(build):
@@ -346,22 +346,22 @@ def test_a_run_a_request_queued_is_marked_as_one(build):
     items = build(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": "Request, no hat, over."}])
 
-    card = next(item for item in items if item.key == "g1")
-    assert card.requested
-    assert not card.modified
+    tile = next(item for item in items if item.key == "g1")
+    assert tile.requested
+    assert not tile.modified
 
 
 def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build):
     asked_of = _row("asked-of", status="completed")
     items = build([asked_of, _row("g1")], requests=[{
         "prompt_id": "g1", "source_prompt_id": "asked-of", "heard": "Request, no hat, over."}])
-    card = next(item for item in items if item.key == "g1")
+    tile = next(item for item in items if item.key == "g1")
 
     standing = requested_of(asked_of, WORKFLOW_REGISTRY["sdxl_t2i"], {})
 
     drawn = ("media_type", "job_kind", "requested", "source_image", "source_file")
     assert {name: standing[name] for name in drawn} == {
-        name: getattr(card, name) for name in drawn}
+        name: getattr(tile, name) for name in drawn}
 
 
 def test_a_queued_run_with_no_thumbnail_shows_what_its_folder_already_holds(build):

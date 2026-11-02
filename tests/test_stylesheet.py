@@ -40,7 +40,7 @@ def test_the_stylesheet_is_qss_with_every_shared_ui_token_resolved():
 
 def test_a_tabs_close_mark_is_styled_flat_not_as_a_button():
     # All a tab's ✕ is is the style's own mark sitting on the tab; the default
-    # QToolButton look would wall it into a raised, rounded border. A scene card's
+    # QToolButton look would wall it into a raised, rounded border. A scene tile's
     # remove wears the same mark, under the same rule.
     qss = build_stylesheet()
     rule = qss.split("QToolButton#tabCloseButton, QToolButton#sceneRemove {", 1)[1].split("}", 1)[0]
@@ -179,7 +179,7 @@ def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
 
 def test_a_radios_ring_stays_visible_in_both_states(qtbot):
     # The ring is what says there is a choice here at all, so the disc arriving
-    # must not swallow it, and neither state may leave it as dark as the panel
+    # must not swallow it, and neither state may leave it as dark as the pane
     # under it.
 
     for checked in (True, False):

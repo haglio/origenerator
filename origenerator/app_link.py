@@ -1,9 +1,9 @@
-"""The way into this app from outside it: the link a clicked notice follows.
+"""The way into this app from outside it: the link a clicked toast follows.
 
-A notification outlives the app that raised it, so Windows answers one by
+A toast outlives the app that raised it, so Windows answers one by
 following the link the toast carries (``activationType="protocol"``) and running
 whatever is registered for its scheme: the production checkout's handler
-(:data:`HANDLER`), whichever copy raised the notice. Qt-free, because this is
+(:data:`HANDLER`), whichever copy raised the toast. Qt-free, because this is
 what runs on a click.
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ _AN_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 CARRIED_IN = "ORIGENERATOR_GO_TO"
 
-HANDLER = Path("tools") / "open_from_notification.py"
+HANDLER = Path("tools") / "open_from_toast.py"
 
 LIVE_LAUNCHER = "launch_origenerator.vbs"
 
@@ -200,6 +200,6 @@ def _note(checkout: Path, what: str) -> None:
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("a", encoding="utf-8") as writing:
             stamped = time.strftime("%Y-%m-%d %H:%M:%S")
-            writing.write(f"===== {stamped} notice: {what}\n")
+            writing.write(f"===== {stamped} toast: {what}\n")
     except OSError:
         pass  # a click is worth more than the note of it

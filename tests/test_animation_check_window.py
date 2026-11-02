@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionButton,
 )
 
-from origenerator.act_settings import VIDEO
+from origenerator.action_settings import VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
 from origenerator.gui.animation_check_window import (
     ACCEPT,
@@ -26,7 +26,7 @@ from origenerator.gui.animation_check_window import (
     BLANK,
     COUNTED,
     FORWARD,
-    FROM_THE_ACTS_OWN,
+    FROM_THE_ACTIONS_OWN,
     HEADING,
     IMAGE,
     NEGATIVE,
@@ -58,7 +58,7 @@ class _Store:
         return None if held is None else {"workflow": held[0], "params": held[1]}
 
 
-def _clip(prompt_id="clip", positive="a scene", negative="flaws"):
+def _video(prompt_id="clip", positive="a scene", negative="flaws"):
     return {
         "prompt_id": prompt_id, "workflow_name": "wan22_i2v",
         "positive_prompt": positive, "negative_prompt": negative,
@@ -101,7 +101,7 @@ def window(qtbot, tmp_path):
 
 
 def test_the_heading_names_the_lane_the_act_and_the_state_it_starts_from(window):
-    made, _store, _sent = window({(VIDEO, "alpha", "state one"): [_clip()]})
+    made, _store, _sent = window({(VIDEO, "alpha", "state one"): [_video()]})
 
     assert "alpha" in _said(made, HEADING)
     assert "state one" in _said(made, HEADING)
@@ -110,7 +110,7 @@ def test_the_heading_names_the_lane_the_act_and_the_state_it_starts_from(window)
 
 def test_the_samples_prompts_are_what_the_boxes_open_on(window):
     made, _store, _sent = window({(VIDEO, "alpha", "state one"):
-                                  [_clip(positive="a scene", negative="flaws")]})
+                                  [_video(positive="a scene", negative="flaws")]})
 
     assert _box(made, POSITIVE).toPlainText() == "a scene"
     assert _box(made, NEGATIVE).toPlainText() == "flaws"
@@ -123,7 +123,7 @@ def test_an_animation_nothing_was_ever_made_for_says_so(window):
 
 
 def test_accepting_takes_the_prompts_as_they_now_read(window):
-    made, store, _sent = window({(VIDEO, "alpha", "state one"): [_clip()]})
+    made, store, _sent = window({(VIDEO, "alpha", "state one"): [_video()]})
     _box(made, POSITIVE).setPlainText("a better scene")
 
     _press(made, ACCEPT).click()
@@ -136,7 +136,7 @@ def test_accepting_takes_the_prompts_as_they_now_read(window):
 
 
 def test_making_one_with_the_edited_prompts_leaves_the_animation_where_it_is(window):
-    made, _store, sent = window({(VIDEO, "alpha", "state one"): [_clip("c1")]})
+    made, _store, sent = window({(VIDEO, "alpha", "state one"): [_video("c1")]})
     _box(made, POSITIVE).setPlainText("a different scene")
 
     _press(made, SUBMIT).click()
@@ -155,7 +155,7 @@ def test_making_one_where_there_is_no_example_cannot_be_asked_for(window):
 
 def test_rejecting_an_example_brings_up_the_next_one(window):
     made, _store, _sent = window({(VIDEO, "alpha", "state one"): [
-        _clip("c1", positive="the first"), _clip("c2", positive="the second")]})
+        _video("c1", positive="the first"), _video("c2", positive="the second")]})
 
     _press(made, REJECT).click()
 
@@ -184,7 +184,7 @@ def test_the_count_says_how_many_have_had_their_settings_taken(window):
 def test_the_pair_is_shown_at_the_size_the_window_gives_them(window, tmp_path):
     still = tmp_path / "still.png"
     Image.new("RGB", (400, 600), "gray").save(still)
-    made, _store, _sent = window({(VIDEO, "alpha", "state one"): [_clip()]},
+    made, _store, _sent = window({(VIDEO, "alpha", "state one"): [_video()]},
                                  look=lambda row: (str(still), None))
 
     shown = made.findChild(QLabel, IMAGE).pixmap()
@@ -197,7 +197,7 @@ def test_the_pair_is_shown_at_the_size_the_window_gives_them(window, tmp_path):
 
 
 def test_the_lane_in_the_heading_is_the_word_the_app_shows(window):
-    made, _store, _sent = window({_ORDER[0]: [_clip()]})
+    made, _store, _sent = window({_ORDER[0]: [_video()]})
 
     assert _said(made, HEADING).startswith("Kino · alpha")
 
@@ -210,14 +210,14 @@ def test_the_count_says_what_it_is_counting(window):
 
 
 def test_taking_the_settings_is_the_one_blue_answer(window):
-    made, _store, _sent = window({_ORDER[0]: [_clip()]})
+    made, _store, _sent = window({_ORDER[0]: [_video()]})
 
     assert _press(made, ACCEPT).text() == "Assign these settings"
     assert _press(made, ACCEPT).property(COMMITS) is True
 
 
 def test_making_another_sample_waits_for_a_prompt_to_be_edited(window):
-    made, _store, _sent = window({_ORDER[0]: [_clip()]})
+    made, _store, _sent = window({_ORDER[0]: [_video()]})
 
     assert _press(made, SUBMIT).text() == "Generate new sample with current settings"
     assert not _press(made, SUBMIT).isEnabled()
@@ -228,7 +228,7 @@ def test_making_another_sample_waits_for_a_prompt_to_be_edited(window):
 
 
 def test_the_next_sample_can_only_be_asked_for_while_there_is_one(window):
-    made, _store, _sent = window({_ORDER[0]: [_clip("one"), _clip("two")]})
+    made, _store, _sent = window({_ORDER[0]: [_video("one"), _video("two")]})
 
     assert _press(made, REJECT).text() == "View next preexisting sample from library"
     assert _press(made, REJECT).isEnabled()
@@ -273,10 +273,10 @@ def _loop(path):
 
 
 def test_a_step_puts_the_new_sample_in_place_of_the_one_before(window, tmp_path):
-    """Each step made a clip of its own and left the one before it on the label,
+    """Each step made a video of its own and left the one before it on the label,
     running, so his window stacked them up instead of replacing them."""
     made, _store, _sent = window(
-        {path: [_clip()] for path in _ORDER},
+        {path: [_video()] for path in _ORDER},
         look=lambda row: (None, _loop(tmp_path / "loop.webp")))
     made.show()
 
@@ -314,7 +314,7 @@ def test_an_animation_nobody_kept_a_video_of_starts_from_the_acts_own_prompts(wi
 
     assert _box(made, POSITIVE).toPlainText() == "the act's own"
     assert _box(made, NEGATIVE).toPlainText() == "its flaws"
-    assert made.findChild(QLabel, BLANK).text() == FROM_THE_ACTS_OWN
+    assert made.findChild(QLabel, BLANK).text() == FROM_THE_ACTIONS_OWN
 
 
 def test_an_animation_with_neither_says_there_is_nothing_to_go_by(window):

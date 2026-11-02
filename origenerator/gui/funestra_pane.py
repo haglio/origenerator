@@ -197,7 +197,7 @@ class FunestraPane(QWidget):
             self._funestra.playback.set_paused(paused)
 
     def position(self) -> int:
-        """How far into the clip on screen the Funestra has got, in milliseconds."""
+        """How far into the video on screen the Funestra has got, in milliseconds."""
         return 0 if self._funestra is None else int(self._funestra.playback.position_ms)
 
     def close_engine(self) -> None:

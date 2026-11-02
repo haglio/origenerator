@@ -1,0 +1,406 @@
+"""The gallery's image + video Combine, sitting under the TOC folder tree.
+
+Drop an image into the top drop zone, then supply *settings* either by picking an act
+from the Action list, which sends the app looking for a fitting past video, or by
+dropping a specific i2v video (shown in gray: it is here for its settings). The two
+are mutually exclusive. A video dropped into the top drop zone lends it only the image
+it was made from, and one let go between the drop zones lends each what it can. Generate
+re-runs the chosen settings on the dropped image; “Edit individual…” hands them to a
+generate tab first.
+
+Under the dropdown, a pair of radios says what the result is *for*: a full-length
+video (the default), or a Genau flick — one complete cycle, looping. That choice
+picks which videos the act is answered from, so the dropdown's usable acts change
+with it: an act only the video lane can answer grays out under Genau, and acts that
+are no kind of cycle at all are not offered there.
+
+Combine is pure UI, reporting what was asked for as one :class:`CombineRequest` on
+:attr:`combine_requested`; its controller
+(:mod:`origenerator.gui.combine_controller`) owns the database, what each drop zone is
+lent, the routing and both the generation and the generator tab.
+"""
+from __future__ import annotations
+
+from collections.abc import Callable, Collection
+from dataclasses import dataclass
+
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
+    QButtonGroup,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QRadioButton,
+    QStyle,
+    QStyleOptionComboBox,
+    QVBoxLayout,
+    QWidget,
+)
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
+
+from origenerator import animation_paths
+from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
+from origenerator.content import genau_flick_word
+from origenerator.gui.action_dropdown import ACTION_LABEL
+from origenerator.gui.drop_zone import DROP_A_VIDEO, DROP_AN_IMAGE, DropZone, DropZones
+from origenerator.gui.eliding import open_the_list_in_full
+from origenerator.gui.generate_button import (
+    DEFAULT_CAPTION,
+    RANDOM_SEED_CAPTION,
+    GenerateButton,
+)
+from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
+from origenerator.gui.recent_videos import RecentVideo, RecentVideos
+from origenerator.media import MediaType
+
+# The dropdown's leading neutral option: no act chosen, so a dropped video is used.
+_NEUTRAL_LABEL = "(custom)"
+_NEEDS_IMAGE = "Nothing to start from — drop an image first"
+_NEEDS_ACTION_OR_VIDEO = "Pick an act or drop a video first"
+_EDIT_TIP = "Load this combination into a generate tab to edit before running it."
+
+
+def _text_inset(dropdown: QComboBox) -> int:
+    """How far in from a dropdown's left edge its own text starts, so a label
+    under it lines up with the words rather than with the frame."""
+    opt = QStyleOptionComboBox()
+    dropdown.initStyleOption(opt)
+    field = dropdown.style().subControlRect(
+        QStyle.ComplexControl.CC_ComboBox, opt,
+        QStyle.SubControl.SC_ComboBoxEditField, dropdown)
+    return field.x() + 1  # the style insets the text a pixel before drawing it
+
+
+def _keep_its_room_when_hidden(widget: QWidget) -> None:
+    room = widget.sizePolicy()
+    room.setRetainSizeWhenHidden(True)
+    widget.setSizePolicy(room)
+
+
+@dataclass(frozen=True)
+class CombineRequest:
+    """One press of Generate or “Edit individual…”: the image, the settings —
+    a dropped video or a picked act, never both — the lane it is answered from,
+    and whether it is bound for the generator rather than for a run now."""
+
+    image_id: str
+    video_id: str = ""
+    category: str = ""
+    intent: str = VIDEO
+    edit_first: bool = False
+
+
+class Combine(QWidget):
+    """Image drop zone + settings (dropped video or picked act) + an intent + Generate."""
+
+    combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
+    animation_settings_requested = pyqtSignal()  # "Edit default…": settle an animation
+    intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regray the acts
+    item_activated = pyqtSignal(str)  # a drop zone's image or video was clicked (prompt_id)
+    video_used = pyqtSignal(str, str)  # (intent, prompt_id) a video put in the drop zone by hand
+
+    def __init__(
+        self,
+        image_lent_by: Callable[[str], str | None],
+        video_lent_by: Callable[[str], str | None],
+        preview: Callable[[str], tuple[str | None, str | None]],
+        history: Callable[[str], list[str]],
+        parent=None,
+        *,
+        named: Callable[[str], str | None] = lambda name: None,
+        name_of: Callable[[str], str] = lambda held: "",
+        browse_image: Callable[[], None] | None = None,
+        leads_to: Callable[[str], str | None] = lambda held: held,
+    ):
+        super().__init__(parent)
+        self._preview = preview
+        self._history = history
+        self.image_zone = DropZone(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
+                                   named=named, name_of=name_of, browse=browse_image,
+                                   leads_to=leads_to)
+        # Gray, always: the video in this drop zone is never what gets made — only the
+        # settings the making follows. In color it reads as a second subject beside
+        # the image, which is the one thing it is not.
+        self.video_zone = DropZone(MediaType.VIDEO, video_lent_by, preview, DROP_A_VIDEO,
+                                   grayscale=True, named=named, name_of=name_of,
+                                   leads_to=leads_to)
+        _keep_its_room_when_hidden(self.video_zone)
+        self._between = DropZones((self.image_zone, self.video_zone))
+        self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)
+        self.image_zone.changed.connect(self._sync)
+        self.video_zone.changed.connect(self._on_video_changed)
+        self.image_zone.activated.connect(self.item_activated)
+        self.video_zone.activated.connect(self.item_activated)
+        self._dropped: dict[str, str] = {}
+        self._folder_generating = False
+        self._recent_videos = RecentVideos(self._recent_rows,
+                                           lambda video: self._preview(video)[1])
+        self._recent_videos.picked.connect(self.video_zone.set_item)
+        _keep_its_room_when_hidden(self._recent_videos)
+
+        # The video part's fast path: pick an act and the view finds a fitting past
+        # video for you. A neutral "(custom)" leads the list (index 0, the default) so
+        # no act is forced; picking it again clears an act.
+        self._category = QComboBox()
+        self._list_the_actions(VIDEO)
+        open_the_list_in_full(self._category)
+        self._category.setToolTip(
+            "Pick an act and Generate — the app reuses a fitting past video's settings "
+            "on the dropped image. Or pick (custom) and drop a specific video instead."
+        )
+        self._category.currentIndexChanged.connect(self._on_category_changed)
+
+        # The word under the dropdown: beside it this pane cuts it to "Ac…", and
+        # the list opens upwards, so underneath stays clear.
+        self._action_part = QWidget()
+        action_column = QVBoxLayout(self._action_part)
+        action_column.setContentsMargins(0, 0, 0, 0)
+        action_column.setSpacing(0)  # a word and the thing it names
+        action_column.addWidget(self._category)
+        named = QLabel(ACTION_LABEL)
+        named.setIndent(_text_inset(self._category))
+        action_column.addWidget(named)
+        action_column.addSpacing(BUTTON_GAP)
+        action_column.addWidget(self._recent_videos)
+        # Or the row's spare height goes to the word, which then floats in it.
+        action_column.addStretch(1)
+
+        # The video part: the two ways to supply the settings, side by side in one
+        # container so the dropdown reads as belonging to the video side, not the image.
+        self._video_part = QWidget()
+        video_row = QHBoxLayout(self._video_part)
+        video_row.setContentsMargins(0, 0, 0, 0)
+        video_row.setSpacing(BUTTON_GAP)  # the family's gap inside a group
+        video_row.addWidget(self._action_part, 1)  # each takes half the part's width
+        video_row.addWidget(self.video_zone, 1)
+
+        # What the result is for. Kino is the default because it is the long-
+        # standing behavior of Combine and by far the more common ask; Genau is
+        # the deliberate detour. Under it the act list narrows, so the radio sits
+        # directly beneath the dropdown it changes.
+        self._video_radio = QRadioButton("Kino")
+        self._video_radio.setToolTip(
+            "Make a full-length video for the Satellite Funestras."
+        )
+        self._video_radio.setChecked(True)
+        self._genau_radio = QRadioButton("Genau")
+        self._genau_radio.setToolTip(
+            f"Make a Genau {genau_flick_word()}: one complete cycle, looping, sent to "
+            "Genau when done."
+        )
+        self._intent_group = QButtonGroup(self)
+        self._intent_group.addButton(self._video_radio)
+        self._intent_group.addButton(self._genau_radio)
+        self._intent_group.buttonToggled.connect(self._on_intent_changed)
+        self._intent_part = QWidget()
+        intent_row = QHBoxLayout(self._intent_part)
+        intent_row.setContentsMargins(0, 0, 0, 0)
+        # Wider than the gap a radio leaves between its own circle and its word,
+        # or each word reads as labelling the circle after it.
+        intent_row.setSpacing(BUTTON_GROUP_GAP)
+        intent_row.addWidget(self._video_radio)
+        intent_row.addWidget(self._genau_radio)
+        intent_row.addStretch(1)
+
+        # Two ways to act on the same chosen settings: run them now, or open them in the
+        # generator to tweak first. Both gate on the same "image + settings" readiness.
+        self._generate_btn = GenerateButton()
+        self._generate_btn.clicked.connect(self._emit)
+        self._open_btn = QPushButton("Edit individual…")
+        self._open_btn.clicked.connect(self._emit_open)
+        self._defaults_btn = QPushButton("Edit default…")
+        self._defaults_btn.setToolTip(
+            "Settle what each animation runs: an act, in a lane, from each kind "
+            "of image")
+        self._defaults_btn.clicked.connect(self.animation_settings_requested)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, GAP_SMALL, 0, 0)
+        layout.setSpacing(BUTTON_GAP)  # rows of one group sit a group's gap apart
+        heading = QLabel("Combine")
+        heading.setObjectName("combineHeading")
+        heading.setToolTip(
+            "Re-run a video's settings on the dropped image: pick an act, or drop a video."
+        )
+        layout.addWidget(heading)
+        parted = QVBoxLayout()
+        parted.setSpacing(0)  # the room between them is the whole gap
+        parted.addWidget(self.image_zone)
+        parted.addWidget(self._between)
+        parted.addWidget(self._video_part)
+        layout.addLayout(parted)
+        layout.addWidget(self._intent_part)
+        layout.addWidget(self._generate_btn)
+        layout.addWidget(self._open_btn)
+        layout.addWidget(self._defaults_btn)
+        self._sync()
+
+    # --- intent (what the result is for) ----------------------------------
+
+    def selected_intent(self) -> str:
+        """``VIDEO`` or ``GENAU`` — which lane the chosen settings are answered from."""
+        return GENAU if self._genau_radio.isChecked() else VIDEO
+
+    def set_intent(self, intent: str):
+        """Select the ``VIDEO``/``GENAU`` radio; anything else selects video.
+
+        For putting Combine back the way a session left it
+        (:meth:`GalleryView.restore_combine_selection`) -- the lane decides which
+        acts are answerable, so it goes in before the act does.
+        """
+        self._genau_radio.setChecked(intent == GENAU)
+        self._video_radio.setChecked(intent != GENAU)
+
+    def _on_intent_changed(self, _button, checked: bool):
+        """Announce the new lane once, on the radio that just went on.
+
+        ``buttonToggled`` fires twice for one click — off for the old radio, on for
+        the new — and the view answers by re-graying the whole act list, so only the
+        on edge is passed along.
+        """
+        if checked:
+            self._list_the_actions(self.selected_intent())
+            if not self.selected_category():
+                self._show_dropped()
+            self.intent_changed.emit(self.selected_intent())
+
+    # --- category ---------------------------------------------------------
+
+    def _list_the_actions(self, lane: str) -> None:
+        picked = self.selected_category() if self._category.count() else ""
+        self._category.clear()
+        self._category.addItem(_NEUTRAL_LABEL)
+        self._category.addItems(animation_paths.acts(lane))
+        self.set_category(picked)
+
+    def selected_category(self) -> str:
+        """The picked act, or "" when the neutral "(custom)" option (index 0) is selected."""
+        index = self._category.currentIndex()
+        return self._category.currentText() if index >= 1 else ""
+
+    def set_category(self, category: str):
+        """Select ``category``, or the neutral option for anything else --
+        including an act the current lane cannot answer, which
+        :meth:`set_available_categories` has grayed out. A grayed act must not
+        arrive selected for the same reason it must not stay selected: the
+        buttons would go live on a pick that can only answer "no past video yet".
+        """
+        index = self._category.findText(category)
+        usable = index >= 1 and self._category.model().item(index).isEnabled()
+        self._category.setCurrentIndex(index if usable else 0)
+
+    def set_available_categories(self, available: Collection[str]):
+        """Gray out every act the current lane has no settings for — nothing to mine and
+        nothing pinned, so offering it could only ever answer "no past video yet". A
+        disabled item says why on hover, naming the lane, since an act the video
+        lane answers happily can still be unanswerable as a loop. The neutral
+        "(custom)" is never grayed."""
+        lane = self.selected_intent()
+        model = self._category.model()
+        for index in range(1, self._category.count()):
+            act = self._category.itemText(index)
+            usable = act in available
+            reason = as_sentence(no_past_video(act, lane))
+            model.item(index).setEnabled(usable)
+            self._category.setItemData(
+                index, "" if usable else reason, Qt.ItemDataRole.ToolTipRole,
+            )
+            # A grayed-out act must not stay selected under it — the buttons would be
+            # live on a pick the lane cannot answer. Dropping to neutral is what the
+            # Combine already means by "no act chosen".
+            if not usable and self._category.currentIndex() == index:
+                self._category.setCurrentIndex(0)
+
+    # --- mutual exclusion: an act and a dropped video never coexist -------
+
+    def _on_category_changed(self):
+        """A picked act supersedes a dropped video: clear the drop zone and hide it, its
+        room kept. Going back to "(custom)" shows it again, holding the video this
+        lane last had dropped in it."""
+        custom = not self.selected_category()
+        if custom:
+            self._show_dropped()
+        else:
+            self.video_zone.clear()
+        self.video_zone.setVisible(custom)
+        self._recent_videos.setVisible(custom)
+        self._sync()
+
+    def _on_video_changed(self):
+        """A dropped video supersedes a picked act: wipe the dropdown back to "(custom)"."""
+        video = self.video_zone.current_id()
+        if video:
+            lane = self.selected_intent()
+            if video != self._dropped.get(lane):
+                self._dropped[lane] = video
+                self.video_used.emit(lane, video)
+            self._category.setCurrentIndex(0)
+        self._sync()
+
+    def _recent_rows(self) -> list[RecentVideo]:
+        held = self.video_zone.current_id()
+        listed = dict.fromkeys(video for video in (held, *self._history(self.selected_intent()))
+                               if video)
+        return [RecentVideo(video, self._preview(video)[0])
+                for video in listed if self.video_zone.accepts(video)]
+
+    def _show_dropped(self):
+        lane = self.selected_intent()
+        video = self._dropped.get(lane)
+        if video and self.video_zone.accepts(video):
+            self.video_zone.set_item(video)
+        else:
+            self._dropped.pop(lane, None)
+            self.video_zone.clear()
+
+    def note_folder_generating(self, generating: bool) -> None:
+        self._folder_generating = generating
+        self._sync()
+
+    def dropped_videos(self) -> dict[str, str]:
+        return dict(self._dropped)
+
+    def reread_names(self) -> None:
+        self.image_zone.reread_name()
+        self.video_zone.reread_name()
+
+    def set_dropped_videos(self, videos: dict[str, str]):
+        self._dropped = dict(videos)
+        if not self.selected_category():
+            self._show_dropped()
+
+    def _sync(self):
+        image_id = self.image_zone.current_id()
+        video_id = self.video_zone.current_id()
+        ready = bool(image_id) and bool(self.selected_category() or video_id)
+        can_run = ready and not self._folder_generating
+        remakes_its_own = bool(video_id) and self.image_zone.lent_by(video_id) == image_id
+        self._generate_btn.setEnabled(can_run)
+        self._generate_btn.set_caption(
+            RANDOM_SEED_CAPTION if can_run and remakes_its_own else DEFAULT_CAPTION)
+        self._open_btn.setEnabled(ready)
+        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_ACTION_OR_VIDEO
+        self._generate_btn.setToolTip(
+            missing or (ALREADY_MAKING_ONE_TIP if self._folder_generating else ""))
+        self._open_btn.setToolTip(missing or _EDIT_TIP)
+
+    def _emit(self):
+        """Generate: run the chosen settings on the dropped image now."""
+        self._dispatch(edit_first=False)
+
+    def _emit_open(self):
+        """“Edit individual…”: hand the settings to a generate tab to change first."""
+        self._dispatch(edit_first=True)
+
+    def _dispatch(self, *, edit_first: bool):
+        """Announce what was asked for: a picked act, else the dropped video, and
+        nothing at all while either the image or the settings are missing."""
+        image_id = self.image_zone.current_id()
+        category = self.selected_category()
+        video_id = "" if category else (self.video_zone.current_id() or "")
+        if not image_id or not (category or video_id):
+            return
+        self.combine_requested.emit(CombineRequest(
+            image_id=image_id, video_id=video_id, category=category,
+            intent=self.selected_intent(), edit_first=edit_first))

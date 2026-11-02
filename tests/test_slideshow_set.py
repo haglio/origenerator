@@ -13,8 +13,8 @@ import pytest
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED
 
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
-from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_act_on_screen
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
+from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_action_on_screen
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests.slideshow_support import slides_named
@@ -235,24 +235,24 @@ _TWO_VERSIONS = [("one_enhanced.png", "image", "Enhancement 1/1"), ("one.png", "
 def test_the_note_on_an_image_filed_once_with_nothing_in_flight_says_nothing():
     slideshow_set, _dealt = _set()
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == ""
+    assert item_note(slideshow_set, versions=[], version_index=0) == ""
 
 
 def test_the_note_names_the_version_on_screen_by_its_name_alone():
     slideshow_set, _dealt = _set()
 
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=0) == "Enhancement 1/1"
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=1) == "Original"
+    assert item_note(slideshow_set, versions=_TWO_VERSIONS, version_index=0) == "Enhancement 1/1"
+    assert item_note(slideshow_set, versions=_TWO_VERSIONS, version_index=1) == "Original"
 
 
 def test_the_note_says_whether_a_better_version_is_being_made_or_waiting():
     slideshow_set, _dealt = _set()
 
     slideshow_set.note_enhancing({"id-1": "queued"})
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancement queued"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancement queued"
     slideshow_set.note_enhancing({"id-1": "running"})
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancing…"
-    assert item_note(slideshow_set, levels=_TWO_VERSIONS, level_index=0) == (
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancing…"
+    assert item_note(slideshow_set, versions=_TWO_VERSIONS, version_index=0) == (
         "Enhancement 1/1 · Enhancing…")
 
 
@@ -261,9 +261,9 @@ def test_an_enhancement_this_slideshow_asked_for_waits_until_the_gallery_says_ot
 
     slideshow_set.note_enhancement_asked("id-1")
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancement queued"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancement queued"
     slideshow_set.note_enhancing({"id-1": "running"})
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Enhancing…"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Enhancing…"
 
 
 def test_an_enhancement_that_landed_leaves_nothing_in_flight_to_say():
@@ -273,7 +273,7 @@ def test_an_enhancement_that_landed_leaves_nothing_in_flight_to_say():
 
     slideshow_set.note_enhancement_landed("id-1")
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == ""
+    assert item_note(slideshow_set, versions=[], version_index=0) == ""
 
 
 def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated():
@@ -281,7 +281,7 @@ def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated
     slideshow_set.playlist.add(Slide(b"frame", LIVE, "id-run"))
     slideshow_set.lead_with_what_is_being_made()
 
-    assert item_note(slideshow_set, levels=[], level_index=0) == "Generating…"
+    assert item_note(slideshow_set, versions=[], version_index=0) == "Generating…"
 
 
 # --- the map around the slide on screen, and the loops along it -------------
@@ -293,8 +293,8 @@ _ACTIONS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
 
 def _neighbors(prompt_id):
     actions = _ACTIONS.get(prompt_id, ())
-    return MapNeighbors(seeds=_SEEDS.get(prompt_id, ()),
-                        column=tuple(MapRow(slide, "dawn") for slide in actions),
+    return NavMapNeighbors(seeds=_SEEDS.get(prompt_id, ()),
+                        column=tuple(NavMapRow(slide, "dawn") for slide in actions),
                         label="fox", group=actions)
 
 
@@ -418,8 +418,8 @@ def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
     """The column steps between acts, so twins of one act share a row; the
     loop is the image and every video of it, and its map is the loop."""
     twin = Slide("one-y.png", "image", "id-1y")
-    whole = lambda pid: MapNeighbors(  # noqa: E731
-        column=tuple(MapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
+    whole = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=tuple(NavMapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
         group=(*_ACTIONS.get(pid, ()), twin) if pid == "id-1" else ())
     slideshow_set, _dealt = _set(neighbors=whole)
 
@@ -430,7 +430,7 @@ def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
 
 
 def test_an_axis_with_nothing_to_loop_is_stepped_over():
-    seeds_only = lambda pid: MapNeighbors(seeds=_SEEDS.get(pid, ()))  # noqa: E731
+    seeds_only = lambda pid: NavMapNeighbors(seeds=_SEEDS.get(pid, ()))  # noqa: E731
     slideshow_set, _dealt = _set(neighbors=seeds_only)
 
     assert slideshow_set.step_loop(locked=True) == SEED
@@ -534,7 +534,7 @@ def test_a_set_with_nothing_in_it_has_nothing_to_map_loop_widen_or_walk():
     assert slideshow_set.map() is None
     assert slideshow_set.step_loop(locked=False) == LOCK
     assert slideshow_set.more_seeds() is False
-    assert slideshow_set.set_act_filter("fox") is False
+    assert slideshow_set.set_action_filter("fox") is False
     assert slideshow_set.nav_target("right") is None
     assert dealt == []
 
@@ -560,7 +560,7 @@ _ROW = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b"),
 def _row_mates(prompt_id):
     """Every slide of the one row is every other's seed, as a folder's images are."""
     in_the_row = any(item[2] == prompt_id for item in _ROW)
-    return MapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
+    return NavMapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
                                     if in_the_row and item[2] != prompt_id), label="fox")
 
 
@@ -702,7 +702,7 @@ def test_a_loop_is_left_naming_what_it_plays_with_the_slide_it_began_on_first():
     slideshow_set.start_loop("seed")
     slideshow_set.playlist.advance()
 
-    left = slideshow_set.state(locked=False, level_index=0)
+    left = slideshow_set.state(locked=False, version_index=0)
 
     assert (left.loop, left.loop_pool) == ("seed", ("id-1", "id-1b", "id-1c"))
     assert left.current == "id-1b"
@@ -716,7 +716,7 @@ def test_a_loop_picked_back_up_plays_its_own_slides_from_the_one_it_was_left_on(
         closed.playlist.advance()
 
     reopened, _dealt = _mapped(slides=slides_named(*closed.playlist.items))
-    assert reopened.resume(closed.state(locked=False, level_index=0)) is True
+    assert reopened.resume(closed.state(locked=False, version_index=0)) is True
 
     assert reopened.current_prompt_id() == "id-far"
     assert reopened.map() == closed.map()
@@ -738,7 +738,7 @@ def _filterable(**fields):
 def test_an_act_filter_narrows_the_pass_to_what_is_named_for_that_act():
     slideshow_set, dealt = _filterable()
 
-    assert slideshow_set.set_act_filter("alpha") is True
+    assert slideshow_set.set_action_filter("alpha") is True
 
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
     assert slideshow_set.filters.act == "alpha"
@@ -750,7 +750,7 @@ def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
     on, and the row's button stays dark."""
     slideshow_set, dealt = _filterable()
 
-    assert slideshow_set.set_act_filter("gamma") is False
+    assert slideshow_set.set_action_filter("gamma") is False
 
     assert (slideshow_set.filters.act, dealt, len(slideshow_set.playlist)) == ("", [], 3)
 
@@ -760,18 +760,18 @@ def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
     carrying both answers it — the rule the HUD lights its rows by."""
     slideshow_set, _dealt = _filterable()
 
-    assert slideshow_set.set_act_filter("source image, alpha") is True
+    assert slideshow_set.set_action_filter("source image, alpha") is True
 
     assert _ids(slideshow_set.playlist.items) == ["id-1"]
 
 
 def test_filtering_to_the_act_on_screen_narrows_to_what_its_row_is_named_for():
-    """A session's spoken "filter", said of a side: the act read off the item
+    """A session's spoken "filter", said of a shape: the act read off the item
     on screen rather than spoken, the way its map row's button would post it."""
     slideshow_set, _dealt = _filterable()
     slideshow_set.playlist.jump_to(2)
 
-    assert narrow_to_the_act_on_screen(slideshow_set) == ("Filter: 'alpha' (2)", True)
+    assert narrow_to_the_action_on_screen(slideshow_set) == ("Filter: 'alpha' (2)", True)
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-3"]
 
 
@@ -780,7 +780,7 @@ def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
     button means."""
     slideshow_set, _dealt = _set(acts=lambda ids: dict.fromkeys(ids, ""))
 
-    said, narrowed = narrow_to_the_act_on_screen(slideshow_set)
+    said, narrowed = narrow_to_the_action_on_screen(slideshow_set)
 
     assert (said, narrowed) == ("No act for this one", False)
     assert (slideshow_set.filters.act, len(slideshow_set.playlist)) == ("", 3)
@@ -788,7 +788,7 @@ def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
 
 def test_a_reset_drops_the_act_filter_with_the_other_switches():
     slideshow_set, dealt = _filterable()
-    slideshow_set.set_act_filter("beta")
+    slideshow_set.set_action_filter("beta")
     dealt.clear()
 
     assert slideshow_set.drop_the_filters() is True
@@ -801,7 +801,7 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
     before it landed is not what a filter may go on matching by."""
     named_for = dict(_NAMED_FOR)
     slideshow_set, _dealt = _set(acts=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
-    slideshow_set.set_act_filter("alpha")
+    slideshow_set.set_action_filter("alpha")
     assert slideshow_set.passes(Slide("two.png", "image", "id-2")) is False
 
     named_for["id-2"] = "Source image, alpha"
@@ -813,12 +813,12 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
 def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
     """Half the column is configurations and half is acts, and the two are
     pressed differently — so the map says which a row is rather than leaving it
-    to be guessed from the words in its gutter."""
+    to be guessed from the words in its margin."""
     a_configuration = Slide("one-x.png", "image", "id-1x")
-    an_act = Slide("one-y.png", "image", "id-1y")
-    both = lambda pid: MapNeighbors(  # noqa: E731
-        column=(MapRow(a_configuration, "E629425B", configuration=True),
-                MapRow(an_act, "alpha")) if pid == "id-1" else ())
+    an_action = Slide("one-y.png", "image", "id-1y")
+    both = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=(NavMapRow(a_configuration, "E629425B", configuration=True),
+                NavMapRow(an_action, "alpha")) if pid == "id-1" else ())
     slideshow_set, _dealt = _set(neighbors=both)
 
     assert slideshow_set.configuration_row("e629425b") is a_configuration

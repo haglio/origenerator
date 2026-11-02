@@ -3,7 +3,7 @@ folder's ``+`` rather than in its place.
 
 It shows the run the way every other in-flight surface does: ComfyUI's preview —
 or, until there is one, what the run is made from
-(:func:`~origenerator.gui.combination_view.combination_pixmap`) — under a scrim
+(:func:`~origenerator.gui.combination_view.combination_pixmap`) — under a tile status scrim
 naming the stage, a bar along the thumbnail's foot reading
 :func:`origenerator.timing.progress_status_label`, and a Cancel that throws the
 run away.
@@ -16,24 +16,24 @@ from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import grid_card, palette
+from origenerator.gui import palette, tile_shape
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import CANCEL_TEXT, TICK_MS, RunReading, cancel_tooltip
-from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
-from origenerator.gui.stage_scrim import StageScrim
+from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
+from origenerator.gui.tile_status_scrim import TileStatusScrim
 
-_RESTING_FRAME_CSS = grid_card.idle_css("generatingTile")
-_SELECTED_FRAME_CSS = grid_card.selected_css("generatingTile")
+_RESTING_FRAME_CSS = tile_shape.idle_css("generatingTile")
+_SELECTED_FRAME_CSS = tile_shape.selected_css("generatingTile")
 
-_IMAGE_SIZE = grid_card.THUMBNAIL_SIZE
+_IMAGE_SIZE = tile_shape.THUMBNAIL_SIZE
 _MADE_FROM_NOTHING = Combination()
 
 
 class GeneratingTile(QFrame):
     cancel_requested = pyqtSignal()
-    selected = pyqtSignal()  # clicked, to drive the info pane
+    selected = pyqtSignal()  # clicked, to drive the Generate pane
     context_requested = pyqtSignal(QPoint)  # global position
 
     def __init__(self, job, parent=None, *, auto_generating=False,
@@ -47,15 +47,15 @@ class GeneratingTile(QFrame):
         self._selected = False
         self._typical_seconds = typical_seconds
         self.setObjectName("generatingTile")
-        self.setFixedSize(*grid_card.card_size())
+        self.setFixedSize(*tile_shape.tile_size())
         self.set_selected(False)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self.mapToGlobal(pos)))
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
-        layout.setSpacing(grid_card.CARD_SPACING)
+        layout.setContentsMargins(*(tile_shape.TILE_MARGIN,) * 4)
+        layout.setSpacing(tile_shape.TILE_SPACING)
 
         self._image = QLabel()
         self._image.setFixedSize(*_IMAGE_SIZE)
@@ -71,9 +71,9 @@ class GeneratingTile(QFrame):
         layout.addWidget(self._cancel)
 
         # Both ride over the thumbnail rather than taking a row of their own, so the
-        # tile is the same size and shape as every card beside it.
-        self._scrim = StageScrim(self)
-        self._bar = ProgressCaption(self)
+        # tile is the same size and shape as every tile beside it.
+        self._status_scrim = TileStatusScrim(self)
+        self._bar = ProgressBar(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._place_bar()
 
@@ -96,7 +96,7 @@ class GeneratingTile(QFrame):
         self._tick.start()
 
     def set_selected(self, selected: bool):
-        """Fill the tile with the selected blue when it drives the info pane."""
+        """Fill the tile with the selected blue when it drives the Generate pane."""
         self._selected = selected
         self.setStyleSheet(_SELECTED_FRAME_CSS if selected else _RESTING_FRAME_CSS)
 
@@ -113,7 +113,7 @@ class GeneratingTile(QFrame):
         # The numbers are read back off the job rather than taken from a signal:
         # the tile's own clock re-renders on a tick that carries none, and both
         # paths must draw the same line.
-        self._scrim.cover(
+        self._status_scrim.cover(
             self._image,
             "Generating…" if self._reading().rendering else "Waiting…",
         )

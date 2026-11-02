@@ -3,8 +3,8 @@
 The row itself is vague. A row the import scan reconstructed keeps the tail's
 numbers under the generic names any sampler has — ``steps`` and ``denoise`` — and
 says nothing at all about the upscale, so folding it on its params alone would
-file the level with a blank settings line and leave the Enhance panel unable to
-tell it apart from a level it has not made yet. The graph that ran is exact about
+file the version with a blank settings line and leave the Enhance pane unable to
+tell it apart from a version it has not made yet. The graph that ran is exact about
 all of it, and it is stored on the row.
 
 Which of the settings it finds are wanted is the caller's business, so the keys to
@@ -42,7 +42,7 @@ _SETTINGS_BY_NODE = {
 _DETAIL_PASS = "DetailerForEach"
 
 
-def graph_level_params(row: dict, keys) -> dict:
+def graph_version_params(row: dict, keys) -> dict:
     """The enhance settings a row's stored ComfyUI graph gives up, kept to *keys*.
 
     The upscale model by name, the scale as the fraction of that model's own 4x

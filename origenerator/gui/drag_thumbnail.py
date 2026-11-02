@@ -8,9 +8,9 @@ threshold wrong and one reason a plain click somewhere could start a drag.
 :class:`DragOut` is it once; each caller keeps only what it carries, what it
 shows, and its own reason to refuse.
 
-Every drag in this app should carry one — a gallery tile onto a combine slot,
-the info-pane preview onto the same slot, an enhancement level onto the Enhance
-panel — so what is in flight is never in doubt. What each source is showing
+Every drag in this app should carry one — a gallery tile onto a Combine drop zone,
+the Generate pane preview onto the same drop zone, an version onto the Enhance
+pane — so what is in flight is never in doubt. What each source is showing
 lives somewhere different, though: a still sits in a label's pixmap, a looping
 WebP in a ``QMovie``, a playing video on the player's own surface with no pixmap
 anywhere. Reaching only for ``label.pixmap()`` is how a dragged video came to
@@ -28,8 +28,8 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.drags import carry
 
-# Every drag's thumbnail fits inside this. Roughly a drop slot's own preview, so what
-# is under the cursor reads as the thing that is about to land in the slot —
+# Every drag's thumbnail fits inside this. Roughly a drop zone's own preview, so what
+# is under the cursor reads as the thing that is about to land in the drop zone —
 # and a full-size still from the preview pane no longer swallows the pane it is
 # being dragged across.
 THUMBNAIL_MAX = 128

@@ -15,7 +15,7 @@ from app_support import haglio_settings
 from funestra.video_families import seed_group_key
 from PIL import Image
 
-from origenerator import config, evolver_agreement, funscript_backfill, recovery
+from origenerator import config, evolver_agreement, funscript_backfill, trash_collection
 from origenerator.db import Database
 from origenerator.gallery import (
     SourceImageGroup,
@@ -42,9 +42,9 @@ from origenerator.outside_videos import (
     OutsideVideo,
     Places,
     Record,
-    journal_stars,
+    journal_favorites,
     outside_videos,
-    pick_act,
+    pick_action,
     places_here,
     record_of,
     rows_bringing_in,
@@ -269,7 +269,7 @@ def test_a_scan_stops_at_the_next_video_once_it_is_told_to(tmp_path):
 
 def _deleted(db, row: dict) -> None:
     db.delete_generation(row["prompt_id"])
-    db.record_deletion(row["prompt_id"], row, {"moves": [], "subdir": None})
+    db.record_trashed(row["prompt_id"], row, {"moves": [], "subdir": None})
 
 
 def test_a_video_waiting_in_the_trash_is_not_brought_in_again(tmp_path):
@@ -290,7 +290,7 @@ def test_a_video_deleted_for_good_is_not_brought_in_again(tmp_path):
     [shown] = _videos(db)
     _deleted(db, shown)
 
-    recovery.purge(db, db.get_deletion(shown["prompt_id"]))
+    trash_collection.purge(db, db.get_trashed(shown["prompt_id"]))
 
     assert scan(db, places, grab=_still) == 0
 
@@ -303,7 +303,7 @@ def test_a_video_made_from_words_alone_takes_its_starting_frame_when_deleted_for
     frame = _frame_of(db, shown)
     _deleted(db, shown)
 
-    recovery.purge(db, db.get_deletion(shown["prompt_id"]))
+    trash_collection.purge(db, db.get_trashed(shown["prompt_id"]))
 
     assert db.get_generation(frame["prompt_id"]) is None
     assert not Path(json.loads(frame["output_files"])[0]["path"]).exists()
@@ -317,7 +317,7 @@ def test_a_starting_frame_a_video_here_was_made_from_outlives_its_video_deleted_
     _made_here_from(db, frame)
     _deleted(db, shown)
 
-    recovery.purge(db, db.get_deletion(shown["prompt_id"]))
+    trash_collection.purge(db, db.get_trashed(shown["prompt_id"]))
 
     assert db.get_generation(frame["prompt_id"]) is not None
     assert Path(json.loads(frame["output_files"])[0]["path"]).exists()
@@ -446,7 +446,7 @@ def test_starring_a_video_from_another_source_tells_fun_time_through_the_journal
     _video, shown, _frame = _brought_in(tmp_path)
     places = _places(tmp_path)
 
-    journal_stars(places, [shown], True, now=lambda: 1_700_000_000.5)
+    journal_favorites(places, [shown], True, now=lambda: 1_700_000_000.5)
 
     [line] = places.journal.read_text(encoding="utf-8").splitlines()
     assert json.loads(line) == {"t": 1_700_000_000_500, "event": "favorite",
@@ -460,14 +460,14 @@ def test_picking_an_act_for_a_video_from_another_source_tells_evolver_through_th
     [shown] = _videos(db)
     places = _places(tmp_path)
 
-    pick_act(db, places, shown, "Bow", now=lambda: 1_700_000_000.5)
+    pick_action(db, places, shown, "Bow", now=lambda: 1_700_000_000.5)
 
     [line] = places.journal.read_text(encoding="utf-8").splitlines()
     assert json.loads(line) == {"t": 1_700_000_000_500, "event": "action", "action": "Bow",
                                 "path": "videos/videos/outbox/portrait/a-site/c1_topaz.mp4"}
 
 
-def _two_word_made_videos_one_act_apart(tmp_path) -> tuple[Database, dict]:
+def _two_word_made_videos_one_action_apart(tmp_path) -> tuple[Database, dict]:
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "12", act="Bow")})
@@ -478,18 +478,18 @@ def _two_word_made_videos_one_act_apart(tmp_path) -> tuple[Database, dict]:
 
 
 def test_picking_another_act_for_a_word_made_video_leaves_it_where_it_is(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     named = ItemNames.from_library(db).of(picked["prompt_id"])
 
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
 
     assert db.get_generation(picked["prompt_id"])["act"] == "Bow"
     assert ItemNames.from_library(db).of(picked["prompt_id"]) == named
 
 
 def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
 
     scan(db, _places(tmp_path), grab=_still)
 
@@ -498,8 +498,8 @@ def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(
 
 
 def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
     video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
     _record(tmp_path, video, _made_from_words("a slow walk on the shore", "11", act="Kneel"))
 
@@ -509,8 +509,8 @@ def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
 
 
 def test_a_pick_does_not_keep_a_video_from_taking_its_star_from_the_record(tmp_path):
-    db, picked = _two_word_made_videos_one_act_apart(tmp_path)
-    pick_act(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
+    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
+    pick_action(db, _places(tmp_path), picked, "Bow", now=lambda: 1_700_000_100)
     video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
     _record(tmp_path, video, {**_made_from_words("a slow walk on the shore", "11", act="Bow"),
                               "favorite": True})
@@ -543,7 +543,7 @@ def test_a_star_set_here_since_its_record_was_written_stands_until_evolver_carri
     [shown] = _videos(db)
 
     db.set_generation_favorite(shown["prompt_id"], True)
-    journal_stars(places, [shown], True, now=lambda: 1_700_000_100)
+    journal_favorites(places, [shown], True, now=lambda: 1_700_000_100)
     scan(db, places, grab=_still)
 
     assert db.get_generation(shown["prompt_id"])["starred"] == 1

@@ -6,7 +6,7 @@ plays, the verbs it takes, the status it reads back -- which a session's Funestr
 answers on its files (:class:`~origenerator.fun_time_mode.FunestraChannel`) and
 the window's in this process (:class:`~origenerator.gui.funestra_pane.PaneChannel`).
 The Funestra owns what is on screen from there: it holds an image for the pace,
-plays a clip to its end and rolls onto the next, repeats the one it is locked
+plays a video to its end and rolls onto the next, repeats the one it is locked
 onto, and freezes with the room.  What differs is only where the slideshow is
 seen -- *shown*: the HUD, the lines it says and the room's pause go to the
 session's Funestra and the gallery's caption, or to the window.
@@ -42,8 +42,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
-from origenerator.gui.level_stepper import LevelStepper
-from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.message import HEARD_MARK, INFO, WARNING
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -52,10 +51,11 @@ from origenerator.gui.slideshow_set import (
     SlideshowSet,
     item_note,
     looping_note,
-    narrow_to_acts,
-    narrow_to_the_act_on_screen,
+    narrow_to_actions,
+    narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
+from origenerator.gui.version_stepper import VersionStepper
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
@@ -76,24 +76,24 @@ class FunestraSlideshow(QObject):
     # Enter on an item, and a lock: the gallery lands on that generation.  Only
     # the lock reaches it here — a Funestra has no Enter to press.
     open_requested = pyqtSignal(str)
-    # The slideshow is over: the side has nothing of this app's on it now.
+    # The slideshow is over: the shape has nothing of this app's on it now.
     closed = pyqtSignal()
     # A different item is on screen.
     media_changed = pyqtSignal()
 
-    def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
-                 hud=None, pace=None, start=None, shuffle=None, levels=None,
+    def __init__(self, items, *, shape: str, channel, frames: FrameFiles, actions=None,
+                 hud=None, pace=None, start=None, shuffle=None, versions=None,
                  say=None, shown=None, clock=None, opening=None, parent=None):
         super().__init__(parent)
         self._clock = clock or time.monotonic
         self._on_screen = OnScreenHistory()
-        self._side = side
+        self._shape = shape
         self.channel = channel
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
         self._actions = actions if actions is not None else SlideshowActions()
         self.shown = shown if shown is not None else OnASessionsFunestra(
-            self, side, channel, say, actions=self._actions)
+            self, shape, channel, say, actions=self._actions)
         self._frames = frames
         self._scripts_on_opening = opening.scripts if opening is not None else {}
         self._request_holds_it = False
@@ -112,8 +112,8 @@ class FunestraSlideshow(QObject):
         self._gesture_owed = False
         self._refusal_checked = False
         self._loads_seen: str | None = None
-        self._levels = LevelStepper()
-        self._levels.arm(levels or {})
+        self._versions_stepper = VersionStepper()
+        self._versions_stepper.arm(versions or {})
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
             self._showing = self._funestra_status().video
@@ -138,12 +138,12 @@ class FunestraSlideshow(QObject):
                                  on_pass_change=self._pass_changed)
 
     def play(self, items, *, start=None, shuffle=None, hud=None, actions=None,
-             levels=None) -> None:
+             versions=None) -> None:
         if actions is not None:
             self._actions = actions
         self._unlock()
         self._take_set(items, start=start, shuffle=shuffle, hud=hud)
-        self._levels.arm(levels or {})
+        self._versions_stepper.arm(versions or {})
         self._hand_over(land=True)
         self._publish()
 
@@ -156,7 +156,7 @@ class FunestraSlideshow(QObject):
         self.channel.write_playlist([self._funestra_item(item) for item in rotated])
         lands = land and current is not None and self._file_of(current) != self._showing
         if lands:
-            self._levels.restart()
+            self._versions_stepper.restart()
         self._tell_the_pace()  # ahead of the file it opens, which reads it
         self._tell_the_keep()
         if lands:
@@ -169,7 +169,7 @@ class FunestraSlideshow(QObject):
         self._hold_what_is_being_made_for_half()
 
     def _funestra_pace(self) -> int:
-        return self._levels.pace(self._pace.seconds)
+        return self._versions_stepper.pace(self._pace.seconds)
 
     def _tell_the_keep(self) -> None:
         keeps = self._keeps()
@@ -193,13 +193,13 @@ class FunestraSlideshow(QObject):
     def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(Path(self._file_of(slide)))
-        return slide_item(slide, self._levels.points_of_interest(self._file_of(slide)),
+        return slide_item(slide, self._versions_stepper.points_of_interest(self._file_of(slide)),
                           scripts=self._scripts_on_opening)
 
     def _send(self, verb: str) -> None:
         if not self.channel.send(verb):
             logger.warning("Dropped %s for the %s Funestra (command file locked)",
-                           verb, self._side)
+                           verb, self._shape)
 
     # --- the pace ----------------------------------------------------------
 
@@ -275,7 +275,7 @@ class FunestraSlideshow(QObject):
         if self._refusal_checked or fields.get("idle") != "1" or status.paused:
             return
         self._refusal_checked = True
-        logger.warning("The %s Funestra would not open a file; stepping past it", self._side)
+        logger.warning("The %s Funestra would not open a file; stepping past it", self._shape)
         self._unlock()
         self._send(NEXT)
 
@@ -293,30 +293,30 @@ class FunestraSlideshow(QObject):
     def _funestra_status(self):
         return parse_status(self.channel.status())
 
-    def set_levels(self, levels_by_path: dict) -> None:
+    def set_versions(self, versions_by_path: dict) -> None:
         """Arm the versions button and the shifted step keys for this set.
 
-        ``levels_by_path`` maps the file the set shows an item under to that
+        ``versions_by_path`` maps the file the set shows an item under to that
         item's versions, newest first, as ``(path, media_type, label)``.
         """
-        if self._levels.arm(levels_by_path):
+        if self._versions_stepper.arm(versions_by_path):
             self._hand_over()
         self._publish()
 
-    def add_levels(self, levels_by_path: dict) -> None:
-        if self._levels.add(levels_by_path):
+    def add_versions(self, versions_by_path: dict) -> None:
+        if self._versions_stepper.add(versions_by_path):
             self._hand_over()
         self._publish()
 
     @property
     def has_other_versions(self) -> bool:
         """Whether the item on screen was filed more than once — what draws
-        the band's versions button live rather than faded."""
-        return len(self._levels.levels(base=self._current_base())) > 1
+        the HUD's versions button live rather than faded."""
+        return len(self._versions_stepper.versions(base=self._current_base())) > 1
 
     def slideshow_step_version(self, delta: int) -> None:
         """Put another version of the item on screen up: an image's enhancement
-        levels, or a video's Evolver upscale and the video itself.
+        versions, or a video's Evolver upscale and the video itself.
 
         An item filed once is left alone rather than paged, since the shift was
         the whole point of the press.  The Funestra is told which file to play
@@ -324,8 +324,8 @@ class FunestraSlideshow(QObject):
         within the versions is held here, ahead of the status the Funestra is
         still publishing.
         """
-        comparing = self._levels.stepping
-        version = self._levels.step(delta, base=self._current_base())
+        comparing = self._versions_stepper.stepping
+        version = self._versions_stepper.step(delta, base=self._current_base())
         if version is None:
             return
         if not comparing:
@@ -335,8 +335,8 @@ class FunestraSlideshow(QObject):
         self.media_changed.emit()
 
     def _leave_the_versions(self) -> None:
-        stepped = self._levels.stepping
-        self._levels.restart()
+        stepped = self._versions_stepper.stepping
+        self._versions_stepper.restart()
         if stepped:
             # The version stepped to was spliced into the Funestra's list after its
             # item; the set's own list stands it back on the item before it moves.
@@ -351,7 +351,7 @@ class FunestraSlideshow(QObject):
     def _follow(self, video: str) -> None:
         """Stand the pass on the item the Funestra just moved to.
 
-        The Funestra walks the list by itself — an image's pace runs out, a clip
+        The Funestra walks the list by itself — an image's pace runs out, a video
         ends — so this is how the map, the star and every word about "this one"
         find out which item that is.
         """
@@ -360,7 +360,7 @@ class FunestraSlideshow(QObject):
             return
         index, item = showing
         if item is not self._set.playlist.current():
-            self._levels.restart()  # a new item, so its own versions from the top
+            self._versions_stepper.restart()  # a new item, so its own versions from the top
         self._set.playlist.jump_to(index)
         self.media_changed.emit()
 
@@ -434,7 +434,7 @@ class FunestraSlideshow(QObject):
 
         The Funestra is told to drop a condemned item before the generation is:
         it is playing that very file, and Windows will not move a file a
-        process still has open — the recovery bin's own retries cover the
+        process still has open — the Trash's own retries cover the
         moment the Funestra takes to let go.
         """
         item = self._set.playlist.current()
@@ -454,7 +454,7 @@ class FunestraSlideshow(QObject):
         self._set.playlist.remove_current()
         self._frames.forget(item.prompt_id)
         if self._set.playlist.is_empty():
-            # A slideshow culled empty is over, and the side goes back to its base
+            # A slideshow culled empty is over, and the shape goes back to its base
             # state — which hands the Funestra another list to move on to.
             self.close()
         elif self._set.end_a_loop_of_one():
@@ -483,7 +483,7 @@ class FunestraSlideshow(QObject):
         try:
             self._actions.delete(prompt_id)
         except OSError:
-            logger.exception("The %s Funestra kept a condemned generation open", self._side)
+            logger.exception("The %s Funestra kept a condemned generation open", self._shape)
             self._flash("couldn't delete that one — the Funestra still has it open",
                         kind=WARNING, mark="trash")
 
@@ -491,8 +491,8 @@ class FunestraSlideshow(QObject):
         self.slideshow_cull()
 
     def favorite(self) -> bool:
-        """Bookmark the item on screen; ``False`` when there is nothing to
-        bookmark."""
+        """Favorite the item on screen; ``False`` when there is nothing to
+        favorite."""
         prompt_id = self._set.current_prompt_id()
         if self._actions.favorite is None or prompt_id is None:
             return False
@@ -501,7 +501,7 @@ class FunestraSlideshow(QObject):
         return True
 
     def slideshow_reset(self) -> None:
-        """Put the side back how it started — the region's base state, which
+        """Put the shape back how it started — the region's base state, which
         the gallery owns, else this set from the top."""
         if self._actions.reset is not None:
             self._actions.reset(self)
@@ -585,7 +585,7 @@ class FunestraSlideshow(QObject):
     def _lock_instead_of_looping(self) -> None:
         """Tell the Funestra to lock what it is showing: the answer a loop asked
         of a row of one gets on a Funestra of its own, where the loop button of a
-        group holding one clip locks that clip.  A row that size is the item
+        group holding one video locks that video.  A row that size is the item
         itself, so the press means "this one" rather than nothing; and a lock is
         not a loop, so a loop that was running is dropped."""
         self._set.end_loop()
@@ -627,12 +627,12 @@ class FunestraSlideshow(QObject):
                 self._jump_to(row)
             self.slideshow_loop(SEED)
             return
-        said, narrowed = narrow_to_acts(self._set, query)
-        self._flash(said, kind=NOTICE if narrowed else WARNING)
+        said, narrowed = narrow_to_actions(self._set, query)
+        self._flash(said, kind=INFO if narrowed else WARNING)
 
-    def slideshow_filter_to_the_act_on_screen(self) -> None:
-        said, narrowed = narrow_to_the_act_on_screen(self._set)
-        self._flash(said, kind=NOTICE if narrowed else WARNING)
+    def slideshow_filter_to_the_action_on_screen(self) -> None:
+        said, narrowed = narrow_to_the_action_on_screen(self._set)
+        self._flash(said, kind=INFO if narrowed else WARNING)
 
     def slideshow_nav(self, direction: str) -> None:
         target = self._set.nav_target(direction)
@@ -654,8 +654,8 @@ class FunestraSlideshow(QObject):
 
     @property
     def hud_item_note(self) -> str:
-        return item_note(self._set, levels=self._levels.levels(base=self._current_base()),
-                         level_index=self._levels.index)
+        return item_note(self._set, versions=self._versions_stepper.versions(base=self._current_base()),
+                         version_index=self._versions_stepper.index)
 
     @property
     def hud_favorites_filter(self) -> bool:
@@ -666,7 +666,7 @@ class FunestraSlideshow(QObject):
         return self._set.filters.enhanced
 
     @property
-    def hud_act_filter(self) -> str:
+    def hud_action_filter(self) -> str:
         return self._set.filters.act
 
     @property
@@ -735,7 +735,7 @@ class FunestraSlideshow(QObject):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._set.playlist.replace_item(prompt_id, path, media_type, still):
             if self._set.current_prompt_id() == prompt_id:
-                self._levels.back_to_the_top()
+                self._versions_stepper.back_to_the_top()
                 self._frame_on_funestra = None
                 self._send(f"{SHOW_FRAME} {path}")
                 self._take_the_whole_pace_unless_being_made()
@@ -810,24 +810,24 @@ class FunestraSlideshow(QObject):
         self._publish()
 
     def osr2_drive_target(self):
-        """What the one device switch follows here: the clip on screen, where this
+        """What the one device switch follows here: the video on screen, where this
         app drives the OSR2 -- its own window -- and nothing on a session's
         Funestra, where the OSR2 is the Main Funestra's alone."""
         player = self.shown.player
-        return None if player is None else drive_target_for(self._clip_on_screen(), player)
+        return None if player is None else drive_target_for(self._video_on_screen(), player)
 
     def video_on_screen(self) -> str | None:
-        """The clip on screen, by id, where this app plays it."""
-        if self.shown.player is None or self._clip_on_screen() is None:
+        """The video on screen, by id, where this app plays it."""
+        if self.shown.player is None or self._video_on_screen() is None:
             return None
         return self._set.current_prompt_id()
 
-    def _clip_on_screen(self) -> str | None:
+    def _video_on_screen(self) -> str | None:
         current = self._set.playlist.current()
         if current is None or current.is_live or self._frame_on_funestra is not None:
             return None
-        versions = self._levels.levels(base=self._current_base())
-        shown = versions[self._levels.index] if self._levels.stepping and versions else current
+        versions = self._versions_stepper.versions(base=self._current_base())
+        shown = versions[self._versions_stepper.index] if self._versions_stepper.stepping and versions else current
         return str(shown.path) if shown.media_type == MediaType.VIDEO else None
 
     # --- the room's and a speaker's hands on the slideshow --------------------
@@ -843,19 +843,19 @@ class FunestraSlideshow(QObject):
         self.shown.dictating(note if paused else "")
 
     def note_request(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         self.shown.request_line(message, request, working=working, kind=kind)
 
-    def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
+    def note_voice_command(self, message: str, *, kind: str = INFO) -> None:
         self.shown.flash(message, kind=kind, ms=2500, mark=HEARD_MARK)
 
-    def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
+    def note_voice_run(self, prompt_id, message: str, *, kind: str = INFO) -> None:
         if prompt_id is not None:
             self._set.note_enhancement_asked(prompt_id)
             self._publish()
         self.note_voice_command(message, kind=kind)
 
-    def _flash(self, message: str, *, kind: str = NOTICE, mark: str = "") -> None:
+    def _flash(self, message: str, *, kind: str = INFO, mark: str = "") -> None:
         self.shown.flash(message, kind=kind, mark=mark)
 
     def release_media(self, paths) -> None:
@@ -877,7 +877,7 @@ class FunestraSlideshow(QObject):
 
     def state(self) -> SlideshowState:
         """Where this slideshow is, in the terms a later one can be opened at."""
-        return self._set.state(locked=self.locked, level_index=self._levels.index)
+        return self._set.state(locked=self.locked, version_index=self._versions_stepper.index)
 
     def resume(self, state: SlideshowState, *, opened_on_it: bool = False) -> bool:
         """Open where a closed slideshow left off rather than at the top of a fresh
@@ -885,8 +885,8 @@ class FunestraSlideshow(QObject):
         if not self._set.resume(state, lead=not opened_on_it):
             return False
         self._hand_over(land=not opened_on_it)
-        if state.level_index and self._set.current_prompt_id() == state.current:
-            self.slideshow_step_version(state.level_index)
+        if state.version_index and self._set.current_prompt_id() == state.current:
+            self.slideshow_step_version(state.version_index)
         if state.locked:
             self._lock(True)
         return True
@@ -902,11 +902,11 @@ class FunestraSlideshow(QObject):
         self._set.take_up(filters, keep_the_slide=keep_the_slide)
 
     def is_showing(self) -> bool:
-        """Whether this slideshow still holds its side."""
+        """Whether this slideshow still holds its shape."""
         return self._open
 
     def close(self) -> None:
-        """Give the side back, handing the gallery the slide that was on it.
+        """Give the shape back, handing the gallery the slide that was on it.
 
         The HUD goes with it, so the session draws its own again; the Funestra
         keeps playing this list until the session hands it its own, which is
@@ -915,7 +915,7 @@ class FunestraSlideshow(QObject):
         if not self._open:
             return
         self._open = False
-        if self._levels.stepping:
+        if self._versions_stepper.stepping:
             self._send(f"{SET_PACE} {self._pace.seconds}")
         if self._keep_told and not self._locked:
             self._send(LOCK_OFF)
@@ -936,28 +936,28 @@ class OnASessionsFunestra:
 
     player = None
 
-    def __init__(self, slideshow, side: str, channel, say=None, *, actions) -> None:
+    def __init__(self, slideshow, shape: str, channel, say=None, *, actions) -> None:
         self._slideshow = slideshow
-        self._side = side
+        self._shape = shape
         self._channel = channel
         self._say = say
         self._published = ""
         self.queue_foot = QueueFoot(actions)
-        self._job_queue_file = JobQueueFile(channel.hud_file, side)
+        self._job_queue_file = JobQueueFile(channel.hud_file, shape)
 
     def hud_changed(self) -> None:
-        model = slideshow_hud_model(self._side, self._slideshow, hosted=True, own_window=False,
+        model = slideshow_hud_model(self._shape, self._slideshow, hosted=True, own_window=False,
                                     foot=self._job_queue_file.of(self.queue_foot.section()))
         text = hud_text(model) if model is not None else ""
         if text != self._published and publish_whole(self._channel.hud_file, text):
             self._published = text
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 0, mark: str = "") -> None:
+    def flash(self, text: str, *, kind: str = INFO, ms: int = 0, mark: str = "") -> None:
         if self._say is not None:
             self._say(text, mark=mark)
 
     def request_line(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         self.flash(message, kind=kind, mark=HEARD_MARK)
 
     def dictating(self, note: str) -> None:

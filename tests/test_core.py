@@ -21,31 +21,31 @@ from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.preview import Preview
 
-from origenerator import act_settings, app_link, downtime, gallery, notice_toast, ui_scale
+from origenerator import action_settings, app_link, downtime, gallery, toast_raising, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.collection import RECENTS_KEY, FolderCollection
-from origenerator.gallery.sides import BOTH, SEPARATE
+from origenerator.gallery.collection import LATEST_KEY, FolderCollection
+from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import core, desktop_notices
+from origenerator.gui import core, toasts
 from origenerator.gui.core import Core
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.window_monitor import the_window_on
+from origenerator.item_shape import shaped_key
 from origenerator.media import MediaType
-from origenerator.orientation import oriented_key
-from origenerator.run_notice import RunOutcome
+from origenerator.run_toast import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
-from tests.test_combine_panel import _listed_under_recent
+from tests.test_combine import _listed_under_recent
 from tests.test_hard_to_miss import _faded_backgrounds
 
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
@@ -286,18 +286,18 @@ def test_a_window_a_session_handed_back_asks_again(qtbot, tmp_path, monkeypatch)
 
 def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    tabs = win._gallery_view._info_tabs
+    tabs = win._gallery_view._generate_pane
     assert tabs.count() == 1  # the pane's resting tab to start
 
     tabs.open_config("wan22_i2v", {"positive_prompt": "hi"})
 
     assert tabs.count() == 1  # taken over, not opened beside
-    panel = tabs.currentWidget()
-    assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values()["positive_prompt"] == "hi"
+    tab = tabs.currentWidget()
+    assert tab._workflow_dropdown.currentData() == "wan22_i2v"
+    assert tab._param_form.get_values()["positive_prompt"] == "hi"
 
 
-def test_restores_config_tabs_from_app_state(qtbot, tmp_path):
+def test_restores_generate_tabs_from_app_state(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("generate_tabs", {"tabs": [
         {"config": {"workflow_name": "sdxl_t2i", "params": {}, "seed_is_random": True}},
@@ -305,9 +305,9 @@ def test_restores_config_tabs_from_app_state(qtbot, tmp_path):
     ], "current": 2})
     win = _window(qtbot, tmp_path, state)
 
-    panels = win._gallery_view._info_tabs.config_panels()
-    assert len(panels) == 2
-    assert panels[1]._workflow_combo.currentData() == "wan22_i2v"
+    tabs = win._gallery_view._generate_pane.generate_tabs()
+    assert len(tabs) == 2
+    assert tabs[1]._workflow_dropdown.currentData() == "wan22_i2v"
 
 
 @pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_DRIVING])
@@ -514,8 +514,8 @@ def test_restores_the_dragged_prompt_heights_from_app_state(
     win = _window(qtbot, tmp_path, state)
 
     assert forget_prompt_heights.height("positive_prompt") == 260
-    panel = win._gallery_view._info_tabs.widget(0)
-    assert panel._param_form._widgets["positive_prompt"].boxes()[0].height() == 260
+    tab = win._gallery_view._generate_pane.widget(0)
+    assert tab._param_form._widgets["positive_prompt"].boxes()[0].height() == 260
 
 
 def test_persists_the_dragged_prompt_heights_on_close(
@@ -628,7 +628,7 @@ def test_once_the_window_has_gone_comfyui_is_asked_with_nothing_of_the_windows_r
         qtbot, tmp_path):
     """While the window is up, a hand-over waits on a thread of its own and the
     window's events run meanwhile, so it keeps answering. Once it has gone those
-    are a closed window's events -- a click on a notification would put it back
+    are a closed window's events -- a click on a toast would put it back
     on screen -- so each hand-over waits for ComfyUI where it is."""
     db = Database(tmp_path / "t.db")
     for prompt_id in ("first", "second"):
@@ -746,7 +746,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)
+    assert view._tree.currentItem() is _collection(view, LATEST_KEY)
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
@@ -832,8 +832,8 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, state)
     win._gallery_view.refresh()  # reconnects the run, then re-asserts the button
 
-    panel = win._gallery_view._info_tabs.current_config_panel()
-    assert panel._generating is True
+    tab = win._gallery_view._generate_pane.current_generate_tab()
+    assert tab._generating is True
 
 
 def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_path):
@@ -866,7 +866,7 @@ def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):
 def test_close_event_persists_session(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
-    tabs = win._gallery_view._info_tabs
+    tabs = win._gallery_view._generate_pane
     tabs.currentWidget().prefill("sdxl_t2i", {})              # the resting tab, used
     tabs.open_config("wan22_i2v", {"positive_prompt": "x"})   # a second one beside it
     win._gallery_view.select_folder("image/sdxl_t2i")
@@ -1020,7 +1020,7 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     2560px monitor (~853px) or a half of a 1440px portrait monitor (~720px). The
     window, frame included (~+16px), must fit the smallest of those, so its
     effective minimum width has to stay under ~704px. Guards against a large
-    minimum — explicit or content-driven (a non-wrapping label, a combo sized to
+    minimum — explicit or content-driven (a non-wrapping label, a dropdown sized to
     its longest item) — that makes the window refuse to fit and breaks
     monitor-to-monitor tiling."""
     win = _window(qtbot, tmp_path)
@@ -1030,7 +1030,7 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
 
 
 def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
-    # The version list is the widest thing the info pane holds — an image beside
+    # The version list is the widest thing the Generate pane holds — an image beside
     # a file row with its copy and Show-in-Explorer buttons, per level. It has to
     # scroll and wrap rather than widen the window, or displaying any enhanced
     # image would knock the whole app out of a tiling slot.
@@ -1053,50 +1053,50 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
     )
     row = db.get_generation("img1")
     win.show()   # an unshown window has never laid out, and answers from nothing
-    win._gallery_view._info_tabs.current_config_panel().show_saved_generation(row, [row])
+    win._gallery_view._generate_pane.current_generate_tab().show_saved_generation(row, [row])
 
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704
 
 
-def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
-    # A config tab's preview-over-form column is wider than the Inspect page, so it
-    # governs the info pane's floor. Even with one open, the window must still fit a
+def test_window_still_tiles_with_a_generate_tab_open(qtbot, tmp_path):
+    # A Generate tab's preview-over-form column is wider than the Inspect page, so it
+    # governs the Generate pane's floor. Even with one open, the window must still fit a
     # narrow tiling slot — its form scrolls rather than widening the window.
     win = _window(qtbot, tmp_path)
     win.show()   # an unshown window has never laid out, and answers from nothing
-    win._gallery_view._info_tabs.open_config("wan22_i2v", {"positive_prompt": "x"})
+    win._gallery_view._generate_pane.open_config("wan22_i2v", {"positive_prompt": "x"})
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704
 
 
-def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_path):
+def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_path):
     # A tab's Generate launches a re-roll of its settings folder; that in-flight
-    # generation shows as a card on Recents, and clicking the card opens the folder
-    # it runs in (where its live tile shows), just like any re-roll's card.
+    # generation shows as a tile on Latest, and clicking the tile opens the folder
+    # it runs in (where its live tile shows), just like any re-roll's tile.
     win = _window(qtbot, tmp_path)
     gv = win._gallery_view
-    tabs = gv._info_tabs
+    tabs = gv._generate_pane
     tabs._client.submit_job = lambda payload, prompt_id: prompt_id
     tabs._client.fetch_history = lambda prompt_id: {}  # reconcile finds nothing done
-    panel = tabs.current_config_panel()
-    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
-    panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
-    panel._on_generate()               # emits generate_requested -> a folder re-roll
+    tab = tabs.current_generate_tab()
+    tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
+    tab._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
+    tab._on_generate()               # emits generate_requested -> a folder re-roll
     (folder_key,) = list(gv._live_jobs)
     pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
-    assert pid in gv._browser._inflight_cards   # the running generation shows as a card
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
+    assert pid in gv._gallery_pane._inflight_tiles   # the running generation shows as a tile
 
-    gv._browser._on_inflight_clicked(pid)       # click that card
+    gv._gallery_pane._on_inflight_clicked(pid)       # click that tile
     assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
-def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
+def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
     # The reported bug: a generation left running by a prior session (here an i2v
-    # video), with the gallery restored onto Recents. It must show as an in-flight
-    # card — the collection reads the database's running rows, so a card appears whether
+    # video), with the gallery restored onto Latest. It must show as an in-flight
+    # tile — the collection reads the database's running rows, so a tile appears whether
     # or not the re-roll controller has re-adopted the job this instant.
     db = Database(tmp_path / "t.db")
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
@@ -1116,12 +1116,12 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
 
     gv = win._gallery_view
     gv.refresh()
-    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
-    assert "vid_run" in gv._browser._inflight_cards
+    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
+    assert "vid_run" in gv._gallery_pane._inflight_tiles
 
 
 def _seed_combine_db(tmp_path, videos=("vid",)):
-    """Put a completed image + i2v video in the window's DB so the combine slots
+    """Put a completed image + i2v video in the window's DB so the Combine drop zones
     can be filled from persisted ids."""
     db = Database(tmp_path / "t.db")
     db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
@@ -1144,14 +1144,14 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     _seed_combine_db(tmp_path)
     win = _window(qtbot, tmp_path, AppState(path))
-    win._gallery_view._combine.panel.image_slot.set_item("img")
-    win._gallery_view._combine.panel.video_slot.set_item("vid")
+    win._gallery_view._combine.widget.image_zone.set_item("img")
+    win._gallery_view._combine.widget.video_zone.set_item("vid")
 
     win.close()
 
     saved = AppState(path).get("gallery_combine")
     assert saved["image"] == "img"
-    assert saved["videos"] == {act_settings.VIDEO: "vid"}
+    assert saved["videos"] == {action_settings.VIDEO: "vid"}
 
 
 def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
@@ -1161,12 +1161,12 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.panel.image_slot.current_id() == "img"
-    assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
+    assert win._gallery_view._combine.widget.image_zone.current_id() == "img"
+    assert win._gallery_view._combine.widget.video_zone.current_id() == "vid"
 
 
 def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot, tmp_path):
-    # Earlier sessions wrote the two slots as a bare list. A user updating into
+    # Earlier sessions wrote the two drop zones as a bare list. A user updating into
     # this build has one of those in their ui_state.json, and it must not read as
     # nothing saved.
     _seed_combine_db(tmp_path)
@@ -1175,20 +1175,20 @@ def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.panel.image_slot.current_id() == "img"
-    assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
+    assert win._gallery_view._combine.widget.image_zone.current_id() == "img"
+    assert win._gallery_view._combine.widget.video_zone.current_id() == "vid"
 
 
 def test_how_many_generate_makes_at_once_survives_close_and_reopen(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._info_tabs.set_how_many(8)
+    first._gallery_view._generate_pane.set_how_many(8)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    panel = reopened._gallery_view._info_tabs.current_config_panel()
-    assert panel._how_many.how_many() == 8
+    tab = reopened._gallery_view._generate_pane.current_generate_tab()
+    assert tab._how_many.how_many() == 8
 
 
 def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_path):
@@ -1203,9 +1203,9 @@ def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_pa
 def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    panel = first._gallery_view._info_tabs.currentWidget()
-    panel.prefill("sdxl_t2i", {})
-    sections = panel._param_form._sections
+    tab = first._gallery_view._generate_pane.currentWidget()
+    tab.prefill("sdxl_t2i", {})
+    sections = tab._param_form._sections
     assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (False, True)
     sections["Seed"]._header.click()
     sections["Size"]._header.click()
@@ -1213,60 +1213,60 @@ def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    sections = reopened._gallery_view._info_tabs.currentWidget()._param_form._sections
+    sections = reopened._gallery_view._generate_pane.currentWidget()._param_form._sections
     assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
 
 
-def test_a_tabs_enhancement_levels_and_details_come_back_folded(qtbot, tmp_path):
+def test_a_tabs_enhancements_and_details_come_back_folded(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    panel = first._gallery_view._info_tabs.currentWidget()
-    panel.prefill("sdxl_t2i", {})
-    panel._versions.set_collapsed(True)
-    panel._metadata_block.set_folded(True)
+    tab = first._gallery_view._generate_pane.currentWidget()
+    tab.prefill("sdxl_t2i", {})
+    tab._versions.set_collapsed(True)
+    tab._basic_section.set_folded(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    panel = reopened._gallery_view._info_tabs.currentWidget()
-    assert (panel._versions.is_collapsed(), panel._metadata_block.is_folded()) == (True, True)
+    tab = reopened._gallery_view._generate_pane.currentWidget()
+    assert (tab._versions.is_collapsed(), tab._basic_section.is_folded()) == (True, True)
 
 
 def test_a_tabs_link_sections_come_back_folded_as_they_were_left(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    panel = first._gallery_view._info_tabs.currentWidget()
-    panel.prefill("sdxl_t2i", {})
+    tab = first._gallery_view._generate_pane.currentWidget()
+    tab.prefill("sdxl_t2i", {})
     left = {"Source": True, "Requests": True, "Modifications": False, "Animations": True,
             "Combine": False, "Trims": True}
-    panel._related.set_folds(left)
+    tab._related.set_folds(left)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._info_tabs.currentWidget()._related.folds() == left
+    assert reopened._gallery_view._generate_pane.currentWidget()._related.folds() == left
 
 
 def test_a_tabs_border_under_its_preview_is_where_it_was_left_after_a_restart(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
-    first._gallery_view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
+    first._gallery_view._generate_pane.currentWidget().prefill("sdxl_t2i", {})
     dragged = _drag_the_first_open_handle(
-        first._gallery_view._info_tabs.currentWidget()._media_split)
+        first._gallery_view._generate_pane.currentWidget()._media_split)
     first.close()
 
     reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
 
-    assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
+    assert reopened._gallery_view._generate_pane.currentWidget()._media_split.sizes() == dragged
 
 
 def test_a_tabs_border_saved_under_its_old_name_is_where_it_was_left_after_a_restart(
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
-    first._gallery_view._info_tabs.currentWidget().prefill("sdxl_t2i", {})
+    first._gallery_view._generate_pane.currentWidget().prefill("sdxl_t2i", {})
     dragged = _drag_the_first_open_handle(
-        first._gallery_view._info_tabs.currentWidget()._media_split)
+        first._gallery_view._generate_pane.currentWidget()._media_split)
     first.close()
     saved = path.read_text(encoding="utf-8")
     path.write_text(saved.replace('"media_border"', '"picture_border"'), encoding="utf-8")
@@ -1274,7 +1274,7 @@ def test_a_tabs_border_saved_under_its_old_name_is_where_it_was_left_after_a_res
     reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
 
     assert '"media_border"' in saved
-    assert reopened._gallery_view._info_tabs.currentWidget()._media_split.sizes() == dragged
+    assert reopened._gallery_view._generate_pane.currentWidget()._media_split.sizes() == dragged
 
 
 def test_the_toc_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
@@ -1285,7 +1285,7 @@ def test_the_toc_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._tree.sides == (BOTH,)
+    assert reopened._gallery_view._tree.shapes == (BOTH,)
 
 
 def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp_path):
@@ -1294,7 +1294,7 @@ def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()
     first._gallery_view._tree.together_button.click()
-    folder = oriented_key("image/sdxl_t2i", BOTH)
+    folder = shaped_key("image/sdxl_t2i", BOTH)
     first._gallery_view._tree.setCurrentItem(first._gallery_view._tree_item_for(folder))
     first.close()
 
@@ -1310,7 +1310,7 @@ def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot
     first = _window(qtbot, tmp_path, AppState(path))
     view = first._gallery_view
     view.refresh()
-    latest = oriented_key(FolderCollection(RECENTS_KEY, MediaType.VIDEO).key, SEPARATE[1])
+    latest = shaped_key(FolderCollection(LATEST_KEY, MediaType.VIDEO).key, SEPARATE[1])
     view._tree.setCurrentItem(view._tree_item_for(latest))
     first.close()
 
@@ -1327,7 +1327,7 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()
     first._gallery_view._tree.together_button.click()
-    folder = oriented_key("image/sdxl_t2i", BOTH)
+    folder = shaped_key("image/sdxl_t2i", BOTH)
     first._gallery_view._tree_item_for(folder).setExpanded(True)
     first.close()
 
@@ -1340,38 +1340,38 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick an image, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane
-    # matters as much as the slots — it is which videos the next Generate is
-    # answered from, and which lane's dropped video the slot shows.
+    # matters as much as the drop zones — it is which videos the next Generate is
+    # answered from, and which lane's dropped video the drop zone shows.
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.panel.image_slot.set_item("img")
-    first._gallery_view._combine.panel.video_slot.set_item("vid")
-    first._gallery_view._combine.panel._genau_radio.setChecked(True)  # as a click does
+    first._gallery_view._combine.widget.image_zone.set_item("img")
+    first._gallery_view._combine.widget.video_zone.set_item("vid")
+    first._gallery_view._combine.widget._genau_radio.setChecked(True)  # as a click does
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    combine = reopened._gallery_view._combine.panel
-    assert combine.image_slot.current_id() == "img"
-    assert combine.selected_intent() == act_settings.GENAU
-    assert combine.video_slot.current_id() is None
+    combine = reopened._gallery_view._combine.widget
+    assert combine.image_zone.current_id() == "img"
+    assert combine.selected_intent() == action_settings.GENAU
+    assert combine.video_zone.current_id() is None
     combine._video_radio.setChecked(True)
-    assert combine.video_slot.current_id() == "vid"
+    assert combine.video_zone.current_id() == "vid"
 
 
 def test_the_videos_recent_lists_come_back_after_close_and_reopen(qtbot, tmp_path):
     _seed_combine_db(tmp_path, videos=("vid", "vid2"))
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.panel.video_slot.set_item("vid")
-    first._gallery_view._combine.panel.video_slot.set_item("vid2")
+    first._gallery_view._combine.widget.video_zone.set_item("vid")
+    first._gallery_view._combine.widget.video_zone.set_item("vid2")
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    combine = reopened._gallery_view._combine.panel
-    assert combine.video_slot.current_id() == "vid2"
+    combine = reopened._gallery_view._combine.widget
+    assert combine.video_zone.current_id() == "vid2"
     assert _listed_under_recent(combine) == ["vid2", "vid"]
 
 
@@ -1690,10 +1690,10 @@ def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
 def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     # The whole chain, because every link in it is one the app has no other
     # reason to have: the queue's news leaves the gallery, the window hands it to
-    # the notices, and Windows shows it wherever the user has got to.
+    # the toasts, and Windows shows it wherever the user has got to.
     win = _window(qtbot, tmp_path)
     said = []
-    monkeypatch.setattr(notice_toast, "show",
+    monkeypatch.setattr(toast_raising, "show",
                         lambda app_id, xml, **_filing: said.append(xml))
 
     win._gallery_view._jobs.run_ended.emit(
@@ -1706,29 +1706,29 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     assert app_link.generation_in(toast.get("launch")) == "alpha-1"
 
 
-def test_a_video_watched_in_the_window_takes_its_notice_back(qtbot, tmp_path, monkeypatch):
+def test_a_video_watched_in_the_window_takes_its_toast_back(qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
     filed, taken_back = [], []
-    monkeypatch.setattr(notice_toast, "show",
+    monkeypatch.setattr(toast_raising, "show",
                         lambda app_id, xml, **filing: filed.append(filing["tag"]))
-    monkeypatch.setattr(notice_toast, "take_back",
+    monkeypatch.setattr(toast_raising, "take_back",
                         lambda app_id, **filing: taken_back.append(filing["tag"]))
-    monkeypatch.setattr(desktop_notices, "app_in_front", lambda: True)
-    monkeypatch.setattr(desktop_notices, "seconds_since_input", lambda: 0.0)
+    monkeypatch.setattr(toasts, "app_in_front", lambda: True)
+    monkeypatch.setattr(toasts, "seconds_since_input", lambda: 0.0)
     win._gallery_view._jobs.run_ended.emit(
         RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
-    front_tab = win._gallery_view._info_tabs.current_config_panel()
+    front_tab = win._gallery_view._generate_pane.current_generate_tab()
     monkeypatch.setattr(front_tab, "video_on_screen", lambda: "alpha-1")
 
-    win._notices.look()
+    win._toasts.look()
 
     assert taken_back == filed
 
 
-def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(
+def test_answering_a_toast_brings_the_window_forward_and_opens_the_item(
         qtbot, tmp_path, monkeypatch):
-    # The whole point of a notice being clickable: whatever the user was doing,
+    # The whole point of a toast being clickable: whatever the user was doing,
     # the app comes up in front of it showing the thing that just landed.
     win = _window(qtbot, tmp_path)
     win.showMinimized()
@@ -1743,9 +1743,9 @@ def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(
     assert went == ["alpha-1"]
 
 
-def test_answering_a_notice_for_an_item_that_has_since_gone_still_comes_forward(
+def test_answering_a_toast_for_an_item_that_has_since_gone_still_comes_forward(
         qtbot, tmp_path):
-    # A notice waits in Windows' notification center until it is answered, which
+    # A toast waits in Windows' notification center until it is answered, which
     # can be after the thing it announced was deleted.
     win = _window(qtbot, tmp_path)
 
@@ -1754,7 +1754,7 @@ def test_answering_a_notice_for_an_item_that_has_since_gone_still_comes_forward(
     assert win._gallery_view.selected_prompt_id() is None
 
 
-def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
+def test_answering_a_toast_in_a_session_asks_the_room_for_origenerator_mode(
         qtbot, tmp_path, monkeypatch):
     # Hosted, this window is the session's to show: in video mode it sits
     # parked under the players, so taking the foreground for itself would be a
@@ -1925,7 +1925,7 @@ def test_a_window_handed_back_from_a_session_shows_under_its_own_taskbar_button(
 def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_found_them(
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
-    kept = {"panels": {"landscape": {"corner": "upper_right", "minimized": True}}}
+    kept = {"tabs": {"landscape": {"corner": "upper_right", "minimized": True}}}
     state = AppState(path)
     state.set("slideshows", kept)
     state.save()
@@ -1999,22 +1999,22 @@ def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_n
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     state = AppState(path)
-    state.set("toc_sides", [BOTH])
+    state.set("toc_shapes", [BOTH])
     state.save()
 
     win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
-    assert win._gallery_view._tree.sides == SEPARATE
+    assert win._gallery_view._tree.shapes == SEPARATE
     win.close()
 
-    assert AppState(path).get("toc_sides") == [BOTH]
+    assert AppState(path).get("toc_shapes") == [BOTH]
 
 
 def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
-    folder = oriented_key("image/sdxl_t2i", BOTH)
+    folder = shaped_key("image/sdxl_t2i", BOTH)
     state = AppState(path)
-    state.set("toc_sides", [BOTH])
+    state.set("toc_shapes", [BOTH])
     state.set("open_folders", [folder])
     state.save()
 

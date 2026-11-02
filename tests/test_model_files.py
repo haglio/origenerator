@@ -47,7 +47,7 @@ def test_a_picker_lists_its_files_in_the_order_of_their_titles(tmp_path, monkeyp
 
 def test_lists_gguf_models(tmp_path, monkeypatch):
     # Flux runs on GGUF-quantized diffusion models (loaded by UnetLoaderGGUF), so
-    # the Model picker must list them alongside the .safetensors it already finds.
+    # the Model dropdown must list them alongside the .safetensors it already finds.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     diffusion = tmp_path / "models" / "diffusion_models"
     diffusion.mkdir(parents=True)
@@ -60,7 +60,7 @@ def test_lists_gguf_models(tmp_path, monkeypatch):
 
 def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
     # ComfyUI's loaders list models in subfolders too, naming them by the path
-    # relative to the category dir (e.g. WAN's split_files/…). The picker must
+    # relative to the category dir (e.g. WAN's split_files/…). The dropdown must
     # match, so a nested model is selectable and its stored value round-trips.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     diffusion = tmp_path / "models" / "diffusion_models"
@@ -73,7 +73,7 @@ def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
 
 
 def test_a_models_folder_nothing_has_changed_in_is_not_walked_again(installed_models, monkeypatch):
-    # Every picker of every form listed its folder afresh -- a walk of the whole
+    # Every dropdown of every form listed its folder afresh -- a walk of the whole
     # folder and a stat of every model in it -- which the first draw of a window
     # paid some thirty times over for folders that change once a month.
     installed_models.add("checkpoints", "a.safetensors", arch=SDXL)
@@ -126,9 +126,9 @@ def test_falls_back_when_the_category_dir_is_empty(tmp_path, monkeypatch):
 
 
 def test_lora_picker_leads_with_the_none_sentinel(installed_models):
-    # A LoRA is optional: the picker offers "None" first (which the workflow
+    # A LoRA is optional: the dropdown offers "None" first (which the workflow
     # builds with no LoraLoader, running the base model unmodified), then the
-    # installed files from the same scan as any model picker.
+    # installed files from the same scan as any model dropdown.
     installed_models.add("loras", "b.safetensors", arch=WAN, lora=True)
     installed_models.add("loras", "a.safetensors", arch=WAN, lora=True)
     assert list_lora_files(["fallback.safetensors"], accepts=(WAN,)) == [
@@ -144,7 +144,7 @@ def test_a_lora_picker_whose_default_is_none_offers_none_once(tmp_path, monkeypa
 
 def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path, monkeypatch):
     # Where the detail pass's provider node looks for them. Empty rather than a
-    # fallback name: "no detector installed" is a real state the panel has to be
+    # fallback name: "no detector installed" is a real state the Enhance pane has to be
     # able to read, and a fabricated default would hide it under a failed submit.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     assert list_detector_files() == []
@@ -200,7 +200,7 @@ def test_a_picker_drops_the_other_half_of_the_expert_pair(installed_models):
     ]
 
 
-def test_a_model_picker_and_a_lora_picker_do_not_offer_each_other(installed_models):
+def test_a_model_dropdown_and_a_lora_picker_do_not_offer_each_other(installed_models):
     # Both folders hold the wrong kind — a WAN LoRA filed under
     # diffusion_models, a full checkpoint filed under loras — and neither loads
     # in the other's slot, whatever architecture it was trained for.
@@ -263,10 +263,10 @@ def test_listing_a_folder_requires_saying_what_the_graph_runs():
     # question. Forgetting is a TypeError at the call, not a dropdown that
     # quietly went back to offering everything. ANY is how a genuinely
     # architecture-neutral category (the ESRGAN upscalers) says so out loud.
-    for picker in (list_model_files, list_lora_files):
-        accepts = inspect.signature(picker).parameters["accepts"]
-        assert accepts.kind is inspect.Parameter.KEYWORD_ONLY, picker.__name__
-        assert accepts.default is inspect.Parameter.empty, picker.__name__
+    for dropdown in (list_model_files, list_lora_files):
+        accepts = inspect.signature(dropdown).parameters["accepts"]
+        assert accepts.kind is inspect.Parameter.KEYWORD_ONLY, dropdown.__name__
+        assert accepts.default is inspect.Parameter.empty, dropdown.__name__
 
     with pytest.raises(TypeError):
         list_model_files("checkpoints", ["fb.safetensors"])

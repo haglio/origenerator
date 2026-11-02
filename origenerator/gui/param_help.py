@@ -214,7 +214,7 @@ PARAM_HELP: dict[str, str] = {
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 
-    # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
+    # --- the enhance tail (off the form; the Enhance pane owns these) ---
     "enhance_scale": (
         "How much bigger the enhanced version is than the render it came from. The "
         "bigger it gets, the more the pass has to invent."
@@ -239,7 +239,7 @@ PARAM_HELP: dict[str, str] = {
     "enhance_fix_prompts": (
         "The prompts a fix redraws its part toward and away from, put ahead of the "
         "image's own, and the LoRA it redraws through. A fix run with different "
-        "ones makes a different enhancement level."
+        "ones makes a different version."
     ),
 
     # --- structure transfer ---

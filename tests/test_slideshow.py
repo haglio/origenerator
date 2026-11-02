@@ -132,7 +132,7 @@ def test_an_out_of_range_start_falls_back_to_the_front():
 
 
 def test_in_order_leaves_the_set_exactly_as_handed_over():
-    # A folder played from a double-click is the browser's own listing, not a pass.
+    # A folder played from a double-click is the Gallery pane's own listing, not a pass.
     playlist = _playlist(shuffle=in_order)
     assert playlist.order == [0, 1, 2]
 
@@ -487,7 +487,7 @@ def test_dropping_something_that_was_never_here_changes_nothing():
 
 
 def test_where_a_slideshow_was_left_reads_back_as_it_was_saved():
-    state = SlideshowState(order=("id-b", "id-a"), current="id-a", locked=True, level_index=1,
+    state = SlideshowState(order=("id-b", "id-a"), current="id-a", locked=True, version_index=1,
                            loop="seed", loop_pool=("id-b", "id-a", "id-far"))
 
     assert SlideshowState.restored(json.loads(json.dumps(state.saved()))) == state
@@ -501,7 +501,7 @@ def test_the_filters_read_back_as_they_were_saved():
 
 
 def test_a_saved_slideshow_that_makes_no_sense_reads_back_as_nowhere():
-    nonsense = {"order": "id-a", "current": 3, "locked": "yes", "level_index": -2,
+    nonsense = {"order": "id-a", "current": 3, "locked": "yes", "version_index": -2,
                 "loop": 5, "loop_pool": "id-a"}
 
     assert SlideshowState.restored(nonsense) == SlideshowState()

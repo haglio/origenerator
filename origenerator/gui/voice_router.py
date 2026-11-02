@@ -8,13 +8,13 @@ one.
 What lives here is the whole path an utterance takes. The microphone and what it
 is listening for. The caption that says what was heard and what it did, with the
 one promise it holds while a request is still being worked out. The matching of
-an utterance to a collection, a switch, a bar, a bank button, an order about the
+an utterance to a collection, a switch, a bar, a Gallery pane button, an order about the
 image on screen, or a request said over several breaths -- and, for a hosted
 app, the same matching of words the session's own microphone heard and posted on
 this app's channel.
 
 What it does NOT hold is the doing. A slideshow's own words went to the slideshows when
-they came out (:mod:`origenerator.gui.slideshow_director`); a bank button's press is
+they came out (:mod:`origenerator.gui.slideshow_director`); a Gallery pane button's press is
 the button's own click; and the three orders about an image -- enhance it, fix a
 part of it, make a Genau flick of it -- stay with the seams that run them.
 :class:`VoiceHost` names each of those.
@@ -39,7 +39,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
-    RECENTS_KEY as _RECENTS_KEY,
+    LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
@@ -47,7 +47,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
-from origenerator.gui.notice_overlay import ERROR, HEARD_MARK, NOTICE, WARNING, set_marked_text
+from origenerator.gui.message import ERROR, HEARD_MARK, INFO, WARNING, set_marked_text
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.voice.app_commands import (
@@ -79,8 +79,8 @@ from origenerator.voice.commands import (
     SlideshowControl,
     SurfaceCommand,
     match_voice_command,
-    sided_app_command,
-    split_side,
+    shaped_app_command,
+    split_shape,
     spoken_phrases,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation
@@ -102,7 +102,7 @@ _WANTS_ANIMATING = "an animation"
 # The collection each spoken collection name stands you in. What to call it back is the
 # host's answer, so a row renamed is renamed in one place.
 _COLLECTIONS = {
-    AppCommand.RECENTS: _RECENTS_KEY,
+    AppCommand.LATEST: _LATEST_KEY,
     AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
     AppCommand.TRASH: _TRASH_KEY,
@@ -117,12 +117,12 @@ _BARS = {
     "center": "set_center",
 }
 
-# The refusal each bank word carries when its button cannot run — ``None`` to use
+# The refusal each button word carries when its button cannot run — ``None`` to use
 # the button's own tooltip, which for most of them already says why ("Nothing to
 # undo", "Nothing here to favorite"). Only the two whose tips are bare labels, and
 # Group, whose tip explains the button rather than refusing it, carry their own
 # words.
-_BANK_REFUSALS = {
+_BUTTON_REFUSALS = {
     AppCommand.BACK: "nowhere back",
     AppCommand.FORWARD: "nowhere forward",
     AppCommand.CULL: None,
@@ -142,7 +142,7 @@ _FILTERS = {
 }
 
 # The words that are about the slide on screen when there is one. The rest of
-# the bank (undo, redo, group) is the gallery's whether or not a slideshow covers it:
+# the Gallery pane buttons (undo, redo, group) is the gallery's whether or not a slideshow covers it:
 # undoing a cull you regret is exactly a thing to do mid-show.
 _ABOUT_THE_SLIDE = frozenset({
     AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
@@ -157,8 +157,8 @@ class VoiceHost(Protocol):
         """What to call a collection back — the plain name its row carries, without
         the waiting-work count."""
 
-    def stand_in_collection(self, key: str, side: str | None) -> bool:
-        """Select the collection ``key`` names on ``side`` (or on whichever side the
+    def stand_in_collection(self, key: str, shape: str | None) -> bool:
+        """Select the collection ``key`` names on ``shape`` (or on whichever shape the
         tree answers with), exactly as clicking its row does. ``False`` when the
         tree has no row for it at all."""
 
@@ -203,7 +203,7 @@ class VoiceRouter(QObject):
         # to hear; everything else is taken down as a sentence.
         self.listener = CommandAndRequestListener(
             command_matcher=match_voice_command,
-            bare_matcher=sided_app_command,
+            bare_matcher=shaped_app_command,
             dictation=RequestDictation(),
             phrases=spoken_phrases(),
             never_repaired=phrases_heard_only_outright(),
@@ -239,13 +239,13 @@ class VoiceRouter(QObject):
         self._flash_timer.timeout.connect(self._revert)
         # What that caption goes back to saying rather than the idle line: the
         # request it is still working out, and which request that is. It has one
-        # slot, so a line flashed over the promise has to know what to restore
-        # — the slideshow's notice keeps its own copy of the same pair.
+        # place, so a line flashed over the promise has to know what to restore
+        # — the slideshow's message keeps its own copy of the same pair.
         self._working_status = ""
         self._working_request = None
-        # The bank the spoken words act through, bound once it exists.
+        # The Gallery pane buttons the spoken words act through, bound once it exists.
         self._switches: dict[str, QWidget | None] = {}
-        self._bank: dict = {}
+        self._buttons: dict = {}
         self._enhance = None
         self._hold_the_motion(motion)
 
@@ -268,7 +268,7 @@ class VoiceRouter(QObject):
         self._hold_the_motion(motion)
         self._switches.update({_RADIO: radio, _DRIVE: drive, _MIC: mic})
 
-    def bind_the_bank(self, *, auto, radio, drive, mic, actions, enhance) -> None:
+    def bind_the_buttons(self, *, auto, radio, drive, mic, actions, enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, by keyword
         and by object rather than by attribute name: spelled as strings, a renamed
         button broke the microphone silently.
@@ -285,7 +285,7 @@ class VoiceRouter(QObject):
         the motion words find nothing to move rather than a driver that is absent.
         """
         self._switches = {_AUTO: auto, _RADIO: radio, _DRIVE: drive, _MIC: mic}
-        self._bank = dict(actions)
+        self._buttons = dict(actions)
         self._enhance = enhance
 
     # --- the microphone -----------------------------------------------------
@@ -327,7 +327,7 @@ class VoiceRouter(QObject):
 
     def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
         """Flash a line on the caption. The slideshows use this when there is no
-        slideshow up whose own notice could carry it."""
+        slideshow up whose own message could carry it."""
         self._show(message, transient=True, mark=mark)
 
     def _set_caption(self, text: str | None, mark: str = HEARD_MARK) -> None:
@@ -381,11 +381,11 @@ class VoiceRouter(QObject):
     def _on_error(self, message: str) -> None:
         self._say_both(message, kind=ERROR)
 
-    def _say_both(self, message: str, *, kind: str = NOTICE) -> None:
+    def _say_both(self, message: str, *, kind: str = INFO) -> None:
         """Put what voice heard or hit in front of whoever is listening.
 
         Both places, because they are different screens: this pane's caption for
-        someone working in the window, and the slideshow's own notice for someone
+        someone working in the window, and the slideshow's own message for someone
         watching a slideshow — who can see nothing of this window at all, and
         for whom a mic that heard nothing and one that heard the wrong words
         look exactly alike.
@@ -417,14 +417,14 @@ class VoiceRouter(QObject):
         request from also matching a command.  Then a whole-utterance word —
         "landscape enhanced only" turns the slideshow's switch, and left to the
         looser image matcher it would read as "enhance" with a word after it.
-        The side is split off for the dictation — it rides every utterance the
+        The shape is split off for the dictation — it rides every utterance the
         session posts, and fed in it would become the first word of the request
         instead of the region the request is about.
         """
-        side, rest = split_side(text)
+        shape, rest = split_shape(text)
         spoken = self.listener.push_dictation(rest, spoken_at=said_at)
         if spoken is not None:
-            self.on_spoken_request(spoken, side=side)
+            self.on_spoken_request(spoken, shape=shape)
             return True
         bare = self.listener.bare_command(text)
         if bare is not None:
@@ -441,19 +441,19 @@ class VoiceRouter(QObject):
     def on_command(self, matched, said_at: float | None = None) -> None:
         """One recognized utterance: a collection to play, a slideshow command, a bare
         word about the app or the slide in front of the speaker, or an order
-        about the image — each with the side it named and when it was said.
+        about the image — each with the shape it named and when it was said.
 
         An order about the image always arrives wrapped in a
-        :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
-        how the side travels, and the matchers put every one of them in it.
+        :class:`SurfaceCommand`, whether or not a shape was said: the wrapper is
+        how the shape travels, and the matchers put every one of them in it.
         """
         if isinstance(matched, CollectionCommand):
             self._slideshows.play_collection(matched)
         elif isinstance(matched, SlideshowControl):
-            self._slideshows.run_slideshow_command(matched.command, matched.side)
+            self._slideshows.run_slideshow_command(matched.command, matched.shape)
         elif isinstance(matched, SurfaceCommand):
             if isinstance(matched.command, AppCommand):
-                self._run_app_command(matched.command, matched.side, said_at)
+                self._run_app_command(matched.command, matched.shape, said_at)
             else:
                 self._on_image_command(matched, said_at)
         elif isinstance(matched, AppCommand):
@@ -468,7 +468,7 @@ class VoiceRouter(QObject):
 
     # --- the bare vocabulary: a collection, a switch, the motion, or the slide ---
 
-    def _run_app_command(self, command: AppCommand, side: str | None = None,
+    def _run_app_command(self, command: AppCommand, shape: str | None = None,
                          said_at: float | None = None) -> None:
         """One bare spoken word.
 
@@ -479,9 +479,9 @@ class VoiceRouter(QObject):
         fullscreen slideshow while one is up and the gallery otherwise.
         """
         if command in _COLLECTIONS:
-            self._go_to_collection(command, side)
+            self._go_to_collection(command, shape)
         elif command in _FILTERS:
-            self._slideshows.filter_enhanced(_FILTERS[command], side)
+            self._slideshows.filter_enhanced(_FILTERS[command], shape)
         elif command in _SWITCHES:
             self._flip_switch(command)
         elif command in _MOTION:
@@ -491,7 +491,7 @@ class VoiceRouter(QObject):
         else:
             self._run_in_gallery(command)
 
-    def _go_to_collection(self, command: AppCommand, side: str | None = None) -> None:
+    def _go_to_collection(self, command: AppCommand, shape: str | None = None) -> None:
         """Stand in the collection a spoken name asks for, exactly as clicking its
         row does.
 
@@ -499,14 +499,14 @@ class VoiceRouter(QObject):
         move is what the slideshow leaves you standing in — so the answer says which
         collection rather than refusing a command whose whole effect is out of sight.
 
-        The name is All's copy of the collection, on the utterance's own side;
-        unsided, the host takes the tree's own answer for the folder — the same
+        The name is All's copy of the collection, on the utterance's own shape;
+        unshaped, the host takes the tree's own answer for the folder — the same
         row a click would have landed on.
         """
         key = _COLLECTIONS[command]
         label = self._host.collection_label(key)
-        if not self._host.stand_in_collection(key, side):
-            # Recents and Favorites appear only once there is one
+        if not self._host.stand_in_collection(key, shape):
+            # Latest and Favorites appear only once there is one
             self._slideshows.answer(f"no {label} collection yet", kind=WARNING)
             return
         self._slideshows.answer(label)
@@ -514,11 +514,11 @@ class VoiceRouter(QObject):
     def _flip_switch(self, command: AppCommand) -> None:
         """Set one of the app-wide switches, through its button rather than
         around it — a spoken switch is the same event as a clicked one, so the
-        bank lights the same way and nothing has to be kept in step.
+        button lights the same way and nothing has to be kept in step.
 
         "Mic off" is the one with no way back: a shut mic hears nothing, so the
         button is what turns it on again. Its answer is still worth saying —
-        with a slideshow up it lands in the slideshow's notice, where the bank is not
+        with a slideshow up it lands in the slideshow's message, where the Gallery pane buttons are not
         visible to say it instead.
         """
         switch, want, name = _SWITCHES[command]
@@ -538,7 +538,7 @@ class VoiceRouter(QObject):
 
         The driver is app-wide, so this answers from the gallery and from a slideshow
         alike, and the bars read the same whether or not the device is running:
-        a motion can be set up before it is started, exactly as the panel allows.
+        a motion can be set up before it is started, exactly as the OSR2 controls allow.
         """
         move, argument = self._motion_moves[command]
         if move is None:
@@ -567,21 +567,21 @@ class VoiceRouter(QObject):
         self._slideshows.answer(self._motion.status_text())
 
     def _run_in_gallery(self, command: AppCommand) -> None:
-        """A word said with no slideshow to take it: the bank button it names, aimed
+        """A word said with no slideshow to take it: the Gallery pane button it names, aimed
         exactly as a click on it would be."""
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
             self._slideshows.answer(f"{command.value} is a slideshow's — none is up",
                                     kind=WARNING)
             return
-        button, act = self._bank[command]
-        self._press_bank_button(button, act, _BANK_REFUSALS[command])
+        button, act = self._buttons[command]
+        self._press_gallery_pane_button(button, act, _BUTTON_REFUSALS[command])
 
-    def _press_bank_button(self, button, act, refusal: str | None = None) -> None:
-        """Do what a bank button does, and answer in that button's own words.
+    def _press_gallery_pane_button(self, button, act, refusal: str | None = None) -> None:
+        """Do what a Gallery pane button does, and answer in that button's own words.
 
         Its tip already says what it will do to what is in front of you — "Favorite
         3 items", "Undo: delete of 2 items" — which is precisely what a speaker
-        who is not looking at the bank needs told back, and it cannot drift from
+        who is not looking at the buttons needs told back, and it cannot drift from
         what the button does. A button that is away or dead says why instead of
         quietly doing nothing: ``refusal``, or its tip where that already reads
         as one.
@@ -589,7 +589,7 @@ class VoiceRouter(QObject):
         if button.isHidden() or not button.isEnabled():
             self._slideshows.answer(refusal or button.toolTip(), kind=WARNING)
             return
-        said = button.toolTip()  # read first: the action re-aims the bank
+        said = button.toolTip()  # read first: the action re-aims the buttons
         act()
         self._slideshows.answer(said)
 
@@ -598,23 +598,23 @@ class VoiceRouter(QObject):
         (or several parts, or "fix all"), "enhance" for the better version of
         it, or "genau it" to animate it as a Genau flick.
 
-        A named side takes that region's slideshow — hosted, two slideshows run at once
+        A named shape takes that region's slideshow — hosted, two slideshows run at once
         and neither is the active window, so naming one is the only way to say
         which image is meant.  Unnamed, it goes to whichever slideshow is up.
         Answered out of the slideshow's own note — the speaker is looking at it, not
-        at this pane. Said with no slideshow up, "enhance" falls to the bank button of
+        at this pane. Said with no slideshow up, "enhance" falls to the Gallery pane button of
         the same name; the other two have no "on screen" to act on, and the
         utterance has already been claimed as a command by the time it gets here,
         so the caption says so rather than letting it vanish."""
-        slideshow = self._slideshows.surface_for(command.side)
+        slideshow = self._slideshows.surface_for(command.shape)
         if slideshow is None:
             if command.command == gallery.ENHANCE_COMMAND:
-                # The word names a bank button too, and with no image filling
+                # The word names a Gallery pane button too, and with no image filling
                 # the screen the button is what it means — aimed the way a click
                 # aims it, at the picked thumbnails else the folder's unenhanced
                 # images. A refusal here would be a dead end where there is a
                 # perfectly good thing to do.
-                self._press_bank_button(*self._enhance)
+                self._press_gallery_pane_button(*self._enhance)
                 return
             wants = (_WANTS_ANIMATING
                      if isinstance(command.command, AnimateRequest)
@@ -632,21 +632,21 @@ class VoiceRouter(QObject):
 
     # --- spoken requests: "Request … over" over whatever is on screen --------
 
-    def on_spoken_request(self, spoken, side: str | None = None) -> None:
+    def on_spoken_request(self, spoken, shape: str | None = None) -> None:
         """One step of a spoken request — from the mic's dictation, or from the
         hosting session's channel with the region it was said to.
 
-        While it is still being said the slideshow pauses and its notice says so;
+        While it is still being said the slideshow pauses and its message says so;
         finished, it queues a revision of the item it was opened over. The
         target is taken at the opening step and kept, because a request is about
         the image that prompted it, not whatever is up when the words run out.
 
-        Hosted, *side* is what makes "the image" an image at all: two slideshows
+        Hosted, *shape* is what makes "the image" an image at all: two slideshows
         run at once on the satellite regions and neither is the active window,
         so the region named is the only thing that says which one the words are
         about.
         """
-        slideshow = self._slideshows.surface_for(side)
+        slideshow = self._slideshows.surface_for(shape)
         if self._request_target is None:
             # Taken at the first step of the request, whichever step that is —
             # "Request, no hat, over" is a whole one in a single breath.
@@ -660,7 +660,7 @@ class VoiceRouter(QObject):
         if spoken.state != COMPLETED:  # given up on — the terminator never came
             self._answer_request(slideshow, "request dropped — never heard “over”", spoken)
             return
-        self._begin_request(target, spoken, side)
+        self._begin_request(target, spoken, shape)
 
     def drop_the_request(self) -> None:
         self.listener.drop_the_request()
@@ -675,7 +675,7 @@ class VoiceRouter(QObject):
 
     def _pause_for_request(self, slideshow, spoken) -> None:
         """Pause (or release) the slideshow while the sentence is being said, and say
-        so — in the slideshow's own notice when one is up, since that is where the
+        so — in the slideshow's own message when one is up, since that is where the
         speaker is looking, and in this pane's voice caption otherwise."""
         note = (f"Request: {spoken.text}… — say “over” to submit"
                 if spoken.listening else "")
@@ -685,7 +685,7 @@ class VoiceRouter(QObject):
             self._show(note, transient=False)
 
     def _answer_request(self, slideshow, message: str, spoken, *,
-                        working: bool = False, kind: str = NOTICE) -> None:
+                        working: bool = False, kind: str = INFO) -> None:
         """Say what *spoken* did, where the speaker is looking.
 
         *working* is the one line that is not an answer but a promise of one, so
@@ -712,7 +712,7 @@ class VoiceRouter(QObject):
             self._show(message, transient=not working)
 
     def _begin_request(self, prompt_id: str | None, spoken,
-                       side: str | None = None) -> None:
+                       shape: str | None = None) -> None:
         """Start working out what a finished request changes.
 
         The working-out goes to the pool because it may have to ask the local
@@ -722,12 +722,12 @@ class VoiceRouter(QObject):
         (nothing on screen, a video this app can't rebuild) is answered here,
         so a request that was never going to run doesn't wait on a model.
 
-        The side rides the pool's context so the answer comes back to the same
+        The shape rides the pool's context so the answer comes back to the same
         region the request was said to — seconds later, with two slideshows running,
         it is the only thing that still says which.
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
-        slideshow = self._slideshows.surface_for(side)
+        slideshow = self._slideshows.surface_for(shape)
         if row is None:
             self._answer_request(
                 slideshow, "nothing on screen to request a change to", spoken)
@@ -743,7 +743,7 @@ class VoiceRouter(QObject):
                              working=True)
         standing = self._starting.show(**requested_of(row, workflow, params))
         QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken, side, standing),
+            self._revision, (row, workflow, params, spoken, shape, standing),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
             spoken.text, in_scenes=workflow.tells_a_story(),
         ))
@@ -755,14 +755,14 @@ class VoiceRouter(QObject):
         a couple of seconds still lands wherever the speaker is looking — on
         the region the request named, hosted, since two of them are up.
         """
-        row, workflow, params, spoken, side, standing = context
+        row, workflow, params, spoken, shape, standing = context
         try:
-            self._answer_the_revision(row, workflow, params, spoken, side, revision)
+            self._answer_the_revision(row, workflow, params, spoken, shape, revision)
         finally:
             self._starting.drop(standing)
 
-    def _answer_the_revision(self, row, workflow, params, spoken, side, revision) -> None:
-        slideshow = self._slideshows.surface_for(side)
+    def _answer_the_revision(self, row, workflow, params, spoken, shape, revision) -> None:
+        slideshow = self._slideshows.surface_for(shape)
         if revision is None:
             self._answer_request(
                 slideshow, f"didn't catch what to change in “{spoken.text}”", spoken,

@@ -1,7 +1,7 @@
-"""A browser-style back/forward history of the views the middle pane has shown.
+"""A web-browser-style back/forward history of the views the middle pane has shown.
 
 Qt-free so the traversal logic stays unit-testable without a widget toolkit. The
-gallery records every view the user lands on — a folder, a collection (Recents,
+gallery records every view the user lands on — a folder, a collection (Latest,
 Favorites, ...), a search's results, and whichever item is picked in it — and
 Back/Forward return to exactly that view, whether it was a generation reached by
 an i2v's input-image link or the collection they drilled from.

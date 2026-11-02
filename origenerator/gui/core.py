@@ -20,13 +20,13 @@ from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
-from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
+from origenerator.gui.toasts import Toasts
 from origenerator.gui.window_monitor import GEOMETRY_KEY, the_window_on
 from origenerator.win32 import (
     bring_back_into_sight,
@@ -56,8 +56,8 @@ logger = logging.getLogger(__name__)
 # The order is the restore order and is load-bearing: the tabs before the folder
 # before the generation, each later one needing what the earlier ones put up.
 SESSION_UI_STATE = (
-    ("generate_tabs", GalleryView.capture_config_tabs, GalleryView.restore_config_tabs),
-    ("toc_sides", GalleryView.toc_sides, GalleryView.set_toc_sides),
+    ("generate_tabs", GalleryView.capture_generate_tabs, GalleryView.restore_generate_tabs),
+    ("toc_shapes", GalleryView.toc_shapes, GalleryView.set_toc_sides),
     ("open_folders", GalleryView.open_folders, GalleryView.set_open_folders),
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
@@ -72,7 +72,7 @@ SESSION_UI_STATE = (
     # The mic switch. Absent from a session saved before it was persisted — and
     # from a first launch — which is the app's default of on (see set_mic_enabled).
     ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),
-    # The Enhance subpanel's settings. App-wide, so they belong to the session
+    # The Enhance pane's settings. App-wide, so they belong to the session
     # rather than to any folder's row in the database.
     ("enhance_settings", GalleryView.enhance_settings, GalleryView.set_enhance_settings),
     # How the gallery search lays its results out (newest first, or banded by
@@ -125,7 +125,7 @@ class Core(QMainWindow):
         # A small floor (not the old 1000x700) so a tiling window manager can snap
         # the window into a monitor third (~853px) or a portrait-monitor half
         # (~720px) — Qt maps this straight to the window's min track size. The
-        # gallery's own pane floors keep content readable at those slot sizes; only
+        # gallery's own pane floors keep content readable at those tiling sizes; only
         # a manual drag below that compresses it.
         self.setMinimumSize(600, 400)
         # The rect this window is pinned to once shown, or None standalone.
@@ -133,17 +133,17 @@ class Core(QMainWindow):
         if fun_time is not None:
             self._wear_the_session(fun_time)
 
-        # One unified view: the gallery, whose info pane now holds the editable
-        # config tabs that used to be a separate Generate tab. A clicked
-        # thumbnail, the re-roll "+", and the combine panel all feed it.
+        # One unified view: the gallery, whose Generate pane now holds the editable
+        # Generate tabs that used to be a separate Generate tab. A clicked
+        # thumbnail, the New tile, and the Combine all feed it.
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
                                          prompt_heights=PROMPT_HEIGHTS)
         self.setCentralWidget(self._gallery_view)
         # Where a run that outlasted the user's attention reports itself: the
         # window's own icon, on a tray icon that lives as long as the app does.
-        self._notices = DesktopNotices(self.windowIcon(), parent=self, shown_as=preview,
+        self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
-        self._gallery_view.run_ended.connect(self._notices.note)
+        self._gallery_view.run_ended.connect(self._toasts.note)
         if fun_time is not None:
             # The session's channels: its verbs onto the region slideshows, the
             # paused flag over them, and the occupancy status back. Built here
@@ -187,7 +187,7 @@ class Core(QMainWindow):
 
     def _restore_session(self):
         """Put the window back where it was — same monitor, size, and maximized
-        state — and reopen the last session's config tabs, gallery folder, and
+        state — and reopen the last session's Generate tabs, gallery folder, and
         selected generation.  Inside a Fun Time session the geometry is the
         session's to dictate, so the saved one is neither restored nor (see
         ``closeEvent``) overwritten -- except in a headset, which names no rect."""
@@ -242,7 +242,7 @@ class Core(QMainWindow):
     def go_to_generation(self, prompt_id: str) -> None:
         """Put a generation in front of the user, from outside this window.
 
-        What a clicked notification comes to (:mod:`origenerator.app_link`).
+        What a clicked toast comes to (:mod:`origenerator.app_link`).
         Standalone that means this window over whatever they had moved on to;
         hosted, the window is the session's to show and taking the foreground
         for it would put it over the room instead, so the gallery asks the room
@@ -353,8 +353,8 @@ class Core(QMainWindow):
     def _wear_the_session(self, session: FunTimeSession) -> None:
         # A managed window of the hosting session: frameless so the client
         # area IS the rect Fun Time named (the Random Favs Browser's), and
-        # in the topmost band where every managed window lives — Fun Time
-        # decides who within the band is in front.
+        # in the topmost layer where every managed window lives — Fun Time
+        # decides who within the layer is in front.
         self._dress_for_the_room(session)
         if session.in_a_headset:
             self._fill_the_frame_cap()

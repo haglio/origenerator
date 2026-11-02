@@ -64,11 +64,11 @@ def _has_image(tile):
 
 
 def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
-    # The stage is read on the scrim over the thumbnail, the way an in-flight card
+    # The stage is read on the scrim over the thumbnail, the way an in-flight tile
     # and an enhancing thumbnail say theirs.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    assert tile._scrim.text() == "Waiting…"
+    assert tile._status_scrim.text() == "Waiting…"
     assert not tile._cancel.isHidden()
     assert tile._cancel.text() == "Cancel"
 
@@ -92,7 +92,7 @@ def test_the_cancel_button_emits_cancel_requested(qtbot):
 
 
 def test_a_click_on_the_tile_selects_it(qtbot):
-    # So the info pane can mirror its preview.
+    # So the Generate pane can mirror its preview.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     picks = []
@@ -116,7 +116,7 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
 
 
 def _picked_tile_drawn(qtbot):
-    """A picked tile, and the pixels of the card it sits in, drawn under the app
+    """A picked tile, and the pixels of the tile it sits in, drawn under the app
     stylesheet."""
     app = QApplication.instance()
     prior = app.styleSheet()
@@ -155,7 +155,7 @@ def test_started_signal_switches_the_scrim_to_generating(qtbot):
     qtbot.addWidget(tile)
     job._state = "running"
     job.started.emit()
-    assert tile._scrim.text() == "Generating…"
+    assert tile._status_scrim.text() == "Generating…"
 
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
@@ -170,7 +170,7 @@ def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
 
 
 def test_the_bar_says_which_pass_is_being_taken(qtbot):
-    # A video run is three passes, and the band along the bar's foot restarts
+    # A video run is three passes, and the substep progress bar along the foot restarts
     # once per pass. Named, the caption says which of them is being done — the
     # one thing a twelve-minute run can report while the countdown is still too
     # early to mean anything.
@@ -184,15 +184,15 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
 
 def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     # It stood a blurred copy of the frame, where the Job Queue's corner stood a
-    # sharp pair and the config tab stood a blank — three surfaces, three ideas
+    # sharp pair and the Generate tab stood a blank — three surfaces, three ideas
     # of one wait. All three stand the sum now.
 
     frame = tmp_path / "frame.png"
     Image.new("RGB", (60, 40), (0, 0, 255)).save(frame)
-    clip = tmp_path / "clip.png"
-    Image.new("RGB", (60, 40), (255, 0, 0)).save(clip)
+    video = tmp_path / "clip.png"
+    Image.new("RGB", (60, 40), (255, 0, 0)).save(video)
     job = FakeJob(state="running", started_at=time.time() - 5)
-    tile = GeneratingTile(job, made_from=Combination(str(frame), str(clip)))
+    tile = GeneratingTile(job, made_from=Combination(str(frame), str(video)))
     qtbot.addWidget(tile)
 
     thumbnail = tile._image.pixmap()
@@ -252,7 +252,7 @@ def test_preview_signal_renders_image(qtbot):
 
 def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
     # Overlaid rather than laid out beneath, so the thumbnail keeps the full
-    # height every card in the grid gives it.
+    # height every tile in the grid gives it.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
@@ -270,12 +270,12 @@ def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
     tile = GeneratingTile(job)
     qtbot.addWidget(tile)
     assert _has_image(tile)
-    assert tile._scrim.text() == "Generating…"
+    assert tile._status_scrim.text() == "Generating…"
     assert tile._bar.caption().startswith("50% · ")
 
 
 def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
-    # The tile is a card in the grid like any other, and every other one answers
+    # The tile is a tile in the grid like any other, and every other one answers
     # a right-click. It hands the gesture up for the gallery to answer with the
     # run's own menu.
     tile = GeneratingTile(FakeJob(state="running"))

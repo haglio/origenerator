@@ -66,12 +66,12 @@ _END_WORDS = ("over",)
 _MAX_UTTERANCES = 8
 
 
-def _strip_leading_word(text: str) -> str:
+def _without_leading_word(text: str) -> str:
     """``text`` without its first word and whatever punctuation followed it."""
     return re.sub(r"^\W*[\w']+\W*", "", text or "", count=1)
 
 
-def _strip_trailing_word(text: str) -> str:
+def _without_trailing_word(text: str) -> str:
     """``text`` without its last word and whatever punctuation surrounded it."""
     return re.sub(r"\W*[\w']+\W*$", "", text or "", count=1)
 
@@ -144,18 +144,18 @@ class RequestDictation:
         self._open = True
         self._opened_at = spoken_at
         self._heard = [text]
-        body = _strip_leading_word(text)
+        body = _without_leading_word(text)
         # "Request, no silver earrings, over" is a whole request in one breath, so
         # the opening utterance is checked for the terminator like any other.
         if self._ends_the_request(heard):
-            return self._finish(_strip_trailing_word(body))
+            return self._finish(_without_trailing_word(body))
         self._parts = [body]
         return SpokenRequest(OPENED, _join(self._parts), _join(self._heard), self._opened_at)
 
     def _continue(self, text: str):
         self._heard.append(text)
         if self._ends_the_request(words(text, keep_apostrophes=True)):
-            return self._finish(_join(self._parts + [_strip_trailing_word(text)]))
+            return self._finish(_join(self._parts + [_without_trailing_word(text)]))
         self._parts.append(text)
         if len(self._heard) >= self._max:
             given_up, opened_at = _join(self._heard), self._opened_at
@@ -179,7 +179,7 @@ class RequestDictation:
 def request_words(heard: str) -> str:
     """The request a transcript of it asked for: everything heard between the
     opening word and "over"."""
-    return _strip_trailing_word(_strip_leading_word(heard)).strip()
+    return _without_trailing_word(_without_leading_word(heard)).strip()
 
 
 def words_of(record: dict | None) -> str:

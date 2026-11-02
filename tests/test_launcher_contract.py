@@ -81,7 +81,7 @@ def test_both_of_those_windows_run_on_the_primary_checkouts_venv():
 
 @on_windows
 def test_the_animation_launcher_reads_the_live_library_too():
-    """The clips it judges and the settings it writes are the live install's,
+    """The videos it judges and the settings it writes are the live install's,
     for the reason the sorting launcher's are."""
     report = dry_run(REPO_ROOT / "check_animations.vbs")
 

@@ -18,7 +18,7 @@ from origenerator.gallery import (
     fold_enhancement,
     is_enhanced_row,
 )
-from origenerator.generation_metadata import basic_section, file_item
+from origenerator.generation_metadata import basic_facts, file_item
 from origenerator.generation_state import GenerationSource
 from origenerator.output_places import OutputPlaces
 
@@ -76,7 +76,7 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
         [{"filename": "sdxl_t2i_src.png", "subfolder": "image", "type": "output"}]
     assert upgraded["thumbnail_path"] == "enh_thumb.jpg"  # shows enhanced pixels
     assert upgraded["starred"] == 1                       # the star survived
-    assert is_enhanced_row(upgraded)                      # wears the badge now
+    assert is_enhanced_row(upgraded)                      # wears the yellow plus now
     # Same node in the same folder: params and identity untouched.
     assert gallery.settings_folder_key(upgraded) == key_before
     # The transient job row is gone.
@@ -156,8 +156,8 @@ def test_an_enhancement_folded_again_after_a_stop_between_its_saves_is_listed_on
 
 def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
     # The transient row is deleted here, and with it the only thing that said
-    # when this enhancement happened. Its id rides onto the level instead, which
-    # is what lifts the image up the Recents collection to where the run belongs
+    # when this enhancement happened. Its id rides onto the version instead, which
+    # is what lifts the image up the Latest collection to where the run belongs
     # rather than leaving it where it was generated.
     db = Database(tmp_path / "t.db")
     _add_source(db)
@@ -166,8 +166,8 @@ def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
 
     fold_enhancement(db, enhance)
 
-    (level,) = json.loads(db.get_generation("src")["enhance_history"])
-    assert level["run_id"] == enhance["id"]
+    (version,) = json.loads(db.get_generation("src")["enhance_history"])
+    assert version["run_id"] == enhance["id"]
     assert gallery.recent_generations(db.list_generations())[0]["prompt_id"] == "src"
 
 
@@ -179,8 +179,8 @@ def test_fold_records_when_the_run_finished_since_the_row_that_said_so_is_delete
 
     fold_enhancement(db, db.get_generation("e1"))
 
-    (level,) = json.loads(db.get_generation("src")["enhance_history"])
-    assert level["finished_at"] == "2026-09-12T19:40:00+00:00"
+    (version,) = json.loads(db.get_generation("src")["enhance_history"])
+    assert version["finished_at"] == "2026-09-12T19:40:00+00:00"
 
 
 def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
@@ -248,7 +248,7 @@ def test_a_stamped_run_moves_its_own_image_up_the_collection(tmp_path):
     assert lifted == {"second": run_id}
 
 
-def test_a_run_id_this_table_never_issued_comes_off_the_level(tmp_path):
+def test_a_run_id_this_table_never_issued_comes_off_the_version(tmp_path):
     """A preview used to keep its own database, seeded from the live one and
     counting on from there, and the rows it made came home with their history
     intact. The image then sits at the top of Latest on a number from a counter
@@ -262,10 +262,10 @@ def test_a_run_id_this_table_never_issued_comes_off_the_level(tmp_path):
 
     assert gallery.disown_foreign_runs(db) == 1
 
-    level, = json.loads(db.get_generation("adopted")["enhance_history"])
-    assert level["run_id"] is None
-    assert level["params"] == {"enhance_scale": 2.0}   # the settings are the level's
-    assert level["filename"] == "e.png"                # and so is its file
+    version, = json.loads(db.get_generation("adopted")["enhance_history"])
+    assert version["run_id"] is None
+    assert version["params"] == {"enhance_scale": 2.0}   # the settings are the version's
+    assert version["filename"] == "e.png"                # and so is its file
     assert gallery.disown_foreign_runs(db) == 0        # nothing left to repair
 
 
@@ -283,8 +283,8 @@ def test_a_run_this_table_really_issued_is_left_where_it_is(tmp_path):
 
     assert gallery.disown_foreign_runs(db) == 0
 
-    level, = json.loads(db.get_generation("mine")["enhance_history"])
-    assert level["run_id"] == ran_as
+    version, = json.loads(db.get_generation("mine")["enhance_history"])
+    assert version["run_id"] == ran_as
 
 
 def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
@@ -336,7 +336,7 @@ def test_an_enhancement_whose_image_is_gone_is_one_to_scrap(tmp_path):
 
 
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
-    # The transient job row shows as an in-flight card on Recents, never as an
+    # The transient job row shows as an in-flight tile on Latest, never as an
     # "Image Enhance" folder in the tree; a completed one that has not been
     # folded yet does.
     db = Database(tmp_path / "t.db")
@@ -354,7 +354,7 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
 
 def test_original_files_survives_capture_and_restore(tmp_path):
     # The undoable-delete path restores rows verbatim; the enhanced marker (and
-    # with it the badge and the original's listing) must survive the round trip.
+    # with it the yellow plus and the original's listing) must survive the round trip.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
@@ -366,7 +366,7 @@ def test_original_files_survives_capture_and_restore(tmp_path):
 
 
 def test_each_version_carries_its_own_file_row(tmp_path):
-    # The file information is per enhancement, so it belongs to the level that
+    # The file information is per enhancement, so it belongs to the version that
     # made the file rather than to one block at the top of the pane. The top
     # block is then left with nothing to say about an image at all.
 
@@ -375,12 +375,12 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
                                       "image_enhance_00001_.png"))
     row = db.get_generation("src")
-    levels = gallery.displayed_levels(row)
-    assert [(lvl.label, file_item(lvl.file).value) for lvl in levels] == [
+    versions = gallery.displayed_versions(row)
+    assert [(lvl.label, file_item(lvl.file).value) for lvl in versions] == [
         ("Enhancement 1/1", "image/image_enhance_00001_.png"),
         ("Original", "image/sdxl_t2i_src.png"),
     ]
-    assert basic_section(row) is None
+    assert basic_facts(row) is None
 
 
 # --- an enhancement the production app never recorded, arriving as a bare file -----
@@ -460,7 +460,7 @@ def test_a_reconstructed_enhance_is_recognized_by_its_file(tmp_path):
                                        "image_enhance_00001_.png")
     assert gallery.is_enhance_product_row(stray)
     # An ordinary generation is not, whatever it was made from; nor is an image
-    # already folded into — there the enhancement is a level, not the row.
+    # already folded into — there the enhancement is a version, not the row.
     assert not gallery.is_enhance_product_row(db.get_generation("src"))
     fold_enhancement(db, stray)
     assert not gallery.is_enhance_product_row(db.get_generation("src"))
@@ -484,13 +484,13 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
         ["image_enhance_00001_.png", "sdxl_t2i_src.png"]
     assert upgraded["starred"] == 1
     assert is_enhanced_row(upgraded)
-    assert [lvl.label for lvl in gallery.displayed_levels(upgraded)] == \
+    assert [lvl.label for lvl in gallery.displayed_versions(upgraded)] == \
         ["Enhancement 1/1", "Original"]
 
 
-def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
+def test_a_rebuilt_version_keeps_the_settings_that_made_it(tmp_path):
     # The row's own params name the sampler numbers generically and the upscale
-    # not at all, so the level reads its settings off the graph that ran: the scale
+    # not at all, so the version reads its settings off the graph that ran: the scale
     # is what the 4x model's output was taken back down to, and the detail pass
     # is there iff its detector nodes are.
     db = Database(tmp_path / "t.db")
@@ -502,8 +502,8 @@ def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
         detectors=(("face_example.pt", 0.45), ("hand_example.pt", 0.6)))
     fold_completed_enhancements(db)
 
-    level = gallery.displayed_levels(db.get_generation("src"))[0]
-    assert level.params == {
+    version = gallery.displayed_versions(db.get_generation("src"))[0]
+    assert version.params == {
         "checkpoint": "example_xl_v1.safetensors",
         "upscale_model": "4xExample_v1.pt",
         "enhance_scale": 1.5, "enhance_steps": 24, "enhance_denoise": 0.25,
@@ -526,7 +526,7 @@ def test_sweep_stacks_a_rebuilt_chain_oldest_first(tmp_path):
     upgraded = db.get_generation("src")
     assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
         ["image_enhance_00002_.png", "image_enhance_00001_.png", "sdxl_t2i_src.png"]
-    assert [lvl.label for lvl in gallery.displayed_levels(upgraded)] == \
+    assert [lvl.label for lvl in gallery.displayed_versions(upgraded)] == \
         ["Enhancement 2/2", "Enhancement 1/2", "Original"]
 
 

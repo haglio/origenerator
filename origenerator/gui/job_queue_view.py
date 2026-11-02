@@ -21,7 +21,7 @@ what kind of thing it is, and nothing else ("~2 min · Video · dancing · Auto 
 line of waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
 folder being re-rolled. Beside that, a thumbnail — the frame an I2V
-animates, the gray clip a dropped-video combine takes its settings from, or a
+animates, the gray video a dropped-video combine takes its settings from, or a
 four-up of the folder the run will land in — because the one thumbnail a queued
 job cannot show is its own.
 Only a run that holds its place is fixed, a shielded one being made say: nothing
@@ -36,7 +36,7 @@ as it's worth giving up. The extra height all goes to the line: the thumbnail
 never grows past the Job Queue's opening height, so a queue dragged tall is a queue
 you can read rather than one enormous frame.
 
-It's fed the in-flight view-models the Recents collection uses
+It's fed the in-flight view-models the Latest collection uses
 (:class:`origenerator.gui.inflight.InFlightItem`), leading job first, refreshed on
 every poll so the frame and progress stay live; a refresh updates rows in place,
 so a drag is never yanked out from under the user. Reordering is asked for, not
@@ -97,7 +97,7 @@ from origenerator.gui.inflight import (
     shield_every_job,
     starting_row_text,
 )
-from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
+from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -107,7 +107,7 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 # looking at (the full-size preview is still one click away). The Job Queue never
 # opens taller than this however long the line gets, so the panes above it don't
 # move on their own — only on a drag of the handle at its top edge.
-_STRIP_HEIGHT = 88
+_ROW_HEIGHT = 88
 # The bar the clock is written across, sized off the line it carries — "45% ·
 # 12:30 elapsed · ~16:02 left" runs about 270px at the app's own font, and a bar
 # narrower than its caption elides the countdown away. The queue's names are
@@ -208,7 +208,7 @@ class RunningPreview(OpensAFolder, QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)
         self._frame = QLabel()
-        self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
+        self._frame.setFixedSize(_ROW_HEIGHT, _ROW_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # Pinned to the foot, so it still sits in the Job Queue's corner once the
         # Job Queue is dragged taller than the square it stops growing at.
@@ -221,9 +221,9 @@ class RunningPreview(OpensAFolder, QWidget):
         # How far along the run is, how long it has been going and how much longer
         # it has — written across the bar those numbers measure, so the reading and
         # the thing read are one object rather than a line of text with a separate
-        # stripe under it. The same line, in the same words, as the browser pane's
-        # in-flight cards carry.
-        self._progress = ProgressCaption()
+        # stripe under it. The same line, in the same words, as the Gallery pane's
+        # in-flight tiles carry.
+        self._progress = ProgressBar()
         self._progress.setFixedHeight(BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)
         column.addWidget(self._progress)
@@ -263,11 +263,11 @@ class RunningPreview(OpensAFolder, QWidget):
 
     def show_foreign(self, text: str):
         """Say what the shared server is holding us up with — under our own job's
-        bar while it is held up by that work, or in the bar's own slot while
+        bar while it is held up by that work, or in the bar's own place while
         nothing of ours is in flight at all.
 
         Hidden with nothing to say, so a job of ours actually being made keeps the
-        slot for its bar alone; an empty half keeps it up regardless, holding the
+        place for its bar alone; an empty half keeps it up regardless, holding the
         space its bar has stood down from.
         """
         self._caption.setText(text)
@@ -351,7 +351,7 @@ class RunningPreview(OpensAFolder, QWidget):
         A live frame is the whole point of this corner and wins whenever there is
         one. There is none for a good while: a WAN video spends over a minute
         loading two 14B models before its first preview, and this corner stood
-        empty through all of it. So the wait shows the same sum the config tab
+        empty through all of it. So the wait shows the same sum the Generate tab
         and the folder's own tile show for that job — the frame, a plus, and the
         source video in gray where a combine brought one
         (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and
@@ -361,7 +361,7 @@ class RunningPreview(OpensAFolder, QWidget):
         The label is sized to what it draws, since the pair is twice as wide as
         the square a single thumbnail (or a live frame) fills.
         """
-        side = min(self.height(), _STRIP_HEIGHT)
+        side = min(self.height(), _ROW_HEIGHT)
         pixmap = QPixmap()
         frame = None if item is None else item.reading.frame
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
@@ -387,7 +387,7 @@ class RunningPreview(OpensAFolder, QWidget):
         to read the line, and every pixel past that goes to the rows.
         """
         super().resizeEvent(event)
-        if min(self.height(), _STRIP_HEIGHT) != self._frame.height():
+        if min(self.height(), _ROW_HEIGHT) != self._frame.height():
             self._render_frame(self._item)
 
 
@@ -466,7 +466,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._thumbs = QueueThumbs(self.THUMB)
         layout.addWidget(self._thumbs)
         # What the row says about the job, in the type the rows always used,
-        # elided rather than widen the row past a narrow strip.
+        # elided rather than widen the row past a narrow pane.
         self._lead = ElidingLabel()
         self._lead.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._lead)
@@ -625,7 +625,7 @@ class JobQueueView(QWidget):
         # A floor, not a fixed height: the Job Queue opens one bar tall and grows only
         # when its splitter handle is dragged, so the panes above never move on
         # their own however long the line gets.
-        self.setMinimumHeight(_STRIP_HEIGHT)
+        self.setMinimumHeight(_ROW_HEIGHT)
         self._items: list = []
         self._drop_at: int | None = None  # where a drag in progress would land
 
@@ -716,7 +716,7 @@ class JobQueueView(QWidget):
         down to leave the hint the full width, asks for exactly the room a busy
         one does, so the splitter above it doesn't shift as the queue drains.
         """
-        return QSize(super().sizeHint().width(), _STRIP_HEIGHT + 1)  # and its rule
+        return QSize(super().sizeHint().width(), _ROW_HEIGHT + 1)  # and its rule
 
     def rows(self) -> list[QueueRow]:
         """Every job in the line, in order — the one being made first.
@@ -847,11 +847,11 @@ class JobQueueView(QWidget):
         if key is None:
             return
         keys = [item.key for item in self._items]
-        slot = self._drop_index(event.position().toPoint())
-        # The slot was read with the dragged row still in place, so a drop below
-        # it names a slot one further along than it will end up in.
+        place = self._drop_index(event.position().toPoint())
+        # The place was read with the dragged row still in place, so a drop below
+        # it names a place one further along than it will end up in.
         rest = [other for other in keys if other != key]
-        landing = slot - 1 if slot > keys.index(key) else slot
+        landing = place - 1 if place > keys.index(key) else place
         if rest[:landing] + [key] + rest[landing:] != keys:
             self.move_requested.emit(key, rest[landing] if landing < len(rest) else None)
         event.acceptProposedAction()
@@ -862,7 +862,7 @@ class JobQueueView(QWidget):
             self._rules.update()
 
     def _drop_index(self, point) -> int:
-        """Which slot a drop at ``point`` (in this widget's coordinates) lands in:
+        """Which place a drop at ``point`` (in this widget's coordinates) lands in:
         above the row whose top half it fell on, else at the end of the line. Never
         in front of a row that holds its place."""
         for index, row in enumerate(self.rows()):

@@ -1,4 +1,4 @@
-"""The before/after rendering a Requests card shows.
+"""The before/after rendering a Requests tile shows.
 
 Invented prompts throughout — what is under test is the marking, not any words.
 """

@@ -1,8 +1,8 @@
 """What a bare spoken word asks of the app — a collection, a button, the image.
 
-Fun Time's Funestras answer single words: "weird" condemns the clip, "lock" holds
+Fun Time's Funestras answer single words: "weird" condemns the video, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
-the toolbar does and the names of the collections that lead the tree — so
+the Gallery pane buttons do and the names of the collections that lead the tree — so
 "experiments" stands you in the Experiments collection exactly as clicking its row
 does, and "undo" takes back the last delete without reaching for the mouse.
 
@@ -40,7 +40,7 @@ class AppCommand(Enum):
     """One thing a bare spoken word asks the app for."""
 
     # The collections that lead the tree, each reached by its own name.
-    RECENTS = "recents"
+    LATEST = "recents"
     FAVORITES = "favorites"
     EXPERIMENTS = "experiments"
     TRASH = "trash"
@@ -71,7 +71,7 @@ class AppCommand(Enum):
     DRIVE_ON = "drive_on"
     DRIVE_OFF = "drive_off"
     # No "mic on": a muted recognizer hears nothing, so there is no spoken way
-    # back — the toolbar's switch is it. Fun Time's mic works the same way.
+    # back — the Gallery pane buttons' switch is it. Fun Time's mic works the same way.
     MIC_OFF = "mic_off"
 
     # What a slideshow may play: the switch beside F-mode on its HUD, which keeps
@@ -151,7 +151,7 @@ def _say(command: AppCommand | BarSetting, *phrases: str) -> None:
 # name is what the row says — and to a verb in front of it or the word "collection"
 # after it, for a speaker who would rather say a sentence.
 _COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
-    AppCommand.RECENTS: ("recents", "recent"),
+    AppCommand.LATEST: ("recents", "recent"),
     AppCommand.FAVORITES: ("favorites",),
     AppCommand.EXPERIMENTS: ("experiments", "experiment"),
     AppCommand.TRASH: ("trash",),
@@ -170,7 +170,7 @@ for _collection, _names in _COLLECTION_NAMES.items():
 _say(AppCommand.BACK, "back", "go back", "previous", "previous slide")
 _say(AppCommand.FORWARD, "forward", "go forward", "next", "next slide", "skip")
 
-# What you do to what is in front of you. "weird" is Fun Time's word for a clip
+# What you do to what is in front of you. "weird" is Fun Time's word for a video
 # that has to go, and it means the same here; "delete" says it plainly for
 # anyone who never learned the other one.
 _say(AppCommand.CULL, "weird", "delete", "delete it")
@@ -193,7 +193,7 @@ for _words, (_toggle, _on, _off) in (
         _say(_on, f"{_word} on")
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
-# Fun Time's word for the console's control-off button, which is this switch
+# Fun Time's word for the OSR2 controls' control-off button, which is this switch
 # off -- the letters however whisper writes them.
 _say(AppCommand.DRIVE_OFF, "osr two off", "o s r two off")
 for _osr2 in ("osr two", "o s r two"):

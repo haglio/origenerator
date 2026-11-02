@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from origenerator import animation_paths, gallery
-from origenerator.act_settings import GENAU, VIDEO, act_of, loops
+from origenerator.action_settings import GENAU, VIDEO, action_of, loops
 from origenerator.db_generations import was_kept
 from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
@@ -27,7 +27,7 @@ def _states_by_image(rows: list[dict]) -> dict[str, str]:
     }
 
 
-def _kept_clips(rows: list[dict]) -> list[dict]:
+def _kept_videos(rows: list[dict]) -> list[dict]:
     return [row for row in rows
             if row.get("status") == GenerationStatus.COMPLETED
             and gallery.produced_output(row)
@@ -42,21 +42,21 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
     newest first; one serves the loop lane only if a looping workflow made it."""
     states = _states_by_image(rows)
     found: dict[Path, list[dict]] = defaultdict(list)
-    for clip in sorted(_kept_clips(rows), key=_made, reverse=True):
-        act = act_of(clip)
+    for video in sorted(_kept_videos(rows), key=_made, reverse=True):
+        act = action_of(video)
         state = states.get(frame_name(
-            gallery.parse_params(clip.get("params_json")).get("input_image")), "")
+            gallery.parse_params(video.get("params_json")).get("input_image")), "")
         if not act or not state:
             continue
-        lanes = (VIDEO, GENAU) if loops(clip) else (VIDEO,)
+        lanes = (VIDEO, GENAU) if loops(video) else (VIDEO,)
         for lane in lanes:
             if animation_paths.allows(lane, act, state, content=content):
-                found[(lane, act, state)].append(clip)
+                found[(lane, act, state)].append(video)
     return dict(found)
 
 
 def paths_in_order(rows: list[dict], *, content: dict | None = None) -> list[Path]:
-    """Every animation the table holds, by how many kept clips it has and then by
+    """Every animation the table holds, by how many kept videos it has and then by
     the table's own order, so two runs list them the same way."""
     samples = samples_by_path(rows, content=content)
     listed = animation_paths.every_path(content=content)

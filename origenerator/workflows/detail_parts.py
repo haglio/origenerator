@@ -6,7 +6,7 @@ its own regions are redrawn, and a part it doesn't name builds no nodes at all
 (:meth:`~origenerator.workflows.base.WorkflowTemplate.detail_fix_nodes`). The
 table is deliberately not derived from the installed files — ``face_yolov8m.pt``
 says "face" only to something that knows to look — and a part stays in it with
-no detector installed, so the Enhance panel can gray that part with the reason
+no detector installed, so the Enhance pane can gray that part with the reason
 on it and the answer to "fix teeth" can name the file to add.
 
 Only the anatomy any photo has is named here. The rest of the vocabulary is
@@ -27,7 +27,7 @@ from origenerator.workflows.model_files import (
     list_outline_detector_files,
 )
 
-# Bold enough to actually re-form a part: the Enhance panel's fields start here.
+# Bold enough to actually re-form a part: the Enhance pane's fields start here.
 DEFAULT_FIX_DENOISE = 0.45
 # How much harder a part is fixed each time a fix of it is asked for again, and
 # the hardest a fix goes.
@@ -37,7 +37,7 @@ FIX_MAX = 1.0
 
 @dataclass(frozen=True)
 class DetailPart:
-    """One part a targeted fix can be asked for: ``name`` is what the level's
+    """One part a targeted fix can be asked for: ``name`` is what the version's
     caption and the on-screen answer call it, ``spoken`` every word a command
     may use for it, and ``matches`` the lowercase filename fragments that
     recognize an installed detector as finding it."""
@@ -218,7 +218,7 @@ def detector_part_label(filename: str) -> str:
 
 
 def name_parts(parts) -> str:
-    """The parts of one fix as the words that caption its level: "hands & teeth"."""
+    """The parts of one fix as the words that caption its version: "hands & teeth"."""
     return " & ".join(part.name for part in parts)
 
 

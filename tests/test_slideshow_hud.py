@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
-from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
+from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -48,11 +48,11 @@ def _window(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")
 
 
 def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")),
-             side="portrait", **kw):
+             shape="portrait", **kw):
     wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "open_in", "label_for")
             if name in kw}
     window = _window(qtbot, items, **kw)
-    window.wear_the_hud(side, **wear)
+    window.wear_the_hud(shape, **wear)
     return window
 
 
@@ -125,12 +125,12 @@ def test_the_hud_names_the_item_the_way_this_app_names_it(qtbot):
 
 class TestTheOneHudASlideshowWears:
     """A slideshow used to wear TWO HUDs: the Funestras' HUD for the set, and Genau's
-    whole console seated under it for the device.  Between them the status was
+    whole OSR2 controls seated under it for the device.  Between them the status was
     said twice and disagreed -- "Looping seeds · Shuffle" over "Unlocked · 4s" --
     and prev, next, lock and trash were drawn on both.
 
     One HUD now: the Funestras' HUD, carrying the device's line and the drive
-    readout out of the console's own code.
+    readout out of the OSR2 controls' own code.
     """
 
     @staticmethod
@@ -140,7 +140,7 @@ class TestTheOneHudASlideshowWears:
                           **kwargs)
 
     def test_the_slideshow_floats_no_second_hud(self, qtbot):
-        assert self._window(qtbot).findChildren(MotionPanel) == []
+        assert self._window(qtbot).findChildren(Osr2Controls) == []
 
     def _model(self, qtbot):
         window = self._window(qtbot)
@@ -210,7 +210,7 @@ class TestTheOneHudASlideshowWears:
         assert "robot_hand_release" in aiming
 
     def test_the_transport_is_drawn_once(self, qtbot):
-        """The console's own prev/next/lock/trash row is off it: the side's
+        """The Funestras' console's own prev/next/lock/trash row is off it: the side's
         four are already there, and they act on the very same slideshow."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 
@@ -255,7 +255,7 @@ class TestTheOneHudASlideshowWears:
 
     def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
         """The device rows are checked before the session's transport now, so a
-        side verb that fell into them would be swallowed instead of posted."""
+        shape verb that fell into them would be swallowed instead of posted."""
         window = self._window(qtbot)
         channel = tmp_path / "dashboard_cmd.txt"
         window.wear_the_hud("portrait", dashboard_cmd_file=channel)
@@ -265,7 +265,7 @@ class TestTheOneHudASlideshowWears:
         assert channel.read_text(encoding="utf-8").split() == ["portrait_next"]
 
     def test_a_press_on_the_transport_still_reaches_the_slideshow(self, qtbot):
-        """The device rows sit beside the side's own band, not in place of it."""
+        """The device rows sit beside the side's own button row, not in place of it."""
         window = self._window(qtbot)
         window.wear_the_hud("portrait")
         before = window.slideshow._set.playlist.index
@@ -688,7 +688,7 @@ class TestTheRowOnTheOneHud:
 
     def test_the_track_is_colored_by_the_funscript_of_the_video_on_screen(
             self, qtbot, tmp_path):
-        # Half as much motion in the first half of the clip as in the second.
+        # Half as much motion in the first half of the video as in the second.
         slow = [{"at": at, "pos": 100 * (index % 2)}
                 for index, at in enumerate(range(0, 2_000, 500))]
         fast = [{"at": at, "pos": 100 * (index % 2)}
@@ -727,7 +727,7 @@ class TestASlideshowOverASessionsRegion:
     def test_its_versions_button_steps_the_image_on_screen(self, qtbot, tmp_path):
         enhanced, original = str(tmp_path / "e1.png"), str(tmp_path / "src.png")
         window = self._slideshow_over_a_region(qtbot, tmp_path, [(enhanced, "image", "id-a")])
-        window.slideshow.set_levels({enhanced: [(enhanced, "image", "Enhanced"), (original, "image", "Base")]})
+        window.slideshow.set_versions({enhanced: [(enhanced, "image", "Enhanced"), (original, "image", "Base")]})
         window._pane.tick()
 
         gestures.click(window._pane._window, button_on_screen(window, "portrait_cycle_version"))

@@ -29,19 +29,18 @@ from shared_ui.colors import BLACK
 
 from origenerator import osr2 as osr2_device
 from origenerator.config import FRAMES_BEING_MADE_DIR
-from origenerator.console_commands import side_press, spelled_for
-from origenerator.gui.console import (
-    REPAINT_MS,
-    post_device_action,
-    slideshow_device,
-)
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueueFoot
+from origenerator.gui.message import HEARD_MARK, INFO, Message
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, NoticeOverlay
+from origenerator.gui.osr2_controls_state import (
+    REPAINT_MS,
+    osr2_controls_state,
+    post_device_action,
+)
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
     OPENS_IN,
@@ -49,6 +48,7 @@ from origenerator.gui.slideshow_hud import (
     slideshow_hud_model,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
+from origenerator.osr2_controls_commands import shape_press, spelled_for
 from origenerator.slideshow_buttons import PRESSES_ON_THE_QUEUE, answer
 
 # How often the HUD is rebuilt: on its own beat, and faster while something
@@ -71,8 +71,8 @@ _WASD_AS_ARROWS = {
 
 
 class SlideshowView(QWidget):
-    def __init__(self, items, *, side: str = "", start=None,
-                 shuffle=None, actions=None, hud=None, levels=None, engine=None, motion=None,
+    def __init__(self, items, *, shape: str = "", start=None,
+                 shuffle=None, actions=None, hud=None, versions=None, engine=None, motion=None,
                  pace=None, frames=None, radio=None, volume=None,
                  clock=time.monotonic, parent=None):
         super().__init__(parent)
@@ -81,7 +81,7 @@ class SlideshowView(QWidget):
         self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
         self._clock = clock
-        self._hud_side = side
+        self._hud_shape = shape
         self._dashboard_cmd_file = None
         self._label_for = None
         self._corner = HudCorner.UPPER_LEFT
@@ -102,10 +102,10 @@ class SlideshowView(QWidget):
         palette.setColor(QPalette.ColorRole.Window, BLACK)
         self.setPalette(palette)
 
-        # A Fun Time notice, at the top center where Fun Time flashes the same
+        # A Fun Time message, at the top center where Fun Time flashes the same
         # kind of line over a Funestra.
-        self._note = NoticeOverlay(self)
-        # What the notice reads while a spoken request pauses the slideshow, and
+        self._note = Message(self)
+        # What the message reads while a spoken request pauses the slideshow, and
         # afterwards while the request said is still being worked out -- held
         # rather than flashed, and cleared by that request's own answer.
         self._request_note = ""
@@ -117,10 +117,10 @@ class SlideshowView(QWidget):
 
         channel = PaneChannel()
         self.slideshow = FunestraSlideshow(
-            items, side=side, channel=channel, shown=self,
+            items, shape=shape, channel=channel, shown=self,
             frames=frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen"),
             actions=self._actions, hud=hud, pace=pace,
-            start=start, shuffle=shuffle, levels=levels, parent=self)
+            start=start, shuffle=shuffle, versions=versions, parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._pane = FunestraPane(
@@ -133,19 +133,19 @@ class SlideshowView(QWidget):
 
     # --- the HUD this slideshow wears -------------------------------------
 
-    def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
+    def wear_the_hud(self, shape: str, *, dashboard_cmd_file=None, label_for=None,
                      corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
                      collapse=None, open_in=None) -> None:
         """Put the Funestras' own HUD on this slideshow, drawn by the Funestra.
 
-        *side* is whose HUD it is, which spells its verbs; *dashboard_cmd_file*
+        *shape* is whose HUD it is, which spells its verbs; *dashboard_cmd_file*
         is the session's command channel, or ``None`` standalone -- which is also
         how a press knows which of the two it is on (see :meth:`press`);
         *label_for* names the item on screen in this app's own vocabulary, and
         *collapse* is what parks the HUD in its corner where there is no
         session to ask.
         """
-        self._hud_side = side
+        self._hud_shape = shape
         self._dashboard_cmd_file = dashboard_cmd_file
         self._label_for = label_for
         self._corner, self._minimized = corner, minimized
@@ -154,8 +154,8 @@ class SlideshowView(QWidget):
         self.refresh_hud()
 
     @property
-    def hud_side(self) -> str:
-        return self._hud_side
+    def hud_shape(self) -> str:
+        return self._hud_shape
 
     def set_hud_place(self, corner, minimized: bool) -> None:
         if (corner, minimized) == (self._corner, self._minimized):
@@ -174,7 +174,7 @@ class SlideshowView(QWidget):
     def _hud_model(self):
         """The HUD as the Funestra draws it, rebuilt on its own beat -- and
         faster while the drive's trace is moving across it."""
-        if not self._hud_side:
+        if not self._hud_shape:
             return None
         now = self._clock()
         beat = REPAINT_MS if self._hud_moving() else _REFRESH_MS
@@ -182,7 +182,7 @@ class SlideshowView(QWidget):
             return self._last_hud_model
         self._hud_stale = False
         self._hud_built_at = now
-        model = slideshow_hud_model(self._hud_side, self.slideshow,
+        model = slideshow_hud_model(self._hud_shape, self.slideshow,
                                     hosted=self._dashboard_cmd_file is not None,
                                     device=self.hud_device, foot=self.queue_foot.section())
         if model is not None:
@@ -227,22 +227,22 @@ class SlideshowView(QWidget):
         if verb == OMNIPAUSE_TOGGLE:
             self._press_on_the_slide()
             return True
-        action, path = side_press(self._hud_side, verb, payload)
+        action, path = shape_press(self._hud_shape, verb, payload)
         if action in COLLAPSES or action == OPENS_IN:
             self._place_here_or_out_there(command, action, path)
             return True
         if action in THE_SLIDESHOWS_OWN:
             answer(self.slideshow, action, path)
             return True
-        if self.press_console(verb):
+        if self.press_osr2_controls(verb):
             return True
         if action in _RATE_STEPS:
             self._pane.channel.send(_RATE_STEPS[action])
             return True
         if self._dashboard_cmd_file is None:
-            return self._act_here(action)
+            return self._action_here(action)
         allowed = ("satellites_kino_activate", "origenerator_activate",
-                   *(spelled_for(self._hud_side, verb)
+                   *(spelled_for(self._hud_shape, verb)
                      for verb in ("prev", "next", "lock", "trash")))
         if command not in allowed:
             return False
@@ -258,7 +258,7 @@ class SlideshowView(QWidget):
         elif self._collapse is not None:
             self._collapse(COLLAPSES[action])
 
-    def _act_here(self, action: str) -> bool:
+    def _action_here(self, action: str) -> bool:
         """A press with no session under it: the slideshow answers it itself,
         through the same answers a session's round trip would have ended at."""
         if answer(self.slideshow, action):
@@ -282,14 +282,14 @@ class SlideshowView(QWidget):
         if self._motion is None:
             return None
         control = self._actions.osr2_control
-        return slideshow_device(
+        return osr2_controls_state(
             self._motion, device=osr2_device.device_mode(),
             trouble=osr2_device.device_trouble(),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None,
             broker_running=osr2_device.broker_running())
 
-    def press_console(self, action: str) -> bool:
+    def press_osr2_controls(self, action: str) -> bool:
         """Take a press off the device rows of that HUD — the motion, the
         four control states, a level dragged on the readout."""
         if self._motion is None:
@@ -314,7 +314,7 @@ class SlideshowView(QWidget):
 
     def room_paused(self, paused: bool) -> None:
         """Freeze or resume the Funestra here whole, with the room: a frozen
-        image stops counting down its pace, a frozen clip stops, and a slide
+        image stops counting down its pace, a frozen video stops, and a slide
         stepped to while frozen arrives frozen too."""
         self._paused = paused
         self._pane.set_paused(paused)
@@ -332,7 +332,7 @@ class SlideshowView(QWidget):
 
     # --- the lines it flashes over the slide --------------------------------
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 1500, mark: str = "") -> None:
+    def flash(self, text: str, *, kind: str = INFO, ms: int = 1500, mark: str = "") -> None:
         """Say something for a moment, then fall back to whatever the note would
         otherwise be saying."""
         self._note.say(text, kind=kind, mark=mark)
@@ -348,13 +348,13 @@ class SlideshowView(QWidget):
         self._refresh_note()
 
     def request_line(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         """Say what the spoken *request* did, where the speaker is looking.
 
-        *working* means it has not done it yet, so the notice holds that line
+        *working* means it has not done it yet, so the message holds that line
         rather than flashing it, and it comes down only for the request that
         put it up -- a second request said over the first would otherwise blank
-        the notice while that one is still out.
+        the message while that one is still out.
         """
         if working:
             self._working_note, self._working_request = message, request
@@ -367,9 +367,9 @@ class SlideshowView(QWidget):
 
     def _refresh_note(self):
         if self._request_note:
-            self._note.say(self._request_note, kind=NOTICE, mark=HEARD_MARK)
+            self._note.say(self._request_note, kind=INFO, mark=HEARD_MARK)
         elif self._working_note:
-            self._note.say(self._working_note, kind=NOTICE, mark=HEARD_MARK)
+            self._note.say(self._working_note, kind=INFO, mark=HEARD_MARK)
         else:
             self._note.hide()
 

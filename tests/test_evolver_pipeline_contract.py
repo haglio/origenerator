@@ -3,7 +3,7 @@
 A send copies the video into a folder of Evolver's and the gallery later reads
 Evolver's upscale back out of another -- both spelled here, from reading that
 repo's source, with nothing comparing them.  A folder renamed over there left
-this app dropping clips where nothing ingests them, and every suite stayed
+this app dropping videos where nothing ingests them, and every suite stayed
 green.
 
 Evolver publishes ``evolver_contract.json`` at its checkout root now.  These
@@ -72,8 +72,8 @@ def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favor
     video, row = _another_sources_video(promise)
     places = _journaling_into(tmp_path, beside=video)
 
-    outside_videos.journal_stars(places, [row], True)
-    outside_videos.journal_stars(places, [row], False)
+    outside_videos.journal_favorites(places, [row], True)
+    outside_videos.journal_favorites(places, [row], False)
 
     lines = _journaled(places)
     assert all(set(line) == set(journals["fields"]) for line in lines)
@@ -87,7 +87,7 @@ def test_an_act_picked_here_is_a_line_evolver_writes_into_the_videos_record(tmp_
     video, row = _another_sources_video(promise)
     places = _journaling_into(tmp_path, beside=video)
 
-    outside_videos.pick_act(MagicMock(), places, row, "Wave")
+    outside_videos.pick_action(MagicMock(), places, row, "Wave")
 
     [line] = _journaled(places)
     assert set(journals["fields"]) <= set(line)

@@ -13,9 +13,9 @@ from typing import NamedTuple
 
 from origenerator.gallery.tree import ALL_KEY
 
-RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
-RECENTS_LABEL = "Latest"
-# "Latest" rather than "Recents" because that is the word the Funestras use
+LATEST_KEY = "__recents__"   # synthetic tree node listing recently generated items
+LATEST_LABEL = "Latest"
+# "Latest" rather than "Latest" because that is the word the Funestras use
 # for the same ordering — a Fun Time session's browse says Latest, and this
 # collection is that same newest-first listing of what the app has made.
 FAVORITES_KEY = "__starred__"   # synthetic tree node collecting every favorited folder
@@ -27,11 +27,11 @@ ENHANCED_KEY = "__enhanced__"   # synthetic node: every enhanced image under its
 ENHANCED_LABEL = "Enhanced"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"
-TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
+TRASH_KEY = "__trash__"   # synthetic node: deleted items still held in the Trash
 TRASH_LABEL = "Trash"
 
-COLLECTIONS = (RECENTS_KEY, FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)
-COLLECTION_LABELS = {RECENTS_KEY: RECENTS_LABEL, FAVORITES_KEY: FAVORITES_LABEL,
+COLLECTIONS = (LATEST_KEY, FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)
+COLLECTION_LABELS = {LATEST_KEY: LATEST_LABEL, FAVORITES_KEY: FAVORITES_LABEL,
                      ENHANCED_KEY: ENHANCED_LABEL, EXPERIMENTS_KEY: EXPERIMENTS_LABEL,
                      TRASH_KEY: TRASH_LABEL}
 _IN_FOLDER = "@"

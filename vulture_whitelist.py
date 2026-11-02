@@ -19,13 +19,13 @@ belong.
 from __future__ import annotations
 
 # --- Qt event handlers and layout hooks -- called by the C++ event loop, never from here ---
-_.dragEnterEvent  # origenerator/gui/drop_slot.py:64, origenerator/gui/folder_tree.py:304, origenerator/gui/job_queue_view.py:743
-_.dropEvent  # origenerator/gui/drop_slot.py:73, origenerator/gui/folder_tree.py:329, origenerator/gui/job_queue_view.py:757
-_.contextMenuEvent  # origenerator/gui/drop_slot.py:238
+_.dragEnterEvent  # origenerator/gui/drop_zone.py:64, origenerator/gui/folder_tree.py:304, origenerator/gui/job_queue_view.py:743
+_.dropEvent  # origenerator/gui/drop_zone.py:73, origenerator/gui/folder_tree.py:329, origenerator/gui/job_queue_view.py:757
+_.contextMenuEvent  # origenerator/gui/drop_zone.py:238
 _.takeAt  # origenerator/gui/flow_layout.py:46
 _.expandingDirections  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # origenerator/gui/flow_layout.py:54
-_.mouseDoubleClickEvent  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/thumbnail_widget.py:392
+_.mouseDoubleClickEvent  # origenerator/gui/funestra_pane.py:283, origenerator/gui/job_queue_view.py:151, origenerator/gui/preview_widget.py:600, origenerator/gui/item_tile.py:392
 _.startDrag  # origenerator/gui/folder_tree.py:219
 _.wheelEvent  # origenerator/gui/funestra_pane.py:290, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
 _.highlightBlock  # origenerator/gui/past_the_limit.py:12
@@ -55,7 +55,7 @@ _.normalizer  # origenerator/prompt_tokens.py:193, origenerator/prompt_tokens.py
 _.pre_tokenizer  # origenerator/prompt_tokens.py:195, origenerator/prompt_tokens.py:206, origenerator/prompt_tokens.py:240
 
 # --- style-option fields written for Qt's painter to read, never read back here ---
-_.textVisible  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
+_.textVisible  # origenerator/gui/progress_bar.py:127, the QStyleOptionProgressBar handed to drawControl
 _.features  # origenerator/gui/thumbnail_dropdown.py:144, the QStyleOptionViewItem the item delegate paints from
 _.decorationSize  # origenerator/gui/thumbnail_dropdown.py:145, the same option
 _.showDecorationSelected  # origenerator/gui/thumbnail_dropdown.py:185, the option a row's ground is drawn from

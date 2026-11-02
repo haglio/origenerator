@@ -122,7 +122,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     """The key of the ``level``-tier folder ``row`` belongs to, recomputed from the
     row under the *current* key formulas.
 
-    A bookmark stores its tier and a representative row under it; recomputing here
+    A favorite stores its tier and a representative row under it; recomputing here
     re-derives the folder's key so a star or custom name follows the folder even
     after a key formula changes — the silent orphaning the reconcile undoes.
     ``image_index`` (see :func:`build_image_config_index`) lets the source-image
@@ -186,7 +186,7 @@ def legacy_settings_folder_key(row: dict) -> str:
     """The settings-folder key ``row`` had under the pre-normalization formula:
     ``settings_only`` hashed with sort_keys, before :func:`canonical_settings`.
 
-    One historical key formula shift that orphaned bookmarks made before it. The
+    One historical key formula shift that orphaned favorites made before it. The
     reconcile recomputes this to re-point such a stale star or name onto the row's
     current settings folder."""
     media_type = media_type_of_row(row)
@@ -287,8 +287,8 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
 def favorite_folders(tree: list[MediaGroup]) -> list:
     """Every favorited folder in ``tree``, at any depth, in top-down tree order.
 
-    Powers the gallery's Favorites collection: a folder is bookmarked in place (its
-    position in the tree never changes) and collected here so all bookmarks —
+    Powers the gallery's Favorites collection: a folder is favorited in place (its
+    position in the tree never changes) and collected here so all favorites —
     however deeply nested — are reachable from one spot.
     """
     found: list = []
@@ -304,7 +304,7 @@ def favorite_folders(tree: list[MediaGroup]) -> list:
 
 
 def folder_names_by_row(
-    tree: list, folder_meta: dict[str, dict] | None = None, custom_folders=()
+    tree: list, folder_meta: dict[str, dict] | None = None, custom_collections=()
 ) -> dict[str, list[str]]:
     names: dict[str, list[str]] = {}
     folder_meta = folder_meta or {}
@@ -323,18 +323,18 @@ def folder_names_by_row(
             walk(child_groups(group))
 
     walk(tree)
-    for folder in custom_folders:
+    for folder in custom_collections:
         credit(folder, folder.label)
     return names
 
 
 def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
-    """Every row with a result, newest first — the whole of the Recents collection's list.
+    """Every row with a result, newest first — the whole of the Latest collection's list.
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
     re-roll -- or, with no run under it at all, a single cycle cut out of a
-    clip for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
-    the app just made for you, it lands in the settings folder of the clip it
+    video for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
+    the app just made for you, it lands in the settings folder of the video it
     came from rather than anywhere you would think to go looking, and left off
     here there is nowhere at all that says it happened. Found on disk is a file
     ComfyUI wrote that no instance of this app queued (``source``
@@ -347,14 +347,14 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     An image being enhanced, or lately enhanced, sits where the *enhancement*
     falls in that order rather than where its own generation does
     (:func:`~origenerator.gallery.enhance.enhancement_recency`). An enhancement
-    has no card of its own here — it is a version of an image, not an item beside
+    has no tile of its own here — it is a version of an image, not an item beside
     one — so if it did not move the image, the work would be listed nowhere and
     the image being worked on could sit a thousand tiles down, unfindable. What
     an image is having done to it is the newest thing about it.
 
     Nothing is capped here: the collection keeps going as far back as the user has ever
     generated, and the pane draws a page of tiles at a time as it's scrolled into
-    (:meth:`~origenerator.gui.browser_pane.BrowserPane.follow_the_scroll`).
+    (:meth:`~origenerator.gui.gallery_pane.GalleryPane.follow_the_scroll`).
     """
     listed = [
         row for row in rows
@@ -386,7 +386,7 @@ def _joined_the_library_at(row: dict) -> datetime:
     return moment_of(row.get("created_at") if found_on_disk else row.get("completed_at"))
 
 
-# How many folders the table of contents marks as lately worked in. A sitting
+# How many folders the tree of contents marks as lately worked in. A sitting
 # reaches a handful of folders; marks past that stop picking anything out, and
 # every folder marked is no folder marked.
 RECENTLY_WORKED_COUNT = 20
@@ -396,10 +396,10 @@ def recently_worked_folders(
     trees: dict[str, list], rows: list[dict], limit: int = RECENTLY_WORKED_COUNT,
     *, bumped=None,
 ) -> set[tuple[str, str]]:
-    """The ``(side, folder key)`` pairs of the folders worked in most recently.
+    """The ``(shape, folder key)`` pairs of the folders worked in most recently.
 
     A folder no longer moves when a generation lands in it — it is placed by the
-    row that made it, so the table of contents keeps the order the settings were
+    row that made it, so the tree of contents keeps the order the settings were
     tried in (:func:`build_gallery_tree`). That order says nothing about where
     the work has lately been, which is the other thing the tree is read for, so
     the freshest folders are marked where they stand instead of floating up.
@@ -409,8 +409,8 @@ def recently_worked_folders(
     anything anywhere under it is, which is nearly always, so a mark on one
     would say nothing about it.
 
-    A folder's recency is the newest row in it, by :func:`row_recency`. Side by
-    side, because both sides draw the same folder key over rows of their own
+    A folder's recency is the newest row in it, by :func:`row_recency`. Shape by
+    shape, because both shapes draw the same folder key over rows of their own
     shape: portrait work must not light the landscape copy of a folder nothing
     portrait-shaped ever touched.
     """
@@ -418,32 +418,32 @@ def recently_worked_folders(
         bumped = enhancement_recency(rows)
     ranked: list[tuple[tuple[datetime, int], tuple[str, str]]] = []
 
-    def walk(group, side: str) -> None:
+    def walk(group, shape: str) -> None:
         children = child_groups(group)
         if children:
             for child in children:
-                walk(child, side)
+                walk(child, shape)
             return
         freshest = max(
             (row_recency(row, bumped) for row in getattr(group, "rows", ())),
             default=None,
         )
         if freshest is not None:
-            ranked.append((freshest, (side, group.key)))
+            ranked.append((freshest, (shape, group.key)))
 
-    for side, model in trees.items():
+    for shape, model in trees.items():
         for group in model:
-            walk(group, side)
+            walk(group, shape)
     ranked.sort(key=lambda entry: entry[0], reverse=True)
     return {folder for _freshest, folder in ranked[:limit]}
 
 
 def favorite_generations(rows: list[dict]) -> list[dict]:
     """Every favorited image or video that produced an output, newest first — the
-    individual bookmarks the Favorites collection gathers alongside favorited folders.
+    individual favorites the Favorites collection gathers alongside favorited folders.
 
     Any produced row the user favorited qualifies, imported files included (unlike
-    the Recents collection, which is app-made results only). ``rows`` arrive newest-first
+    the Latest collection, which is app-made results only). ``rows`` arrive newest-first
     (the caller lists them by descending id), so the result is too.
     """
     return [row for row in rows if row.get("starred") and produced_output(row)]
@@ -456,7 +456,7 @@ def enhanced_generations(rows: list[dict]) -> list[dict]:
 def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     """The finished experiments awaiting the user's verdict, newest first — the
     Experiments collection's review queue. Only completed results qualify: a failed
-    experiment has nothing to judge, and an in-flight one shows as a live card."""
+    experiment has nothing to judge, and an in-flight one shows as a live tile."""
     return [
         row for row in rows
         if row.get("source") == GenerationSource.EXPERIMENT
@@ -592,8 +592,8 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     A running standalone enhance is machinery, not a generation: its result folds
     into the image it upgrades, so its transient row must not grow an "Image
     Enhance" folder while it cooks (its progress shows on the tile of the image
-    it is upgrading, under that tile's "Enhancing…" scrim — the Recents collection
-    gives it no card of its own either). A completed one still in the DB — its
+    it is upgrading, under that tile's "Enhancing…" scrim — the Latest collection
+    gives it no tile of its own either). A completed one still in the DB — its
     source image deleted before it could fold — stays visible, so it can be found
     and deleted rather than haunting the disk invisibly. A re-derived base render
     is a repair of an existing image, not an image of its own: it folds into its
@@ -622,8 +622,8 @@ def start_frame_index(rows: list[dict]) -> dict:
     Hand this to :func:`build_gallery_tree` wherever the tree is built from a
     *slice* of the library — one shape's rows, say. The key of a video's folder
     names the image it animates, and that image can perfectly well be on the
-    other side of the split (a portrait frame with the size unlocked to a
-    landscape clip, or a run placed by the size it asked for while its frame is
+    other shape of the split (a portrait frame with the size unlocked to a
+    landscape video, or a run placed by the size it asked for while its frame is
     measured). An index built from the slice alone misses it, and keys the folder
     to something nothing else in the app computes. The folder is still drawn — it
     is simply unreachable: every reveal, star and custom name resolves a folder
@@ -656,7 +656,7 @@ def build_gallery_tree(
     :func:`placeable_rows`. Images lead Videos; every other folder is placed by
     the oldest of its rows, newest-made first (the caller orders rows
     newest-first); neither a new generation in a folder nor a star moves it —
-    bookmarks are gathered by :func:`favorite_folders` instead. ``folder_meta``
+    favorites are gathered by :func:`favorite_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and
     supplies the star state.
 
@@ -704,6 +704,6 @@ ALL_LABEL = "All"
 
 
 def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
-    """Images and Videos gathered under one folder, named and starred like any other."""
+    """Images and Videos gathered under one folder, named and favorited like any other."""
     label, favorite = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
     return AllGroup(ALL_KEY, label, list(tree_model), favorite)

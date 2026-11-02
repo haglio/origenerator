@@ -12,12 +12,12 @@ calling each one an equal share of the work is what made a WAN 2.2 I2V bar read
 backwards: its 20 video steps against the audio pass's 50 put three quarters of
 the bar on the audio, and that three quarters went by in fifteen seconds after
 the first quarter had taken eleven minutes. The two are not comparable units — a
-WAN step denoises every frame of the clip through a 14B model, and a foley step
+WAN step denoises every frame of the video through a 14B model, and a foley step
 denoises a few seconds of audio through a small one — so the bar is budgeted in
 *seconds of sampling* instead, and each pass is sized by what a step of it
 actually costs (:data:`_VIDEO_STEP_SECONDS_PER_FRAME` and the constants beside
-it). Steps are still what the passes report, and still what the band along the
-bar's foot counts; they are simply not what the bar is measured in.
+it). Steps are still what the passes report, and still what the substep progress
+bar along the bar's foot counts; they are simply not what the bar is measured in.
 
 Two readings come out of that, and a bar shows both. :meth:`ProgressTracker.
 update` gives the whole run's ramp; :meth:`ProgressTracker.current_pass` gives
@@ -26,7 +26,7 @@ single bar used to be mistaken for. An enhancement that upscales an image and
 then fixes its faces and its hands is three passes — more, wherever a detector
 finds several regions — and one bar showing only the pass in hand empties and
 refills once per fix, which reads as a queue of separate jobs rather than one
-job's work. Kept apart, the restarting belongs to the lower band, where it is
+job's work. Kept apart, the restarting belongs to the substep progress bar, where it is
 the truth about the step being taken, and the reading above it only advances.
 
 The measuring is what has to be right. A pass left out of the up-front total
@@ -43,16 +43,16 @@ from __future__ import annotations
 #
 # Seconds, measured off this app's own completed runs, and only ever read against
 # each other: what a bar needs is the ratio between the passes of one job, and a
-# faster or slower card moves every one of these together. Two fits from those
+# faster or slower graphics card moves every one of these together. Two fits from those
 # durations:
 #
-#   WAN 2.2 I2V at 8 steps, the same settings but for the clip's length: 81
+#   WAN 2.2 I2V at 8 steps, the same settings but for the video's length: 81
 #   frames took ~355s and 161 frames ~730s. The difference is all sampling, and
 #   it divides out at about half a second per frame per step — which is also what
 #   a 161-frame run showed directly, at 35s a step.
 #
 #   The audio pass under it ran its 50 steps in about fifteen seconds on ten
-#   seconds of audio. Its cost follows the clip's length the same way the video's
+#   seconds of audio. Its cost follows the video's length the same way the video's
 #   does, being a diffusion over an audio latent of that length.
 #
 # A still has no frame count to scale by, so it is sized flat; a detail fix's crop
@@ -63,11 +63,11 @@ _AUDIO_STEP_SECONDS_PER_SECOND = 0.03
 _IMAGE_STEP_SECONDS = 0.5
 _DETAIL_STEP_SECONDS = 0.15
 
-# The inputs every latent builder that measures a clip carries together —
+# The inputs every latent builder that measures a video carries together —
 # WanImageToVideo, WanFirstLastFrameToVideo,
 # EmptyHunyuanLatentVideo. Matched on that shape rather than on a list of class
 # names, so a video workflow written next year is sized as one without anyone
-# remembering to add it here; a name list that goes stale sizes a clip's samplers
+# remembering to add it here; a name list that goes stale sizes a video's samplers
 # as stills, which is the exact mistake this module exists to undo.
 # ``ImageFromBatch`` carries a ``length`` too and is not one of these, which is
 # why the match needs all four.
@@ -134,7 +134,7 @@ def _video_latent_frames(payload: dict) -> int:
     """Frames in the video latent this payload samples — 0 when it samples a still.
 
     Read off the latent builder (see :data:`_LATENT_SIZE_INPUTS`), because that
-    is the one place a clip's length is a plain number: the samplers downstream
+    is the one place a video's length is a plain number: the samplers downstream
     of it only ever see a latent. 0 for a payload with no such node, and for one
     whose length is itself derived in-graph — both of which fall back to sizing
     the samplers as stills.
@@ -283,8 +283,8 @@ def expected_sampling_seconds(payload: dict) -> int:
 def expected_pass_count(payload: dict) -> int:
     """How many sampler passes a payload is budgeted for.
 
-    What decides whether a bar has a second band to show at all: a lone-sampler
-    image job is one pass end to end, and a band counting the same steps as the
+    What decides whether a bar has a substep progress bar to show at all: a lone-sampler
+    image job is one pass end to end, and one counting the same steps as the
     reading above it says nothing twice. A detailer counts once here however many
     regions it turns out to sample — the rest are found, not budgeted.
     """
@@ -298,7 +298,7 @@ class ProgressTracker:
     is running — with that sampler's node id, where the caller has one — it
     returns ``(done, total)`` in the budgeted seconds of
     :func:`expected_sampling_seconds`. Each new pass restarts its own ``value``
-    from the low end; the tracker banks the finished pass's cost so the next
+    from the low end; the tracker puts by the finished pass's cost so the next
     continues where it left off instead of snapping back to zero. That restarting
     count is worth showing on its own, and :meth:`current_pass` is where it is
     kept — in steps, which is the honest unit for one pass of one sampler.
@@ -375,7 +375,7 @@ class ProgressTracker:
         self._last_value = None if last_value is None else int(last_value)
         self._node = snapshot.get("node")
         self._passes = max(1, int(snapshot.get("passes", self._passes)))
-        # A snapshot taken before the band existed says nothing about which pass
+        # A snapshot taken before the substep progress bar existed says nothing about which pass
         # it was in, but the rest of it does: banked seconds mean a pass finished
         # and another began. Reading that back beats leaving a reconnected job's
         # bar whole until its next tick and then splitting it.
@@ -396,12 +396,12 @@ class ProgressTracker:
     def current_pass(self) -> tuple[int, int] | None:
         """The pass running right now, as its own ``(done, total)`` steps — or ``None``.
 
-        ``None`` wherever a second band would say nothing the reading above it
+        ``None`` wherever a substep progress bar would say nothing the reading above it
         doesn't: a run budgeted for one pass and still inside it, a run that has
         not reported a step, and a run with no recognized sampler (whose bar is
         already showing raw per-node numbers, which *are* this reading). A run
-        budgeted for several passes has its band from its first step, so the band
-        doesn't appear from nowhere partway through; an under-budgeted one grows
+        budgeted for several passes has its substep progress bar from its first step, so
+        it doesn't appear from nowhere partway through; an under-budgeted one grows
         one the moment a second pass proves there was more than the one.
         """
         if self._total <= 0 or self._pass_index == 0:
@@ -418,7 +418,7 @@ class ProgressTracker:
             self._pass_index = 1
             self._begin_pass(node)
         elif self._is_new_pass(value, node):
-            # Bank the finished pass at its own rate before taking up the next's.
+            # Put by the finished pass at its own rate before taking up the next's.
             self._banked += self._stage_max * self._stage_seconds
             self._stage_max = 0
             self._pass_index += 1

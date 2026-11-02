@@ -1,6 +1,6 @@
-"""A stand-in for the OSR2 motion a console acts on.
+"""A stand-in for the OSR2 motion the OSR2 controls act on.
 
-Shared because three surfaces press the same console verbs -- the panel in Core's top left, a slideshow's own panel, and the keys -- and each was growing its
+Shared because three surfaces press the same OSR2 controls verbs -- the OSR2 controls in Core's top left, a slideshow's own HUD, and the keys -- and each was growing its
 own half-driver to be pressed against.
 """
 from __future__ import annotations
@@ -10,7 +10,7 @@ from origenerator.motion_engine import Motion
 
 
 class FakeMotion:
-    """Stands in for the driver: records what the console asked it to do."""
+    """Stands in for the driver: records what the OSR2 controls asked it to do."""
 
     def __init__(self):
         self.state = Motion()

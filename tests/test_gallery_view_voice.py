@@ -14,7 +14,7 @@ from PyQt6.QtCore import (
 )
 
 from origenerator import (
-    act_settings,
+    action_settings,
     config,
     gallery,
     motion_engine,
@@ -29,7 +29,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gui import (
@@ -39,7 +39,7 @@ from origenerator.gui import (
 )
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.commands import match_voice_command as match
@@ -87,7 +87,7 @@ def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._toggle_auto(True)
     prompt = view._live_jobs[key].params["positive_prompt"]
 
@@ -104,7 +104,7 @@ def test_auto_generate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view._toggle_auto(True)
     view._toggle_auto(False)
@@ -124,10 +124,10 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     assert not view._voice.listener.commands_on
     view._toggle_auto(False)
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     assert view._voice.listener.commands_on
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     assert not view._voice.listener.commands_on
 
 
@@ -137,14 +137,14 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     view.refresh()
     _select_first_leaf(view)
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     assert not view._voice.status.isHidden()
     assert "Listening" in words(view._voice.status)
 
     view._voice.listener.heard.emit("no hat")
     assert "no hat" in words(view._voice.status)
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     assert view._voice.status.isHidden()
 
 
@@ -155,10 +155,10 @@ def test_the_captions_section_is_up_only_while_the_caption_is(qtbot, tmp_path):
     section = view._voice.status.parentWidget()
     assert not section.isVisible()
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     assert section.isVisible()
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     assert not section.isVisible()
 
 
@@ -169,7 +169,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("no hat")
 
     view._voice._flash_timer.timeout.emit()  # the beat is up
@@ -177,7 +177,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     assert words(view._voice.status) == "Listening…"
     assert not view._voice.status.isHidden()
 
-    view._bank.mic.setChecked(False)
+    view._buttons.mic.setChecked(False)
     view._voice._show("nothing here to enhance", transient=True)
 
     view._voice._flash_timer.timeout.emit()
@@ -194,7 +194,7 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view._voice.listener.heard.emit("Enhanced it.")
     assert "enhance it" in words(view._voice.status)
@@ -206,18 +206,18 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
 
 def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path):
     # It used to float centered over the top of the view, landing squarely on the
-    # header toolbar the user was trying to click. It now takes its own room at
+    # header buttons the user was trying to click. It now takes its own room at
     # the top of the left pane, so it covers nothing however long the message.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     _on_screen(qtbot, view, 1200, 800)
     _select_first_leaf(view)
 
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("give her a much longer caption than the idle one")
     qtbot.wait(1)  # let the layout settle around the grown caption
 
     caption = QRect(view._voice.status.mapTo(view, QPoint(0, 0)), view._voice.status.size())
-    for button in (view._bank.back, view._bank.forward, view._bank.undo, view._bank.delete):
+    for button in (view._buttons.back, view._buttons.forward, view._buttons.undo, view._buttons.delete):
         assert not caption.intersects(
             QRect(button.mapTo(view, QPoint(0, 0)), button.size())
         )
@@ -260,7 +260,7 @@ class _VoiceSurface:
     def note_enhancing(self, statuses, frames=None):
         self.enhancing = statuses
 
-    def note_voice_command(self, message, *, kind=NOTICE):
+    def note_voice_command(self, message, *, kind=INFO):
         self.said = message
 
     def slideshow_step(self, delta):
@@ -341,7 +341,7 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
@@ -357,12 +357,12 @@ def test_a_closed_gallery_leaves_the_mic_shut_and_its_button_as_it_was(qtbot, tm
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     view.close()
 
     assert not view._voice.listener.commands_on
-    assert view._bank.mic.isChecked()
+    assert view._buttons.mic.isChecked()
 
 
 def test_a_slideshow_with_the_mic_off_hears_nothing(qtbot, tmp_path):
@@ -389,7 +389,7 @@ def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
     return view
@@ -459,7 +459,7 @@ def _voiceable(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     return view
 
 
@@ -581,7 +581,7 @@ def _speak_request(view, qtbot, *utterances):
     which only that request's own answer does.  It used to wait for the words
     "working out" to leave the corner, inside a budget that was exactly the
     note's own flash time -- which told answered from timed out only because
-    a hidden notice happens not to clear its text (bug 44).
+    a hidden message happens not to clear its text (bug 44).
     """
     for text in utterances:
         view._voice.listener.speak(text)
@@ -776,7 +776,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    section = view._info_tabs.current_config_panel()._related._requests_section
+    section = view._generate_pane.current_generate_tab()._related._requests_section
     assert not section.isHidden()
     assert [(tile._heading.text(), tile._prompt_id) for tile in section._tiles] == [
         ("Requested from", "orig")]
@@ -807,7 +807,7 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    field = view._info_tabs.current_config_panel()._param_form.request_field()
+    field = view._generate_pane.current_generate_tab()._param_form.request_field()
     assert field._words.text() == "no hat"
 
 
@@ -845,20 +845,20 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
 # --- "animate as go now", spoken over a fullscreen image -------------------
 
 
-_SPOKEN_LOOP = AnimateRequest(act_settings.GENAU, "")
+_SPOKEN_LOOP = AnimateRequest(action_settings.GENAU, "")
 
 
 def test_a_spoken_loop_takes_the_one_act_the_sorted_image_leaves(qtbot, tmp_path,
                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    # "img_act" is sorted, and its state leaves the Genau lane one act, so the
+    # "img_action" is sorted, and its state leaves the Genau lane one act, so the
     # command needs none said.
-    prompt_id, message, kind = view.animate_it("img_act", _SPOKEN_LOOP)
+    prompt_id, message, kind = view.animate_it("img_action", _SPOKEN_LOOP)
 
-    assert prompt_id == "img_act"
+    assert prompt_id == "img_action"
     assert "alpha" in message
-    assert kind == NOTICE
+    assert kind == INFO
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_act.png [output]"
@@ -881,7 +881,7 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
 def test_a_spoken_loop_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    # A sorted image of a state whose act the gallery holds no looping clip of.
+    # A sorted image of a state whose act the gallery holds no looping video of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="another image", seed=3,
@@ -920,14 +920,14 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
                                                                 monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    surface = _VoiceSurface("img_act")
+    surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
     # Answered in the surface's own corner, not in a dialog over it — the speaker
     # is looking at the image, not at this pane.
-    assert surface.noted[0] == "img_act"
+    assert surface.noted[0] == "img_action"
     assert "alpha" in surface.noted[1]
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
@@ -939,11 +939,11 @@ def _spoken_genau_rows(view):
 
 def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, monkeypatch):
     # Saying it twice is what you do when the first time appeared to do nothing,
-    # and it does appear to: the clip queues after whatever the machine is on
+    # and it does appear to: the video queues after whatever the machine is on
     # and the image on screen doesn't change. Two identical runs would spend
-    # minutes of the one GPU making a clip that is already coming.
+    # minutes of the one GPU making a video that is already coming.
     view = _genau_view(qtbot, tmp_path)
-    surface = _VoiceSurface("img_act")
+    surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
@@ -957,10 +957,10 @@ def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, mo
 
 def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    # A clip that has arrived is still a clip of this image — asking again
+    # A video that has arrived is still a video of this image — asking again
     # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path)
-    surface = _VoiceSurface("img_act")
+    surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
@@ -976,10 +976,10 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
-    # Asking again is the only way to get a clip after a failure, so a row that
+    # Asking again is the only way to get a video after a failure, so a row that
     # produced nothing must not read as this image having been Genau'd.
     view = _genau_view(qtbot, tmp_path)
-    view._slideshows._slideshow = _VoiceSurface("img_act")
+    view._slideshows._slideshow = _VoiceSurface("img_action")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     (failed,) = _spoken_genau_rows(view)
@@ -995,8 +995,8 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path)
-    view._combine.generate_category("img_act", "alpha", act_settings.GENAU)
-    view._slideshows._slideshow = _VoiceSurface("img_act")
+    view._combine.generate_category("img_action", "alpha", action_settings.GENAU)
+    view._slideshows._slideshow = _VoiceSurface("img_action")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
@@ -1019,11 +1019,11 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
     # Answered in the slideshow's own corner: the speaker is looking at the image.
-    assert surface.noted == ("g0", "enhancing…", NOTICE)
+    assert surface.noted == ("g0", "enhancing…", INFO)
 
 
 def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
-    # Said over a slideshow, this is a gesture made with no view of the Enhance panel
+    # Said over a slideshow, this is a gesture made with no view of the Enhance pane
     # — the same reason a hold's Down leaves one alone — so it says so rather
     # than re-deriving the image at whatever the settings happen to read now.
     db = _enhanceable_db(tmp_path, count=1)
@@ -1079,7 +1079,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
 
 
 def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tmp_path):
-    # The word names a bank button as well as the image on screen, and with no
+    # The word names a Gallery pane button as well as the image on screen, and with no
     # image filling the screen it is the button — aimed the way a click aims
     # it, at the folder's images that have never been enhanced.
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
@@ -1113,7 +1113,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # One matcher reaches the mic for everything that tolerates a filler word, so
     # a verb added to the vocabulary lands there without this module listing the
     # parts a second time and drifting from it.  It wraps what it matches with
-    # the side the utterance named, which is how a room with two slideshows in it
+    # the shape the utterance named, which is how a room with two slideshows in it
     # says which image is meant.
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
@@ -1128,12 +1128,12 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
 
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     # The folder is read off the lane, so a spoken send and a pressed one cannot
-    # differ about where a clip lands.
+    # differ about where a video lands.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")   # as a spoken launch would have
-    clip = Path("C:/out/flf2v_loop_1.mp4")
+    video = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (clip, "video"))
+                        lambda row, out: (video, "video"))
     sent = []
     monkeypatch.setattr(combine_controller.evolver_export, "export_video",
                         lambda src, dest, funscript=None:
@@ -1141,7 +1141,7 @@ def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
 
     view._on_reroll_finished("k", "loop")
 
-    assert sent == [(clip, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert sent == [(video, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
     assert view._db.get_generation("loop")["genau_exported_at"]
 
 
@@ -1161,7 +1161,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
 
 
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
-    # The inbox copy is the only thing that failed; the clip itself is fine, and
+    # The inbox copy is the only thing that failed; the video itself is fine, and
     # Send-to-Genau is still there to retry with.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
@@ -1178,7 +1178,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
-# --- the bare vocabulary: a collection, a bank button, a word over the slideshow ---
+# --- the bare vocabulary: a collection, a Gallery pane button, a word over the slideshow ---
 
 
 def _listening(qtbot, tmp_path, db=None):
@@ -1188,14 +1188,14 @@ def _listening(qtbot, tmp_path, db=None):
                        client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
     return view
 
 
 @pytest.mark.parametrize("said, key", [
     ("experiments", EXPERIMENTS_KEY),
     ("trash", TRASH_KEY),
-    ("recents", RECENTS_KEY),
+    ("recents", LATEST_KEY),
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])
@@ -1252,7 +1252,7 @@ def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_pa
     assert surface.steps == [1, 1, -1, -1]
 
 
-def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path):
+def test_a_spoken_favorite_over_a_slideshow_favorites_the_slide(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface
@@ -1264,7 +1264,7 @@ def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path)
 
 
 def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_path):
-    # The active side, with two sides: over a slideshow "back" is the slide before,
+    # The active shape, with two shapes: over a slideshow "back" is the slide before,
     # and in the gallery it is the stop before — both are the one before.
     view = _listening(qtbot, tmp_path)
     first = _select_first_leaf(view)
@@ -1288,17 +1288,17 @@ def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
         qtbot, tmp_path):
     # The tip already names the target it is aimed at, which is exactly what a
-    # speaker who is not looking at the bank needs told back.
+    # speaker who is not looking at the Gallery pane buttons needs told back.
     view = _listening(qtbot, tmp_path)
     _select_first_leaf(view)
     _click_off(view)                               # so the button is the folder's
-    aimed = view._bank.favorite.toolTip()
+    aimed = view._buttons.favorite.toolTip()
     assert aimed.startswith("Favorite folder")
 
     view._voice.listener.speak("favorite")
 
     assert words(view._voice.status) == aimed
-    assert view._bank.favorite.toolTip().startswith("Unfavorite folder")
+    assert view._buttons.favorite.toolTip().startswith("Unfavorite folder")
 
 
 def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
@@ -1319,7 +1319,7 @@ def test_locking_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     # Set through the button rather than around it, so a spoken switch and a
-    # clicked one are the same event and the bank lights the same way.
+    # clicked one are the same event and the Gallery pane buttons lights the same way.
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("drive on")
@@ -1333,7 +1333,7 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     assert not view.osr2_control.isChecked()
 
 
-def test_osr2_off_parks_the_device_as_the_console_switch_does(qtbot, tmp_path):
+def test_osr2_off_parks_the_device_as_the_osr2_controls_switch_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     view._voice.listener.speak("drive on")
 
@@ -1345,13 +1345,13 @@ def test_osr2_off_parks_the_device_as_the_console_switch_does(qtbot, tmp_path):
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
     # And only shut: a mic that hears nothing cannot hear "mic on", so the
-    # toolbar switch is the only way back.
+    # Gallery pane buttons' switch is the only way back.
     view = _listening(qtbot, tmp_path)
     assert view._voice.listener.commands_on
 
     view._voice.listener.speak("mic off")
 
-    assert not view._bank.mic.isChecked()
+    assert not view._buttons.mic.isChecked()
     assert not view._voice.listener.commands_on
 
 
@@ -1365,7 +1365,7 @@ def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
 
     assert bars.amplitude == amplitude - 10
     assert bars.center == center + 5
-    # Answered with what the device now reads, which is the panel's own line.
+    # Answered with what the device now reads, which is the tab's own line.
     assert words(view._voice.status) == view._osr2_motion.status_text()
 
 

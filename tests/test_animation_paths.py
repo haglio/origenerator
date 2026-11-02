@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from origenerator import animation_paths
-from origenerator.act_settings import GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
 from origenerator.image_states import state_names
 
@@ -29,8 +29,8 @@ def paths(monkeypatch):
 
 
 def test_a_state_offers_the_acts_its_row_says_yes_to(paths):
-    assert animation_paths.acts_for("state two", VIDEO) == ("alpha", "beta")
-    assert animation_paths.acts_for("state two", GENAU) == ("alpha",)
+    assert animation_paths.actions_for("state two", VIDEO) == ("alpha", "beta")
+    assert animation_paths.actions_for("state two", GENAU) == ("alpha",)
 
 
 def test_a_lane_offers_every_act_the_table_gives_it_in_its_own_order(paths):
@@ -41,8 +41,8 @@ def test_a_lane_offers_every_act_the_table_gives_it_in_its_own_order(paths):
 
 
 def test_a_state_no_act_answers_offers_nothing(paths):
-    assert animation_paths.acts_for("state one", GENAU) == ()
-    assert animation_paths.acts_for("a state the table never heard of", VIDEO) == ()
+    assert animation_paths.actions_for("state one", GENAU) == ()
+    assert animation_paths.actions_for("a state the table never heard of", VIDEO) == ()
 
 
 def test_the_table_answers_whether_one_animation_is_on_it(paths):
@@ -52,7 +52,7 @@ def test_the_table_answers_whether_one_animation_is_on_it(paths):
 
 
 def test_an_overlay_that_predates_the_table_allows_nothing():
-    assert animation_paths.acts_for("state one", VIDEO, content={}) == ()
+    assert animation_paths.actions_for("state one", VIDEO, content={}) == ()
     assert animation_paths.allows(VIDEO, "alpha", "state one", content={}) is False
 
 
@@ -62,9 +62,9 @@ def test_a_malformed_line_costs_that_line_and_no_more():
         GENAU: [],
     }}
 
-    assert animation_paths.acts_for("state one", VIDEO, content=content) == ("alpha",)
-    assert animation_paths.acts_for("state two", VIDEO, content=content) == ()
-    assert animation_paths.acts_for("state two", GENAU, content=content) == ()
+    assert animation_paths.actions_for("state one", VIDEO, content=content) == ("alpha",)
+    assert animation_paths.actions_for("state two", VIDEO, content=content) == ()
+    assert animation_paths.actions_for("state two", GENAU, content=content) == ()
 
 
 def test_the_example_table_names_only_acts_and_states_the_example_declares():

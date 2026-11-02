@@ -70,9 +70,9 @@ def test_the_audio_pass_is_a_sliver_of_a_video_job_not_most_of_it():
     assert audio / (video + audio) < 0.02
 
 
-def test_a_video_step_is_costed_by_the_length_of_the_clip():
+def test_a_video_step_is_costed_by_the_length_of_the_video():
     # Doubling the frames doubles what a step of the same schedule costs, which
-    # is what makes one set of numbers fit a five-second clip and a ten-second
+    # is what makes one set of numbers fit a five-second video and a ten-second
     # one. A flat cost per step could only ever be right for one of them.
     short = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=81))["15"]
     long = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=161))["15"]
@@ -170,7 +170,7 @@ def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
 
 def test_each_sampler_pass_is_named_the_way_the_form_names_it():
     # A WAN pair splits one schedule between its experts, and the bar calls them
-    # what the form does ("Model (First Pass)"). The pass that scores the clip is
+    # what the form does ("Model (First Pass)"). The pass that scores the video is
     # the Sound the form's section is named for.
     names = stage_names(_payload("wan22_i2v", steps=20))
     assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound")
@@ -213,19 +213,19 @@ def test_a_node_with_nothing_worth_saying_is_left_unnamed():
 
 
 def test_current_pass_reads_the_pass_in_hand_on_its_own_count():
-    # The lower band: it restarts per pass and counts steps, which is exactly
+    # The substep progress bar: it restarts per pass and counts steps, which is exactly
     # what the reading above it must not do.
     tracker = ProgressTracker(60, passes=3)
     tracker.update(5, 20)
     assert tracker.current_pass() == (5, 20)
     tracker.update(20, 20)
     tracker.update(3, 20)                        # the next pass begins
-    assert tracker.current_pass() == (3, 20)     # band back to 3/20...
+    assert tracker.current_pass() == (3, 20)     # substep progress bar back to 3/20...
     assert tracker.current() == (23, 60)         # ...while the run reads 23/60
 
 
 def test_a_single_pass_run_has_no_band():
-    # A band counting the same steps as the bar above it says nothing twice.
+    # A substep progress bar counting the same steps as the bar above it says nothing twice.
     tracker = ProgressTracker(30, passes=1)
     tracker.update(10, 30)
     assert tracker.current_pass() is None
@@ -233,7 +233,7 @@ def test_a_single_pass_run_has_no_band():
 
 def test_a_band_grows_when_an_unbudgeted_second_pass_turns_up():
     # A run budgeted for one pass that runs two: there IS something to say now,
-    # so the band appears rather than staying hidden for the rest of the job.
+    # so the substep progress bar appears rather than staying hidden for the rest of the job.
     tracker = ProgressTracker(20, passes=1)
     tracker.update(10, 10)
     assert tracker.current_pass() is None
@@ -328,7 +328,7 @@ def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():
     # continue the ramp — the next tick reads 14/20, not 4/20 as a tracker that
     # forgot the banked first pass would.
     tracker = ProgressTracker(20)
-    tracker.update(10, 10)          # first pass done -> banks 10
+    tracker.update(10, 10)          # first pass done -> puts by 10
     tracker.update(3, 10)           # second pass at 3 -> 13/20
     assert tracker.current() == (13, 20)
 

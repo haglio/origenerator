@@ -23,9 +23,9 @@ class FlowLayout(QLayout):
     of buttons wraps onto a second line rather than squeezing every label down to
     an unreadable stub.
 
-    ``align_right`` pushes each row against the right edge, for a bank of buttons
+    ``align_right`` pushes each row against the right edge, for a row of buttons
     that sits in that corner — the rows stay ragged on the left, the way a button
-    bank reads, instead of walking away from the corner as it wraps.
+    row reads, instead of walking away from the corner as it wraps.
     """
 
     def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,
@@ -112,7 +112,7 @@ class FlowLayout(QLayout):
         rows, row, x = [], [], area.x()
         for item in self._items:
             if item.isEmpty():
-                continue  # a hidden widget takes no slot, and no gap where one was
+                continue  # a hidden widget takes no place, and no gap where one was
             if isinstance(item, _FullRow):
                 if row:
                     rows.append(row)

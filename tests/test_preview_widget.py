@@ -17,7 +17,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_widget
+from origenerator.gui import corner_buttons, drag_thumbnail, icons, preview_widget
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
@@ -174,7 +174,7 @@ def test_clear_releases_the_video_file(make_preview, tmp_path):
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")
     w.clear()
-    # Dropping the source unlocks the file, so a previewed clip can be deleted
+    # Dropping the source unlocks the file, so a previewed video can be deleted
     # (a held media handle blocks the move-to-trash on Windows).
     w._player.setSource.assert_called_with(QUrl())
 
@@ -183,12 +183,12 @@ def test_clear_releases_the_video_file(make_preview, tmp_path):
 
 def test_release_media_drops_the_file_it_is_showing(make_preview, tmp_path):
     w = make_preview()
-    clip = tmp_path / "clip.mp4"
-    w.show_video(clip)
+    video = tmp_path / "clip.mp4"
+    w.show_video(video)
 
-    w.release_media([clip])
+    w.release_media([video])
 
-    assert not w.is_showing_any([clip])
+    assert not w.is_showing_any([video])
     w._player.setSource.assert_called_with(QUrl())  # the handle is let go
 
 
@@ -205,24 +205,24 @@ def test_release_media_leaves_a_pane_showing_something_else_alone(make_preview, 
 
 def test_release_media_matches_the_same_file_spelled_differently(make_preview, tmp_path):
     w = make_preview()
-    clip = tmp_path / "clip.mp4"
-    w.show_video(clip)
+    video = tmp_path / "clip.mp4"
+    w.show_video(video)
 
     w.release_media([tmp_path / "sub" / ".." / "clip.mp4"])  # same file, other spelling
 
-    assert not w.is_showing_any([clip])
+    assert not w.is_showing_any([video])
 
 
 def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_path):
     # A fullscreen slideshow built over this pane holds the file open too.
     w = make_preview()
-    clip = tmp_path / "clip.mp4"
-    w.show_video(clip)
+    video = tmp_path / "clip.mp4"
+    w.show_video(video)
     w._fullscreen = MagicMock()
 
-    w.release_media([clip])
+    w.release_media([video])
 
-    w._fullscreen.release_media.assert_called_once_with([clip])
+    w._fullscreen.release_media.assert_called_once_with([video])
 
 
 def test_a_video_plays_with_no_sound_output_at_all(make_preview, tmp_path):
@@ -261,7 +261,7 @@ def test_an_animated_preview_is_fitted_into_the_pane_without_being_stretched(
         make_preview, tmp_path):
     # The hazard this scaling exists for, and the one it was never asked about: a
     # 4:3 loop stretched to fill a square pane is a different item from the one
-    # that was made, and the shape is what a viewer notices first.
+    # that was made, and the shape is what a viewer messages first.
     w = make_preview()
     w._image_label.resize(200, 200)
 
@@ -455,7 +455,7 @@ def test_fullscreen_opens_over_the_wait_before_the_first_frame(live_preview):
 
 
 def _slideshow_on_a_sessions_funestra(tmp_path):
-    slideshow = FunestraSlideshow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
+    slideshow = FunestraSlideshow([(str(tmp_path / "a.png"), "image", "id-a")], shape="landscape",
                       channel=FunestraChannel(
                           playlist=tmp_path / "landscape.tsv",
                           command_file=tmp_path / "landscape_cmd.txt",
@@ -482,25 +482,25 @@ def test_a_pane_whose_item_went_to_a_sessions_funestra_goes_on_taking_runs_and_f
     assert slideshow.channel.command_file.read_text(encoding="utf-8") == handed_over
 
 
-# --- the video's timeline -----------------------------------------------
+# --- the video's scrubber -----------------------------------------------
 
-def _timeline_preview(qtbot):
-    w = PreviewWidget(player=MagicMock(), show_timeline=True)
+def _scrubber_preview(qtbot):
+    w = PreviewWidget(player=MagicMock(), show_scrubber=True)
     qtbot.addWidget(w)
     return w
 
 
 def test_no_timeline_unless_opted_in(make_preview, tmp_path):
-    w = make_preview()  # the default (slideshow/plain) preview has no timeline
-    assert w._timeline is None
+    w = make_preview()  # the default (slideshow/plain) preview has no scrubber
+    assert w._scrubber is None
     w.show_video(_scripted_video(tmp_path))  # still works without one
 
 
 def test_a_scripted_video_fills_its_timeline_with_the_motion(qtbot, tmp_path):
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
-    assert w._timeline._actions
-    assert not w._timeline.isHidden()
+    assert w._scrubber._actions
+    assert not w._scrubber.isHidden()
 
 
 def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monkeypatch):
@@ -512,98 +512,98 @@ def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monk
     write_funscript(funscript_path_for(vid, places=OutputPlaces.in_one_folder(tmp_path)),
                     synthesize_actions(2.0, hz=1.0))
 
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(vid)
 
-    assert w._timeline._actions
-    assert not w._timeline.isHidden()
+    assert w._scrubber._actions
+    assert not w._scrubber.isHidden()
 
 
 def test_the_corners_keep_off_the_timeline_while_a_videos_size_is_unknown(qtbot, tmp_path):
-    # A clip's resolution arrives late, or never (a backend need not report it),
+    # A video's resolution arrives late, or never (a backend need not report it),
     # and until it does the item is taken to be the whole media area. That
-    # is not the whole pane: the timeline along the foot is no part of the item, and a
-    # chip laid over it read as a dark tab hanging off the video's lower edge.
-    w = _timeline_preview(qtbot)
+    # is not the whole pane: the scrubber along the foot is no part of the item, and a
+    # corner button laid over it read as a dark tab hanging off the video's lower edge.
+    w = _scrubber_preview(qtbot)
     w.resize(320, 480)
     w.show()
     w.show_video(_scripted_video(tmp_path))
     w.set_actions("gen-1")
     w.layout().activate()
-    timeline_top = w._timeline.geometry().top()
-    assert not w._timeline.isHidden()
-    assert timeline_top > 0
-    assert w.media_rect().bottomLeft().y() < timeline_top
-    assert all(b.geometry().bottomLeft().y() < timeline_top
+    scrubber_top = w._scrubber.geometry().top()
+    assert not w._scrubber.isHidden()
+    assert scrubber_top > 0
+    assert w.media_rect().bottomLeft().y() < scrubber_top
+    assert all(b.geometry().bottomLeft().y() < scrubber_top
                for b in w._controls.buttons())
 
 
 def test_the_cursor_follows_playback_position(qtbot, tmp_path):
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     follow = w._player.positionChanged.connect.call_args.args[0]
     follow(1500)
-    assert w._timeline._position == 1500
+    assert w._scrubber._position == 1500
     w.show_video(_scripted_video(tmp_path, name="next.mp4"))
-    assert w._timeline._position is None
+    assert w._scrubber._position is None
 
 
 def test_the_timeline_takes_the_videos_length_from_the_player(qtbot, tmp_path):
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     length = w._player.durationChanged.connect.call_args.args[0]
     length(4000)
-    assert w._timeline._duration == 4000
+    assert w._scrubber._duration == 4000
 
 
 def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp_path):
-    # The timeline appears with the video, a layout pass later, and takes its rows
-    # from the media area. A clip whose resolution is known is placed against
+    # The scrubber appears with the video, a layout pass later, and takes its rows
+    # from the media area. A video whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
-    # shrinks; placed once, against the pane as it was, the bin chip stayed
-    # straddling the video's lower edge and the timeline.
+    # shrinks; placed once, against the pane as it was, the Trash corner button stayed
+    # straddling the video's lower edge and the scrubber.
 
     player = MagicMock()
     player.metaData.return_value.value.side_effect = (
         lambda key: QSize(480, 864) if key == QMediaMetaData.Key.Resolution else None)
-    w = PreviewWidget(player=player, show_timeline=True)
+    w = PreviewWidget(player=player, show_scrubber=True)
     qtbot.addWidget(w)
     w.resize(320, 480)
     w.show()
     w.layout().activate()
     w.show_video(_scripted_video(tmp_path))
-    w.set_actions("gen-1")     # placed before the timeline has its room...
+    w.set_actions("gen-1")     # placed before the scrubber has its room...
     w.layout().activate()      # ...which it takes here
-    timeline_top = w._timeline.geometry().top()
-    assert not w._timeline.isHidden()
-    assert timeline_top > 0
-    assert w.media_rect().bottomLeft().y() < timeline_top
-    assert all(b.geometry().bottomLeft().y() < timeline_top
+    scrubber_top = w._scrubber.geometry().top()
+    assert not w._scrubber.isHidden()
+    assert scrubber_top > 0
+    assert w.media_rect().bottomLeft().y() < scrubber_top
+    assert all(b.geometry().bottomLeft().y() < scrubber_top
                for b in w._controls.buttons())
 
 
 def test_a_video_without_a_funscript_still_gets_its_timeline(qtbot, tmp_path):
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")  # no sidecar written
-    assert not w._timeline._actions
-    assert not w._timeline.isHidden()
+    assert not w._scrubber._actions
+    assert not w._scrubber.isHidden()
 
 
 def test_showing_an_image_takes_the_timeline_away(qtbot, tmp_path):
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     w.show_image(_make_png(tmp_path / "p.png"))
-    assert w._timeline.isHidden()
+    assert w._scrubber.isHidden()
 
 
 def test_clearing_takes_the_timeline_away(qtbot, tmp_path):
-    w = _timeline_preview(qtbot)
+    w = _scrubber_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     w.clear()
-    assert w._timeline.isHidden()
+    assert w._scrubber.isHidden()
 
 
-# --- dragging the shown generation out to a combine slot --------------------
+# --- dragging the shown generation out to a Combine drop zone --------------------
 
 @pytest.fixture
 def drags(monkeypatch):
@@ -685,7 +685,7 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
 def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
         qtbot, make_preview, tmp_path, drags):
     # The pane fits its item to its own size, which is far bigger than a drop
-    # slot; under the cursor it travels as a thumbnail like every other drag.
+    # drop zone; under the cursor it travels as a thumbnail like every other drag.
     w = make_preview()
     w.show()
     w.resize(600, 480)
@@ -766,7 +766,7 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
     assert drags == []
 
 
-# --- the notice: this item isn't what the settings beside it would make ---
+# --- the message: this item isn't what the settings beside it would make ---
 
 def _video_frame(color: str) -> QVideoFrame:
     pixels = QImage(64, 36, QImage.Format.Format_RGB32)
@@ -801,29 +801,29 @@ def test_a_playing_video_is_drawn_in_the_preview_itself(make_preview, tmp_path):
 
 @pytest.mark.parametrize("show_red", [_show_a_red_video, _show_a_red_still],
                          ids=["video", "still"])
-def test_a_notice_leaves_the_item_under_it_as_it_was(make_preview, tmp_path, show_red):
+def test_a_message_leaves_the_item_under_it_as_it_was(make_preview, tmp_path, show_red):
     w = make_preview()
     w.resize(320, 240)
     show_red(w, tmp_path)
 
-    w.set_notice("(not yet generated with modifications)")
+    w.set_message("(not yet generated with modifications)")
 
     assert _middle_of_the_media(w) == QColor("red")
 
 
-def test_a_preview_starts_with_no_notice(make_preview):
+def test_a_preview_starts_with_no_message(make_preview):
     w = make_preview()
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
 
 
-def test_a_notice_says_its_piece(make_preview, tmp_path):
+def test_a_message_says_its_piece(make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
 
-    w.set_notice("(not yet generated with modifications)")
+    w.set_message("(not yet generated with modifications)")
 
-    assert not w._notice.isHidden()
-    assert w._notice.text() == "(not yet generated with modifications)"
+    assert not w._message.isHidden()
+    assert w._message.text() == "(not yet generated with modifications)"
 
 
 def test_the_plate_sits_in_the_top_left_corner_clear_of_both_edges(make_preview, tmp_path):
@@ -831,21 +831,21 @@ def test_the_plate_sits_in_the_top_left_corner_clear_of_both_edges(make_preview,
     w._media_host.resize(300, 200)
     w.show_image(_make_png(tmp_path / "p.png"))
 
-    w.set_notice("modified")
+    w.set_message("modified")
 
-    assert 0 < w._notice.x() < w._media_host.width() // 2
-    assert 0 < w._notice.y() < w._media_host.height() // 2
-    assert w._notice.width() <= w._media_host.width()
+    assert 0 < w._message.x() < w._media_host.width() // 2
+    assert 0 < w._message.y() < w._media_host.height() // 2
+    assert w._message.width() <= w._media_host.width()
 
 
-def test_clearing_the_notice_takes_it_away(make_preview, tmp_path):
+def test_clearing_the_message_takes_it_away(make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_notice("modified")
+    w.set_message("modified")
 
-    w.set_notice(None)
+    w.set_message(None)
 
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
 
 
 @pytest.mark.parametrize("show", [
@@ -856,52 +856,52 @@ def test_clearing_the_notice_takes_it_away(make_preview, tmp_path):
     lambda w, tmp: w.clear(),
     lambda w, tmp: w.show_combination(Combination(_make_png(tmp / "c.png"))),
 ])
-def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, show):
-    # A notice is about the item it was set over, so it can never outlive it —
+def test_a_new_view_drops_the_message_about_the_last_one(make_preview, tmp_path, show):
+    # A message is about the item it was set over, so it can never outlive it —
     # least of all over the live frames of the run that answers it.
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_notice("modified")
+    w.set_message("modified")
 
     show(w, tmp_path)
 
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
 
 
-def test_frames_of_the_item_itself_leave_the_notice_up(make_preview, tmp_path):
+def test_frames_of_the_item_itself_leave_the_message_up(make_preview, tmp_path):
     # An enhancement streams the coming state of what is already on display —
-    # not a run of the settings beside it — so a notice about that item is
+    # not a run of the settings beside it — so a message about that item is
     # just as true of the version arriving, and the two belong on screen
     # together. Cleared by each frame and re-asserted by each keystroke, it
     # blinked at the rate the run streamed while the form was typed in.
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_notice("modified")
+    w.set_message("modified")
 
     w.show_frame(_png_bytes(), enhancing=True)
 
-    assert not w._notice.isHidden()
-    assert w._notice.text() == "modified"
+    assert not w._message.isHidden()
+    assert w._message.text() == "modified"
 
 
-def test_a_kept_notice_rides_over_the_frame_that_lands_under_it(make_preview, tmp_path):
+def test_a_kept_message_rides_over_the_frame_that_lands_under_it(make_preview, tmp_path):
     # Switching the stacked layout to the item raises that widget above every
-    # sibling it has, the notice included — so a kept one is lifted back.
+    # sibling it has, the message included — so a kept one is lifted back.
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")  # the stack is on the video surface
-    w.set_notice("modified")
+    w.set_message("modified")
 
     w.show_frame(_png_bytes(), enhancing=True)
 
     order = w._media_host.children()
-    assert order.index(w._notice) > order.index(w._image_label)
+    assert order.index(w._message) > order.index(w._image_label)
 
 
 def test_narrowing_the_pane_wraps_the_plate_to_fit_inside_it(make_preview, tmp_path):
     w = make_preview()
     w._media_host.resize(600, 200)
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_notice("(not yet generated with modifications)")
+    w.set_message("(not yet generated with modifications)")
     old = w._image_label.size()
 
     w._media_host.resize(120, 200)
@@ -909,7 +909,7 @@ def test_narrowing_the_pane_wraps_the_plate_to_fit_inside_it(make_preview, tmp_p
     # The label's resize is what the pane's refit rides on (see eventFilter).
     QApplication.sendEvent(w._image_label, QResizeEvent(QSize(120, 200), old))
 
-    assert w._notice.x() + w._notice.width() <= w._media_host.width()
+    assert w._message.x() + w._message.width() <= w._media_host.width()
 
 
 
@@ -921,9 +921,9 @@ def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, t
     # nothing, which is exactly what this is not.
     w = make_preview()
     frame = _make_png(tmp_path / "frame.png")
-    clip = _animated_webp(tmp_path / "source.webp")
+    video = _animated_webp(tmp_path / "source.webp")
 
-    w.show_combination(Combination(frame, clip))
+    w.show_combination(Combination(frame, video))
 
     assert w._stack.currentWidget() is w._combination
     assert not w._combination.image_label.pixmap().isNull()
@@ -1006,7 +1006,7 @@ def test_an_edit_marked_on_the_pair_on_screen_encloses_its_clip_without_restarti
 
 
 def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path):
-    # Its clip would otherwise keep looping under whatever replaced it.
+    # Its video would otherwise keep looping under whatever replaced it.
     w = make_preview()
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
                                    _animated_webp(tmp_path / "source.webp")))
@@ -1015,7 +1015,7 @@ def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path)
 
     assert w._stack.currentWidget() is w._image_label
     assert w._combination._movie is None
-# --- the corner controls over the item ------------------------------------
+# --- the corner buttons over the item ------------------------------------
 
 def _corners(w):
     """The preview's star, trash can and plus, in that order."""
@@ -1034,7 +1034,7 @@ def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
 
 def test_a_new_item_takes_the_last_one_s_corners_away(make_preview, tmp_path):
     # The corners are about the generation on screen, so they can no more outlive
-    # it than the "no longer these settings" notice can.
+    # it than the "no longer these settings" message can.
     w = make_preview()
     w.set_actions("p1", favorite=True, enhance=None)
 
@@ -1046,7 +1046,7 @@ def test_a_new_item_takes_the_last_one_s_corners_away(make_preview, tmp_path):
 
 def test_a_running_generation_has_no_corners_to_press(make_preview):
     # Live frames are a part-drawn file that does not exist yet: nothing to
-    # bookmark, bin or enhance.
+    # favorite, bin or enhance.
     w = make_preview()
     w.set_actions("p1", favorite=False, enhance=None)
 
@@ -1066,7 +1066,7 @@ def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
 
     _corners(w)[0].click()
 
-    assert fired == [("p1", corner_controls.STAR)]
+    assert fired == [("p1", corner_buttons.STAR)]
 
 
 def test_right_clicking_the_item_asks_for_its_menu(make_preview, tmp_path):
@@ -1109,17 +1109,17 @@ def test_the_corners_follow_the_item_rather_than_the_pane(make_preview, tmp_path
 # --- putting the pane down before laying new content in it -------------------
 #
 # Every show_* opens by clearing what the pane was holding: the playback, the
-# notice, the corner controls, the media, the live follow and the generation.
+# message, the corner buttons, the media, the live follow and the generation.
 # The set is the same six things each time, so these pin it as one list —
-# including the deliberate exception (a kept notice rides over the frames of the
+# including the deliberate exception (a kept message rides over the frames of the
 # item it is about) and the one that is a defect, held below.
 
 
 def _pane_holding_everything(w, tmp_path):
     """A pane holding a saved generation with every resettable thing set: an
-    animated item, a notice over it, armed corners and an armed drag."""
+    animated item, a message over it, armed corners and an armed drag."""
     w.show_image(_animated_webp(tmp_path / "held.webp"), "held")
-    w.set_notice("no longer what these settings would make")
+    w.set_message("no longer what these settings would make")
     w.set_actions("held", favorite=True, enhance=None)
     w._player.reset_mock()
     return w
@@ -1132,7 +1132,7 @@ def test_showing_an_image_puts_down_all_the_pane_was_holding(make_preview, tmp_p
     w.show_image(path)
 
     assert w._player.stop.called            # whatever was playing
-    assert w._notice.isHidden()             # the notice about the last item
+    assert w._message.isHidden()             # the message about the last item
     assert w._actions_id is None            # and its corners
     assert w._media == (path, "image")
     assert w._live is False
@@ -1146,8 +1146,8 @@ def test_showing_a_video_puts_down_all_the_pane_was_holding(make_preview, tmp_pa
     path = tmp_path / "clip.mp4"
     w.show_video(path)
 
-    assert not w._player.stop.called        # setSource takes over from the old clip
-    assert w._notice.isHidden()
+    assert not w._player.stop.called        # setSource takes over from the old video
+    assert w._message.isHidden()
     assert w._actions_id is None
     assert w._media == (path, "video")
     assert w._live is False
@@ -1163,7 +1163,7 @@ def test_showing_a_live_frame_puts_down_all_the_pane_was_holding(make_preview,
     w.show_frame(data)
 
     assert w._player.stop.called
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
     assert w._actions_id is None
     assert w._media is None                 # a frame is no file to open fullscreen
     assert w._live is True
@@ -1178,7 +1178,7 @@ def test_showing_a_combination_puts_down_all_the_pane_was_holding(make_preview,
     w.show_combination(Combination(_make_png(tmp_path / "frame.png")))
 
     assert w._player.stop.called
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
     assert w._actions_id is None
     assert w._media is None
     assert w._live is False
@@ -1193,7 +1193,7 @@ def test_showing_a_message_puts_down_all_the_pane_was_holding(make_preview,
     w.show_message("Waiting for preview…")
 
     assert w._player.stop.called
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
     assert w._actions_id is None
     assert w._media is None
     assert w._live is False
@@ -1212,15 +1212,15 @@ def test_a_message_marked_live_leaves_the_pane_following_the_run(make_preview,
     assert w._live is True
 
 
-def test_frames_of_the_item_itself_keep_the_notice_they_are_about(make_preview,
+def test_frames_of_the_item_itself_keep_the_message_they_are_about(make_preview,
                                                                   tmp_path):
-    # An enhancement of the item on screen: whatever the notice says about that
+    # An enhancement of the item on screen: whatever the message says about that
     # item is just as true of the version being made, so it stays up.
     w = _pane_holding_everything(make_preview(), tmp_path)
 
     w.show_frame(_png_bytes(), enhancing=True)
 
-    assert not w._notice.isHidden()
+    assert not w._message.isHidden()
 
 
 def test_frames_of_the_item_itself_keep_its_corners(make_preview, tmp_path):
@@ -1241,7 +1241,7 @@ def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,
     w.show_folder([_make_png(tmp_path / "wall.png")])
 
     assert w._player.stop.called
-    assert w._notice.isHidden()
+    assert w._message.isHidden()
     assert w._actions_id is None            # a wall of items is not a row
     assert w._media is None
     assert w._live is False
@@ -1253,7 +1253,7 @@ def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
                                                                  tmp_path):
     # The defect this closes (audit §3 bug 15, signed off 2026-08-31): the wall
     # kept the corners of whatever generation was there before it, so pressing
-    # trash binned an item the user was no longer looking at.
+    # trash trashed an item the user was no longer looking at.
     w = _pane_holding_everything(make_preview(), tmp_path)
     fired = []
     w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))

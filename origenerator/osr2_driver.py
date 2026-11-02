@@ -113,7 +113,7 @@ class Osr2Driver(QObject):
     def trace(self, count: int, seconds: float) -> tuple[float, ...]:
         """The script's line from the playhead forward, as *count* heights 0-1
         spanning *seconds* -- the motion the device is about to be asked for,
-        which is what the console draws in the Robot Hand's place while a
+        which is what the OSR2 controls draw in the Robot Hand's place while a
         funscript has the device.
 
         Folded onto the script the same way the stream is (the preview loops),
@@ -135,7 +135,7 @@ class Osr2Driver(QObject):
         """Advance the device toward the action following the current playhead.
 
         Driven purely by ``position()`` — the driver doesn't gate on the player's
-        playback state (the info-pane preview auto-plays with no pause control; the
+        playback state (the Generate pane preview auto-plays with no pause control; the
         Drive OSR2 button is the on/off). A stalled playhead simply holds the device
         at the current target.
         """

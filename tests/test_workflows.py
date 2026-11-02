@@ -9,7 +9,7 @@ from PIL import Image
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.detail_parts as detail_module
 import origenerator.workflows.lora_rows as lora_rows_module
-import origenerator.workflows.model_pickers as pickers
+import origenerator.workflows.model_dropdowns as dropdowns
 from origenerator import config, points_of_interest
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params, texts_read
@@ -94,7 +94,7 @@ def test_workflows_declare_the_params_that_identify_their_lora():
 
 
 def test_only_the_flf2v_workflow_declares_itself_looping():
-    # The funscript synthesized alongside a video tiles seamlessly only for a clip
+    # The funscript synthesized alongside a video tiles seamlessly only for a video
     # that returns to its start, so the loop workflow marks itself looping and the
     # others (a one-shot i2v, the still-image workflows) don't.
     assert Wan22Flf2vLoopWorkflow().looping is True
@@ -104,10 +104,10 @@ def test_only_the_flf2v_workflow_declares_itself_looping():
 
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # The WAN video workflows pick their LoRA from the installed files, like the
-    # SDXL Model dropdown: a combo per high/low LoRA, its options led by "None"
+    # SDXL Model dropdown: a dropdown per high/low LoRA, its options led by "None"
     # (so a run can opt out of a LoRA) then the loras scan, and its default
     # matching the persisted default — not a hidden param the form silently reset
-    # to default. Where the pickers sit is asserted separately, by
+    # to default. Where the dropdowns sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
 
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
@@ -116,11 +116,11 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
-            picker = by_key[f"lora_{level}"]
-            assert picker.type == "combo"
-            assert picker.options == options
-            assert picker.options[0] == NO_LORA  # a run can bypass the LoRA
-            assert picker.default == wf.default_params()[f"lora_{level}"]
+            dropdown = by_key[f"lora_{level}"]
+            assert dropdown.type == "dropdown"
+            assert dropdown.options == options
+            assert dropdown.options[0] == NO_LORA  # a run can bypass the LoRA
+            assert dropdown.default == wf.default_params()[f"lora_{level}"]
 
 
 def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
@@ -158,32 +158,32 @@ def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
         assert read["unet_low"] == base["unet_low"]
 
 
-def test_wan_video_workflows_expose_model_pickers(monkeypatch):
-    # The base diffusion model (high/low UNET) is a combo too, drawn from the
+def test_wan_video_workflows_expose_model_dropdowns(monkeypatch):
+    # The base diffusion model (high/low UNET) is a dropdown too, drawn from the
     # installed diffusion_models — selectable, not a hidden default the form
-    # silently reset. Where the pickers sit is asserted separately, by
+    # silently reset. Where the dropdowns sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
 
     installed = {
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
         "loras": ["l.safetensors"],
     }
-    picker = lambda category, fallback, **terms: installed[category]
-    monkeypatch.setattr(pickers, "list_model_files", picker)
+    dropdown = lambda category, fallback, **terms: installed[category]
+    monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
             model = by_key[f"unet_{level}"]
-            assert model.type == "combo"
+            assert model.type == "dropdown"
             assert model.options == installed["diffusion_models"]
             assert model.default == wf.default_params()[f"unet_{level}"]
 
 
 def test_wan_video_workflows_group_all_models_then_all_loras():
     # Model and LoRA settings are grouped by kind, not by noise level: both UNET
-    # pickers sit together, then every LoRA picker (each directly above its own
-    # strength). So the Generate form and the gallery info pane read as "all the
+    # dropdowns sit together, then every LoRA dropdown (each directly above its own
+    # strength). So the Generate form and the gallery Generate pane read as "all the
     # models, then all the LoRAs" rather than "everything high, then everything
     # low". This order is the single source both surfaces draw from.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
@@ -193,7 +193,7 @@ def test_wan_video_workflows_group_all_models_then_all_loras():
         # Each kind is one contiguous run, in the listed order...
         assert model_block == list(range(model_block[0], model_block[0] + 2))
         assert lora_block == list(range(lora_block[0], lora_block[0] + len(lora_block)))
-        # ...with every model picker above every LoRA picker.
+        # ...with every model dropdown above every LoRA dropdown.
         assert model_block[-1] < lora_block[0]
 
 
@@ -244,7 +244,7 @@ def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
 
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # Reusing a still's settings pins its seed: the composition is the point of
-    # editing one. Reusing a clip's does not — a pinned video seed would ride
+    # editing one. Reusing a video's does not — a pinned video seed would ride
     # every prompt edit out of that lineage, and one seed sampled over and over
     # says nothing about the motion. Registry-wide, so a new video workflow is
     # covered the day it is registered.
@@ -260,7 +260,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
 def test_wan_video_workflows_expose_editable_audio_params():
     # The audio prompt/negative/seed are ordinary editable fields (the foley
     # model files stay read-only passthroughs, like clip_name/vae_name): a run
-    # can steer what the clip sounds like, or leave the prompt blank to let the
+    # can steer what the video sounds like, or leave the prompt blank to let the
     # foley model score the frames on its own.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -363,7 +363,7 @@ def test_image_workflows_carry_the_enhance_toggle_off_by_default():
     # The tail is still a bool param on every image workflow — an old run
     # reproduces exactly what it recorded — but nothing turns it on by hand any
     # more, and no form offers it. Enhancement is a layer the gallery applies
-    # afterward (its Enhance subpanel, per folder), which keeps the original and
+    # afterward (its Enhance pane, per folder), which keeps the original and
     # names every level; baking the tail in here would leave neither.
     for name in _ENHANCE_TOGGLE_WORKFLOWS:
         wf = WORKFLOW_REGISTRY[name]
@@ -554,7 +554,7 @@ def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
 
 def test_krea2_runs_its_lora_on_the_model_alone():
     # A Krea 2 LoRA trains the diffusion model; its prompt reader is left as it
-    # is, and a picker set to "None" builds the graph with no LoRA node at all.
+    # is, and a dropdown set to "None" builds the graph with no LoRA node at all.
     wf = Krea2T2iWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), lora="a_lora.safetensors",
                                         lora_strength=0.8))
@@ -573,7 +573,7 @@ def test_krea2_runs_its_lora_on_the_model_alone():
 
 
 def test_krea2_offers_only_what_a_krea2_graph_can_run(installed_models):
-    # diffusion_models and loras hold every family at once; Krea 2's pickers
+    # diffusion_models and loras hold every family at once; Krea 2's dropdowns
     # keep its own files and the ones nobody could read, and drop the rest.
     for family in ("krea2", "flux", "wan"):
         installed_models.add("diffusion_models", f"fam_{family}.safetensors", arch=family)
@@ -740,7 +740,7 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
 
     providers = {nid: n for nid, n in payload.items()
                  if n["class_type"] == "UltralyticsDetectorProvider"}
-    # The provider names its model the way its own picker does, bbox/ and all.
+    # The provider names its model the way its own dropdown does, bbox/ and all.
     assert sorted(n["inputs"]["model_name"] for n in providers.values()) == [
         "bbox/face_finder.pt", "bbox/hand_finder.pt",
     ]
@@ -901,7 +901,7 @@ def test_a_detector_comfyui_hasnt_got_drops_its_part_rather_than_failing_the_sub
 
 
 def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
-    # The panel greys those numbers for this, but settings stored while a
+    # The Enhance pane greys those numbers for this, but settings stored while a
     # detector was installed outlive it being removed, and that must not fail
     # every enhance.
     payload = _enhance_payload(installed=[],
@@ -912,7 +912,7 @@ def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
 
 
 def test_the_detail_passs_setting_is_defined_with_the_range_its_spinners_take():
-    # The Enhance panel builds its per-part spinners from this, so the range
+    # The Enhance pane builds its per-part spinners from this, so the range
     # lives with the workflow rather than being retyped beside it.
     defs = {pd.key: pd
             for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()}
@@ -988,18 +988,18 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
 def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
     # The enhance tail's look-affecting settings are ordinary form fields: the
     # upscale model picked from the installed upscale_models files like every
-    # other model picker, and the scale/steps/denoise numerics — not hidden
+    # other model dropdown, and the scale/steps/denoise numerics — not hidden
     # defaults the form would silently reset.
 
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
-    picker = lambda category, fallback, **terms: installed.get(category, list(fallback))
-    monkeypatch.setattr(pickers, "list_model_files", picker)
+    dropdown = lambda category, fallback, **terms: installed.get(category, list(fallback))
+    monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
 
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         model = by_key["upscale_model"]
-        assert model.type == "combo"
+        assert model.type == "dropdown"
         assert model.options == ["4x_crisp.pt", "4x_soft.pth"]
         assert model.default == wf.default_params()["upscale_model"]
         scale = by_key["enhance_scale"]
@@ -1017,7 +1017,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
 _FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_t2v", "wan_fun_control",
              "wan_animate", "ltx", "krea2")
 # The categories that hold more than one architecture. upscale_models is left
-# out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
+# out on purpose: the ESRGAN upscalers are architecture-neutral, and a dropdown
 # over them is meant to list everything.
 _MIXED_CATEGORIES = ("checkpoints", "diffusion_models", "controlnet", "loras")
 
@@ -1026,7 +1026,7 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
     # The standing rule, checked across the whole registry rather than a list of
     # workflow names — a workflow added later is covered the day it is added.
     # Every mixed category is stocked with one model of every architecture, so a
-    # picker that offers all of them did not filter at all.
+    # dropdown that offers all of them did not filter at all.
     for category in _MIXED_CATEGORIES:
         for family in _FAMILIES:
             installed_models.add(
@@ -1039,14 +1039,14 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
     checked = 0
     for name, wf in WORKFLOW_REGISTRY.items():
         for pd in wf.param_definitions():
-            if pd.type != "combo" or not pd.options:
+            if pd.type != "dropdown" or not pd.options:
                 continue
             offered = planted.intersection(pd.options)
             if not offered:
-                continue   # not a picker over a mixed category
+                continue   # not a dropdown over a mixed category
             checked += 1
             assert offered < planted, f"{name}.{pd.key} offers every architecture"
-    assert checked, "no model pickers were exercised — the fixture stopped matching"
+    assert checked, "no model dropdowns were exercised — the fixture stopped matching"
 
 
 def test_an_image_to_video_form_offers_no_model_that_makes_video_from_text_or_a_control_video(
@@ -1074,10 +1074,10 @@ def test_an_image_to_video_form_offers_no_lora_civitai_files_under_text_to_video
 
     for workflow in ("wan22_i2v", "wan22_flf2v_loop", "wan22_animate"):
         lora_keys = WORKFLOW_REGISTRY[workflow].lora_keys
-        pickers = [pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
+        dropdowns = [pd for pd in WORKFLOW_REGISTRY[workflow].param_definitions()
                    if pd.key in lora_keys]
-        assert pickers, workflow
-        for pd in pickers:
+        assert dropdowns, workflow
+        for pd in dropdowns:
             assert looks.intersection(pd.options) == looks - {"a_t2v_look.safetensors"}, (
                 f"{workflow}.{pd.key}")
 
@@ -1107,7 +1107,7 @@ def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
     checked = 0
     for name, wf in WORKFLOW_REGISTRY.items():
         for pd in wf.param_definitions():
-            if pd.type != "combo" or not pd.options:
+            if pd.type != "dropdown" or not pd.options:
                 continue
             for half, other in (("high", "low"), ("low", "high")):
                 if not pd.key.endswith(f"_{half}"):
@@ -1377,7 +1377,7 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
     # The loop workflow gets the same HunyuanVideo-Foley pass as the one-shot
     # i2v, but its writer is VHS_VideoCombine, so the audio rides its ``audio``
     # input. (The track won't loop seamlessly the way the frames do — Funestras
-    # restart it each cycle — but the clip itself is scored to its motion.)
+    # restart it each cycle — but the video itself is scored to its motion.)
     wf = Wan22Flf2vLoopWorkflow()
     params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3)
     payload = wf.build_api_payload(params)
@@ -1397,7 +1397,7 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
 
 
 def test_foley_duration_never_undercuts_the_models_one_second_floor():
-    # HunyuanFoley rejects sub-second durations, so a clip shorter than 1s (the
+    # HunyuanFoley rejects sub-second durations, so a video shorter than 1s (the
     # default 21-frame loop at 16fps is 1.3s, but 5 frames is 0.2s) asks for a
     # clamped 1s of audio; the mux just carries the sliver of overhang.
     wf = Wan22Flf2vLoopWorkflow()
@@ -1623,7 +1623,7 @@ def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
 
 def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     # The pose references this workflow is steered by are a curated folder of the
-    # library, not ComfyUI's input dump, so its Structure Image picker opens
+    # library, not ComfyUI's input dump, so its Structure Image dropdown opens
     # there. The path is built from the (private) library root, never spelled out
     # in source.
 
@@ -1983,21 +1983,21 @@ def test_flux_t2i_upscaled_default_params_has_required_keys():
     assert params["unet"].endswith(".gguf")
 
 
-def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
-    # The GGUF diffusion model is a combo drawn from the installed diffusion
-    # models, like SDXL's checkpoint picker — the one thing a user varies most.
+def test_flux_t2i_upscaled_exposes_a_gguf_model_dropdown(monkeypatch):
+    # The GGUF diffusion model is a dropdown drawn from the installed diffusion
+    # models, like SDXL's checkpoint dropdown — the one thing a user varies most.
 
     installed = ["a_flux.gguf", "b_flux.gguf"]
-    monkeypatch.setattr(pickers, "list_model_files",
+    monkeypatch.setattr(dropdowns, "list_model_files",
                         lambda category, fallback, **terms: installed)
 
     wf = FluxT2iUpscaledWorkflow()
     by_key = {pd.key: pd for pd in wf.param_definitions()}
     assert "unet" in by_key
-    picker = by_key["unet"]
-    assert picker.type == "combo"
-    assert picker.options == installed
-    assert picker.default == wf.default_params()["unet"]
+    dropdown = by_key["unet"]
+    assert dropdown.type == "dropdown"
+    assert dropdown.options == installed
+    assert dropdown.default == wf.default_params()["unet"]
 
 
 def test_flux_t2i_upscaled_build_api_payload_structure():
@@ -2062,7 +2062,7 @@ def test_flux_t2i_upscaled_extract_output_info():
 def test_every_enhance_capable_workflow_keeps_its_base_render():
     # A workflow whose tail re-samples its own render must save that render too,
     # or the row lands with one file and no "before" — enhanced pixels with
-    # nothing to compare them against, and the only recovery a full re-render at
+    # nothing to compare them against, and the only trash_collection a full re-render at
     # the recorded seed. 147 rows in this library needed exactly that repair.
     # Asserted across the registry so a new enhance-capable workflow inherits the
     # rule rather than a later reader having to know it.
@@ -2159,7 +2159,7 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
     # Seconds are counted at the rate the MODEL paces motion at, never at the
-    # playback rate: that is what makes a clip's length hold when its rate moves.
+    # playback rate: that is what makes a video's length hold when its rate moves.
     assert frames.rate == NATIVE_FPS
     assert frames.options == [1, 5, 10, 15, 30, 60]
     assert frames.unit == "s"
@@ -2186,7 +2186,7 @@ def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
-    # More steps cost only time, and a long clip already costs hours of it;
+    # More steps cost only time, and a long video already costs hours of it;
     # a step count the machine can finish is nothing the form should refuse.
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     assert defs["steps"].max_val == 100
@@ -2195,7 +2195,7 @@ def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
 
 
 def _segments(payload: dict, conditioning: str) -> list[dict]:
-    """A clip's conditioning nodes in the order their segments run: the first
+    """A video's conditioning nodes in the order their segments run: the first
     is fed by the scaled start image, each later one by a frame cut out of the
     decode before it, whose samplers lead back to the previous conditioning."""
     nodes = [n for n in payload.values() if n["class_type"] == conditioning]
@@ -2214,7 +2214,7 @@ def _segments(payload: dict, conditioning: str) -> list[dict]:
 
 @pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
 def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
-    # A clip of today's lengths is one segment: one conditioning node, fed by
+    # A video of today's lengths is one segment: one conditioning node, fed by
     # the scaled start image, nothing cut out of a decode or joined back on.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=SINGLE_WINDOW_FRAMES))
@@ -2225,9 +2225,9 @@ def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
 
 
 def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame():
-    # 481 frames as one window is 31 GB of activations on a 16 GB card, and
-    # windows blended over each other crossfade and drift. So a long clip is
-    # rendered as clips of the longest length one window takes, each started
+    # 481 frames as one window is 31 GB of activations on a 16 GB tile, and
+    # windows blended over each other crossfade and drift. So a long video is
+    # rendered as videos of the longest length one window takes, each started
     # from the last frame the one before it decoded: no blend, one scene.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
@@ -2238,8 +2238,8 @@ def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame(
         assert last["class_type"] == "ImageFromBatch"
         assert (last["inputs"]["batch_index"], last["inputs"]["length"]) == (160, 1)
         # the same frame is what its CLIP-Vision conditioning looks at
-        clip = payload[segment["inputs"]["clip_vision_output"][0]]
-        assert clip["inputs"]["image"] == segment["inputs"]["start_image"]
+        clip_vision = payload[segment["inputs"]["clip_vision_output"][0]]
+        assert clip_vision["inputs"]["image"] == segment["inputs"]["start_image"]
 
 
 def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_frame():
@@ -2376,7 +2376,7 @@ def test_each_scene_keeps_out_its_own_negative(name, conditioning):
 def test_each_scene_runs_for_its_own_frames_and_reads_its_own_prompt(name, conditioning):
     # A story is scenes of their own lengths: 10 s, 5 s and 10 s here, each a
     # segment started from the frame before it, each conditioned on its own
-    # scene's text. The clip is the scenes end to end, one shared frame at each
+    # scene's text. The video is the scenes end to end, one shared frame at each
     # seam, and the audio is scored for that whole length.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(
@@ -2398,7 +2398,7 @@ def test_a_scene_longer_than_one_window_is_two_segments_of_the_same_scene():
 
 
 def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
-    # One scene is the whole clip, and the clip length is what every other
+    # One scene is the whole video, and the video length is what every other
     # reader of the settings goes by (settings from the overlay carry only that),
     # so a single entry never overrules it.
     wf = Wan22I2vWorkflow()
@@ -2407,7 +2407,7 @@ def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
 
 
 def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
-    # The stored clip length is derived from the scenes by the form; settings
+    # The stored video length is derived from the scenes by the form; settings
     # whose scenes and length disagree scores its audio for the frames it will
     # really render.
     wf = Wan22I2vWorkflow()
@@ -2488,7 +2488,7 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
 def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
     # A rate typed by hand — or carried in by settings saved before the rates
     # were multiples — doesn't get to skew the tempo: the graph interpolates to
-    # the nearest reachable rate and writes at THAT, so the clip lands a little
+    # the nearest reachable rate and writes at THAT, so the video lands a little
     # off the rate asked for and exactly on time.
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=60.0))
@@ -2511,7 +2511,7 @@ def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
 @pytest.mark.parametrize("name", _SCORED_VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
     # Foley scores the DECODED frames — the motion the model actually authored,
-    # at the rate it authored them in — so the track is the clip's real seconds
+    # at the rate it authored them in — so the track is the video's real seconds
     # and lands on the same beats however many frames the file ends up holding.
     wf = WORKFLOW_REGISTRY[name]
     params = dict(wf.default_params(), frame_count=81, frame_rate=MAX_PLAYBACK_FPS)
@@ -2605,7 +2605,7 @@ def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
-def test_a_workflow_name_uses_no_model_card_shorthand_but_t2i_i2v_and_t2v(name):
+def test_a_workflow_name_uses_no_model_tile_shorthand_but_t2i_i2v_and_t2v(name):
     assert not re.search(r"\b(FLF2V|ATI|I2I|S2V)\b", WORKFLOW_REGISTRY[name].display_name)
 
 

@@ -60,7 +60,7 @@ def lora_rows(defaults: dict, keys, *, qualifier: str = "", beside_model: str = 
     for number, key in enumerate(keys, start=1):
         label = _row_label(number, len(keys), qualifier)
         rows += [
-            ParamDef(key, f"LoRA{label}", ParamType.COMBO, defaults[key],
+            ParamDef(key, f"LoRA{label}", ParamType.DROPDOWN, defaults[key],
                      options=list_lora_files([defaults[key]], **offered),
                      beside_model=beside_model, folder="loras"),
             lora_strength(strength_key_of(key), defaults[strength_key_of(key)], label),

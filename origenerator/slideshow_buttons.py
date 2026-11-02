@@ -4,7 +4,7 @@ A slideshow wears the Funestras' own HUD (:mod:`origenerator.gui.slideshow_hud`)
 HUD's buttons are its source's to declare: rows of
 :class:`funestra.hud_button.Button`, each carrying the verb a press posts.
 The verbs are the side's own, spelled the way a satellite's are — hosted, the
-session routes ``portrait_next`` back to whatever holds that side; standalone,
+session routes ``portrait_next`` back to whatever holds that shape; standalone,
 the slideshow answers the same verb itself.
 
 Only what a slideshow answers is declared, which depends on what is drawing the
@@ -24,9 +24,9 @@ from funestra.hud_marks import FMODE_ICON, LOCK_ICON, NEXT_ICON, PREVIOUS_ICON, 
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.console_commands import FILTER, spelled_for
+from origenerator.osr2_controls_commands import FILTER, spelled_for
 
-# The band, in the order the Funestras put the same controls in.  The tuples are
+# The HUD's button row, in the order the Funestras put the same controls in.  The tuples are
 # the groups the wider gap opens between.
 CONTROL_GROUPS = (
     ("prev", "next"),
@@ -45,8 +45,8 @@ _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name 
 ORIGENERATOR_MODE = "origenerator_activate"
 
 
-def origenerator_mode_on(side: str) -> str:
-    return spelled_for(side, ORIGENERATOR_MODE)
+def origenerator_mode_on(shape: str) -> str:
+    return spelled_for(shape, ORIGENERATOR_MODE)
 
 MODE_BUTTONS = (
     ("satellites_kino_activate", "Kino", False),
@@ -71,7 +71,7 @@ CONTROL_FACES = {
 _NO_OTHER_VERSION = " (none for this one)"
 
 # What each one is, in this app's words rather than a Funestra's: these act on the
-# generations this app made, so the bin is the toolbar's Delete and the lock is
+# generations this app made, so the Trash is the Gallery pane buttons' Delete and the lock is
 # the whole of what locking a slide means here.
 CONTROL_TOOLTIPS = {
     "prev": "Previous slide",
@@ -85,7 +85,7 @@ CONTROL_TOOLTIPS = {
     "cycle_version": "Other versions of this one — an enhancement, the image it was "
                 "made from, the upscale Evolver made of a video",
 }
-# Reset means what the side goes back TO, which is not the same in both places:
+# Reset means what the shape goes back TO, which is not the same in both places:
 # hosted it is the region's base state — that side's whole library, the way a
 # Funestra's reset leaves it browsing its own — and standalone there is no such
 # state, so it is this slideshow's own set from the top.
@@ -95,7 +95,7 @@ RESET_TOOLTIPS = {
 }
 
 
-def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
+def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool = False,
                    enhanced: bool = False, order: str = "", hosted: bool = False,
                    own_window: bool = True, has_other_versions: bool = False,
                    clip_seconds: int | None = None) -> tuple[tuple[Button, ...], ...]:
@@ -110,30 +110,30 @@ def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = 
     names = [name for group in CONTROL_GROUPS for name in group]
     lit = {"lock": locked, "fmode": favorites_filter, "enhanced": enhanced,
            "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
-    band = tuple(
-        _control(side, name, hosted=hosted, lit=lit.get(name, False),
+    row = tuple(
+        _control(shape, name, hosted=hosted, lit=lit.get(name, False),
                  dim=name == "cycle_version" and not has_other_versions,
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
         for index, name in enumerate(names)
     )
-    pace = () if clip_seconds is None else (clip_seconds_row(side, clip_seconds),)
-    return (_mode_row(), band, *pace) if mode_row else (band, *pace)
+    pace = () if clip_seconds is None else (clip_seconds_row(shape, clip_seconds),)
+    return (_mode_row(), row, *pace) if mode_row else (row, *pace)
 
 
-def clip_seconds_row(side: str, seconds: int) -> tuple[Button, ...]:
+def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
     return (
         Button("", "Clip seconds", "", width=ROW_LABEL_W),
-        Button(f"{side}_clip_seconds_down", shared_mark("minus"), "Move on sooner",
+        Button(f"{shape}_clip_seconds_down", shared_mark("minus"), "Move on sooner",
                group_break=True),
         Button("", f"{seconds}s", "", width=VALUE_W),
-        Button(f"{side}_clip_seconds_up", shared_mark("plus"), "Leave each clip longer"),
+        Button(f"{shape}_clip_seconds_up", shared_mark("plus"), "Leave each clip longer"),
     )
 
 
 _NEWER, _OLDER = -1, 1
 
-# What each press asks of a slideshow, by the name its verb carries after the side:
-# the band's buttons, the map's own chrome, the session's own keys and a window's
+# What each press asks of a slideshow, by the name its verb carries after the shape:
+# the button row's buttons, the map's own chrome, the session's own keys and a window's
 # shifted arrows, all in the Funestras' spelling.
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda host: host.slideshow_step(-1),
@@ -155,7 +155,7 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "loop": lambda host: host.slideshow_loop_cycle(),
     "more_seeds": lambda host: host.slideshow_more_seeds(),
     "no_filter": lambda host: host.clear_modes(),
-    "lock_action": lambda host: host.slideshow_filter_to_the_act_on_screen(),
+    "lock_action": lambda host: host.slideshow_filter_to_the_action_on_screen(),
     "nav_left": lambda host: host.slideshow_nav("left"),
     "nav_right": lambda host: host.slideshow_nav("right"),
     "nav_up": lambda host: host.slideshow_nav("up"),
@@ -187,7 +187,7 @@ PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEAS
 
 def answer(host, action: str, argument: str = "") -> bool:
     """Do what a press on a slideshow's HUD asks of *host*, by the name its verb
-    carries after the side ("next", "fmode", "play_video"), and say whether the
+    carries after the shape ("next", "fmode", "play_video"), and say whether the
     slideshow had an answer.
 
     One table for every way a press reaches a slideshow — its own window's HUD
@@ -216,11 +216,11 @@ def _mode_row() -> tuple[Button, ...]:
     )
 
 
-def _control(side: str, name: str, *, hosted: bool, lit: bool, dim: bool,
+def _control(shape: str, name: str, *, hosted: bool, lit: bool, dim: bool,
              group_break: bool) -> Button:
     tooltip = RESET_TOOLTIPS[hosted] if name == "reset" else CONTROL_TOOLTIPS[name]
     if dim:
         tooltip += _NO_OTHER_VERSION
-    return Button(f"{side}_{name}", CONTROL_FACES[name], tooltip, lit=lit, dim=dim,
+    return Button(f"{shape}_{name}", CONTROL_FACES[name], tooltip, lit=lit, dim=dim,
                   favorite=name in ("lock", "fmode"), enhanced=name == "enhanced",
                   danger=name == "trash", group_break=group_break)

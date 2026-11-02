@@ -25,7 +25,7 @@ from origenerator import (
     osr2_driver,
 )
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import (
     omnipause,
 )
@@ -87,8 +87,8 @@ class _FakeDriver:
         self.active = False
 
     def trace(self, count, seconds):
-        """What the console asks a driver for while it has the device. These
-        cases carry no scripted clip, so there is no line to draw — the same
+        """What the OSR2 controls ask a driver for while they have the device. These
+        cases carry no scripted video, so there is no line to draw — the same
         empty answer the real driver gives for one."""
         return ()
 
@@ -102,14 +102,14 @@ def _osr2_view(qtbot):
     driver = _FakeDriver()
     view._osr2_driver = driver
     view.osr2_control.script = driver
-    return view, driver, view._info_tabs.current_config_panel()
+    return view, driver, view._generate_pane.current_generate_tab()
 
 
-def test_the_consoles_control_group_is_the_apps_one_osr2_switch(qtbot):
+def test_the_osr2_controls_control_group_is_the_apps_one_osr2_switch(qtbot):
     """The whole point of the group: from a slideshow there was no way to reach
-    the toolbar's switch at all, and now there is no toolbar switch to reach."""
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    the Gallery pane buttons' switch at all, and now there is no Gallery pane buttons' switch to reach."""
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
 
     view.osr2_control.set_state(OSR2_DRIVING)
     assert driver.started == [("player-A", "actions-A")]
@@ -120,7 +120,7 @@ def test_the_consoles_control_group_is_the_apps_one_osr2_switch(qtbot):
     assert view.osr2_control.isChecked() is False
 
 
-def test_parking_from_the_console_stills_the_motion_at_home_and_keeps_the_device(qtbot):
+def test_parking_from_the_osr2_controls_stills_the_motion_at_home_and_keeps_the_device(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
 
     view.osr2_control.set_state(OSR2_PARKED)
@@ -132,10 +132,10 @@ def test_parking_from_the_console_stills_the_motion_at_home_and_keeps_the_device
 
 def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbot):
     """A script driving through a park is the device ignoring the hold, which is
-    what the console would be lying about.  The stilled motion is what takes the
+    what the OSR2 controls would be lying about.  The stilled motion is what takes the
     device to that end and keeps it there."""
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     view.osr2_control.set_state(OSR2_DRIVING)
     assert driver.started
     assert view._osr2_motion.active is False
@@ -148,8 +148,8 @@ def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbo
 
 
 def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     view.osr2_control.set_state(OSR2_PARKED)
 
     view.osr2_control.set_state(OSR2_DRIVING)
@@ -182,8 +182,8 @@ def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
     auto flag among it -- so one that takes over before the other has let go
     finds the device already taken, and later puts that back.  A hold handed to
     a script that way left OSR2 auto switched off for every app."""
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     view.osr2_control.set_state(OSR2_PARKED)
     log = _handoff_log(view, driver)
 
@@ -193,8 +193,8 @@ def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
 
 
 def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     view.osr2_control.set_state(OSR2_DRIVING)
     log = _handoff_log(view, driver)
 
@@ -203,10 +203,10 @@ def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
     assert log == ["script lets go", "motion takes"]
 
 
-def test_every_console_over_the_device_hears_that_it_was_re_aimed(qtbot):
-    """The panel redraws on this: which driver has the device moves with the
+def test_every_osr2_controls_drawing_over_the_device_hears_that_it_was_re_aimed(qtbot):
+    """The tab redraws on this: which driver has the device moves with the
     video in front, not only with a press."""
-    view, _driver, panel = _osr2_view(qtbot)
+    view, _driver, tab = _osr2_view(qtbot)
     heard = []
     view.osr2_control.settled.connect(lambda: heard.append(True))
 
@@ -216,8 +216,8 @@ def test_every_console_over_the_device_hears_that_it_was_re_aimed(qtbot):
 
 
 def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
 
     view.osr2_control.setChecked(True)  # the one global switch, on
     assert driver.started == [("player-A", "actions-A")]
@@ -230,8 +230,8 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     # "Genau mode when no funscript is going": with nothing scripted in front,
     # the one switch drives the device from the app's own motion rather than
     # sitting armed and doing nothing.
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
     view.osr2_control.setChecked(True)
     assert driver.started == []
@@ -245,8 +245,8 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     # Space is genau's "drives" key and the switch is the same control, so it has
     # to reach the switch: routed to the motion directly it would start a second
     # source alongside a funscript the switch already had streaming.
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     _on_screen(qtbot, view, 1400, 900)
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
@@ -259,7 +259,7 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     assert view._osr2_motion.held == OSR2_PARKED
 
 
-def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_again(qtbot):
+def test_space_after_a_click_in_the_generate_pane_drives_rather_than_pressing_it_again(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
     section = next(iter(_tab_with_prompts(view)._param_form._sections.values()))
     _on_screen(qtbot, view, 1400, 900)
@@ -283,23 +283,23 @@ def test_a_slideshow_gets_space_wired_to_the_switch(qtbot):
 
 
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
-    panel.osr2_drive_target = lambda: ("B.mp4", "pB", "aB")
-    panel.displayed_changed.emit()  # user browsed to another video in the same tab
+    tab.osr2_drive_target = lambda: ("B.mp4", "pB", "aB")
+    tab.displayed_changed.emit()  # user browsed to another video in the same tab
     assert driver.started[-1] == ("pB", "aB")  # re-aimed at B
 
 
 def test_switching_to_a_tab_without_a_scripted_video_stops_driving(qtbot):
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started
 
-    view._info_tabs._add_subtab()  # a fresh, blank tab comes to the front
+    view._generate_pane._add_subtab()  # a fresh, blank tab comes to the front
     assert driver.stopped >= 1
 
 
@@ -331,10 +331,10 @@ def test_the_radio_switch_tunes_the_radio_in_and_silences_it(qtbot):
     view, radio = _radio_view(qtbot)
     assert (radio.starts, radio.stops) == (0, 0)  # off until asked
 
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
     assert radio.starts == 1
 
-    view._bank.radio.setChecked(False)
+    view._buttons.radio.setChecked(False)
     assert radio.stops == 1
 
 
@@ -345,7 +345,7 @@ def test_the_radio_switch_round_trips_for_persistence(qtbot):
     view.set_radio_enabled(True)
 
     assert view.radio_enabled() is True
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
     assert radio.starts == 1  # restoring the switch actually starts it playing
 
 
@@ -367,8 +367,8 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
     monkeypatch.setattr(osr2_driver, "Osr2Broker", lambda *a, **k: broker)
     view = GalleryView(FakeDB([]), actions=FakeActions(), osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
-    panel = view._info_tabs.current_config_panel()
-    panel.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), ACTIONS)
+    tab = view._generate_pane.current_generate_tab()
+    tab.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), ACTIONS)
     view.osr2_control.setChecked(True)
 
     view.set_room_paused(True)
@@ -379,7 +379,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
     # Left/Right step through the folder: the slideshow is built from the visible
-    # items' media, in the browser's order, starting on the one already shown.
+    # items' media, in the Gallery pane's order, starting on the one already shown.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
@@ -394,13 +394,13 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
     slideshow = _double_click_slideshow(view, qtbot)
 
-    order = view._browser.listed_prompt_ids()
+    order = view._gallery_pane.listed_prompt_ids()
     # Each entry carries its generation's id, so the slideshow's Up and Down can name
-    # what to trash and what to bookmark, and its stored thumbnail, which is the
+    # what to trash and what to favorite, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
     assert slideshow._set.playlist._items == [(f"{pid}.png", "image", pid, None)
                                           for pid in order]
-    assert slideshow._set.playlist.order == list(range(len(order)))  # the browser's order
+    assert slideshow._set.playlist.order == list(range(len(order)))  # the Gallery pane's order
     assert slideshow._set.playlist.current()[2] == "i2"  # opened on the shown item
     slideshow.close()
 
@@ -409,13 +409,13 @@ def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_i
         qtbot, tmp_path, monkeypatch):
     by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
-    monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._bank.auto.click()
+    view._buttons.auto.click()
     _generating_tile(view).selected.emit()  # watching Auto-Generate in the tab
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)  # the tab shows it; the next runs
@@ -453,19 +453,19 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
 
 
 def test_stepping_a_double_clicked_slideshow_re_aims_the_osr2(qtbot):
-    # Stepping to another clip re-aims the one device at the newly shown video.
+    # Stepping to another video re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
     view.osr2_control.setChecked(True)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
-    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another clip
+    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another video
     assert driver.started[-1] == ("pB", "aB")
     slideshow.close()
 
 
 def test_a_slideshow_opened_with_the_switch_off_drives_nothing(qtbot):
-    # Double-clicking a clip open once took the device whatever the switch said.
+    # Double-clicking a video open once took the device whatever the switch said.
     view, driver, _panel = _osr2_view(qtbot)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
 
@@ -477,15 +477,15 @@ def test_a_slideshow_opened_with_the_switch_off_drives_nothing(qtbot):
 
 
 def test_the_video_in_front_is_the_front_tab_s_while_no_slideshow_is_up(qtbot):
-    view, _driver, panel = _osr2_view(qtbot)
-    panel.video_on_screen = lambda: "alpha-1"
+    view, _driver, tab = _osr2_view(qtbot)
+    tab.video_on_screen = lambda: "alpha-1"
 
     assert view.video_in_front() == "alpha-1"
 
 
 def test_a_slideshow_up_is_what_is_in_front_of_the_tab(qtbot):
-    view, _driver, panel = _osr2_view(qtbot)
-    panel.video_on_screen = lambda: "alpha-1"
+    view, _driver, tab = _osr2_view(qtbot)
+    tab.video_on_screen = lambda: "alpha-1"
     slideshow = _double_click_slideshow(view, qtbot)
     slideshow.video_on_screen = lambda: "beta-1"
 
@@ -516,10 +516,10 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     # bigger". Watching the frames come in is what fullscreen is for.
     _resolve_by_id(monkeypatch)
     view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    panel = view._info_tabs.current_config_panel()
-    panel._preview.show_frame(_png_bytes())  # Auto-Generate's generation, streaming
+    tab = view._generate_pane.current_generate_tab()
+    tab._preview.show_frame(_png_bytes())  # Auto-Generate's generation, streaming
 
-    win = panel._preview.open_fullscreen()
+    win = tab._preview.open_fullscreen()
 
     qtbot.addWidget(win.shown)
     assert win is not None
@@ -535,15 +535,15 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()
     view._osr2_driver = driver
-    panel = view._info_tabs.current_config_panel()
-    panel.osr2_drive_target = lambda: None
+    tab = view._generate_pane.current_generate_tab()
+    tab.osr2_drive_target = lambda: None
 
     view.osr2_control.setChecked(True)
     assert view._osr2_motion.active
     assert driver.started == []
 
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    panel.displayed_changed.emit()
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    tab.displayed_changed.emit()
 
     assert driver.started == [("pA", "aA")]
     assert not view._osr2_motion.active  # the motion stood down for the script
@@ -566,7 +566,7 @@ def test_a_move_of_a_standing_slideshows_volume_turns_the_radio_on(qtbot, monkey
 
     slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
 
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
     assert radio.starts == 1
 
 
@@ -692,7 +692,7 @@ def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
-    # The toggle governs a slideshow as much as the tab preview: double-clicking a clip
+    # The toggle governs a slideshow as much as the tab preview: double-clicking a video
     # to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
     assert not view.osr2_control.isChecked()
@@ -738,10 +738,10 @@ def test_closing_the_slideshow_stops_driving_with_no_tab_video_behind_it(qtbot):
 
 
 def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot):
-    # With the toggle already driving the front-tab video, opening a clip fullscreen
+    # With the toggle already driving the front-tab video, opening a video fullscreen
     # re-aims the one device at the slideshow's player; closing hands it back.
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
@@ -755,11 +755,11 @@ def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot)
 def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
     # The surface in front answers for the device alone: a slideshow opening on an
     # image hands the OSR2 to the motion, the way a Funestra hands back to it
-    # between scripted clips.  Falling through to the front tab left that tab's
+    # between scripted videos.  Falling through to the front tab left that tab's
     # funscript driving under a slideshow it has nothing to do with, until the slideshow
     # happened to reach a scripted video of its own.
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
@@ -771,15 +771,15 @@ def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscri
 
 
 def _driving_the_device(qtbot):
-    view, _driver, panel = _osr2_view(qtbot)
+    view, _driver, tab = _osr2_view(qtbot)
     _keys_are_the_gallerys(view)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     return view
 
 
 def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
-    # The driven video usually lives in the focused info-pane tab, where the gallery
+    # The driven video usually lives in the focused Generate pane tab, where the gallery
     # doesn't own Delete/Undo.
     view = _driving_the_device(qtbot)
     view._gallery_owns_keys = lambda **_kw: False
@@ -820,17 +820,17 @@ def test_esc_in_a_text_field_is_the_fields_own_even_with_the_osr2_moving(
     assert omnipause.frozen() is paused
 
 
-def test_the_console_hints_that_esc_pauses_the_room(qtbot):
+def test_the_osr2_controls_hint_that_esc_pauses_the_room(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
-    assert view._motion_panel.toolTip().endswith(" · Esc pauses")
+    assert view._osr2_controls.toolTip().endswith(" · Esc pauses")
 
 
 def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
     # A fullscreen preview or the slideshow is a separate top-level window that uses
     # Esc to close. The gallery's app-wide filter sees Esc first, so it must defer
     # when another window is active rather than swallow Esc to stop the OSR2.
-    view, driver, panel = _osr2_view(qtbot)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view, driver, tab = _osr2_view(qtbot)
+    tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     fullscreen = QWidget()
     qtbot.addWidget(fullscreen)
@@ -847,7 +847,7 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
     view, _driver, _panel = _osr2_view(qtbot)
     # Which window Qt calls active is ambient in a test process — a fullscreen
-    # slideshow another test opened and closed can still hold it — so both sides of
+    # slideshow another test opened and closed can still hold it — so both shapes of
     # the guard are said here rather than inherited.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
     assert view._other_window_owns_keys() is False  # only the gallery is up
@@ -857,7 +857,7 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
     assert view._other_window_owns_keys() is True
 
-    # And a dialog or a combo's dropdown with no window of its own under it: the
+    # And a dialog or a dropdown's list with no window of its own under it: the
     # filter is installed on the application, so without this it eats the keys the
     # popup was opened to take.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
@@ -880,7 +880,7 @@ def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
     view.refresh()
     _select_first_leaf(view)
     view.show()
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -899,7 +899,7 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
     assert radio.frozen
     assert view._slideshows.showing is slideshow
     assert slideshow.shown.isVisible()
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
 
 
 def test_esc_at_a_standalone_slideshow_has_its_osr2_line_say_parked_until_a_second_plays(
@@ -932,13 +932,13 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
     view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
     view._toggle_auto(True)
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
     assert omnipause.frozen()
     assert radio.frozen
     assert view._auto.is_active(key)
-    assert view._bank.radio.isChecked()
+    assert view._buttons.radio.isChecked()
 
     _press_escape_at_the_gallery(view)
     assert not omnipause.frozen()
@@ -949,13 +949,13 @@ def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_aga
         qtbot, tmp_path, monkeypatch):
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
-    view._bank.radio.setChecked(True)
+    view._buttons.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
-    assert lit_in(view._bank.radio) == "yellow"
+    assert lit_in(view._buttons.radio) == "yellow"
 
     _press_escape_at_the_gallery(view)
-    assert lit_in(view._bank.radio) == "blue"
+    assert lit_in(view._buttons.radio) == "blue"
 
 
 def _startable_view(qtbot, tmp_path, monkeypatch):
@@ -988,10 +988,10 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     # Speaking is how anything gets going again without reaching for the keyboard.
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
-    view._bank.mic.setChecked(True)
+    view._buttons.mic.setChecked(True)
 
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._bank.mic.isChecked()
+    assert view._buttons.mic.isChecked()
     assert view._voice.listener.commands_on

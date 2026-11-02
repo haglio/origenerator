@@ -155,7 +155,7 @@ def test_the_speech_slot_offers_only_the_speech_model_and_the_experts_never_do(i
 
 def test_the_voice_is_a_preset_or_a_sample_and_only_the_one_shot_workflow_speaks():
     by_key = {pd.key: pd for pd in Wan22I2vWorkflow().param_definitions()}
-    assert by_key["voice"].type == "combo"
+    assert by_key["voice"].type == "dropdown"
     assert by_key["voice"].options[0] == by_key["voice"].default
     assert by_key["voice_sample"].type == "audio"
     assert by_key["voice_sample"].browse_dir is not None

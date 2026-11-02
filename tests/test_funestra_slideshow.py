@@ -24,10 +24,10 @@ from origenerator.funscript import funscript_path_for
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
-from origenerator.gui.notice_overlay import HEARD_MARK
+from origenerator.gui.message import HEARD_MARK
 from origenerator.gui.region_openings import RegionOpening
-from origenerator.gui.slideshow_map import MapNeighbors, MapRow
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -44,7 +44,7 @@ FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 ROOT = Path(__file__).resolve().parent.parent
 DRIVERS = ("origenerator/gui/slideshow_hud.py", "origenerator/fun_time_bridge.py",
-           "origenerator/gui/console.py")
+           "origenerator/gui/osr2_controls_state.py")
 
 
 def _into(said: list):
@@ -70,7 +70,7 @@ def _slideshow(qtbot, tmp_path, items=_ITEMS, **fields) -> FunestraSlideshow:
     Its poll timer is stopped and :meth:`FunestraSlideshow.tick` called by hand, so a
     test says when the Funestra is next read rather than racing it.
     """
-    slideshow = FunestraSlideshow(items, side="portrait", channel=_channel(tmp_path),
+    slideshow = FunestraSlideshow(items, shape="portrait", channel=_channel(tmp_path),
                       frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
     slideshow._timer.stop()
     return slideshow
@@ -190,7 +190,7 @@ def test_a_funestra_that_says_nothing_leaves_the_slideshow_as_it_was(qtbot, tmp_
 
 
 def test_a_file_the_funestra_would_not_open_is_stepped_past(qtbot, tmp_path):
-    """A clip carries no pace of its own -- its length is its pace -- so a file the
+    """A video carries no pace of its own -- its length is its pace -- so a file the
     Funestra cannot open would be a black screen for the rest of the slideshow."""
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
@@ -247,15 +247,15 @@ def test_a_slideshow_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):
     assert played == ["one.png", "two.png", "three.png"]
 
 
-def _scripted(monkeypatch, tmp_path, *clips: str) -> dict[str, Path]:
+def _scripted(monkeypatch, tmp_path, *videos: str) -> dict[str, Path]:
     output = tmp_path / "output"
     monkeypatch.setattr(slideshow_pass, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     scripts = {}
-    for clip in clips:
-        script = funscript_path_for(clip, places=OutputPlaces.in_one_folder(output))
+    for video in videos:
+        script = funscript_path_for(video, places=OutputPlaces.in_one_folder(output))
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("{}", encoding="utf-8")
-        scripts[clip] = script
+        scripts[video] = script
     return scripts
 
 
@@ -306,7 +306,7 @@ def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
-    """The Funestra walks the list by itself — an image's pace runs out, a clip
+    """The Funestra walks the list by itself — an image's pace runs out, a video
     ends — so which item the map lights, the star answers about and a spoken
     "this one" means is the Funestra's answer, read back."""
     slideshow = _slideshow(qtbot, tmp_path)
@@ -524,7 +524,7 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
 
 
 def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
-    """The recovery bin asks every surface to let go of the files it moves; the
+    """The Trash asks every surface to let go of the files it moves; the
     Funestra is already letting go of this one, so asking again would move it on
     past the item after it as well."""
     released = []
@@ -618,7 +618,7 @@ def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before
 
     monkeypatch.setattr(FunestraChannel, "write_playlist", write_playlist)
 
-    _slideshow(qtbot, tmp_path, levels=_LEVELS,
+    _slideshow(qtbot, tmp_path, versions=_VERSIONS,
                actions=SlideshowActions(queue_now=lambda: ([_inflight("j1")], 0)))
 
     hud = out_when_the_list_went[0]
@@ -865,26 +865,26 @@ _ONE_LISTED_AT_ITS_NEWEST = {"one.png": [("one.png", "image", "Enhancement 1/1")
 def test_a_slideshow_picked_back_up_on_another_version_plays_that_version_locked(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
-    slideshow.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
+    slideshow.set_versions(_ONE_LISTED_AT_ITS_NEWEST)
 
     slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1",
-                                    locked=True, level_index=1))
+                                    locked=True, version_index=1))
 
     sent = _sent(slideshow)
     assert ("PLAY_FILE one_original.png" in sent, _locks(sent)[-1]) == (True, "LOCK_ON")
-    assert slideshow.state().level_index == 1
+    assert slideshow.state().version_index == 1
 
 
 def test_the_funestra_reaching_the_slide_a_slideshow_resumed_on_keeps_its_version(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
-    slideshow.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
-    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1", level_index=1))
+    slideshow.set_versions(_ONE_LISTED_AT_ITS_NEWEST)
+    slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1", version_index=1))
 
     _says(slideshow, video="one.png")
     slideshow.tick()
 
-    assert slideshow.state().level_index == 1
+    assert slideshow.state().version_index == 1
 
 
 def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
@@ -982,17 +982,17 @@ def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtb
     assert slideshow.locked is False
 
 
-_LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
+_VERSIONS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
                        ("one.png", "image", "Original")]}
 
 
 class TestVersions:
     """Stepping an item's own versions on the Funestra, the axis the shifted keys
-    and the band's versions button share with a slideshow in a window."""
+    and the HUD's versions button share with a slideshow in a window."""
 
     def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
 
@@ -1011,7 +1011,7 @@ class TestVersions:
     def test_leaving_the_versions_hands_the_funestra_its_pace_before_it_opens_the_next(
             self, qtbot, tmp_path, move, verb):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
 
@@ -1023,12 +1023,12 @@ class TestVersions:
     def test_a_version_landing_while_they_are_compared_holds_the_funestra_on_the_new_one(
             self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
 
         slideshow.note_enhanced("id-1", "one_better.png")
-        slideshow.add_levels({"one_better.png": [
+        slideshow.add_versions({"one_better.png": [
             ("one_better.png", "image", "Enhancement 2/2"),
             ("one_enhanced.png", "image", "Enhancement 1/2"),
             ("one.png", "image", "Original")]})
@@ -1043,7 +1043,7 @@ class TestVersions:
         _says(slideshow, video="clip.mp4")
         slideshow.tick()
         _sent(slideshow)
-        slideshow.set_levels({"clip.mp4": [("clip_upscaled.mp4", "video", "Upscale"),
+        slideshow.set_versions({"clip.mp4": [("clip_upscaled.mp4", "video", "Upscale"),
                                            ("clip.mp4", "video", "Original")]})
 
         slideshow.slideshow_step_version(1)
@@ -1052,7 +1052,7 @@ class TestVersions:
 
     def test_stepping_on_and_back_walks_the_versions_in_order(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
@@ -1063,9 +1063,9 @@ class TestVersions:
     def test_the_sessions_shift_left_counts_the_enhancements_down_and_shift_right_up(
             self, qtbot, tmp_path):
         """The session sends Shift+Left as cycle_version_back, and Shift+Right as
-        cycle_version, which the band's versions button sends too."""
+        cycle_version, which the HUD's versions button sends too."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
+        slideshow.set_versions({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
                                           ("one_1.png", "image", "Enhancement 1/2"),
                                           ("one.png", "image", "Original")]})
 
@@ -1083,7 +1083,7 @@ class TestVersions:
         """Nothing to compare it against, and the shift was the whole point of
         the press — so it does nothing rather than walking to the neighbor."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
 
@@ -1094,7 +1094,7 @@ class TestVersions:
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         assert slideshow.has_other_versions is False
 
-        slideshow.set_levels(_LEVELS)
+        slideshow.set_versions(_VERSIONS)
 
         assert slideshow.has_other_versions is True
 
@@ -1103,7 +1103,7 @@ class TestVersions:
         """A step on the new item must offer its own newest version, not carry the
         place the last item was stepped to."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_levels({**_LEVELS,
+        slideshow.set_versions({**_VERSIONS,
                               "two.png": [("two_enhanced.png", "image", "Enhancement 1/1"),
                                           ("two.png", "image", "Original")]})
         slideshow.slideshow_step_version(1)
@@ -1123,11 +1123,11 @@ def _around(prompt_id):
     """A library in which the first item has one seed sibling and one other
     act down its column, and the rest have nobody."""
     if prompt_id != "id-1":
-        return MapNeighbors()
-    other_act = Slide("one-x.png", "image", "id-1x")
-    return MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
-                        column=(MapRow(other_act, "dawn"),), label="fox",
-                        group=(other_act,))
+        return NavMapNeighbors()
+    other_action = Slide("one-x.png", "image", "id-1x")
+    return NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
+                        column=(NavMapRow(other_action, "dawn"),), label="fox",
+                        group=(other_action,))
 
 
 def test_the_hud_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
@@ -1263,7 +1263,7 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(acts=_acts), say=_into(said))
 
-    slideshow.slideshow_filter_to_the_act_on_screen()
+    slideshow.slideshow_filter_to_the_action_on_screen()
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert (played, said) == (["one.png"], ["Filter: 'source image, alpha' (1)"])
@@ -1273,7 +1273,7 @@ def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
-    slideshow.slideshow_filter_to_the_act_on_screen()
+    slideshow.slideshow_filter_to_the_action_on_screen()
 
     assert said == ["No act for this one"]
 
@@ -1295,8 +1295,8 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
     seeds round and round, rather than narrowing the slideshow to an act."""
     said = []
     a_configuration = Slide("one-x.png", "image", "id-1x")
-    around = lambda pid: MapNeighbors(  # noqa: E731
-        column=(MapRow(a_configuration, "E629425B", configuration=True),)
+    around = lambda pid: NavMapNeighbors(  # noqa: E731
+        column=(NavMapRow(a_configuration, "E629425B", configuration=True),)
         if pid == "id-1" else (),
         seeds=(Slide("one-y.png", "image", "id-1y"),) if pid == "id-1x" else ())
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=around, acts=_acts),
@@ -1306,7 +1306,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
     slideshow.slideshow_filter("e629425b")
 
     assert slideshow.hud_prompt_id == "id-1x"
-    assert slideshow.hud_act_filter == ""            # a jump, not a narrowing
+    assert slideshow.hud_action_filter == ""            # a jump, not a narrowing
     assert said == ["Looping seeds: 2"]
 
 
@@ -1356,7 +1356,7 @@ def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
 def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
     """A row holding only the image on screen cannot be looped, and the press
     still means "this one" — so the Funestra is told to lock it, the way its own
-    loop button locks a clip whose group holds only that clip."""
+    loop button locks a video whose group holds only that video."""
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)
@@ -1525,7 +1525,7 @@ def _hud(slideshow: FunestraSlideshow):
 def test_the_hud_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.set_levels(_LEVELS)
+    slideshow.set_versions(_VERSIONS)
 
     assert _hud(slideshow).item_note == "Enhancement 1/1"
 
@@ -1658,7 +1658,7 @@ def test_a_slideshow_closed_while_a_request_holds_its_slide_lets_the_funestra_go
 def test_a_slideshow_closed_while_its_versions_are_compared_sets_the_funestra_going_again(
         qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-    slideshow.set_levels(_LEVELS)
+    slideshow.set_versions(_VERSIONS)
     slideshow.slideshow_step_version(1)
     _sent(slideshow)
 
@@ -1762,7 +1762,7 @@ def test_an_image_enhanced_during_the_slideshow_steps_its_versions_on_the_funest
     slideshow.tick()
     _sent(slideshow)
 
-    slideshow.add_levels({"one_enhanced.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
+    slideshow.add_versions({"one_enhanced.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
                                                ("one.png", "image", "Original")]})
     slideshow.slideshow_step_version(1)
 
@@ -1934,8 +1934,8 @@ def test_a_run_that_lands_after_the_funestra_moved_on_is_the_funestras_next_item
 def _row_only(prompt_id):
     """A library holding one folder's row and nothing made of it, so the loop
     key's stop after the seeds is off."""
-    return (MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
-            if prompt_id == "id-1" else MapNeighbors())
+    return (NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
+            if prompt_id == "id-1" else NavMapNeighbors())
 
 
 def test_taking_the_loop_off_a_folder_on_a_funestra_asks_for_the_regions_library(
@@ -1968,7 +1968,7 @@ _PLACED = {"one.png": [("one.png", "image", "Enhance 1", FACE), ("one-base.png",
 def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
 
-    slideshow.set_levels(_PLACED)
+    slideshow.set_versions(_PLACED)
 
     handed = {str(item.path): item.points_of_interest
               for item in read_playlist(slideshow.channel.playlist)}
@@ -1984,7 +1984,7 @@ def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(
     monkeypatch.setattr(FunestraChannel, "write_playlist",
                         lambda channel, items: written.append(len(items)) or write(channel, items))
 
-    slideshow = _slideshow(qtbot, tmp_path, levels=_PLACED)
+    slideshow = _slideshow(qtbot, tmp_path, versions=_PLACED)
 
     handed = {str(item.path): item.points_of_interest
               for item in read_playlist(slideshow.channel.playlist)}
@@ -1995,14 +1995,14 @@ def test_versions_that_bring_no_places_leave_the_pass_where_it_was(qtbot, tmp_pa
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
-    slideshow.set_levels(_LEVELS)
+    slideshow.set_versions(_VERSIONS)
 
     assert "RELOAD_PLAYLIST" not in _sent(slideshow)
 
 
 def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-    slideshow.set_levels({"one.png": [("one.png", "image", "Enhance 2", FACE),
+    slideshow.set_versions({"one.png": [("one.png", "image", "Enhance 2", FACE),
                                       ("one-v1.png", "image", "Enhance 1", ((0.0, 0.0, 0.5, 0.5),))]})
     _sent(slideshow)
 
@@ -2012,7 +2012,7 @@ def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
 
 
 def _ready_opening(items, *, scripts=None, lead=0, lead_neighbors=None) -> RegionOpening:
-    return RegionOpening(rows=[], items=items, levels={}, enhanced_ids=set(),
+    return RegionOpening(rows=[], items=items, versions={}, enhanced_ids=set(),
                          scripts=scripts or {}, lead=lead, lead_neighbors=lead_neighbors)
 
 
@@ -2027,7 +2027,7 @@ def test_a_ready_opening_hands_over_its_scripts_without_looking_on_disk(
     monkeypatch.setattr(slideshow_pass, "funscript_of", looked)
 
     slideshow = FunestraSlideshow(
-        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
         opening=_ready_opening(items, scripts={"clip.mp4": script, "other.mp4": None}))
     slideshow._timer.stop()
 
@@ -2039,7 +2039,7 @@ def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
         qtbot, tmp_path, monkeypatch):
     items = [("clip.mp4", "video", "id-1")]
     slideshow = FunestraSlideshow(
-        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
         opening=_ready_opening(items, scripts={"clip.mp4": None}))
     slideshow._timer.stop()
     scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
@@ -2052,13 +2052,13 @@ def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
 
 def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tmp_path):
     items = [("one.png", "image", "id-1"), ("two.png", "image", "id-2")]
-    neighbors = MapNeighbors()
+    neighbors = NavMapNeighbors()
 
     def walked(_prompt_id):
         raise AssertionError("walked the library for the first slide's map")
 
     slideshow = FunestraSlideshow(
-        items, side="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
+        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
         actions=SlideshowActions(neighbors=walked),
         opening=_ready_opening(items, lead=1, lead_neighbors=neighbors))
     slideshow._timer.stop()

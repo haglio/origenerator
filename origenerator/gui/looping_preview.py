@@ -1,14 +1,14 @@
 """Play a looping WebP preview inside a QLabel via ``QMovie``.
 
-Video thumbnails across the gallery — the grid tiles, the Recents collection, the
-"Animated in" strip and a combine slot — all show a short looping WebP rather
+Video thumbnails across the gallery — the grid tiles, the Latest collection, the
+Animations and a Combine drop zone — all show a short looping WebP rather
 than a static frame. ``QMovie`` plays them cheaply, with no video player per
 tile.
 
 Every one of them is built here, which is why every one of them is put under
 the session's freeze here too (:mod:`origenerator.gui.omnipause`): wiring each
 widget to it separately is how all but the grid tiles were missed once, and a
-strip nobody remembered kept playing through a stopped room.
+row nobody remembered kept playing through a stopped room.
 """
 
 from __future__ import annotations
@@ -20,10 +20,10 @@ from origenerator.gui import omnipause
 
 
 def fit_size(path: str, size: QSize) -> QSize | None:
-    """The clip at ``path`` aspect-fit into ``size``, or ``None`` when its native
+    """The video at ``path`` aspect-fit into ``size``, or ``None`` when its native
     size can't be read (so the caller leaves the movie's own scaling alone).
 
-    Split out so a pane that re-fits its clip as it resizes can ask the same
+    Split out so a pane that re-fits its video as it resizes can ask the same
     question again without rebuilding the movie and restarting the loop.
     """
     native = QImageReader(str(path)).size()
@@ -34,7 +34,7 @@ def fit_size(path: str, size: QSize) -> QSize | None:
 
 
 def looping_movie(path: str, size: QSize, parent) -> QMovie:
-    """A running clip for a caller that paints the frames itself rather than
+    """A running video for a caller that paints the frames itself rather than
     handing it to a label (:mod:`origenerator.gui.grayscale`); everything else
     takes :func:`play_in`.
 
@@ -49,8 +49,8 @@ def play_in(label, path: str, size: QSize) -> QMovie:
     playing, aspect-fit into ``size``.
 
     The order is the point: a label handed a movie that is already running draws
-    only the rect its frames fill, so a clip of another shape left the one before
-    it showing around the edges, one per clip ever shown.
+    only the rect its frames fill, so a video of another shape left the one before
+    it showing around the edges, one per video ever shown.
     """
     stop_what_plays_in(label)
     movie = _fitted(path, size, label)

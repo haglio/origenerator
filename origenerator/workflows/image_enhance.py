@@ -5,8 +5,8 @@ from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate, p
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.model_arch import SDXL
+from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
-from origenerator.workflows.model_pickers import model_picker
 from origenerator.workflows.prompt_readers import CLIP
 
 ENHANCE_MODEL_FAMILIES = (SDXL,)
@@ -81,10 +81,10 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
-            model_picker("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
+            model_dropdown("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
                          accepts=ENHANCE_MODEL_FAMILIES),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
-            model_picker("upscale_model", "Upscaler", defaults["upscale_model"],
+            model_dropdown("upscale_model", "Upscaler", defaults["upscale_model"],
                          "upscale_models", accepts=ANY),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
@@ -92,7 +92,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
             # One denoise per part fixed, keyed by the part's name — the Enhance
-            # panel's line of numbers, and the range those spinners take. A
+            # pane's line of numbers, and the range those spinners take. A
             # part not named here is a part left alone; a part that IS named
             # runs a real pass, so the floor sits above zero (the detailer node
             # rejects a zero denoise, and a pass that repaints nothing is a

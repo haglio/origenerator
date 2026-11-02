@@ -1,6 +1,6 @@
-"""Handing a label the looping clip it shows.
+"""Handing a label the looping video it shows.
 
-Fixture clips are fabricated (see CLAUDE.md): two frames of flat color.
+Fixture videos are fabricated (see CLAUDE.md): two frames of flat color.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def label(qtbot):
 def test_the_label_has_the_clip_before_it_runs(label, tmp_path, monkeypatch):
     """A QLabel handed a movie that is already running leaves its own repaint to
     that movie's first frame, which covers only the rect the frame fills -- so
-    the clip before it stayed on screen around the new one."""
+    the video before it stayed on screen around the new one."""
     held = []
     monkeypatch.setattr(QMovie, "start",
                         lambda movie: held.append(label.movie() is movie))

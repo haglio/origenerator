@@ -59,7 +59,7 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
 def test_a_session_hands_over_each_funestras_own_channel():
     """Inside a session the Funestras are what shows the slides, so the launch
     names each one's channel: the list it plays, the verbs it answers, the
-    status it publishes, and the panel this app publishes for it."""
+    status it publishes, and the HUD this app publishes for it."""
     args = parse_app_args(hosted_launch(funestras=True, **{
         "--portrait-playlist": "st/portrait.tsv",
         "--portrait-cmd-file": "st/portrait_cmd.txt",
@@ -209,7 +209,7 @@ def test_a_tie_between_the_shapes_goes_to_landscape_the_roomier_region(tmp_path)
 
 def test_region_for_items_routes_a_running_slideshows_own_slides(tmp_path):
     # A slideshow already playing asks again when its region has to be re-decided,
-    # and what it holds are slides rather than the tuples the browser built.
+    # and what it holds are slides rather than the tuples the Gallery pane built.
     tall = _png(tmp_path / "tall.png", 100, 200)
     assert region_for_items([Slide(str(tall), "image", "a", str(tall))]) == "portrait"
 
@@ -230,8 +230,8 @@ def test_videos_without_stills_are_probed_rather_than_defaulted(tmp_path):
     # all, and "nothing" fell to landscape — which is how a portrait slideshow
     # once landed on the landscape region.  With no stills to vote, the first
     # video's own frame answers.
-    clip = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
-    items = [(str(clip), "video", "a", None), (str(clip), "video", "b", None)]
+    video = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
+    items = [(str(video), "video", "a", None), (str(video), "video", "b", None)]
     assert region_for_items(items) == "portrait"
 
 

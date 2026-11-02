@@ -37,7 +37,7 @@ BLANK = "animation.blank"
 
 NO_SAMPLE = ("No video made this way has been favorited "
               "or sent to Genau or Evolver.")
-FROM_THE_ACTS_OWN = (
+FROM_THE_ACTIONS_OWN = (
     "No video made this way has been favorited or sent to Genau or Evolver. "
     "The prompts below are this act's own settings, to start from.")
 ALL_DONE = "Every animation has been through."
@@ -67,16 +67,16 @@ class AnimationCheckWindow(QWidget):
         self._image = QLabel(objectName=IMAGE)
         self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image.setMinimumSize(280, 280)
-        self._clip = QLabel(objectName=SAMPLE)
-        self._clip.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._clip.setMinimumSize(280, 280)
+        self._video = QLabel(objectName=SAMPLE)
+        self._video.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._video.setMinimumSize(280, 280)
 
         pair = QWidget()
         shown = QHBoxLayout(pair)
         shown.setContentsMargins(0, 0, 0, 0)
         shown.setSpacing(GAP_MEDIUM)
         shown.addWidget(self._image, 1)
-        shown.addWidget(self._clip, 1)
+        shown.addWidget(self._video, 1)
         # Sharing the row it reads as a caption on the image's half.
         self._blank = QLabel(NO_SAMPLE, objectName=BLANK)
         self._blank.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -190,7 +190,7 @@ class AnimationCheckWindow(QWidget):
         from_here = self._session.starting_point
         self._shown.setCurrentWidget(self._blank if sample is None else
                                      self._shown.widget(0))
-        self._blank.setText(NO_SAMPLE if from_here is None else FROM_THE_ACTS_OWN)
+        self._blank.setText(NO_SAMPLE if from_here is None else FROM_THE_ACTIONS_OWN)
         self._press(REJECT).setEnabled(self._session.another_sample)
         self._write_the_prompts(sample, from_here)
         self._only_offer_a_new_sample_once_edited()
@@ -220,8 +220,8 @@ class AnimationCheckWindow(QWidget):
     def _clear_the_pair(self, *, keep_the_prompts: bool = False) -> None:
         self._still = QPixmap()
         self._image.clear()
-        stop_what_plays_in(self._clip)
-        self._clip.clear()
+        stop_what_plays_in(self._video)
+        self._video.clear()
         if not keep_the_prompts:
             self._positive.setPlainText("")
             self._negative.setPlainText("")
@@ -237,11 +237,11 @@ class AnimationCheckWindow(QWidget):
 
     def _play(self, loop) -> None:
         if not loop:
-            self._clip.clear()
-            self._clip.setText("(this clip's file is missing)")
+            self._video.clear()
+            self._video.setText("(this clip's file is missing)")
             return
-        play_in(self._clip, str(loop),
-                QSize(self._clip.width(), self._clip.height()))
+        play_in(self._video, str(loop),
+                QSize(self._video.width(), self._video.height()))
 
     def resizeEvent(self, event):  # noqa: N802 — Qt override
         super().resizeEvent(event)

@@ -3,7 +3,7 @@
 A prompt here runs to hundreds of words through a field a hundred pixels tall, so
 most of what you wrote has scrolled away while you are still writing it. The
 lower edge of the field is a drag handle: grab it and it grows, the way a
-browser's textarea does.
+web browser's textarea does.
 
 The height belongs to the *param*, app-wide — every Positive Prompt is as tall
 as the last one you dragged, in every tab and every workflow, and it comes back
@@ -27,10 +27,10 @@ DEFAULT_HEIGHT = 100
 # A drag stops here: a field taller than any monitor is a slip of the mouse rather
 # than a request, and it would bury the rest of the form under itself.
 MAX_HEIGHT = 1600
-# The band along the lower edge that grabs the field instead of placing the text
+# The grip along the lower edge that grabs the field instead of placing the text
 # cursor. Narrow, like a splitter handle — the rest of the field is for typing.
 GRIP = 6
-# How wide the pair of rules drawn on that band is.
+# How wide the pair of rules drawn on that grip is.
 _MARK_WIDTH = 24
 
 
@@ -128,7 +128,7 @@ class PromptField(QPlainTextEdit):
         """One line of text plus the field's own furniture — where a drag upward
         stops. Measured rather than a constant: the form runs at the app's
         heading font and inside a stylesheet that pads the field, so a number
-        that leaves a line visible in one place clips it in another."""
+        that leaves a line visible in one place cuts it off in another."""
         # Frame and stylesheet padding both, whatever the style makes of them.
         chrome = max(self.height() - self.viewport().height(), 2 * self.frameWidth())
         return (self.fontMetrics().lineSpacing()
@@ -137,10 +137,10 @@ class PromptField(QPlainTextEdit):
     # --- dragging the edge ---------------------------------------------------
 
     def _in_grip(self, pos) -> bool:
-        """Is this point on the lower edge's drag band?
+        """Is this point on the lower edge's grip?
 
         Mouse events on a scroll area arrive in *viewport* coordinates, so the
-        band is measured from the viewport's own lower edge — which also means the
+        grip is measured from the viewport's own lower edge — which also means the
         scrollbar, a child with its own events, is never part of it.
         """
         return pos.y() >= self.viewport().height() - GRIP

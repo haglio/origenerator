@@ -7,7 +7,7 @@ import pytest
 
 from origenerator.gallery import (
     ALL_KEY,
-    CustomGroup,
+    CustomCollection,
     LoraGroup,
     MediaGroup,
     ModelGroup,
@@ -19,7 +19,6 @@ from origenerator.gallery import (
     build_gallery_tree,
     build_image_config_index,
     child_groups,
-    config_tab_title,
     enhance_params_for,
     enhanced_generations,
     favorite_folders,
@@ -29,6 +28,7 @@ from origenerator.gallery import (
     folder_key_at_level,
     folder_level,
     folder_names_by_row,
+    generate_tab_title,
     generation_of_file,
     group_level,
     is_enhanced_row,
@@ -60,7 +60,7 @@ from origenerator.gallery import (
 )
 from origenerator.gallery import output as gallery_output
 from origenerator.gallery.labels import workflow_label
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
@@ -89,9 +89,9 @@ def test_the_all_group_gathers_images_and_videos_and_walks_to_every_row():
 
 
 def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
-    clip, still = _i2v("v1", "styleA"), _img("i1", "a cat", 50, 1)
+    video, still = _i2v("v1", "styleA"), _img("i1", "a cat", 50, 1)
 
-    images, videos = build_gallery_tree([clip, still])
+    images, videos = build_gallery_tree([video, still])
 
     assert (images.key, images.label, group_level(images)) == ("image", "Images", "media")
     assert (videos.key, videos.label, group_level(videos)) == ("video", "Videos", "media")
@@ -101,7 +101,7 @@ def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
 
 def test_folder_level_names_the_folder_levels_and_nothing_else():
     # The workflow -> model -> LoRA -> source-image folders each report their
-    # level, so each carries a badge saying which it is. A settings leaf is
+    # level, so each carries a TOC initial saying which it is. A settings leaf is
     # where the generations live and reports none.
     assert folder_level(WorkflowGroup("k", "wf", "WF", [])) == "workflow"
     assert folder_level(ModelGroup("k", "M", [])) == "model"
@@ -110,17 +110,17 @@ def test_folder_level_names_the_folder_levels_and_nothing_else():
     assert folder_level(SettingsGroup("k", "S", [])) is None
 
 
-def test_config_tab_title_leads_with_model_then_prompt():
-    title = config_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
+def test_generate_tab_title_leads_with_model_then_prompt():
+    title = generate_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
     assert title == "SDXL T2I › a cat in a hat"
 
 
-def test_config_tab_title_is_just_the_model_without_a_prompt():
-    assert config_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL T2I"
+def test_generate_tab_title_is_just_the_model_without_a_prompt():
+    assert generate_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL T2I"
 
 
-def test_config_tab_title_handles_unknown_workflow():
-    assert config_tab_title("nope", {}) == "nope"
+def test_generate_tab_title_handles_unknown_workflow():
+    assert generate_tab_title("nope", {}) == "nope"
 
 
 def test_job_kind_separates_a_video_from_an_image():
@@ -132,7 +132,7 @@ def test_job_kind_separates_a_video_from_an_image():
 
 def test_every_video_workflow_is_one_kind_of_job():
     # Each of them animates a start image, so the queue has one kind of video to
-    # name, and names it in a word rather than the model card's shorthand.
+    # name, and names it in a word rather than the model tile's shorthand.
     videos = ("wan22_i2v", "wan22_flf2v_loop")
     assert {job_kind_label(name) for name in videos} == {"Video"}
 
@@ -1055,7 +1055,7 @@ def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
     # The name that image's own tile and tab wear, so the two read as one
-    # image from either side.
+    # image from either shape.
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     (source,) = _i2v_source_folders(rows, name_of={"face": "3FA9C0D2 004"}.get)
@@ -1076,7 +1076,7 @@ def test_videos_made_without_a_start_frame_share_a_folder_named_in_the_forms_wor
 
 
 def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index():
-    # A source-image bookmark's key is recomputed from a row under it; it depends on
+    # A source-image favorite's key is recomputed from a row under it; it depends on
     # the start frame's config, so folder_key_at_level must resolve it through the
     # image index — matching the tree, not the bare filename.
     face = _img("face", "a face", 30, 1)
@@ -1128,7 +1128,7 @@ def _loop_output(prompt_id, filename):
 
 
 _LOOP_STILL = _loop_output("still", "flf2v_loop_00001_.png")
-_LOOP_CLIP = _loop_output("clip", "flf2v_loop_00002_.mp4")
+_LOOP_VIDEO = _loop_output("clip", "flf2v_loop_00002_.mp4")
 _LOOPING = workflow_label("wan22_flf2v_loop")
 
 
@@ -1138,7 +1138,7 @@ def _workflow_labels(rows, meta=None):
 
 
 def test_a_retired_workflows_folder_keeps_the_name_it_had():
-    retired = dict(_LOOP_CLIP, prompt_id="old", workflow_name="wan21_ati_i2v")
+    retired = dict(_LOOP_VIDEO, prompt_id="old", workflow_name="wan21_ati_i2v")
 
     assert _workflow_labels([retired]) == {
         "video/wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)"}
@@ -1147,21 +1147,21 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():
     # The two no longer share a parent, Images holding the one and Videos the
     # other, so neither needs telling apart from its twin by what it holds.
-    assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP]) == {
+    assert _workflow_labels([_LOOP_STILL, _LOOP_VIDEO]) == {
         "image/wan22_flf2v_loop": _LOOPING, "video/wan22_flf2v_loop": _LOOPING}
-    assert _workflow_labels([_LOOP_CLIP]) == {"video/wan22_flf2v_loop": _LOOPING}
+    assert _workflow_labels([_LOOP_VIDEO]) == {"video/wan22_flf2v_loop": _LOOPING}
 
 
 def test_copies_given_one_name_each_wear_it_as_given():
     named = {"image/wan22_flf2v_loop": {"custom_name": "Odds"},
              "video/wan22_flf2v_loop": {"custom_name": "Odds"}}
 
-    assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP], named) == {
+    assert _workflow_labels([_LOOP_STILL, _LOOP_VIDEO], named) == {
         "image/wan22_flf2v_loop": "Odds", "video/wan22_flf2v_loop": "Odds"}
 
 
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
-    # The reconcile recomputes a settings bookmark's key from a row under it; for an
+    # The reconcile recomputes a settings favorite's key from a row under it; for an
     # i2v that key depends on the start frame's config, so folder_key_at_level must
     # resolve it through the image index — matching the tree, not the bare filename.
     face = _img("face", "a face", 30, 1)
@@ -1226,7 +1226,7 @@ def test_group_level_names_each_tier():
 
 
 def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
-    # A bookmark stores its tier + a row under it; recomputing the key from that row
+    # A favorite stores its tier + a row under it; recomputing the key from that row
     # must reproduce the folder's key at every tier, so the star can follow it.
     rows = [_i2v("v1", "styleA")]
     (media,) = build_gallery_tree(rows)
@@ -1388,7 +1388,7 @@ def test_build_gallery_tree_includes_in_progress_rows_so_a_new_folder_appears():
     # A running (or pending) generation has no output yet, but its folder must
     # appear at once — a tab's Generate into a brand-new settings folder needs a
     # node to navigate to while it runs. The output-less running row gives that
-    # folder its node; its live card/tile stands in for the missing thumbnail.
+    # folder its node; its live tile/tile stands in for the missing thumbnail.
     rows = [
         _img("i1", "a cat", 50, 1),                          # a finished image
         _row(prompt_id="run", workflow_name="wan22_i2v",
@@ -1577,7 +1577,7 @@ def test_a_folder_the_user_composed_names_what_it_gathers():
     cat_leaf = _workflows(tree)[0].children[0].children[0].children[0]
 
     names = folder_names_by_row(
-        tree, {}, [CustomGroup("__custom__/1", "Beach trip", [cat_leaf])])
+        tree, {}, [CustomCollection("__custom__/1", "Beach trip", [cat_leaf])])
 
     assert "Beach trip" in names["i1"]
     assert "Beach trip" not in names["i2"]
@@ -1634,7 +1634,7 @@ def test_recent_generations_lists_a_run_by_when_it_finished_not_when_it_was_aske
 def test_recent_generations_lists_imported_files_where_they_arrived():
     # A file ComfyUI wrote that no instance of this app queued joins the collection at
     # the launch that found it, which is when it is looked for there; leaving
-    # imports off Latest hid a clip queued straight on ComfyUI in its workflow's
+    # imports off Latest hid a video queued straight on ComfyUI in its workflow's
     # folder alone.
     generated = _img("gen", "a cat", 50, 1)
     imported = _row(prompt_id="imp", source="imported", id=2,
@@ -1685,7 +1685,7 @@ def test_favorite_generations_collects_favorite_items_newest_first():
 
 
 def test_favorite_generations_includes_imported_files():
-    # A bookmark is a bookmark: an imported image the user favorited belongs on the
+    # A favorite is a favorite: an imported image the user favorited belongs on the
     # Favorites collection.
     imported = _row(prompt_id="imp", source="imported", starred=1,
                     output_files=json.dumps([{"filename": "imp.png"}]))
@@ -1727,7 +1727,7 @@ def _enhance_run(prompt_id, source_file, row_id, *, done=None):
 
 
 def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
-    # An enhancement gets no card of its own in the collection — it is a version of an
+    # An enhancement gets no tile of its own in the collection — it is a version of an
     # image, not an item beside one — so the image itself has to move, or the run
     # is listed nowhere and the image being worked on stays buried under
     # everything made since.
@@ -1911,7 +1911,7 @@ def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
     assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (thumb, "image")
 
 
-def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
+def test_resolve_preview_follows_a_file_the_trash_has_re_pointed(tmp_path):
     # A deleted generation's files sit in the trash, and its row says so — which
     # is what lets the Trash collection play a deleted video rather than offer a still.
     out = tmp_path / "output"
@@ -2002,7 +2002,7 @@ def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies()
 def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     # A row from before scenes carries only frame_count; its re-roll writes the
     # one scene out as scene_frames. Both are the same settings, and a scene list
-    # of one that disagrees with the clip length is overruled by it in the graph
+    # of one that disagrees with the video length is overruled by it in the graph
     # too, so it must not split the folder.
 
     before = canonical_settings("wan22_i2v", {"frame_count": 121})

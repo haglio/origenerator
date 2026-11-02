@@ -56,7 +56,7 @@ def _launcher(db, client, enhance_settings):
 
 
 def the_animation_window():
-    from origenerator import act_settings, animation_samples, gallery
+    from origenerator import action_settings, animation_samples, gallery
     from origenerator.animation_check_session import AnimationCheckSession
     from origenerator.animation_settings import AcceptedSettings
     from origenerator.app_state import AppState
@@ -80,7 +80,7 @@ def the_animation_window():
               if gallery.media_type_of_row(row) == MediaType.IMAGE]
 
     def look(sample: dict):
-        """The image this clip was made from, and the clip's own loop."""
+        """The image this video was made from, and the video's own loop."""
         source = gallery.find_source_image_id(sample, images)
         row = db.get_generation(source) if source else None
         still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None
@@ -92,7 +92,7 @@ def the_animation_window():
             list(animation_samples.paths_in_order(rows)),
             animation_samples.samples_by_path(rows),
             AcceptedSettings(),
-            pinned=act_settings.pinned_settings),
+            pinned=action_settings.pinned_settings),
         look,
         _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS),
                   gallery.EnhanceSettings.parse(AppState(UI_STATE_PATH).get("enhance_settings"))),

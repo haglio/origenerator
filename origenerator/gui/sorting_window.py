@@ -196,14 +196,14 @@ class SortingWindow(QWidget):
 
         inside = QWidget()
         inside.setLayout(column)
-        panel = QScrollArea()
-        panel.setWidget(inside)
-        panel.setWidgetResizable(True)
-        panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll = QScrollArea()
+        scroll.setWidget(inside)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         # Fixed to what the column asks for, so the image takes every other
         # pixel of the window.
-        panel.setFixedWidth(inside.sizeHint().width() + 28)  # room for the scrollbar
-        return panel
+        scroll.setFixedWidth(inside.sizeHint().width() + 28)  # room for the scrollbar
+        return scroll
 
     def _make_every_tile_one_size(self, tiles, drawings, scale) -> None:
         faces = [self._face(state) for state in self._tiles]

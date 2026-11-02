@@ -45,13 +45,13 @@ def test_idle_reads_generate(button):
 def test_the_button_keeps_the_primary_blue_with_a_run_in_flight(styled_button):
     # It used to step back to a neutral face and fill with the run's progress,
     # which put a third account of one run on screen beside the queue's and the
-    # in-flight card's. Submitting is all it does now, so it never changes face.
+    # in-flight tile's. Submitting is all it does now, so it never changes face.
     assert _face(styled_button) == BLUE
 
 
 def test_the_button_tracks_no_run(button):
     # Nothing here to feed a run's progress into: the Job Queue and the
-    # browser pane's card are the two places a run in flight is watched.
+    # Gallery pane's tile are the two places a run in flight is watched.
     assert not hasattr(button, "set_progress")
     assert not hasattr(button, "start")
     assert not hasattr(button, "finish")

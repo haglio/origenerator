@@ -1,6 +1,6 @@
 """Synthesize the funscript that rides alongside a generated video, and find it.
 
-What a ``.funscript`` document is -- its keys, the metadata block an outside
+What a ``.funscript`` document is -- its keys, the metadata an outside
 player reads, what a document listing no actions answers -- belongs to every app
 in this family that reads or writes one and lives in
 :mod:`app_support.funscript`. Origenerator's videos carry no explicit
@@ -105,7 +105,7 @@ def synthesize_actions(duration_s: float, *, hz: float) -> list[dict]:
 def write_funscript(path, actions: list[dict], *, duration_seconds: int | None = None) -> None:
     """Write ``actions`` as the family's funscript document, credited to this app.
 
-    *duration_seconds* is the clip the script was authored for, which only a
+    *duration_seconds* is the video the script was authored for, which only a
     caller that measured it knows; without one, the script's own span answers,
     which is the closest this app can get for a motion it was handed rather
     than synthesized.
@@ -122,7 +122,7 @@ def _span_seconds(actions: list[dict]) -> int:
 
 
 def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, int]]:
-    """The heat strip the Funestras' scrubber paints, over ``[0, last action]``:
+    """The heat map the Funestras' scrubber paints, over ``[0, last action]``:
     empty with no actions, no span or no buckets, so the caller can treat
     "nothing to draw" and "no script" alike."""
     if not actions or buckets <= 0 or actions[-1]["at"] <= 0:

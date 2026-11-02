@@ -46,7 +46,7 @@ class SlideshowActions:
     plays that library in the order it is in. ``drive_toggle`` takes nothing: Space goes to
     the app's one OSR2 switch rather than straight to this slideshow's motion, and
     ``osr2_control`` is that same switch handed over whole, which is what the
-    console's four control buttons read and set.
+    OSR2 controls' four buttons read and set.
     ``omnipause`` takes nothing: a click on the slide asks the room to pause,
     the hosting session's or this app's own, and a slideshow handed none pauses
     itself.
@@ -54,10 +54,10 @@ class SlideshowActions:
     ``neighbors`` and ``widen`` take a prompt_id and answer for the library
     the slideshow cannot see: what shows that generation's act under other seeds
     and what else was made of its image (the map's two axes, as
-    :class:`~origenerator.gui.slideshow_map.MapNeighbors`), and what lies just
+    :class:`~origenerator.gui.hud_nav_map.NavMapNeighbors`), and what lies just
     beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
     prompt_ids and answers what each one's map row is named for, which is
-    what an act filter matches it on, and ``slides`` the slides they play as,
+    what an action filter matches it on, and ``slides`` the slides they play as,
     which a loop picked back up plays whatever set it reopened on.
 
     ``volume_moved`` takes the volume the viewer moved the slideshow's
@@ -100,7 +100,7 @@ class HudFacts:
     """What this slideshow's own HUD says about the set it is playing.
 
     All of it is the Funestras' vocabulary, because the HUD is the Funestras'
-    HUD: ``order_label`` is how the set is ordered — "Latest" for Recents and
+    HUD: ``order_label`` is how the set is ordered — "Latest" for Latest and
     for a folder opened on one of its items, both of which play newest
     first, and "Shuffle" for everything else; ``favorite_ids`` is which of
     the items are favorites, so the star readout and the F-mode narrowing mean
@@ -110,7 +110,7 @@ class HudFacts:
     between loops.
 
     The defaults are a shuffled set with nothing favorited — a slideshow asked for by
-    the toolbar, which is the ordinary case.
+    the Gallery pane buttons, which is the ordinary case.
     """
 
     order_label: str = SHUFFLE_LABEL

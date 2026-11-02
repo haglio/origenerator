@@ -291,7 +291,7 @@ def _seed_form(qtbot, history, **kwargs):
 
 
 def test_a_seed_drops_down_the_seeds_used_most_recent_first(qtbot):
-    form, field = _seed_form(qtbot, [SeedUse(30, None), SeedUse(20, None)])
+    _form, field = _seed_form(qtbot, [SeedUse(30, None), SeedUse(20, None)])
 
     field.showPopup()
 
@@ -300,7 +300,7 @@ def test_a_seed_drops_down_the_seeds_used_most_recent_first(qtbot):
 
 
 def test_a_seed_used_several_times_in_a_row_is_listed_once_for_the_stretch(qtbot):
-    form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None),
+    _form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None),
                                      SeedUse(5, None)])
 
     field.showPopup()
@@ -314,7 +314,7 @@ def _red_square(tmp_path):
 
 
 def test_each_seed_in_the_dropdown_wears_a_thumbnail_of_what_it_made(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
+    _form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
     row = painted_row(field, 0)
@@ -325,7 +325,7 @@ def test_each_seed_in_the_dropdown_wears_a_thumbnail_of_what_it_made(qtbot, tmp_
 
 
 def test_a_stretch_is_one_row_wearing_each_of_its_thumbnails_newest_on_top(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(5, square(tmp_path, "red")),
+    _form, field = _seed_form(qtbot, [SeedUse(5, square(tmp_path, "red")),
                                      SeedUse(5, square(tmp_path, "blue")),
                                      SeedUse(6, None)])
     field.showPopup()
@@ -345,7 +345,7 @@ def _lettering_in(row: QImage, *, right_of: int) -> list[QPoint]:
 
 
 def test_a_stretch_is_braced_between_its_thumbnails_and_its_seed(qtbot):
-    form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None)])
+    _form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None)])
     field.showPopup()
 
     stretch = painted_row(field, 0, under_the_mouse=True)
@@ -358,7 +358,7 @@ def test_a_stretch_is_braced_between_its_thumbnails_and_its_seed(qtbot):
 
 
 def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_thumbnails(qtbot):
-    form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(5, None),
+    _form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(5, None),
                                      SeedUse(6, None)])
     field.showPopup()
 
@@ -373,7 +373,7 @@ def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_thumbnails(qtbo
 
 
 def test_a_thumbnail_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
+    _form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
     row = painted_row(field, 0)
@@ -386,7 +386,7 @@ def test_a_thumbnail_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, 
 
 
 def test_a_thumbnail_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
+    _form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
     field.showPopup()
 
     row = painted_row(field, 0, under_the_mouse=True)
@@ -401,7 +401,7 @@ def test_a_thumbnail_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_
 ])
 def test_a_seed_nothing_was_made_with_shows_a_blank_of_the_shape_it_would_make(
         qtbot, size, beside, within):
-    form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
+    _form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
     field.showPopup()
 
     row = painted_row(field, 0)
@@ -425,7 +425,7 @@ def _bounds_of(image: QImage, color: str, *, left_of: int) -> QRect:
 
 @pytest.mark.parametrize("size", [(800, 400), (400, 800), (512, 512)])
 def test_the_question_mark_on_a_blank_nearly_fills_it(qtbot, size):
-    form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
+    _form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
     field.showPopup()
 
     row = painted_row(field, 0)
@@ -546,7 +546,7 @@ def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qt
 
 
 def test_a_seed_picked_from_the_dropdown_keeps_its_thumbnail_closed(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path)), SeedUse(20, None)])
+    _form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path)), SeedUse(20, None)])
     field.showPopup()
     view = field.view()
 
@@ -557,7 +557,7 @@ def test_a_seed_picked_from_the_dropdown_keeps_its_thumbnail_closed(qtbot, tmp_p
 
 
 def test_picking_anywhere_on_a_stretch_takes_its_seed_with_its_newest_thumbnail(qtbot, tmp_path):
-    form, field = _seed_form(qtbot, [SeedUse(30, square(tmp_path, "red")),
+    _form, field = _seed_form(qtbot, [SeedUse(30, square(tmp_path, "red")),
                                      SeedUse(30, square(tmp_path, "blue")),
                                      SeedUse(20, None)])
     field.showPopup()

@@ -269,7 +269,7 @@ def _keepers_holding_the_images(model):
 
 
 def test_a_folder_of_your_own_shows_the_folders_it_holds_as_they_show_in_their_own_place(qtbot):
-    pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat"), _image("i2", "a dog")],
+    pane, _tree, model = _gathered_tree(qtbot, [_image("i1", "a cat"), _image("i2", "a dog")],
                                        _keepers_holding_the_images)
     keepers = pane._trees[LANDSCAPE].topLevelItem(0)
     all_row = pane._trees[LANDSCAPE].topLevelItem(1)
@@ -336,7 +336,7 @@ def test_a_folder_worked_in_lately_wears_its_mark_inside_a_folder_of_your_own_to
 
 
 def test_a_folder_left_open_inside_a_folder_of_your_own_is_open_again_after_a_rebuild(qtbot):
-    pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")],
+    _pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")],
                                        _keepers_holding_the_images)
     own, again = tree.keys_for_folder(model[0].key)
     tree.item_by_key[again].setExpanded(True)

@@ -458,7 +458,7 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     view.refresh()
     _select_first_leaf(view)
     view.enhance_items(["g0"])
-    (job,) = view._jobs.all_jobs
+    (_job,) = view._jobs.all_jobs
     assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
     labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 

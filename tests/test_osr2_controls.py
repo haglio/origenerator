@@ -98,7 +98,7 @@ def test_cores_osr2_controls_are_the_consoles_osr2_section_alone(qtbot):
 
 
 def test_the_osr2_controls_declare_the_buttons_this_app_answers(qtbot):
-    _panel_, motion = _controls(qtbot)
+    _panel, motion = _controls(qtbot)
 
     hud = osr2_controls_hud(motion, control=OSR2_DRIVING)
 
@@ -133,7 +133,7 @@ def test_a_press_on_the_broker_button_presses_the_broker(qtbot, monkeypatch):
 
 
 def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot):
-    _panel_, motion = _controls(qtbot)
+    _panel, motion = _controls(qtbot)
     motion.parked_by_the_pause = True
 
     assert osr2_controls_hud(motion, control=OSR2_DRIVING).main_hud_model.paused
@@ -240,7 +240,7 @@ def test_the_readout_carries_the_max_intensity_the_motion_is_held_to(qtbot):
 def test_the_readout_under_a_funscript_carries_the_max_intensity_too(qtbot):
     script = FakeScript()
     control = FakeControl(script=script)
-    controls, motion = _controls(qtbot, control=control)
+    _panel, motion = _controls(qtbot, control=control)
     motion.set_max_intensity(40)
 
     drive = osr2_controls_hud(motion, control=control.state(), script=script).drive
@@ -326,7 +326,7 @@ class FakeScript:
 def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
     script = FakeScript()
     control = FakeControl(script=script)
-    controls, motion = _controls(qtbot, control=control)
+    _panel, motion = _controls(qtbot, control=control)
 
     hud = osr2_controls_hud(motion, control=control.state(), script=script)
 
@@ -338,7 +338,7 @@ def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
 def test_the_dot_sits_where_the_script_has_the_device_now(qtbot):
     script = FakeScript(heights=tuple([0.25] * 80))
     control = FakeControl(script=script)
-    controls, motion = _controls(qtbot, control=control)
+    _panel, motion = _controls(qtbot, control=control)
 
     hud = osr2_controls_hud(motion, control=control.state(), script=script)
 
@@ -348,7 +348,7 @@ def test_the_dot_sits_where_the_script_has_the_device_now(qtbot):
 def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
     script = FakeScript(active=False)
     control = FakeControl(script=script)
-    controls, motion = _controls(qtbot, control=control)
+    _panel, motion = _controls(qtbot, control=control)
     motion.active = True
 
     hud = osr2_controls_hud(motion, control=control.state(), script=script)
@@ -368,7 +368,7 @@ def test_with_their_switch_off_the_osr2_controls_say_parked_over_a_device_that_i
 def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
     script = FakeScript()
     control = FakeControl(script=script)
-    controls, motion = _controls(qtbot, control=control)
+    _panel, motion = _controls(qtbot, control=control)
 
     hud = osr2_controls_hud(motion, device=Osr2Mode.OFF, control=control.state(),
                       script=script)

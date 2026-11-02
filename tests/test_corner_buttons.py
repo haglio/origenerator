@@ -77,19 +77,19 @@ def _controls(qtbot):
 
 
 def test_nothing_shows_until_there_is_something_to_act_on(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     assert all(b.isHidden() for b in controls.buttons())
 
 
 def test_every_corner_is_up_the_moment_there_is_an_item_under_it(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
 
     assert all(not b.isHidden() for b in controls.buttons())
 
 
 def test_an_item_the_enhancer_cannot_take_grows_no_plus(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=None)
     star, trash, plus = controls.buttons()
 
@@ -99,7 +99,7 @@ def test_an_item_the_enhancer_cannot_take_grows_no_plus(qtbot):
 
 
 def test_a_spent_enhance_corner_is_a_sign_rather_than_a_button(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_HELD)
     plus = controls.buttons()[2]
     assert not plus.isEnabled()
@@ -109,7 +109,7 @@ def test_a_spent_enhance_corner_is_a_sign_rather_than_a_button(qtbot):
 
 
 def test_taking_the_item_away_takes_every_corner_with_it(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=True, enhance=icons.ENHANCE_HELD)
 
     controls.hide_all()
@@ -118,7 +118,7 @@ def test_taking_the_item_away_takes_every_corner_with_it(qtbot):
 
 
 def test_each_control_names_the_act_it_carries(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
     fired = []
     controls.triggered.connect(fired.append)
@@ -130,7 +130,7 @@ def test_each_control_names_the_act_it_carries(qtbot):
 
 
 def test_the_star_says_which_way_it_would_go(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=None)
     star = controls.buttons()[0]
     assert star.toolTip() == "Favorite this item"
@@ -140,7 +140,7 @@ def test_the_star_says_which_way_it_would_go(qtbot):
 
 
 def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=None)
     star = controls.buttons()[0]
 
@@ -159,7 +159,7 @@ def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
 
 
 def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
-    host, controls = _controls(qtbot)
+    _host, controls = _controls(qtbot)
     area = QRect(20, 30, 120, 100)
 
     controls.place(area)

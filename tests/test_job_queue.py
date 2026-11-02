@@ -1411,7 +1411,7 @@ def _a_video_waiting_on_an_image(tmp_path, now):
 
 
 def test_the_wait_is_timed_for_what_is_left_of_the_minute(qtbot, tmp_path):
-    _client_, queue, _video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
+    _client, queue, _video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     assert queue._videos_wait.isActive()
     assert queue._videos_wait.interval() == 50_000
@@ -1437,7 +1437,7 @@ def test_an_image_asked_for_during_the_wait_starts_at_once_and_the_minute_starts
 
 
 def test_the_video_waiting_out_the_minute_says_when_it_starts(qtbot, tmp_path):
-    _client_, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
+    _client, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     assert queue.starts_at(video.prompt_id) == 1060.0
 
@@ -1462,7 +1462,7 @@ def test_start_now_starts_the_video_waiting_out_the_minute_at_once(qtbot, tmp_pa
 
 
 def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
-    _client_, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
+    _client, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     queue.watch_training(_Training())
 
@@ -1471,7 +1471,7 @@ def test_a_video_held_for_a_training_says_no_start(qtbot, tmp_path):
 
 def test_only_the_video_at_the_front_says_when_it_starts(qtbot, tmp_path):
     now = [1000.0]
-    _client_, queue, _video = _a_video_waiting_on_an_image(tmp_path, now)
+    _client, queue, _video = _a_video_waiting_on_an_image(tmp_path, now)
 
     behind = _launch_video(queue, "v2", seed=2)
 

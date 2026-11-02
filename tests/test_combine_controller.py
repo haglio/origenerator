@@ -1149,7 +1149,7 @@ def test_an_image_browsed_from_outside_runs_the_settings_on_that_file(combine, t
     controller.widget.image_zone.set_item(photo)
     controller.widget.video_zone.set_item("clip")
 
-    workflow, params, video_row, image_row = controller._combined_params(photo, "clip")
+    _workflow, params, _video_row, image_row = controller._combined_params(photo, "clip")
 
     assert params["input_image"] == photo
     assert image_row is None
@@ -1181,5 +1181,5 @@ def test_a_picked_action_runs_its_pinned_settings_on_a_browsed_image(combine, tm
     built = controller._curated_combination(photo, "gamma")
 
     assert built is not None
-    workflow, params = built
+    _workflow, params = built
     assert (params["input_image"], params["steps"]) == (photo, 7)

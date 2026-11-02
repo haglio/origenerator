@@ -999,7 +999,7 @@ def test_a_director_names_both_shapes_for_a_slideshow_of_both(slideshows):
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
-    director, host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+    director, host, _made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     assert host.visible == []
     director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
                                          for row in rows}
@@ -1370,7 +1370,7 @@ def test_a_slideshow_asks_this_director_for_the_way_out_of_a_loop(slideshows):
 
 def test_a_region_slideshow_ending_comes_back_on_the_base_state(slideshows):
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+    director, _host, _made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     open_both_shapes(director)
     first = director.region_slideshow(PORTRAIT)
 
@@ -1620,7 +1620,7 @@ def test_the_spoken_play_plays_a_paused_room_again_at_the_clip_seconds_set(slide
 
 
 def test_the_spoken_start_with_no_slideshow_up_opens_one_at_the_clip_seconds_set(slideshows):
-    director, _host, made = slideshows(FakeHost(rows=[_row("g1")]))
+    director, _host, _made = slideshows(FakeHost(rows=[_row("g1")]))
     director._pace.set_seconds(7)
 
     director.run_slideshow_command(SlideshowCommand.START, None)

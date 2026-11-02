@@ -403,7 +403,7 @@ def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, 
 
 
 def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
     assert omnipause.frozen() is False
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")

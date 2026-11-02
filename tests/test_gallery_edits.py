@@ -235,7 +235,7 @@ def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
 
 
 def test_redo_label_names_the_step_it_would_re_apply(tmp_path):
-    actions, db, output_dir = _actions(tmp_path)
+    actions, _db, _output_dir = _actions(tmp_path)
     assert actions.redo_label() is None
     assert not actions.can_redo()
     actions.custom_collections.create("Keepers", [])
@@ -366,7 +366,7 @@ def test_two_rows_claiming_one_file_move_it_once_and_both_come_back(tmp_path):
 
 
 def test_restoring_or_purging_an_item_the_trash_no_longer_holds_is_a_noop(tmp_path):
-    actions, db, _ = _actions(tmp_path)
+    actions, _db, _ = _actions(tmp_path)
     assert actions.restore_deleted(["never-deleted"]) is None
     actions.purge_deleted(["never-deleted"])
 

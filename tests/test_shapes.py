@@ -1,11 +1,3 @@
-"""What each shape of the folder list holds, said in one place.
-
-The list is a shape per shape (Separate) or one shape of both shapes (Together).
-Every part of the app that narrows something to a shape asks
-:mod:`origenerator.gallery.shapes`; the source checks at the bottom keep it the
-only place that says what a shape holds, since a comparison written by hand when
-there were two shapes is what left every queued item off Together's Latest.
-"""
 from __future__ import annotations
 
 import ast
@@ -62,8 +54,6 @@ def test_narrowing_to_a_side_keeps_what_it_holds_in_order():
 
 
 def test_a_side_holding_every_shape_narrows_without_measuring_a_thing():
-    """Reading a shape can mean opening a file, and Both is drawn over the
-    whole library."""
     def never(_thing):
         raise AssertionError("a shape was read")
 
@@ -72,7 +62,6 @@ def test_a_side_holding_every_shape_narrows_without_measuring_a_thing():
 
 
 def test_a_side_covers_each_side_whose_every_shape_it_holds():
-    """What a folder composed on one shape is drawn on: there, and on Both."""
     covering = {(shape, other) for shape in SHAPES_AND_BOTH for other in SHAPES_AND_BOTH
                 if shape_covers(shape, other)}
 
@@ -121,7 +110,9 @@ def _names_both(operand) -> bool:
 
 
 def test_only_the_shapes_module_says_what_both_holds():
-    """Both is the one shape holding more than one shape, so code elsewhere that
-    tests for it is saying by hand what Both holds: a second copy of the rule."""
     assert [where for where, operands in _comparisons_outside_the_shapes_module()
             if any(_names_both(operand) for operand in operands)] == []
+
+
+def test_the_words_stored_tree_keys_are_built_from_never_change():
+    assert (PORTRAIT, LANDSCAPE, BOTH) == ("portrait", "landscape", "both")

@@ -1,14 +1,3 @@
-"""The shapes the tree of contents can be drawn over: the two shapes, and both.
-
-A Fun Time session plays portrait media on one screen and landscape on the
-other, so every folder is looked at from one shape or the other. On its own this
-app has one screen, where either shape fits, so the list can also be drawn once
-over the whole library — the shape a mixed slideshow is started from.
-
-These words are what a tree key is built from, so they are data the same way a
-collection key is: stored expansions, favorites and navigation history are written
-with them, and a changed value would orphan every one.
-"""
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
@@ -27,7 +16,7 @@ _SHAPES_ON = {
     PORTRAIT: frozenset({PORTRAIT}),
     LANDSCAPE: frozenset({LANDSCAPE}),
     BOTH: _EVERY_SHAPE,
-    None: _EVERY_SHAPE,  # no shape at all, where nothing is narrowing
+    None: _EVERY_SHAPE,
 }
 
 

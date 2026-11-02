@@ -1,7 +1,3 @@
-"""The search field's placeholder, which says where a query would search.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from PyQt6.QtGui import QResizeEvent
@@ -9,7 +5,6 @@ from PyQt6.QtWidgets import QToolButton
 
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 
-# A path wide enough that no field in these tests can hold all of it.
 LONG = "Library / Images / Alpha Folder / One Two Three / Four Five Six Seven Eight"
 
 
@@ -31,8 +26,6 @@ def test_the_placeholder_names_the_whole_path_when_there_is_room_for_it(qtbot):
 
 
 def test_a_path_too_long_for_the_field_keeps_its_tail(qtbot):
-    """The tail is the folder itself and its nearest parents, which is the half
-    that answers "search where?" -- a folder's own code says nothing alone."""
     field = _field(qtbot, 200)
     field.set_scope(LONG)
     shown = field.placeholderText()
@@ -57,8 +50,6 @@ def test_a_wider_field_shows_more_of_the_path(qtbot):
 
 
 def test_growing_the_field_re_renders_what_it_can_now_hold(qtbot):
-    """The handler is called rather than waited for: a resize is delivered when
-    Qt next runs its loop, and a test that spun one would be timing-dependent."""
     field = _field(qtbot, 150)
     field.set_scope(LONG)
     narrow = field.placeholderText()

@@ -86,11 +86,6 @@ siblings = ["app_support", "funestra", "shared_ui", "voice_core"]
 [tool.haglio.dead-code]
 # Each chained workflow hands its chaining helper a segment builder called with
 # the same arguments; these three builders ignore the ones they do not need.
-unread-arguments = ["origenerator/workflows/wan22_animate.py: scene",
-                    "origenerator/workflows/wan22_animate.py: last",
-                    "origenerator/workflows/wan22_animate.py: previous",
-                    "origenerator/workflows/wan22_flf2v_loop.py: previous",
-                    "origenerator/workflows/wan22_i2v.py: last"]
 # The gallery's search timings, which nothing in the tree reads any more.
 # A search result's score, which nothing reads back.
 unread-dataclass-fields = ["SearchResult.score"]

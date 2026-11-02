@@ -55,15 +55,6 @@ def first_frame_of(path: Path) -> Image.Image | None:
 def generate_animated_thumbnail(
     source_path: Path, thumb_dir: Path, *, name: str, frames: int = 8, duration_ms: int = 140
 ) -> Path | None:
-    """Render a short looping WebP preview of a video into
-    ``thumb_dir / f"{name}_anim.webp"`` — the moving preview the gallery shows for
-    the videos an image was animated into.
-
-    Cached: an existing file is returned untouched. ``None`` when it cannot be made
-    (a missing or unreadable video), so the caller falls back to the static
-    thumbnail. WebP + ``QMovie`` playback keeps many previews light and avoids a
-    video player per tile.
-    """
     dest = animated_thumbnail_path(thumb_dir, name)
     if dest.exists():
         return dest

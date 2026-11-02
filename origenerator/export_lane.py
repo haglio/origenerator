@@ -15,7 +15,7 @@ from origenerator.media import MediaType
 
 @dataclass(frozen=True)
 class ExportLane:
-    # Evolver reads the destination from the sub-folder 'source' names, so keep it spelled as in origenerator.config; mark and unmark name database methods outright, since a stamp reached by a string looks like dead code to the scan
+    # vulture reads a stamp reached by a string as dead code, so mark and unmark name database methods outright
 
     name: str
     source_key: str

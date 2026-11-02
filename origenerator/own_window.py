@@ -53,7 +53,6 @@ def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_ke
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
 
-    # Imported before config, which a missing overlay key stops from importing.
     if find_missing_overlay_keys is None:
         from origenerator.content import missing_overlay_keys as find_missing_overlay_keys
     missing = find_missing_overlay_keys()
@@ -71,7 +70,7 @@ def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_ke
     from origenerator.gui.stylesheet import dress_application
     dress_application(app, preview)
 
-    # Held in a local: handed straight to show_or_say the window was collected before anything could run.
+    # Held in a local: PyQt collected the window handed straight to show_or_say before anything could run.
     built = build()
     return 0 if show_or_say(title, built) else app.exec()
 

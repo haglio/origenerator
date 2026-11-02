@@ -17,8 +17,6 @@ PRESET_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 CLONE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 # Under ComfyUI's input folder, which is where its LoadAudio reads from.
 SPEECH_DIR = "origenerator_speech"
-# Run by path under the speech environment's Python; it lives outside the package
-# so the dependency gate never asks the app to carry the voice's torch.
 WORKER = Path(__file__).resolve().parents[1] / "tools" / "speech_worker.py"
 SPEECH_VERSION = 2
 # Windows flashes a console window for a bare subprocess.
@@ -37,7 +35,6 @@ class SceneSpeech:
 
     @property
     def seconds(self) -> float:
-        # Imported here: the workflows package imports this module at load.
         from origenerator.workflows.frame_rate import NATIVE_FPS  # noqa: PLC0415
 
         return self.frames / NATIVE_FPS

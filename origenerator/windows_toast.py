@@ -19,7 +19,7 @@ _TOAST_FILING = "9dfb9fd1-143a-490e-90bf-b9fba7132de7"
 _XML_DOCUMENT_IO = "6cd0e74e-ee65-4489-9ebf-ca43e87ba637"
 _XML_DOCUMENT_IID = "f7f3a506-1e87-42d6-bcfb-b8c809fa5494"
 
-# Table positions, read off windows.ui.notifications.h: the three IUnknown entries and
+# Table positions, read off Windows' windows.ui.notifications.h: the three IUnknown entries and
 # IInspectable's three come first, so an interface's own calls start at six.
 _QUERY_INTERFACE = 0
 _RELEASE = 2
@@ -154,7 +154,7 @@ def _guid(text: str) -> _GUID:
 
 
 def _factory(runtime_class: str, iid: str):
-    _combase.RoInitialize(_RO_INIT_MULTITHREADED)  # already-initialized is a no-op
+    _combase.RoInitialize(_RO_INIT_MULTITHREADED)  # Windows: already-initialized is a no-op
     factory = ctypes.c_void_p()
     with _text(runtime_class) as named:
         _raise_on(_combase.RoGetActivationFactory(

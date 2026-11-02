@@ -133,7 +133,7 @@ def _cloak(hwnd: int, hidden: bool) -> None:
 
 
 def keep_out_of_sight(hwnd: int) -> None:
-    # DWM still composites a cloaked window, so a frame can still be published.
+    # Windows' DWM still composites a cloaked window, so a frame can still be published.
     if window_exists(hwnd):
         _cloak(hwnd, True)
 

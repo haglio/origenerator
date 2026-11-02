@@ -1,22 +1,3 @@
-"""The Trash — deleted generations held until you say otherwise.
-
-Deleting a generation moves its files into the trash and drops its row (see
-:class:`~origenerator.gallery_edits.GalleryEdits`), which the session's undo
-stack can reverse. That hold does not end on its own at all -- not at the next
-launch, not ever -- because the delete also records the row it dropped and the
-batch its files went into. The gallery's Trash
-collection lists those records, puts one back, or ends one for good — and ending one
-by hand is the only thing that ends one. A launch clears the batch folders no record
-names (:func:`reclaim_orphans`) and takes every file but the thumbnail from an item
-that has waited a day (:func:`empty_what_has_waited_a_day`), and restoring such an
-item runs a job that makes it again.
-
-A record is the whole story of one delete — ``{"prompt_id", "row", "batch",
-"deleted_at"}``, as :meth:`origenerator.db.Database.list_trashed` returns it —
-so nothing about a deleted item has to be reconstructed from the disk. This
-module is pure data over the database and the trash, with no Qt dependency, so
-what the collection shows can be unit-tested directly.
-"""
 
 from __future__ import annotations
 
@@ -67,12 +48,6 @@ def _deleted_at(record: dict) -> datetime | None:
 
 
 def days_held(record: dict, now: datetime | None = None) -> int:
-    """Whole days ``record`` has been sitting in the trash, rounded down.
-
-    Read as "how long ago did I trash this", which is why it rounds down: an item
-    deleted an hour ago has been there no days rather than a whole one. A record
-    whose stamp won't parse simply reads as freshly deleted.
-    """
     when = _deleted_at(record)
     if when is None:
         return 0
@@ -261,14 +236,6 @@ def tend_the_trash(db, places: OutputPlaces, *, environ=os.environ) -> int:
 
 
 def reclaim_orphans(db, trash) -> int:
-    """Clear the trash folders nothing can reach, and say how many went.
-
-    It never takes anything the Trash is holding: every held record's batch folder
-    is named as one to spare, so what is removed is only what no record points at
-    — a rejected experiment's batch that fell off the undo stack, a batch from
-    before the Trash existed, or a folder left by a crash between the move and the
-    record.
-    """
     return trash.purge_orphans([
         (record.get("batch") or {}).get("subdir") for record in db.list_trashed()
     ])

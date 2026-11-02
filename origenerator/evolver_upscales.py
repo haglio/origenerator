@@ -1,8 +1,3 @@
-"""The upscale Evolver makes of a video sent to it, found where Evolver files it.
-
-Evolver writes it to ``<shape>/<source>/<name>_topaz.mp4`` under
-``upscaled_by_orientation`` (Evolver's ``util/sidecar.upscaled_video_path``).
-"""
 from __future__ import annotations
 
 import time
@@ -72,6 +67,4 @@ def _predates(video: Path, upscale: Path) -> bool:
         written, upscaled = video.stat(), upscale.stat()
     except OSError:
         return False
-    # Some upscales leave the encoder dated 1970, so an upscale is timed by when
-    # its file was made rather than by when it was last written.
     return written.st_mtime <= getattr(upscaled, "st_birthtime", upscaled.st_mtime)

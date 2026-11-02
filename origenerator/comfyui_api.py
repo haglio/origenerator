@@ -75,7 +75,7 @@ def format_execution_error(message: str) -> str:
 
 
 def _timed_out(error: BaseException) -> bool:
-    # urllib: a read that times out raises TimeoutError; a connect that does wraps one in URLError
+    # CPython's urllib: a read that times out raises TimeoutError; a connect that does wraps one in URLError
     if isinstance(error, TimeoutError):
         return True
     return isinstance(error, urllib.error.URLError) and isinstance(error.reason, TimeoutError)

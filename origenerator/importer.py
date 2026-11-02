@@ -80,7 +80,7 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
         if (output_type == MediaType.VIDEO
                 and sibling_of_type(fpath, MediaType.IMAGE) is not None):
             continue
-        # VHS_VideoCombine writes one sidecar image per video
+        # ComfyUI's VHS_VideoCombine writes one sidecar image per video
         play_path = fpath
         if output_type == MediaType.IMAGE:
             sibling_video = sibling_of_type(fpath, MediaType.VIDEO)
@@ -359,7 +359,7 @@ def graph_of(row: dict) -> dict:
 
 
 def graph_from_text(text: str) -> dict:
-    # VHS_VideoCombine stores the graph as a JSON string of the object, so decode until a dict
+    # ComfyUI's VHS_VideoCombine stores the graph as a JSON string of the object, so decode until a dict
     try:
         data = json.loads(text)
         if isinstance(data, str):

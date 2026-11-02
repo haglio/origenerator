@@ -47,7 +47,6 @@ def export_video(src: Path, dest_dir: Path, *, funscript: Path | None = None) ->
     return final
 
 
-# Evolver skips any name containing this marker, per evolver_contract.json, so it goes between the stem and the extension.
 PARTIAL_MARKER = ".partial."
 
 

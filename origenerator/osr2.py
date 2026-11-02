@@ -11,7 +11,6 @@ from funestra.tcode import format_tcode_command, to_tcode_position
 from origenerator.config import project_dir
 
 SENDER = "origenerator"
-# The directory all three apps meet at, named in the broker's broker_contract.json; tests/test_broker_contract.py holds the two spellings together
 SHARED_STATE_DIR = project_dir("fun_time") / "state"
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from origenerator.db import Database
 from origenerator.experiments.background import (
-    BATCH_SIZE,
+    EXPERIMENTS_QUEUED_PER_ABSENCE,
     cancel_experiments,
     queue_experiments,
 )
@@ -55,8 +55,8 @@ def test_each_launch_records_what_it_was_bred_from_and_what_it_varies(caplog):
 def test_closing_fills_the_queue_with_a_batch_of_experiments():
     policy = StubPolicy()
     launcher = FakeLauncher()
-    assert queue_experiments([], policy, launcher) == BATCH_SIZE
-    assert len(launcher.launched) == BATCH_SIZE
+    assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
+    assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE
 
 
 def test_a_launch_that_didnt_take_doesnt_use_up_the_batch():
@@ -64,8 +64,8 @@ def test_a_launch_that_didnt_take_doesnt_use_up_the_batch():
     # skip, not an experiment — the batch is short by one unless it's retried.
     policy = StubPolicy()
     launcher = FakeLauncher(refuse=(1, 4))
-    assert queue_experiments([], policy, launcher) == BATCH_SIZE
-    assert len(launcher.launched) == BATCH_SIZE + 2
+    assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
+    assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE + 2
 
 
 def test_a_gallery_with_nothing_to_build_on_queues_nothing():
@@ -81,7 +81,7 @@ def test_launches_that_keep_failing_give_up_instead_of_retrying_the_batch_out():
     policy = StubPolicy()
     launcher = FakeLauncher(refuse_all=True)
     assert queue_experiments([], policy, launcher) == 0
-    assert 0 < len(launcher.launched) < BATCH_SIZE
+    assert 0 < len(launcher.launched) < EXPERIMENTS_QUEUED_PER_ABSENCE
 
 
 class FakeClient:

@@ -15,8 +15,6 @@ def open_both_shapes(gallery_or_director) -> None:
 
 
 def funestra_of(slideshow):
-    """The slideshow's Funestra -- opened on a stand-in engine where the suite's
-    platform has no window for the pane to open the real one in."""
     pane = slideshow._pane
     if pane._funestra is None:
         pane._engine_for = lambda wid: FakeEngine()
@@ -30,20 +28,17 @@ def engine_of(slideshow) -> FakeEngine:
 
 
 def hud_targets(slideshow):
-    """What the HUD the slideshow's Funestra drew put where."""
     funestra = funestra_of(slideshow)
     slideshow._pane.tick()
     return funestra._hud.targets
 
 
 def hud_button_names(slideshow) -> list[str]:
-    """The buttons on that HUD, by their own names."""
     return [button.command.removeprefix(f"{slideshow.hud_shape}_")
             for _rect, button in hud_targets(slideshow).buttons]
 
 
 def _on_screen(slideshow, rect) -> QPoint:
-    """The middle of a rect of the HUD, in the slideshow's window's own pixels."""
     left, top, _pixels = engine_of(slideshow).overlays[HUD_OVERLAY_ID]
     x, y, width, height = rect
     scale = slideshow._pane._window.devicePixelRatioF()
@@ -61,7 +56,6 @@ def thumbnail_on_screen(slideshow, path) -> QPoint:
 
 
 def speaker_on_screen(pane) -> QPoint:
-    """The speaker on the HUD a pane's Funestra drew, in its window's own pixels."""
     left, top, _pixels = pane._engine.overlays[HUD_OVERLAY_ID]
     x, y, width, height = pane._funestra._hud.row.rect
     cx, cy = chip_xy(win_w=width, win_h=height, timeline_h=TIMELINE_HEIGHT)

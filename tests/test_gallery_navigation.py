@@ -1,11 +1,3 @@
-"""Back and Forward, driven with no gallery around them.
-
-The trail used to be a list, a boolean and eight methods on a 7,000-line widget,
-and every one of these behaviours could only be reached by building one. Here
-the host is a handful of recorded calls.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import pytest
@@ -14,8 +6,6 @@ from origenerator.gui.gallery_navigation import NavigationController
 
 
 class FakeSearch:
-    """A search reduced to what a history asks of one."""
-
     def __init__(self, query=""):
         self.query = query
         self.restored = []
@@ -30,20 +20,17 @@ class FakeSearch:
 
 
 class FakeHost:
-    """A gallery reduced to what a history asks of one."""
-
     def __init__(self, folders=("workflow/a",)):
         self.folders = set(folders)
         self.folder = None
         self.item = None
         self.visible: set[str] = set()
-        self.shown = []          # every folder key show_folder was asked for
-        self.went_to = []        # every fallback go_to_generation
+        self.shown = []
+        self.went_to = []
         self.revealed = []
         self.cleared = 0
         self.buttons = (False, False)
 
-    # what a stop is made of
     def selected_folder_key(self):
         return self.folder
 
@@ -53,7 +40,6 @@ class FakeHost:
     def pane_holds(self, prompt_id):
         return prompt_id in self.visible
 
-    # how to get somewhere
     def show_folder(self, key):
         self.shown.append(key)
         if key not in self.folders:
@@ -90,14 +76,12 @@ def test_a_gesture_records_where_it_put_the_pane(trail):
 
     nav.record("g1")
 
-    assert host.buttons == (False, False)   # one stop is nowhere to go back to
+    assert host.buttons == (False, False)
     nav.record("g2")
     assert host.buttons == (True, False)
 
 
 def test_a_move_off_the_record_records_nothing(trail):
-    # A rebuild's restore and a Back both re-select something; neither is a place
-    # the user went, and a poll would otherwise pile up duplicates.
     nav, host = trail()
     host.folder = "workflow/a"
 
@@ -108,8 +92,6 @@ def test_a_move_off_the_record_records_nothing(trail):
 
 
 def test_off_the_record_restores_rather_than_clears(trail):
-    # Nested: an inner move that cleared the flag on the way out would hand the
-    # trail back while the outer one was still walking it.
     nav, _host = trail()
 
     with nav.off_the_record():
@@ -146,11 +128,9 @@ def test_back_re_shows_the_stop_as_it_stood(trail):
 
 
 def test_a_stop_that_picked_nothing_lands_with_nothing_picked(trail):
-    # A folder still showing the item Back just left would look like the press
-    # had done nothing at all.
     nav, host = trail(FakeHost(folders={"workflow/a", "workflow/b"}))
     host.folder = "workflow/a"
-    nav.record()                       # a folder opened, no item picked
+    nav.record()
     host.folder = "workflow/b"
     nav.record("g2")
 
@@ -166,7 +146,7 @@ def test_a_stop_whose_folder_is_gone_falls_back_to_the_item_itself(trail):
     nav.record("g1")
     host.folder = "workflow/b"
     nav.record("g2")
-    host.folders.discard("workflow/a")   # a delete emptied it
+    host.folders.discard("workflow/a")
 
     nav.go_back()
 
@@ -188,8 +168,6 @@ def test_a_stop_that_had_a_query_comes_back_with_it_running(trail):
 
 
 def test_a_search_redrawing_itself_is_not_another_stop(trail):
-    # A results pane redraws for reasons that are not navigations — a sort, a
-    # widening landing, a generation finishing under a poll.
     search = FakeSearch("tabby")
     nav, host = trail(search=search)
     host.folder = "workflow/a"
@@ -197,7 +175,7 @@ def test_a_search_redrawing_itself_is_not_another_stop(trail):
     nav.record()
     nav.record()
 
-    assert host.buttons == (False, False)   # one stop, not three
+    assert host.buttons == (False, False)
 
 
 def test_narrowing_a_query_overwrites_its_stop_rather_than_adding_one(trail):
@@ -208,9 +186,9 @@ def test_narrowing_a_query_overwrites_its_stop_rather_than_adding_one(trail):
     search.query = "tabby"
     nav.record()
 
-    assert host.buttons == (False, False)   # still one stop, now the longer query
+    assert host.buttons == (False, False)
     nav.go_back()
-    assert host.shown == []                 # nowhere to go back to
+    assert host.shown == []
 
 
 def test_picking_a_hit_is_a_step_within_the_results(trail):
@@ -230,7 +208,7 @@ def test_the_first_landing_is_seeded_once(trail):
 
     nav.seed()
     host.folder = "workflow/b"
-    nav.seed()          # already seeded: the second landing is not a stop
+    nav.seed()
 
     nav.record("g2")
     nav.go_back()

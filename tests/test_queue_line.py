@@ -1,4 +1,3 @@
-"""The queue's rules: where a job joins the line, and where one set aside rejoins it."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -20,11 +19,8 @@ def _video(name=""):
 
 
 def _video_frame(name=""):
-    """A chained i2v's start frame: an image prompt opening a video run."""
     return _job("image", name=name, run="video")
 
-
-# --- joining the line ---------------------------------------------------------
 
 def test_an_image_joins_the_front():
     line = [_video(), _video()]
@@ -37,17 +33,12 @@ def test_a_video_joins_the_back():
 
 
 def test_a_videos_start_frame_joins_the_back_though_it_draws_a_still():
-    # Asking for a video is asking for minutes of GPU whichever prompt goes
-    # first. Placed by what its own prompt makes, the frame would take the very
-    # front and land the whole run ahead of every image already waiting.
     line = [_image(), _image()]
     assert queue_line.is_video(_video_frame()) is True
     assert queue_line.insertion_index(line, _video_frame()) == 2
 
 
 def test_images_stack_newest_first():
-    # Each new image takes the front, so the last one asked for is next: it was
-    # asked for while looking at the one before it.
     line = []
     for job in (older := _image("older"), newer := _image("newer")):
         line.insert(queue_line.insertion_index(line, job), job)
@@ -55,8 +46,6 @@ def test_images_stack_newest_first():
 
 
 def test_work_nobody_asked_for_never_jumps_the_line():
-    # A background experiment or a base re-render makes images too, and there can
-    # be a great many of them.
     line = [_video()]
     for source in ("experiment", "base_render"):
         assert queue_line.insertion_index(line, _job("image", source)) == 1
@@ -73,27 +62,17 @@ def test_what_is_put_first_leads_the_line_and_each_part_keeps_its_order():
     assert line == [locked, also_locked, newest, older, video]
 
 
-# --- a job that declares nothing ----------------------------------------------
-
 def test_an_unclassifiable_job_is_treated_as_an_image():
-    # Images go first and start sooner, so this is the harmless way to be wrong.
     bare = SimpleNamespace()
     assert queue_line.is_video(bare) is False
     assert queue_line.insertion_index([_video()], bare) == 0
 
 
-# --- what takes the machine ------------------------------------------------------
-
 def test_the_users_image_work_takes_the_machine_from_whatever_is_rendering():
-    # Seconds the user is sitting waiting for, against anything already on the
-    # GPU: the user's own words for this queue are that their work goes first
-    # while they are working, whatever that costs the run under way.
     assert queue_line.takes_the_front(_image()) is True
 
 
 def test_a_video_asked_for_takes_the_machine_from_nothing():
-    # Asking for a video is asking for "later" -- and the start frame of one is
-    # the opening of a video, not an image to wait for.
     assert queue_line.takes_the_front(_video()) is False
     assert queue_line.takes_the_front(_video_frame()) is False
 
@@ -103,18 +82,13 @@ def test_work_nobody_asked_for_takes_the_machine_from_nothing():
         assert queue_line.takes_the_front(_job("image", source)) is False
 
 
-# --- rejoining the line after being set aside -----------------------------------
-
 def test_a_video_set_aside_rejoins_after_the_last_image():
-    # Ahead of the videos still waiting, which it was in front of, and after
-    # every image and enhancement, which are what it was set aside for.
     newcomer = _image("new")
     line = [newcomer, _image("older"), _video(), _video()]
     assert queue_line.rejoin_index(line, _video(), newcomer) == 2
 
 
 def test_a_video_set_aside_rejoins_after_an_image_a_video_was_dragged_above():
-    # "Not above any other image or enhancement" outranks "top of the videos".
     newcomer = _image("new")
     line = [newcomer, _video(), _image("older")]
     assert queue_line.rejoin_index(line, _video(), newcomer) == 3
@@ -126,8 +100,6 @@ def test_a_videos_start_frame_set_aside_rejoins_with_the_videos():
 
 
 def test_an_image_set_aside_rejoins_right_after_the_image_that_took_its_place():
-    # It was the front until the newcomer took it, so it stays ahead of the
-    # images asked for before it, as newest-first already had it.
     newcomer = _image("new")
     line = [newcomer, _image("older"), _video()]
     assert queue_line.rejoin_index(line, _image(), newcomer) == 1
@@ -138,20 +110,13 @@ def test_an_image_set_aside_for_a_newcomer_no_longer_in_line_takes_the_front():
 
 
 def test_work_nobody_asked_for_set_aside_rejoins_at_the_back():
-    # A repair from the last absence, caught rendering, goes back to where it
-    # joined: after everything the user asked for.
     newcomer = _image("new")
     line = [newcomer, _video()]
     for source in ("experiment", "base_render"):
         assert queue_line.rejoin_index(line, _job("image", source), newcomer) == 2
 
 
-# --- when a video may start ------------------------------------------------------
-
 def test_a_video_waits_until_a_minute_after_the_last_image_asked_for():
-    # An image asked for stops the video being made, so one started in the gap
-    # before the user's next image is only stopped again: its render thrown
-    # away, and that image slowed by the switch (the user's call, 2026-10-21).
     assert queue_line.wait_before_starting(_video(), seconds_since_an_image=10) == 50
 
 
@@ -171,8 +136,6 @@ def test_a_videos_start_frame_waits_with_the_videos():
     assert queue_line.wait_before_starting(_video_frame(), seconds_since_an_image=10) == 50
 
 
-# --- a video waits for the enhancement of its start image -----------------------
-
 def _enhance(image, name=""):
     return SimpleNamespace(media_type="image", source="generated", prompt_id=name,
                            run_media_type="image", start_image=image, enhances=image)
@@ -182,8 +145,6 @@ def _video_from(image, name=""):
     return SimpleNamespace(media_type="video", source="generated", prompt_id=name,
                            run_media_type="video", start_image=image, enhances="")
 
-
-# --- a job moved by hand ---------------------------------------------------------
 
 def test_a_job_moved_lands_just_ahead_of_the_one_it_is_let_go_over():
     first, second, third = _video("first"), _video("second"), _video("third")
@@ -198,7 +159,6 @@ def test_a_job_let_go_past_the_last_one_ends_the_line():
 
 
 def test_a_video_moved_ahead_of_its_images_enhancement_takes_the_enhancement_along():
-    # It is made from that enhancement, so the enhancement still comes first.
     other, enhance = _video("other"), _enhance("p.png", "enhance")
     video = _video_from("p.png", "video")
 
@@ -206,7 +166,6 @@ def test_a_video_moved_ahead_of_its_images_enhancement_takes_the_enhancement_alo
 
 
 def test_an_enhancement_moved_behind_the_videos_waiting_for_it_takes_them_along():
-    # In the order they had, right behind it.
     enhance, other = _enhance("p.png", "enhance"), _video("other")
     first, second = _video_from("p.png", "first"), _video_from("p.png", "second")
 

@@ -1,20 +1,3 @@
-"""The motion this app drives the OSR2 with — genau's wave, and what rides it.
-
-The slideshow shows images, and an image gives the device nothing to follow, so
-this supplies the motion instead. The waveform itself is not written here: the
-shapes, the Speed bar's exponential map and the amplitude and center arithmetic
-are :mod:`funestra.robot_hand` — the Robot Hand, genau's own, shared so both
-apps move the same way rather than two ways that look alike until they don't.
-
-What genau keeps elsewhere and this has to carry is the phase. Genau's engine
-advances it against the video's beats; here there is no video, so the motion
-free-runs on the driver's clock and the phase rides along with the bars, in
-:class:`Motion`.
-
-:mod:`funestra.learned_motion` is the one takeover: phrases of real scripting in
-place of the waveform, played inside the bars' range and at the Speed bar's
-pace; the rest of the time the motion is the single hand-driven wave.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -74,14 +57,9 @@ __all__ = [
 
 @dataclass
 class Motion:
-    """The live motion: genau's bars, the learned motion, and the phase."""
-
     state: RobotHandState = field(default_factory=RobotHandState)
-    # Its model is read from the package the first time it is switched on.
     learned: LearnedMotionState = field(default_factory=LearnedMotionState)
     phase: float = 0.0
-    # The phase counted up without wrapping: what the readout's knots are
-    # anchored to, so they stay put from one cycle to the next.
     phase_total: float = 0.0
 
     @property
@@ -90,21 +68,16 @@ class Motion:
 
 
 def advance(motion: Motion, dt_s: float) -> None:
-    """Carry the wave's phase forward by ``dt_s`` seconds of motion."""
     motion.phase = phase_advanced(motion.phase, motion.state.bpm, dt_s)
     motion.phase_total += max(0.0, min(dt_s, MAX_TICK_SECONDS)) * motion.state.bpm / 60.0
 
 
 def tick_learned_motion(motion: Motion, now: float) -> None:
-    """Let the phrases carry the motion, if the learned motion has it.  The
-    first phrase begins where the wave already has the device, so the takeover
-    cannot be felt."""
     learned_motion.tick_learned_motion(
         motion.state, motion.learned, now, start_fraction=_envelope_fraction(motion))
 
 
 def toggle_learned_motion(motion: Motion) -> None:
-    """Hands off to the scripts, or back — genau's ``;``."""
     if motion.learned.active:
         disable_learned_motion(motion)
     else:
@@ -112,7 +85,6 @@ def toggle_learned_motion(motion: Motion) -> None:
 
 
 def enable_learned_motion(motion: Motion) -> None:
-    """Hands off to the scripts, whichever way the switch was standing."""
     if motion.learned.model is None:
         motion.learned.model = load_default_model()
     learned_motion.enable_learned_motion(motion.learned)
@@ -141,16 +113,12 @@ def take_settings(motion: Motion, saved) -> None:
 
 
 def position(motion: Motion) -> float:
-    """Where the motion is now, 0-100 — the scale
-    :func:`origenerator.osr2.format_position` takes."""
     if motion.learned.active:
         return learned_motion.position(motion.learned, motion.state)
     return _at(motion, motion.phase)
 
 
 def _envelope_fraction(motion: Motion) -> float:
-    """How far up the bars' envelope the wave has the device, 0 at its floor
-    and 1 at its ceiling — where the learned motion's first phrase begins."""
     state = motion.state
     if state.amplitude <= 0:
         return 0.0
@@ -160,29 +128,12 @@ def _envelope_fraction(motion: Motion) -> float:
 
 
 def position_ahead(motion: Motion, lead_s: float) -> float:
-    """Where the motion will be ``lead_s`` seconds from now, 0-100.
-
-    This, not :func:`position`, is what a device command should aim at: the OSR2
-    is told a place and how long to take getting there, so the place has to be
-    one it is actually due to be at when the time is up. Aimed at the present it
-    can only ever chase.
-    """
     if motion.learned.active:
         return learned_motion.position(motion.learned, motion.state, lead_s)
     return _at(motion, motion.phase + lead_s * motion.state.bpm / 60.0)
 
 
 def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[float], float]:
-    """The motion sampled forward from now as 0-1 heights — the drive readout's
-    drawing of the motion the device is being sent, ``span_s`` seconds of it —
-    as ``samples`` + 1 values, the last one the knot past the readout's edge,
-    and how far the drawn line is shifted left, as a fraction of one sample.
-
-    Both sources are read on knots a fixed stretch of their own clock apart --
-    the wave on its phase, the learned motion on its script -- so the drawing
-    holds still between knots and slides by the fraction rather than being
-    redrawn at fixed columns.
-    """
     if motion.learned.active:
         return learned_motion.trace_window(motion.learned, motion.state, samples, span_s)
     state = motion.state

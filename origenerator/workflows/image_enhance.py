@@ -13,38 +13,6 @@ ENHANCE_MODEL_FAMILIES = (SDXL,)
 
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
-    """Upscale and enhance an existing image — the standalone form of the
-    enhance tail the generation workflows append.
-
-    Takes any image (a past generation, an import, a file on disk) and runs it
-    through the shared tail (:meth:`WorkflowTemplate.enhance_image_nodes`): an
-    ESRGAN-family model upscale for sharpness, then a low-denoise SDXL sampling
-    pass that re-imagines the enlarged pixels into real texture. The SDXL
-    checkpoint does the refining regardless of what made the source image —
-    at ``enhance_denoise`` this low it adds texture without repainting, which
-    is what lets one enhancer serve every workflow's output (and imports,
-    whose maker is unknown). The prompts steer that texture; a batch enhance
-    seeds them from the source generation's own prompts.
-
-    That tail's gentleness is also its ceiling: it cannot mend a mouth fused
-    into its teeth or a hand with a finger too many, because the denoise that
-    would redraw them redraws everything else too. ``enhance_detail_fixes`` adds
-    a second stage past it (:meth:`WorkflowTemplate.detail_fix_nodes`) that
-    finds one named part at a time — faces, hands, teeth, whatever a detector is
-    installed for — and re-samples each found region alone at that part's own
-    much higher denoise, leaving every pixel outside those regions exactly as
-    the tail left it. No part is fixed by default: each one needs its detector
-    installed, and each costs a sampling run per region found.
-
-    Machinery, not a peer workflow (``selectable`` False): its results are
-    upgrades of existing images, not generations with a shared nature, so it
-    never appears in the Generate dropdown and its finished rows never live in
-    the gallery — each is folded into the image it enhanced
-    (:func:`origenerator.gallery.enhance.fold_enhancement`), which keeps its
-    folder and star and simply becomes the enhanced version. The output size
-    is the source's own dimensions at ``enhance_scale`` — no pixel budget.
-    """
-
     name = "image_enhance"
     version = "v005"
     display_name = "Image Enhance"
@@ -91,21 +59,12 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
             ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
-            # One denoise per part fixed, keyed by the part's name — the Enhance
-            # pane's line of numbers, and the range those spinners take. A
-            # part not named here is a part left alone; a part that IS named
-            # runs a real pass, so the floor sits above zero (the detailer node
-            # rejects a zero denoise, and a pass that repaints nothing is a
-            # slower way of not running one).
+            # The detailer node rejects a zero denoise, so a named part's floor sits above zero.
             ParamDef("enhance_detail_fixes", "Fixes", ParamType.FIXES, defaults["enhance_detail_fixes"],
                      min_val=0.05, max_val=FIX_MAX, step=0.05),
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
-        """The source image's own size at ``enhance_scale`` — what the tail's
-        rescale lands on — rather than a pixel-budget derivation. ``None`` when
-        no image is picked or it can't be measured, so the form shows nothing
-        until one resolves."""
         size = measure_image_size(params.get("input_image", ""))
         if size is None:
             return None

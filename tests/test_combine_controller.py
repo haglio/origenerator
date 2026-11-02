@@ -1,12 +1,3 @@
-"""Combine, driven with no gallery around it.
-
-The whole action used to be reachable only by building the app's central widget:
-which settings a picked action resolves to, what a stand-in row does before there is
-a job, and what a spoken animation refuses. Here the host is a handful of
-recorded calls.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -43,8 +34,6 @@ _A_CLIENT = object()
 
 
 class FakePanel:
-    """The Combine reduced to what the controller drives."""
-
     class _Slot:
         def __init__(self):
             self.item = None
@@ -225,8 +214,6 @@ class FakeGenerateTab:
 
 
 class FakeHost:
-    """A gallery reduced to what a combine asks of one."""
-
     def __init__(self, *, rows=()):
         self.rows = list(rows)
         self.revealed = []
@@ -294,8 +281,6 @@ def starting(qtbot):
 
 @pytest.fixture
 def combine(qtbot, monkeypatch, starting):
-    """A controller under a parent this fixture keeps alive, with a recorder for
-    a tab."""
     monkeypatch.setattr(module, "Combine", FakePanel)
     built = []
 
@@ -308,20 +293,14 @@ def combine(qtbot, monkeypatch, starting):
             host, parent=parent, db=db or FakeDB(), jobs=jobs or FakeReroll(),
             client=client, info_tabs_of=lambda: tabs or FakeTabs(),
             slideshows=slideshows or FakeSlideshows(), starting=starting, inbox=inbox)
-        # The wait between a press and a real job is what the stand-in row is
-        # for; running it straight through is what lets a test press and look.
         controller._after_painting = lambda work: work()
         built.append((parent, controller))
         return controller, host
     yield build
 
 
-# --- what the drop zones take ----------------------------------------------------
-
 
 def test_the_image_slot_takes_an_image_with_a_file_to_seed_from(combine):
-    # Not merely anything that produced a file: a video would satisfy
-    # that and cannot be a start frame.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     assert controller._accepts_image("img") is True
@@ -421,12 +400,8 @@ def test_a_panel_with_no_server_behind_it_hides(combine):
     assert controller.widget.visible is False
 
 
-# --- what a session keeps ---------------------------------------------------
-
 
 def test_the_session_keeps_the_image_each_lanes_videos_the_lane_and_the_action(combine):
-    # None of the four is recoverable from the others: an action says nothing about
-    # which lane answers it.
     controller, _host = combine()
     controller.widget.image_zone.set_item("img")
     controller.widget.set_dropped_videos({action_settings.VIDEO: "clip"})
@@ -490,8 +465,6 @@ def test_recent_leaves_out_what_the_video_slot_would_not_take(combine):
 
 
 def test_a_restore_puts_the_lane_in_before_the_action(combine):
-    # The lane decides which actions are answerable, and set_category refuses one
-    # that is grayed out under it.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     controller.restore({"image": "img", "video": "clip",
@@ -519,12 +492,8 @@ def test_the_two_item_list_older_sessions_wrote_still_restores(combine):
     assert controller.widget.video_zone.item == "clip"
 
 
-# --- the stand-in row -------------------------------------------------------
-
 
 def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine, starting):
-    # The work between the press and a real job is seconds long, and a button
-    # that seems to do nothing reads as an app that has died.
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     key = controller._show_starting("img", video_id="clip")
@@ -547,15 +516,13 @@ def test_a_picked_action_names_itself_rather_than_showing_a_video(combine, start
 
 
 def test_the_stand_in_row_comes_off_however_the_launch_ends(combine, starting):
-    controller, _host = combine(db=FakeDB([_image("img")]))  # its video is gone
+    controller, _host = combine(db=FakeDB([_image("img")]))
 
     controller.widget.combine_requested.emit(CombineRequest(
         image_id="img", video_id="clip", intent=action_settings.VIDEO))
 
     assert starting.rows() == []
 
-
-# --- launching a dropped pair ----------------------------------------------
 
 
 def test_a_dropped_pair_runs_the_videos_settings_on_the_image(combine, monkeypatch):
@@ -596,8 +563,6 @@ def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
     assert jobs.prepared == []
 
 
-# --- finding the settings an action names --------------------------------------
-
 
 def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_model(
         combine, monkeypatch):
@@ -633,7 +598,7 @@ def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
 
     controller.generate_category("img", "waving")
 
-    assert mined == []  # never asked: the overlay had pinned settings
+    assert mined == []
     assert jobs.prepared[0][0] == f"folder-for-{VIDEO_WORKFLOW}-3"
     assert host.revealed == [f"folder-for-{VIDEO_WORKFLOW}-3"]
 
@@ -655,8 +620,6 @@ def test_an_action_with_no_past_video_says_so_and_launches_nothing(combine,
 
 def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
                                                                        monkeypatch):
-    # A dialog thrown over an image someone is talking to is the one place this
-    # must never appear.
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.action_settings, "most_used_video", lambda *a, **k: None)
     slideshows = FakeSlideshows(showing=object())
@@ -679,8 +642,6 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, starting, mon
 
     assert starting.rows() == []
 
-
-# --- opening one instead of running it --------------------------------------
 
 
 def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
@@ -731,7 +692,6 @@ def _apart_from_the_image_and_the_seeds(params, workflow):
 @pytest.mark.parametrize("state", ["state one", None], ids=["sorted", "unsorted"])
 def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
         combine, monkeypatch, state):
-    # A past video of the action is there, and its settings are not what opens.
     _nothing_assigned(monkeypatch)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tab = FakeGenerateTab()
@@ -796,8 +756,6 @@ def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
                          ids=["generate", "edit individual"])
 def test_settings_assigned_by_prompts_alone_run_as_if_they_named_the_lanes_own_workflow(
         combine, monkeypatch, edit_first, lane):
-    # Assigned in Edit default… where no video was kept and the action had no
-    # settings of its own, so the record holds what he typed and no workflow.
     prompts = {"positive_prompt": "scene one", "negative_prompt": "scene two"}
     lanes_own = action_settings.starting_settings(lane)["workflow"]
 
@@ -812,8 +770,6 @@ def test_settings_assigned_by_prompts_alone_run_as_if_they_named_the_lanes_own_w
     assert params["negative_prompt"].startswith("scene two")
 
 
-# --- a spoken animation over the image on screen ---------------------------
-
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(combine,
                                                                        monkeypatch):
@@ -825,7 +781,6 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(combine,
                  _video("clip", status="error", requested="now", files=[])])
     controller, _host = combine(db=db)
 
-    # It gets as far as launching, which means the image was not refused.
     assert controller.animate_it(
         "img", AnimateRequest(action_settings.GENAU, "waving"))[1] != ALREADY_GENAUD
 
@@ -846,8 +801,6 @@ def test_a_spoken_launch_is_stamped_to_hand_its_clip_on(combine, monkeypatch):
 
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(combine, monkeypatch):
-    # Someone at the keyboard can look at it first; someone talking to a
-    # fullscreen image cannot.
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
@@ -881,9 +834,6 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
 
 def test_the_clip_lands_in_the_inbox_this_controller_was_handed(combine, monkeypatch,
                                                                 tmp_path):
-    """No patching of anything: where a video goes used to be a config constant
-    this module imported, so a test could only redirect it by reaching into the
-    module. It is an object now, given at construction."""
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
@@ -911,7 +861,6 @@ def test_a_clip_already_handed_on_is_not_sent_twice(combine, monkeypatch, tmp_pa
 
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
                                                           tmp_path):
-    # The video is safe either way, and Send-to-Genau is still there to retry with.
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
@@ -929,8 +878,6 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
     assert db.exported == []
 
 
-# --- which actions are pickable at all -----------------------------------------
-
 
 def test_an_action_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_image_conditioned",
@@ -946,7 +893,6 @@ def test_an_action_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
 
 
 def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypatch):
-    # An action with plenty of long-form video under it may have no loop at all.
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     seen = []
     monkeypatch.setattr(module.action_settings, "available_categories",
@@ -960,9 +906,6 @@ def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypat
 
 
 def test_a_spoken_action_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch):
-    # One item at a time per folder, and the spoken request still gets its video: the
-    # run already going is stamped to be handed over when it lands, rather than a
-    # second one being made of the same thing.
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
@@ -979,7 +922,6 @@ def test_a_spoken_action_whose_folder_is_already_making_one_joins_that_run(combi
     assert db.requested == ["the-run-already-going"]
     assert jobs.prepared == []
     assert [message for _pid, message, _kind in slideshows.runs_said] == [module.ALREADY_MAKING_ONE]
-# --- the spoken "animate as" -------------------------------------------------
 
 _PATHS = {
     "animation_paths": {
@@ -1119,8 +1061,6 @@ def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,
 
 
 def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
-    # Graying every action over an image that says nothing about itself would read
-    # as the tab being broken.
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
                         lambda rows, intent: {"waving", "leaning"})
@@ -1133,8 +1073,6 @@ def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
 
 def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin(
         combine, monkeypatch, tmp_path):
-    """The same action started from two situations is two runs, and the overlay's
-    per-action pin can only be right for one of them."""
     pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
     accepted = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 24}}
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: pinned)
@@ -1162,8 +1100,6 @@ def test_an_image_nobody_sorted_still_gets_the_actions_pin(combine, monkeypatch)
 
 
 def test_edit_default_opens_the_window_that_settles_each_animation(combine, monkeypatch, qtbot):
-    """His ask: reachable from inside the app, so the window he judges an
-    animation's settings in needs no launcher of its own."""
     controller, _host = combine()
     made = QWidget()
     qtbot.addWidget(made)
@@ -1193,8 +1129,6 @@ def test_a_second_press_brings_that_window_back_rather_than_another(combine, mon
 
 
 def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch):
-    """Every other test here drives a recorder in the tab's place, so the one
-    thing it cannot answer is whether the button he presses is wired at all."""
     made = QWidget()
     qtbot.addWidget(made)
     monkeypatch.setattr(module, "the_animation_window", lambda: made)

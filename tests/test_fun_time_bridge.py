@@ -1,9 +1,3 @@
-"""The hosted app's file channels: Fun Time's verbs in, occupancy out.
-
-Fun Time speaks to its Satellite Funestras through a command file, a paused
-flag and a status file; a hosted Origenerator answers the same idioms so the
-session's hotkeys reach the region slideshows and its choreography can see them.
-"""
 from __future__ import annotations
 
 import json
@@ -63,9 +57,6 @@ def _session(tmp_path):
 
 
 def _as_items(rows):
-    """The fixture's rows as a slideshow's items — a tuple passed through, a row
-    stood in for by a tuple named after it — where a test hands the director a
-    library of ready-made items rather than files to resolve."""
     return [row if isinstance(row, tuple)
             else (f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
             for row in rows]
@@ -80,7 +71,7 @@ def _view_with_bridge(qtbot, tmp_path, rows=()):
 
 def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
     items = []
-    for n in range(count):  # a file each, since a Funestra says what it shows by its file
+    for n in range(count):
         still = tmp_path / f"tall{n}.png"
         Image.new("RGB", (100, 200)).save(still)
         items.append((str(still), "image", f"id{n}", str(still)))
@@ -102,7 +93,7 @@ def test_side_verbs_drive_the_slideshow_holding_that_region(qtbot, tmp_path, mon
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_NEXT\n", encoding="utf-8")
     bridge._tick()
-    slideshow.tick()  # it reads its Funestra, as its poll does a moment later
+    slideshow.tick()
 
     assert slideshow._set.playlist.index == (before + 1) % 3
 
@@ -111,10 +102,8 @@ def test_a_verb_for_an_empty_region_is_dropped(qtbot, tmp_path):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     (tmp_path / "origenerator_cmd.txt").write_text("LANDSCAPE_TRASH\n", encoding="utf-8")
 
-    bridge._tick()  # nothing holds the landscape region
+    bridge._tick()
 
-    # Dropped, not queued: the verb is taken off the channel like any other, and
-    # nothing was opened to answer it with.
     assert not (tmp_path / "origenerator_cmd.txt").exists()
     assert view.region_slideshow("landscape") is None
 
@@ -131,8 +120,6 @@ def test_lock_verb_locks_the_slide(qtbot, tmp_path, monkeypatch):
 
 def test_the_spoken_lock_and_unlock_each_leave_the_slide_the_way_they_name(
         qtbot, tmp_path, monkeypatch):
-    """Said twice, "portrait lock" stays locked where the key's flip would let
-    go: the session sends the words as the state they ask for."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     held = []
@@ -146,8 +133,6 @@ def test_the_spoken_lock_and_unlock_each_leave_the_slide_the_way_they_name(
 
 
 def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
-    """The reset on the shared button row, spoken to a slideshow: the lock
-    releases and the top of the set comes back."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     slideshow._set.playlist.jump_to(2)
@@ -182,9 +167,6 @@ def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path,
 
 
 def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch):
-    """The session owns the room's microphone, so it hears "landscape
-    favorites" and posts the WORDS on this channel — matched here, against this
-    app's own vocabulary, because only this app knows what its collections are."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     spoken = []
     monkeypatch.setattr(view, "run_spoken_command",
@@ -252,8 +234,6 @@ def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, t
 
 
 def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path, monkeypatch):
-    """End to end from the words: the phrase the session heard becomes the
-    command this app would have matched had it heard it itself."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     played = []
     monkeypatch.setattr(view._slideshows, "play_collection", played.append)
@@ -266,8 +246,6 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
 
 
 def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, monkeypatch):
-    """Each of the session's Satellite Funestras goes into Origenerator mode by
-    itself, so the session hands this app one shape at a time."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     filled = []
     monkeypatch.setattr(view, "fill_the_region", filled.append)
@@ -330,12 +308,6 @@ def test_a_side_taken_back_on_its_own_closes_that_sides_slideshow_alone(qtbot, t
 
 
 def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
-    """Both regions on their base state, each playing the ids named for it —
-    what the session's two opens put up, and the arrangement one switch has to move.
-
-    The ids are the fabricated rows' own, so the slideshow can tell which of its
-    items carry an enhancement; the items above carry ids no row has.
-    """
     tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
     Image.new("RGB", (100, 200)).save(tall)
     Image.new("RGB", (200, 100)).save(wide)
@@ -343,8 +315,6 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
         "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in portrait],
         "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in landscape],
     }
-    # The library's own row under the fabricated still, so whether an image
-    # carries an enhancement is read where the app reads it.
     monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [
         {**(view.row_for(item[2]) or {}), **_row_of(item)}
         for item in library.get(key, [])])
@@ -363,9 +333,6 @@ def _press_filter_enhanced(bridge, tmp_path):
 
 def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
         qtbot, tmp_path, monkeypatch):
-    """The session's console carries the enhanced-only switch a slideshow's own HUD
-    carries, so a press there has to reach the slideshows here — answered nowhere, it
-    left the console lit over regions still playing all of them."""
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
@@ -375,7 +342,6 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
     _press_filter_enhanced(bridge, tmp_path)
 
     assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [True, True]
-    # Each region down to the one enhanced image it was playing.
     assert [slideshow.pass_size() for slideshow in (portrait, landscape)] == [1, 1]
 
     _press_filter_enhanced(bridge, tmp_path)
@@ -386,17 +352,12 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
 
 def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    """Each region's own HUD carries this switch too, so the two can already
-    disagree when the session's one is pressed.  The press reads the pair to
-    pick its direction — anything narrowed widens — because flipping each in
-    place would only swap which region was narrowed, and one lit switch cannot
-    say that a room is half narrowed."""
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
     portrait, landscape = _fill_both_regions(
         qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
-    portrait.toggle_enhanced_mode()  # narrowed from its own HUD, the other not
+    portrait.toggle_enhanced_mode()
 
     _press_filter_enhanced(bridge, tmp_path)
 
@@ -405,8 +366,6 @@ def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
 
 def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
         qtbot, tmp_path, monkeypatch):
-    """A set with nothing enhanced in it refuses the narrowing rather than
-    emptying itself, exactly as it does when its own HUD button is pressed."""
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _image("l2", "a boat", 40, 4)])
@@ -420,8 +379,6 @@ def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
 
 
 def test_filter_enhanced_with_no_slideshow_up_is_dropped(qtbot, tmp_path):
-    """Nothing to narrow and nothing armed for later: the verb comes off the
-    channel like any other and the mode is left as it was."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
 
     _press_filter_enhanced(bridge, tmp_path)
@@ -434,7 +391,7 @@ def test_filter_enhanced_with_no_slideshow_up_is_dropped(qtbot, tmp_path):
 def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    assert _will_move_on(slideshow)  # an image slide dwells on its timer
+    assert _will_move_on(slideshow)
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
@@ -446,10 +403,6 @@ def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, 
 
 
 def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
-    """Every video tile loops a little video of itself and the generate tabs
-    play the real thing, so a paused room with the gallery in it was a wall of
-    videos still going. OmniPause stops the room, not only its slideshows, and one
-    freeze covers every one of them — wherever drawn, and whenever built."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     assert omnipause.frozen() is False
 
@@ -463,9 +416,6 @@ def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
 
 
 def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):
-    """All the session asks of this file, and all it has ever asked: that it is
-    there and reads.  It waits on it before opening the mode, because a mode
-    opened over an app still booting has nothing under it."""
     _view, bridge = _view_with_bridge(qtbot, tmp_path)
 
     bridge._tick()
@@ -475,10 +425,6 @@ def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):
 
 
 def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
-    """The session clears this file as it opens the mode, so that last
-    session's does not answer for this one.  A signal written once and
-    remembered would never come back for the session that cleared it, and the
-    mode would sit closed forever."""
     _view, bridge = _view_with_bridge(qtbot, tmp_path)
     bridge._tick()
     (tmp_path / "origenerator_status.txt").unlink()
@@ -490,22 +436,16 @@ def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
 
 
 def test_a_slideshow_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):
-    """The room being OmniPaused must hold a slideshow the user opens DURING the
-    pause too — the flag edged onto already-open slideshows once, so a slideshow
-    started mid-pause played while everything else in the session stood."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
 
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    assert not _will_move_on(slideshow)  # no dwell armed: it opened frozen
+    assert not _will_move_on(slideshow)
 
 
 def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path, monkeypatch):
-    """Stepping a frozen slideshow moves it to a new slide, but the new slide must
-    arrive frozen — re-arming the dwell was the slideshow quietly unpausing
-    itself while the rest of the room stayed frozen."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
@@ -514,20 +454,13 @@ def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path,
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_NEXT\n", encoding="utf-8")
     bridge._tick()
-    slideshow.tick()  # it reads its Funestra, as its poll does a moment later
+    slideshow.tick()
 
-    assert slideshow._set.playlist.index == (before + 1) % 3  # the step still lands
-    assert not _will_move_on(slideshow)                # but the slide stays frozen
+    assert slideshow._set.playlist.index == (before + 1) % 3
+    assert not _will_move_on(slideshow)
 
 
 def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):
-    """The one spoken input with no phrase to match: the words between
-    "request" and "over" are the speaker's own, so the session forwards each
-    utterance verbatim and this app's own dictation assembles them — the same
-    one its mic feeds, since the two never listen at once.
-
-    Fabricated request wording, like every fixture here.
-    """
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     begun = []
@@ -537,20 +470,17 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
     (tmp_path / "origenerator_cmd.txt").write_text(
         "PORTRAIT_SAY:request no feet\n", encoding="utf-8")
     bridge._tick()
-    assert not begun  # still being said — the slideshow pauses rather than acting
+    assert not begun
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "PORTRAIT_SAY:over\n", encoding="utf-8")
     bridge._tick()
 
-    # The shape is the region it was said to, not the first word of the request.
     assert begun == [("no feet", "portrait")]
     assert slideshow is view.region_slideshow("portrait")
 
 
 def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkeypatch):
-    """While one is open the dictation swallows what it hears — half a sentence
-    must not fire a command because two of its words happened to be one."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     played = []
@@ -625,14 +555,11 @@ def test_closing_the_slideshow_a_request_was_said_to_drops_the_request(
 
 
 def _press(bridge, tmp_path, line: str) -> None:
-    """A press the session routed back here, as a Funestra's HUD posted it."""
     (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
     bridge._tick()
 
 
 def test_a_funestras_filter_presses_reach_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):
-    """A session hands a Funestra's presses back verbatim, spelled the way the
-    HUD posted them — so the slideshow's own two switches answer them here."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id1"})
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -656,8 +583,6 @@ def test_a_press_on_a_funestras_clip_seconds_paces_the_slideshow_on_that_side(
 
 
 def test_a_thumbnail_press_carries_its_path_through_the_colon_in_it(qtbot, tmp_path, monkeypatch):
-    """A path rides after the "|", and a Windows path has a colon of its own —
-    which must not be read as the start of a spoken phrase."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     jumps = []
@@ -698,8 +623,6 @@ def _funestras_session(tmp_path):
 
 def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
         qtbot, tmp_path, monkeypatch):
-    """Entering the mode with the Funestras handed over: each Funestra is given the
-    list of its own side's shape, and no window of this app's opens at all."""
     def no_window(*args, **kwargs):
         raise AssertionError("a window of this app's opened over a region")
 
@@ -770,12 +693,6 @@ def _stills(tmp_path, prefix, count, size):
 
 
 def _row_of(item) -> dict:
-    """An item of ``_stills`` as the row the gallery lists it from.
-
-    Rows and items are different things — a slideshow is built from items and armed
-    with the versions read off rows — so the stubs hand over each in its own
-    shape rather than one standing in for both.
-    """
     return {"prompt_id": item[2], "output_files": "[]", "thumbnail_path": item[3]}
 
 
@@ -843,8 +760,6 @@ def test_a_double_click_over_frames_of_no_run_in_flight_leaves_the_funestras_alo
 
 def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_folder=False,
                                  tall=False):
-    """A session with its Funestras handed over, a run going in the tab in front,
-    and that tab's preview double-clicked on the run's first frame."""
     def by_id(row, places):
         if row.get("status") != "completed":
             return None
@@ -866,7 +781,7 @@ def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_f
     _key, job = _running_reroll(view, PORTRAIT if tall else LANDSCAPE)
     if alone_in_its_folder:
         db.delete_generation("orig")
-    view.refresh()  # the poll's rebuild, which puts the run in its folder
+    view.refresh()
     _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
     _preview_of(view).open_fullscreen()
@@ -915,10 +830,6 @@ def test_a_run_watched_on_a_funestra_lands_at_the_clip_seconds(qtbot, tmp_path, 
 
 
 def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):
-    """Home and E are the session's loop keys, one per satellite; in
-    origenerator mode they arrive here as the side's loop verb and step the
-    slideshow's loop.  A slideshow of items no library maps has nothing to loop, so the
-    press is the lock — and the next lets go, the way a lone video's is."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
@@ -930,8 +841,6 @@ def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_pat
 
 
 def test_the_maps_own_verbs_all_reach_the_slideshow(qtbot, tmp_path, monkeypatch):
-    """Every press the Funestras' map posts — the two loop buttons, the expand
-    mark, a map key — has an answer here, so none is dropped on the log."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     dropped = []
@@ -948,8 +857,6 @@ def test_the_maps_own_verbs_all_reach_the_slideshow(qtbot, tmp_path, monkeypatch
 
 def test_a_rows_filter_press_is_spelled_the_other_way_round_and_still_reaches_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    """The HUD posts a row's filter button as ``filter_<shape>_<row>`` —
-    the shape in the middle — and a session hands it back verbatim."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     asked = []
@@ -969,8 +876,6 @@ def test_a_verb_said_to_neither_side_is_dropped_on_the_log(qtbot, tmp_path, capl
 
 
 def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
-    """*line* on the command file of a bridge over a gallery that has every
-    answer, so a line dropped is dropped by the bridge itself."""
     session = _session(tmp_path)
     bridge = FunTimeBridge(session, MagicMock())
     session.command_file.write_text(f"{line}\n", encoding="utf-8")
@@ -985,9 +890,6 @@ def _a_line_like(template: str, tmp_path) -> str:
 
 
 def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_path, caplog):
-    """A host sends what the document names, so a named line dropped here is a
-    key that does nothing in the session -- in whichever case the host spells
-    it, which the document leaves to the host."""
     document = contract.declaration()
     assert document["command_case_blind"]
 
@@ -1043,9 +945,6 @@ def test_a_line_naming_nothing_here_or_carrying_nothing_where_it_must_matches_no
 
 def test_a_clip_the_session_names_lands_the_gallery_on_the_generation_it_copies(
         qtbot, tmp_path):
-    """Genau locking, in the session, on a loop this app made: the gallery goes
-    to that loop -- its folder, its tile, its tab -- as a lock on one of this
-    app's own slideshows takes it there."""
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("i1", "a cat", 50, 1),
         _row("v7", "wan22_i2v", {"seed": 7}, "wan22_i2v_00007_.mp4")])
@@ -1057,8 +956,6 @@ def test_a_clip_the_session_names_lands_the_gallery_on_the_generation_it_copies(
 
 
 def test_a_clip_this_app_did_not_make_leaves_the_gallery_where_it_stands(qtbot, tmp_path):
-    """Genau's folder holds the videos carved by hand as well: one of those is
-    none of this app's to show."""
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("i1", "a cat", 50, 1),
         _row("v7", "wan22_i2v", {"seed": 7}, "wan22_i2v_00007_.mp4")])
@@ -1084,8 +981,6 @@ def test_a_clip_the_session_names_that_this_app_made_asks_the_room_to_show_this_
 
 
 def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
-    """The keys that move a HUD are the room's, so the session keeps the
-    answer and tells this app; a slideshow opened into that region later wears it."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
 
     view._fun_time.command_file.write_text(
@@ -1145,7 +1040,7 @@ def test_the_radio_is_dealt_once_however_often_this_app_says_it_is_up(qtbot, tmp
     _view, bridge = _view_with_funestras_and_bridge(qtbot, tmp_path)
     bridge._tick()
     dealt = radio_file_for(tmp_path / "portrait.tsv").read_text(encoding="utf-8")
-    (tmp_path / "origenerator_status.txt").unlink()  # the session opening the mode again
+    (tmp_path / "origenerator_status.txt").unlink()
 
     for _ in range(5):
         bridge._tick()
@@ -1171,3 +1066,19 @@ def test_an_app_closing_takes_its_funestras_radio_with_it(qtbot, tmp_path):
 
     assert _stations_dealt(tmp_path) == [0, 0]
     assert not radio_file_for(tmp_path / "portrait.tsv").exists()
+
+
+def test_asking_the_room_for_the_mode_writes_it_on_the_dashboard_channel(tmp_path):
+    from origenerator.fun_time_bridge import ask_for_origenerator_mode
+    from origenerator.slideshow_buttons import ORIGENERATOR_MODE
+    channel = tmp_path / "dashboard_cmd.txt"
+
+    ask_for_origenerator_mode(channel)
+
+    assert consume_command_file(channel) == [ORIGENERATOR_MODE.upper()]
+
+
+def test_a_session_that_names_no_dashboard_channel_is_not_asked_for_the_mode():
+    from origenerator.fun_time_bridge import ask_for_origenerator_mode
+
+    ask_for_origenerator_mode(None)

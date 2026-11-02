@@ -1,18 +1,3 @@
-"""Shared fixtures — the overlay pin, and the state directory of the suite's own.
-
-The suite runs against the committed example overlay and the example of the
-settings all of Haglio shares, never the developer's git-ignored
-content.local.json or ~/.haglio, so a run here matches a public checkout.
-pytest imports this before any test module, and the app loads its content at
-import, so the pin has to happen here.
-
-The same goes for where the app keeps its state: config binds STATE_DIR at
-import and every module that reads it binds its own copy, so the one place a
-run can be pointed at a directory of its own is the environment, before the
-first origenerator import.  A run used to leave a log, arrow PNGs, thumbnails,
-trash and a real recording in the checkout's live state/, and what one run
-left decided what the next one drew.
-"""
 from __future__ import annotations
 
 import os
@@ -26,17 +11,12 @@ if "ORIGENERATOR_STATE_DIR" not in os.environ:
     os.environ["ORIGENERATOR_STATE_DIR"] = _suite_state_dir
     remove_at_exit(Path(_suite_state_dir))
 
-# Before anything that can pull PyQt6 in: the voice stack's native DLLs
-# (whisper's engine, its VAD, and torch where installed) die with a plain
-# access violation when first loaded AFTER Qt — the same crash
-# app._warm_voice_runtimes preloads its way past for the app, which took a
-# whole pytest run down mid-suite on a machine carrying the voice extra.
-# Guarded per module: none is required, and CI has none of them.
+# The voice stack's native DLLs (onnxruntime, ctranslate2, torch) crash with an access violation when first loaded after Qt.
 for _voice_module in ("onnxruntime", "ctranslate2", "torch"):
     try:
         __import__(_voice_module)
     except Exception:
-        pass  # no voice extra (or a broken one): the suite still runs
+        pass
 
 from app_support import haglio_settings as _haglio_settings
 
@@ -93,22 +73,12 @@ pytest_plugins = ("shared_ui.testing",)
 
 @pytest.fixture(autouse=True)
 def _unscaled_between_tests():
-    """No test leaves this process drawing at another size than it found it.
-
-    QT_SCALE_FACTOR is read by Qt per widget, and it is an ENVIRONMENT variable
-    -- process-global, outliving whatever set it. A test that runs the hosted
-    launch (main(["--fun-time", ...]), which scales the app on purpose) would
-    otherwise hand every later test in the session a scaled Qt, and the tests
-    that assert a window landed on the rect it was given fail hundreds of cases
-    downstream of the one that actually set it.
-    """
+    """QT_SCALE_FACTOR is a process-global environment variable that Qt reads per widget, so a test that scales the app would scale every test after it."""
     before = os.environ.get("QT_SCALE_FACTOR")
     try:
         yield
     finally:
         if os.environ.get("QT_SCALE_FACTOR") != before:
-            # A window taken into a session rescales Qt itself, not only the
-            # variable, and Qt's factor outlives the test just the same.
             from origenerator import ui_scale  # noqa: PLC0415 (after Qt is up)
             ui_scale.draw_at(1.0)
         if before is None:
@@ -116,18 +86,9 @@ def _unscaled_between_tests():
         else:
             os.environ["QT_SCALE_FACTOR"] = before
 
-# Render Qt offscreen for the whole suite. Agents run these GUI tests on every
-# commit; without this, each test that shows a widget throws a real window onto
-# the screen for a few milliseconds, so a run flashes a burst of windows. Must
-# be set before any QApplication is created (i.e. before pytest-qt's qapp
-# fixture); setdefault lets a developer override it to watch a test on a real
-# display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
-# One recognizable tensor name per architecture, matching the signatures in
-# origenerator.workflows.model_arch. Fabricated, not lifted from a real file —
-# a header is all the dropdowns read, so a stand-in needs nothing else.
 ARCH_TENSOR_NAMES = {
     "sdxl": ["conditioner.embedders.0.transformer.x", "model.diffusion_model.input_blocks.0.y"],
     "sd15": ["cond_stage_model.transformer.x", "model.diffusion_model.input_blocks.0.y"],
@@ -148,20 +109,10 @@ _ARCH_TENSOR_SHAPES = {"wan_t2v": {"patch_embedding.weight": [5120, 16, 1, 2, 2]
 
 
 class ModelTree:
-    """A stand-in ``ComfyUI/models`` tree, written one fake model at a time."""
-
     def __init__(self, root):
         self.root = root
 
     def add(self, category, name, *, arch=None, lora=False, body=None, metadata=None):
-        """Write ``models/<category>/<name>``, returning its path.
-
-        With *arch*, the file gets a real safetensors header naming that
-        architecture's tensors — plus the LoRA suffixes when *lora* — which is
-        what the dropdowns classify it by, and *metadata* goes into that header
-        as the trainer's own notes would. With *body*, the raw bytes are
-        written instead, for the unreadable-file cases.
-        """
         path = self.root / "models" / category / name
         path.parent.mkdir(parents=True, exist_ok=True)
         if body is not None:
@@ -182,7 +133,6 @@ class ModelTree:
 
 @pytest.fixture
 def installed_models(tmp_path, monkeypatch):
-    """An empty stand-in models tree, with ``config.COMFYUI_DIR`` pointed at it."""
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     return ModelTree(tmp_path)
 
@@ -213,17 +163,6 @@ def recorded_base_models(tmp_path, monkeypatch):
 
 
 class FakeCommandAndRequestListener(QObject):
-    """Stands in for CommandAndRequestListener so no test ever opens a real
-    microphone.
-
-    Suite-wide rather than per-module, so a module that builds a gallery for
-    some other reason can never inherit a device grab and a speech-model
-    download from the one that does.
-
-    ``speak_command`` simulates an utterance either matcher recognizes, and
-    ``speak`` one fed through the real request dictation.
-    """
-
     error = pyqtSignal(str)
     heard = pyqtSignal(str)
     request = pyqtSignal(object)
@@ -246,9 +185,6 @@ class FakeCommandAndRequestListener(QObject):
         self._execute = None
 
     def speak_command(self, text):
-        """One spoken utterance while commands are armed: matched → executed.
-
-        Both vocabularies, bare one first — the order the live listener uses."""
         if not self.commands_on:
             return None
         matched = self._bare_matcher(text) if self._bare_matcher else None
@@ -259,20 +195,12 @@ class FakeCommandAndRequestListener(QObject):
         return matched
 
     def bare_command(self, text):
-        """The whole-utterance command *text* is, asked first of a phrase the
-        hosting session heard -- the live listener's own method, mirrored."""
         collecting = self._dictation is not None and self._dictation.listening
         if collecting or self._bare_matcher is None:
             return None
         return self._bare_matcher(text)
 
     def speak(self, text):
-        """One utterance through the real dictation, as the mic would feed it.
-
-        The live routing, in its own order: a whole-utterance command outranks
-        an opening request (and nothing else does), then an open dictation
-        swallows what it hears, then the looser matcher gets what is left.
-        """
         collecting = self._dictation is not None and self._dictation.listening
         if not collecting and self.commands_on and self._bare_matcher is not None:
             bare = self._bare_matcher(text)
@@ -286,9 +214,6 @@ class FakeCommandAndRequestListener(QObject):
         return self.speak_command(text)
 
     def push_dictation(self, text, spoken_at=None):
-        """The same dictation, fed from somewhere other than the mic — the
-        hosting session's channel, which is where the words of a request arrive
-        while this app is hosted and its own mic is shut."""
         return (self._dictation.push(text, spoken_at=spoken_at)
                 if self._dictation is not None else None)
 
@@ -302,8 +227,6 @@ class FakeCommandAndRequestListener(QObject):
 
 
 class FakeHearing(QObject):
-    """A microphone that says *says* each time ``hear`` is called."""
-
     said = pyqtSignal(str, float)
     failed = pyqtSignal(str)
 
@@ -324,7 +247,6 @@ class FakeHearing(QObject):
 
 
 def keep_the_microphone_shut(setattr) -> None:
-    """Point every voice router's listener at the inert stand-in above."""
     setattr(voice_router, "CommandAndRequestListener", FakeCommandAndRequestListener)
 
 
@@ -334,14 +256,6 @@ def _no_real_mic(monkeypatch):
 
 
 def refuse_the_comfyui_on_this_machine(setattr) -> None:
-    """Refuse every call to the real ComfyUI and local LLM addresses, as a
-    machine without either would.
-
-    Whatever reaches the ComfyUI running here is rendered into the folder the
-    app imports new images from at launch -- into the user's own gallery; and
-    a test answered by whatever model happens to be running here passes on this
-    machine alone.
-    """
     real_urlopen = urllib.request.urlopen
     llm = urllib.parse.urlsplit(config.LOCAL_LLM_BASE_URL)
     refused = {(config.COMFYUI_HOST, config.COMFYUI_PORT), (llm.hostname, llm.port)}
@@ -364,8 +278,6 @@ def _never_reach_the_comfyui_on_this_machine():
 
 
 def start_no_comfyui_on_this_machine(setattr) -> None:
-    """A queue whose submit is refused starts the ComfyUI here; a queue the
-    suite builds has nothing to start, unless its test hands it a stand-in."""
     setattr(job_queue, "BRING_UP_COMFYUI", None)
 
 
@@ -377,16 +289,6 @@ def _never_start_the_comfyui_on_this_machine():
 
 
 def keep_off_the_device(setattr) -> None:
-    """Keep the suite off the OSR2.
-
-    A test that builds a gallery gets real drive controllers, and the one OSR2
-    switch now *drives* the moment it goes on — a motion when there's no
-    funscript to follow — where it used to arm and wait. So turning it on in a
-    test would open a socket at the broker's port and spin the 40 Hz clock.
-    Both drivers take an injectable broker, and every test that
-    exercises one for its own sake injects its own; this only replaces the
-    default, so nothing is left reaching the hardware by accident.
-    """
     class _NoDevice:
         def want(self, wanted): pass
         def ask(self, verb): pass
@@ -401,17 +303,9 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "_TickThread", _NoTicker)
-    # And off the broker's serial stamps, which the OSR2 controls read to say whether
-    # the device is answering: those are live files whose freshness depends on
-    # whether the OSR2 happens to be switched on right now, so a suite reading
-    # them would pass or fail with the hardware. The stand-in says it is there —
-    # the OSR2 controls' own state before they could tell — and the tests about the
-    # device being off inject their own.
     setattr(osr2_controls.osr2, "device_mode",
             lambda **_kw: osr2_controls.osr2.osr2_device.Osr2Mode.CONTROLLED)
     setattr(osr2_controls.osr2, "device_trouble", lambda **_kw: None)
-    # The Broker's heartbeat is as live as those stamps, and a press on its
-    # button would start or stop the machine's own Broker.
     setattr(osr2_controls.osr2, "broker_running", lambda **_kw: True)
     setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)
 
@@ -427,17 +321,6 @@ def _never_take_the_real_device(monkeypatch):
 
 
 def keep_out_of_windows(setattr) -> None:
-    """Keep the suite out of the registry and off the user's screen.
-
-    Every window this suite builds builds the desktop toasts with it, and those
-    name the app to Windows: two values under HKEY_CURRENT_USER — what to call
-    this app over a toast, and what a click on one runs — and a mark
-    written beside them, all of which belong to a real launch rather than to a
-    test's fiftieth throwaway window. And a toast raised here would be a
-    toast on the user's desktop and a line in their notification center,
-    from a run that never happened. All three are replaced; the test that
-    covers any of them supplies its own stand-in over these.
-    """
     setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
     setattr(toasts, "register_toast_identity", lambda *_a, **_kw: None)
     setattr(toasts, "register_link_handler", lambda *_a, **_kw: None)
@@ -460,7 +343,6 @@ def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
 
 @pytest.fixture(autouse=True)
 def _never_name_this_app_to_the_real_windows(monkeypatch, _this_tests_own_folder):
-    """keep_out_of_windows, with the toasts' marks in an AppData of the run's own."""
     appdata = _this_tests_own_folder / "appdata"
     appdata.mkdir()
     monkeypatch.setenv("LOCALAPPDATA", str(appdata))
@@ -479,8 +361,6 @@ def alert_sounds(monkeypatch):
 
 
 def keep_the_run_at_its_own_priority(setattr) -> None:
-    """A run is background work: nothing a test plays puts it ahead of the apps
-    in use on this computer. The test that needs the real block puts it back."""
     setattr(running_ahead, "_THIS_APP", running_ahead.AheadWhilePlaying(contextlib.nullcontext))
 
 
@@ -490,17 +370,7 @@ def _never_raise_the_runs_priority(monkeypatch):
 
 
 def refuse_the_dialogs_nobody_can_answer(setattr) -> None:
-    """Fail on a modal the test never arranged to answer, rather than hang on it.
-
-    A message dialog or input dialog raised in an offscreen run has nobody to click
-    it: it spins a nested event loop that nothing ever ends, so the test stops
-    dead and holds the merge gate open until GitHub's six-hour limit, with no
-    output naming which test it was. That is worse than the wrong answer in every
-    way, and it is one mis-wired menu entry away at all times — a "Favorite"
-    pointed at the delete's handler asks for confirmation, and there the run
-    stops. Every test that means to reach a dialog answers it with a monkeypatch
-    of its own, which lands over this one.
-    """
+    """An offscreen modal dialog spins a nested event loop nobody can end, so the run would hang instead of failing."""
     def refuse(name):
         def blocked(*_args, **_kwargs):
             raise AssertionError(
@@ -522,42 +392,20 @@ def _no_dialog_nobody_can_answer(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _enhance_presets_of_the_tests_own(monkeypatch, _this_tests_own_folder):
-    """Every window loads the presets, and one test's saved preset is no other's."""
     monkeypatch.setattr(enhance_presets, "PRESETS_PATH",
                         _this_tests_own_folder / "enhance_presets.json")
 
 
 def pytest_collection_finish(session):
-    """Take the import graph out of every collection the reap below runs.
-
-    That reap is a full ``gc.collect()`` after each of ~3,280 tests, and nearly
-    everything it walks is import graph — pytest, PyQt6, origenerator and the
-    test modules themselves — which is permanently live and never garbage.
-    ``gc.freeze`` moves it to the permanent generation, which no collection
-    traverses, so each reap costs what the test allocated instead of what the
-    interpreter holds.
-
-    Nothing about reaping changes for what tests build afterwards: a cycle
-    created post-freeze is still promoted through the generations and still
-    reaped by a full collect. Collection-finish is the last moment before any
-    test runs — every test module is imported by then, and pytest-qt's
-    QApplication does not exist yet, so no widget can be frozen alive.
-    """
+    """gc.freeze moves the import graph out of the full gc.collect() each test's reap runs; collection finish is before pytest-qt's QApplication exists, so no widget is frozen alive."""
     gc.collect()
     gc.freeze()
 
 
-# The suite's standing tail of deliberately long-lived widgets: measured at
-# 26-27 at the end of identical full runs. Growth past double that is
-# accumulation — the pile-up the per-test reap below exists to prevent —
-# well before the hundreds it takes to hurt.
 _WIDGET_TAIL_ALLOWANCE = 50
 
 
 class _DeferredDeleteCounter(QObject):
-    """Counts DeferredDelete events. Installed on the application object, which
-    Qt gives every event in this thread, whatever object it was sent to."""
-
     def __init__(self) -> None:
         super().__init__()
         self.seen = 0
@@ -580,21 +428,7 @@ def _deliver_deferred_deletes() -> int:
 
 
 def _deliver_the_deletions_already_scheduled():
-    """Carry out Qt's pending ``deleteLater`` deletions now, and the ones they set off.
-
-    pytest-qt hands each test's registered widgets a ``deleteLater`` at
-    teardown, but a posted DeferredDelete is only delivered once an event loop
-    spins — which a test that never pumps one leaves undone. Until then the C++
-    widget is still allocated and still connected, so the deletion has to be
-    driven rather than waited for: a lone run of the gallery view's tests
-    otherwise ends holding 1,048 widgets that are already condemned, and every
-    one of them goes when this runs.
-
-    PyQt keeps an object of its own for each Python slot connected to a
-    signal, and when the signal's sender is destroyed it queues a call that
-    hands that object a ``deleteLater``, so the queued calls are delivered
-    between rounds until a round has nothing left to delete.
-    """
+    """A posted deleteLater is delivered only while an event loop spins, and PyQt queues a further deleteLater for each slot object of a destroyed sender, so deliver rounds until one deletes nothing."""
     if QApplication.instance() is None:
         return
     QCoreApplication.sendPostedEvents()
@@ -604,13 +438,6 @@ def _deliver_the_deletions_already_scheduled():
 
 @pytest.fixture(autouse=True, scope="session")
 def _the_live_widget_count_stays_flat():
-    """The per-test reap's acceptance criterion, asserted: widgets from the
-    run's thousands of built-and-discarded widgets must not accumulate.
-
-    Sampled after the pending deletions are delivered and the cycles collected,
-    so what it counts is what something still *holds* — a widget already
-    condemned is not a leak, and a widget nothing can reach is not one either.
-    """
     before = len(QApplication.allWidgets()) if QApplication.instance() else 0
     yield
     if QApplication.instance() is None:
@@ -626,14 +453,7 @@ def _the_live_widget_count_stays_flat():
 
 @pytest.fixture(scope="session")
 def _widgets_registered_this_test():
-    """What the running test handed ``qtbot.addWidget``, held until the reap below.
-
-    pytest-qt holds those widgets only weakly, and spins the event loop again
-    once the test body has returned. A shown gallery is a reference cycle, so for
-    that spin it was garbage Qt was still painting, and a collection that landed
-    inside one of its paints freed the whole tree under the paint: the Python 3.14
-    gate went down that way in the gallery's delete tests.
-    """
+    """pytest-qt holds registered widgets weakly and spins the event loop once more after the test body, so a collection landing inside a shown gallery's paint frees the tree under it."""
     held = []
     register = QtBot.addWidget
 
@@ -648,24 +468,7 @@ def _widgets_registered_this_test():
 
 @pytest.fixture(autouse=True)
 def _collect_widgets_between_tests(_widgets_registered_this_test):
-    """Reap each test's widgets before the next one builds its own.
-
-    The GUI widgets (a Generate tab's param form, the gallery's panes) form Python
-    reference cycles — a widget owns a signal whose slot closes back over it — so
-    their C++ objects linger until Python's cyclic collector runs. Left to chance,
-    hundreds of galleries' worth pile up across a full run and eventually corrupt
-    the Qt heap. Collecting after each test keeps the live object count flat.
-
-    The collector releases what Python was holding; delivering the deletions then
-    finishes what Qt was asked to do with it, so each test pays for its own
-    leavings rather than handing them to the next one that runs an event loop —
-    which is what the suite's one flake was (tests/test_deferred_deletes.py).
-    By now pytest-qt has closed what the test registered, so letting go of it
-    here cannot free anything Qt is still drawing.
-
-    The drain runs as each test starts too: pytest lets go of the last test's
-    fixture values only after every teardown hook, this one included.
-    """
+    """Widgets form reference cycles whose C++ objects linger until the cyclic collector runs; collect after each test, then deliver the deletions, and drain again at each test's start because pytest releases the last test's fixtures after every teardown hook."""
     _deliver_the_deletions_already_scheduled()
     yield
     _widgets_registered_this_test.clear()
@@ -675,9 +478,7 @@ def _collect_widgets_between_tests(_widgets_registered_this_test):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_timeout_cancel_timer(item):
-    """pytest-timeout leaves each test's cancel on the test once it has run, and
-    with it the timer and its locks and events, which every later collection
-    walks: a run held thousands of them by its end."""
+    """pytest-timeout leaves each test's cancel timer on the test once it has run, and every later collection walks them."""
     yield
     vars(item).pop("cancel_timeout", None)
 
@@ -695,48 +496,22 @@ def pytest_configure(config):
 
 @pytest.fixture
 def _stub_preview_resolution(monkeypatch):
-    """Keep the gallery view's tests off the real filesystem and media backend.
-
-    Each of their files asks for this by name. Preview resolution is exercised
-    in test_gallery.py and rendering in test_preview_widget.py; here it
-    defaults to "nothing to show" so a real PreviewWidget never starts WMF
-    playback (which deadlocks at teardown). Tests that assert routing override
-    this with their own return value.
-    """
     monkeypatch.setattr(gallery, "resolve_preview", lambda row, places: None)
 
 
 @pytest.fixture(autouse=True)
 def _off_thread_work_runs_inline(request, monkeypatch):
-    """Let the gallery's off-thread work run straight through.
-
-    The app does slow work on a pool thread so the window stays alive. A test
-    wants the opposite: act and inspect in one call, with no event loop to pump. A
-    test that exercises the real hop marks itself ``real_thread_hop`` and this
-    stays out of its way -- it used to put the hop back with
-    ``monkeypatch.undo()``, which undid every fixture's patches with it and left
-    that test on a real microphone and a real device.
-    """
     if request.node.get_closest_marker("real_thread_hop"):
         return
 
     monkeypatch.setattr(GalleryView, "off_thread",
                         lambda self, work, done: done(work()))
-    # The same deal for the beat the combine's Generate waits out so its stand-in
-    # queue row reaches the screen before the launch blocks the thread.
     monkeypatch.setattr(CombineController, "_after_painting",
                         lambda self, work: work())
 
 
 @pytest.fixture(autouse=True)
 def _previews_start_running():
-    """Leave the app-wide preview freeze off between tests.
-
-    The freeze is module state (origenerator.gui.omnipause), which is exactly
-    what makes it reach a preview built after it was set — and exactly what
-    would otherwise let a test that pauses hand the next test a gallery of
-    still thumbnails it never asked for.
-    """
     omnipause.freeze(False)
     yield
     omnipause.freeze(False)
@@ -744,13 +519,7 @@ def _previews_start_running():
 
 @pytest.fixture(autouse=True)
 def _no_mouse_button_left_held():
-    """Let go of whatever a test pressed and never released.
-
-    QTest carries the buttons it pressed from one event to the next, for the
-    whole run: a drag whose QDrag.exec is stood in for never sees its release,
-    so the next test's click through a window arrives with that button still
-    held, and lands as part of a drag that began in a widget already gone.
-    """
+    """QTest carries pressed buttons from one event to the next, so a drag whose QDrag.exec is stood in for leaves its button held for the next test."""
     yield
     if QApplication.instance() is None:
         return
@@ -762,12 +531,7 @@ def _no_mouse_button_left_held():
 
 @pytest.fixture(autouse=True, scope="session")
 def _context_menus_open_on_release(qapp):
-    """Open a right-click's menu as the button comes up, as Windows does.
-
-    Offscreen, Qt opens it on the press, before the press has finished picking
-    the row under the pointer and redrawing the panes around it, so a menu that
-    opens fine for the user can open over the wrong widget in a test.
-    """
+    """Offscreen, Qt opens a context menu on the press; Windows opens it on the release."""
     qapp.styleHints().setContextMenuTrigger(Qt.ContextMenuTrigger.Release)
 
 
@@ -778,7 +542,6 @@ def _no_outline_detector_but_the_ones_a_test_installs(monkeypatch):
 
 @pytest.fixture
 def another_program():
-    """A live program of the tests' own, whose pid can hold a claim and then die."""
     program = subprocess.Popen([sys._base_executable, "-c", "import time; time.sleep(120)"],
                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     yield program

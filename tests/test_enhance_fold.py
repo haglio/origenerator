@@ -1,12 +1,3 @@
-"""Folding a finished standalone enhance into the image it upgraded.
-
-An enhancement is an upgraded layer on an existing image, not a generation of
-its own: the fold moves the enhanced file onto the source row (same folder,
-same star, same identity), keeps the pre-enhance original listed and on disk,
-and deletes the transient job row. The startup sweep does the same for
-completions that landed while the app was closed — and retroactively for rows
-recorded back when Image Enhance was presented as its own workflow.
-"""
 from __future__ import annotations
 
 import json
@@ -68,18 +59,14 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
 
     upgraded = db.get_generation("src")
     files = gallery.row_output_files(upgraded)
-    # The enhanced file leads (previews and thumbnails use it); the original
-    # stays listed, reachable and safe from re-import as an orphan.
     assert [f["filename"] for f in files] == \
         ["image_enhance_00001_.png", "sdxl_t2i_src.png"]
     assert json.loads(upgraded["original_files"]) == \
         [{"filename": "sdxl_t2i_src.png", "subfolder": "image", "type": "output"}]
-    assert upgraded["thumbnail_path"] == "enh_thumb.jpg"  # shows enhanced pixels
-    assert upgraded["starred"] == 1                       # the star survived
-    assert is_enhanced_row(upgraded)                      # wears the yellow plus now
-    # Same node in the same folder: params and identity untouched.
+    assert upgraded["thumbnail_path"] == "enh_thumb.jpg"
+    assert upgraded["starred"] == 1
+    assert is_enhanced_row(upgraded)
     assert gallery.settings_folder_key(upgraded) == key_before
-    # The transient job row is gone.
     assert db.get_generation("e1") is None
 
 
@@ -122,7 +109,6 @@ def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
                          "image_enhance_00001_.png")
     fold_enhancement(db, first)
 
-    # A deliberate re-enhance runs on the original and folds again.
     second = _add_enhance(db, "e2", "image/sdxl_t2i_src.png [output]",
                           "image_enhance_00002_.png")
     assert fold_enhancement(db, second) == "src"
@@ -131,7 +117,6 @@ def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
     names = [f["filename"] for f in gallery.row_output_files(upgraded)]
     assert names == ["image_enhance_00002_.png", "image_enhance_00001_.png",
                      "sdxl_t2i_src.png"]
-    # original_files still names the pre-ANY-enhance file, not the first enhance.
     assert [f["filename"] for f in json.loads(upgraded["original_files"])] == \
         ["sdxl_t2i_src.png"]
 
@@ -155,10 +140,6 @@ def test_an_enhancement_folded_again_after_a_stop_between_its_saves_is_listed_on
 
 
 def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
-    # The transient row is deleted here, and with it the only thing that said
-    # when this enhancement happened. Its id rides onto the version instead, which
-    # is what lifts the image up the Latest collection to where the run belongs
-    # rather than leaving it where it was generated.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     enhance = _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
@@ -184,10 +165,6 @@ def test_fold_records_when_the_run_finished_since_the_row_that_said_so_is_delete
 
 
 def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
-    # Two rows naming one file — ComfyUI's counter reused a number after a
-    # delete, or a completion was recorded twice — and an enhance of the second.
-    # By file, the fold would land on whichever the listing put first; the stamp
-    # names the row the user actually chose.
     db = Database(tmp_path / "t.db")
     _add_source(db, "first", filename="sdxl_t2i_twin.png")
     _add_source(db, "second", filename="sdxl_t2i_twin.png")
@@ -202,8 +179,6 @@ def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
 
 
 def test_a_stamp_naming_a_deleted_image_folds_nothing(tmp_path):
-    # The image the run was of is gone: the run is left alone rather than
-    # landed on some other row that happens to name the same file.
     db = Database(tmp_path / "t.db")
     _add_source(db, "lookalike", filename="sdxl_t2i_twin.png")
     _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png")
@@ -214,7 +189,6 @@ def test_a_stamp_naming_a_deleted_image_folds_nothing(tmp_path):
 
 
 def test_an_unstamped_run_still_folds_by_the_file_it_read(tmp_path):
-    # A run from before the stamp was recorded has only the file to go by.
     db = Database(tmp_path / "t.db")
     _add_source(db, "src")
     enhance = _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]", "image_enhance_e1.png")
@@ -222,8 +196,6 @@ def test_an_unstamped_run_still_folds_by_the_file_it_read(tmp_path):
 
 
 def test_a_stamped_run_is_awaited_by_id_not_by_file(tmp_path):
-    # Enhance All must skip the image whose enhance is in flight — and only that
-    # one, even when another row names the same file.
     db = Database(tmp_path / "t.db")
     first = _add_source(db, "first", filename="sdxl_t2i_twin.png")
     second = _add_source(db, "second", filename="sdxl_t2i_twin.png")
@@ -249,11 +221,6 @@ def test_a_stamped_run_moves_its_own_image_up_the_collection(tmp_path):
 
 
 def test_a_run_id_this_table_never_issued_comes_off_the_version(tmp_path):
-    """A preview used to keep its own database, seeded from the live one and
-    counting on from there, and the rows it made came home with their history
-    intact. The image then sits at the top of Latest on a number from a counter
-    that was never this table's, and nothing moves it until this table's own has
-    climbed past it."""
     db = Database(tmp_path / "t.db")
     _add_source(db, "adopted")
     db.update_generation("adopted", enhance_history=json.dumps(
@@ -264,15 +231,12 @@ def test_a_run_id_this_table_never_issued_comes_off_the_version(tmp_path):
 
     version, = json.loads(db.get_generation("adopted")["enhance_history"])
     assert version["run_id"] is None
-    assert version["params"] == {"enhance_scale": 2.0}   # the settings are the version's
-    assert version["filename"] == "e.png"                # and so is its file
-    assert gallery.disown_foreign_runs(db) == 0        # nothing left to repair
+    assert version["params"] == {"enhance_scale": 2.0}
+    assert version["filename"] == "e.png"
+    assert gallery.disown_foreign_runs(db) == 0
 
 
 def test_a_run_this_table_really_issued_is_left_where_it_is(tmp_path):
-    """Including one whose row is gone: a fold deletes the row its enhancement
-    ran under, so an id missing from the table is the ordinary case. Only one
-    above the high-water mark is provably not ours."""
     db = Database(tmp_path / "t.db")
     _add_source(db, "mine")
     _add_enhance(db, "transient", "image/sdxl_t2i_src.png [output]", "e.png")
@@ -288,8 +252,6 @@ def test_a_run_this_table_really_issued_is_left_where_it_is(tmp_path):
 
 
 def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
-    # The enhanced image's source was deleted: nothing to fold onto, so the fold
-    # leaves the row whole rather than half-migrated, for the Trash to take.
     db = Database(tmp_path / "t.db")
     enhance = _add_enhance(db, "e1", "image/sdxl_t2i_gone.png [output]",
                            "image_enhance_00001_.png")
@@ -298,9 +260,6 @@ def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
 
 
 def test_fold_completed_enhancements_sweeps_only_finished_rows(tmp_path):
-    # The startup sweep: folds completions that landed while the app was closed
-    # (and the retroactive "Image Enhance generation" rows), leaves in-flight
-    # jobs for their live completion and sourceless rows for the Trash.
     db = Database(tmp_path / "t.db")
     _add_source(db, "src_a", "sdxl_t2i_a.png")
     _add_source(db, "src_b", "sdxl_t2i_b.png")
@@ -336,9 +295,6 @@ def test_an_enhancement_whose_image_is_gone_is_one_to_scrap(tmp_path):
 
 
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
-    # The transient job row shows as an in-flight tile on Latest, never as an
-    # "Image Enhance" folder in the tree; a completed one that has not been
-    # folded yet does.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     _add_enhance(db, "running", "image/sdxl_t2i_src.png [output]", "x.png",
@@ -353,8 +309,6 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
 
 
 def test_original_files_survives_capture_and_restore(tmp_path):
-    # The undoable-delete path restores rows verbatim; the enhanced marker (and
-    # with it the yellow plus and the original's listing) must survive the round trip.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
@@ -366,10 +320,6 @@ def test_original_files_survives_capture_and_restore(tmp_path):
 
 
 def test_each_version_carries_its_own_file_row(tmp_path):
-    # The file information is per enhancement, so it belongs to the version that
-    # made the file rather than to one block at the top of the pane. The top
-    # block is then left with nothing to say about an image at all.
-
     db = Database(tmp_path / "t.db")
     _add_source(db)
     fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
@@ -383,13 +333,9 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     assert basic_facts(row) is None
 
 
-# --- an enhancement the production app never recorded, arriving as a bare file -----
-
 def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
                    checkpoint="example_xl_v1.safetensors",
                    upscale_model="4xExample_v1.pt", detectors=()):
-    """The graph the enhance workflow embeds in every file it saves, as the
-    import scan reads it back."""
     graph = {
         "1": {"class_type": "CheckpointLoaderSimple",
               "inputs": {"ckpt_name": checkpoint}},
@@ -408,9 +354,6 @@ def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
                "inputs": {"images": ["11", 0],
                           "filename_prefix": "image/image_enhance"}},
     }
-    # Three nodes per part fixed, exactly as the workflow lays them out: the
-    # detailer names no part, so which one it redrew is only readable back
-    # through the segs it sampled and the detector that found them.
     for offset, (detector, fix_denoise) in enumerate(detectors):
         base = 13 + offset * 3
         graph[str(base)] = {"class_type": "UltralyticsDetectorProvider",
@@ -424,10 +367,6 @@ def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
 
 
 def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, **graph_kwargs):
-    """What the import scan makes of an enhanced file it finds on disk with no
-    row claiming it: an image generation of its own, the workflow read off the
-    graph as the img2img pass it looks like, and the tail's numbers under the
-    generic sampler names."""
     graph = _enhance_graph(**graph_kwargs)
     sampler = graph["9"]["inputs"]
     db.insert_generation(
@@ -451,26 +390,17 @@ def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, **graph_kwarg
 
 
 def test_a_reconstructed_enhance_is_recognized_by_its_file(tmp_path):
-    # What names an enhancement is the file the enhance workflow wrote, not the
-    # workflow the import scan guessed from the graph — which for an enhance is
-    # an ordinary low-denoise img2img and reads as one.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     stray = _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
                                        "image_enhance_00001_.png")
     assert gallery.is_enhance_product_row(stray)
-    # An ordinary generation is not, whatever it was made from; nor is an image
-    # already folded into — there the enhancement is a version, not the row.
     assert not gallery.is_enhance_product_row(db.get_generation("src"))
     fold_enhancement(db, stray)
     assert not gallery.is_enhance_product_row(db.get_generation("src"))
 
 
 def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
-    # A branch session's enhance folds in the worktree database, which adoption
-    # never carries home (a fold creates no row to adopt), so the enhanced file
-    # reaches the production app bare and the scan rebuilds it as a standalone
-    # image — pointing a start-frame tile at the very image it is a version of.
     db = Database(tmp_path / "t.db")
     _add_source(db, favorite=True)
     _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
@@ -478,7 +408,7 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
 
     assert fold_completed_enhancements(db) == 1
 
-    assert db.get_generation("i1") is None  # no separate image any more
+    assert db.get_generation("i1") is None
     upgraded = db.get_generation("src")
     assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
         ["image_enhance_00001_.png", "sdxl_t2i_src.png"]
@@ -489,10 +419,6 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
 
 
 def test_a_rebuilt_version_keeps_the_settings_that_made_it(tmp_path):
-    # The row's own params name the sampler numbers generically and the upscale
-    # not at all, so the version reads its settings off the graph that ran: the scale
-    # is what the 4x model's output was taken back down to, and the detail pass
-    # is there iff its detector nodes are.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     _add_reconstructed_enhance(
@@ -512,8 +438,6 @@ def test_a_rebuilt_version_keeps_the_settings_that_made_it(tmp_path):
 
 
 def test_sweep_stacks_a_rebuilt_chain_oldest_first(tmp_path):
-    # An enhance made from an enhanced file resolves only once the file it ran
-    # on has been folded onto the image, so the sweep works forwards.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
@@ -531,8 +455,6 @@ def test_sweep_stacks_a_rebuilt_chain_oldest_first(tmp_path):
 
 
 def test_sweep_leaves_an_ordinary_image_alone(tmp_path):
-    # A hand-run img2img in ComfyUI is an image of its own however low its
-    # denoise: the enhance workflow did not write it, and nothing folds it away.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     kept = _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",

@@ -1,19 +1,3 @@
-"""Dictating a spoken request across as many utterances as it takes.
-
-"Request … over" is the one voice input that isn't a single breath: the user
-opens with the word *request*, says as much as they like — pausing wherever they
-like — and closes with *over*. The mic endpoints on silence, so every one of
-those pauses ends an utterance and starts another; a matcher that only ever saw
-one utterance at a time could not hear a sentence spoken in three.
-
-So :class:`RequestDictation` is a state machine over the transcriptions. Idle, it
-ignores everything that doesn't open with the lead word. Open, it swallows every
-utterance — which is what keeps the words of a request from also matching a
-"fix …" command — until one ends on the terminator.
-
-Pure and text-driven: no mic, no Qt, no model. :class:`~origenerator.voice.
-listener.CommandAndRequestListener` owns one and feeds it each transcription.
-"""
 from __future__ import annotations
 
 import re
@@ -24,73 +8,42 @@ from origenerator.voice.text import sounds_like, words
 
 
 class RequestState(Enum):
-    """Where a fed transcription leaves the dictation.
-
-    An Enum like the two vocabularies beside it
-    (:class:`~origenerator.voice.app_commands.AppCommand`,
-    :class:`~origenerator.voice.slideshow_commands.SlideshowCommand`), so a consumer
-    cannot compare against a literal that was never one of these four.
-    """
-
-    OPENED = "opened"          # the request just started; the caller shows it and waits
-    COLLECTING = "collecting"  # more of the same request; shown and waited on too
-    COMPLETED = "completed"    # the whole request, ready to act on
-    ABANDONED = "abandoned"    # the terminator never came
+    OPENED = "opened"
+    COLLECTING = "collecting"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
 
     @property
     def listening(self) -> bool:
-        """Whether this state means the dictation is still expecting more."""
         return self in (RequestState.OPENED, RequestState.COLLECTING)
 
 
-# The four by their bare names, which is how every caller here reads them.
 OPENED = RequestState.OPENED
 COLLECTING = RequestState.COLLECTING
 COMPLETED = RequestState.COMPLETED
 ABANDONED = RequestState.ABANDONED
 
-# What opens a request, as whisper renders it. "Request" is distinctive enough
-# that one substitution is safe (the same tolerance the fix matcher allows its
-# lead word), and the trailing forms are what a hurried "request:" comes back as.
+# As whisper renders the lead word; a hurried "request:" comes back in the trailing forms.
 LEAD_WORDS = ("request", "requests", "requested")
-# What closes one. Radio's own word, chosen because nothing in a prompt ends on
-# it by accident — and matched only as an utterance's LAST word, so "the blanket
-# over her legs" carries on rather than cutting the request short there.
 _END_WORDS = ("over",)
 
-# How many utterances an open request may run to before it is given up on. The
-# failure this guards is whisper missing the "over": without a cap the dictation
-# would swallow every later utterance for the rest of the session, and the user
-# would have no way to tell why nothing they said was landing. Eight is a long
-# request and a short hostage-taking.
 _MAX_UTTERANCES = 8
 
 
 def _without_leading_word(text: str) -> str:
-    """``text`` without its first word and whatever punctuation followed it."""
     return re.sub(r"^\W*[\w']+\W*", "", text or "", count=1)
 
 
 def _without_trailing_word(text: str) -> str:
-    """``text`` without its last word and whatever punctuation surrounded it."""
     return re.sub(r"\W*[\w']+\W*$", "", text or "", count=1)
 
 
 def _join(parts: list) -> str:
-    """The collected pieces as one line, blank pieces dropped."""
     return " ".join(part for part in (p.strip() for p in parts) if part)
 
 
 @dataclass(frozen=True)
 class SpokenRequest:
-    """Where an in-progress (or just-finished) request stands.
-
-    ``text`` is the request itself — the words between the markers, which is what
-    gets acted on. ``heard`` is every transcription that went into it, markers
-    and all: what the user actually said, kept verbatim so a request that came
-    out wrong shows *why* rather than just being wrong.
-    """
-
     state: RequestState
     text: str
     heard: str
@@ -98,41 +51,28 @@ class SpokenRequest:
 
     @property
     def listening(self) -> bool:
-        """Whether the dictation is still open and expecting more."""
         return self.state.listening
 
 
 class RequestDictation:
-    """Collects "Request … over" out of a stream of transcriptions.
-
-    :meth:`push` takes one transcription and answers what it meant: ``None`` for
-    an utterance that isn't part of a request (the caller's other uses of the mic
-    get it), or a :class:`SpokenRequest` saying the request opened, is still
-    collecting, finished, or was given up on.
-    """
-
     def __init__(self, *, max_utterances: int = _MAX_UTTERANCES):
         self._max = max_utterances
-        self._parts: list[str] = []  # the request body, one utterance per entry
-        self._heard: list[str] = []  # what was transcribed, markers included
+        self._parts: list[str] = []
+        self._heard: list[str] = []
         self._open = False
         self._opened_at: float | None = None
 
     @property
     def listening(self) -> bool:
-        """Whether a request is open right now — the cue to pause a slideshow."""
         return self._open
 
     def reset(self) -> None:
-        """Forget an open request. The mic closing calls this: a request nobody
-        can finish saying must not be waiting the next time it opens."""
         self._parts = []
         self._heard = []
         self._open = False
         self._opened_at = None
 
     def push(self, text: str, *, spoken_at: float | None = None):
-        """Feed one transcription; see the class docstring for the answers."""
         if not self._open:
             return self._maybe_open(text, spoken_at)
         return self._continue(text)
@@ -140,13 +80,11 @@ class RequestDictation:
     def _maybe_open(self, text: str, spoken_at: float | None):
         heard = words(text, keep_apostrophes=True)
         if not heard or not sounds_like(heard[0], LEAD_WORDS):
-            return None  # not a request — the caller's other uses may have it
+            return None
         self._open = True
         self._opened_at = spoken_at
         self._heard = [text]
         body = _without_leading_word(text)
-        # "Request, no silver earrings, over" is a whole request in one breath, so
-        # the opening utterance is checked for the terminator like any other.
         if self._ends_the_request(heard):
             return self._finish(_without_trailing_word(body))
         self._parts = [body]
@@ -165,9 +103,6 @@ class RequestDictation:
 
     @staticmethod
     def _ends_the_request(heard: list[str]) -> bool:
-        """Whether an utterance's last word closes the request. Only the last:
-        "over" is an ordinary English word in the middle of a sentence and a
-        deliberate sign-off at the end of one."""
         return bool(heard) and sounds_like(heard[-1], _END_WORDS)
 
     def _finish(self, body: str):
@@ -177,15 +112,10 @@ class RequestDictation:
 
 
 def request_words(heard: str) -> str:
-    """The request a transcript of it asked for: everything heard between the
-    opening word and "over"."""
     return _without_trailing_word(_without_leading_word(heard)).strip()
 
 
 def words_of(record: dict | None) -> str:
-    """What a recorded request asked for in its own words, or "" for a folder's
-    Modify, which said what it wanted by rewriting the prompt instead. A record
-    from before the words were kept reads them back out of what was heard."""
     if not record:
         return ""
     if record.get("asked") is not None:
@@ -194,10 +124,5 @@ def words_of(record: dict | None) -> str:
 
 
 def request_bias() -> str:
-    """The request markers as whisper's initial prompt.
-
-    The same trick the fix commands need: a short marker word off a quiet mic
-    comes back as something else entirely unless the model is told to expect it,
-    and the whole feature hangs on hearing exactly these two words.
-    """
+    # A short marker word off a quiet mic comes back as something else unless whisper is told to expect it.
     return "Voice requests: request, over."

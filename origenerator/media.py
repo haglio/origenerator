@@ -1,8 +1,3 @@
-"""Media-type vocabulary shared by ingestion and the gallery.
-
-A single source of truth for which file extensions count as images vs videos,
-so the importer and the gallery model classify outputs identically.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -28,12 +23,6 @@ def media_type_from_filename(filename: str) -> MediaType | None:
 
 
 def sibling_of_type(path: Path, media: MediaType) -> Path | None:
-    """A file beside ``path`` with the same stem but a ``media``-type extension.
-
-    This is how a video and its VHS_VideoCombine metadata-PNG sidecar find each
-    other — shared by import (which folds them into one entry) and deletion
-    (which removes both so a re-import can't resurrect the orphan).
-    """
     exts = IMAGE_EXTS if media == MediaType.IMAGE else VIDEO_EXTS
     for ext in sorted(exts):
         sibling = path.with_suffix(ext)
@@ -44,8 +33,6 @@ def sibling_of_type(path: Path, media: MediaType) -> Path | None:
 
 @dataclass(frozen=True)
 class VideoHeader:
-    """What a video's container says without a frame being decoded."""
-
     width: int
     height: int
     fps: float

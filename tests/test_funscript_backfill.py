@@ -59,7 +59,7 @@ def test_backfill_scripts_each_video_and_skips_images(tmp_path):
     seen = []
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
 
-    assert sorted(seen) == ["v_i2v.mp4", "v_loop.mp4"]  # the still image isn't
+    assert sorted(seen) == ["v_i2v.mp4", "v_loop.mp4"]
     assert result["written"] == 2
     assert result["skipped"] == 0
 
@@ -126,8 +126,6 @@ def test_two_types_of_one_video_name_in_one_folder_are_each_scripted(tmp_path):
 @pytest.mark.parametrize("older_place", ["under its name", "beside it"])
 def test_a_video_no_other_shares_a_name_with_keeps_the_script_an_older_version_filed(
         tmp_path, older_place):
-    """Writing it again in the video's own place would leave two scripts for one
-    video, and only the reader's search order would say which of them wins."""
     video = tmp_path / "video" / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"v")
@@ -165,19 +163,15 @@ def test_a_script_an_older_version_filed_at_another_pace_is_rewritten_where_it_i
 
 
 def test_backfill_counts_a_video_whose_file_is_missing(tmp_path):
-    db = FakeDB([_row("1", "wan22_i2v", "gone.mp4")])  # no file on disk
+    db = FakeDB([_row("1", "wan22_i2v", "gone.mp4")])
     seen = []
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), write=_recording_write(seen))
-    assert seen == []  # nothing to script
+    assert seen == []
     assert result["missing"] == 1
     assert result["written"] == 0
 
 
 def test_the_output_places_are_resolved_when_the_sweep_runs(tmp_path, monkeypatch):
-    """It was a signature default, evaluated at import from a constant that was
-    itself built by reading the content overlay at import. So the sweep could not
-    be pointed anywhere the module had not already decided on before anything
-    called it."""
     monkeypatch.setattr(config, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
     seen = []
 
@@ -190,7 +184,6 @@ def test_the_output_places_are_resolved_when_the_sweep_runs(tmp_path, monkeypatc
 
 
 def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
-    """The same defect on the same line: the motion rate was bound at import."""
     monkeypatch.setattr(config, "MOTION_DEFAULT_HZ", 2.5)
     video = tmp_path / "alpha.mp4"
     video.write_bytes(b"not really a video")

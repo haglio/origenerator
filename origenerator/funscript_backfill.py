@@ -1,8 +1,3 @@
-"""Give every already-generated video the funscript it would get today.
-
-    python -c "from origenerator.funscript_backfill import main; main()"
-"""
-
 from __future__ import annotations
 
 import logging

@@ -1858,10 +1858,7 @@ def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
 
 
 def test_the_sound_prompts_are_shut_down_while_every_scene_speaks(qtbot):
-    form = ParamForm(_scene_defs() + [
-        ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
-        ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True),
-    ])
+    form = ParamForm([*_scene_defs(), ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True), ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
@@ -1928,9 +1925,7 @@ def _scene_text_state(scene, key):
 
 
 def _scene_form_at_strength_one():
-    return ParamForm(_scene_defs() + [
-        ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
-    ])
+    return ParamForm([*_scene_defs(), ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1)])
 
 
 _SHUT_DOWN_AVOID = (False, True, True, STRENGTH_ONE_HELP, STRENGTH_ONE_HELP, "Negative Prompt")

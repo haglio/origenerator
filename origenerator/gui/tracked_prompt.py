@@ -39,7 +39,7 @@ def _spliced(layout: list, position: int, removed: int, inserted: str) -> list:
         before.append((kind, text[:max(0, position - doc)]))
         after.append((kind, text[max(0, position + removed - doc):]))
         doc += len(text)
-    return [(kind, text) for kind, text in before + [(ADDED, inserted)] + after if text]
+    return [(kind, text) for kind, text in [*before, (ADDED, inserted), *after] if text]
 
 
 class UndoHistory(QObject):

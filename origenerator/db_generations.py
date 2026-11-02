@@ -117,7 +117,7 @@ class GenerationStore(Store):
         if not fields:
             return
         set_clause = ", ".join(f"{k} = ?" for k in fields)
-        values = list(fields.values()) + [prompt_id]
+        values = [*list(fields.values()), prompt_id]
         with self._connect() as conn:
             conn.execute(
                 f"UPDATE generations SET {set_clause} WHERE prompt_id = ?",

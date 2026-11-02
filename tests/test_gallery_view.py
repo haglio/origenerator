@@ -1901,7 +1901,7 @@ def _linked_view(qtbot, source="i7", count=12):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": f"sdxl_t2i_{source}.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video] + images))
+    view = GalleryView(FakeDB([video, *images]))
     _on_screen(qtbot, view, 1100, 1200)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _click_tile(view, "vid1")

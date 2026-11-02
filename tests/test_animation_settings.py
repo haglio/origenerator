@@ -1,4 +1,3 @@
-"""Fixture values are fabricated throughout (see CLAUDE.md)."""
 from __future__ import annotations
 
 import pytest
@@ -83,8 +82,6 @@ def test_a_reader_never_meets_a_half_written_file(held):
 
 
 def test_an_animation_answered_by_prompts_alone_is_still_answered(held):
-    """An animation with no kept video has no workflow to copy, so what he types
-    is all there is -- and reading it back is what makes Assign mean anything."""
     animation_settings.remember(VIDEO, "alpha", "state one", workflow="",
                                 params={"positive_prompt": "a scene"}, path=held)
 

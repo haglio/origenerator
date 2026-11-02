@@ -40,6 +40,7 @@ from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_names import ItemNames
@@ -213,11 +214,11 @@ class CombineController(QObject):
             return self._files.preview(prompt_id)
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
-    def _video_history(self, intent: str) -> list[str]:
-        used = video_history(self._db.custom_combinations(), intent,
-                             self._db.list_combine_video_uses())
-        return [video for video in used
-                if act_settings.lane_of(self._db.get_generation(video) or {}) == intent]
+    def _video_history(self, intent: str) -> list[RecentVideo]:
+        return [RecentVideo(row["prompt_id"], row.get("thumbnail_path"))
+                for row in video_history(self.rebuildable_videos(self._db.list_generations()),
+                                         intent, self._db.custom_combinations(),
+                                         self._db.list_combine_video_uses())]
 
     def reread_names(self) -> None:
         self.panel.reread_names()

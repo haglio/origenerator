@@ -1,5 +1,3 @@
-"""Enhancement settings saved under a name: what the Enhance pane's dropdown
-lists, and the most common enhancements a library starts it with."""
 from __future__ import annotations
 
 import json
@@ -20,7 +18,6 @@ from tests.test_core import _window
 
 
 def _enhanced(prompt_id, checkpoint="anemone_v3.safetensors", **settings):
-    """An image the Generate form's own enhance finished, at ``settings``."""
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
@@ -47,8 +44,6 @@ def test_an_image_enhanced_by_the_model_that_made_it_was_enhanced_matching_the_s
 
 
 def _library_of_one_image(tmp_path, own_params, *runs):
-    """The rows of a library holding one image, made at ``own_params``, with a
-    standalone enhancement folded onto it for each of ``runs``."""
     db = Database(tmp_path / "t.db")
     db.insert_generation(prompt_id="src", workflow_name="flux_t2i", workflow_version="v001",
                          params_json=json.dumps(own_params), workflow_json="{}")
@@ -79,8 +74,6 @@ def test_an_image_that_recorded_no_model_was_enhanced_matching_the_source_by_the
 
 def test_a_fix_from_before_fixes_had_prompts_counts_with_the_one_the_panel_would_run_for_it(
         tmp_path):
-    """The pane cannot run a fix without its part's own prompts any more, so the
-    two would be one setting on it, and one preset."""
     rows = _library_of_one_image(
         tmp_path, {},
         {"enhance_detail_fixes": {"faces": 0.45}},
@@ -89,8 +82,6 @@ def test_a_fix_from_before_fixes_had_prompts_counts_with_the_one_the_panel_would
 
     assert len(most_used_enhancements(rows, 5)) == 1
 
-
-# --- the presets kept beside the library ------------------------------------
 
 
 def test_a_library_that_never_had_presets_starts_with_its_five_most_common_named_by_settings(
@@ -167,8 +158,6 @@ def test_the_settings_are_the_preset_holding_them_whatever_each_leaves_to_the_de
     assert enhance_presets.matching(presets, {"enhance_steps": 30}) == 1
     assert enhance_presets.matching(presets, {"enhance_steps": 50}) is None
 
-
-# --- in the window ------------------------------------------------------------
 
 
 def test_a_preset_saved_in_the_window_is_the_one_its_dropdown_shows_after_a_restart(

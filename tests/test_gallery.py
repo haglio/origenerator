@@ -85,7 +85,7 @@ def test_the_all_group_gathers_images_and_videos_and_walks_to_every_row():
     assert group.label == "All"
     assert child_groups(group) == [images]
     assert rows_under(group) == [{"prompt_id": "g1"}]
-    assert folder_level(group) is None   # everything is not a level of anything
+    assert folder_level(group) is None
 
 
 def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
@@ -100,9 +100,6 @@ def test_the_tree_files_each_kind_under_a_folder_of_its_own_images_first():
 
 
 def test_folder_level_names_the_folder_levels_and_nothing_else():
-    # The workflow -> model -> LoRA -> source-image folders each report their
-    # level, so each carries a TOC initial saying which it is. A settings leaf is
-    # where the generations live and reports none.
     assert folder_level(WorkflowGroup("k", "wf", "WF", [])) == "workflow"
     assert folder_level(ModelGroup("k", "M", [])) == "model"
     assert folder_level(LoraGroup("k", "L", [])) == "lora"
@@ -124,28 +121,20 @@ def test_generate_tab_title_handles_unknown_workflow():
 
 
 def test_job_kind_separates_a_video_from_an_image():
-    # What the queue's rows lead with, because it is what a job costs: seconds
-    # against minutes.
     assert job_kind_label("sdxl_t2i") == "Image"
     assert job_kind_label("wan22_i2v") == "Video"
 
 
 def test_every_video_workflow_is_one_kind_of_job():
-    # Each of them animates a start image, so the queue has one kind of video to
-    # name, and names it in a word rather than the model tile's shorthand.
     videos = ("wan22_i2v", "wan22_flf2v_loop")
     assert {job_kind_label(name) for name in videos} == {"Video"}
 
 
 def test_an_enhancement_is_its_own_kind_of_job():
-    # It outputs an image from an image, so neither "Image" nor "Video" says what
-    # it is: a second pass over something already made.
     assert job_kind_label("image_enhance") == "Enhance"
 
 
 def test_an_unregistered_workflow_claims_no_kind():
-    # An old import this build has no template for. A row saying nothing is read
-    # as unknown; one guessing "Image" at a video is read, wrongly, as seconds.
     assert job_kind_label("nope") == ""
     assert job_kind_label(None) == ""
 
@@ -162,7 +151,6 @@ def _row(**kw):
 
 
 def test_make_animated_preview_generates_a_cached_webp_for_a_video(tmp_path, monkeypatch):
-    """A video row resolves to its looping WebP, generated from the on-disk file."""
     video = tmp_path / "wan22_i2v_v1.mp4"
     video.write_bytes(b"fake video")
     row = _row(prompt_id="v1", workflow_name="wan22_i2v",
@@ -178,11 +166,10 @@ def test_make_animated_preview_generates_a_cached_webp_for_a_video(tmp_path, mon
     result = make_animated_preview(row, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs")
 
     assert result == str(tmp_path / "thumbs" / "v1_anim.webp")
-    assert calls == [(video, tmp_path / "thumbs", "v1")]  # generated from the real file
+    assert calls == [(video, tmp_path / "thumbs", "v1")]
 
 
 def test_make_animated_preview_is_none_for_an_image(tmp_path, monkeypatch):
-    """An image row has nothing to animate, so no WebP is generated."""
     image = tmp_path / "sdxl_t2i_i1.png"
     image.write_bytes(b"fake image")
     row = _row(prompt_id="i1", output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}]))
@@ -194,7 +181,6 @@ def test_make_animated_preview_is_none_for_an_image(tmp_path, monkeypatch):
 
 
 def test_make_animated_preview_is_none_when_the_video_yields_no_frames(tmp_path, monkeypatch):
-    """An unreadable video yields no WebP, so the caller falls back to the still."""
     video = tmp_path / "wan22_i2v_v1.mp4"
     video.write_bytes(b"fake video")
     row = _row(prompt_id="v1", workflow_name="wan22_i2v",
@@ -222,8 +208,6 @@ def test_a_made_moving_preview_is_found_without_decoding_anything(tmp_path, monk
 
 
 def test_a_rows_kind_is_read_out_of_its_stored_files_once(monkeypatch):
-    """One redraw asks every row its kind several times over -- 38,000 asks of a
-    5,700-row library -- and each answer parsed the row's file list afresh."""
     parsed = []
     real = gallery_output.parse_file_list
     monkeypatch.setattr(gallery_output, "parse_file_list",
@@ -238,9 +222,6 @@ def test_a_rows_kind_is_read_out_of_its_stored_files_once(monkeypatch):
 
 
 def test_media_type_of_row_uses_actual_output_file_over_workflow_type():
-    # A row tagged with a video workflow whose real output is an image is an
-    # image — many imported stills land under video prefixes and must not show
-    # up in the Videos folder.
     mislabeled = _row(workflow_name="wan22_flf2v_loop",
                       output_files=json.dumps([{"filename": "flf2v_loop_00001_.png"}]))
     assert media_type_of_row(mislabeled) == "image"
@@ -251,7 +232,6 @@ def test_media_type_of_row_uses_actual_output_file_over_workflow_type():
 
 
 def test_media_type_of_row_falls_back_to_registry_without_output_files():
-    # Pending rows have no file yet; the workflow's declared type stands in.
     assert media_type_of_row(_row(workflow_name="sdxl_t2i")) == "image"
     assert media_type_of_row(_row(workflow_name="wan22_i2v")) == "video"
 
@@ -327,15 +307,11 @@ def test_settings_signature_ignores_seeds_but_keeps_other_params():
     a = json.dumps({"steps": 50, "cfg": 7.5, "seed": 1, "noise_seed": 99})
     b = json.dumps({"cfg": 7.5, "steps": 50, "seed": 2, "noise_seed": 7})
     c = json.dumps({"steps": 40, "cfg": 7.5, "seed": 1})
-    # Same settings, different seeds -> identical signature (order-independent).
     assert settings_signature(None, a) == settings_signature(None, b)
-    # A real setting differs -> different signature.
     assert settings_signature(None, a) != settings_signature(None, c)
 
 
 def test_settings_signature_ignores_the_audio_seed_like_the_sampler_seeds():
-    # The foley pass's audio_seed varies per run exactly like the sampler seeds
-    # (a variation re-rolls all three), so it must not split a settings folder.
     a = json.dumps({"positive_prompt": "a wave", "audio_seed": 1})
     b = json.dumps({"positive_prompt": "a wave", "audio_seed": 2})
     assert settings_signature("wan22_i2v", a, {}) == settings_signature("wan22_i2v", b, {})
@@ -349,13 +325,6 @@ def test_settings_signature_ignores_the_audio_seed_like_the_sampler_seeds():
     ("enhance_denoise", 0.2, 0.5),
 ])
 def test_an_import_keeps_one_folder_however_this_param_varies(key, one, other):
-    """The two static key sets are only ever the answer for a row with no
-    registered workflow, and every test that names one of these behaviours passes
-    a registered name — which derives its keys from the template instead. So a
-    key dropped from either set shows up here or nowhere, and an imported row
-    would start splitting its folder by the foley seed, or by how hard it was
-    upscaled after the fact.
-    """
     def params(value):
         return json.dumps({"positive_prompt": "a lighthouse", key: value})
 
@@ -363,23 +332,17 @@ def test_an_import_keeps_one_folder_however_this_param_varies(key, one, other):
 
 
 def test_settings_signature_drops_input_image_for_an_unknown_workflow():
-    # With no registered workflow the grouping can't tell an i2v from anything
-    # else, so it falls back to dropping input_image (instance-level, like the
-    # seed): two rows differing only by image/seed still share one folder.
     a = json.dumps({"steps": 20, "input_image": "img_a.png", "seed": 1})
     b = json.dumps({"steps": 20, "input_image": "image/img_b.png [output]", "seed": 2})
     c = json.dumps({"steps": 30, "input_image": "img_a.png", "seed": 1})
-    assert settings_signature(None, a) == settings_signature(None, b)  # only image/seed differ
-    assert settings_signature(None, a) != settings_signature(None, c)  # a real setting differs
+    assert settings_signature(None, a) == settings_signature(None, b)
+    assert settings_signature(None, a) != settings_signature(None, c)
 
 
 def test_settings_signature_folds_which_image_the_start_frame_is_for_i2v():
-    # A video groups by the *image* it animates: two videos with identical video
-    # settings split whenever their frames are different images — even two draws
-    # of one prompt, which are two images however alike the settings were.
-    face1 = _img("face1", "a face", 30, 1)      # sdxl_t2i_face1.png
-    face2 = _img("face2", "a face", 30, 2)      # same image config, a second draw
-    scene = _img("scene", "a landscape", 30, 1)  # a differently configured frame
+    face1 = _img("face1", "a face", 30, 1)
+    face2 = _img("face2", "a face", 30, 2)
+    scene = _img("scene", "a landscape", 30, 1)
     index = build_image_config_index([face1, face2, scene])
 
     def vid(frame):
@@ -388,14 +351,11 @@ def test_settings_signature_folds_which_image_the_start_frame_is_for_i2v():
     sig_face1 = settings_signature("wan22_i2v", vid("sdxl_t2i_face1.png"), index)
     sig_face2 = settings_signature("wan22_i2v", vid("sdxl_t2i_face2.png"), index)
     sig_scene = settings_signature("wan22_i2v", vid("sdxl_t2i_scene.png"), index)
-    assert sig_face1 != sig_face2  # a second draw is a second image -> its own folder
-    assert sig_face1 != sig_scene  # and so is an unrelated frame
+    assert sig_face1 != sig_face2
+    assert sig_face1 != sig_scene
 
 
 def test_settings_signature_folds_the_frames_config_for_an_image_result():
-    # An enhance is image-conditioned too, but its results live in the Images tree,
-    # which has no source-image tier — so a batch of enhances stays one folder of
-    # work rather than fragmenting into one folder per image.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)
     index = build_image_config_index([face1, face2])
@@ -408,16 +368,14 @@ def test_settings_signature_folds_the_frames_config_for_an_image_result():
 
 
 def test_settings_signature_falls_back_to_the_frame_filename_when_unresolvable():
-    # A hand-picked or since-deleted frame isn't a known generation, so it can't
-    # resolve to a config; distinct filenames still separate rather than collapse.
     def vid(frame):
         return json.dumps({"positive_prompt": "", "input_image": frame})
 
     same = settings_signature("wan22_i2v", vid("hand_picked.png"), {})
     also = settings_signature("wan22_i2v", vid("input/hand_picked.png [input]"), {})
     other = settings_signature("wan22_i2v", vid("someone_else.png"), {})
-    assert same == also   # the same external frame -> one folder
-    assert same != other  # a different external frame -> a new folder
+    assert same == also
+    assert same != other
 
 
 def test_settings_signature_tolerates_missing_or_invalid_params():
@@ -426,29 +384,16 @@ def test_settings_signature_tolerates_missing_or_invalid_params():
 
 
 def test_settings_signature_splits_workflow_generations():
-    # A workflow's version is part of a row's identity: different generations of
-    # a workflow render the same settings differently (v002 SDXL had no enhance
-    # tail), so their rows must not share a folder. The regression this pins: an
-    # old row stores none of the newer params, so default-normalization alone
-    # hashes it exactly like a new run.
-
-    old = json.dumps({"positive_prompt": "a lighthouse", "steps": 50})  # pre-enhance row
+    old = json.dumps({"positive_prompt": "a lighthouse", "steps": 50})
     new = json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                           positive_prompt="a lighthouse"))
     assert settings_signature("sdxl_t2i", old, None, workflow_version="v002") \
         != settings_signature("sdxl_t2i", new, None, workflow_version="v003")
-    # The same generation still groups: the split is the version, not the
-    # old row's sparseness.
     assert settings_signature("sdxl_t2i", old, None, workflow_version="v002") \
         == settings_signature("sdxl_t2i", new, None, workflow_version="v002")
 
 
 def test_settings_signature_gives_imports_and_live_forms_the_current_generation():
-    # "imported" names no workflow generation (best-effort metadata), and a live
-    # form's prospective settings pass no version at all; both take the current
-    # version, so a sparse import, its full re-roll (stamped with the real
-    # version), and the form that would re-run it all share one folder.
-
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     reroll = json.dumps(wf.default_params())
     assert settings_signature("sdxl_t2i", "{}", None, workflow_version="imported") \
@@ -458,11 +403,6 @@ def test_settings_signature_gives_imports_and_live_forms_the_current_generation(
 
 
 def test_settings_signature_ignores_the_enhancement():
-    # An enhancement is a finish applied to an image, not a different image: the
-    # same settings with the enhance tail on and off are ONE folder. (The standalone
-    # enhancer already worked this way — it folds onto the row it upgrades without
-    # moving it — and the workflows' inline toggle now agrees.)
-
     def sdxl(**overrides):
         return json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                                positive_prompt="a lighthouse", **overrides))
@@ -470,21 +410,15 @@ def test_settings_signature_ignores_the_enhancement():
     plain = settings_signature("sdxl_t2i", sdxl(enhance=False), None, workflow_version="v004")
     assert settings_signature("sdxl_t2i", sdxl(enhance=True), None,
                               workflow_version="v004") == plain
-    # Nor does HOW it was enhanced: the tail's own settings are part of the finish,
-    # so a harder upscale or a second pass at another denoise stays put too.
     assert settings_signature("sdxl_t2i", sdxl(enhance=True, enhance_scale=4.0,
                                                enhance_steps=40, enhance_denoise=0.3,
                                                upscale_model="4x_other.pth"),
                               None, workflow_version="v004") == plain
-    # A real difference in settings still splits — the drop is the tail, not the row.
     assert settings_signature("sdxl_t2i", sdxl(enhance=True, steps=12), None,
                               workflow_version="v004") != plain
 
 
 def test_settings_signature_ignores_how_finely_a_video_was_compressed():
-    # How finely a file was compressed is how it was saved, not what was
-    # rendered: a loop that stored the quality it was saved at shares a folder
-    # with one saved at any other.
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
 
     def loop(**stored):
@@ -496,23 +430,17 @@ def test_settings_signature_ignores_how_finely_a_video_was_compressed():
 
 
 def test_flux_still_groups_by_its_namesake_upscale_model():
-    # Flux reads upscale_model on BOTH paths: with the toggle off it drives the
-    # plain 4x upscale the workflow is named for, so there it is a genuine
-    # difference between two renders and keeps splitting folders.
-
     def flux(**overrides):
         return json.dumps(dict(WORKFLOW_REGISTRY["flux_t2i_upscaled"].default_params(),
                                positive_prompt="a lighthouse", **overrides))
 
     assert settings_signature("flux_t2i_upscaled", flux(upscale_model="RealESRGAN_x4.pth")) \
         != settings_signature("flux_t2i_upscaled", flux(upscale_model="4x_crisp.pt"))
-    # Its enhance toggle is still just a finish, though.
     assert settings_signature("flux_t2i_upscaled", flux(enhance=True)) \
         == settings_signature("flux_t2i_upscaled", flux(enhance=False))
 
 
 def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin():
-    # The tree-level shape of the same rule: one settings leaf, both rows in it.
     def render(prompt_id, seed, enhance):
         return _row(
             prompt_id=prompt_id,
@@ -528,19 +456,14 @@ def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin()
 
 
 def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
-    # An explicit flag is authoritative, whichever way it points.
     assert is_enhanced_row(_row(params_json=json.dumps({"enhance": True}))) is True
     assert is_enhanced_row(_row(params_json=json.dumps(
         {"enhance": False, "enhance_denoise": 0.15}))) is False
-    # A folded-in standalone enhance marks the row via original_files.
     assert is_enhanced_row(_row(
         params_json=json.dumps({"steps": 50}),
         original_files=json.dumps([{"filename": "sdxl_t2i_old.png"}]),
     )) is True
-    # A still-transient (unfolded) enhancer row is an enhanced image too.
     assert is_enhanced_row(_row(workflow_name="image_enhance", params_json="{}")) is True
-    # SDXL rows from the era the tail ran unconditionally carry its params but
-    # no flag; they count. Pre-enhance rows and other workflows' rows don't.
     assert is_enhanced_row(_row(params_json=json.dumps({"enhance_denoise": 0.3}))) is True
     assert is_enhanced_row(_row(params_json=json.dumps({"steps": 50}))) is False
     assert is_enhanced_row(_row(workflow_name="wan22_t2i",
@@ -557,11 +480,11 @@ def test_a_video_is_never_enhanced_whatever_its_record_carries():
 
 
 def test_rows_awaiting_enhancement_targets_only_plain_uncovered_images():
-    plain = _img("plain", "a cat", 30, 1)          # nothing enhanced about it
-    inline = _row(prompt_id="inline",               # ran the tail itself
+    plain = _img("plain", "a cat", 30, 1)
+    inline = _row(prompt_id="inline",
                   params_json=json.dumps({"positive_prompt": "a cat", "enhance": True}),
                   output_files=json.dumps([{"filename": "sdxl_t2i_inline.png"}]))
-    covered = _img("covered", "a cat", 30, 2)       # already has a standalone enhance
+    covered = _img("covered", "a cat", 30, 2)
     enhance_of_covered = _row(
         prompt_id="e1", workflow_name="image_enhance",
         params_json=json.dumps({"input_image": "image/sdxl_t2i_covered.png [output]"}),
@@ -587,19 +510,15 @@ def test_enhance_params_for_builds_an_image_enhance_config():
     )
     params = enhance_params_for(src)
     assert params["input_image"] == "image/sdxl_t2i_s.png [output]"
-    assert params["positive_prompt"] == "a lakeside cabin"   # steers the texture
+    assert params["positive_prompt"] == "a lakeside cabin"
     assert params["negative_prompt"] == "blurry"
-    assert params["checkpoint"] == "dreamscape_v3.safetensors"  # source's own style
+    assert params["checkpoint"] == "dreamscape_v3.safetensors"
 
-    # A row with no output file has nothing to enhance.
     assert enhance_params_for(_row(output_files=None)) is None
-    # A source with no checkpoint (WAN/flux) keeps the enhancer's SDXL default.
     bare = _row(params_json="{}",
                 output_files=json.dumps([{"filename": "wan22_t2i_b.png"}]))
     assert enhance_params_for(bare)["checkpoint"] == \
         WORKFLOW_REGISTRY["image_enhance"].default_params()["checkpoint"]
-    # An already-enhanced row re-enhances from its ORIGINAL file, so a
-    # deliberate re-enhance re-derives rather than compounding upscales.
     folded = _row(
         params_json="{}",
         output_files=json.dumps([{"filename": "image_enhance_1_.png", "subfolder": "image",
@@ -612,10 +531,14 @@ def test_enhance_params_for_builds_an_image_enhance_config():
     assert enhance_params_for(folded)["input_image"] == "image/sdxl_t2i_s.png [output]"
 
 
+def test_an_enhance_leaves_the_seed_at_the_workflows_default():
+    src = _row(output_files=json.dumps([{"filename": "sdxl_t2i_s.png"}]))
+    default_seed = WORKFLOW_REGISTRY["image_enhance"].default_params()["seed"]
+
+    assert enhance_params_for(src)["seed"] == default_seed
+
+
 def test_gallery_tree_splits_different_workflow_generations_into_folders():
-    # The user-facing shape of the version fold: an old-generation SDXL render
-    # and a new one of the same settings become sibling settings folders rather
-    # than one mixed folder of unlike outputs.
     old = _row(prompt_id="old", workflow_version="v002",
                params_json=json.dumps({"positive_prompt": "a lighthouse"}),
                output_files=json.dumps([{"filename": "sdxl_t2i_old.png"}]))
@@ -631,13 +554,8 @@ def test_gallery_tree_splits_different_workflow_generations_into_folders():
 
 
 def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
-    # A re-roll that keeps the frame and re-rolls only the video seed builds its
-    # params via prepared_params (which fills every workflow default). It must land
-    # in the original's folder despite that default-filling, which canonical
-    # settings absorb.
-
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    frame = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
+    frame = _img("fa", "a face", 30, 1)
     index = build_image_config_index([frame])
 
     model_and_loras = {key: wf.default_params()[key]
@@ -648,7 +566,7 @@ def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
                                 **model_and_loras}),
         output_files=json.dumps([{"filename": "wan22_i2v_a.mp4"}]),
     )
-    reroll_params = prepared_params(sparse, wf)  # exactly what the gallery re-roll runs
+    reroll_params = prepared_params(sparse, wf)
     reroll = _row(
         workflow_name="wan22_i2v",
         params_json=json.dumps(reroll_params),
@@ -658,12 +576,8 @@ def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
 
 
 def test_a_video_reroll_on_a_fresh_frame_opens_that_frames_own_folder():
-    # Re-drawing the start frame makes a different image, and a source-image
-    # folder holds one image — so the new video files under the new frame rather
-    # than joining the old one's folder.
-
-    frame_a = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
-    frame_b = _img("fb", "a face", 30, 2)  # same settings, re-drawn -> sdxl_t2i_fb.png
+    frame_a = _img("fa", "a face", 30, 1)
+    frame_b = _img("fb", "a face", 30, 2)
     index = build_image_config_index([frame_a, frame_b])
 
     def video(frame, name):
@@ -678,11 +592,6 @@ def test_a_video_reroll_on_a_fresh_frame_opens_that_frames_own_folder():
 
 
 def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
-    # i2v derives width/height in-graph from the input image, so a generation
-    # never stores them — but an imported graph does, along with raw sampler-node
-    # fields. Those keys the workflow doesn't define must not split the import
-    # into a folder of its own, away from an otherwise identical generation.
-
     generated_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params())
     generated_params["positive_prompt"] = "a wave"
     imported_params = {**generated_params, "width": 720, "height": 544, "add_noise": "enable"}
@@ -739,9 +648,7 @@ def test_model_signature_groups_by_model_params_only():
     a = json.dumps({"checkpoint": "reapony_v80.safetensors", "steps": 50, "seed": 1})
     b = json.dumps({"checkpoint": "reapony_v80.safetensors", "steps": 40, "seed": 2})
     c = json.dumps({"checkpoint": "dreamshaper.safetensors", "steps": 50})
-    # Same model, different settings/seed -> identical model signature.
     assert model_signature("sdxl_t2i", a) == model_signature("sdxl_t2i", b)
-    # A different checkpoint -> different model signature.
     assert model_signature("sdxl_t2i", a) != model_signature("sdxl_t2i", c)
 
 
@@ -749,24 +656,19 @@ def test_model_signature_spans_every_model_key():
     base = {"unet_high": "h1.safetensors", "unet_low": "l1.safetensors"}
     same = model_signature("wan22_i2v", json.dumps(base))
     diff_low = model_signature("wan22_i2v", json.dumps({**base, "unet_low": "l2.safetensors"}))
-    # The low-noise UNET is part of the model identity, so changing it splits.
     assert same != diff_low
 
 
 def test_lora_signature_groups_by_lora_params_only():
     base = {"lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors"}
     a = json.dumps({**base, "steps": 20, "seed": 1})
-    b = json.dumps({**base, "steps": 30, "seed": 2})  # same LoRAs, other settings
-    c = json.dumps({**base, "lora_low": "styleB_low.safetensors"})  # a LoRA differs
-    # Same LoRAs, different settings/seed -> identical LoRA signature.
+    b = json.dumps({**base, "steps": 30, "seed": 2})
+    c = json.dumps({**base, "lora_low": "styleB_low.safetensors"})
     assert lora_signature("wan22_i2v", a) == lora_signature("wan22_i2v", b)
-    # A different LoRA file -> different LoRA signature.
     assert lora_signature("wan22_i2v", a) != lora_signature("wan22_i2v", c)
 
 
 def test_lora_signature_is_empty_for_a_workflow_without_lora_keys():
-    # SDXL declares no LoRA keys, so every row shares one (empty) LoRA signature
-    # and no LoRA level is ever drawn.
     a = json.dumps({"lora_high": "x.safetensors", "steps": 20})
     b = json.dumps({"steps": 30})
     assert lora_signature("sdxl_t2i", a) == lora_signature("sdxl_t2i", b)
@@ -785,9 +687,7 @@ def test_model_label_joins_multiple_model_keys():
 
 
 def test_model_label_falls_back_when_model_is_unknown():
-    # No model param recorded (e.g. an imported file that didn't carry it)...
     assert model_label("sdxl_t2i", {}) == "(unknown model)"
-    # ...or a workflow that declares no model keys at all.
     assert model_label("nope", {"checkpoint": "x.safetensors"}) == "(unknown model)"
 
 
@@ -800,14 +700,10 @@ def test_lora_label_joins_cleaned_lora_filenames():
 
 
 def test_lora_label_falls_back_when_no_lora_recorded():
-    # A row that carried no LoRA value (e.g. an older import) reads as "(no LoRA)"
-    # rather than an empty name.
     assert lora_label("wan22_i2v", {}) == "(no LoRA)"
 
 
 def test_lora_label_treats_the_none_sentinel_as_no_lora():
-    # Picking "None" for a LoRA is not a file: it reads as no LoRA, not a literal
-    # "None" folder. Both off -> "(no LoRA)"; one off -> just the real one.
     assert lora_label("wan22_i2v", {"lora_high": NO_LORA, "lora_low": NO_LORA}) == "(no LoRA)"
     label = lora_label("wan22_i2v", {"lora_high": "styleA-high.safetensors", "lora_low": NO_LORA})
     assert label == "styleA-high"
@@ -825,12 +721,9 @@ def test_a_model_folder_and_a_lora_folder_are_named_by_their_files_titles(titled
 
 
 def test_lora_signature_merges_the_none_sentinel_with_no_lora():
-    # A run generated with "None" LoRAs and a no-LoRA import (whose graph carried
-    # no LoRA node, so no lora_* keys) are the same "no LoRA" bucket: one folder.
     generated = json.dumps({"lora_high": NO_LORA, "lora_low": NO_LORA, "steps": 20})
-    imported = json.dumps({"steps": 30})  # no lora keys at all
+    imported = json.dumps({"steps": 30})
     assert lora_signature("wan22_i2v", generated) == lora_signature("wan22_i2v", imported)
-    # ...but still distinct from a real LoRA.
     real = json.dumps({"lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors"})
     assert lora_signature("wan22_i2v", generated) != lora_signature("wan22_i2v", real)
 
@@ -856,8 +749,6 @@ def test_find_source_image_matches_i2v_input_to_an_image_row_by_basename():
 
 
 def test_source_image_id_for_resolves_a_bare_input_value():
-    # The Generate tab knows only the input_image value (not a whole row), yet
-    # must resolve it the same way — through the "[output]" annotation too.
     image = _row(prompt_id="img-1", workflow_name="sdxl_t2i",
                  output_files=json.dumps([{"filename": "sdxl_t2i_00007_.png",
                                            "subfolder": "image"}]))
@@ -867,9 +758,6 @@ def test_source_image_id_for_resolves_a_bare_input_value():
 
 
 def test_find_source_image_matches_through_an_output_annotation():
-    # A re-rolled i2v references its freshly generated input by an annotated
-    # output path ("subfolder/name [output]"); the link must still resolve it
-    # back to the image generation by basename.
     image = _row(
         prompt_id="img-1",
         workflow_name="sdxl_t2i",
@@ -887,8 +775,6 @@ def test_find_source_image_matches_through_an_output_annotation():
 
 
 def test_output_file_reference_annotates_the_first_output_for_loadimage():
-    # A generation's saved file lives in the output dir; LoadImage resolves it
-    # only when the reference carries its subfolder and an "[output]" tag.
     files = [{"filename": "sdxl_t2i_00007_.png", "subfolder": "image",
               "type": "output"}]
     assert output_file_reference(files) == "image/sdxl_t2i_00007_.png [output]"
@@ -900,12 +786,10 @@ def test_output_file_reference_without_subfolder_defaults_to_output():
 
 def test_output_file_reference_is_none_when_no_usable_file():
     assert output_file_reference([]) is None
-    assert output_file_reference([{"subfolder": "image"}]) is None  # no filename
+    assert output_file_reference([{"subfolder": "image"}]) is None
 
 
 def test_output_reference_round_trips_back_to_its_source_image():
-    # The reference a re-roll writes into a video's input_image must resolve back
-    # to the very image it was built from — the contract between the two helpers.
     image = _row(
         prompt_id="img-1", workflow_name="sdxl_t2i",
         output_files=json.dumps([{"filename": "sdxl_t2i_00007_.png",
@@ -979,8 +863,6 @@ def _i2v(prompt_id, lora, prompt="dance", steps=20, seed=1):
 
 
 def _i2v_frame(prompt_id, frame_file, prompt=""):
-    """An i2v video sharing one model/LoRA/settings, distinguished only by the
-    start frame it animates."""
     return _row(
         prompt_id=prompt_id,
         workflow_name="wan22_i2v",
@@ -997,20 +879,16 @@ def _i2v_frame(prompt_id, frame_file, prompt=""):
 
 
 def _i2v_source_folders(rows, name_of=None):
-    """The source-image folders of the sole video/workflow/model/LoRA path."""
     workflow = _workflows(build_gallery_tree(rows, name_of=name_of), "video")[0]
     return workflow.children[0].children[0].children
 
 
 def _i2v_leaves(rows):
-    """The settings leaves under the sole video/workflow/model/LoRA/source path."""
     (source,) = _i2v_source_folders(rows)
     return source.children
 
 
 def test_i2v_videos_split_into_a_folder_per_input_image_config():
-    # Two i2v videos sharing every video setting but built from differently
-    # configured frames land in separate source-image folders.
     face = _img("face", "a face", 30, 1)
     scene = _img("scene", "a landscape", 30, 1)
     sources = _i2v_source_folders([
@@ -1025,11 +903,8 @@ def test_i2v_videos_split_into_a_folder_per_input_image_config():
 
 
 def test_every_video_in_a_source_folder_animates_the_one_image():
-    # The tier's whole promise: open any settings folder inside a source-image
-    # folder and every video in it ran on that one frame. Two draws of a single
-    # prompt are two images, so they get two folders however alike their settings.
     face1 = _img("face1", "a face", 30, 1)
-    face2 = _img("face2", "a face", 30, 2)  # a second draw of the same settings
+    face2 = _img("face2", "a face", 30, 2)
     sources = _i2v_source_folders([
         _i2v_frame("v1", "sdxl_t2i_face1.png"),
         _i2v_frame("v2", "sdxl_t2i_face2.png"),
@@ -1041,8 +916,6 @@ def test_every_video_in_a_source_folder_animates_the_one_image():
 
 
 def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
-    # Their prompts are identical, so their images share a folder, and the
-    # number each image has there is what tells the two apart.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)
     first, second = _i2v_source_folders([
@@ -1054,8 +927,6 @@ def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
 
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
-    # The name that image's own tile and tab wear, so the two read as one
-    # image from either shape.
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     (source,) = _i2v_source_folders(rows, name_of={"face": "3FA9C0D2 004"}.get)
@@ -1063,9 +934,6 @@ def test_i2v_source_folder_is_named_by_the_image_it_animates():
 
 
 def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():
-    # A frame that isn't a known generation can't borrow an image's folder name, so
-    # the source folder falls back to the bare filename (distinct frames still read
-    # apart) rather than a blank or collapsed name.
     (source,) = _i2v_source_folders([_i2v_frame("vf", "input/hand_picked.png [input]")])
     assert source.label == "hand_picked.png"
 
@@ -1076,24 +944,17 @@ def test_videos_made_without_a_start_frame_share_a_folder_named_in_the_forms_wor
 
 
 def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index():
-    # A source-image favorite's key is recomputed from a row under it; it depends on
-    # the start frame's config, so folder_key_at_level must resolve it through the
-    # image index — matching the tree, not the bare filename.
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
     (source,) = _i2v_source_folders([video, face])
-    assert source.key.startswith("video/wan22_i2v/i")  # the source level tags its key with 'i'
+    assert source.key.startswith("video/wan22_i2v/i")
     assert folder_key_at_level(video, "source_image", index) == source.key
-    # Without the index it falls back to the filename and misses the real folder.
     assert folder_key_at_level(video, "source_image", index) != \
         folder_key_at_level(video, "source_image")
 
 
 def test_settings_folder_key_matches_an_i2v_leaf_under_its_source_folder():
-    # The leaf key is independent of the new source-image parent, so an in-flight
-    # i2v (absent from the tree) still matches the exact leaf it will join — the
-    # invariant the Generate tab and re-roll reconnection rely on.
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
@@ -1102,10 +963,6 @@ def test_settings_folder_key_matches_an_i2v_leaf_under_its_source_folder():
 
 
 def test_an_i2v_workflow_still_gets_no_source_image_level_under_images():
-    # An image-conditioned WORKFLOW can output a still — an imported PNG under a
-    # video prefix — which classifies as an image. A still animates nothing, so it
-    # must not grow a source-image level: filed as an image it goes straight from
-    # LoRA to its settings leaf, exactly like any other image.
     still = _row(
         prompt_id="still",
         workflow_name="wan22_flf2v_loop",
@@ -1145,8 +1002,6 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
 
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():
-    # The two no longer share a parent, Images holding the one and Videos the
-    # other, so neither needs telling apart from its twin by what it holds.
     assert _workflow_labels([_LOOP_STILL, _LOOP_VIDEO]) == {
         "image/wan22_flf2v_loop": _LOOPING, "video/wan22_flf2v_loop": _LOOPING}
     assert _workflow_labels([_LOOP_VIDEO]) == {"video/wan22_flf2v_loop": _LOOPING}
@@ -1161,26 +1016,18 @@ def test_copies_given_one_name_each_wear_it_as_given():
 
 
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
-    # The reconcile recomputes a settings favorite's key from a row under it; for an
-    # i2v that key depends on the start frame's config, so folder_key_at_level must
-    # resolve it through the image index — matching the tree, not the bare filename.
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
     assert folder_key_at_level(video, "settings", index) == settings_folder_key(video, index)
-    # Without the index it falls back to the filename and misses the real folder.
     assert folder_key_at_level(video, "settings", index) != settings_folder_key(video)
 
 
 def test_legacy_preframe_settings_folder_key_drops_the_frame():
-    # The pre-frame-config key hashes the video's own settings with the input image
-    # dropped — distinct from the current key, which folds the frame's config in.
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
     assert legacy_preframe_settings_folder_key(video) != settings_folder_key(video, index)
-    # A non-image-conditioned row never folded a frame, so its pre-version key is
-    # the preframe one; the current key differs from both by the version fold.
     image = _img("cat", "a cat", 20, 1)
     assert legacy_preframe_settings_folder_key(image) \
         == legacy_preversion_settings_folder_key(image)
@@ -1190,23 +1037,21 @@ def test_legacy_preframe_settings_folder_key_drops_the_frame():
 def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
     rows = [
         _i2v("v1", "styleA"),
-        _i2v("v2", "styleA", seed=2),   # same LoRA + settings, different seed
-        _i2v("v3", "styleB"),           # same base model, different LoRA
+        _i2v("v2", "styleA", seed=2),
+        _i2v("v3", "styleB"),
     ]
     workflow = _workflows(build_gallery_tree(rows))[0]
-    (model,) = workflow.children                       # one shared base model
+    (model,) = workflow.children
     loras = {lg.label: lg for lg in model.children}
     assert set(loras) == {"styleA_high / styleA_low", "styleB_high / styleB_low"}
 
-    (a_source,) = loras["styleA_high / styleA_low"].children  # one "(no start image)" source
-    (a_settings,) = a_source.children                          # the two seeds collapse
+    (a_source,) = loras["styleA_high / styleA_low"].children
+    (a_settings,) = a_source.children
     assert {r["prompt_id"] for r in a_settings.rows} == {"v1", "v2"}
     assert {r["prompt_id"] for r in rows_under(loras["styleB_high / styleB_low"])} == {"v3"}
 
 
 def test_settings_folder_key_matches_the_rows_tree_leaf():
-    # A completed row's settings-folder key equals the leaf key build_gallery_tree
-    # gives it, so an in-flight sibling (absent from the tree) can be matched to it.
     row = _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)
     (lora,) = _workflows(build_gallery_tree([row]))[0].children[0].children
     (leaf,) = lora.children
@@ -1214,7 +1059,7 @@ def test_settings_folder_key_matches_the_rows_tree_leaf():
 
 
 def test_group_level_names_each_tier():
-    rows = [_i2v("v1", "styleA")]  # videos -> wan22_i2v -> model -> lora -> source -> settings
+    rows = [_i2v("v1", "styleA")]
     (media,) = build_gallery_tree(rows)
     wf = media.children[0]
     model = wf.children[0]
@@ -1226,8 +1071,6 @@ def test_group_level_names_each_tier():
 
 
 def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
-    # A favorite stores its tier + a row under it; recomputing the key from that row
-    # must reproduce the folder's key at every tier, so the star can follow it.
     rows = [_i2v("v1", "styleA")]
     (media,) = build_gallery_tree(rows)
     wf = media.children[0]
@@ -1297,18 +1140,12 @@ def test_a_rows_folder_chain_is_the_path_the_tree_files_it_under():
 
 
 def test_legacy_settings_key_differs_from_the_current_normalized_key():
-    # canonical_settings changed the settings hash, so the legacy formula yields a
-    # different key for the same row — exactly why a star set before the change no
-    # longer matches its folder, and what the reconcile recomputes to re-point it.
     row = _img("i1", "a cat", 50, 1)
     assert legacy_settings_folder_key(row) != settings_folder_key(row)
     assert legacy_settings_folder_key(row).startswith("image/sdxl_t2i/")
 
 
 def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
-    # SDXL declares no LoRA keys, so its model folder still grows a LoRA level — a
-    # single "(no LoRA)" folder wrapping the settings leaves — so every branch of
-    # the tree nests to the same depth whether or not the pipeline uses a LoRA.
     rows = [_img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)]
     (model,) = _workflows(build_gallery_tree(rows))[0].children
     (lora,) = model.children
@@ -1321,13 +1158,13 @@ def test_lora_folders_get_stable_keys_and_apply_custom_names_and_favorites():
     rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
     model = _workflows(build_gallery_tree(rows))[0].children[0]
     a, b = model.children
-    assert a.key.startswith("video/wan22_i2v/l")  # the LoRA level tags its key with 'l'
+    assert a.key.startswith("video/wan22_i2v/l")
     assert a.key != b.key
 
     meta = {b.key: {"custom_name": "Style B", "starred": True}}
     loras = _workflows(build_gallery_tree(rows, meta))[0].children[0].children
-    assert [lora.key for lora in loras] == [a.key, b.key]  # order unchanged — no reshuffle
-    assert loras[1].label == "Style B"     # custom name applied in place
+    assert [lora.key for lora in loras] == [a.key, b.key]
+    assert loras[1].label == "Style B"
     assert loras[1].favorite is True
     assert loras[0].favorite is False
 
@@ -1335,8 +1172,8 @@ def test_lora_folders_get_stable_keys_and_apply_custom_names_and_favorites():
 def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     rows = [
         _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
-        _img_model("i2", "a cat", "reapony_v80.safetensors", 50, 2),  # same model+settings
-        _img_model("i3", "a cat", "dreamshaper.safetensors", 50, 1),  # same prompt, other model
+        _img_model("i2", "a cat", "reapony_v80.safetensors", 50, 2),
+        _img_model("i3", "a cat", "dreamshaper.safetensors", 50, 1),
     ]
     workflow = _workflows(build_gallery_tree(rows))[0]
 
@@ -1344,8 +1181,8 @@ def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     assert set(models) == {"reapony_v80", "dreamshaper"}
 
     reapony = models["reapony_v80"]
-    (reapony_lora,) = reapony.children              # the single "(no LoRA)" level
-    assert len(reapony_lora.children) == 1          # the two seeds collapse
+    (reapony_lora,) = reapony.children
+    assert len(reapony_lora.children) == 1
     assert {r["prompt_id"] for r in reapony_lora.children[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in rows_under(models["dreamshaper"])} == {"i3"}
 
@@ -1361,49 +1198,41 @@ def test_model_folders_get_stable_keys_and_apply_custom_names_and_favorites():
 
     meta = {dream.key: {"custom_name": "Dreamy", "starred": True}}
     models = _workflows(build_gallery_tree(rows, meta))[0].children
-    assert [m.key for m in models] == [reapony.key, dream.key]  # order unchanged
-    assert models[1].label == "Dreamy"     # custom name applied in place
+    assert [m.key for m in models] == [reapony.key, dream.key]
+    assert models[1].label == "Dreamy"
     assert models[1].favorite is True
     assert models[0].favorite is False
 
 
 def test_build_gallery_tree_excludes_failed_rows_that_produced_no_output():
-    # A failed generation never wrote a file. The gallery shows results, so a
-    # file-less error row must not surface as an empty, output-less entry — not
-    # even the workflow folder it would otherwise create.
     rows = [
-        _img("i1", "a cat", 50, 1),                          # real result: has a file
+        _img("i1", "a cat", 50, 1),
         _row(prompt_id="boom", workflow_name="wan22_i2v",
              status="error",
              params_json=json.dumps({"positive_prompt": "dance", "seed": 5}),
-             output_files=None),                             # failed: no file
+             output_files=None),
     ]
     tree = build_gallery_tree(rows)
     surfaced = {r["prompt_id"] for folder in tree for r in rows_under(folder)}
     assert surfaced == {"i1"}
-    assert [w.key for w in _workflows(tree)] == ["image/sdxl_t2i"]  # no folder for the dead row
+    assert [w.key for w in _workflows(tree)] == ["image/sdxl_t2i"]
 
 
 def test_build_gallery_tree_includes_in_progress_rows_so_a_new_folder_appears():
-    # A running (or pending) generation has no output yet, but its folder must
-    # appear at once — a tab's Generate into a brand-new settings folder needs a
-    # node to navigate to while it runs. The output-less running row gives that
-    # folder its node; its live tile/tile stands in for the missing thumbnail.
     rows = [
-        _img("i1", "a cat", 50, 1),                          # a finished image
+        _img("i1", "a cat", 50, 1),
         _row(prompt_id="run", workflow_name="wan22_i2v",
              status="running",
              params_json=json.dumps({"positive_prompt": "dance", "seed": 5}),
-             output_files="[]"),                             # in flight: no file yet
+             output_files="[]"),
     ]
     tree = build_gallery_tree(rows)
     surfaced = {r["prompt_id"] for folder in tree for r in rows_under(folder)}
-    assert surfaced == {"i1", "run"}                         # the running row appears
+    assert surfaced == {"i1", "run"}
     assert {w.key for w in _workflows(tree)} == {"image/sdxl_t2i", "video/wan22_i2v"}
 
 
 def test_build_gallery_tree_includes_a_pending_row():
-    # "pending" (queued, not yet begun) is in flight too, so its folder appears.
     rows = [_row(prompt_id="q", workflow_name="sdxl_t2i", status="pending",
                  params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
                  output_files="[]")]
@@ -1413,10 +1242,6 @@ def test_build_gallery_tree_includes_a_pending_row():
 
 
 def test_build_gallery_tree_nests_experiments_like_any_other_generation():
-    # An experiment is a generation, so it gets its settings folder whatever the
-    # review says — from the moment it starts running, before any verdict. A
-    # rejected one is absent only because rejecting it trashed its files, the
-    # same reason any output-less row is absent.
     def _experiment(prompt_id, verdict, **kw):
         kw.setdefault("status", "completed")
         kw.setdefault("output_files", json.dumps([{"filename": f"{prompt_id}.png"}]))
@@ -1456,9 +1281,9 @@ def test_unreviewed_experiments_lists_only_finished_unjudged_results():
 
 def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder():
     rows = [
-        _img("i1", "a cat", 50, 1),   # same settings as i2, different seed
+        _img("i1", "a cat", 50, 1),
         _img("i2", "a cat", 50, 2),
-        _img("i3", "a cat", 40, 1),   # different steps -> its own settings group
+        _img("i3", "a cat", 40, 1),
         _row(prompt_id="v1", workflow_name="wan22_i2v",
              params_json=json.dumps({"positive_prompt": "dance", "seed": 5}),
              output_files=json.dumps([{"filename": "wan22_i2v_00001_.mp4"}])),
@@ -1468,24 +1293,20 @@ def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder(
     by_key = {w.key: w for w in _workflows(tree)}
     assert set(by_key) == {"image/sdxl_t2i", "video/wan22_i2v"}
 
-    (model,) = by_key["image/sdxl_t2i"].children  # no checkpoint -> one model
-    (lora,) = model.children                # the single "(no LoRA)" level
+    (model,) = by_key["image/sdxl_t2i"].children
+    (lora,) = model.children
     settings = lora.children
     assert len(settings) == 2
     assert {r["prompt_id"] for r in settings[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in settings[1].rows} == {"i3"}
 
     (video_model,) = by_key["video/wan22_i2v"].children
-    (video_lora,) = video_model.children    # wan22_i2v grows a LoRA level ("(no LoRA)" here)
-    (video_source,) = video_lora.children   # then a source-image level ("(no start image)")
+    (video_lora,) = video_model.children
+    (video_source,) = video_lora.children
     assert len(video_source.children) == 1
 
 
 def test_a_tree_of_videos_alone_keys_its_source_image_folders_the_same():
-    # A caller that narrows the rows itself hands in the whole library's index,
-    # so the frame a video animates is still looked up among every finished
-    # image: a tree of videos alone keys and names its source-image folders
-    # exactly as a tree of both does.
     face = _img("face", "a smiling face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     rows = [video, face]
@@ -1504,11 +1325,9 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert workflow.key == "image/sdxl_t2i"
     model = workflow.children[0]
     assert model.key.startswith("image/sdxl_t2i/")
-    settings = model.children[0].children[0]     # model -> "(no LoRA)" -> settings
+    settings = model.children[0].children[0]
     assert settings.key.startswith("image/sdxl_t2i/")
 
-    # The model and settings keys are derived from signatures, so they are
-    # stable across rebuilds (what lets a rename/star stick to the same folder).
     again_model = _workflows(build_gallery_tree([_img("i9", "a cat", 50, 7)]))[0] \
         .children[0]
     assert again_model.key == model.key
@@ -1518,15 +1337,15 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
 def test_build_gallery_tree_applies_custom_names_and_favorites_in_place():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     plain_lora = _workflows(build_gallery_tree(rows))[0] \
-        .children[0].children[0]  # the "(no LoRA)" level
-    cat, dog = plain_lora.children  # newest-first: cat, dog
+        .children[0].children[0]
+    cat, dog = plain_lora.children
 
     meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
     settings = _workflows(build_gallery_tree(rows, meta))[0] \
         .children[0].children[0].children
 
-    assert [s.key for s in settings] == [cat.key, dog.key]  # order unchanged — no reshuffle
-    assert settings[1].label == "Doggos"      # custom name applied in place
+    assert [s.key for s in settings] == [cat.key, dog.key]
+    assert settings[1].label == "Doggos"
     assert settings[1].favorite is True
     assert settings[0].favorite is False
 
@@ -1598,11 +1417,9 @@ def test_a_video_with_no_start_image_is_found_by_that_folders_name():
 
 
 def test_favorite_folders_collects_favorite_across_every_level():
-    # Favorite a whole workflow folder and one deep settings leaf; the collector
-    # returns both, top-down in tree order, regardless of how deep each sits.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     workflow = _workflows(build_gallery_tree(rows))[0]
-    cat_leaf = workflow.children[0].children[0].children[0]  # model -> "(no LoRA)" -> settings
+    cat_leaf = workflow.children[0].children[0].children[0]
 
     meta = {
         workflow.key: {"custom_name": None, "starred": True},
@@ -1632,10 +1449,6 @@ def test_recent_generations_lists_a_run_by_when_it_finished_not_when_it_was_aske
 
 
 def test_recent_generations_lists_imported_files_where_they_arrived():
-    # A file ComfyUI wrote that no instance of this app queued joins the collection at
-    # the launch that found it, which is when it is looked for there; leaving
-    # imports off Latest hid a video queued straight on ComfyUI in its workflow's
-    # folder alone.
     generated = _img("gen", "a cat", 50, 1)
     imported = _row(prompt_id="imp", source="imported", id=2,
                     output_files=json.dumps([{"filename": "imp.png"}]))
@@ -1652,9 +1465,6 @@ def test_recent_generations_lists_a_file_found_on_disk_by_when_it_was_found_howe
 
 
 def test_recent_generations_leaves_experiments_to_their_own_collection():
-    # An experiment is reviewed in the Experiments collection; listed here as well it
-    # would read as something asked for. Everything else with a result is here,
-    # including a cycle cut for the Genau lane, which has no run under it.
     generated = _img("gen", "a cat", 50, 1)
     experiment = _row(prompt_id="exp", source="experiment", id=2,
                       output_files=json.dumps([{"filename": "exp.png"}]))
@@ -1664,16 +1474,12 @@ def test_recent_generations_leaves_experiments_to_their_own_collection():
 
 
 def test_recent_generations_excludes_rows_that_produced_no_output():
-    # Mirrors the tree: a failed or in-flight row wrote no file, so it has nothing
-    # to show and stays out of the collection.
     done = _img("done", "a cat", 50, 1)
     pending = _row(prompt_id="wip", output_files=None)
     assert [r["prompt_id"] for r in recent_generations([done, pending])] == ["done"]
 
 
 def test_recent_generations_is_uncapped():
-    # The collection keeps going as far back as the user has generated — nothing is
-    # trimmed off the end here; the pane draws it a page at a time as it scrolls.
     rows = [_img(f"i{n}", "a cat", 50, n) for n in range(200)]
     assert len(recent_generations(rows)) == 200
 
@@ -1685,15 +1491,12 @@ def test_favorite_generations_collects_favorite_items_newest_first():
 
 
 def test_favorite_generations_includes_imported_files():
-    # A favorite is a favorite: an imported image the user favorited belongs on the
-    # Favorites collection.
     imported = _row(prompt_id="imp", source="imported", starred=1,
                     output_files=json.dumps([{"filename": "imp.png"}]))
     assert [r["prompt_id"] for r in favorite_generations([imported])] == ["imp"]
 
 
 def test_favorite_generations_excludes_rows_with_no_output():
-    # A favorited row that produced nothing (in-flight/failed) has nothing to show.
     favorite_wip = _row(prompt_id="wip", starred=1, output_files=None)
     assert favorite_generations([favorite_wip]) == []
 
@@ -1713,24 +1516,16 @@ def test_enhanced_generations_are_the_enhanced_images_with_a_file_in_the_order_g
 
 
 def _collection(*ids_and_seeds):
-    """Finished images newest-first, ids ascending with age — the shape the DB
-    hands the collection (``ORDER BY id DESC``)."""
     return [_img(pid, "a cat", 50, n, id=n) for pid, n in ids_and_seeds]
 
 
 def _enhance_run(prompt_id, source_file, row_id, *, done=None):
-    """A standalone enhance of ``source_file``: in flight (no output) unless
-    ``done`` names the file it produced."""
     return _row(prompt_id=prompt_id, workflow_name="image_enhance", id=row_id,
                 params_json=json.dumps({"input_image": f"image/{source_file} [output]"}),
                 output_files=json.dumps([{"filename": done}]) if done else None)
 
 
 def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
-    # An enhancement gets no tile of its own in the collection — it is a version of an
-    # image, not an item beside one — so the image itself has to move, or the run
-    # is listed nowhere and the image being worked on stays buried under
-    # everything made since.
     running = _enhance_run("e1", "sdxl_t2i_i1.png", 4)
     rows = [running] + _collection(("i3", 3), ("i2", 2), ("i1", 1))
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
@@ -1743,9 +1538,6 @@ def test_recent_generations_leaves_an_image_the_backfill_is_enhancing_where_it_s
 
 
 def test_recent_generations_keeps_a_folded_enhancement_where_its_run_landed():
-    # The transient row is deleted by the fold, so the level it left is
-    # what remembers where the run fell in the library's order: the image stays
-    # lifted after it completes rather than dropping back to where it was made.
     i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 4}])
@@ -1786,8 +1578,6 @@ def test_recent_generations_seats_an_enhancement_folded_before_finishes_were_rec
 
 
 def test_recent_generations_lets_a_newer_generation_outrank_an_enhancement():
-    # The lift is a place in the order, not a pin to the top: something made
-    # since the enhancement is still the newer thing.
     i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 3}])
@@ -1796,9 +1586,6 @@ def test_recent_generations_lets_a_newer_generation_outrank_an_enhancement():
 
 
 def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place():
-    # A level folded before the run's id was recorded has nothing to sort by, and
-    # keeps the image where it was made — an enhancement older than the record of
-    # it is an enhancement from long ago.
     i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}}])
@@ -1807,8 +1594,6 @@ def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place
 
 
 def test_recent_generations_lifts_the_image_a_re_enhance_runs_on_its_original():
-    # A re-enhance runs on the pre-enhance file, still listed under the enhanced
-    # one: the row it belongs to is the same image, so it is that image that moves.
     i1, = _collection(("i1", 1))
     i1["output_files"] = json.dumps([{"filename": "image_enhance_e1.png"},
                                      {"filename": "sdxl_t2i_i1.png"}])
@@ -1824,11 +1609,11 @@ def test_child_groups_and_rows_under_walk_the_tree():
     tree = build_gallery_tree(rows)
 
     assert [w.workflow_name for w in _workflows(tree)] == ["sdxl_t2i"]
-    (model,) = child_groups(_workflows(tree)[0])  # no checkpoint recorded -> one model
-    (lora,) = child_groups(model)          # the single "(no LoRA)" level
+    (model,) = child_groups(_workflows(tree)[0])
+    (lora,) = child_groups(model)
     settings = child_groups(lora)
     assert len(settings) == 2
-    assert child_groups(settings[0]) == []  # a leaf has no child folders
+    assert child_groups(settings[0]) == []
 
     assert {r["prompt_id"] for r in rows_under(_workflows(tree)[0])} == {"i1", "i2", "i3"}
     assert {r["prompt_id"] for r in rows_under(settings[0])} == {"i1", "i2"}
@@ -1841,8 +1626,6 @@ def test_build_gallery_tree_labels_workflow_with_display_name():
 
 
 def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
-    # A prompt is a paragraph where a folder name is a line, so a settings leaf
-    # is named from its key instead.
     prompt = "a cat asleep on a windowsill in the late afternoon sun"
     (lora,) = _workflows(build_gallery_tree(
         [_img("i1", prompt, 50, 1)]))[0].children[0].children
@@ -1855,9 +1638,6 @@ def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
 
 
 def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
-    # The name has to be as stable as the folder — it is what the user reads a
-    # folder by, and one that changed as the library grew would be no name at all
-    # — and two folders on one screen must never wear the same one.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     lora = _workflows(build_gallery_tree(rows))[0].children[0].children[0]
     cat, dog = lora.children
@@ -1871,7 +1651,6 @@ def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
 
 
 def test_a_custom_name_replaces_the_code():
-    # The code is a starting name, not a fixed one: naming a folder replaces it.
     rows = [_img("i1", "a cat", 50, 1)]
     (leaf,) = _workflows(build_gallery_tree(rows))[0].children[0].children[0].children
 
@@ -1905,15 +1684,12 @@ def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
     out.mkdir()
     thumb = tmp_path / "thumb.jpg"
     thumb.write_bytes(b"x")
-    # Output references a video that is not on disk; the thumbnail still previews.
     row = _row(output_files=json.dumps([{"filename": "gone_1_.mp4", "subfolder": "video"}]),
                thumbnail_path=str(thumb))
     assert resolve_preview(row, OutputPlaces.in_one_folder(out)) == (thumb, "image")
 
 
 def test_resolve_preview_follows_a_file_the_trash_has_re_pointed(tmp_path):
-    # A deleted generation's files sit in the trash, and its row says so — which
-    # is what lets the Trash collection play a deleted video rather than offer a still.
     out = tmp_path / "output"
     out.mkdir()
     trashed = tmp_path / "trash" / "abc" / "0_wan22_i2v_1_.mp4"
@@ -1955,10 +1731,8 @@ def test_output_disk_files_includes_a_video_metadata_sidecar(tmp_path):
     (out / "video").mkdir(parents=True)
     mp4 = out / "video" / "wan22_i2v_1_.mp4"
     mp4.write_bytes(b"v")
-    sidecar = out / "video" / "wan22_i2v_1_.png"  # VHS_VideoCombine writes this
+    sidecar = out / "video" / "wan22_i2v_1_.png"
     sidecar.write_bytes(b"p")
-    # The consolidated row points at the video; deleting it must also take the
-    # PNG, or the next import would resurrect the orphaned still as an image.
     row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
                                          "subfolder": "video"}]))
     assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [mp4, sidecar]
@@ -1986,8 +1760,6 @@ def test_output_disk_files_omits_files_not_on_disk(tmp_path):
 
 
 def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies():
-    # Sent to Genau, a loop is copied under a counter where its name was taken,
-    # upscaled under "_topaz", and counted again where Genau's folder had one.
     loop = _row(prompt_id="vid-7", workflow_name="wan22_i2v",
                 output_files=json.dumps([{"filename": "wan22_i2v_00007_.mp4",
                                           "subfolder": "video"}]))
@@ -2000,11 +1772,6 @@ def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies()
 
 
 def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
-    # A row from before scenes carries only frame_count; its re-roll writes the
-    # one scene out as scene_frames. Both are the same settings, and a scene list
-    # of one that disagrees with the video length is overruled by it in the graph
-    # too, so it must not split the folder.
-
     before = canonical_settings("wan22_i2v", {"frame_count": 121})
     rerolled = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [121]})
     stale = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [81]})
@@ -2015,16 +1782,11 @@ def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
 
 @pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer"])
 def test_the_redraw_amount_that_left_the_form_still_keys_every_sdxl_folder(name):
-    # A folder's key hashes every default-normalized setting, so the default
-    # outlives the field: dropping it would re-key every SDXL folder and part
-    # each one from its name, its star and its Enhance settings.
     assert canonical_settings(name, {})["denoise"] == 1.0
     assert canonical_settings(name, {"denoise": 0.4})["denoise"] == 0.4
 
 
 def _worked_tree(*leaf_ids):
-    """One workflow folder over one settings leaf per id, the id standing for
-    where that leaf's generation falls in the library's order."""
     leaves = [SettingsGroup(f"s{i}", f"S{i}", [{"prompt_id": f"g{i}", "id": i}])
               for i in leaf_ids]
     return [WorkflowGroup("w", "wf", "WF",
@@ -2038,19 +1800,12 @@ def test_the_folder_of_the_newest_generation_is_marked_lately_worked_in():
 
 
 def test_only_a_folder_with_nothing_nested_under_it_is_marked():
-    # The mark goes on the folder the generations themselves are in. A folder of
-    # folders is fresh whenever anything under it is, which is nearly always, so
-    # marking one would say nothing about it.
-
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1)}, [])
 
     assert marked == {(PORTRAIT, "s1")}
 
 
 def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
-    # Both halves of the tree draw the same folder key over rows of their own
-    # shape, so portrait work must not light the landscape copy of it.
-
     marked = recently_worked_folders(
         {PORTRAIT: _worked_tree(2), LANDSCAPE: _worked_tree()}, [])
 
@@ -2059,19 +1814,12 @@ def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
 
 
 def test_only_the_last_few_folders_worked_in_are_marked():
-    # Every folder marked is no folder marked, so the freshest few take it and
-    # the rest of the library stays quiet.
-
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1, 2, 3)}, [], limit=2)
 
     assert marked == {(PORTRAIT, "s3"), (PORTRAIT, "s2")}
 
 
 def test_enhancing_an_old_image_marks_the_folder_it_sits_in():
-    # Enhancing is working in the folder the image is in, and it leaves no row
-    # of its own there — so a folder whose only fresh thing is an enhancement is
-    # still one of the folders you were last in.
-
     old = {"prompt_id": "g1", "id": 1,
            "enhance_history": json.dumps([{"run_id": 9}])}
     newer = {"prompt_id": "g2", "id": 2}
@@ -2081,4 +1829,4 @@ def test_enhancing_an_old_image_marks_the_folder_it_sits_in():
 
     marked = recently_worked_folders({PORTRAIT: tree}, [old, newer], limit=1)
 
-    assert marked == {(PORTRAIT, "s1")}  # the enhanced image's, not the newer one's
+    assert marked == {(PORTRAIT, "s1")}

@@ -120,45 +120,24 @@ from origenerator.workflows.model_files import NO_LORA
 
 logger = logging.getLogger(__name__)
 
-_CAPTION_DELAY_MS = 250    # settle before re-reading whether Generate would duplicate
+_CAPTION_DELAY_MS = 250
 _RANDOM_SEED_TIP = (
     "These settings have already been generated with this exact seed, so "
     "Generate draws a fresh one rather than re-creating the same file. "
     "Change a setting to generate something else instead."
 )
-# Breathing room round the tab's contents, and between the form and the scroll
-# bar beside it — enough that nothing reads as jammed into a corner, small
-# enough that a narrow pane still spends its width on the fields.
-# How far the "never narrower than its contents" floor below is allowed to go.
-# One thing in the tab is wider than a tiling-narrow window can give the Generate pane
-# — an image's list of versions, a thumbnail beside a file's facts and buttons — and
-# a floor that insisted on it would take the whole window out of the monitor-third
-# place it has to fit (see tests/test_core.py). Past this the settings scroll
-# sideways after all, which is the smaller of the two losses.
 _FLOOR_CAP = 330
 
-# What the preview says once the form has been edited away from the generation
-# on it: that item was generated, these settings have not been.
 _MODIFIED_MESSAGE = "(not yet generated with modifications)"
 
-# What the preview says while following a run that has streamed no frame yet,
-# where the gallery has nothing more specific to say about the wait.
 _WAITING_NOTE = "Waiting for preview…"
 
-# What a tab opened on a folder's Modify (all seeds) says on its Generate and above
-# its tabs. The count is in the hover rather than on the face: the press does
-# submit that many runs at once, which is worth being able to read, but what
-# the button asks for is one thing — this folder, said the way it now reads.
 _MODIFY_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
 @dataclass(frozen=True)
 class _RequestAim:
-    """What the Request section asks its changes of: the image on display, the
-    words that made it when a request did, the prompt pair those words were asked
-    of, the image's own pair, and the image a request made here is about."""
-
     prompt_id: str
     words: str
     asked_of: tuple[str, str]
@@ -201,46 +180,22 @@ def _pick_installed_ones_first(names: list[str]) -> str:
 
 
 class GenerateTab(DropZones):
-    """One generation configuration: pick a workflow and set its params.
-
-    Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
-    for the gallery to launch as a re-roll of this config's settings folder. The
-    tab is one column: a fixed preview on top, then a single button row over
-    one scroll holding the File/Created block above the editable form and, at its
-    foot, the displayed generation's related media. Generate's caption says when a
-    press will draw a fresh seed rather than re-create what these settings have
-    already made, and the info appears only while a saved generation is on show.
-
-    What acts on the generation itself is on the preview rather than in the button row:
-    the preview wears the same star / trash / plus corners a gallery thumbnail
-    does, and right-clicking it raises the same menu. Each file row carries a
-    "Go to folder" beside its Show in Explorer.
-
-    A fresh tab opens with no workflow picked — the pane's resting state.
-    """
-
-    title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
-    form_edited = pyqtSignal()          # any field changed — every keystroke
-    # A field changed because someone changed it — the workflow dropdown included,
-    # and never the seeding a load does. What tells the tab row this tab is
-    # being worked in rather than looked at (see _loading_config).
+    title_changed = pyqtSignal(str)
+    form_edited = pyqtSignal()
     user_edited = pyqtSignal()
-    prompt_fields_changed = pyqtSignal()  # a new form, or a prompt gained or lost a box
+    prompt_fields_changed = pyqtSignal()
     link_clicked = pyqtSignal(str)
-    item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
-    context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
-    go_to_folder_requested = pyqtSignal(str)  # a file row's "Go to folder": the shown prompt_id
-    generate_requested = pyqtSignal(str, list)  # Generate clicked: (workflow_name, each one's params)
-    # Generate clicked on a folder rewrite: (source folder key, workflow_name, form
-    # params). A separate signal because it asks for something else entirely — one
-    # run per item in that folder, each keeping its own seed.
+    item_action_requested = pyqtSignal(str, str)
+    context_menu_requested = pyqtSignal(str, QPoint)
+    go_to_folder_requested = pyqtSignal(str)
+    generate_requested = pyqtSignal(str, list)
     modify_requested = pyqtSignal(str, str, dict)
-    cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
+    cancel_requested = pyqtSignal()
     how_many_chosen = pyqtSignal(int)
-    displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
-    enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
-    versions_delete_requested = pyqtSignal(str, list)  # trash these versions of this image (prompt_id, filenames)
-    train_requested = pyqtSignal(str)        # a LoRA row's Train was pressed (the row's key)
+    displayed_changed = pyqtSignal()
+    enhance_requested = pyqtSignal(str)
+    versions_delete_requested = pyqtSignal(str, list)
+    train_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None, heights=None,
@@ -249,93 +204,52 @@ class GenerateTab(DropZones):
                  names: ItemNames | None = None,
                  animated_preview: Callable[[dict], str | None] | None = None):
         super().__init__(parent=parent)
-        self._heights = heights  # the window's prompt heights, for its forms
-        # Where a video is handed to Evolver. Asked for rather than performed
-        # here: the destination is one object's to know, and a test points it at
-        # a directory of its own instead of patching a constant this module
-        # imported (origenerator.evolver_export).
+        self._heights = heights
         self._inbox = inbox or evolver_export.default_inbox()
-        self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
+        self._client = client
         self._db = db
         self._library = library or LibraryViews(db)
         self._names = names or ItemNames(db)
         self._animated_preview = animated_preview or (
             lambda row: gallery.animated_preview_if_made(row, OUTPUT_PLACES, THUMB_DIR))
         self._param_form: ParamForm | None = None
-        self._generating = False                       # a run this tab launched is in flight (offers the discard button)
+        self._generating = False
         self._making_one = None
-        self._launched_runs: dict[str, dict | None] = {}  # the runs this tab holds, each with what its press made it of
-        # The settings folder whose live run this tab's preview follows — its
-        # own Generate's, or the run it was pointed at by a click on that
-        # folder's live tile (see watch_folder). None while the preview is the
-        # tab's own item. Beside it, the wait text standing in for a frame
-        # that hasn't streamed yet, so the same text isn't re-painted every poll.
+        self._launched_runs: dict[str, dict | None] = {}
         self._watched_key: str | None = None
         self._live_note: str | None = None
-        # The pair standing in for a frame that hasn't streamed — kept so the
-        # same one isn't rebuilt every poll, which would restart the video's loop
-        # from frame one each second.
         self._live_source: Combination | None = None
-        self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
-        # (status, frame, settings) of an enhancement running on the displayed
-        # image, fed from outside (the gallery owns the jobs); None when nothing
-        # is in flight. Beside it, the app-wide enhance settings the "+ Enhance"
-        # row would run at — also the gallery's, pushed in the same way.
+        self._displayed_row: dict | None = None
         self._pending_enhancement: RunningEnhancement | None = None
         self._enhance_settings = EnhanceSettings()
-        # The settings the preview's generation went on display under, captured
-        # whenever one does. Editing the form away from these is what marks the
-        # preview as no longer showing what a Generate would make; None whenever
-        # there's no saved generation on display to be modified away from.
         self._displayed_config: ConfigSnapshot | None = None
-        # Set while this tab is a whole folder's prompt rewrite rather than one
-        # configuration: the folder being rewritten, what to call it, how many
-        # items the press will run, and the settings it opened on — which is
-        # what says whether anything has actually been rewritten yet.
         self._folder_modify: FolderModify | None = None
-        # Where this tab's settings came from, when the Combine opened them
-        # here: the action picked in its dropdown, the video whose settings they are and
-        # the lane, as (category, video_prompt_id, intent). Carried so a run launched
-        # from this tab — as opened, or edited first — says in the queue what it was
-        # asked for. Nothing else on the form remembers any of them.
         self._settings_source: tuple[str, str | None, str] = ("", None, "")
         self._source_video_row: dict | None = None
         self._trainings_running: dict[str, str] = {}
         self._offered_loras: dict[str, object] = {}
-        # Re-reads (shortly) whether Generate would reproduce a past run — see
-        # refresh_generate_caption for why the answer isn't taken on the spot.
         self._caption_timer = QTimer(self)
         self._caption_timer.setSingleShot(True)
         self._caption_timer.setInterval(_CAPTION_DELAY_MS)
         self._caption_timer.timeout.connect(self._apply_generate_caption)
-        # The hosting session, or None standalone.  Hosted, this tab lives in
-        # the RFB's upright column, where a portrait preview stacked over the
-        # form pushes every prompt field off the foot (_reflow_for_the_media).
         self._fun_time = fun_time
-        # How deep we are inside a load — a prefill, a restore, a seed the
-        # gallery set. Every one of those writes to the same widgets a person
-        # types in, so the widgets' own signals cannot tell the two apart; this
-        # is what does, and user_edited is silent while it is up. A depth rather
-        # than a flag because the loads nest (restore_config prefills, prefill
-        # re-picks the workflow, which re-seeds the carried-over fields).
         self._loading_config = 0
         self._fresh_form = False
         self._form_checkpoint = None
-        self._autoshow_held = False   # see _point_elsewhere
+        self._autoshow_held = False
         self._request_aim: _RequestAim | None = None
-        self._asked = 0  # how many times the Request has been edited, so a late answer can tell
+        self._asked = 0
         self._rewriter = RevisionWorker(prompt_edit.work_out, parent=self)
         self._rewriter.revised.connect(self._on_rewritten)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
-        self._go_to_folder.setVisible(False)  # until the gallery says there is a folder
+        self._go_to_folder.setVisible(False)
         self._go_to_folder.triggered.connect(self._on_go_to_folder)
-        self._can_go_to_folder = None   # the gallery's; see set_folder_check
+        self._can_go_to_folder = None
         self._build_ui()
 
     @contextmanager
     def _loading(self):
-        """Mark everything done inside as a load, not as someone editing."""
         self._loading_config += 1
         try:
             yield
@@ -343,27 +257,11 @@ class GenerateTab(DropZones):
             self._loading_config -= 1
 
     def _note_user_edit(self):
-        """Pass on a field change someone made; swallow the ones a load makes."""
         if not self._loading_config:
             self.user_edited.emit()
 
     def _build_ui(self):
-        """The column, in the order it reads: the preview, then the splitter's
-        handle, then the button row over one scroll holding everything that is
-        about the settings.
-
-        Each region below builds itself and says why it is the way it is; this
-        is only their order, which is the one thing about them a reader has to
-        take in at once. Two orderings inside them are load-bearing and are
-        noted where they happen: the dropdown takes its index before its signal is
-        connected, and _on_workflow_changed runs last, once everything it lays
-        out below the dropdown exists.
-        """
         layout = QVBoxLayout(self)
-        # Top and foot only: the splitter below spans the tab, so its handle
-        # meets the pane's own border instead of stopping short of it, and the
-        # margin that keeps the preview, the form and the button row off the pane's
-        # sides is inside each of them.
         layout.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
         self._build_preview()
         body = self._build_body_scroll()
@@ -371,8 +269,6 @@ class GenerateTab(DropZones):
         self._build_saved_generation_block(body, header)
         self._build_workflow_header(body, header)
         self._build_related_media(body)
-        # The slack goes here, under everything, so a short column rests at the
-        # top of the scroll rather than spreading itself out.
         body.addStretch(1)
         self._settings_pane = self._build_settings_pane()
         self._media_split.addWidget(self._settings_pane)
@@ -380,28 +276,13 @@ class GenerateTab(DropZones):
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
         self._media_border: list[int] | None = None
-        # Lays out the empty state on a fresh tab — no form, no estimate, and a
-        # Generate with nothing to run — and everything below the dropdown once a
-        # workflow is chosen. Last, because everything it lays out has to exist.
         self._on_workflow_changed()
 
     def _build_preview(self) -> PreviewWidget:
-        """The pane leading the column: a running re-roll's frames (driven from
-        outside), the browsed generation's output when one is loaded, and the
-        newest matching result otherwise."""
         self._preview = PreviewWidget(show_scrubber=True)
-        # Its corners and its right-click go to the gallery, which owns the
-        # favorite, the Trash and the enhance queue — the same route the Gallery pane
-        # pane's thumbnails take, so an action means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)
-        # The preview and the settings under it share a splitter, so the line
-        # between them is a drag handle like every other pane boundary in this
-        # app: a tall item can be given the room it wants without the form
-        # being pinned to a ratio someone else chose.
         self._media_split = PaneSplitter(Qt.Orientation.Vertical)
-        # The preview keeps its margin inside this, so the splitter itself can
-        # span the tab (see _build_ui).
         self._preview_pane, preview_column = pane()
         preview_column.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
         preview_column.addWidget(self._preview)
@@ -410,25 +291,11 @@ class GenerateTab(DropZones):
         return self._preview
 
     def _build_body_scroll(self) -> QVBoxLayout:
-        """One scroll under the button row for everything else, and the column
-        inside it that the three regions below fill.
-
-        The read-only info on top, the editable form below it, so they scroll
-        together. This replaces the old split — a cramped form-only scroll above
-        a separate, non-scrolling info footer — that buried the form
-        (width/height, the swap button) out of reach.
-        """
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        # Said here rather than left to the stylesheet's `border: none`, so the
-        # margin below is the whole of what stands between the fields and the
-        # pane's edge however this is styled.
         self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         body_host = QWidget()
         body = QVBoxLayout(body_host)
-        # The scroll spans the tab, so the margin keeping the fields off the
-        # pane's sides and off the border above them is here; on the right it
-        # also stops them running under the scroll bar.
         body.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
                                 MARGIN_STANDARD, 0)
         body.setSpacing(GAP_MEDIUM)
@@ -436,15 +303,6 @@ class GenerateTab(DropZones):
         return body
 
     def _build_saved_generation_block(self, body: QVBoxLayout, header: LabelForm) -> None:
-        """The output file, when it was made and the workflow version that made
-        it, at the top of the scroll (shown only while displaying a saved
-        generation). Above the form, because it names what the settings below it
-        made. Params — editable or read-only — all live in that form now, so
-        this block carries only those facts.
-
-        What the item shows sits with them, for the same reason: it is a fact
-        about the finished item rather than a setting that made it, and it is
-        the one of these facts anyone can change."""
         self._basic_section = BasicSection(go_to_folder=self._go_to_folder)
         self._basic_section.hide()
         body.addWidget(self._basic_section)
@@ -452,8 +310,6 @@ class GenerateTab(DropZones):
         self._action.chosen.connect(self._on_action_chosen)
 
     def _on_action_chosen(self, prompt_id: str, said: str) -> None:
-        """Record what the item on display shows: an image's in the column the
-        sorting window writes, so it is answered there too, a video's as its action."""
         row = self._displayed_row or {}
         if media_type_of_row(row) != MediaType.VIDEO:
             self._db.set_image_state(prompt_id, said or None)
@@ -463,9 +319,7 @@ class GenerateTab(DropZones):
             self._db.set_action(prompt_id, said or None)
 
     def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
-        """The editable half: the workflow dropdown, its typical-time estimate, and
-        the host the param form is swapped into whenever the workflow changes."""
-        self._form_workflow_key = None  # which workflow the installed form belongs to
+        self._form_workflow_key = None
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(GAP_MEDIUM)
         header.setLabelAlignment(
@@ -475,14 +329,9 @@ class GenerateTab(DropZones):
         self._workflow_dropdown.setPlaceholderText("Select a workflow…")
         self._offer_workflows(makes=None, holding=None)
         self._workflow_dropdown.currentIndexChanged.connect(self._on_workflow_changed)
-        # Picking a workflow is an edit as much as typing in a field is, and on a
-        # form with nothing to carry over it is the only signal there is.
         self._workflow_dropdown.currentIndexChanged.connect(self._note_user_edit)
         self._workflow_warning = WarningMark()
         self._workflow_warning.pressed.connect(self._resolve_every_warning)
-        # It shrinks to a short floor when the pane is narrow rather than holding
-        # the width of the longest workflow name — see NoWheelDropdown, which every
-        # dropdown in the app inherits that from. It still expands to fill the row.
         header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"),
                                 header.label_column),
                       self._workflow_dropdown)
@@ -494,8 +343,6 @@ class GenerateTab(DropZones):
         body.addWidget(self._cannot_remake_note)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
-        # A sentence, so it wraps rather than holding the pane open at its own
-        # length — the form below it shrinks, and this has to shrink with it.
         self._estimate_label.setWordWrap(True)
         body.addWidget(self._estimate_label)
         self._form_host = QWidget()
@@ -504,14 +351,6 @@ class GenerateTab(DropZones):
         body.addWidget(self._form_host)
 
     def _build_related_media(self, body: QVBoxLayout) -> None:
-        """What the generation on display is tied to, below the form: what it
-        was built from and what it was animated into
-        (:class:`~origenerator.gui.related_media.RelatedMedia`), and every version
-        an enhanced image holds. All of it hidden while the tab shows no saved
-        generation, unless Combine opened it, and stacked straight under the form
-        with no stretch between — a stretch grew an elastic gap above them by
-        exactly what folding a form section saved.
-        """
         self._related = RelatedMedia(video_rows=self._video_rows,
                                      row_of=self._db.get_generation,
                                      held_rows=lambda: self._library.now().held_rows,
@@ -520,13 +359,7 @@ class GenerateTab(DropZones):
                                      requests_about=self._db.requests_about)
         self._related.link_clicked.connect(self.link_clicked)
         body.addWidget(self._related)
-        # The preview opens on the most-enhanced version, and this is where the
-        # earlier versions (and the original) are, each captioned with what made
-        # it and draggable onto the Enhance pane to reuse those settings.
-        # Hides itself for an image with only its original, which is most of them.
         self._versions = EnhanceVersions()
-        # What the list is showing, in its order: the positions its rows report
-        # are only good against this.
         self._listed_versions = []
         self._versions.version_selected.connect(self._show_version)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
@@ -547,14 +380,6 @@ class GenerateTab(DropZones):
         return settings_pane
 
     def _build_button_row(self) -> FlowLayout:
-        """One button row, fixed over the scroll so Generate is always reachable.
-
-        The lane button shows only for a video on display, and the discard
-        button only while a run this tab launched is in flight — "Cancel", or "Next
-        seed" while that folder is auto-generating. A flow rather than a row: it
-        wraps onto a second line when the pane is too narrow, instead of squeezing
-        every label down to an unreadable stub.
-        """
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
         self._lane_button = QPushButton()
@@ -593,24 +418,12 @@ class GenerateTab(DropZones):
         return row
 
     def minimumSizeHint(self):
-        """Never narrower than the settings can be squeezed into.
-
-        The pane refuses to be dragged past what its contents fit in rather than
-        scrolling them sideways, read live from the scroll's contents so the floor
-        follows the workflow on show. No explicit ``setMinimumWidth`` here or on
-        the wrapper this sits in: an explicit minimum *replaces* this hint rather
-        than joining it, so one would pin the floor at its own number and put the
-        scroll bar back. Capped at ``_FLOOR_CAP``, where holding the floor would
-        cost the window its tiling place.
-        """
+        """Qt takes an explicit setMinimumWidth in place of this hint, not alongside it, so none is set here or on the wrapper."""
         hint = super().minimumSizeHint()
         hint.setWidth(min(self._contents_floor(), _FLOOR_CAP))
         return hint
 
     def _contents_floor(self) -> int:
-        """The narrowest the tab can be with its settings still whole: what the
-        scroll's contents need, plus the vertical scroll bar beside them, the
-        scroll's own frame, and the pane's margins."""
         body = self._scroll.widget()
         return (body.minimumSizeHint().width()
                 + self._scroll.verticalScrollBar().sizeHint().width()
@@ -689,15 +502,7 @@ class GenerateTab(DropZones):
         return wf.missing_inputs(self._param_form.get_values())
 
     def _on_workflow_changed(self):
-        # A different workflow is different settings: whatever Combine opened
-        # here no longer describes what this tab would run, so its mark goes
-        # rather than riding onto an unrelated launch. Set again after a prefill,
-        # which is what re-picks the workflow in the first place.
         self._forget_settings_source()
-        # And a folder's rewrite is a rewrite of that folder's own settings. Swap
-        # the workflow and the form is rebuilt from scratch — the tracked prompt
-        # fields with it — so what is left is an ordinary config, not a rewrite
-        # of anything.
         self._end_folder_modify()
         self._fresh_form = False
         key = self._workflow_dropdown.currentData()
@@ -705,15 +510,7 @@ class GenerateTab(DropZones):
         if wf is not None:
             self._offer_workflows(makes=wf.output_type, holding=key)
             edited = self._edited_form_values()
-            # An i2v workflow derives its output size from the input image; hand
-            # the form that deriver so it can show the size in a locked, unlockable
-            # Dimensions field. A manual-size workflow passes None and lays out its
-            # own width/height as usual.
             deriver = wf.derived_display_size if wf.derives_size_from_input else None
-            # The enhance params stay off the form: everything laid out here
-            # decides which gallery folder a run lands in, and an enhancement
-            # doesn't — the Gallery pane's Enhance pane owns it per folder.
-            # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
                                          size_source=wf.derived_size_source,
                                          hidden_keys=wf.enhance_keys(),
@@ -738,20 +535,15 @@ class GenerateTab(DropZones):
             self._form_checkpoint = checkpoint
             self._offer_trainings()
         else:
-            self._clear_form()  # no workflow picked: nothing below is known yet
+            self._clear_form()
         self._show_advice()
         self._refresh_estimate()
         self.refresh_generate_caption()
         self._sync_generate()
         self._emit_title()
-        self.show_recent_preview()  # these settings' newest result, not a blank pane
+        self.show_recent_preview()
 
     def _edited_form_values(self) -> dict:
-        """What the user changed on the installed form: its values minus the keys
-        still where a fresh form of its workflow and model puts them. Switching
-        workflows carries these over (where the new workflow shares the param), so
-        a typed prompt or picked image survives the switch — while the departing
-        form's own starting values never leak into the next one's."""
         prior = workflow_named(self._form_workflow_key)
         if self._param_form is None or prior is None:
             return {}
@@ -808,12 +600,7 @@ class GenerateTab(DropZones):
         self._param_form.resolve_every_warning()
 
     def _detach_form(self):
-        """Take the installed form off the tab, if there is one.
-
-        Detached from its parent at once (not just scheduled for deletion), so it
-        leaves the screen immediately instead of lingering under whatever comes
-        next until the event loop spins.
-        """
+        """Detached from its parent at once: deleteLater leaves it on screen until the event loop spins."""
         if self._param_form is None:
             return
         self._form_host_column.removeWidget(self._param_form)
@@ -822,19 +609,13 @@ class GenerateTab(DropZones):
         self._param_form = None
 
     def _clear_form(self):
-        """Leave the tab with no form at all — the state of a tab whose dropdown
-        is still on its placeholder. Which params exist is the workflow's answer,
-        so until one is chosen there is nothing truthful to lay out."""
         had_form = self._param_form is not None
         self._detach_form()
         self._form_workflow_key = None
         if had_form:
-            self.prompt_fields_changed.emit()  # an open find must let go of its fields
+            self.prompt_fields_changed.emit()
 
     def _install_form(self, form: ParamForm):
-        """Swap the workflow's ParamForm into the form host inside the scroll,
-        discarding the previous one. The form lives in the shared scroll so it moves
-        with the info above it, not walled into a separate scroll of its own."""
         self._detach_form()
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
@@ -844,7 +625,6 @@ class GenerateTab(DropZones):
         self._param_form.changed.connect(self._show_advice)
         self._param_form.changed.connect(self.refresh_modified_message)
         self._param_form.changed.connect(self._mark_prompt_edits)
-        # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._param_form.changed.connect(self._sync_generate)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
@@ -855,8 +635,7 @@ class GenerateTab(DropZones):
         self._param_form.changed.connect(self._offer_trainings)
         self._offered_loras = {}
         self._form_host_column.addWidget(self._param_form)
-        # Announced while the outgoing form is still alive (Qt defers the actual
-        # deletion), so an open find can let go of its fields before they die.
+        # Qt defers deleteLater, so the outgoing form is still alive here.
         self.prompt_fields_changed.emit()
 
     def _offer_trainings(self, every_row: bool = False) -> None:
@@ -891,20 +670,12 @@ class GenerateTab(DropZones):
         return True
 
     def prompt_fields(self) -> list:
-        """This tab's prompt inputs, for a find over the words it would generate
-        from. Empty until a workflow's form is installed."""
         return self._param_form.text_fields() if self._param_form is not None else []
 
     def _emit_title(self):
         self.title_changed.emit(self.title())
 
     def _refresh_estimate(self):
-        """Show how long this workflow typically takes, from its recent runs.
-
-        Hidden entirely with no workflow picked: a typical time belongs to a
-        workflow, and "no runs yet" over an unanswered dropdown reads as a fact
-        about the app rather than about the question still being asked.
-        """
         wf = workflow_named(self._workflow_dropdown.currentData())
         self._estimate_label.setVisible(wf is not None and wf.generates_here)
         if wf is not None and wf.generates_here:
@@ -913,17 +684,9 @@ class GenerateTab(DropZones):
             )
 
     def refresh_generate_caption(self):
-        """Re-read, shortly, whether Generate would reproduce a past run.
-
-        Deferred rather than answered on the spot: the answer needs every stored
-        generation's params, far too much to spend on each keystroke, and every
-        cue restarts the one timer. Public because the gallery has the other cue:
-        a run of these very settings completing.
-        """
         self._caption_timer.start()
 
     def _apply_generate_caption(self):
-        """Say on the button what a press will do, and why, or leave it plain."""
         self._generate_pair.offer_how_many(self._folder_modify is None)
         if self._folder_modify is not None:
             self._generate_btn.set_caption(self._folder_modify.caption())
@@ -947,15 +710,10 @@ class GenerateTab(DropZones):
             self._why_generate_is_blocked() or (_RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
-        """Ask the gallery to generate this config — a re-roll of its settings folder,
-        as many times as the dropdown beside the button says."""
         if not self._can_generate() or refused_over_prompts(self._generate_btn, self.prompt_fields()):
             return
         key = self._workflow_dropdown.currentData()
         if self._folder_modify is not None:
-            # A request that asked for nothing would re-run every seed in the
-            # folder to re-create the folder, so the press says what it still
-            # needs rather than filling the queue with copies.
             if self._folder_modify.is_unchanged(self.current_config()):
                 self._generate_btn.flash_guard(_MODIFY_GUARD)
                 return
@@ -979,14 +737,6 @@ class GenerateTab(DropZones):
 
     def set_settings_source(self, category: str, video_prompt_id: str | None,
                             intent: str) -> None:
-        """Remember that these settings came out of Combine — the action off its
-        dropdown, and the video whose settings they are — and link to that video
-        and the image under the form, as the generation they make will.
-
-        Set after the settings are in (:meth:`prefill` re-picks the workflow,
-        which clears this), so what the tab launches carries the mark whether it
-        is run as opened or edited first.
-        """
         self._settings_source = (category or "", video_prompt_id or None, intent)
         self._source_video_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
         self._related.show_row(self._the_row_generate_would_make(), self._image_rows())
@@ -997,8 +747,6 @@ class GenerateTab(DropZones):
                 "source_video": self._settings_source[1]}
 
     def settings_source(self) -> tuple[str, str | None, str]:
-        """``(category, video_prompt_id, intent)`` for a tab Combine opened, else
-        ``("", None, "")`` — what a launch from here stamps on its row."""
         return self._settings_source
 
     def _prompts_differ_from_source(self) -> bool:
@@ -1017,9 +765,6 @@ class GenerateTab(DropZones):
             self._preview.mark_prompt_edited(self._prompts_differ_from_source())
 
     def show_combination(self, combination: Combination) -> None:
-        """Put the combination this tab was opened with in the preview: the frame,
-        a plus, and the gray video whose settings came with it. Nothing has been
-        made from the pair yet, so there is no result for the pane to show."""
         if self._live_source is None:
             combination = combination._replace(
                 prompt_edited=self._prompts_differ_from_source())
@@ -1027,37 +772,20 @@ class GenerateTab(DropZones):
         self._reflow_for_the_media()
 
     def launched_runs(self) -> list[str]:
-        """The runs this tab's Generate started, oldest first.
-
-        Each named by the prompt id it *began* under, so a chained i2v stays one
-        run to this tab, and a tab can hold several. Empty once the tab has been
-        pointed at someone else's generation.
-        """
         return list(self._launched_runs)
 
     def note_launched(self, origin: str, made_of: dict | None = None):
-        """Claim a run this tab's Generate just started, at the back of its own."""
         self._launched_runs[origin] = made_of
         if made_of is not None:
             self._mark_prompts()
 
     def forget_launched(self, origins=None):
-        """Let go of runs this tab claimed — all of them, or the named ones (those
-        that have finished, failed or been cancelled)."""
         ended = [self._launched_runs.pop(origin) for origin in self.launched_runs()
                  if origins is None or origin in origins]
         if any(made_of is not None for made_of in ended):
             self._mark_prompts()
 
     def set_generating(self, generating: bool, *, auto_generating: bool = False):
-        """Reflect whether a run of this config's folder is in flight.
-
-        All it moves is the Cancel button. ``auto_generating`` says the run's
-        folder is auto-generating, which changes what that button's hover says
-        (:func:`inflight.cancel_tooltip`) — set ahead of the idempotence guard
-        below, because the Auto toggle flips mid-run without the generating state
-        ever changing.
-        """
         self._cancel_btn.setToolTip(cancel_tooltip(auto_generating))
         if generating == self._generating:
             return
@@ -1065,15 +793,8 @@ class GenerateTab(DropZones):
         self._cancel_btn.setVisible(generating)
 
     def use_random_seed(self):
-        """Switch this config's seed(s) to Random.
-
-        Called by the gallery when a press drew a fresh seed rather than reproduce a
-        past run: the form then shows what the next press will do too, and the choice
-        outlives a cancelled first attempt instead of snapping back to the pinned
-        seed that was already generated.
-        """
         if self._param_form is not None:
-            with self._loading():  # the gallery checked this, not the user
+            with self._loading():
                 self._param_form.set_seed_random(True)
 
     def _set_displayed_row(self, row: dict | None) -> None:
@@ -1108,13 +829,6 @@ class GenerateTab(DropZones):
 
     def workflow_and_signature(self, image_index: dict | None = None,
                                ) -> tuple[str, str] | None:
-        """The two parts the gallery builds this config's folder key out of.
-
-        The signature is normalized against the workflow's defaults (see
-        ``canonical_settings``), so it matches the folder this tab's outputs land
-        in and groups reruns that differ only by per-instance keys.
-        ``None`` when no workflow is selected.
-        """
         key = self._workflow_dropdown.currentData()
         wf = workflow_named(key)
         if wf is None or self._param_form is None:
@@ -1128,8 +842,6 @@ class GenerateTab(DropZones):
 
     def _shown_run_the_form_still_holds(self, params_json: str | None = None,
                                        image_index: dict | None = None) -> dict | None:
-        """The saved generation on display while the form still holds its
-        settings, else ``None`` — the seeds left out of the question."""
         row = self._displayed_row
         workflow_name = self._workflow_dropdown.currentData()
         if row is None or self._param_form is None or not workflow_name:
@@ -1145,28 +857,12 @@ class GenerateTab(DropZones):
         return row if holds_it else None
 
     def settings_folder_key(self) -> str | None:
-        """The gallery folder this tab's settings have been generating into,
-        by the key the tree files it under -- the same key the tab is *named* off
-        (:meth:`title`).
-
-        ``None`` when there is no such folder: no workflow picked, or nothing
-        generated with these settings yet, and a folder with nothing in it is not
-        in the tree to go to.
-        """
         key = self.workflow_and_signature()
         if key is None or self._recent_matching_row() is None:
             return None
         return config_folder_key(*key)
 
     def refresh_media_layout(self) -> None:
-        """Re-ask what shape the item is and lay out for it.
-
-        Called when this tab comes to the front as well as when its media
-        changes: the shape belongs to the tab, so switching to one holding a
-        landscape item has to stand the panes back up even though nothing in
-        THIS tab resized.  Left to the resize signal alone the old arrangement
-        stayed until something else nudged the splitter.
-        """
         self._reflow_for_the_media()
 
     def become_hosted(self, session) -> None:
@@ -1178,15 +874,8 @@ class GenerateTab(DropZones):
         self._stand_the_media(beside=False)
 
     def _reflow_for_the_media(self) -> None:
-        """Stand the preview beside the settings when it is a PORTRAIT one.
-
-        Only hosted by Fun Time, where this tab lives in the Random Favs Browser's
-        upright rect and a stacked portrait preview pushes every prompt field off
-        the foot. Landscape media stays stacked: beside a form it gets a column too
-        narrow to show it, and the form loses the width its prompt fields need.
-        """
         if self._fun_time is None:
-            return  # standalone the pane is wide; stacking is right at any shape
+            return
         self._stand_the_media(beside=self._media_is_portrait())
 
     def _stand_the_media(self, *, beside: bool) -> None:
@@ -1196,7 +885,7 @@ class GenerateTab(DropZones):
         sizes = self._media_split.sizes()
         if beside:
             self._media_split.setOrientation(Qt.Orientation.Horizontal)
-            self._media_split.insertWidget(0, self._settings_pane)  # settings lead
+            self._media_split.insertWidget(0, self._settings_pane)
         else:
             self._media_split.setOrientation(Qt.Orientation.Vertical)
             self._media_split.insertWidget(0, self._preview_pane)
@@ -1210,26 +899,20 @@ class GenerateTab(DropZones):
         return bool(size) and shape_of_size(*size) == PORTRAIT
 
     def show_recent_preview(self):
-        """Put up the newest saved generation matching this tab's settings, through
-        the same tail a clicked one goes through (:meth:`_display_result`), else the
-        'select a generation' placeholder. The form is all an autoshow leaves alone:
-        these settings chose the row, so seeding them from it would overwrite what
-        the user typed."""
         if self._autoshow_held:
             return
         row = self._recent_matching_row()
         if row is not None and resolve_preview(row, OUTPUT_PLACES) is not None:
             self._display_result(row, self._image_rows())
             return
-        self._preview.clear()  # nothing generated with these settings yet
+        self._preview.clear()
         self._set_displayed_row(None)
         self._hide_footer()
         self._arm_preview_actions()
         self._note_displayed_config()
-        self._emit_title()  # the tab is named after what it shows
+        self._emit_title()
 
     def _recent_matching_row(self) -> dict | None:
-        """The newest saved generation in this tab's settings folder, or None."""
         library = self._library.now()
         matching = library.in_settings(self.workflow_and_signature(library.image_config_index))
         return matching[0] if matching else None
@@ -1244,22 +927,9 @@ class GenerateTab(DropZones):
         )
 
     def is_blank(self) -> bool:
-        """Has this tab been used for anything yet?
-
-        True only for a tab still on the dropdown's placeholder with nothing on
-        display — the pane's resting tab. Such a tab is what a clicked generation
-        loads into rather than opening beside; a tab whose workflow has been
-        picked holds a choice someone made, so it is left alone.
-        """
         return self._workflow_dropdown.currentData() is None and self._displayed_row is None
 
     def title(self) -> str:
-        """This tab's name: the item on display, else the gallery folder this
-        config would generate into, else what a tab with no workflow yet is.
-
-        Named after what it is showing rather than after its settings, so the row
-        of tabs reads as the things you have open.
-        """
         if self._folder_modify is not None:
             return self._folder_modify.title()
         return self.name() or "New generation"
@@ -1287,12 +957,6 @@ class GenerateTab(DropZones):
         return () if self._param_form is None else self._param_form.drop_zones()
 
     def tab_icon(self) -> QIcon:
-        """The mark beside this tab's name: the displayed item's own thumbnail,
-        else the plain image/video mark for what this config makes.
-
-        A null icon for a tab with no workflow picked — nothing is known yet, and
-        a mark guessing at one would be the tab's most confident claim.
-        """
         row = self._displayed_row
         thumb = (row or {}).get("thumbnail_path")
         if thumb and Path(thumb).exists():
@@ -1301,17 +965,6 @@ class GenerateTab(DropZones):
         return icons.media_type_icon(media) if media else QIcon()
 
     def prefill(self, workflow_name: str, params: dict):
-        # Seeding the form with one configuration is the end of any folder-wide
-        # rewrite this tab was holding: the prompts it lands are settings to run,
-        # not a change to a folder's. (:meth:`open_folder_modify` prefills first and
-        # arms the rewrite afterwards, so it is not undoing itself.) It is the end
-        # of following a run, too: the next frame would land over the item
-        # these settings just put up. (A tab pointed at a run is re-seeded first
-        # and told to follow afterwards, so that is not undoing itself either.)
-        #
-        # The whole of it under _loading: this writes the workflow dropdown and
-        # every field, exactly as a person would, and a tab filled by an open is
-        # not a tab someone has worked in.
         with self._loading():
             self._fresh_form = False
             self._end_folder_modify()
@@ -1323,8 +976,6 @@ class GenerateTab(DropZones):
             if self._param_form:
                 self._param_form.clear_prompt_rewrites()
                 self._param_form.replace_values(params)
-            # Now that the settings match a real folder, show its newest result (the
-            # workflow may not have changed above, so this doesn't ride on that signal).
             self.show_recent_preview()
 
     def _offer_workflows(self, *, makes: MediaType | None, holding: str | None) -> None:
@@ -1345,12 +996,6 @@ class GenerateTab(DropZones):
             dropdown.blockSignals(blocked)
 
     def restore_config(self, snapshot: ConfigSnapshot):
-        """Reapply a snapshot captured by :meth:`current_config`.
-
-        Like :meth:`prefill`, but also restores the seed's Random state so a tab
-        comes back the way it was left instead of pinned to the stale seed that was
-        in its field at save time.
-        """
         with self._loading():
             self.prefill(snapshot.workflow_name, snapshot.params)
             if self._param_form:
@@ -1382,29 +1027,16 @@ class GenerateTab(DropZones):
         if self._fun_time is None:
             self._media_split.take_dragged_sizes(self._media_border)
 
-    # --- rewriting a whole folder's prompt ------------------------------------
-
     def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
                       params: dict, thumbnails: list) -> None:
-        """Open this tab as a rewrite of one folder's prompt.
-
-        The folder's own settings fill the form, its prompts are marked against
-        what they say now (:mod:`origenerator.gui.tracked_prompt`), and its images
-        fill the preview, tiled. Nothing about it is one generation, so the tab
-        shows no file, no footer and no "modified" message. ``thumbnails`` carries one
-        entry per run the press will make, whether or not there is a thumbnail for
-        it, so the count in the hover is of images rather than of readable files.
-        """
-        self.prefill(workflow_name, params)  # ends any rewrite already here
+        self.prefill(workflow_name, params)
         self._folder_modify = FolderModify(
             folder_key=folder_key, label=label, count=len(thumbnails),
-            # What the tab opened on, so a press can tell a rewrite from a
-            # re-run of the folder it was rewriting.
             opened_on=self.current_config(),
         )
         self._hide_footer()
-        self._set_displayed_row(None)  # a folder, not a generation on display
-        self._displayed_config = None  # ...so no settings for a message to deviate from
+        self._set_displayed_row(None)
+        self._displayed_config = None
         self._preview.show_folder(thumbnails)
         self._reflow_for_the_media()
         self._mark_prompts()
@@ -1412,63 +1044,30 @@ class GenerateTab(DropZones):
         self._emit_title()
 
     def _end_folder_modify(self) -> None:
-        """Stop this tab being a folder rewrite, leaving an ordinary config.
-
-        The prompt fields go back to plain inputs holding the prompts they show —
-        a marked-up field left over would go on measuring edits against a
-        folder the tab is no longer about, and would keep its undo switched off.
-        """
         if self._folder_modify is None:
             return
         self._folder_modify = None
         self._mark_prompts()
         self._apply_generate_caption()
 
-    # --- displaying a saved generation (the browsed selection) ----------------
-
     def show_saved_generation(self, row: dict, image_rows: list[dict]):
-        """Display a browsed generation in this tab: its settings in the
-        editable form, its output in the preview, and the info for its media type.
-
-        The form is seeded first, with the newest-result autoshow held back while
-        it is, so nothing but the selection is ever put up. A workflow the tab
-        cannot lay out leaves no form at all. Whatever the tab was about before
-        it lets go of (:meth:`_point_elsewhere`).
-        """
         self._point_elsewhere(row)
         self._display_result(row, image_rows)
 
     def show_running_generation(self, row: dict):
-        """Point this tab at a generation still being made: its settings
-        fill the form the way a saved generation's would, and nothing else -- there
-        is no file to show until the run lands, which the preview follows from here
-        (:meth:`watch_folder`).
-
-        What a click on a folder's live tile lands in a tab: the tab is *for* this
-        run now, and is named after the folder the run will land in.
-        """
         self._point_elsewhere(row)
         self._hide_footer()
         self._related.show_requests_and_modifications(row["prompt_id"])
-        self._preview.clear()          # whatever was up is not this run's
-        self._note_displayed_config(being_made=row)  # nothing saved for a message to deviate from
+        self._preview.clear()
+        self._note_displayed_config(being_made=row)
         self._emit_title()
 
     def _point_elsewhere(self, row: dict):
-        """Aim this tab at ``row``'s settings, letting go of what it was about.
-
-        Its claim on the runs it launched and the run it was watching ends, or the
-        bar would sit mid-run over an unrelated item, its Cancel would stop
-        something off screen, and the next frame would paint over what was just
-        put here. The same goes for a combination Combine opened here. Both
-        callers put up an item of their own straight after, so the one the
-        seeded settings would show is held back rather than loaded for nothing.
-        """
         self.forget_launched()
         self._forget_watch()
         self._forget_settings_source()
         self._set_displayed_row(None)
-        self._end_folder_modify()  # a workflow this tab cannot lay out never reaches prefill
+        self._end_folder_modify()
         workflow_name = row.get("workflow_name", "")
         self._autoshow_held = True
         try:
@@ -1482,72 +1081,29 @@ class GenerateTab(DropZones):
             self._autoshow_held = False
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
-        """Show a generation this tab's own Generate just produced: the saved
-        output in place of the live preview, its footer revealed, and the form left
-        as the user left it but for a seed still on Random, which takes this
-        result's seed.
-
-        Re-seeding the form here would wipe edits made while the run was in flight.
-        A tab holding a folder rewrite takes none of it: its batch lands an item
-        at a time, and each would swap the wall of thumbnails for the last to finish.
-        """
         if self._folder_modify is not None:
             return
         self._display_result(row, image_rows, made_with=merge_denormalized(row))
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):
-        """``row`` has changed under this tab: re-show it if it is what the tab
-        is displaying, else leave the tab alone.
-
-        A tab holds the row it was given rather than a live view of the database,
-        so an enhancement folding in a new version would otherwise show only the next
-        time the tab was opened. The form is left exactly as the user has it.
-        """
         shown = self._displayed_row
         if shown is None or shown.get("prompt_id") != row.get("prompt_id"):
             return
         self._display_result(row, image_rows)
 
     def show_finished_media(self, row: dict):
-        """Put a finished run's saved output in the preview alone -- no footer,
-        no form, and not as this tab's displayed generation.
-
-        What the tab *mirroring* a run shows when it lands. Taking it on would
-        leave the pane's blank resting tab holding a generation, and the next click
-        would open a tab beside it instead of filling it; the tab that *did* launch
-        the run gets the whole end state through :meth:`show_completed_result`.
-        """
         preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is None:
-            return  # nothing to look at; leave the frames rather than blank the pane
+            return
         self._live_note = None
         self._preview.show_media(*preview, row["prompt_id"])
-        self._arm_preview_actions(row["prompt_id"])  # …and wears its corners
-
-    # --- following a run in flight ------------------------------------------
+        self._arm_preview_actions(row["prompt_id"])
 
     def watched_key(self) -> str | None:
-        """The settings folder whose live run this tab's preview follows, or
-        ``None`` while the preview is the tab's own item.
-
-        A tab follows a folder rather than one run, because a folder's runs come
-        one after another and watching one is watching the next. Set by this tab's
-        Generate and by a click on the folder's live tile; ended by pointing the
-        tab at a saved generation, or by :meth:`stop_watching`.
-        """
         return self._watched_key
 
     def watch_folder(self, key: str, frame: bytes | None, note: str | None = None,
                      made_from: Combination | None = None):
-        """Follow the run leading folder ``key``: its latest ``frame`` now, each
-        later one as it streams (:meth:`show_live_frame`), and the item it
-        lands as.
-
-        With no frame yet the pane stands ``made_from`` — the image and video the
-        run was built on — or, for a run made from nothing, says it is waiting:
-        ``note`` where the caller knows what for, marked live so a double-click
-        opens the run fullscreen before its first frame.
-        """
         self._watched_key = key
         self._live_note = None
         if frame:
@@ -1558,24 +1114,17 @@ class GenerateTab(DropZones):
             self.show_live_wait(note)
 
     def show_live_source(self, made_from: Combination):
-        """Stand what the followed run is being made from, in place of a frame it
-        has not streamed yet. Repainted only when the pair changes, since the
-        poll re-reads the watch every tick and the video beside it is looping."""
         if made_from == self._live_source:
             return
         self._live_source = made_from
         self.show_combination(made_from)
 
     def show_live_frame(self, frame: bytes):
-        """The run this tab follows streamed a frame: put it up."""
         self._live_note = None
         self._live_source = None
         self._preview.show_frame(frame)
 
     def show_live_wait(self, note: str | None):
-        """Say what the followed run is waiting on, in place of a frame it has
-        not streamed yet. Repainted only when the text changes, since the poll
-        re-reads the wait every tick."""
         text = note or _WAITING_NOTE
         if text == self._live_note:
             return
@@ -1584,17 +1133,9 @@ class GenerateTab(DropZones):
         self._preview.show_message(text, live=True)
 
     def is_awaiting_frame(self) -> bool:
-        """Whether the preview is standing on a *worded* wait for the followed
-        run's first frame — the one state a fresher wait text should replace.
-        A pane standing the pair the run is made from is not waiting in words,
-        and has nothing for a changed count to rewrite."""
         return self._watched_key is not None and self._live_note is not None
 
     def stop_watching(self):
-        """Let go of the folder this tab was following — its run ended with
-        nothing to show — and put the tab's own item back: the generation on
-        display, else the newest result of the settings on the form, else the
-        idle placeholder."""
         if self._watched_key is None:
             return
         self._forget_watch()
@@ -1612,15 +1153,12 @@ class GenerateTab(DropZones):
 
     def _display_result(self, row: dict, image_rows: list[dict],
                         made_with: dict | None = None):
-        """Point the preview and footer at ``row`` — the shared tail of showing a
-        generation, whether freshly browsed or just completed. The form is left
-        untouched; :meth:`show_saved_generation` seeds it first, before this runs."""
         arriving = (self._displayed_row is None
                     or self._displayed_row.get("prompt_id") != row.get("prompt_id"))
         self._set_displayed_row(row)
         preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is not None:
-            self._preview.show_media(*preview, row["prompt_id"])  # after any prefill, so it wins over autoshow
+            self._preview.show_media(*preview, row["prompt_id"])
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview)
@@ -1628,27 +1166,12 @@ class GenerateTab(DropZones):
         if arriving:
             self._note_displayed_config(made_with)
         else:
-            # The same generation, changed under the tab: an enhancement folded
-            # in, a version deleted. Nothing about the settings moved, so the mark
-            # edits are measured against stays where it is — re-taking it read the
-            # user's edits as the new baseline, and the "not yet generated with
-            # modifications" plate vanished the moment an enhancement landed, from
-            # over the very frames it had been standing over. Only re-asserted,
-            # because the item put up above took the message off with the old one.
             self.refresh_modified_message()
         self._sync_generate()
-        self._emit_title()  # the tab is named after what it shows
-        self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
+        self._emit_title()
+        self.displayed_changed.emit()
 
     def _arm_preview_actions(self, prompt_id: str | None = None):
-        """Point the preview's corners and right-click menu at what is on it.
-
-        Re-run after every change to the item: showing media is what takes them
-        away, everything they report moves under the item too, and an autoshow
-        arms them as readily as an explicit selection. ``prompt_id`` names the
-        generation when it is NOT the row this tab holds — a followed run's item
-        goes up without the tab taking it on.
-        """
         if prompt_id is None and self._displayed_row is not None:
             prompt_id = self._displayed_row["prompt_id"]
         row = self._db.get_generation(prompt_id) if prompt_id is not None else None
@@ -1673,13 +1196,6 @@ class GenerateTab(DropZones):
 
     def _note_displayed_config(self, made_with: dict | None = None, *,
                                being_made: dict | None = None):
-        """Take the settings a generation arriving in this tab was made with
-        as the mark to measure edits against, and clear any message left from the
-        last one: the form's, or ``made_with`` for a result of this tab's own
-        Generate, since the form may have been edited while that run was made.
-        What happens to the generation already on display leaves the mark alone
-        (see :meth:`_display_result`).
-        """
         self._displayed_config = (
             self._item_config(made_with) if self._displayed_row is not None else None
         )
@@ -1692,7 +1208,7 @@ class GenerateTab(DropZones):
         if self._param_form is None:
             return
         marked_against = self._marked_against()
-        with self._loading():  # marking the fields is no edit of them
+        with self._loading():
             if marked_against is None:
                 self._param_form.clear_prompt_rewrites()
             else:
@@ -1714,8 +1230,6 @@ class GenerateTab(DropZones):
 
     def _settings_shown(self) -> ConfigSnapshot:
         return self._displayed_config or self._item_config()
-
-    # --- the Request section: words the image on display is asked to change by
 
     def _aim_the_request(self, row: dict | None) -> None:
         field = self._param_form.request_field()
@@ -1740,8 +1254,6 @@ class GenerateTab(DropZones):
         field.show_words(words)
 
     def asked(self) -> dict | None:
-        """The request this tab's Generate is making, for the gallery to record
-        beside each run it launches -- ``None`` while the Request is empty."""
         field = self._param_form.request_field() if self._param_form is not None else None
         aim = self._request_aim
         if field is None or aim is None or not field.words():
@@ -1750,10 +1262,6 @@ class GenerateTab(DropZones):
                 "old_positive": aim.asked_of[0], "old_negative": aim.asked_of[1]}
 
     def _on_request_asked(self, words: str) -> None:
-        """Rewrite the prompts to say what the Request now asks, off the UI
-        thread, since that is a call to the local LLM. The words that made the
-        image put its own prompts back, and no words put back the ones they
-        were asked of, neither of which needs asking anyone."""
         aim = self._request_aim
         if aim is None:
             return
@@ -1770,7 +1278,7 @@ class GenerateTab(DropZones):
         asked, prompt_id = context
         aim = self._request_aim
         if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
-            return  # the words, or the image, have changed since it was asked
+            return
         field = self._param_form.request_field()
         if revision is None:
             field.failed()
@@ -1789,12 +1297,6 @@ class GenerateTab(DropZones):
                               seed_is_random=False)
 
     def refresh_modified_message(self):
-        """Mark the preview when the form no longer describes the item on it.
-
-        Putting the settings back takes the message away again. Public because the
-        version list re-shows a version of the same row from outside the form, which
-        clears the message, so whoever did that re-asserts it.
-        """
         modified = (self._displayed_config is not None
                     and not self._would_remake_what_it_shows())
         self._preview.set_message(_MODIFIED_MESSAGE if modified else None)
@@ -1804,23 +1306,14 @@ class GenerateTab(DropZones):
                 and configs_match(self._displayed_config, self.current_config()))
 
     def _hide_footer(self):
-        """Hide every info/action element that belongs only to a saved generation —
-        the state of a tab with none on display: blank, following a run still
-        being made, or holding a whole folder's rewrite."""
         self._basic_section.hide()
         self._action.clear()
         self._related.clear()
         self._versions.hide()
-        self._pending_enhancement = None  # nothing on display to be enhancing
+        self._pending_enhancement = None
         self._update_lane_button(None)
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
-        """Reveal the info and actions for the generation on display: the
-        read-only Basic section for every selection, the source tile + the lane
-        button for a video, and the Animations for an image. ``preview`` is the
-        resolved ``(path, media_type)`` (or ``None``), so the lane button keys off the
-        same lookup.
-        """
         self.reread_folder_buttons()
         self._basic_section.setVisible(
             self._basic_section.show_row(row, self._upscale_of(row), self._item_name()))
@@ -1830,24 +1323,9 @@ class GenerateTab(DropZones):
         self._update_lane_button(preview)
 
     def displayed_row(self) -> dict | None:
-        """The saved generation this tab is showing, or ``None``.
-
-        Whatever is in the preview — a browsed selection or an idle autoshow —
-        which is what the gallery matches its live enhance jobs against.
-        """
         return self._displayed_row
 
     def set_pending_enhancement(self, pending: RunningEnhancement | None):
-        """Reflect an enhancement being generated for the image on display.
-
-        ``pending`` is a :class:`RunningEnhancement` while one is running, ``None``
-        otherwise. A frame updates the version's row in place and goes up to the
-        preview; only a run starting or ending rebuilds the list. These frames keep
-        whatever the pane says about the item rather than clearing it, which
-        every other live frame does: an enhancement is the coming state of that
-        very image, and clearing it left the mark and the frames trading places
-        several times a second while the form was typed in.
-        """
         if pending == self._pending_enhancement:
             return
         was_running = self._pending_enhancement is not None
@@ -1863,8 +1341,6 @@ class GenerateTab(DropZones):
         self._refresh_versions()
 
     def _restore_preview(self):
-        """Put the displayed generation's own output back in the preview, after
-        a live enhancement of it has finished streaming over the top."""
         row = self._displayed_row
         preview = resolve_preview(row, OUTPUT_PLACES) if row else None
         if preview is None:
@@ -1872,23 +1348,12 @@ class GenerateTab(DropZones):
             return
         self._preview.show_media(*preview, row["prompt_id"])
         self._arm_preview_actions()
-        self.refresh_modified_message()  # the item is back; so is anything said about it
+        self.refresh_modified_message()
 
     def set_fullscreen_factory(self, make):
-        """Wire what a double-click on this tab's preview opens — a slideshow of
-        the folder under it, which only the gallery can assemble. Passed straight
-        through to the preview (see
-        :meth:`~origenerator.gui.preview_widget.PreviewWidget.set_fullscreen_factory`).
-        """
         self._preview.set_fullscreen_factory(make)
 
     def set_enhance_settings(self, settings: EnhanceSettings):
-        """The app-wide enhance settings the ``+ Enhance`` row would run at.
-
-        Pushed in by the gallery whenever the Enhance pane changes, so the row
-        names the current settings and knows whether they would only duplicate a
-        version this image already holds.
-        """
         if settings == self._enhance_settings:
             return
         self._enhance_settings = settings
@@ -1907,8 +1372,6 @@ class GenerateTab(DropZones):
         self._can_go_to_folder = can_go
 
     def reread_folder_buttons(self) -> None:
-        """Asked again whenever the gallery moves: in the item's own folder it
-        would do nothing, and is not there."""
         row, can_go = self._displayed_row, self._can_go_to_folder
         self._go_to_folder.setVisible(
             row is not None and can_go is not None and can_go(row))
@@ -1916,12 +1379,6 @@ class GenerateTab(DropZones):
             self._basic_section.setVisible(self._basic_section.has_content())
 
     def _on_versions_delete_requested(self, positions: list):
-        """Relay a version-list delete by filename, not by position.
-
-        The list is rebuilt from the row on every refresh, so a position is only
-        good for as long as the widget that produced it — the gallery does the
-        deleting and it must be told *which files*, resolved here while the list
-        and the row still agree."""
         row = self._displayed_row
         if row is None:
             return
@@ -1932,14 +1389,6 @@ class GenerateTab(DropZones):
             self.versions_delete_requested.emit(row["prompt_id"], names)
 
     def _refresh_versions(self):
-        """Rebuild the version list for whatever this tab is displaying.
-
-        The preview is already on ``output_files[0]`` — the most-enhanced
-        version — so the list leads with that version and offers the rest below
-        it, under the ``+ Enhance`` row. A video has no row to press — the
-        enhancer takes images — and lists versions only once Evolver has
-        upscaled it, none of them trashed from here.
-        """
         row = self._displayed_row
         if row is None:
             self._listed_versions = []
@@ -1947,7 +1396,6 @@ class GenerateTab(DropZones):
             return
         if media_type_of_row(row) != MediaType.IMAGE:
             self._listed_versions = displayed_versions(row, self._upscale_of(row))
-            # A video file is no image, so both versions wear its thumbnail.
             self._versions.show_versions(
                 [(version, row.get("thumbnail_path")) for version in self._listed_versions],
                 created_fallback=str(row.get("created_at", "")),
@@ -1955,8 +1403,6 @@ class GenerateTab(DropZones):
             )
             return
         self._listed_versions = displayed_versions(row)
-        # Each drawn from its own file, so a version shows what it actually looks
-        # like rather than the row's one shared thumbnail.
         self._versions.show_versions(
             [(version, self._version_path(version)) for version in self._listed_versions],
             self._pending_enhancement, self._add_row_for(row),
@@ -1964,7 +1410,6 @@ class GenerateTab(DropZones):
         )
 
     def _upscale_of(self, row: dict) -> Path | None:
-        """The upscale Evolver has made of the video on display, if it has."""
         if media_type_of_row(row) != MediaType.VIDEO:
             return None
         preview = resolve_preview(row, OUTPUT_PLACES)
@@ -1973,48 +1418,28 @@ class GenerateTab(DropZones):
         return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE).upscale_of(preview[0])
 
     def _add_row_for(self, row: dict) -> EnhanceOffer:
-        """What the ``+ Enhance`` row on ``row`` would run, and what it repeats."""
         params = enhance_params_for(row, self._enhance_settings)
         return EnhanceOffer(describe_enhance_params(params or {}),
                             version_matching_settings(row, self._enhance_settings))
 
     @staticmethod
     def _version_path(version) -> Path:
-        """Where one version's file lives — under ComfyUI's output folder, or in
-        the trash once the generation has been deleted."""
         return output_file_path(version.file, OUTPUT_PLACES)
 
     def _show_version(self, position: int):
-        """Put one of the displayed generation's versions in the preview.
-
-        Only the preview changes: the row on display, its form, its metadata and
-        the OSR2 drive all still belong to the generation — the versions are
-        versions of one image or video, not separate generations, so switching
-        between them is a look rather than a navigation.
-        """
         if self._displayed_row is None or not 0 <= position < len(self._listed_versions):
             return
         path = self._version_path(self._listed_versions[position])
         if path.exists():
             self._preview.show_media(path, media_type_of_row(self._displayed_row),
                                      self._displayed_row["prompt_id"])
-            self._arm_preview_actions()  # still the same generation, still actionable
-            self.refresh_modified_message()  # a version of the same generation, same message
+            self._arm_preview_actions()
+            self.refresh_modified_message()
 
     def _video_rows(self) -> list[dict]:
         return self._library.now().video_rows
 
-    # --- the export lanes: hand a displayed video to a sibling app -----------
-
     def _update_lane_button(self, preview):
-        """Offer the displayed generation to the one app :func:`lane_for` picks.
-
-        Shown only for a video of this app's with a file on disk, since Evolver holds
-        every other source's: an image, a missing file or another source's video hides it.
-        One already sent says so beside Unsend instead, read from the row rather
-        than from the button's own state so it survives a restart.
-        ``preview`` is the resolved ``(path, media_type)``, or ``None``.
-        """
         row = self._displayed_row or {}
         is_video = preview is not None and preview[1] == MediaType.VIDEO and made_here(row)
         lane = self._offered_lane = lane_for(row) if is_video else None
@@ -2031,13 +1456,6 @@ class GenerateTab(DropZones):
         self._unsend_button.setToolTip(lane.unsend_tooltip)
 
     def _on_send(self, lane):
-        """Copy the displayed video into *lane*'s inbox folder and remember it.
-
-        Re-checks the persisted flag rather than the button's disabled state, so
-        the handoff cannot be repeated. The copy lands in another app's inbox
-        with no other visible result here, so a failure that reached only the log
-        would look exactly like a success — hence the dialog.
-        """
         if not self._displayed_row or self._displayed_row.get(lane.flag):
             return
         path = self._displayed_video_path()
@@ -2054,14 +1472,6 @@ class GenerateTab(DropZones):
         self._redraw_lane_button()
 
     def _on_unsend(self, lane):
-        """Take the send back: the app it went to deletes every copy it holds.
-
-        Nothing is deleted from here. The video has been sorted, upscaled and
-        re-filed since it was handed over, and only the app whose folders those
-        are can still find it — so the whole of this is a stamp on the row, which
-        that app reads on its next run. The button goes back to offering the
-        send, which from here on puts a fresh copy in that app's hands.
-        """
         if not self._displayed_row or not self._displayed_row.get(lane.flag):
             return
         lane.unmark(self._db, self._displayed_row["prompt_id"])
@@ -2074,13 +1484,6 @@ class GenerateTab(DropZones):
         self._update_lane_button(None if path is None else (path, MediaType.VIDEO))
 
     def _displayed_video_path(self) -> Path | None:
-        """The on-disk video file backing the displayed generation, or ``None``
-        when it isn't a video (or its file is missing). Resolved fresh, so a file
-        deleted since selection is caught. Shared by the lane button and OSR2 drive.
-
-        ``_displayed_row`` is whatever the preview is showing — a browsed selection
-        or this tab's idle autoshow — so a scripted video on screen arms the drive
-        either way."""
         if not self._displayed_row:
             return None
         preview = resolve_preview(self._displayed_row, OUTPUT_PLACES)
@@ -2088,21 +1491,10 @@ class GenerateTab(DropZones):
             return None
         return preview[0]
 
-    # --- Drive OSR2: what the (global) driver should stream for this tab -------
-
     def release_media(self, paths) -> None:
-        """Let go of any of ``paths`` this tab is showing — files about to be
-        moved or deleted, which Windows will not let go of while a player holds
-        them open."""
         self._preview.release_media(paths)
 
     def osr2_drive_target(self):
-        """``(video_path, player, actions)`` for the shown video, or ``None``.
-
-        The view's single global driver asks the front tab for this whenever driving
-        is on and the shown video changes: the on-disk video (the drive identity), the
-        media player to follow, and the funscript actions beside it. ``None`` when the
-        tab isn't showing a video, or that video has no funscript."""
         return drive_target_for(self._displayed_video_path(), self._preview.player())
 
     def video_on_screen(self) -> str | None:

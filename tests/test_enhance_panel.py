@@ -2131,19 +2131,22 @@ def test_clicking_a_fixs_trigger_word_warning_puts_the_word_at_the_start_of_its_
     qtbot.mouseClick(getattr(worded_fix, mark), Qt.MouseButton.LeftButton)
 
     assert worded_fix.positive.value() == "exmplstyle, a close-up"
-    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+    assert worded_fix.prompt_warning.isHidden()
+    assert worded_fix.lora_warning.isHidden()
 
 
 def test_a_fixs_prompt_is_one_prompt_however_many_lines_of_dashes_it_holds(worded_fix):
     worded_fix.positive.boxes()[0].setPlainText("exmplstyle, part one\n---\npart two")
 
-    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+    assert worded_fix.prompt_warning.isHidden()
+    assert worded_fix.lora_warning.isHidden()
 
 
 def test_a_fixs_trigger_word_warning_goes_once_its_lora_is_put_on_none(worded_fix):
     worded_fix.lora.setCurrentIndex(worded_fix.lora.findData("None"))
 
-    assert worded_fix.prompt_warning.isHidden() and worded_fix.lora_warning.isHidden()
+    assert worded_fix.prompt_warning.isHidden()
+    assert worded_fix.lora_warning.isHidden()
 
 
 def test_a_fixs_trigger_word_warnings_sit_left_of_the_prompt_and_lora_captions(worded_fix):

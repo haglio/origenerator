@@ -490,7 +490,7 @@ def test_a_setting_advices_click_uses_its_fix_whatever_the_setting_holds():
     found = setting_advice(_image(steps=50))["steps"]
 
     assert (found.writes, found.fixed(50), found.said) == (
-        "", 40, "Example Model's page recommends 20–40 steps. Click to use 40.")
+        "", 40, "Example Model's page recommends 20\N{EN DASH}40 steps. Click to use 40.")
 
 
 def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so_and_a_click_uses_it(

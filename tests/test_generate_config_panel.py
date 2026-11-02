@@ -2720,8 +2720,8 @@ def test_a_model_installed_but_not_made_for_the_workflow_says_so_rather_than_not
 
     mark = panel._param_form._warning_marks["checkpoint"]
     assert (mark.isHidden(), mark.toolTip()) == (
-        False, "an_old_look isn't made for SDXL T2I, so it isn't offered here. "
-               "Click to use reapony_v80.")
+        False, ("an_old_look isn't made for SDXL T2I, so it isn't offered here. "
+                "Click to use reapony_v80."))
     assert _note(panel) == ""
     assert panel._generate_pair.isEnabled()
 
@@ -2741,8 +2741,8 @@ def test_a_lora_not_made_for_the_model_beside_it_says_so_on_its_row(
 
     mark = panel._param_form._warning_marks["lora"]
     assert (mark.isHidden(), mark.toolTip()) == (
-        False, "speed_up isn't made for turbo_model, so it isn't offered here. "
-               "Click to use None.")
+        False, ("speed_up isn't made for turbo_model, so it isn't offered here. "
+                "Click to use None."))
 
 
 def test_generate_is_grayed_out_while_the_form_names_a_model_that_is_not_installed(

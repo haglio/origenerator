@@ -29,6 +29,9 @@ _CLIP_WORDS = Regex(r"""'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]
 _QWEN_WORDS = Regex(r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}|"""
                     r""" ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""")
 _SPIECE_UNKNOWN = 2
+_MODEL_PIECES, _MODEL_NORMALIZER, _NORMALIZER_CHARSMAP = 1, 3, 2
+_PIECE_TEXT, _PIECE_SCORE, _PIECE_KIND = 1, 2, 3
+_WIRE_VARINT, _WIRE_FIXED64, _WIRE_BYTES = 0, 1, 2
 _EMBEDDING = "embedding:"
 _AN_EMBEDDING = re.compile(r"(?<=\s)embedding:")
 _ESCAPED = {"\0\1": ")", "\0\2": "("}
@@ -61,16 +64,17 @@ class PromptReading:
         starts, counts = [0], [0]
         for group in self._groups(text):
             splits = len(group) >= _CLIP_PHRASE_TOO_SHORT_TO_SPLIT
-            while group:
-                if counts[-1] + len(group) <= _CLIP_PIECE:
-                    counts[-1] += len(group)
-                    group = []
+            left = group
+            while left:
+                if counts[-1] + len(left) <= _CLIP_PIECE:
+                    counts[-1] += len(left)
+                    left = []
                     continue
                 if splits:
                     room = _CLIP_PIECE - counts[-1]
                     counts[-1] += room
-                    group = group[room:]
-                starts.append(_opening_brackets_before(text, group[0]))
+                    left = left[room:]
+                starts.append(_opening_brackets_before(text, left[0]))
                 counts.append(0)
         return list(zip(starts, counts, strict=True))
 
@@ -156,7 +160,7 @@ def _opening_brackets_before(text: str, position: int) -> int:
 def _weighted_segments(string: str, offset: int) -> list[tuple[str, int]]:
     segments = []
     for item, start in _bracketed(string, offset):
-        if len(item) >= 2 and item[0] == "(" and item[-1] == ")":
+        if item.startswith("(") and item.endswith(")"):
             inner = item[1:-1]
             colon = inner.rfind(":")
             if colon > 0:
@@ -257,13 +261,13 @@ def _umt5(encoder: Path) -> Tokenizer | None:
         return None
     pieces, unknown, charsmap = [], 0, b""
     for number, value in _proto_fields(proto):
-        if number == 1:
+        if number == _MODEL_PIECES:
             text, score, kind = _spiece_piece(value)
             if kind == _SPIECE_UNKNOWN:
                 unknown = len(pieces)
             pieces.append((text, score))
-        elif number == 3:
-            charsmap = dict(_proto_fields(value)).get(2, b"")
+        elif number == _MODEL_NORMALIZER:
+            charsmap = dict(_proto_fields(value)).get(_NORMALIZER_CHARSMAP, b"")
     tokenizer = Tokenizer(models.Unigram(pieces, unknown, False))
     steps = [normalizers.Precompiled(charsmap)] if charsmap else []
     tokenizer.normalizer = normalizers.Sequence([*steps, normalizers.Replace(Regex(" {2,}"), " ")])
@@ -285,8 +289,8 @@ def _spiece_model(encoder: Path) -> bytes | None:
 
 def _spiece_piece(proto: bytes) -> tuple[str, float, int]:
     fields = dict(_proto_fields(proto))
-    score = struct.unpack("<f", fields[2])[0] if 2 in fields else 0.0
-    return fields.get(1, b"").decode("utf-8"), score, fields.get(3, 1)
+    score = struct.unpack("<f", fields[_PIECE_SCORE])[0] if _PIECE_SCORE in fields else 0.0
+    return fields.get(_PIECE_TEXT, b"").decode("utf-8"), score, fields.get(_PIECE_KIND, 1)
 
 
 def _proto_fields(data: bytes) -> list[tuple[int, object]]:
@@ -294,11 +298,11 @@ def _proto_fields(data: bytes) -> list[tuple[int, object]]:
     while at < len(data):
         key, at = _varint(data, at)
         number, wire = key >> 3, key & 7
-        if wire == 0:
+        if wire == _WIRE_VARINT:
             value, at = _varint(data, at)
-        elif wire == 1:
+        elif wire == _WIRE_FIXED64:
             value, at = data[at:at + 8], at + 8
-        elif wire == 2:
+        elif wire == _WIRE_BYTES:
             length, at = _varint(data, at)
             value, at = data[at:at + length], at + length
         else:

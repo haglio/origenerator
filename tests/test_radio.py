@@ -1,4 +1,3 @@
-"""Origenerator Radio: the videos it deals out, Standalone's switch, and a session's Funestras' stations."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,15 +17,12 @@ def _videos(*names):
 
 
 def _kept_in_order(target):
-    """A shuffle that leaves the videos as they were, so a test can name what
-    each station is dealt."""
+    pass
 
 
 def _reversed(target):
     target.reverse()
 
-
-# --- the videos -------------------------------------------------------------
 
 def test_find_clips_reads_videos_at_any_depth_in_a_stable_order(tmp_path):
     (tmp_path / "nested").mkdir()
@@ -47,13 +43,9 @@ def test_find_clips_ignores_files_that_are_not_videos(tmp_path):
 
 @pytest.mark.parametrize("folder", [None, "does/not/exist"])
 def test_find_clips_answers_a_missing_folder_with_silence(tmp_path, folder):
-    # The committed example settings name a folder that isn't there, so a public
-    # checkout has to get an empty set rather than an exception.
     target = None if folder is None else tmp_path / folder
     assert find_videos(target) == []
 
-
-# --- the folder the settings name ------------------------------------------
 
 def test_a_relative_radio_folder_hangs_off_the_library_root():
     resolved = radio_dir({"library_root": "C:/root", "ambient_audio_dir": "videos/clips"})
@@ -68,8 +60,6 @@ def test_an_absolute_radio_folder_is_taken_as_given():
 def test_settings_naming_no_radio_folder_give_none():
     assert radio_dir({"library_root": "C:/root"}) is None
 
-
-# --- dealing the stations --------------------------------------------------
 
 def test_each_station_is_dealt_its_own_share_of_the_videos():
     stations = deal_stations(_videos("a", "b", "c", "d", "e", "f", "g"), 3,
@@ -94,8 +84,6 @@ def test_fewer_clips_than_stations_still_gives_every_station_something_to_play()
 def test_no_clips_deal_no_stations():
     assert deal_stations([], 3) == []
 
-
-# --- Standalone's switch ---------------------------------------------------
 
 class FakeStation:
     def __init__(self, videos) -> None:
@@ -157,14 +145,12 @@ def test_turning_it_on_twice_does_not_double_the_stations(tmp_path):
 
 
 def test_a_folder_with_no_clips_stays_silent(tmp_path):
-    # A public checkout's example settings point at a folder that isn't there:
-    # the switch may be flipped, and nothing happens.
     radio, stations = _radio(tmp_path, video_names=())
 
     radio.start()
 
     assert stations == []
-    radio.stop()  # and turning off a silent radio is harmless
+    radio.stop()
 
 
 def test_turned_on_again_it_is_dealt_a_fresh_set_of_stations(tmp_path):
@@ -208,8 +194,6 @@ def test_a_station_is_one_of_the_funestras_own_opened_once_their_engine_is_found
     assert asked == ["the engine found", _videos("a.mp4", "b.mp4")]
 
 
-# --- the Standalone Slideshow ---------------------------------------------
-
 def test_a_radio_a_slideshow_holds_is_heard_while_its_image_is_up_at_its_level(tmp_path):
     radio, stations = _radio(tmp_path)
     radio.start()
@@ -242,8 +226,6 @@ def test_a_radio_a_slideshow_holds_still_holds_still_with_the_room(tmp_path):
     assert [station.paused for station in stations] == [True, True, True]
 
 
-# --- the room's pause ------------------------------------------------------
-
 def test_a_frozen_room_holds_every_station_and_lets_them_all_play_again(tmp_path):
     radio, stations = _radio(tmp_path)
     radio.start()
@@ -265,8 +247,6 @@ def test_a_radio_turned_on_in_a_frozen_room_waits_for_it_to_play(tmp_path):
     radio.set_frozen(False)
     assert [station.paused for station in stations] == [False, False, False]
 
-
-# --- a session's Funestras -------------------------------------------------
 
 def test_each_funestra_is_dealt_stations_of_its_own_beside_its_playlist(tmp_path):
     videos = tmp_path / "clips"

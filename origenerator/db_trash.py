@@ -44,12 +44,6 @@ class TrashStore(Store):
             )
 
     def list_trashed(self) -> list[dict]:
-        """Every trashed item, newest first — what the Trash collection lists.
-
-        The stamp only has second resolution, so a batch deleted together ties;
-        the rowid breaks it, and an ``INSERT OR REPLACE`` takes a fresh one, so
-        the order stays the order things were deleted in.
-        """
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT prompt_id, row_json, batch_json, deleted_at FROM deletions"
@@ -82,7 +76,6 @@ class TrashStore(Store):
                 for path in library_paths_in(json.loads(record[0]).get("output_files"))}
 
     def forget_trashed(self, prompt_id: str):
-        """Drop a trashed item — the item was restored or purged."""
         with self._connect() as conn:
             conn.execute("DELETE FROM deletions WHERE prompt_id = ?", (prompt_id,))
 
@@ -92,7 +85,6 @@ def _of_a_known_source(trashed: dict) -> bool:
 
 
 def _trashed_record(record) -> dict:
-    """One ``deletions`` row with its JSON columns parsed back into data."""
     return {
         "prompt_id": record["prompt_id"],
         "row": as_read(json.loads(record["row_json"])),

@@ -1,13 +1,3 @@
-"""Canonical grouping of workflow params into labeled form sections.
-
-Every workflow must present the same kinds of params in the same sections, in the
-same order, regardless of which workflow's ``param_definitions()`` produced them.
-So the grouping lives here, once, keyed by param name — not on each workflow,
-which would let the orderings drift apart. :class:`~origenerator.gui.param_form.
-ParamForm` lays its fields out by this order.
-
-Kept Qt-free so the grouping is unit-testable without a QApplication.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,27 +8,11 @@ from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS
 
 @dataclass(frozen=True)
 class Section:
-    """One labeled, collapsible group of params.
-
-    ``keys`` is the canonical intra-section order; ``collapsed`` is whether the
-    section starts folded shut (the default a fresh form opens with).
-    """
-
     title: str
     keys: tuple[str, ...]
     collapsed: bool
 
 
-# The sections, in the order they stack down the form. Prompts and Seed lead and
-# start open — the fields touched every run; the rest start collapsed so a fresh
-# form is compact, one click from any group. A param's section is fixed here, so
-# switching workflows never reshuffles where a given kind of setting appears.
-#
-# There is deliberately no Enhance section: everything in this form defines the
-# settings folder a run lands in, and an enhancement does not — it is a finish
-# applied to an image afterward, which the gallery's Enhance pane owns per
-# folder. The enhance params stay on their workflows (the tail still builds from
-# them) but the form hides them; see ParamForm's ``hidden_keys``.
 SECTIONS: tuple[Section, ...] = (
     Section("Prompts", ("positive_prompt", "scene_frames", "scene_lines",
                         "negative_prompt", "input_image", "video", "video_start"),
@@ -65,9 +39,6 @@ SECTIONS: tuple[Section, ...] = (
     ), collapsed=True),
 )
 
-# Where an unmapped param lands: a trailing catch-all so a newly added key still
-# renders (and round-trips) instead of vanishing. A guard test keeps every
-# registered workflow's params out of here; it exists only for forward safety.
 OTHER_TITLE = "Other"
 OTHER_COLLAPSED = True
 
@@ -76,18 +47,11 @@ _WITHIN_INDEX = {key: j for s in SECTIONS for j, key in enumerate(s.keys)}
 
 
 def section_title(key: str) -> str:
-    """The section a param belongs in, or :data:`OTHER_TITLE` if unmapped."""
     i = _SECTION_INDEX.get(key)
     return SECTIONS[i].title if i is not None else OTHER_TITLE
 
 
 def key_rank(key: str) -> tuple[int, int]:
-    """``(section, position)`` — the total order a key sorts to across the form.
-
-    Sorting a workflow's keys by this lays them out in canonical section order,
-    each section's fields in canonical order. Unmapped keys tie at the very end,
-    so a stable sort keeps them in their given order after every mapped key.
-    """
     if key in _SECTION_INDEX:
         return (_SECTION_INDEX[key], _WITHIN_INDEX[key])
     return (len(SECTIONS), 0)

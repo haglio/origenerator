@@ -34,7 +34,6 @@ from origenerator.osr2 import (
 
 @pytest.fixture
 def the_brokers_slot():
-    """The broker's own slot on a port of the test's, and what it hands on."""
     lines: queue.Queue[tuple[str, str]] = queue.Queue()
     slot = Osr2Slot(port=0, logger=logging.getLogger("test.origenerator.osr2"),
                     start_thread=start_daemon_thread)
@@ -53,7 +52,6 @@ def _first_line_handed_on(broker: Osr2Broker, lines) -> tuple[str, str]:
 
 
 def test_format_position_maps_percent_to_four_digit_axis_and_interval():
-    # L0 is the OSR2 motion axis; position is 0000-9999 (floor to top), then I<ms>.
     assert format_position(0, 100) == "L00000I100"
     assert format_position(50, 100) == "L05000I100"
     assert format_position(100, 250) == "L09999I250"
@@ -95,11 +93,7 @@ def test_an_app_that_does_not_want_the_osr2_sends_it_nothing(the_brokers_slot):
     assert slot.holder is None
 
 
-# --- is the device there: what the OSR2 controls read to say "Off" ---------------
-
 def _rx(tmp_path, stamped=None):
-    """The broker's directory, its stamp of when the OSR2 last spoke at whatever
-    time is given."""
     if stamped is not None:
         (tmp_path / OSR2_SERIAL_RX).write_text(str(stamped), encoding="utf-8")
     return tmp_path
@@ -114,8 +108,6 @@ def test_a_device_that_has_gone_quiet_reads_as_off(tmp_path):
 
 
 def test_nothing_stamped_at_all_reads_as_off(tmp_path):
-    # A broker that never ran, a state dir that isn't there, a hand-mangled file:
-    # all of them are "as far as anything here can tell, no device".
     assert device_mode(now=1000.0, state_dir=_rx(tmp_path)) is Osr2Mode.OFF
     assert device_mode(now=1000.0, state_dir=_rx(tmp_path, "just now")) is Osr2Mode.OFF
 

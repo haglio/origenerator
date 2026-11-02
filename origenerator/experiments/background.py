@@ -7,13 +7,13 @@ from origenerator.inflight import drop_in_flight
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 8
+EXPERIMENTS_QUEUED_PER_ABSENCE = 8
 _MAX_CONSECUTIVE_MISSES = 3
 
 
 def queue_experiments(rows, policy, launch) -> int:
     launched = misses = 0
-    while launched < BATCH_SIZE and misses < _MAX_CONSECUTIVE_MISSES:
+    while launched < EXPERIMENTS_QUEUED_PER_ABSENCE and misses < _MAX_CONSECUTIVE_MISSES:
         proposal = policy.propose(rows)
         if proposal is None:
             break

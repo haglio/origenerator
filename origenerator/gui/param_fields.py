@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 from PyQt6.QtCore import QSignalBlocker, Qt
@@ -23,6 +24,26 @@ from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
 
 NOT_KNOWN = "—"
+
+
+@dataclass(frozen=True)
+class WorkflowTraits:
+    size_deriver: Callable[[dict], tuple[int, int] | None] | None = None
+    size_source: str = "input_image"
+    hidden_keys: tuple[str, ...] = ()
+    pins_reused_seed: bool = True
+    lora_keys: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FormHelpers:
+    heights: object = None
+    seed_history: SeedHistory | None = None
+    items: object = None
+
+
+NO_TRAITS = WorkflowTraits()
+NO_HELPERS = FormHelpers()
 
 
 class FieldKind(ABC):

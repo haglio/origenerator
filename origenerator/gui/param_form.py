@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QSize, Qt, pyqtSignal
@@ -34,7 +33,16 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
-from origenerator.gui.param_fields import NOT_KNOWN, field_kind, grey_out_of_reach, offer_only
+from origenerator.gui.param_fields import (
+    NO_HELPERS,
+    NO_TRAITS,
+    NOT_KNOWN,
+    FormHelpers,
+    WorkflowTraits,
+    field_kind,
+    grey_out_of_reach,
+    offer_only,
+)
 from origenerator.gui.param_help import (
     advice_help,
     definition_help,
@@ -53,7 +61,6 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.lora_training import TrainingOffer
 from origenerator.prompt_tokens import PromptReading
-from origenerator.seed_history import SeedHistory
 from origenerator.setting_advice import Advice, MissingTriggerWords
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
@@ -107,26 +114,6 @@ _IN_USE_WHILE = {
 _DIMENSION_MAX = 8192
 _DIMENSION_STEP = 16
 _PADLOCK = {False: "lock", True: "unlock"}
-
-@dataclass(frozen=True)
-class WorkflowTraits:
-    size_deriver: Callable[[dict], tuple[int, int] | None] | None = None
-    size_source: str = "input_image"
-    hidden_keys: tuple[str, ...] = ()
-    pins_reused_seed: bool = True
-    lora_keys: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class FormHelpers:
-    heights: object = None
-    seed_history: SeedHistory | None = None
-    items: object = None
-
-
-NO_TRAITS = WorkflowTraits()
-NO_HELPERS = FormHelpers()
-
 
 class ParamForm(QWidget):
     changed = pyqtSignal()

@@ -35,10 +35,8 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.param_fields import NO_TRAITS, FormHelpers, WorkflowTraits
 from origenerator.gui.param_form import (
-    NO_TRAITS,
-    FormHelpers,
-    WorkflowTraits,
     BOTH_STRENGTHS_ONE_HELP,
     EVERY_SCENE_SPEAKS_HELP,
     STRENGTH_ONE_HELP,

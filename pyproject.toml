@@ -92,7 +92,6 @@ unread-arguments = ["origenerator/workflows/wan22_animate.py: scene",
                     "origenerator/workflows/wan22_flf2v_loop.py: previous",
                     "origenerator/workflows/wan22_i2v.py: last"]
 # The gallery's search timings, which nothing in the tree reads any more.
-unread-constants = ["_SEARCH_EXPAND_DELAY_MS", "_SEARCH_DELAY_MS", "_SEARCH_MIN_CHARS"]
 # A search result's score, which nothing reads back.
 unread-dataclass-fields = ["SearchResult.score"]
 # Test helpers no test calls.

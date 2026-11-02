@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from origenerator.db import Database, NewGeneration
-from origenerator.gui.zone_items import FilesOnly, ZoneItems
+from origenerator.gui.zone_items import FilesOnly, ZoneFolders, ZoneItems
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
@@ -32,8 +32,9 @@ def library(tmp_path):
     names = ItemNames.from_library(db)
     items = ZoneItems(
         db, names, LibraryViews(db),
-        places=OutputPlaces.in_one_folder(output_dir), input_dir=tmp_path / "input",
-        thumb_dir=tmp_path / "thumbs", moving_preview=lambda row: None)
+        ZoneFolders(places=OutputPlaces.in_one_folder(output_dir),
+                    input_dir=tmp_path / "input", thumb_dir=tmp_path / "thumbs"),
+        moving_preview=lambda row: None)
     return items, names, output_dir, thumb
 
 

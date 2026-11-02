@@ -91,7 +91,7 @@ from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.viewport import Viewport
 from origenerator.gui.warning_mark import WarningMark
-from origenerator.gui.zone_items import ZoneItems
+from origenerator.gui.zone_items import ZoneFolders, ZoneItems
 from origenerator.image_states import state_names
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
@@ -811,9 +811,10 @@ class GenerateTab(DropZones):
         return self._animated_preview(row) if row else None
 
     def _zone_items(self) -> ZoneItems:
-        return ZoneItems(self._db, self._names, self._library, places=OUTPUT_PLACES,
-                         input_dir=COMFYUI_INPUT_DIR, thumb_dir=THUMB_DIR,
-                         moving_preview=self._animated_preview)
+        return ZoneItems(
+            self._db, self._names, self._library,
+            ZoneFolders(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR, thumb_dir=THUMB_DIR),
+            moving_preview=self._animated_preview)
 
     def _record_drawn_seed(self, key: str, seed: int) -> None:
         width, height = self._param_form.output_size() or (None, None)

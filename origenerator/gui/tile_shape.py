@@ -3,8 +3,18 @@ from __future__ import annotations
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QLabel
+from shared_ui import colors
 from shared_ui.fonts import FONT_UI, SIZE_TINY, make_font
+from shared_ui.icons import draw_icon
+from shared_ui.palette import BORDER_SUBTLE, TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
+
+from origenerator.gui.palette import (
+    EMPTY_PLATE,
+    SELECTED_BORDER,
+    SELECTED_FILL,
+    TILE_HOVER_BORDER,
+)
 
 TILE_WIDTH = 180
 THUMBNAIL_SIZE = (172, 160)
@@ -44,17 +54,6 @@ def style_caption(label) -> None:
     label.setFont(caption_font())
     label.setMaximumHeight(caption_height())
 
-
-from shared_ui import colors
-from shared_ui.icons import draw_icon
-from shared_ui.palette import BORDER_SUBTLE, TEXT_MUTED, as_hex
-
-from origenerator.gui.palette import (
-    EMPTY_PLATE,
-    SELECTED_BORDER,
-    SELECTED_FILL,
-    TILE_HOVER_BORDER,
-)
 
 _CORNER = f"border-radius: {BUTTON_RADIUS}px;"
 

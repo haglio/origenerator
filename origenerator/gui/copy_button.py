@@ -1,9 +1,3 @@
-"""A small copy-to-clipboard icon button, shared wherever a value is worth
-lifting to the clipboard in one click — a metadata filename, a prompt, a seed.
-
-The value can be fixed (a string) or live (a zero-arg callable read at click
-time), so the same button serves a read-only label and an editable form field.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
@@ -27,10 +21,6 @@ class IconButton(QPushButton):
 
 
 class CopyButton(IconButton):
-    """Copies ``source`` to the clipboard. ``source`` is the text itself, or a
-    zero-arg callable returning it — read at click time so an editable field's
-    current value is copied, not whatever it held when the button was built."""
-
     def __init__(self, source, parent=None):
         super().__init__(_copy_icon(), "Copy to clipboard", "copyButton", parent)
         self._source = source

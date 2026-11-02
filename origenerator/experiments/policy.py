@@ -1,18 +1,3 @@
-"""Derive the next background experiment from the gallery's own history.
-
-The policy hill-climbs the user's actual work: it picks a past generation as a
-base (favoring favorited items and up-voted experiments), mutates one or two of
-its workflow's declared dimensions — a numeric nudged within its form range, a
-dropdown swapped for another installed option, or the prompt pair crossed over from
-a sibling generation — and re-rolls every seed. Review verdicts feed back in:
-values that appeared in up-voted experiments are sampled more, values from
-down-voted ones less, so the search concentrates where the user's taste points
-while an exploration floor keeps it from tunneling.
-
-Deliberately deterministic machinery (no LLM): everything is derived from
-gallery rows and ``param_definitions``, so it works offline and is unit-testable
-with an injected RNG.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -28,43 +13,25 @@ from origenerator.workflows.lora_rows import (
     strength_without_its_lora,
 )
 
-# A base is worth more when the user has explicitly liked it: a star is the
-# strongest signal, an up-voted experiment close after it, newness a mild boost.
 _FAVORITE_BONUS = 2.0
 _UP_BONUS = 1.0
 _RECENT_BONUS = 0.5
-_RECENT_WINDOW = 25  # rows arrive newest-first; this many count as "recent"
+_RECENT_WINDOW = 25
 
-# Videos are the goal. A gallery is usually stills-heavy (many frames tried per
-# video made), so video bases get a fixed share of proposals rather than a
-# multiplier the image count would swamp.
 _VIDEO_SHARE = 0.8
-# LoRA dims (the file dropdowns and their strengths) are the dimensions the user
-# most wants explored, so they're drawn this much more often than the rest.
 _LORA_DIM_WEIGHT = 4.0
 
-# How often a proposal mutates two dimensions instead of one.
 _SECOND_DIM_CHANCE = 0.3
-# Exploration floor: this often, a mutated value is drawn uniformly instead of
-# by verdict weight, so a promising-but-unseen value still gets its chance.
 _EXPLORE_CHANCE = 0.25
-# A value the reviews have clearly damned is dropped from the pool outright —
-# explore draws included — once it has this many votes at or under this weight.
-# "Down" has to actually mean the value stops coming back.
 _VETO_MIN_VOTES = 3
 _VETO_MAX_WEIGHT = 0.25
-# Numeric jitter: candidate values are drawn around the base value with a sigma
-# of range/_JITTER_SPREAD, so mutations search locally rather than teleport.
 _JITTER_SPREAD = 8.0
 _NUMERIC_CANDIDATES = 5
-_NUMERIC_BUCKETS = 8  # verdict-weight resolution across a numeric's range
+_NUMERIC_BUCKETS = 8
 
 
 @dataclass
 class Proposal:
-    """One experiment to run: a workflow, its full params (seeds already
-    re-rolled), and the provenance the runner records/logs."""
-
     workflow: object
     params: dict
     base_prompt_id: str
@@ -76,11 +43,7 @@ class ExperimentPolicy:
         self._registry = registry
         self._rng = rng
 
-    # --- the one entry point ------------------------------------------------
-
     def propose(self, rows: list[dict]) -> Proposal | None:
-        """The next experiment to run, derived from ``rows`` (newest first), or
-        ``None`` when the gallery holds nothing to build on."""
         bases = self._prefer_videos(self._base_candidates(rows))
         if not bases:
             return None
@@ -91,22 +54,13 @@ class ExperimentPolicy:
         params = randomize_seeds(params, workflow.seed_keys())
         return Proposal(workflow, params, row["prompt_id"], tuple(mutated))
 
-    # --- base selection -----------------------------------------------------
-
     def _base_candidates(self, rows):
-        """Rows an experiment may build on, paired with their workflow: finished
-        results of a registered workflow. A down-voted experiment is out — the
-        user has said not to go there — while an unreviewed one waits for its
-        verdict rather than compounding unvetted mutations."""
         out = []
         for row in rows:
             workflow = self._registry.get(row.get("workflow_name") or "")
             if workflow is None:
                 continue
             if not workflow.selectable:
-                # Machinery rather than a workflow anyone picks — the enhance
-                # workflow. Mutating one of its results just re-enhances an
-                # existing image, so there is nothing to explore.
                 continue
             if row.get("status") != GenerationStatus.COMPLETED or not produced_output(row):
                 continue
@@ -118,10 +72,6 @@ class ExperimentPolicy:
         return out
 
     def _prefer_videos(self, bases):
-        """Narrow the base pool to videos ``_VIDEO_SHARE`` of the time.
-
-        Drawn per proposal, so images still get their minority share of
-        experiments; a gallery with only one kind keeps its whole pool."""
         videos = [b for b in bases if b[1].output_type == MediaType.VIDEO]
         stills = [b for b in bases if b[1].output_type != MediaType.VIDEO]
         if not videos or not stills:
@@ -139,20 +89,12 @@ class ExperimentPolicy:
             weight += _RECENT_BONUS
         return weight
 
-    # --- mutation -----------------------------------------------------------
-
     def _mutate(self, params, workflow, rows):
-        """Mutate ``params`` in place along one or two of the workflow's
-        dimensions, returning the mutated keys."""
         definitions = workflow.param_definitions()
         dims = self._mutable_dims(definitions)
         if not dims:
             return []
         count = 2 if len(dims) > 1 and self._rng.random() < _SECOND_DIM_CHANCE else 1
-        # Walk the dims in weighted random order (LoRA dims first far more often)
-        # until enough mutations actually applied — a dim can be a no-op (a
-        # prompt with no donor to cross from, say), and a proposal that changes
-        # nothing but its seed teaches nothing.
         mutated = []
         for dim in self._weighted_dim_order(dims):
             if len(mutated) == count:
@@ -162,9 +104,6 @@ class ExperimentPolicy:
         return mutated
 
     def _weighted_dim_order(self, dims):
-        """The dims in draw order for this proposal: a weighted shuffle in which
-        a LoRA dim (the file dropdown or its strength) outdraws any other dimension
-        ``_LORA_DIM_WEIGHT``-fold — LoRAs are what the user wants explored."""
         remaining = list(dims)
         order = []
         while remaining:
@@ -176,10 +115,6 @@ class ExperimentPolicy:
 
     @staticmethod
     def _mutable_dims(definitions):
-        """The dimensions an experiment may vary: the prompt pair, any bounded
-        numeric, and any multi-option dropdown — per the workflow's own form.
-        Batch size is exempt: varying it re-runs the same settings in bulk, which
-        explores nothing and multiplies the GPU bill."""
         dims = []
         for pd in definitions:
             if pd.key == "batch_size":
@@ -190,8 +125,6 @@ class ExperimentPolicy:
         return dims
 
     def _apply_mutation(self, params, pd, definitions, workflow, rows) -> bool:
-        """Write one mutated value for ``pd`` into ``params``. Returns whether a
-        change was made (a dimension with nothing to change to is a no-op)."""
         if pd.key == "positive_prompt":
             return self._crossover_prompts(params, workflow, rows)
         if strength_without_its_lora(pd.key, params):
@@ -201,9 +134,6 @@ class ExperimentPolicy:
         return self._jitter_numeric(params, pd, workflow, rows)
 
     def _crossover_prompts(self, params, workflow, rows):
-        """Replace the prompt pair with another finished generation's — the same
-        settings pointed at a sibling subject. Donors are weighted by their own
-        appeal (stars/up-votes) and the verdict record of their prompt."""
         current = params.get("positive_prompt", "")
         donors = []
         weights = []
@@ -260,28 +190,14 @@ class ExperimentPolicy:
 
     @staticmethod
     def _snap(value, pd):
-        """Clamp a jittered value to the dimension's range and step, and to int
-        for an int dimension."""
         value = max(pd.min_val, min(pd.max_val, value))
         if pd.step:
             value = pd.min_val + round((value - pd.min_val) / pd.step) * pd.step
             value = max(pd.min_val, min(pd.max_val, value))
         return int(round(value)) if pd.type == ParamType.INT else round(value, 4)
 
-    # --- verdict-driven value weights --------------------------------------
-
     def _pick_value(self, candidates, workflow, key, rows, *, pd=None,
                     value_of=lambda c: c, appeal=None):
-        """Draw one of ``candidates`` for ``key``, steered by review verdicts.
-
-        Each candidate's weight is the mean of a Beta(1+ups, 1+downs) posterior
-        over its verdict record — 0.5 with no evidence, rising under up-votes,
-        falling under down-votes — times any caller-supplied ``appeal`` (a prompt
-        donor's stars). A candidate the reviews have clearly damned is vetoed
-        from the pool outright; an exploration floor keeps the rest reachable.
-        Returns ``None`` when nothing survives to choose (no candidates, or all
-        vetoed with nothing to fall back on).
-        """
         tallies = self._verdict_tallies(workflow, key, rows, pd)
         pool = []
         weights = []
@@ -289,7 +205,7 @@ class ExperimentPolicy:
             ups, downs = tallies.get(self._bucket(value_of(candidate), pd), (0, 0))
             weight = (1.0 + ups) / (2.0 + ups + downs)
             if ups + downs >= _VETO_MIN_VOTES and weight <= _VETO_MAX_WEIGHT:
-                continue  # the reviews have damned this value — drop it outright
+                continue
             pool.append(candidate)
             weights.append(weight * (appeal[i] if appeal else 1.0))
         if not pool:
@@ -297,8 +213,6 @@ class ExperimentPolicy:
         return self._explore_or_exploit(pool, weights)
 
     def _verdict_tallies(self, workflow, key, rows, pd) -> dict:
-        """Per value bucket, the ``(ups, downs)`` this workflow's reviewed
-        experiments have recorded for ``key``."""
         tallies: dict = {}
         for row in rows:
             if row.get("source") != GenerationSource.EXPERIMENT:
@@ -318,9 +232,6 @@ class ExperimentPolicy:
 
     @staticmethod
     def _bucket(value, pd):
-        """The verdict-tally key for a value: numerics pool into coarse ranges
-        across their range (individual floats would never repeat), everything
-        else tallies exactly."""
         if pd is not None and pd.type in (ParamType.INT, ParamType.FLOAT):
             try:
                 span = pd.max_val - pd.min_val
@@ -329,10 +240,7 @@ class ExperimentPolicy:
                 return value
         return value
 
-    # --- weighted sampling --------------------------------------------------
-
     def _explore_or_exploit(self, candidates, weights):
-        """Draw by weight, except an exploration floor's worth of uniform draws."""
         if self._rng.random() < _EXPLORE_CHANCE:
             return self._rng.choice(candidates)
         return self._weighted_choice(candidates, weights)

@@ -55,12 +55,10 @@ _WHAT_A_RUN_MADE = ("status", "output_files", "original_files", "enhance_history
 
 
 def _now() -> datetime:
-    """Now in the frame sqlite stamps a trashed item in: UTC, without a timezone."""
     return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _deleted_at(record: dict) -> datetime | None:
-    """When ``record``'s delete happened, or ``None`` if its stamp won't parse."""
     stamp = (record.get("deleted_at") or "").strip()
     try:
         return datetime.fromisoformat(stamp)
@@ -83,22 +81,6 @@ def days_held(record: dict, now: datetime | None = None) -> int:
 
 
 def trash_items(records, now: datetime | None = None) -> list[dict]:
-    """The trashed items as gallery rows the Trash collection can draw, newest first.
-
-    Each is the row exactly as it was deleted — so its media type, its star and
-    its caption read the way they did in the gallery — with its files re-pointed
-    at where they actually sit now, inside the trash, and ``days_in_trash`` for
-    how long it has been there.
-
-    Re-pointing the *output* files, not only the thumbnail, is what makes a
-    deleted item as watchable as any other. A Trash row is fed to the same preview,
-    slideshow and fullscreen machinery every live row goes through, and all of
-    that resolves files through
-    :func:`~origenerator.gallery.output.output_file_path` — which follows the
-    re-pointed path. Left alone, those rows resolve to the folder the files were
-    taken out of, so the collection could offer a stored thumbnail and nothing else:
-    no video to play, nothing to open full size.
-    """
     now = now or _now()
     return [_trash_item(record, now) for record in records
             if not (record.get("batch") or {}).get("regenerating_as")]
@@ -118,14 +100,6 @@ def _trash_item(record: dict, now: datetime) -> dict:
 
 
 def _trashed_output_files(record: dict, row: dict) -> str:
-    """``row``'s output files with each one's current location stamped on it.
-
-    The recorded ``filename``/``subfolder`` stay as they were — they say what the
-    generation produced and where it lived, which is what the Generate pane shows —
-    and a ``path`` alongside says where that file is right now. A file the batch
-    never moved (a branch session's delete takes none) gets no ``path`` and is
-    read from its own folder, as before.
-    """
     moved = {Path(moved_from).name: moved_to
              for moved_from, moved_to in (record.get("batch") or {}).get("moves") or []}
     files = []
@@ -136,17 +110,11 @@ def _trashed_output_files(record: dict, row: dict) -> str:
 
 
 def _trashed_path(record: dict, original: str) -> str:
-    """Where ``original`` sits now that it has been trashed — or the path itself,
-    unchanged, when the delete moved nothing (a branch session takes no files)."""
     held = TrashedBatch.from_record(record.get("batch") or {}).holding(Path(original))
     return str(held) if held is not None else original
 
 
 def restore(db, record: dict) -> str:
-    """Put one trashed item back: its files return to the paths they were taken
-    from, or beside them under a new number where that name is taken, and its
-    row rejoins the gallery naming them. Returns the restored prompt_id, so a
-    caller can navigate to what it brought back."""
     renamed = TrashedBatch.from_record(record.get("batch") or {}).restore()
     db.restore_generation(with_files_renamed(record["row"], renamed))
     db.forget_trashed(record["prompt_id"])
@@ -154,11 +122,6 @@ def restore(db, record: dict) -> str:
 
 
 def purge(db, record: dict) -> None:
-    """End one trashed item now: its files are removed and the Trash forgets it.
-
-    Irreversible, and there is nothing left to undo it with — the row went when
-    the item was deleted, and this takes the only copies of its files.
-    """
     TrashedBatch.from_record(record.get("batch") or {}).purge()
     db.forget_trashed(record["prompt_id"])
     leave_out_for_good(db, record["row"])

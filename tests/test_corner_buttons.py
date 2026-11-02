@@ -1,4 +1,3 @@
-"""The three controls a generation wears in the corners of its thumbnail or preview."""
 from __future__ import annotations
 
 import json
@@ -20,7 +19,6 @@ from origenerator.gui.corner_buttons import (
 
 
 def _image_row(**extra):
-    """A finished SDXL image, fabricated whole (never lifted from the library)."""
     row = {
         "prompt_id": "p1",
         "workflow_name": "sdxl_t2i",
@@ -36,9 +34,6 @@ def _image_row(**extra):
 
 
 def _enhanced_row(settings):
-    """That image with one enhancement folded onto it, made at ``settings`` — the
-    enhanced file leading, the original still listed under it, and the version
-    recording the params the run actually used."""
     row = _image_row()
     made_at = gallery.enhance_params_for(row, settings)
     row["output_files"] = json.dumps([
@@ -52,11 +47,7 @@ def _enhanced_row(settings):
     return row
 
 
-# --- what the enhance corner has to say ---------------------------------------
-
 def test_a_video_has_no_enhance_corner_at_all():
-    # The enhancer refines a still; there is no reading of the corner that would
-    # be true of a video, so it grows no plus rather than a dead one.
     video = _image_row(workflow_name="wan22_i2v", output_files=json.dumps(
         [{"filename": "wan22_i2v_00001_.mp4", "subfolder": "video",
           "type": "output"}]))
@@ -73,18 +64,12 @@ def test_an_image_holding_these_very_settings_has_nothing_to_offer():
 
 
 def test_a_setting_moved_turns_that_back_into_an_offer():
-    # The image is not finished with the enhancer, it is finished with THESE
-    # settings — so the corner offers again as soon as they describe another one.
     settings = gallery.EnhanceSettings(auto=False, params={"enhance_scale": 2.0})
     other = gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0})
     assert enhance_state(_enhanced_row(settings), other) == icons.ENHANCE_MORE
 
 
-# --- when each control is up --------------------------------------------------
-
 def _controls(qtbot):
-    """A bare host and its three controls. The host is handed back so the test
-    keeps it alive: nothing else references it, and Qt frees the buttons with it."""
     host = QWidget()
     host.resize(200, 200)
     qtbot.addWidget(host)
@@ -97,9 +82,6 @@ def test_nothing_shows_until_there_is_something_to_act_on(qtbot):
 
 
 def test_every_corner_is_up_the_moment_there_is_an_item_under_it(qtbot):
-    # Not hover-revealed: a corner that comes and goes with the cursor is one you
-    # have to go looking for, and two of these report state as well as offering
-    # an act.
     host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
 
@@ -158,9 +140,6 @@ def test_the_star_says_which_way_it_would_go(qtbot):
 
 
 def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
-    # test_icons pins that an armed mark is drawn differently from a resting one;
-    # nothing ever armed a real corner button, so the step from a hover to that drawing ran
-    # in no test at all.
     host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=None)
     star = controls.buttons()[0]
@@ -172,11 +151,11 @@ def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
 
     star.enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
 
-    assert mark() != resting  # the hover shows
+    assert mark() != resting
 
     star.leaveEvent(QEvent(QEvent.Type.Leave))
 
-    assert mark() == resting  # and goes again when the pointer does
+    assert mark() == resting
 
 
 def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
@@ -189,8 +168,6 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
     for corner in (star, trash, plus):
         assert area.contains(corner)
         assert corner.size().width() == CORNER_SIZE
-    # Top-right, lower-left, lower-right — and never top-left, which the
-    # item type icon has always had.
     assert star.left() == plus.left() > area.center().x()
     assert star.top() < area.center().y() < plus.top()
     assert trash.left() < area.center().x()

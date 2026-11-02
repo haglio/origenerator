@@ -1,20 +1,3 @@
-"""Synthesize the funscript that rides alongside a generated video, and find it.
-
-What a ``.funscript`` document is -- its keys, the metadata an outside
-player reads, what a document listing no actions answers -- belongs to every app
-in this family that reads or writes one and lives in
-:mod:`app_support.funscript`. Origenerator's videos carry no explicit
-motion track — the diffusion model's motion lives only in the pixels — so rather than
-measuring the finished video, this authors a motion *with* it from what the generation
-already knows: the video's duration. The result is a rhythm, not a
-pixel-accurate script; the whole generator is one function so a later swap to a
-measured (FunGen) source touches nothing else.
-
-The scripts have a place of their own, laid out like the folders the videos are
-kept in, each script named for its video's whole filename, so no two videos
-share one.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -34,7 +17,6 @@ from origenerator.output_places import OutputPlaces
 logger = logging.getLogger(__name__)
 
 
-#: This app's name on the scripts it authors.
 CREATOR = "origenerator"
 
 
@@ -52,8 +34,6 @@ def _beside(video_path) -> Path:
 
 
 def funscript_of(video_path, *, places: OutputPlaces) -> Path | None:
-    """The script this video HAS, or ``None`` when it has none. An upscale
-    Evolver made of a video has that video's."""
     original = original_stem(video_path)
     if original is not None:
         return _script_of_upscaled(original, places)
@@ -63,9 +43,6 @@ def funscript_of(video_path, *, places: OutputPlaces) -> Path | None:
 
 
 def library_funscript_of(video_path, *, videos_dir, scripts_dir) -> Path | None:
-    """The script a video of the library HAS, or ``None``: filed in the scripts
-    tree at the video's own place under the videos tree (the family's rule,
-    :mod:`app_support.mirrored_tree`), or left beside the video."""
     if not video_path:
         return None
     video = Path(video_path)
@@ -79,9 +56,6 @@ def _first_file(paths) -> Path | None:
 
 
 def _script_of_upscaled(stem: str, places: OutputPlaces) -> Path | None:
-    """The upscale's own path does not say which folder the video it was made
-    from was kept in, so that video's script is looked for as if it were in
-    each of them."""
     videos = [folder / f"{stem}{suffix}"
               for folder in places.video_folders()
               for suffix in sorted(VIDEO_EXTS)]
@@ -103,13 +77,6 @@ def synthesize_actions(duration_s: float, *, hz: float) -> list[dict]:
 
 
 def write_funscript(path, actions: list[dict], *, duration_seconds: int | None = None) -> None:
-    """Write ``actions`` as the family's funscript document, credited to this app.
-
-    *duration_seconds* is the video the script was authored for, which only a
-    caller that measured it knows; without one, the script's own span answers,
-    which is the closest this app can get for a motion it was handed rather
-    than synthesized.
-    """
     write(Path(path), document(
         actions,
         duration_seconds=_span_seconds(actions) if duration_seconds is None else duration_seconds,
@@ -122,9 +89,6 @@ def _span_seconds(actions: list[dict]) -> int:
 
 
 def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, int]]:
-    """The heat map the Funestras' scrubber paints, over ``[0, last action]``:
-    empty with no actions, no span or no buckets, so the caller can treat
-    "nothing to draw" and "no script" alike."""
     if not actions or buckets <= 0 or actions[-1]["at"] <= 0:
         return []
     script = Funscript(actions=[(action["at"], action["pos"]) for action in actions])

@@ -61,3 +61,20 @@ def test_the_document_names_the_command_that_starts_this_apps_work_while_it_is_c
 
     assert interpreter == ".venv/Scripts/python.exe"
     assert arguments == ["-m", "origenerator.downtime"]
+
+
+def test_a_reader_taking_the_first_model_key_present_gets_the_workflows_own_first_model():
+    for name, workflow in WORKFLOW_REGISTRY.items():
+        recorded = [key for key in workflow.model_keys if key in contract.PARAMS_MODEL_KEYS]
+        if not recorded:
+            continue
+        read = next(key for key in contract.PARAMS_MODEL_KEYS if key in recorded)
+
+        assert read == recorded[0], name
+
+
+def test_the_start_frame_key_is_the_one_every_image_to_video_workflow_records():
+    animating = [wf for wf in WORKFLOW_REGISTRY.values() if wf.starts_from_an_image()]
+
+    assert animating
+    assert all(contract.PARAMS_INPUT_IMAGE_KEY in wf.default_params() for wf in animating)

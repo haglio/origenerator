@@ -25,7 +25,12 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator import motion_engine
 from origenerator.gui.osr2_controls import Osr2Controls
-from origenerator.gui.osr2_controls_state import drive_hud, osr2_controls_hud, osr2_controls_room
+from origenerator.gui.osr2_controls_state import (
+    drive_hud,
+    osr2_controls_hud,
+    osr2_controls_room,
+    post_device_action,
+)
 from tests.motion_doubles import FakeMotion
 
 
@@ -623,3 +628,19 @@ def test_the_panel_redraws_once_the_osr2_goes_into_its_own_auto_mode(qtbot):
     device["mode"] = Osr2Mode.AUTO
 
     assert controls._redraw_if_the_device_switched() is True
+
+
+def test_post_device_action_answers_true_for_a_consoles_verb_so_a_hud_can_route_the_rest():
+    motion = FakeMotion()
+
+    assert post_device_action("robot_hand_speed_up", motion=motion)
+    assert post_device_action("robot_hand_cycle_shape", motion=motion)
+    assert motion.calls[0] == ("speed", 5)
+
+
+@pytest.mark.parametrize("verb", ["", "skip_ahead", "robot_hand_unheard_of"])
+def test_post_device_action_answers_false_and_touches_nothing_for_a_verb_that_is_not_the_consoles(verb):
+    motion = FakeMotion()
+
+    assert not post_device_action(verb, motion=motion)
+    assert motion.calls == []

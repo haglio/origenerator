@@ -208,3 +208,25 @@ def test_a_script_that_will_not_move_leaves_its_video_followed(tmp_path, monkeyp
 
     assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
     assert _files(db, "a")[0]["subfolder"] == "tidied"
+
+
+def test_a_video_kept_in_the_library_is_not_followed(tmp_path):
+    kept = tmp_path / "library" / "kept.mp4"
+    db, output_dir = _library(
+        tmp_path, {"a": [_file("kept.mp4", "video", library_path=str(kept))]})
+    (output_dir / "kept.mp4").write_bytes(b"mp4")
+
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
+    assert _files(db, "a")[0]["subfolder"] == "video"
+
+
+def test_the_enhance_history_names_files_by_name_alone_so_a_move_leaves_it_as_it_is(tmp_path):
+    db, output_dir = _library(tmp_path, {"a": [_file("enhanced.png")]})
+    history = json.dumps([_file("older.png", "gone")])
+    db.update_generation("a", enhance_history=history)
+    (output_dir / "image").mkdir()
+    for name in ("enhanced.png", "older.png"):
+        (output_dir / "image" / name).write_bytes(b"png")
+
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
+    assert _row(db, "a")["enhance_history"] == history

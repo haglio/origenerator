@@ -19,7 +19,6 @@ from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
 from origenerator.gui import palette, tile_shape
 
-# The four thumbnails fill the tile's thumbnail area, a gap apart.
 _CELL_GAP = HAIRLINE
 _CELL_SIZE = ((tile_shape.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
               (tile_shape.THUMBNAIL_SIZE[1] - _CELL_GAP) // 2)
@@ -27,18 +26,10 @@ _INNER_WIDTH = tile_shape.TILE_WIDTH - 2 * tile_shape.TILE_MARGIN
 
 
 class FolderTile(QFrame):
-    """A folder shown in the main view: up to four thumbnails plus name + count.
-
-    Clicking drills into the folder; right-clicking asks for a context menu.
-    Both signals carry the folder's stable key so the view can act on it.
-    ``detail`` is what the name doesn't say (a settings folder's prompt and
-    settings), shown on hover.
-    """
-
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
-    _KIND_ICON = BUTTON_ICON  # on-tile size of the TOC initial or image-or-video icon
+    _KIND_ICON = BUTTON_ICON
 
     def __init__(self, key, text, preview_paths, count, favorite=False,
                  context="", kind_icon=None, parent=None):
@@ -47,8 +38,6 @@ class FolderTile(QFrame):
         self._selected = False
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # The same tile the generations beside it in the flow stand in, plus the
-        # folder path line the Favorites collection's tiles carry.
         self.setFixedSize(*tile_shape.folder_tile_size(folder_path=bool(context)))
         self.setStyleSheet(tile_shape.idle_css("folderTile"))
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -63,9 +52,6 @@ class FolderTile(QFrame):
         layout.addWidget(self._thumbnails)
 
         if context:
-            # Where this folder lives, so a favorited folder is tellable apart from a
-            # same-named one elsewhere. Elided from the left to keep the tail — the
-            # folder's own parent — visible; the whole path sits in the tooltip.
             crumb = QLabel()
             crumb.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
             crumb.setFont(tile_shape.caption_font())
@@ -85,10 +71,7 @@ class FolderTile(QFrame):
         caption.setTextFormat(Qt.TextFormat.RichText)
         caption.setText(self._captioned(favorite))
         caption.setWordWrap(True)
-        tile_shape.style_caption(caption)  # the grid's shared caption size
-        # A settings folder is named by a code, so what it holds — the prompt and
-        # the settings that set it apart — is read on hover rather than under the
-        # thumbnails, where it would take more of the tile than the thumbnails do.
+        tile_shape.style_caption(caption)
         caption.setToolTip(text)
         caption_row.addWidget(caption, 1)
         layout.addLayout(caption_row)

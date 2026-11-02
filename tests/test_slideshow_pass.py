@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from origenerator.gui.slideshow_pass import rotated_onto
+
+
+@dataclass
+class _Slide:
+    prompt_id: str | None
+
+
+def test_the_pass_is_turned_so_the_slide_on_screen_leads_and_the_order_is_otherwise_kept():
+    a, b, c, d = _Slide("a"), _Slide("b"), _Slide("c"), _Slide("d")
+
+    assert rotated_onto([a, b, c, d], c) == [c, d, a, b]
+
+
+def test_the_slide_on_screen_is_found_by_its_generation_when_the_set_holds_another_copy_of_it():
+    items = [_Slide("a"), _Slide("b"), _Slide("c")]
+
+    assert rotated_onto(items, _Slide("b")) == [items[1], items[2], items[0]]
+
+
+def test_a_pass_with_nothing_on_screen_or_without_the_slide_on_screen_is_left_alone():
+    items = [_Slide("a"), _Slide(None), _Slide("c")]
+
+    assert rotated_onto(items, None) is items
+    assert rotated_onto(items, _Slide("z")) is items
+    assert rotated_onto(items, _Slide(None)) is items

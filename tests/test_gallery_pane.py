@@ -691,6 +691,24 @@ def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_bel
                   pane.rows_for_collection(shaped_key(favorites, LANDSCAPE))) == ["a1", "a2"]
 
 
+def test_a_favorite_item_inside_a_favorite_folder_is_one_item_in_what_favorites_gathers(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors", starred=1),
+            _made_with("a2", "alpha.safetensors", prompt="scene two", starred=1)]
+    tree = gallery.build_gallery_tree(rows)
+    alpha = _models(tree)["alpha"]
+    (lora,) = gallery.child_groups(alpha)
+    (scene_two,) = [leaf for leaf in gallery.child_groups(lora) if leaf.rows[0]["prompt_id"] == "a2"]
+    scene_two.favorite = True
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    favorites = FolderCollection(FAVORITES_KEY, alpha.key).key
+
+    pane.show_collection(favorites, LANDSCAPE)
+
+    assert sorted(row["prompt_id"] for row in
+                  pane.rows_for_collection(shaped_key(favorites, LANDSCAPE))) == ["a1", "a2"]
+
+
 def _enhanced_made_with(prompt_id, checkpoint):
     row = _made_with(prompt_id, checkpoint)
     row["original_files"] = json.dumps([{"filename": f"sdxl_t2i_{prompt_id}_base.png"}])

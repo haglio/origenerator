@@ -66,6 +66,20 @@ def test_renders_thumbnail_when_output_is_on_disk(tmp_path):
     assert Path(thumb).exists()
 
 
+def test_a_thumbnail_that_cannot_be_drawn_never_strands_a_finished_run(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "a.png").write_bytes(b"this is not a picture")
+
+    files, thumb, duration = extract_completion(
+        SDXL, _history_with_duration(3.0), OutputPlaces.in_one_folder(out), tmp_path / "thumbs", "n1"
+    )
+
+    assert files == [{"filename": "a.png", "subfolder": ""}]
+    assert thumb is None
+    assert duration == 3.0
+
+
 def test_parses_execution_duration(tmp_path):
     _files, _thumb, duration = extract_completion(
         SDXL, _history_with_duration(12.5), OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs", "n1"

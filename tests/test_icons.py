@@ -32,15 +32,11 @@ def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, mo
 
 
 def test_tab_close_icon_is_the_familys_cross(qtbot):
-    # The corner's close-all must wear a tab's own cross, not a lookalike, so the
-    # two controls read as one spelling of "close" rather than two.
     assert (icons.tab_close_icon().pixmap(16).toImage()
             == qt_icon("cross").pixmap(16).toImage())
 
 
 def test_toc_initial_icons_render_for_each_level(qtbot):
-    # Every level maps to a rendered ground: the four folder levels,
-    # workflow -> model -> LoRA -> source image.
     assert set(icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
     assert icons.LEVEL_LABELS["lora"] == "LoRA"
@@ -57,8 +53,6 @@ def test_a_lora_folder_wears_an_l(qtbot):
 
 
 def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
-    # The grounds sit in one slot down the tree, so no two levels may draw the
-    # same mark — that slot is the whole of what says which level a row is.
     drawn = [icons.toc_initial_icon(level).pixmap(48, 48).toImage()
              for level in icons.LEVEL_LABELS]
     for i, one in enumerate(drawn):
@@ -67,23 +61,16 @@ def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
 
 
 def test_item_type_icons_render_for_image_and_video(qtbot):
-    # The Latest collection marks each tile image-or-video with a small item type icon;
-    # both types must draw a non-blank pixmap so neither shows an empty square.
     image_icon = icons.item_type_icon(MediaType.IMAGE)
     video_icon = icons.item_type_icon(MediaType.VIDEO)
     assert not image_icon.isNull()
     assert image_icon.width() > 0
     assert not video_icon.isNull()
     assert video_icon.width() > 0
-    # The two glyphs differ, so an image is never mistaken for a video.
     assert image_icon.toImage() != video_icon.toImage()
 
 
 def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
-    # The pair over the tree of contents' two halves says which shape each half
-    # holds, and it says it by BEING that shape: an upright frame and a
-    # lying-down one, each the other transposed. Both are drawn on one square
-    # canvas, so the words beside them start at the same x.
     portrait = icons.shape_mark("portrait")
     landscape = icons.shape_mark("landscape")
     assert portrait.size() == landscape.size()
@@ -96,20 +83,13 @@ def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
 
 
 def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
-    # A frame, like the family's screen and photo marks -- what it stands for is
-    # a region an image goes in. Filled, it would read as a swatch, and the
-    # rounded corners that say "screen" would be lost against the heading's word.
-
     image = icons.shape_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
-    assert middle.alpha() == 0                       # hollow through the center
+    assert middle.alpha() == 0
     assert _dominant_color(icons.shape_mark("portrait")) == TEXT_PRIMARY.rgb()
 
 
 def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
-    # Laid out at numbers of its own, the pair came out wider than its canvas:
-    # the upright frame's left edge and the lying-down one's right edge were cut
-    # off at the sides of the button.
     assert not _ink_at_the_edges(icons.separate_mark(BUTTON_FILLING_ICON))
 
 
@@ -125,13 +105,10 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
 
 
 def test_a_collection_mark_is_drawn_once():
-    """One redraw of the folder list asked for these 1,280 times -- every collection
-    of every folder of folders, on every side -- and drew each one afresh."""
     assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY)
 
 
 def _ink_at_the_edges(pixmap) -> bool:
-    """Whether anything drawn runs into the pixmap's own border."""
     image = pixmap.toImage()
     last_x, last_y = image.width() - 1, image.height() - 1
     border = ([(x, 0) for x in range(image.width())]
@@ -142,7 +119,6 @@ def _ink_at_the_edges(pixmap) -> bool:
 
 
 def _ink_bounds(pixmap) -> tuple[int, int]:
-    """How wide and how tall what is drawn in *pixmap* actually is."""
     image = pixmap.toImage()
     drawn = [(x, y)
              for y in range(image.height()) for x in range(image.width())
@@ -156,11 +132,6 @@ def _corner_image(icon):
 
 
 def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
-    # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
-    # the value its HUD paints), so one color means "favorited" in both apps —
-    # which leaves the enhanced image's plus this palette's yellow, since the
-    # two can sit on one tile and blue is genau's across this family. Both marks
-    # are solid at their center, so the middle pixel is the color.
     star = _corner_image(icons.corner_star_icon(favorite=True, armed=False))
     plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False))
     assert star.pixelColor(24, 25) == GREEN
@@ -168,9 +139,6 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
 
 
 def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
-    # The mark is the sign and the button at once, so what is filled says what
-    # is true: an unfavorited item's star is an outline with nothing in the middle,
-    # and an image with no enhancement yet wears the hollow plus.
     unfavorited = _corner_image(icons.corner_star_icon(favorite=False, armed=False))
     assert unfavorited.pixelColor(24, 25).alpha() < 32
     open_plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_OPEN,
@@ -179,24 +147,19 @@ def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
 
 
 def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
-    # A hollow plus with the one it already holds as a yellow shadow under it:
-    # the middle stays empty like the plain hollow one, and the yellow shows out
-    # from under it down and to the right.
     more = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_MORE, armed=False))
-    assert more.pixelColor(24, 24).alpha() < 32          # still hollow
+    assert more.pixelColor(24, 24).alpha() < 32
     yellows = [
         (x, y)
         for y in range(48) for x in range(48)
         if more.pixelColor(x, y) == YELLOW
     ]
     assert yellows, "the enhancement it already holds never showed"
-    assert max(x for x, _y in yellows) > 24 + 12          # …out to the right
-    assert max(y for _x, y in yellows) > 24 + 12          # …and below
+    assert max(x for x, _y in yellows) > 24 + 12
+    assert max(y for _x, y in yellows) > 24 + 12
 
 
 def test_arming_a_corner_button_changes_its_icon(qtbot):
-    # Hovering says "this is a button" — the trash can in the red every delete in
-    # this app wears, the others in the light gray that only means "armed".
     rest = _corner_image(icons.corner_trash_icon(armed=False))
     armed = _corner_image(icons.corner_trash_icon(armed=True))
     assert rest != armed
@@ -208,8 +171,6 @@ def test_arming_a_corner_button_changes_its_icon(qtbot):
 
 
 def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
-    # It is dead because it is a finished statement — this image already holds the
-    # version you would be asking for — so Qt's usual fade would read as a fault.
     icon = icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False)
     normal = icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()
     disabled = icon.pixmap(QSize(48, 48), QIcon.Mode.Disabled).toImage()
@@ -217,20 +178,14 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
 
 
 def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
-    # The tree paints a favorited leaf (and the Favorites collection) with the filled star,
-    # so it wears the corner star's green: one color for "favorited", tile or folder row.
     filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
     assert filled.toImage().pixelColor(24, 25) == GREEN
-    # The outline is the offer to favorite, not a thing that is favorited, so it stays
-    # the chrome's gray — and it dims like every other icon when disabled.
     outline = icons.star_icon(filled=False)
     assert outline.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage() \
         != filled.toImage()
 
 
 def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
-    # The i2v hover controls: a video-seed and an image-seed re-roll glyph, each
-    # a non-blank pixmap, and visibly distinct so one isn't mistaken for the other.
     video = icons.reroll_seed_icon(MediaType.VIDEO)
     image = icons.reroll_seed_icon(MediaType.IMAGE)
     size = QSize(24, 24)
@@ -248,7 +203,6 @@ def test_gallery_pane_button_icons_render_with_normal_and_disabled_modes(qtbot):
     for make in makers:
         icon = make()
         assert not icon.isNull()
-        # A drawn (not blank) pixmap in both modes, so a disabled button dims cleanly.
         size = QSize(24, 24)
         assert not icon.pixmap(size, QIcon.Mode.Normal).isNull()
         assert not icon.pixmap(size, QIcon.Mode.Disabled).isNull()
@@ -275,10 +229,6 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
 
 
 def test_undo_and_redo_carry_their_heads_on_opposite_sides(qtbot):
-    # The pair is one drawing mirrored, and the arrowhead is what the mirror
-    # moves: undo's fills the top-left, redo's the top-right. That difference has
-    # to be big — the small head this replaced left the two all but identical at
-    # button size — so each side carries at least half again the other's ink.
     size = QSize(48, 48)
     undo_left, undo_right = _top_corner_ink(icons.undo_icon().pixmap(size))
     redo_left, redo_right = _top_corner_ink(icons.redo_icon().pixmap(size))
@@ -287,7 +237,6 @@ def test_undo_and_redo_carry_their_heads_on_opposite_sides(qtbot):
 
 
 def _top_corner_ink(pixmap) -> tuple[int, int]:
-    """How much is drawn in the glyph's top-left and top-right corners."""
     image = pixmap.toImage()
     half, third = image.width() // 2, image.height() // 3
     left = right = 0
@@ -302,10 +251,6 @@ def _top_corner_ink(pixmap) -> tuple[int, int]:
 
 
 def test_the_bank_colors_its_act_on_this_trio(qtbot):
-    # Star green, enhance yellow, delete red — the colors the corner buttons wear,
-    # so a button and the mark it leaves on a tile are one symbol. And every one
-    # of them still dims to the same muted gray when it has nothing to act on, so
-    # a dead button never reads as a dimmer shade of its color.
     size = QSize(48, 48)
     for icon, color in ((icons.star_icon(filled=True), GREEN),
                         (icons.enhance_icon(), YELLOW),
@@ -316,7 +261,6 @@ def test_the_bank_colors_its_act_on_this_trio(qtbot):
 
 
 def _dominant_color(pixmap) -> int:
-    """The most common fully-opaque pixel in a rendered glyph — its ink."""
     image = pixmap.toImage()
     counts = Counter(
         image.pixel(x, y)
@@ -327,12 +271,10 @@ def _dominant_color(pixmap) -> int:
 
 
 def test_experiment_icons_render_and_verdicts_differ(qtbot):
-    # The Experiments collection marker draws in both modes like the other collections'.
     flask = icons.flask_icon()
     size = QSize(24, 24)
     assert not flask.pixmap(size, QIcon.Mode.Normal).isNull()
     assert not flask.pixmap(size, QIcon.Mode.Disabled).isNull()
-    # The review hover controls: keep and reject, non-blank and visibly distinct.
     keep = icons.experiment_verdict_icon("up")
     reject = icons.experiment_verdict_icon("down")
     assert not keep.pixmap(size).isNull()
@@ -341,11 +283,6 @@ def test_experiment_icons_render_and_verdicts_differ(qtbot):
 
 
 def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
-    # The reason the glyphs left this module: a drawing kept here is a drawing
-    # that can drift from Fun Time's copy of it, and the two apps' microphones
-    # had already drifted into different shapes on one screen. So every button's
-    # mark has to BE the family glyph, pixel for pixel -- what this app still
-    # chooses is only which mark and in what color.
     cases = (
         (icons.back_icon(), "chevron_left", TEXT_PRIMARY),
         (icons.forward_icon(), "chevron_right", TEXT_PRIMARY),
@@ -372,9 +309,6 @@ def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
 
 
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
-    # The white line art on a thumbnail's hover buttons is the same family mark
-    # the Gallery pane buttons wears, in the white these read in over an image -- not a
-    # second set of drawings kept for the tiles.
     white = QColor(255, 255, 255)
     for icon, name in ((icons.experiment_verdict_icon("up"), "check"),
                        (icons.experiment_verdict_icon("down"), "cross")):
@@ -382,7 +316,6 @@ def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
         assert drawn == icon_pixmap(name, 48, white).toImage(), name
 
 
-# Where each call that names one of shared_ui's marks takes the name.
 _MARK_ARGUMENT = {"qt_icon": 0, "icon_pixmap": 0, "shapes_of": 0, "shared_mark": 0,
                   "draw_icon": 1}
 
@@ -396,9 +329,7 @@ def _names_in(argument):
 
 
 def test_every_mark_this_app_names_is_one_its_shared_ui_draws():
-    # A mark the installed shared_ui does not have is drawn as its stand-in and
-    # nothing fails: the button only looks broken. So a mark added to shared_ui
-    # for this app counts here until the release that has it is pinned.
+    # shared_ui draws a mark it lacks as a stand-in without failing.
     named = set()
     for path in Path(origenerator.__file__).parent.rglob("*.py"):
         for call in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):

@@ -115,10 +115,8 @@ class TestOutOfSight:
 
     def test_the_window_is_cloaked_for_the_block_and_uncloaked_after_it(self):
         with _user32_with_a_window(), \
-                patch("origenerator.win32._dwmapi") as dwm:
-
-            with out_of_sight(111):
-                assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
+                patch("origenerator.win32._dwmapi") as dwm, out_of_sight(111):
+            assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
 
         assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4),
                                      (111, self.DWMWA_CLOAK, 0, 4)]
@@ -137,19 +135,16 @@ class TestOutOfSight:
 
     def test_the_window_comes_back_into_sight_when_the_block_fails(self):
         with _user32_with_a_window(), \
-                patch("origenerator.win32._dwmapi") as dwm:
-
-            with pytest.raises(RuntimeError), out_of_sight(111):
-                raise RuntimeError("the hand-back failed")
+                patch("origenerator.win32._dwmapi") as dwm, \
+                pytest.raises(RuntimeError), out_of_sight(111):
+            raise RuntimeError("the hand-back failed")
 
         assert self._cloaks(dwm)[-1] == (111, self.DWMWA_CLOAK, 0, 4)
 
     def test_a_dead_handle_is_left_alone(self):
         with _user32_with_a_window(alive=False), \
-                patch("origenerator.win32._dwmapi") as dwm:
-
-            with out_of_sight(111):
-                pass
+                patch("origenerator.win32._dwmapi") as dwm, out_of_sight(111):
+            pass
 
         dwm.DwmSetWindowAttribute.assert_not_called()
 

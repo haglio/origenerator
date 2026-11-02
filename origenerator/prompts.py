@@ -1,17 +1,3 @@
-"""The three system prompts the local LLM is given.
-
-Behavior, not configuration: every one of these is tuned by reading what the
-model does with it, and each changes for reasons that have nothing to do with
-where the media library sits or which port the OSR2 broker listens on, so
-they share neither a file nor a blame history with those.
-
-All local: the prompts and everything sent under them go to an
-OpenAI-compatible chat server on this machine (``config.LOCAL_LLM_BASE_URL``),
-and nothing leaves it. Uncensored models throughout -- a censored one refuses
-explicit edits, refuses to match explicit words and refuses to widen a search
-with the library's own vocabulary -- so each prompt says outright that explicit
-content is expected and is to be handled literally rather than softened.
-"""
 from __future__ import annotations
 
 REQUEST_REWRITE_SYSTEM_PROMPT = (
@@ -47,13 +33,6 @@ REQUEST_REWRITE_SYSTEM_PROMPT = (
     "\"blurry\"} -> {\"positive\": \"a street, at night\", \"negative\": \"blurry\"}"
 )
 
-# --- Gallery search → widened vocabulary ----------------------------------
-# The gallery search matches on meaning, not letters. A built-in synonym table
-# does the predictable half on every keystroke; once typing stops, the same
-# local LLM is asked which OTHER words a generation prompt might have used for
-# the ones typed, and those widen the match too. Uncensored, so it answers with
-# the library's actual vocabulary rather than refusing; a refusal, a timeout or
-# an unparseable reply simply leaves the table's own widening standing.
 SEARCH_EXPANSION_SYSTEM_PROMPT = (
     "You widen the words of a search over a library of generated images and "
     "videos. You get a list of search words. For each one, list the OTHER words "
@@ -74,11 +53,6 @@ SEARCH_EXPANSION_SYSTEM_PROMPT = (
     "key per search word you were given and no keys of your own."
 )
 
-# A spoken request names a thing in its own words, and the prompt names it in
-# the prompt's ("no earrings" against a prompt that says "silver ear studs").
-# When the words themselves aren't in the prompt, the same local LLM is asked
-# which of the prompt's own terms the speaker meant. A lookup, not a rewrite:
-# what happens to the chosen term is fixed policy (see origenerator.prompt_edit).
 VOICE_REQUEST_MATCH_SYSTEM_PROMPT = (
     "You match a spoken phrase to the term in an image-generation prompt that "
     "means the same thing. You get a numbered list of the terms already in the "

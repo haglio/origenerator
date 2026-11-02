@@ -1,14 +1,3 @@
-"""What this app and Evolver must agree about, checked while the app runs.
-
-``test_evolver_pipeline_contract.py`` holds this repo's values against Evolver's
-published document, and skips where there is no Evolver beside the checkout --
-which is every run of this repo's gate.  So on the one machine where both apps
-are installed, nothing checked anything: a folder renamed on either side left
-videos arriving nowhere, both apps silent.
-
-These are that check's runtime twin, driven against written-out checkouts so
-each disagreement can be produced rather than waited for.
-"""
 from __future__ import annotations
 
 import json
@@ -25,7 +14,6 @@ AGREED_MARKER = ".partial."
 
 def _evolver(root: Path, *, inbox=AGREED_INBOX, upscaled=AGREED_UPSCALED,
              marker=AGREED_MARKER) -> Path:
-    """A checkout of Evolver, with the document it publishes."""
     checkout = root / "evolver"
     checkout.mkdir(parents=True, exist_ok=True)
     (checkout / "evolver_contract.json").write_text(json.dumps({
@@ -78,7 +66,6 @@ class TestWhenEvolverIsBeside:
         assert ".partial." in said[0]
 
     def test_every_disagreement_is_reported_at_once(self, tmp_path: Path):
-        """Told one at a time, three renames are three launches."""
         checkout = _evolver(tmp_path, inbox="a", upscaled="b", marker="c")
 
         assert len(evolver_agreement.disagreements(_ours(), checkout)) == 3
@@ -86,7 +73,6 @@ class TestWhenEvolverIsBeside:
 
 class TestWhenThereIsNoEvolver:
     def test_no_checkout_beside_this_one_is_not_a_disagreement(self, tmp_path: Path):
-        """A fresh clone, and every run of this repo's gate."""
         assert evolver_agreement.disagreements(_ours(), tmp_path / "evolver") == ()
 
     def test_a_checkout_with_no_published_document_says_nothing(self, tmp_path: Path):
@@ -96,8 +82,6 @@ class TestWhenThereIsNoEvolver:
         assert evolver_agreement.disagreements(_ours(), bare) == ()
 
     def test_an_unreadable_document_is_reported_rather_than_raised(self, tmp_path: Path):
-        """At startup, before a window: a broken file over there must not be how
-        this app fails to open."""
         checkout = _evolver(tmp_path)
         (checkout / "evolver_contract.json").write_text("{not json", encoding="utf-8")
 
@@ -125,8 +109,6 @@ class TestTheFoldersEvolverPublishesForTheOtherApps:
 
 class TestWhatTheAppCompares:
     def test_our_side_is_read_off_this_app_s_own_config(self):
-        """The record the check is given is built from config, so a value renamed
-        there is compared, rather than a second copy of it written here."""
         ours = evolver_agreement.our_side()
 
         assert ours.inbox_dir == config.EVOLVER_INBOX_DIR
@@ -134,7 +116,6 @@ class TestWhatTheAppCompares:
         assert ours.library_root == config.LIBRARY_ROOT
 
     def test_the_lane_folder_is_the_one_all_of_haglio_shares(self):
-        """Evolver reads the same setting, so there is no second copy to compare."""
         assert haglio_settings.value("genau_source") == config.GENAU_SOURCE
 
     def test_the_marker_is_the_one_a_copy_actually_wears(self):

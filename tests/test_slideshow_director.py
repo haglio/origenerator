@@ -1,13 +1,3 @@
-"""The fullscreen slideshows, driven with no gallery and no Qt around them.
-
-Every behaviour here used to need a 7,000-line widget and a real window on a
-monitor to reach: what a slideshow is offered when a generation lands, which runs it
-turns down, what happens to a satellite region when the slideshow covering it ends,
-and what the spoken words about a slideshow do. The slideshow itself is a recorder, the
-host a handful of recorded calls.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -47,8 +37,6 @@ from tests.slideshow_hud_support import open_both_shapes
 
 PORTRAIT = "portrait"
 LANDSCAPE = "landscape"
-# What a region plays with nothing else asked for: the whole library,
-# narrowed to that region's shape.
 ALL_PORTRAIT = shaped_key(gallery.ALL_KEY, PORTRAIT)
 _HELD_ON_G1 = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
 ALL_LANDSCAPE = shaped_key(gallery.ALL_KEY, LANDSCAPE)
@@ -75,8 +63,6 @@ class FakeSignal:
 
 
 class FakeSlideshow:
-    """A slideshow reduced to what the director asks of one."""
-
     def __init__(self, items=(), *, actions=None, pace=None, hud=None, versions=None, **kwargs):
         self.items = list(items)
         self.actions = actions
@@ -129,7 +115,6 @@ class FakeSlideshow:
         self.has_osr2 = None
         self.transport = self
 
-    # what a slideshow is, and what it holds
     def holds(self, prompt_id):
         return prompt_id in self.ids
 
@@ -142,7 +127,6 @@ class FakeSlideshow:
     def is_showing(self):
         return self.visible
 
-    # what the director tells it
     def play(self, items, *, hud=None, versions=None, **kwargs):
         self.items = list(items)
         self.hud = hud
@@ -266,9 +250,6 @@ class FakeSlideshow:
 
 
 class FakeSessionsFunestra:
-    """Where a slideshow handed to one of a session's Funestras is seen: on the
-    session's own window, which draws the HUD this app publishes for it."""
-
     def __init__(self) -> None:
         self.queue_set = None
 
@@ -277,9 +258,6 @@ class FakeSessionsFunestra:
 
 
 class FakeWindow:
-    """The window a slideshow of this app's own is drawn in, reduced to what the
-    director asks of it."""
-
     def __init__(self, slideshow, *, motion=None):
         self.slideshow = slideshow
         slideshow.shown = self
@@ -352,12 +330,6 @@ class FakeRect:
 
 
 class FakeSession:
-    """A hosting Fun Time session reduced to the three things a slideshow asks of one.
-
-    *Funestras* is which shapes it hands over as Funestras, by the channel it names
-    for each; a shape it names none for is one a window of this app's covers.
-    """
-
     dashboard_cmd_file = None
 
     def __init__(self, funestras=None):
@@ -379,11 +351,6 @@ class FakeJobQueue:
 
 
 class FakeGalleryPane:
-    """The middle pane reduced to the questions a slideshow asks of it.
-
-    Its gallery reads as new at every look unless a test gives it a *stamp*,
-    since most tests here change its collections between looks."""
-
     def __init__(self, collections=None, latest=False, searching=False, stamp=None):
         self.collections = collections or {}
         self.latest = latest
@@ -426,8 +393,6 @@ class FakeDB:
 
 
 class FakeHost:
-    """A gallery reduced to what the slideshows ask of one."""
-
     def __init__(self, *, location=None, rows=(), groups=None):
         self.location = location
         self.rows = list(rows)
@@ -522,8 +487,6 @@ class FakeHost:
         self.enhanced.append(prompt_id)
         return True
 
-    # The app's one OSR2 switch, handed to a slideshow whole: a host with no device
-    # (which is every host here) has none to hand over.
     osr2_control = None
 
     def toggle_osr2_drive(self):
@@ -541,11 +504,8 @@ class FakeHost:
 
 
 def test_asking_whether_anything_can_play_stops_at_the_first_item(slideshows, monkeypatch):
-    """The slideshow button only needs to know that something can play. Reading
-    every row's files to answer it is what made one click on the folder list
-    redraw for seconds: five of these go into a single redraw."""
     director, _host, _made = slideshows(FakeHost(rows=[_row(f"g{n}") for n in range(50)]))
-    del director.items_of  # the fixture's stand-in, so the real one answers
+    del director.items_of
     read = []
 
     def resolve(row, _output_dir):
@@ -559,8 +519,6 @@ def test_asking_whether_anything_can_play_stops_at_the_first_item(slideshows, mo
 
 
 def test_asking_whether_anything_can_play_lists_no_folder_of_upscales(slideshows, monkeypatch):
-    # An upscale changes which file a slide plays, never whether there is one,
-    # and every click on the folder list asks this several times over.
     director, _host, _made = slideshows(FakeHost(rows=[_row("g0")]))
     del director.items_of
     monkeypatch.setattr(module.gallery, "resolve_preview",
@@ -589,7 +547,6 @@ def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,
 
 @pytest.fixture
 def slideshows(monkeypatch):
-    """A director whose slideshows are recorders and whose HUD HUD is absent."""
     made = []
 
     def build_slideshow(items, **kwargs):
@@ -615,8 +572,6 @@ def slideshows(monkeypatch):
             jobs=FakeJobQueue(), pace=SlideshowPace(), motion=None,
             fun_time=fun_time, names=ItemNames(db))
         host.slideshows = director
-        # The playlist is what a slideshow is of; deriving it from files on disk is
-        # resolve_preview's own tested job, not this one's.
         director.items_of = lambda rows: [
             (f"{r['prompt_id']}.png", "image", r["prompt_id"], None) for r in rows]
         return director, host, made
@@ -642,9 +597,6 @@ def test_the_last_slideshow_closing_leaves_nothing_showing(slideshows):
 
 
 def test_asking_for_a_second_slideshow_standalone_replays_the_one_already_up(slideshows):
-    # Standalone there is one screen, so there is one slideshow. A second set asked
-    # for while one is up -- by voice, or from the window Alt+Tab reaches --
-    # re-points the slideshow that is there rather than stacking another over it.
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)], location="collection/a")
 
@@ -656,9 +608,6 @@ def test_asking_for_a_second_slideshow_standalone_replays_the_one_already_up(sli
 
 
 def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(slideshows):
-    """The gallery lists a folder's newest generation first and this slideshow plays
-    it in that order, which is the order Latest plays — so the HUD lights
-    Latest over it rather than leaving both of the order pair dark."""
     host = FakeHost(rows=[_row("a2"), _row("a1")])
     host.visible = ["a2", "a1"]
     director, _host, made = slideshows(host)
@@ -671,8 +620,6 @@ def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(sli
 
 def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_folder_is_ready(
         slideshows):
-    # Worked out whole before anything showed, a folder of thousands held its
-    # slideshow back for a second or more.
     host = FakeHost(rows=[_row("a3"), _row("a2"), _row("a1")])
     host.holding = []
     director, _host, made = slideshows(host)
@@ -688,8 +635,6 @@ def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_fo
 
 def test_a_double_clicked_item_plays_the_rows_the_gallery_pane_listed_without_reading_each_again(
         slideshows):
-    # Asked of the library one at a time, the rows of Latest kept a double-click
-    # waiting eleven seconds before its slideshow could open.
     rows = [_row("a2"), _row("a1")]
     host = FakeHost(rows=rows)
     asked = []
@@ -705,8 +650,6 @@ def test_a_double_clicked_item_plays_the_rows_the_gallery_pane_listed_without_re
 
 def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_folder(
         slideshows, monkeypatch, tmp_path):
-    # Asked after one at a time, the files of Latest's items held a double-click
-    # for a second; the folder they sit in is listed once instead.
     for n in range(3):
         (tmp_path / f"g{n}.png").write_bytes(b"x")
     monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
@@ -731,8 +674,6 @@ def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_fold
 
 def test_a_double_clicked_item_s_slideshow_takes_the_shape_its_rows_say_opening_no_file(
         slideshows, monkeypatch):
-    # Every item's file opened to measure it held a double-click on Latest for
-    # sixteen seconds, when the rows already say which shape each item is.
     rows = [_shaped("g1", TALL), _shaped("g2", TALL), _shaped("g3", WIDE)]
     director, _host, made = slideshows(FakeHost(rows=rows))
     monkeypatch.setattr(module, "region_for_items",
@@ -1056,14 +997,10 @@ def test_a_director_names_both_shapes_for_a_slideshow_of_both(slideshows):
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):
-    """A slideshow on a Funestra opens on its side's whole library, which the Gallery pane
-    is not listing — so versions read off the Gallery pane's rows named none of the
-    slides on screen, and every versions button on the HUD was drawn faded
-    however many enhancements that library held (2026-09-19)."""
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
     director, host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
-    assert host.visible == []  # the Gallery pane is somewhere else entirely
+    assert host.visible == []
     director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
                                          for row in rows}
 
@@ -1088,10 +1025,6 @@ def test_a_sessions_regions_open_on_their_base_state_whatever_was_pressed(slides
 
 
 def test_a_region_says_how_long_it_took_to_fill(slideshows, caplog):
-    """The wait the owner is judging when he presses the button that brings
-    this mode up -- the one between the press and the slides -- named in the
-    line that says the region opened, so a slow one can be read off the log
-    instead of counted off a stopwatch."""
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")],
                                        ALL_LANDSCAPE: [_row("g5")]})
     director, _host, _made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
@@ -1121,10 +1054,6 @@ def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullsc
 
 
 def test_a_landing_reaches_the_slideshow_whose_own_folder_holds_it(slideshows):
-    # Asked of each slideshow's OWN location rather than of the Gallery pane, which has
-    # usually moved on by the time a generation lands.
-    # On the two regions, which is the only place two slideshows are up at once:
-    # standalone the monitor's one slideshow takes over the new set instead.
     gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g9")], "collection/b": []})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="collection/a",
@@ -1162,8 +1091,6 @@ def test_a_run_the_folder_lists_only_after_its_first_frame_joins_on_its_next(sli
 
 
 def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
-    # It is a better version of an image the slideshow may already be playing, and a
-    # half-rendered second slide would be the same image twice, one of them worse.
     enhance = _row("g8", workflow_name="enhance_image")
     host = FakeHost(rows=[_row("g1"), enhance])
     director, _host, made = slideshows(host, db=FakeDB([enhance]),
@@ -1177,10 +1104,6 @@ def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
 
 
 def test_a_run_turned_down_frame_after_frame_looks_at_the_slideshows_set_once(slideshows):
-    """Every in-progress image asked each slideshow that was not playing the run
-    whether it would, and answering collected that slideshow's whole set again -- on
-    a region's base state, sorting the whole library by shape -- until Core
-    stopped answering and Windows closed it (2026-10-07 23:31)."""
     gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]}, stamp="one gallery")
     director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([_row("g-run")]),
                                        fun_time=FakeSession())
@@ -1209,8 +1132,6 @@ def test_a_run_a_collection_lists_only_after_the_next_rebuild_joins_on_the_frame
 
 
 def test_a_run_of_the_folder_on_screen_joins_on_its_first_frame(slideshows):
-    # Waiting for the file is waiting minutes for the one thing the slideshow is
-    # being watched for.
     host = FakeHost(rows=[_row("g1"), _row("g5")])
     director, _host, made = slideshows(host, db=FakeDB([_row("g5")]))
     director.open([("a.png", "image", "g1", None)])
@@ -1221,8 +1142,6 @@ def test_a_run_of_the_folder_on_screen_joins_on_its_first_frame(slideshows):
 
 
 def test_a_landed_enhancement_reaches_every_surface(slideshows, tmp_path, monkeypatch):
-    # An enhancement asked for from a slideshow lands minutes later, by which time it
-    # has long paged on: an upgrade it doesn't take here it never takes at all.
     output = tmp_path / "output"
     output.mkdir()
     (output / "better.png").write_bytes(b"pixels")
@@ -1238,12 +1157,11 @@ def test_a_landed_enhancement_reaches_every_surface(slideshows, tmp_path, monkey
 
 
 def _evolver_upscaled_video(tmp_path, monkeypatch):
-    """A video row with its file on disk, and the upscale Evolver made of it."""
     output = tmp_path / "output"
     video = output / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"video")
-    os.utime(video, (1_000_000, 1_000_000))  # made well before its upscale
+    os.utime(video, (1_000_000, 1_000_000))
     library = tmp_path / "upscaled_by_orientation"
     upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
     upscale.parent.mkdir(parents=True)
@@ -1303,8 +1221,6 @@ def test_the_eyes_of_two_faces_in_an_enhanced_image_come_back_as_a_close_up_of_e
 
 
 def test_a_region_reset_re_points_what_feeds_it(slideshows):
-    # A generation landing in the library must reach a region that has been
-    # reset back to the library, not the folder it used to be playing.
     gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
@@ -1317,10 +1233,6 @@ def test_a_region_reset_re_points_what_feeds_it(slideshows):
 
 
 def test_a_set_handed_to_a_running_slideshow_brings_its_own_versions_with_it(slideshows):
-    """Latest, Shuffle and a region reset each hand the slideshow a different set of
-    its side's library.  A versions map still armed on the set the slideshow opened
-    with names none of the images now on screen, so the HUD's versions button
-    goes faded over a whole library of enhancements (2026-09-19)."""
     gallery_pane = FakeGalleryPane(collections={LATEST_LANDSCAPE: [_row("g9")],
                                        ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane,
@@ -1410,7 +1322,7 @@ def test_a_loop_ending_on_a_folder_slideshow_hands_it_the_library_it_is_ordered_
     assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
     assert made[0].kept_the_slide is True
     assert director._live_slideshows == [(made[0], ALL_LANDSCAPE)]
-    assert made[0].said == []               # the surface says "Loop off" itself
+    assert made[0].said == []
 
 
 def test_a_slideshow_playing_latest_falls_back_to_latest_rather_than_to_the_shuffle(slideshows):
@@ -1457,8 +1369,6 @@ def test_a_slideshow_asks_this_director_for_the_way_out_of_a_loop(slideshows):
 
 
 def test_a_region_slideshow_ending_comes_back_on_the_base_state(slideshows):
-    # In origenerator mode the Funestra underneath is blacked for the whole mode,
-    # so a region left empty is a black rectangle rather than a fallback.
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     open_both_shapes(director)
@@ -1471,8 +1381,6 @@ def test_a_region_slideshow_ending_comes_back_on_the_base_state(slideshows):
 
 
 def test_closing_the_slideshows_drops_the_wanting_before_it_closes_anything(slideshows):
-    # A slideshow closing while the mode still wants its regions is refilled with the
-    # base state, and these closes must not be.
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, _made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     open_both_shapes(director)
@@ -1514,9 +1422,6 @@ def _asking_session(tmp_path):
 
 def test_a_slideshow_for_a_side_the_session_still_plays_waits_for_the_session_to_hand_it_over(
         slideshows, tmp_path):
-    """A slideshow started in the gallery on a shape whose Funestra is still in
-    Kino mode: the session is asked for that Funestra, and the slideshow opens there
-    once the session hands it over, rather than the side's library."""
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=_asking_session(tmp_path))
 
@@ -1579,8 +1484,6 @@ def test_a_region_already_holding_a_slideshow_is_left_alone(slideshows):
 
 
 def test_a_freeze_that_one_slideshow_refuses_still_reaches_the_rest(slideshows):
-    # A freeze that stopped at the first slideshow left the others running with no
-    # sign of why.
     director, _host, made = slideshows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
@@ -1592,8 +1495,6 @@ def test_a_freeze_that_one_slideshow_refuses_still_reaches_the_rest(slideshows):
 
 
 def test_a_slideshow_opened_while_the_room_is_frozen_opens_frozen(slideshows):
-    # The room's OmniPause holds this surface from its first frame, not from
-    # whenever the flag next changes.
     director, _host, made = slideshows(fun_time=FakeSession())
     director.set_room_paused(True)
 
@@ -1749,7 +1650,6 @@ def test_a_spoken_pause_or_play_asks_a_hosting_session_for_omnipause_only_to_cha
 
 
 def test_a_spoken_word_is_answered_in_the_slideshows_own_corner(slideshows):
-    # The window under it is covered by the very thing being talked to.
     director, host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
@@ -1777,8 +1677,6 @@ def test_a_spoken_word_with_no_slideshow_up_is_answered_on_the_caption(slideshow
 
 
 def test_a_named_side_holding_nothing_is_an_answer_in_itself(slideshows):
-    # Falling back to the other region's slideshow would act on the slide the
-    # speaker did not name.
     director, _host, _made = slideshows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
 
@@ -1787,8 +1685,6 @@ def test_a_named_side_holding_nothing_is_an_answer_in_itself(slideshows):
 
 
 def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slideshows):
-    # On a Funestra that word is F-mode, and a slideshow is meant to read the same way.
-
     class Spoken:
         collection_key = FAVORITES_KEY
         shape = None
@@ -1799,7 +1695,7 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slid
     director.play_collection(Spoken())
 
     assert made[0].hud_favorites_filter is True
-    assert len(made) == 1  # no second slideshow opened
+    assert len(made) == 1
     assert host.said == ["F-mode on"]
 
 
@@ -1824,7 +1720,7 @@ def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
     director.run_on_slide(AppCommand.BACK, said_at=7.5)
 
     assert made[0].steps == [1, -1]
-    assert made[0].done == []  # a step is from the slide on screen
+    assert made[0].done == []
     assert made[0].said == ["next", "back"]
     assert made[0].said_kinds == [INFO, INFO]
 
@@ -1879,8 +1775,6 @@ def test_a_favorite_that_lands_says_so_in_the_favorites_green(slideshows):
 
 
 def test_leaving_a_slideshow_picks_its_slide_where_the_slideshow_was_playing(slideshows):
-    # Not the folder the item was generated in: the items you were watching
-    # are where you want to be put back, with that one picked among them.
     director, host, made = slideshows(FakeHost(rows=[_row("g1")]))
     director.open([("a.png", "image", "g1", None)])
 
@@ -1901,8 +1795,6 @@ def test_leaving_a_slideshow_on_a_slide_the_pane_does_not_hold_goes_to_it(slides
 
 
 def test_a_region_slideshow_is_placed_muted_frameless_and_on_top(slideshows):
-    # The Satellite Funestra it covers is topmost itself, and the session's main
-    # Funestra owns the room's audio.
     director, _host, made = slideshows(fun_time=FakeSession())
 
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
@@ -1926,8 +1818,6 @@ def test_a_standalone_slideshow_takes_the_whole_monitor(slideshows):
 
 
 def test_a_session_that_hands_over_its_funestras_gets_the_slideshow_on_one(slideshows):
-    # The Funestra IS the surface: the slideshow is handed that side's channel, and no
-    # window of this app's is placed, shown or raised over the region.
     channel = object()
     director, _host, made = slideshows(fun_time=FakeSession(funestras={PORTRAIT: channel}))
 
@@ -1940,8 +1830,6 @@ def test_a_session_that_hands_over_its_funestras_gets_the_slideshow_on_one(slide
 
 
 def test_a_slideshow_on_a_funestra_says_its_lines_in_the_gallerys_caption(slideshows):
-    # A Funestra has no corner to flash a line in, and the gallery's own caption
-    # is on screen beside the Funestras in a session.
     director, host, made = slideshows(fun_time=FakeSession(funestras={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
@@ -1950,8 +1838,6 @@ def test_a_slideshow_on_a_funestra_says_its_lines_in_the_gallerys_caption(slides
 
 
 def test_a_side_the_session_named_no_funestra_for_still_gets_a_window(slideshows):
-    # An older session names no Funestras, and its regions want a window of this
-    # app's over them exactly as before.
     director, _host, made = slideshows(fun_time=FakeSession(funestras={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
@@ -2062,9 +1948,6 @@ def test_a_row_dragged_down_the_block_re_lines_the_queue(slideshows):
 
 
 def test_the_spoken_filter_narrows_the_slideshow_and_says_what_is_left(slideshows):
-    # A speaker who has just narrowed a slideshow wants to know there is still
-    # something in it, and "nothing here is enhanced" is the one answer worth
-    # hearing at once.
     slideshow = FakeSlideshow()
     slideshow.enhanced_items = ["a", "b"]
     director, _host, _made = slideshows()
@@ -2086,9 +1969,20 @@ def test_a_slideshow_with_nothing_enhanced_in_it_says_so(slideshows):
     assert slideshow.said_kinds == [WARNING]
 
 
+def test_the_spoken_filter_answers_even_when_the_switch_was_already_on(slideshows):
+    slideshow = FakeSlideshow()
+    slideshow.enhanced_items = ["a", "b"]
+    slideshow.hud_enhanced_mode = True
+    slideshow.set_enhanced_mode = lambda on: False
+    director, _host, _made = slideshows()
+    director._slideshow = slideshow
+
+    director.filter_enhanced(True)
+
+    assert slideshow.said == ["enhanced only — 2 to play"]
+
+
 def test_clearing_the_filter_takes_f_mode_with_it(slideshows):
-    # "clear filter" is the way out of ALL of the narrowing, on every satellite
-    # in this family.
     slideshow = FakeSlideshow()
     slideshow.hud_favorites_filter = True
     director, _host, _made = slideshows()
@@ -2109,7 +2003,6 @@ def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slidesh
 
 
 def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):
-    # Windows won't move a file while a handle on it is open.
     director, _host, made = slideshows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
@@ -2119,11 +2012,7 @@ def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):
     assert [slideshow.released for slideshow in made] == [[["one.png"]], [["one.png"]]]
 
 
-# --- the map around the slide on screen: what the library says ---------------
-
 def _image(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
-    """A finished image with real params, shaped by what it asked for —
-    which is what places it on a shape with no file to measure."""
     params = {"positive_prompt": prompt, "seed": seed, "steps": steps,
               "width": width, "height": height}
     row = _row(prompt_id, params=params)
@@ -2132,11 +2021,6 @@ def _image(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
 
 
 def _animation(prompt_id, *, frame, action, tmp_path, width=100, height=200):
-    """A finished video animated from the image that wrote *frame*, showing
-    *action* — picked for it in Combine, which is where an action is written down.
-
-    A video's settings ask for no size, so what puts this one on a shape is the
-    shape of the film itself, which is what its thumbnail carries."""
     params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame}
     row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
                files=(f"{prompt_id}.mp4",))
@@ -2149,8 +2033,6 @@ def _animation(prompt_id, *, frame, action, tmp_path, width=100, height=200):
 
 
 def _library(rows):
-    """A director over *rows*, its gallery indexing the images among them the
-    way the real one does."""
     host = FakeHost(rows=rows)
     index = gallery.build_image_config_index(
         [row for row in rows if row["workflow_name"] != "wan22_i2v"])
@@ -2159,10 +2041,6 @@ def _library(rows):
 
 
 def test_the_library_of_the_slideshows_side_answers_for_the_map_around_a_generation(slideshows, tmp_path):
-    """The same configuration under other seeds is the row and the videos
-    animated from the image are the column, each named for its action — read
-    off every generation of that side's shape, whatever set the slideshow itself is
-    playing."""
     fox = _image("g1", "a red fox", seed=1)
     fox["output_files"] = json.dumps([{"filename": "g1.png"}])
     rows = [fox, _image("g2", "a red fox", seed=2),
@@ -2188,8 +2066,6 @@ def _fox(prompt_id, *, seed):
 
 
 def test_the_map_reads_the_library_once_for_each_state_of_it(slideshows):
-    # Read afresh for every slide the map was drawn around, the library held
-    # each step of a slideshow, and its double-click, a tenth of a second.
     rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
     db = FakeDB(rows)
     director, _host, _made = slideshows(_library(rows), db=db, gallery_pane=FakeGalleryPane(stamp=1))
@@ -2201,9 +2077,6 @@ def test_the_map_reads_the_library_once_for_each_state_of_it(slideshows):
 
 
 def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(slideshows, tmp_path):
-    """Both halves, in that order: the same seed under another configuration,
-    named by its folder as the tree names it, and then the videos animated from
-    this image, named by the action each shows."""
     fox = _fox("g1", seed=1)
     tweaked = _image("g2", "a red fox at dawn", seed=1)
     tweaked["output_files"] = json.dumps([{"filename": "g2.png"}])
@@ -2221,9 +2094,6 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sli
 
 
 def test_a_video_sits_under_its_images_seed_with_the_image_down_its_column(slideshows, tmp_path):
-    """A video's own sampler seed says nothing about which image it is of, so
-    its row is its action animated from its image's other seeds, and its column
-    opens on the image it was animated from."""
     rows = [_fox("g1", seed=1), _fox("g2", seed=2),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="g2.png", action="alpha", tmp_path=tmp_path),
@@ -2260,15 +2130,12 @@ def test_the_library_says_what_each_generation_an_action_filter_asks_about_is_na
 
 
 def test_an_image_taken_away_leaves_the_map_its_row_draws(slideshows):
-    """The map is read off the library every time it is drawn, not off a list
-    taken once — so an image condemned from a slideshow stops being drawn beside its
-    siblings instead of offering a thumbnail of something that is gone."""
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a red fox", seed=2)]
     host, db = FakeHost(rows=rows), FakeDB(rows)
     director, _host, _made = slideshows(host, db=db)
     assert [slide.prompt_id for slide in director.neighbors_of("g1", shape="portrait").seeds] == ["g2"]
 
-    db.rows.pop("g2")                                    # condemned: the row goes
+    db.rows.pop("g2")
     host.rows = [row for row in host.rows if row["prompt_id"] != "g2"]
 
     assert director.neighbors_of("g1", shape="portrait").seeds == ()
@@ -2294,9 +2161,6 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(slideshows):
 
 
 def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows):
-    """What a slideshow asks the gallery on its own behalf now includes what the
-    library says about an item — and the star's undoing, for the Funestras'
-    "trash" over a favorite."""
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a red fox", seed=2)]
     director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows))
 
@@ -2326,8 +2190,6 @@ def test_a_lock_on_a_hosted_slideshow_puts_the_generation_it_holds_in_front_of_h
 
 
 def _a_sitting():
-    """Newest first, as a collection lists: two seeds of one image, another image,
-    then two more seeds of the first."""
     return [_image("g5", "a red fox", seed=5), _image("g4", "a red fox", seed=4),
             _image("g3", "a blue car", seed=3),
             _image("g2", "a red fox", seed=2), _image("g1", "a red fox", seed=1)]
@@ -2382,9 +2244,6 @@ def test_a_seed_landing_while_latest_plays_reaches_it_as_its_runs_newest(slidesh
 
 
 def test_a_slideshow_of_favorites_plays_the_sides_whole_library_with_the_filter_on(slideshows):
-    """Favorites is the Shuffle playlist with the favorites switch held down,
-    so the switch can be let go to widen and the order pair still means the
-    library rather than the favorites."""
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a blue car", seed=2)]
     gallery_pane = FakeGalleryPane(collections={shaped_key(FAVORITES_KEY, PORTRAIT): [rows[0]],
                                        ALL_PORTRAIT: rows})
@@ -2432,8 +2291,6 @@ def test_a_slideshow_of_a_folders_enhanced_plays_that_folder_with_enhanced_only_
 
 
 def test_a_slideshow_of_latest_opens_on_the_newest_rather_than_where_the_last_one_stopped(slideshows):
-    """Latest is newest-first and the newest is the whole point of opening it,
-    so it does not pick up where a Latest slideshow left off."""
     rows = _a_sitting()
     director, _host, made = slideshows(FakeHost(location=LATEST_PORTRAIT, rows=rows))
     director._slideshow_state = SlideshowState(order=["g1"], current="g1")
@@ -2566,8 +2423,6 @@ def test_a_slideshow_of_a_folder_still_picks_up_where_the_last_one_stopped(slide
     assert made[0].resumed is director._slideshow_state
 
 
-
-# --- what is being made while a slideshow is up ---------------------------------
 
 def _being_made(key, frame=b"frame"):
     return SimpleNamespace(key=key, reading=SimpleNamespace(frame=frame))

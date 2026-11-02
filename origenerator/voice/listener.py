@@ -1,15 +1,3 @@
-"""What the microphone hears: a spoken command, a spoken request, or nothing.
-
-While a surface listens for commands the mic stays open
-(:class:`~origenerator.voice.hearing.Hearing`), and an utterance the injected
-matcher recognizes -- "fix teeth" -- is executed. Anything else does nothing.
-
-An injected :class:`~origenerator.voice.dictation.RequestDictation` gets first
-refusal on every transcription, so "Request … over" can be said wherever it is
-heard. While one is open it swallows what it hears -- which keeps the words of a
-request from matching a command -- and each step of it is re-emitted as
-:attr:`CommandAndRequestListener.request`.
-"""
 from __future__ import annotations
 
 import logging
@@ -23,16 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class CommandAndRequestListener(QObject):
-    error = pyqtSignal(str)    # a mic that failed, or a sound with no words in it
-    heard = pyqtSignal(str)    # what was said
-    request = pyqtSignal(object)  # a SpokenRequest: one step of "Request … over"
+    error = pyqtSignal(str)
+    heard = pyqtSignal(str)
+    request = pyqtSignal(object)
 
     def __init__(self, *, hearing=None, command_matcher=None, bare_matcher=None,
                  dictation=None, phrases=(), never_repaired=(), said_in=None,
                  parent=None):
         super().__init__(parent)
-        # *phrases* is the vocabulary said outright, which the mic hears fast and
-        # exactly; everything else reaches the same matchers as a sentence taken down.
         self._hearing = hearing if hearing is not None else Hearing(
             phrases, never_repaired=never_repaired, said_in=said_in)
         self._matcher = command_matcher
@@ -44,37 +30,18 @@ class CommandAndRequestListener(QObject):
             lambda reason: self.error.emit(f"mic unavailable — {reason}"))
 
     def start_commands(self, execute) -> None:
-        """Open the mic: an utterance the matcher recognizes calls ``execute``
-        with what it matched and when it was said."""
         self._execute_command = execute
-        self._hearing.start()  # an already-open mic stays as it is
+        self._hearing.start()
 
     def stop_commands(self) -> None:
-        """Shut the mic and drop any half-said request with it -- one nobody can
-        finish saying must not be waiting the next time it opens."""
         self._execute_command = None
         self._hearing.stop()
         self.drop_the_request()
 
     def bare_command(self, text: str):
-        """The whole-utterance command *text* is, or ``None`` -- asked once the
-        request has passed on it and before the looser matcher, of what this
-        app's own mic heard and of what the HOSTING session heard alike. Without
-        it the session's "enhanced only" reached the looser image matcher,
-        which reads it as "enhance" with a word after it and spends a generation
-        on it.
-        """
         return self._bare_matcher(text) if self._bare_matcher is not None else None
 
     def push_dictation(self, text: str, spoken_at: float | None = None):
-        """Feed the open request one transcription, and answer what it meant
-        (``None`` when it is not part of a request).
-
-        Hosted inside a Fun Time session this app's mic is shut -- the session
-        hears for the whole room and posts what it heard on this app's channel --
-        so the words of a request arrive here from there, into the same dictation:
-        half a request must never be held in one place and half in another.
-        """
         return (self._dictation.push(text, spoken_at=spoken_at)
                 if self._dictation is not None else None)
 
@@ -88,9 +55,9 @@ class CommandAndRequestListener(QObject):
 
     def _on_said(self, text: str, spoken_at: float) -> None:
         if self._execute_command is None:
-            return  # a late utterance after the mic was shut
+            return
         self.heard.emit(text)
-        if not any(char.isalpha() for char in text):  # '', '. . . .', noise
+        if not any(char.isalpha() for char in text):
             self.error.emit("Didn't catch that.")
             return
         meaning = self._meaning(text, spoken_at)
@@ -105,12 +72,6 @@ class CommandAndRequestListener(QObject):
             logger.info("Voice: a %d-word utterance matched no command", length)
 
     def _meaning(self, text: str, spoken_at: float):
-        """What one transcription meant, or ``None`` for nothing at all.
-
-        The dictation first, which has first refusal because it is collecting a
-        sentence, then the whole-utterance vocabulary and after it the general
-        command matcher.
-        """
         spoken = self.push_dictation(text, spoken_at)
         if spoken is not None:
             return spoken

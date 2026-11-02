@@ -1,30 +1,11 @@
-"""The folders the user composes by hand, and what each one gathers.
-
-`custom_folders` is the name, `custom_folder_items` the folders it gathers and
-`custom_folder_generations` the items it holds on their own (see
-origenerator.gallery.custom). A custom collection holds references, not copies -- what
-it gathers outlives it.
-
-A gathered folder is stored by tree key, so it drifts when a key formula moves
-exactly as a `folder_meta` favorite does, and carries the same identity columns for
-the same reason: `origenerator.favorite_reconcile` re-points it from a generation
-under it.
-"""
 from __future__ import annotations
 
 from origenerator.db_connection import Store
 
 
 class CustomCollectionStore(Store):
-    """The queries over `custom_folders` and `custom_folder_items`."""
-
     def create_custom_collection(self, name: str, folder_id: int | None = None,
                              side: str | None = None) -> int:
-        """Make an empty custom collection and return its id.
-
-        ``folder_id`` re-creates one at the id it had, so an undone removal comes
-        back under the very key the session was saved with (see
-        :meth:`GalleryEdits.delete_custom_collection`)."""
         with self._connect() as conn:
             cur = conn.execute("INSERT INTO custom_folders (id, name, side) VALUES (?, ?, ?)",
                                (folder_id, name, side))
@@ -36,18 +17,12 @@ class CustomCollectionStore(Store):
                          (side, folder_id))
 
     def delete_custom_collection(self, folder_id: int):
-        """Drop a custom collection and everything it holds. The gathered folders and
-        their generations are untouched — it holds references, not copies."""
         with self._connect() as conn:
             for table in ("custom_folder_items", "custom_folder_generations"):
                 conn.execute(f"DELETE FROM {table} WHERE folder_id = ?", (folder_id,))
             conn.execute("DELETE FROM custom_folders WHERE id = ?", (folder_id,))
 
     def add_folders_to_custom_collection(self, folder_id: int, folders: list[tuple]):
-        """Add ``(folder_key, level, ref_prompt_id)`` folders to a custom collection,
-        appended after whatever it already holds. A key already in the folder keeps
-        its position and refreshes its identity, so re-dropping a folder is a no-op
-        rather than a duplicate."""
         if not folders:
             return
         with self._connect() as conn:
@@ -105,8 +80,6 @@ class CustomCollectionStore(Store):
             )
 
     def list_custom_collections(self) -> list[dict]:
-        """Every custom collection as ``{"id", "name", "side", "folders": [folder_key, ...]}``,
-        oldest first, each folder list in the order it was built up."""
         with self._connect() as conn:
             folders = [
                 {"id": r["id"], "name": r["name"], "side": r["side"], "folders": [],
@@ -133,7 +106,6 @@ class CustomCollectionStore(Store):
             return folders
 
     def folders_in_custom_collections(self) -> list[dict]:
-        """Every gathered folder with its stored identity, for the reconcile."""
         with self._connect() as conn:
             return [
                 {"folder_id": r["folder_id"], "folder_key": r["folder_key"],
@@ -146,12 +118,6 @@ class CustomCollectionStore(Store):
 
     def repoint_folder_in_custom_collection(self, folder_id: int, old_key: str, new_key: str,
                                         *, level: str | None, ref_prompt_id: str | None):
-        """Move a gathered folder onto ``new_key``, keeping its place.
-
-        Used by the reconcile when a gathered folder's key drifts. If the folder
-        already holds ``new_key`` the stale row is simply dropped — the grouping
-        already contains that folder once, which is all it can mean.
-        """
         with self._connect() as conn:
             held = conn.execute(
                 "SELECT position FROM custom_folder_items "
@@ -174,8 +140,6 @@ class CustomCollectionStore(Store):
 
     def stamp_folder_in_custom_collection(self, folder_id: int, folder_key: str,
                                       *, level: str | None, ref_prompt_id: str | None):
-        """Refresh a gathered folder's stored identity, so a future key formula
-        change can re-derive it from a generation under it."""
         with self._connect() as conn:
             conn.execute(
                 "UPDATE custom_folder_items SET level = ?, ref_prompt_id = ? "

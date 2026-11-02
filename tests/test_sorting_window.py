@@ -1,7 +1,3 @@
-"""The sorting window: one image, one press, the next image.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import pytest
@@ -162,8 +158,6 @@ def test_undo_with_nothing_answered_yet_says_so(window):
     assert "Nothing to undo" in _said(made, LAST_LINE)
 
 
-# --- the drawings on the buttons --------------------------------------------
-
 
 def test_each_state_wears_its_own_drawing(window, tmp_path):
     made, _store = window("first", drawings={"state two": _drawn(tmp_path / "two.png")})
@@ -179,7 +173,6 @@ def test_a_state_with_no_drawing_installed_stands_on_its_words(window):
 
 
 def test_a_state_of_several_terms_reads_one_term_to_a_line():
-    """A comma, a plus and a parenthesis each start the next line."""
     named = ("alpha, beta gamma", "delta (with epsilon)", "eta + theta")
 
     assert tuple(one_term_to_a_line(name) for name in named) == (
@@ -195,8 +188,6 @@ def test_a_drawing_that_will_not_load_is_no_worse_than_none(window, tmp_path):
     assert _tile(made, "state one").icon().isNull()
 
 
-# --- the image itself ------------------------------------------------------
-
 
 def test_the_image_is_drawn_at_the_size_the_window_gives_it(window, tmp_path):
     made, _store = window(images=[{"prompt_id": "first", "name": "3FA9C0D2 001",
@@ -208,7 +199,7 @@ def test_the_image_is_drawn_at_the_size_the_window_gives_it(window, tmp_path):
     made._fill_with_the_image()
 
     drawn = _image(made).pixmap()
-    assert drawn.height() == 700  # the taller side fills, the shape is kept
+    assert drawn.height() == 700
     assert drawn.width() == 466
 
 
@@ -234,12 +225,8 @@ def test_an_image_whose_file_has_gone_says_so_rather_than_showing_nothing(window
     assert _image(made).text() == SortingWindow.MISSING
 
 
-# --- the grid of buttons -----------------------------------------------------
-
 
 def test_every_button_is_the_same_shape_and_size(window, tmp_path):
-    """A column was as wide as its own widest name, so the three columns came
-    out three widths and the grid did not read as a grid."""
     made, _store = window("first", drawings={
         "state one": _drawn(tmp_path / "one.png"),
         "state three": _drawn(tmp_path / "three.png", size=(140, 60)),
@@ -296,8 +283,6 @@ def _where(made, state):
 
 
 def test_a_tile_the_grid_merges_fills_both_of_its_columns(window):
-    """His words: "I'd like them to be double-wide i.e. take up the whole space of
-    both columns"."""
     made, _ = window("gen-one", tiles=(Tile("state one", 0, 0, columns=2),
                                        Tile("state two", 0, 2)))
 
@@ -307,8 +292,6 @@ def test_a_tile_the_grid_merges_fills_both_of_its_columns(window):
 
 
 def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window):
-    """His words for the tile down the fourth column: its background "should be 9x
-    taller than the others and actually span the whole thing"."""
     made, _ = window("gen-one", tiles=(Tile("state one", 0, 0),
                                        Tile("state two", 1, 0),
                                        Tile("state three", 0, 1, rows=2)))
@@ -327,8 +310,6 @@ def _drawing_rows(made, state):
 
 
 def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
-    """His words: on the tile down seven rows the "image should be aligned in a
-    horizontal row w/ the images for" the single-row tiles beside its middle."""
     drawings = {state: _drawn(tmp_path / f"{state}.png", color="red")
                 for state in ("state one", "state two", "state three", "state four")}
     made, _ = window("gen-one", drawings=drawings,
@@ -343,9 +324,6 @@ def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
 
 
 def test_nine_rows_of_buttons_stand_in_the_room_the_window_has(window):
-    """His words: "shrink the buttons", so that all nine rows of his sheet are
-    there to press without the strip of them scrolling: the drawing gives up the
-    pixels the rows cannot spare."""
     rows = 9
     made, _ = window("gen-one", tiles=tuple(Tile(f"state {n}", n, 0) for n in range(rows)))
 
@@ -354,9 +332,15 @@ def test_nine_rows_of_buttons_stand_in_the_room_the_window_has(window):
 
 
 def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():
-    """Wrapped on its spaces, so no button is wider than the widest word in it."""
     assert wrapped_to_fit("alpha beta\ngamma", 9, len) == "alpha\nbeta\ngamma"
 
 
 def test_a_term_that_fits_is_left_on_its_line():
     assert wrapped_to_fit("alpha beta", 10, len) == "alpha beta"
+
+
+def test_no_tile_or_button_takes_the_keyboard_so_space_fires_nothing_pressed_before(window):
+    made, _store = window("first")
+    pressable = made.findChildren(QToolButton) + made.findChildren(QPushButton)
+    assert pressable
+    assert all(widget.focusPolicy() == Qt.FocusPolicy.NoFocus for widget in pressable)

@@ -1,6 +1,3 @@
-"""The window for saying what each image shows: one image, one press, the
-next. The image fills the left and every action is a button in the grid down
-the right, wearing the drawing :mod:`origenerator.action_drawings` found for it."""
 from __future__ import annotations
 
 import re
@@ -29,8 +26,6 @@ from shared_ui.colors import WHITE
 from shared_ui.fonts import SIZE_SMALL, make_font
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
-# The room nine rows of buttons have on the shortest screen he works on, and
-# the drawing he asked for, which gives up pixels the rows cannot spare.
 ROOM_FOR_THE_GRID = 1260
 MARK = 96
 NAME_LINES = 2
@@ -81,8 +76,6 @@ def _fitted(source: QPixmap, width: int, height: int) -> QPixmap:
 
 
 def one_scale_for_all(drawings, side: int) -> float:
-    """The one factor fitting the largest drawing in a *side*-square, so each
-    keeps its size against the others rather than filling the square itself."""
     largest = max((max(drawing.width(), drawing.height()) for drawing in drawings
                    if not drawing.isNull()), default=0)
     return side / largest if largest else 1.0
@@ -90,7 +83,6 @@ def one_scale_for_all(drawings, side: int) -> float:
 
 def on_a_white_square(source: QPixmap, side: int, scale: float,
                       above: int = 0) -> QPixmap:
-    """The drawing on a white square, under *above* pixels of clear space."""
     canvas = QPixmap(side, side + above)
     canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)
@@ -119,8 +111,6 @@ class SortingWindow(QWidget):
         self._faces: dict[str, QToolButton] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
-        # The image at its own size, kept so a resize re-scales from the
-        # original rather than from an already-shrunk copy.
         self._shown = QPixmap()
         self.setWindowTitle("Origenerator — what does this image show?")
 
@@ -200,9 +190,7 @@ class SortingWindow(QWidget):
         scroll.setWidget(inside)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Fixed to what the column asks for, so the image takes every other
-        # pixel of the window.
-        scroll.setFixedWidth(inside.sizeHint().width() + 28)  # room for the scrollbar
+        scroll.setFixedWidth(inside.sizeHint().width() + 28)
         return scroll
 
     def _make_every_tile_one_size(self, tiles, drawings, scale) -> None:
@@ -238,8 +226,6 @@ class SortingWindow(QWidget):
     def _state_tile(self, state: str, drawing: QPixmap | None, scale: float,
                     name: str, rows: int = 1) -> QToolButton:
         tile = QToolButton(objectName=state_button(state))
-        # Never the keyboard's: Space would otherwise re-fire whichever tile was
-        # pressed last, and Escape has to go on closing the window.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tile.clicked.connect(lambda _checked=False, state=state: self._on_state(state))
         self._tiles[state] = tile

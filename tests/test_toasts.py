@@ -1,7 +1,3 @@
-"""What this app says on the desktop, and the way back in from what it says.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -76,8 +72,6 @@ def test_a_failed_run_wears_the_warning_mark(qapp, monkeypatch):
 
 
 def test_a_toast_carries_the_way_back_to_what_it_is_about(qapp, monkeypatch):
-    # The whole of what a click has to go on: the run is over, the app may be
-    # closed by the time anyone answers, and Windows keeps nothing but the link.
     toasts = Toasts(QIcon())
     said = _raised(monkeypatch)
 
@@ -142,8 +136,6 @@ def test_windows_refusing_the_notification_costs_the_app_nothing(qapp, monkeypat
 
 
 def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monkeypatch, tmp_path):
-    # Windows heads a toast with whatever is registered under the id the
-    # process claims, and draws a generic glyph where it finds no mark.
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     registered = []
     monkeypatch.setattr(toasts_module, "register_toast_identity",
@@ -154,8 +146,6 @@ def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monk
     app_id, named = registered[0]
     assert app_id == APP_USER_MODEL_ID
     assert named["name"] == "Origenerator"
-    # The app's own O, as a real file — and outside any checkout, so the entry
-    # outlives the copy of the app that wrote it.
     assert named["icon"].read_bytes().startswith(b"\x89PNG")
     assert tmp_path in named["icon"].parents
 
@@ -191,8 +181,6 @@ def test_the_marks_beside_a_toast_outlive_the_copy_that_wrote_them(
 
 def test_a_mark_that_cannot_be_written_leaves_the_toast_to_speak_for_itself(
         qapp, monkeypatch, tmp_path):
-    # Every failure here is Windows' side of the fence: what matters is that the
-    # run is announced at all, so a missing glyph must not swallow the toast.
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "unwritable"))
     (tmp_path / "unwritable").write_text("not a directory", encoding="utf-8")
     toasts = Toasts(QIcon())
@@ -203,8 +191,6 @@ def test_a_mark_that_cannot_be_written_leaves_the_toast_to_speak_for_itself(
     assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
     assert _toast(said).find("./visual/binding/image") is None
 
-
-# --- a toast taken back once its video has been watched ----------------------
 
 _RUN = "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 
@@ -287,8 +273,6 @@ def test_a_video_watched_on_and_on_is_taken_back_once(qapp, monkeypatch):
 
 
 def test_a_toast_raised_for_a_video_already_watched_is_taken_back_too(qapp, monkeypatch):
-    # The run lands in the tab being watched: what is on screen may be looked at
-    # a moment before the toast for it is raised.
     toasts = Toasts(QIcon(), video_in_front=lambda: _RUN)
     taken_back = _watching(monkeypatch)
     toasts.look()

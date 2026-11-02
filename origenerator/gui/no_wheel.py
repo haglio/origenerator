@@ -1,17 +1,3 @@
-"""Form widgets that stay out of a scrolling form's way.
-
-A QComboBox / QSpinBox / QDoubleSpinBox changes its value on a wheel scroll, so
-scrolling a settings form accidentally edits whatever field the cursor happens to
-be over. These subclasses ignore the wheel event, so it scrolls the enclosing form
-instead of changing the field's value.
-
-The dropdown also refuses to make its longest item a floor. A model or LoRA dropdown
-holds file names hundreds of pixels wide, and a plain QComboBox cannot be laid out
-narrower than the widest of them — so a slim pane grew a horizontal scroll bar
-rather than let the field shrink. This one still asks for its full width and gets
-it wherever there is room; squeezed, it gives way down to a few characters and
-elides what it shows.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
@@ -32,35 +18,21 @@ class NoWheelDropdown(QComboBox):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # A plain QComboBox declares itself unshrinkable (QSizePolicy::Minimum), so a
-        # layout takes its preferred width — the longest item — as a floor. This
-        # one can shrink, and says so, or the clamp in minimumSizeHint below would
-        # never be consulted. What it *prefers* is untouched: a dropdown laid out at
-        # its own hint (the sort dropdown over the search results) is as wide as it
-        # ever was, and only a squeezed one gives width up.
+        # QComboBox declares QSizePolicy::Minimum, so a layout takes its longest item as a floor.
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)
         self.setSizePolicy(policy)
 
     def wheelEvent(self, event):
-        event.ignore()  # let the form scroll; don't change the selection
+        event.ignore()
 
     def minimumSizeHint(self):
-        """:attr:`floor_chars` wide, whatever the items or the placeholder say.
-
-        Qt's own minimum is the longest item, and it also widens to hold the
-        placeholder text — keeping that width after a choice is made, so a dropdown
-        opening on "Select a workflow…" would prop the pane open at that phrase's
-        width for the rest of the session.
-        """
+        """:attr:`floor_chars` wide, whatever the items or the placeholder say (Qt widens its hints to hold both)."""
         hint = super().minimumSizeHint()
         hint.setWidth(min(hint.width(), self._floor_width()))
         return hint
 
     def _floor_width(self) -> int:
-        """How wide this dropdown is holding only :attr:`floor_chars` — the same sum
-        (frame, arrow, padding, text) Qt makes for a full-length value, so the
-        floor tracks the font and the stylesheet rather than guessing at them."""
         opt = QStyleOptionComboBox()
         self.initStyleOption(opt)
         fm = self.fontMetrics()
@@ -83,8 +55,7 @@ class NoWheelDropdown(QComboBox):
             QStyle.ComplexControl.CC_ComboBox, opt,
             QStyle.SubControl.SC_ComboBoxEditField, self,
         )
-        # The style insets the text a pixel each side before drawing it (see
-        # QCommonStyle's CE_ComboBoxLabel); elide to what is left after that.
+        # The style insets the text a pixel each side (QCommonStyle, CE_ComboBoxLabel).
         opt.currentText = self.display_text(max(0, field.width() - 2))
         painter.drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt)
 

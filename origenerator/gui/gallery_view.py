@@ -180,9 +180,6 @@ logger = logging.getLogger(__name__)
 _POLL_INTERVAL_MS = 1500
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
 _PATH_MARK_OF = {_FAVORITES_KEY: "star", _ENHANCED_KEY: "plus"}
-_SEARCH_EXPAND_DELAY_MS = 700
-_SEARCH_DELAY_MS = 300
-_SEARCH_MIN_CHARS = 3
 
 
 class _SearchScope(NamedTuple):
@@ -246,15 +243,6 @@ def _is_one_of_the_picked(selection_group, group) -> bool:
 
 
 def _is_deletable_folder(group) -> bool:
-    """Whether a folder may be deleted: anything nested inside a workflow.
-
-    Model, LoRA, source-image, and settings folders live within a workflow folder
-    and are fair game; a whole workflow or media folder is off-limits, so a
-    workflow's entire history can never be wiped in one action. A custom collection is
-    off-limits too, and for a stronger reason: deleting one must remove the
-    grouping, never the generations it gathers, so it has its own path
-    (:meth:`GalleryView._remove_custom_collection`) rather than this one.
-    """
     return isinstance(
         group,
         (gallery.ModelGroup, gallery.LoraGroup, gallery.SourceImageGroup, gallery.SettingsGroup),
@@ -504,14 +492,6 @@ class GalleryView(QWidget):
             focus is not None and self._generate_pane.isAncestorOf(focus))
 
     def _build_ui(self):
-        """Put the three panes on screen, in the order their contents need.
-
-        Each pane builds itself and hands back the widget it built; the
-        arrangement they are handed to is the one place the hosted and
-        standalone shapes differ. Sequence rather than grouping is what this
-        preserves -- the motion, the sound and the device driver must exist
-        before the widgets that wire them, and each pane's own comments say which.
-        """
         layout = QVBoxLayout(self)
         toc = self._build_toc_pane()
         gallery_pane = self._build_gallery_pane()
@@ -704,15 +684,6 @@ class GalleryView(QWidget):
         self.wear_the_room(None)
 
     def _wire_generate_tab(self, tab):
-        """Route a Generate tab's footer links to the gallery: its "from source
-        image" link and an animation-tile click both navigate like any source link,
-        and its preview's corner buttons and right-click menu act on the shown
-        generation exactly as a Gallery pane thumbnail's do.
-        Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
-        and re-reads whether the tab still owns a run in flight, a double-click on
-        its preview opens the folder under it as a slideshow standing on it,
-        and its Cancel stops the re-roll running in the tab's folder. Called for the
-        initial tab and every tab forked afterward."""
         tab.link_clicked.connect(self.follow_link)
         tab.go_to_folder_requested.connect(self.follow_link)
         tab.set_folder_check(self._can_open_containing_folder)
@@ -836,13 +807,6 @@ class GalleryView(QWidget):
         self._experiments_cb.setChecked(bool(enabled) and not is_branch_session())
 
     def flush_queue_to_server(self) -> int:
-        """Hand ComfyUI everything the queue is still holding, as the app closes.
-
-        The queue hands ComfyUI one prompt at a time so the line stays
-        re-orderable for whoever is watching, and closing the app ends that
-        reason. ComfyUI outlives it and works through the rest alone; the next
-        launch picks up whatever finished. Returns how many jobs went.
-        """
         return self._jobs.flush_to_server()
 
     def _on_experiments_toggled(self, _checked: bool):
@@ -884,19 +848,6 @@ class GalleryView(QWidget):
         return self.folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Point every Generate tab's discard button at the run *it* launched, and
-        have its Generate ask again whether its folder is making one.
-
-        A tab follows the *oldest still alive* of its own runs — the one nearest to
-        being made, and so the one its button discards — across a chained i2v's
-        hand-off, which is two prompts but one run. Launches from outside a tab —
-        the folder tile's "+", Auto-Generate — are claimed by the tab looking at
-        that same folder (:meth:`_claim_launch`), so they light it up too.
-
-        Idempotent — driven by every re-roll lifecycle change and by switching the
-        front tab. Every tab is reconciled, not just the front one, so a run
-        launched from a tab that is now under another still shows there.
-        """
         for tab in self._generate_pane.generate_tabs():
             live = [(origin, job) for origin in tab.launched_runs()
                     if (job := self._jobs.job_for_origin(origin)) is not None]
@@ -919,20 +870,6 @@ class GalleryView(QWidget):
                      if job in jobs), None)
 
     def _claim_launch(self, key: str):
-        """Give a run launched outside any tab — the folder tile's "+",
-        Auto-Generate — to the front Generate tab when that tab is showing the same folder.
-
-        Unclaimed, such a run belonged to no tab at all, so the tab looking
-        straight at it showed neither the discard button nor a filling Generate
-        while the pane beside it streamed the very frames it was making. Only a
-        matching folder claims it, so a tab parked on other settings is untouched.
-
-        A tab that claims one is kept, for the reason a tab that pressed its own
-        Generate is: the run's Cancel and its filling bar are in it now, and a
-        later click replacing the tab would take both away mid-run. Since opening
-        a folder puts the pane's italic tab on that folder, the claimer usually is
-        that tab.
-        """
         tab = self._generate_pane.current_generate_tab()
         job = self._jobs.newest_job_for(key)
         if tab is None or job is None or tab.workflow_and_signature() is None:
@@ -988,22 +925,6 @@ class GalleryView(QWidget):
         self._stand_on_the_run_in(key, rebuild=True)
 
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
-        """Open the folder ``key`` names and land on the run in flight there,
-        saying whether the tree had a row to open at all.
-
-        The ways here are one move — a Generate, a folder's prompt rewrite, a
-        combine's launch, the Auto-Generate tip's link, a click on an in-flight tile —
-        and in all of them the open is a step on the way to that run's tile rather
-        than somewhere browsed to. So it lands on no saved item of its own
-        (:meth:`_land_on_the_first_item`): one loaded here would paint an item
-        nobody asked for over the very tab the run belongs to, and re-seed that
-        tab's form from a saved row mid-run. The folder is a stop and a visit all
-        the same, both recorded once the tile is picked.
-
-        ``rebuild`` first, for a run just started: it inserts a running row, and a
-        rebuild is what gives even a brand-new settings folder a node
-        (:func:`build_gallery_tree` includes in-flight rows).
-        """
         if rebuild:
             self.refresh()
         item = self._tree_item_for(key)
@@ -1188,17 +1109,6 @@ class GalleryView(QWidget):
         return self._start_frames, {shape: self._lists_by_shape[shape] for shape in shapes}
 
     def _build_sides(self, trees):
-        """The shapes the pane is drawing, in the order it draws them.
-
-        A shape is the whole tree of contents over the rows it holds: its own
-        hierarchy, its own copies of the folders the user composed, and collections
-        whose counts are its own — a number covering more than the shape draws
-        would send you to a collection that then showed you nothing.
-
-        Only the drawn shapes are built. The radio's other answer is a section
-        nobody can see, and filling it would cost every rebuild a table of
-        contents for nothing.
-        """
         return [ShapeModel(
             shape=shape,
             tree_model=trees[shape],
@@ -1377,17 +1287,6 @@ class GalleryView(QWidget):
         self._re_aim()
 
     def _land_on_the_first_item(self) -> str | None:
-        """Pick the folder's first generation and show it, returning which one —
-        ``None`` where the folder has none to pick.
-
-        Opening a folder is opening what is in it, so the first tile lands
-        selected and on the form, exactly as clicking it would. A folder of
-        sub-folders has no generation of its own on screen and lands on nothing.
-
-        Skipped while a rebuild or a Back/Forward is what re-drew the folder:
-        those restore the item that stop was recorded with (or none at all), and
-        a landing of our own would overwrite it.
-        """
         if self._navigation.suppressed:
             return None
         first = next(iter(self._gallery_pane.listed_prompt_ids()), None)
@@ -1416,16 +1315,6 @@ class GalleryView(QWidget):
                                             collections=self._tree_view.collections_in(item))
 
     def _go_to_folder(self, key: str):
-        """Go to a folder: select its tree row, which draws it.
-
-        The one move under every gesture that names a folder to open — a folder
-        tile's click, a Generate tab's "Go to folder", a step of the path — as
-        :meth:`_go_to_generation` is the one under every gesture that names an
-        item. Each is a decision to go there, so a running search is put away
-        first: a search's results are folder tiles too, and this is how they
-        open; without it the field would still be full while the pane shows the
-        folder it drilled into.
-        """
         item = _row_under(self._tree.currentItem(), key) or self._tree_item_for(key)
         if item is not None:
             self._search.leave()
@@ -1683,14 +1572,6 @@ class GalleryView(QWidget):
 
     @staticmethod
     def _folder_modify_rows(group) -> list[dict]:
-        """The generations a request over ``group`` would re-run: the ones that
-        actually produced an image.
-
-        A failed or in-flight row is a seed with nothing to compare against — the
-        point of the request is this image said differently, so a row with no
-        image is not part of it. Anything but a settings leaf holds no rows of
-        its own to re-run, so it comes back empty rather than raising.
-        """
         if not isinstance(group, gallery.SettingsGroup):
             return []
         return [row for row in group.rows if gallery.produced_output(row)]
@@ -1701,14 +1582,6 @@ class GalleryView(QWidget):
         return tile
 
     def _open_folder_modify(self, group):
-        """Open this folder's prompt in a tab, ready to be rewritten.
-
-        Nothing is launched: the tile is the start of an edit made by hand, which
-        is the whole reason it is typed rather than spoken. The tab carries the
-        folder's settings, its prompts marked against themselves, and its images
-        tiled in the preview — see
-        :meth:`GenerateTab.open_folder_modify`.
-        """
         rows = self._folder_modify_rows(group)
         workflow = WORKFLOW_REGISTRY.get(rows[0].get("workflow_name") or "") if rows else None
         if workflow is None or self._client is None:
@@ -1752,16 +1625,6 @@ class GalleryView(QWidget):
             self._stand_on_the_run_in(key, rebuild=True)
 
     def _job_source_image(self, job) -> str | None:
-        """A file showing what ``job`` came from, for the tile to stand blurred
-        under the wait until the run streams a frame of its own.
-
-        The image it was requested or modified from first — a folder's Modify
-        queues a run per image and none of them animates anything, so what it
-        rewrites is the only image it has — then the start frame an i2v or an enhance is
-        built on. ``None`` for a run that came from nothing, which keeps the
-        plain plate: a queued image looks like every other queued image because
-        it genuinely is.
-        """
         if job is None:
             return None
         record = self._db.get_request(job.prompt_id)
@@ -1773,15 +1636,6 @@ class GalleryView(QWidget):
         return str(frame) if frame is not None else None
 
     def _job_made_from(self, job, source_video_media) -> Combination:
-        """What ``job`` was made from, for a surface with no frame of it yet: the
-        image, and the video whose settings it follows as ``source_video_media`` shows
-        that video — a still on the folder's tile, a loop in a Generate tab.
-
-        The video only where a *video* was dropped: an action picked off the Combine
-        dropdown names what the run will do rather than a video, and a thumbnail of
-        some video the user never chose reads as a job that is that video — the
-        same reason the queue's rows leave it out (see GalleryPane).
-        """
         row = self._db.get_generation(job.prompt_id) if job is not None else None
         source_video = (None if row is None or row.get("action")
                         else self._db.get_generation(row.get("source_video") or ""))
@@ -1797,16 +1651,6 @@ class GalleryView(QWidget):
         return timing.estimate_seconds(self._db.recent_durations(job.workflow.name))
 
     def _start_auto_reroll(self, key: str) -> bool:
-        """Auto-Generate's own launch: the variation the tile's "+" would start,
-        except that nothing about it reaches a Generate tab.
-
-        Auto-Generate is left running while the user works, so what it is making is not
-        what they are looking at. Its frames used to fill the Generate pane — that is,
-        the preview of whichever tab was open, over the item the user had put
-        there — and its results landed in a tab too. Both belong to the folder's
-        own live tile in the middle column, which streams the run whether or not
-        the pane is pointed at it.
-        """
         return self._start_reroll(key, from_auto=True)
 
     def _start_reroll(self, key: str, *, from_auto: bool = False) -> bool:
@@ -1831,13 +1675,6 @@ class GalleryView(QWidget):
         return self._jobs.has(key)
 
     def _note_auto_launch(self, key: str):
-        """Remember that Auto-Generate, not a tab, asked for the run just launched — so
-        no tab shows its result when it lands (:meth:`_on_reroll_finished`).
-
-        Recorded by the id the run began under, the same name a tab knows its own
-        runs by, and pruned to what is still in flight as it goes: only a live run
-        can still finish, so a cancelled variation leaves nothing.
-        """
         job = self._jobs.newest_job_for(key)
         if job is None:
             return
@@ -1880,15 +1717,6 @@ class GalleryView(QWidget):
         self._sync_cancel_buttons()
 
     def _sync_cancel_buttons(self):
-        """Re-word the hover of every Cancel that throws a run away — the
-        folder's live tile, the Job Queue's rows, each Generate tab's — after
-        Auto-Generate started or ended.
-
-        Nothing else repaints them at that moment: switching Auto on over a folder
-        that is already generating launches nothing, so there is no re-roll change
-        to ride, and the hover would keep promising a stop that the press no
-        longer performs (or a next seed after Auto-Generate is off).
-        """
         self._rerender_current_leaf()
         self._update_queue()
         self._reconcile_generating()
@@ -1948,14 +1776,6 @@ class GalleryView(QWidget):
             self._selection_group is None or bool(self._current_deletable_folders()))
 
     def button_states(self, enhance: Offer) -> ButtonStates:
-        """How the Gallery pane buttons stand right now, gathered from the seams the buttons
-        belong to: the trail, the undo stack, the tree's selection, the items
-        picked, the enhance settings, the slideshows, and Auto-Generate.
-
-        Assembled here because here is where those meet. Everything it reads is
-        a question already asked by name, so the record can be written by hand in
-        a test and the buttons written from it with no gallery at all.
-        """
         can_go_back, can_go_forward = self._trail
         undo_label = self._edits.undo_label()
         redo_label = self._edits.redo_label()
@@ -2223,12 +2043,6 @@ class GalleryView(QWidget):
         tabs.setCurrentWidget(tab)
 
     def _restore_reroll_selection(self, key: str | None):
-        """After a rebuild, re-assert a still-running re-roll as the selected
-        item — its tile lit again in the folder now on screen. The tabs following
-        the run kept their frames across the rebuild (an i2v's image frame while
-        the video stage warms up included); the tile is the one thing redrawn.
-        A no-op unless that re-roll is still running in the folder on screen.
-        """
         if (key is None or key not in self._live_jobs
                 or getattr(self.current_group(), "key", None) != key):
             return
@@ -2288,11 +2102,6 @@ class GalleryView(QWidget):
         self._enhance.reconcile()
 
     def _abandon_reroll_preview(self, key: str):
-        """A run in folder ``key`` ended with nothing to show (cancelled or
-        failed): its tile stops being the selected item; and once the folder has
-        no run left, the tabs following it put their own items back. While it
-        still has one — the next of a batch, Auto-Generate's next seed — they keep
-        following, since that run's frames are what comes next."""
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()
             self._selected_row = None
@@ -2346,15 +2155,6 @@ class GalleryView(QWidget):
             launcher.show_completed_result(finished_row, self._image_rows)
 
     def _show_landed_to_watchers(self, key: str, finished_row: dict | None, launcher):
-        """The run a tab was following has landed: put its item where its live
-        frames were, in every tab following folder ``key``.
-
-        Without this a tab watching Auto-Generate — or a fullscreen slideshow opened over
-        those frames — would sit on the last partial frame of a run that has
-        finished. Only the preview changes: the tab holds no more of a run it
-        didn't ask for. The ``launcher`` is skipped, having just been given the
-        whole end-state instead.
-        """
         if finished_row is None or not gallery.produced_output(finished_row):
             return
         for tab in self._generate_pane.watchers_of(key):
@@ -2392,14 +2192,6 @@ class GalleryView(QWidget):
         self._slideshows.note_in_flight(items)
 
     def _refresh_foreign_queue(self):
-        """Re-read what another app has on the shared ComfyUI.
-
-        Read whether or not anything of ours is in flight: the point is to see a
-        queue full of somebody else's work *before* pressing Generate, instead of
-        learning about it from a submit that reports six jobs ahead of it out of
-        nowhere. ComfyUI outlives every app that queues on it, so that backlog can
-        be a branch preview's background experiments that outlived the preview.
-        """
         queue = _read_foreign_queue(self._client)
         if queue is not None:
             self._foreign_queue = queue
@@ -2877,19 +2669,6 @@ class GalleryView(QWidget):
         self._navigation.record(prompt_id)
 
     def _show_generation(self, prompt_id: str) -> bool:
-        """Make a generation the selected item and load it into a Generate tab —
-        its output in the preview, its settings in the form, a footer for its
-        media type — saying whether the gallery still has a row for it.
-
-        Which tab is :meth:`GeneratePane.load_selection`'s to say — the one
-        already on this row's folder, else the pane's preview tab — and a tab is
-        only ever painted through there: no tab's preview is repainted from the
-        outside, so what a tab shows is always what that tab is for.
-
-        The move itself, with no step recorded: a click records the stop it made,
-        while a folder opening onto its first item records that landing as part
-        of the folder's own stop rather than as a second one beside it.
-        """
         row = self.row_for(prompt_id)
         if not row:
             return False
@@ -2938,17 +2717,6 @@ class GalleryView(QWidget):
                     len(self._gallery_pane.listed_prompt_ids()), revealed)
 
     def _folder_row_for(self, prompt_id: str):
-        """The tree row of the folder a generation lives in: its settings row, or
-        — for one the tree holds no row for, such as a generation that failed
-        with no file — the row its settings key names, and for one held in the
-        trash, the Trash.
-
-        ``None`` only when the tree has nowhere at all to put it, which is the
-        one case a move has no folder to open. Answering ``None`` for anything
-        less than that is what left a move opening no folder while the item it
-        named went on to fill the Generate pane, so the click read as having done
-        nothing.
-        """
         leaf = self._leaf_by_id.get(prompt_id)
         if leaf is not None:
             return leaf

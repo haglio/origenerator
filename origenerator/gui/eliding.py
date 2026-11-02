@@ -1,17 +1,10 @@
 """Widgets that shorten their text rather than hold a pane open.
 
-Qt sizes a button or a label to its whole text and, squeezed below that, cuts it off
-— so either one sets a floor under everything beside it, and the scroll it sits in
-grows a horizontal bar rather than let the column shrink. These ask for a couple of
-characters at their narrowest and elide to whatever width they are given: "Show in
-Explorer" reads as "Show i…" in a slim pane instead of being cut mid-letter or
-dragging a scroll bar in beneath it.
+Qt sizes a button or a label to its whole text as a floor. These ask for a couple of
+characters at their narrowest and elide to whatever width they are given.
 
-Word wrap is the other way to fit a long label into a narrow column, and it is a
-trap here: ``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its own
-full-line size hint without clamping it to the row, so the text runs out past the
-pane's right edge — which is worse than either eliding or scrolling, since nothing
-on screen says it happened.
+Word wrap is no substitute: ``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its
+own full-line size hint without clamping it to the row.
 """
 from __future__ import annotations
 
@@ -28,8 +21,6 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.spacing import MARGIN_STANDARD
 
-# What one of these asks for when there is nothing to spare: a letter or two and
-# the ellipsis that says the rest was cut.
 _STUB = "XX…"
 
 
@@ -37,23 +28,14 @@ class ElidingButton(QPushButton):
     def __init__(self, text: str = "", parent=None):
         super().__init__(parent)
         self._raw = ""
-        # Preferred, not the stock Minimum: a layout reads Minimum as "this may
-        # grow but never shrink" and takes the full label as a floor, which is the
-        # whole problem. Preferred consults minimumSizeHint below instead.
+        # A layout takes the stock Minimum policy's full label as a floor; Preferred consults minimumSizeHint.
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)
         self.setSizePolicy(policy)
         self.setText(text)
 
     def setText(self, text: str):
-        """Set the label, keeping the unescaped copy the eliding paint needs.
-
-        Qt reads a lone "&" as an accelerator marker, so a button's text carries
-        it doubled ("Models && LoRAs"); eliding that string could cut between the
-        pair and leave the survivor swallowing the next character. Eliding the raw
-        label and doubling afterwards can't. ``text()`` still answers with the
-        doubled form, as any other button's does.
-        """
+        """Qt reads a lone "&" as an accelerator marker, so the text carries it doubled; eliding the raw label avoids cutting between the pair."""
         self._raw = text
         super().setText(text.replace("&", "&&"))
 
@@ -63,9 +45,6 @@ class ElidingButton(QPushButton):
         return hint
 
     def _floor_width(self) -> int:
-        """How wide this button is holding only the stub — the same sum (border,
-        padding, whatever the stylesheet adds) the style makes for a full label,
-        so the floor tracks the font and the theme rather than guessing at them."""
         opt = QStyleOptionButton()
         self.initStyleOption(opt)
         opt.text = _STUB
@@ -76,7 +55,6 @@ class ElidingButton(QPushButton):
         ).width()
 
     def display_text(self, width: int) -> str:
-        """The label elided to ``width`` — what :meth:`paintEvent` draws."""
         return self.fontMetrics().elidedText(
             self._raw, Qt.TextElideMode.ElideRight, width
         )
@@ -98,18 +76,9 @@ class ElidingButton(QPushButton):
 
 
 class ElidingLabel(QLabel):
-    """A label that elides rather than set the width of the column it sits in.
-
-    Its text stays whole — ``text()`` answers with all of it — and only what is
-    *drawn* is shortened.
-    """
-
     def __init__(self, text: str = "", parent=None, *, preferred_width: int = 0):
         super().__init__(text, parent)
-        # A column of keys lines up by asking for the same width — the widest key
-        # in the group — while each label stays free to shrink below it. Asking
-        # through the size *hint* rather than a minimum is what allows both: a
-        # minimum would line the keys up and then refuse to give the width back.
+        # Asked through the size hint, since a minimum would refuse to give the width back.
         self._preferred_width = preferred_width
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)
@@ -126,15 +95,11 @@ class ElidingLabel(QLabel):
         return hint
 
     def display_text(self, width: int) -> str:
-        """The text elided to ``width`` — what :meth:`paintEvent` draws."""
         return self.fontMetrics().elidedText(
             self.text(), Qt.TextElideMode.ElideRight, width
         )
 
     def paintEvent(self, event):
-        # What QLabel does for a plain-text label, with the text elided on the way
-        # in: the background and border the stylesheet asks for, then the text
-        # through the style, so it keeps the color and the alignment it would have.
         painter = QStylePainter(self)
         opt = QStyleOption()
         opt.initFrom(self)
@@ -147,8 +112,6 @@ class ElidingLabel(QLabel):
 
 
 def open_the_list_in_full(dropdown) -> None:
-    """Let ``dropdown`` open its list wide enough for every entry, whole: the closed
-    field gives its width up to the pane, and the open list must not."""
     view = dropdown.view()
     advance = dropdown.fontMetrics().horizontalAdvance
     widest = max((advance(dropdown.itemText(i)) for i in range(dropdown.count())), default=0)

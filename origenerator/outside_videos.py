@@ -1,4 +1,3 @@
-"""The AI videos other sources made, brought in from Evolver's outbox."""
 from __future__ import annotations
 
 import itertools

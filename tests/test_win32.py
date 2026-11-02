@@ -1,4 +1,3 @@
-"""Tests for origenerator.win32 taskbar identity and window helpers."""
 from __future__ import annotations
 
 import ctypes
@@ -125,9 +124,6 @@ class TestOutOfSight:
                                      (111, self.DWMWA_CLOAK, 0, 4)]
 
     def test_a_window_stays_out_of_sight_until_it_is_brought_back(self):
-        """A window handed to a room in the headset is out of sight for as long
-        as the room has it, which is no block to hold.  DWM draws a cloaked
-        window as it always did, so there is still a frame to publish."""
         with _user32_with_a_window(), \
                 patch("origenerator.win32._dwmapi") as dwm:
 
@@ -160,10 +156,6 @@ class TestOutOfSight:
 
 class TestNotificationIdentity:
     def test_it_registers_the_name_and_the_mark_under_the_apps_own_id(self):
-        # Windows heads a toast with whatever is registered under the id
-        # the process claims. With nothing there it prints the id itself and
-        # draws a generic glyph, which is what a finished run's first
-        # toast came out looking like.
         written = {}
 
         register_toast_identity(
@@ -187,9 +179,6 @@ class TestNotificationIdentity:
 
 class TestLinkHandler:
     def test_it_registers_the_command_windows_runs_for_this_apps_links(self):
-        # What makes a clicked toast reach the app at all: Windows follows
-        # the link the toast carries, and follows it by running whatever
-        # stands here for its scheme.
         written = {}
 
         register_link_handler(

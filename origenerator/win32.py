@@ -1,11 +1,3 @@
-"""Win32 helpers for Origenerator's taskbar identity and its window on screen.
-
-Clicking a pinned taskbar shortcut only activates the running window if the
-shortcut's ``System.AppUserModel.ID`` matches the AppUserModelID the process
-claims for itself, ``APP_USER_MODEL_ID`` below; ``app.py`` claims it and stamps
-the pin through ``app_support.win32``.  The rest is the window itself: whether it
-is still there, where it goes, and taking the foreground for it.
-"""
 from __future__ import annotations
 
 import ctypes
@@ -18,8 +10,7 @@ from pathlib import Path
 from app_support.win32 import window_exists
 
 _user32 = ctypes.windll.user32  # type: ignore[attr-defined]
-# HWND/HANDLE argtypes declared so ctypes passes them as 64-bit pointers rather
-# than truncating to c_int -- the same rule fun_time/win32.py follows.
+# Declared so ctypes passes HWND/HANDLE as 64-bit pointers rather than truncating them to c_int.
 _user32.SetWindowPos.argtypes = [
     ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
     ctypes.c_int, ctypes.c_int, ctypes.c_uint,
@@ -30,15 +21,11 @@ _SWP_NOMOVE = 0x0002
 _SWP_NOZORDER = 0x0004
 _SWP_NOACTIVATE = 0x0010
 
-# What this app calls itself to Windows. It is not decoration: the taskbar
-# groups by it, and it is the name Windows prints over a toast this app
-# raises, so it is this app's name and no one else's. It read
-# "FunTime.Origenerator" until the toasts made that visible.
+# Windows groups the taskbar by it and prints it over this app's toasts.
 APP_USER_MODEL_ID = "Origenerator"
 
 
 def _write_string_values(key_path: str, values: dict[str, str]) -> None:
-    """Put *values* under *key_path* in HKEY_CURRENT_USER, making the key if new."""
     import winreg  # noqa: PLC0415 (raises off Windows)
 
     with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0,
@@ -49,15 +36,6 @@ def _write_string_values(key_path: str, values: dict[str, str]) -> None:
 
 def register_toast_identity(app_id: str, *, name: str, icon: Path,
                                    write=_write_string_values) -> None:
-    """Say what Windows calls this app over a toast, and what mark
-    it draws.
-
-    It takes both from whatever is registered under the AppUserModelID the
-    process claims; with nothing registered it prints the id itself beside a
-    generic glyph, which is how this app's first toast came out headed
-    "FunTime.Origenerator". Written on every launch rather than once, so a mark
-    that has moved or been deleted comes back, and never fatal.
-    """
     try:
         write(rf"Software\Classes\AppUserModelId\{app_id}",
               {"DisplayName": name, "IconUri": str(icon)})
@@ -68,12 +46,6 @@ def register_toast_identity(app_id: str, *, name: str, icon: Path,
 
 def register_link_handler(scheme: str, *, name: str, command: str,
                           write=_write_string_values) -> None:
-    """Say what Windows runs to follow a link of this app's.
-
-    A toast carries a link rather than a way back to the process that
-    raised it, because it outlives that process (:mod:`origenerator.app_link` is
-    what Windows runs and why). Written on every launch, and never fatal.
-    """
     try:
         write(rf"Software\Classes\{scheme}", {"": f"URL:{name}", "URL Protocol": ""})
         write(rf"Software\Classes\{scheme}\shell\open\command", {"": command})
@@ -84,33 +56,12 @@ def register_link_handler(scheme: str, *, name: str, command: str,
 
 def place_window_in_device_pixels(hwnd: int, x: int, y: int,
                                   width: int, height: int) -> bool:
-    """Put *hwnd* on exactly this DEVICE rect, whatever Qt is scaled to.
-
-    Qt's own ``setGeometry`` cannot do this in a scaled process on a multi-
-    monitor desktop, and the failure is not a rounding error.  With
-    ``QT_SCALE_FACTOR`` below 1 the screens' logical rects OVERLAP -- measured
-    here, the primary reports logical (0, 0, 3982, 2240) while the second
-    monitor's logical origin is 2560, inside it -- and Qt maps a logical point
-    through whichever screen's rect contains it.  So a logical x of 3982 was
-    read against the second screen and landed 914px too far right, and a logical
-    x of 2560 was read against the PRIMARY and landed 914px too far left.  There
-    is no logical x that satisfies both readings; the coordinate is genuinely
-    ambiguous, so the whole space is the wrong place to say this in.
-
-    Win32 has no such ambiguity: ``SetWindowPos`` is device pixels on the
-    virtual desktop, which is the space Fun Time measured these rects in and
-    the space it places its own windows in.  So the rects it hands over are
-    used verbatim, and nothing is converted at all.
-
-    Call it AFTER the window is shown -- an unrealized window has no handle to
-    place, and Qt re-applies its own geometry when it creates one.
-    """
+    # Not Qt's setGeometry: with QT_SCALE_FACTOR below 1 the screens' logical rects overlap, so a
+    # logical x is read against the wrong screen. SetWindowPos takes device pixels, used verbatim.
     if not window_exists(hwnd):
         return False
     if _user32.IsIconic(hwnd):
         return _place_where_it_comes_back(hwnd, x, y, width, height)
-    # Banding and focus belong to whoever asked for them, and a move must not
-    # quietly take either.
     return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None,
                                      int(x), int(y), int(width), int(height),
                                      _SWP_NOZORDER | _SWP_NOACTIVATE))
@@ -182,8 +133,7 @@ def _cloak(hwnd: int, hidden: bool) -> None:
 
 
 def keep_out_of_sight(hwnd: int) -> None:
-    """Off the monitors, still drawn: DWM composites a cloaked window, so one
-    handed to a room in the headset still has a frame to publish."""
+    # DWM still composites a cloaked window, so a frame can still be published.
     if window_exists(hwnd):
         _cloak(hwnd, True)
 

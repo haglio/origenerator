@@ -1,18 +1,3 @@
-"""Her lines, spoken: each scene's line of a story made into audio ComfyUI can
-load, before the video that moves her lips to it is submitted.
-
-A story's scenes carry ``scene_lines`` beside their prompts (see
-:mod:`origenerator.gui.scenes_editor`). A scene with a line renders on WAN 2.2's
-speech-to-video model, which reads the line as audio, so the audio has to exist
-first: this module says which files a run's settings need and makes the ones missing.
-
-The voice is Qwen3-TTS, run by ``tools/speech_worker.py`` in a Python
-environment of its own -- its pins would break the app's and ComfyUI's -- named
-by ``speech_python`` in the overlay. A line's file is named from everything that
-shapes it (the words, the voice, the seed, the scene's length), so re-running the
-same settings finds their lines already made, and a changed word or voice makes new ones.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -24,62 +9,42 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# The CustomVoice model's preset speakers, the women first; the first is the
-# default. A preset is the same voice every run, which a story needs across
-# its scenes.
 VOICE_PRESETS = ("Vivian", "Serena", "Ono_Anna", "Sohee", "Ryan", "Aiden",
                  "Uncle_Fu", "Dylan", "Eric")
-# The Voice dropdown's last entry: not a preset but a recording of the user's
-# own, named in the Voice Sample field, copied by the Base model.
 CUSTOM_VOICE = "Custom voice (a recording)"
 VOICE_OPTIONS = (*VOICE_PRESETS, CUSTOM_VOICE)
-# Which of the family speaks: the presets, or a voice copied from a recording.
 PRESET_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 CLONE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
-# Where the lines land, under ComfyUI's input folder, which is where its
-# LoadAudio reads from.
+# Under ComfyUI's input folder, which is where its LoadAudio reads from.
 SPEECH_DIR = "origenerator_speech"
-# The script that does the speaking: a plain file under tools/, run by path
-# under the speech environment's Python. It imports nothing of this package,
-# and lives outside it so the package's own dependency gate (which installs
-# exactly what pyproject declares) never asks the app to carry the voice's
-# torch.
+# Run by path under the speech environment's Python; it lives outside the package
+# so the dependency gate never asks the app to carry the voice's torch.
 WORKER = Path(__file__).resolve().parents[1] / "tools" / "speech_worker.py"
-# Part of every line's file name: bump it when the worker speaks differently
-# (a model, a setting), so lines already on disk are spoken again rather than
-# reused from before the change.
 SPEECH_VERSION = 2
-# Suppress the console-window flash Windows shows for a bare subprocess.
+# Windows flashes a console window for a bare subprocess.
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _STDERR_TAIL = 2000
 
 
 class SpeechError(RuntimeError):
-    """A line could not be spoken; the message says why, for the row's error."""
+    pass
 
 
 @dataclass(frozen=True)
 class SceneSpeech:
-    """One scene's line and the file that speaks it for the scene's length."""
-
     text: str
     frames: int
     file: str  # relative to ComfyUI's input folder, the way LoadAudio names it
 
     @property
     def seconds(self) -> float:
-        # Imported here, not above: the workflows package imports this module
-        # (its graphs read which scenes speak), so this module cannot import
-        # the package back at load.
+        # Imported here: the workflows package imports this module at load.
         from origenerator.workflows.frame_rate import NATIVE_FPS  # noqa: PLC0415
 
         return self.frames / NATIVE_FPS
 
 
 def voice_request(params: dict) -> dict:
-    """Whose voice the lines are spoken in: the recording the settings name when
-    its Voice is the custom one (with what the recording says, which makes the
-    copy a close one), else the preset speaker the Voice names."""
     voice = str(params.get("voice") or VOICE_PRESETS[0])
     if voice == CUSTOM_VOICE:
         return {"mode": "clone", "sample": str(params.get("voice_sample") or "").strip(),
@@ -88,13 +53,6 @@ def voice_request(params: dict) -> dict:
 
 
 def scene_speech(params: dict) -> list[SceneSpeech | None]:
-    """What each scene says, or ``None`` for a scene with no line.
-
-    The scenes are ``scene_frames``, one length each; a lone scene is the whole
-    video and runs for ``frame_count`` -- the same reading of the settings the graph's
-    scene plan makes, so line and segment agree on the seconds. Settings with
-    no ``scene_lines`` at all is a workflow that cannot speak: no scenes.
-    """
     if "scene_lines" not in params:
         return []
     frames = [int(n) for n in (params.get("scene_frames") or [])]
@@ -116,7 +74,6 @@ def scene_speech(params: dict) -> list[SceneSpeech | None]:
 
 
 def missing_speech(params: dict, input_dir: Path) -> list[SceneSpeech]:
-    """The lines whose files are not under ``input_dir`` yet."""
     return [scene for scene in scene_speech(params)
             if scene is not None and not (input_dir / scene.file).exists()]
 
@@ -124,9 +81,6 @@ def missing_speech(params: dict, input_dir: Path) -> list[SceneSpeech]:
 def ensure_speech_files(params: dict, *, input_dir: Path, python: Path | None,
                         worker: Path | None = None, run=subprocess.run,
                         device: str = "cuda") -> list[Path]:
-    """Speak every line of ``params`` that has no file yet, and return the files
-    made. Raises :class:`SpeechError` when the voice is not set up or a line
-    came back unspoken, with the worker's own words for why."""
     worker = worker or WORKER
     missing = missing_speech(params, input_dir)
     if not missing:

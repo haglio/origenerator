@@ -42,7 +42,7 @@ from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.folder_tree import _action_rects
-from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
+from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.request_worker import RevisionWorker
@@ -968,7 +968,8 @@ class _SignalMotion(QObject):
 def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
-                       client=ComfyUIClient(folders=SUITE_FOLDERS), **gallery)
+                       client=ComfyUIClient(folders=SUITE_FOLDERS),
+                       shared=Shared(**gallery))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)

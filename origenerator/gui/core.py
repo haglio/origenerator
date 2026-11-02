@@ -21,7 +21,7 @@ from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
-from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.panes import RememberedBorders
@@ -100,7 +100,7 @@ class Core(QMainWindow):
             self._wear_the_session(fun_time)
 
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
-                                         prompt_heights=PROMPT_HEIGHTS)
+                                         shared=Shared(prompt_heights=PROMPT_HEIGHTS))
         self.setCentralWidget(self._gallery_view)
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)

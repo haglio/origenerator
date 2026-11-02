@@ -121,6 +121,7 @@ from origenerator.gui.gallery_tree import (
     ShapeModel,
     path_text,
 )
+from origenerator.gui.gallery_view_parts import NO_SHARED, Shared
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
@@ -148,7 +149,6 @@ from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
-from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
@@ -269,25 +269,21 @@ def _press_for_the_gallery(event, *, delete, copy_names, undo, redo):
 class GalleryView(QWidget):
     run_ended = pyqtSignal(object)
 
-    def __init__(self, db: Database, parent=None, *,
+    def __init__(self, db: Database, *,
                  client: ComfyUIClient | None = None,
                  actions: GalleryEdits | None = None,
-                 osr2_motion: Osr2MotionDriver | None = None,
-                 radio: OrigeneratorRadio | None = None,
-                 search_expander: SearchExpander | None = None,
                  fun_time: FunTimeSession | None = None,
-                 prompt_heights=None):
-        super().__init__(parent)
+                 shared: Shared = NO_SHARED):
+        super().__init__()
         self._db = db
-        self._prompt_heights = prompt_heights
+        self._prompt_heights = shared.prompt_heights
         self._client = client
         self._fun_time = fun_time
-        self._radio = radio if radio is not None else OrigeneratorRadio()
+        self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
         omnipause.holds(self._radio)
-        if fun_time is not None:
-            self._osr2_motion = None
-        else:
-            self._osr2_motion = osr2_motion if osr2_motion is not None else Osr2MotionDriver(parent=self)
+        self._osr2_motion = None if fun_time is not None else (
+            shared.osr2_motion if shared.osr2_motion is not None else Osr2MotionDriver(parent=self))
+        if self._osr2_motion is not None:
             omnipause.holds(self._osr2_motion)
         self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
         self._osr2_left_in = None
@@ -296,7 +292,7 @@ class GalleryView(QWidget):
         self._reconciling_osr2 = False
         self._build_the_queue_of_runs(db, client)
         self._forget_the_listing()
-        self._build_the_panes(db, client, search_expander)
+        self._build_the_panes(db, client)
         self._edits = actions or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
@@ -353,9 +349,8 @@ class GalleryView(QWidget):
         self._listed_requests: list[dict] = []
         self._image_index: dict | None = None
 
-    def _build_the_panes(self, db, client, search_expander):
-        self._search = GallerySearchController(
-            self, parent=self, expander=search_expander)
+    def _build_the_panes(self, db, client):
+        self._search = GallerySearchController(self, parent=self)
         self._held_rows: list[dict] = []
         self._selected_row: dict | None = None
         self._item_names = ItemNames(db)

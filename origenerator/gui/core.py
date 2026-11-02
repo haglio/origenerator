@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import logging
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from app_support.loading_screen import MeetingPlace
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
@@ -72,18 +72,25 @@ def _run_on_its_own(chore) -> None:
         logger.warning("Close-time %s failed: %s", chore.__name__, e)
 
 
+@dataclass(frozen=True)
+class Launch:
+    preview: Preview | None = None
+    taskbar: TaskbarIdentity | None = None
+    next_launch: MeetingPlace | None = None
+
+
 class Core(QMainWindow):
     handed_back = pyqtSignal()
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
-                 parent=None, *, fun_time: FunTimeSession | None = None,
-                 preview: Preview | None = None, taskbar: TaskbarIdentity | None = None,
-                 next_launch: MeetingPlace | None = None):
-        super().__init__(parent)
+                 *, fun_time: FunTimeSession | None = None, launch: Launch | None = None):
+        super().__init__()
+        launch = launch or Launch()
         self._app_state = app_state
-        self._next_launch = next_launch
+        self._next_launch = launch.next_launch
         self._fun_time = fun_time
-        self._taskbar = taskbar
+        self._taskbar = launch.taskbar
+        preview = launch.preview
 
         PROMPT_HEIGHTS.restore(app_state.get(_PROMPT_HEIGHTS_KEY))
         self.setWindowTitle(WINDOW_TITLE if fun_time else window_title(WINDOW_TITLE, preview))

@@ -12,12 +12,12 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import comfyui_api, provenance, speech
 from origenerator.completion import animate_before_filing, extract_completion
-from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, THUMB_DIR
 from origenerator.db import NewGeneration, NewSeedUse
 from origenerator.file_refs import frame_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.job_speaker import Speaker
+from origenerator.gui.job_spec import NO_FOLDERS, JobFolders, JobSpec
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.media import MediaType
@@ -92,24 +92,23 @@ class GenerationJob(QObject):
     failed = pyqtSignal(str)
     unreachable = pyqtSignal(str)
 
-    def __init__(self, client, workflow, params, *, source=GenerationSource.GENERATED,
-                 places=OUTPUT_PLACES, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
-                 speaker=None, prompt_id=None, run=None, parent=None):
-        super().__init__(parent)
+    def __init__(self, client, spec: JobSpec, folders: JobFolders = NO_FOLDERS, *,
+                 speaker=None, run=None):
+        super().__init__()
         self._client = client
         self._run = run or run_off_thread
-        self.workflow = workflow
-        self.params = dict(params)
-        self._input_dir = input_dir
+        self.workflow = spec.workflow
+        self.params = dict(spec.params)
+        self._input_dir = folders.input_dir
         self._speaker = speaker or Speaker(client)
-        self.source = source
-        self.prompt_id = prompt_id or str(uuid.uuid4())
-        self._places = places
+        self.source = spec.source
+        self.prompt_id = spec.prompt_id or str(uuid.uuid4())
+        self._places = folders.places
         self.payload = self._payload_for(self.params)
         self.origin = self.prompt_id
         self.run_media_type = self.media_type
         self.shielded = False
-        self._thumb_dir = thumb_dir
+        self._thumb_dir = folders.thumb_dir
         self._state = JobState.IDLE
         self._stages = stage_names(self.payload)
         self._forget_the_run()
@@ -200,8 +199,8 @@ class GenerationJob(QObject):
             self._started_at = float(started)
 
     @classmethod
-    def reconnect(cls, client, workflow, params, prompt_id, *, progress_state=None, **kwargs):
-        job = cls(client, workflow, params, prompt_id=prompt_id, **kwargs)
+    def reconnect(cls, client, spec: JobSpec, *, progress_state=None, **kwargs):
+        job = cls(client, spec, **kwargs)
         if progress_state:
             job._restore_progress(progress_state)
         job._attach()

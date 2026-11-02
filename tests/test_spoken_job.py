@@ -10,7 +10,7 @@ from PyQt6.QtCore import QTimer
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui import generation_job, job_speaker
-from origenerator.gui.generation_job import GenerationJob
+from origenerator.gui.generation_job import GenerationJob, JobFolders, JobSpec
 from origenerator.speech import scene_speech
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -47,7 +47,7 @@ def _spoken_params():
 
 def test_a_story_with_lines_is_spoken_before_it_is_submitted(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     job.start(_from_a_window)
     assert job.state == "speaking"
     client.submit_job.assert_not_called()
@@ -61,7 +61,7 @@ def test_a_story_with_lines_is_spoken_before_it_is_submitted(qtbot, tmp_path):
 def test_started_with_no_window_to_answer_its_voice_a_story_is_spoken_there_then_sent(
         qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     job.start()
     (params, done, _failed), = speaker.asked
     assert params["scene_lines"] == ["Come in."]
@@ -76,7 +76,7 @@ def test_lines_already_spoken_send_the_job_at_once(qtbot, tmp_path):
     file = tmp_path / scene_speech(params)[0].file
     file.parent.mkdir(parents=True)
     file.write_bytes(b"RIFF")
-    job = GenerationJob(client, I2V, params, input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, params), JobFolders(input_dir=tmp_path), speaker=speaker)
     job.start()
     assert speaker.asked == []
     client.submit_job.assert_called_once()
@@ -85,8 +85,7 @@ def test_lines_already_spoken_send_the_job_at_once(qtbot, tmp_path):
 
 def test_a_story_without_lines_never_calls_the_voice(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
-    job = GenerationJob(client, I2V, dict(I2V.default_params(), frame_count=81),
-                        input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, dict(I2V.default_params(), frame_count=81)), JobFolders(input_dir=tmp_path), speaker=speaker)
     job.start()
     assert speaker.asked == []
     client.submit_job.assert_called_once()
@@ -94,7 +93,7 @@ def test_a_story_without_lines_never_calls_the_voice(qtbot, tmp_path):
 
 def test_a_voice_that_fails_fails_the_job_before_comfyui_hears_of_it(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     failed = []
     job.failed.connect(failed.append)
     job.start(_from_a_window)
@@ -110,7 +109,7 @@ def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbo
     client.submit_job = MagicMock(side_effect=[urllib.error.URLError(ConnectionRefusedError(
         10061, "No connection could be made because the target machine actively refused it")),
         "comfy-A"])
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     said = []
     job.unreachable.connect(said.append)
     job.failed.connect(said.append)
@@ -129,7 +128,7 @@ def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbo
 
 def test_a_job_canceled_while_its_lines_are_spoken_is_not_sent(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path, speaker=speaker)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     job.start(_from_a_window)
     job.cancel()
     (_params, done, _failed), = speaker.asked
@@ -159,7 +158,7 @@ def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, 
     monkeypatch.setattr(job_speaker, "COMFYUI_INPUT_DIR", tmp_path)
     client = _client()
     client.submit_job = MagicMock(side_effect=lambda *a: seen.setdefault("sent_on", threading.get_ident()))
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path))
     ticks = []
     timer = QTimer()
     timer.timeout.connect(lambda: ticks.append(time.monotonic()))
@@ -187,7 +186,7 @@ def test_the_voice_a_job_with_no_window_asks_for_speaks_on_the_starting_thread(
     monkeypatch.setattr(generation_job.speech, "ensure_speech_files", speak)
     monkeypatch.setattr(job_speaker, "COMFYUI_INPUT_DIR", tmp_path)
     client = _client()
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path))
     job.start()
     assert spoke_on == [threading.get_ident()]
     client.free_memory.assert_called_once()
@@ -207,7 +206,7 @@ def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_
     monkeypatch.setattr(job_speaker, "COMFYUI_INPUT_DIR", tmp_path)
     monkeypatch.setattr(job_speaker, "SPEECH_PYTHON", sys.executable)
     client = _client()
-    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
+    job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path))
     ticks = []
     timer = QTimer()
     timer.timeout.connect(lambda: ticks.append(1))

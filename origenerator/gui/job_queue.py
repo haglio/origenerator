@@ -17,6 +17,7 @@ from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import (
     GenerationJob,
+    JobSpec,
     JobState,
     insert_generation_row,
     record_unfinished_run,
@@ -273,7 +274,7 @@ class JobQueue(QObject):
                  source=GenerationSource.GENERATED, origin=None, run_media_type=None,
                  shielded=False):
         try:
-            job = GenerationJob(self._client, workflow, params, source=source)
+            job = GenerationJob(self._client, JobSpec(workflow, params, source))
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             if _the_users_own(source):
@@ -555,9 +556,9 @@ class JobQueue(QObject):
         params = gallery.parse_params(row.get("params_json"))
         try:
             job = GenerationJob.reconnect(
-                self._client, workflow, params, row["prompt_id"],
+                self._client,
+                JobSpec(workflow, params, prompt_id=row["prompt_id"], source=source_of(row)),
                 progress_state=_parse_progress_state(row.get("progress_json")),
-                source=source_of(row),
             )
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
@@ -574,10 +575,9 @@ class JobQueue(QObject):
         try:
             if workflow is None:
                 raise ValueError(f"unknown workflow {row.get('workflow_name')!r}")
-            job = GenerationJob(
-                self._client, workflow, gallery.parse_params(row.get("params_json")),
-                prompt_id=row["prompt_id"], source=source_of(row),
-            )
+            job = GenerationJob(self._client, JobSpec(
+                workflow, gallery.parse_params(row.get("params_json")),
+                prompt_id=row["prompt_id"], source=source_of(row)))
         except Exception as e:
             logger.warning("Dropping a queued generation we can no longer build: %s", e)
             self._db.delete_generation(row["prompt_id"])

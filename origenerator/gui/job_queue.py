@@ -16,7 +16,11 @@ from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import GenerationJob, JobPlan, JobSpec, JobState
-from origenerator.gui.job_records import insert_generation_row, record_canceled_run, record_failed_run
+from origenerator.gui.job_records import (
+    insert_generation_row,
+    record_canceled_run,
+    record_failed_run,
+)
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.media import MediaType
 from origenerator.run_toast import RunOutcome

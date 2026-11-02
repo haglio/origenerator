@@ -30,13 +30,12 @@ def test_visiting_builds_a_stack_that_back_and_forward_traverse():
 def test_back_and_forward_return_none_at_the_ends():
     history = NavigationHistory()
     history.visit("only")
-    assert history.back() is None      # already at the oldest
-    assert history.forward() is None   # already at the newest
+    assert history.back() is None
+    assert history.forward() is None
     assert history.current() == "only"
 
 
 def test_revisiting_the_current_location_is_a_noop():
-    # Refresh re-selects the same generation constantly; that must not pile up.
     history = NavigationHistory()
     history.visit("a")
     history.visit("a")
@@ -50,9 +49,43 @@ def test_visiting_after_going_back_drops_the_forward_branch():
     history.visit("a")
     history.visit("b")
     history.visit("c")
-    history.back()          # now at "b"
-    history.visit("d")      # a new branch replaces "c"
+    history.back()
+    history.visit("d")
     assert history.current() == "d"
     assert not history.can_go_forward()
     assert history.back() == "b"
     assert history.back() == "a"
+
+
+def test_replacing_overwrites_where_the_cursor_stands_without_stacking_a_stop():
+    history = NavigationHistory()
+    history.visit("a")
+    history.visit("b")
+
+    history.replace("b typed")
+
+    assert history.current() == "b typed"
+    assert history.back() == "a"
+    assert history.forward() == "b typed"
+    assert not history.can_go_forward()
+
+
+def test_replacing_drops_the_forward_tail():
+    history = NavigationHistory()
+    for name in ("a", "b", "c"):
+        history.visit(name)
+    history.back()
+
+    history.replace("b again")
+
+    assert history.current() == "b again"
+    assert not history.can_go_forward()
+
+
+def test_replacing_in_an_empty_history_visits():
+    history = NavigationHistory()
+
+    history.replace("a")
+
+    assert history.current() == "a"
+    assert not history.can_go_back()

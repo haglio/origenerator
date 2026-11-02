@@ -1,35 +1,3 @@
-"""Pure gallery model: classify and group generations into a folder tree, with no
-Qt dependency so it can be unit-tested directly.
-
-The logic is split by responsibility, in dependency order:
-
-* :mod:`.signatures` — parse a row's params and reduce them to the canonical keys
-  the tree groups by (settings, model, LoRA, and an i2v's start-frame config).
-* :mod:`.keys` — the stable key each derived folder is identified by, and the
-  short code it is named by until the user names it.
-* :mod:`.groups` — the folder-tier dataclasses and the helpers that walk them.
-* :mod:`.custom` — the folders the user composes by hand, over those tiers.
-* :mod:`.output` — what a generation produced on disk: media type, preview, files.
-* :mod:`.labels` — the human-facing folder and Generate-tab names.
-* :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
-* :mod:`.moments` — the moment a stored stamp names, whichever way it was written.
-* :mod:`.time_sections` — where a newest-first listing breaks between one sitting
-  and the next, and what each section's heading says about when it was made.
-* :mod:`.tree` — nesting rows into the media -> workflow -> model -> LoRA ->
-  [source image] -> settings hierarchy, and the favorite-key helpers around it.
-* :mod:`.enhance_settings` — what a folder's enhancement is configured with,
-  and how one enhancement is described.
-* :mod:`.enhance_graph` — the same settings read back off a row's stored ComfyUI
-  graph, for a row whose own params are vague about them.
-* :mod:`.enhance` — what an enhancement is, which rows have had one and which
-  want one.
-* :mod:`.enhance_fold` — folding a finished enhancement onto the image it
-  upgraded. The one module here that takes a database and changes what is in it;
-  everything else takes rows and answers questions about them.
-
-This package re-exports the public surface below, so ``from origenerator.gallery
-import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
-"""
 from __future__ import annotations
 
 from origenerator.gallery.combine import (
@@ -188,11 +156,6 @@ from origenerator.gallery.voice_commands import (
     recognized_spelling,
 )
 
-# The surface outside code may import from this package, rather than left to be
-# inferred from the import list above -- which reads to a linter as ninety-odd
-# unused imports, so a genuinely accidental one could never be seen among them.
-# A name kept for the package's own use is imported from its submodule and is
-# not here.
 __all__ = [
     "ALL_KEY",
     "ALL_LABEL",

@@ -1,7 +1,3 @@
-"""Runs that land while Origenerator is closed, and how he hears about them.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -43,8 +39,6 @@ def _landed(filename="vid.mp4", seconds=252):
 
 
 class _Api:
-    """ComfyUI's history, as the watcher asks after it."""
-
     def __init__(self, history):
         self._history = history
         self.asked = []
@@ -67,8 +61,6 @@ def _watch(db, api, tmp_path, **over):
 
 
 def test_a_run_that_lands_while_the_app_is_closed_is_announced(tmp_path):
-    # The app is what watches ComfyUI, so a run that lands after he closes it
-    # was announced by nobody and sat in the gallery as still being made.
     db = Database(tmp_path / "t.db")
     _in_flight(db)
 
@@ -79,8 +71,6 @@ def test_a_run_that_lands_while_the_app_is_closed_is_announced(tmp_path):
 
 
 def test_the_watcher_asks_nothing_once_the_app_is_back(tmp_path):
-    # From then on the app is watching those runs itself, and two watchers would
-    # announce every one of them twice.
     db = Database(tmp_path / "t.db")
     _in_flight(db)
     api = _Api({})
@@ -93,8 +83,6 @@ def test_the_watcher_asks_nothing_once_the_app_is_back(tmp_path):
 
 
 def test_a_run_still_going_is_waited_out(tmp_path):
-    # An empty history is "not yet": the run keeps its place and is asked after
-    # again, and nothing is announced until it lands.
     db = Database(tmp_path / "t.db")
     _in_flight(db)
     landed = {}
@@ -103,11 +91,11 @@ def test_a_run_still_going_is_waited_out(tmp_path):
 
     def nap(seconds):
         naps.append(seconds)
-        landed["vid"] = _landed()           # it lands while the watcher waits
+        landed["vid"] = _landed()
 
     said = _watch(db, api, tmp_path, sleep=nap)
 
-    assert naps          # it waited rather than asking once and giving up
+    assert naps
     assert [toast.title for toast in said] == ["Video ready"]
 
 
@@ -148,7 +136,6 @@ def test_quitting_hands_the_runs_still_in_flight_to_a_process_of_its_own(tmp_pat
 
 @pytest.fixture
 def started(monkeypatch):
-    """What the app asked Windows to start, each answered as process 4321."""
     asked = []
 
     def popen(args, **_named):
@@ -160,9 +147,7 @@ def started(monkeypatch):
 
 
 def test_the_watcher_runs_on_an_interpreter_that_opens_no_console(tmp_path, started):
-    # The app runs on the console interpreter its launcher's log needs. Started on
-    # that one, the watcher's own interpreter was handed a console window, left
-    # open on his desktop until the runs in flight landed.
+    # Started on the console interpreter, Windows hands the watcher a console window.
     db = Database(tmp_path / "t.db")
     _in_flight(db)
 
@@ -201,8 +186,6 @@ def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):
 
 
 def test_what_the_watcher_says_lands_in_the_apps_log(tmp_path):
-    # Its process has no window and no console, so a line it logs anywhere else
-    # is read by nobody.
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)

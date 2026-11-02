@@ -27,6 +27,7 @@ from origenerator.gui.gallery_pane import (
     GalleryPaneScrollArea,
     LeadTiles,
     PaneHost,
+    PaneModel,
     TreeNavigation,
 )
 from origenerator.gui.item_tile import ItemTile
@@ -108,11 +109,6 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, job
         qtbot.addWidget(scroll)
     pane = GalleryPane(
         scroll, _StubDB(rows), jobs or _StubJobQueue(), _StubAuto(),
-        TreeNavigation(
-            selected_folder_key=lambda: selected,
-            folder_context=lambda key: "",
-            group_for_key=lambda key: None,
-        ),
         PaneHost(
             image_rows=list,
             animated_preview=animated_preview,
@@ -120,13 +116,18 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, job
             experiments_enabled=lambda: False,
             lead_tiles=lead_tiles,
             item_name=lambda prompt_id: f"item {prompt_id}",
+            tree=TreeNavigation(
+                selected_folder_key=lambda: selected,
+                folder_context=lambda key: "",
+                group_for_key=lambda key: None,
+            ),
         ),
     )
     return pane, scroll
 
 
 def _open_latest(pane, rows):
-    pane.set_model(rows, {}, [], [], [])
+    pane.set_model(PaneModel(rows, {}, [], [], []))
     pane.show_collection(LATEST_KEY)
 
 
@@ -254,7 +255,7 @@ def test_a_settings_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
 def test_favorites_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
     rows = [dict(row, starred=1) for row in _sixty()]
     pane, scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], []))
 
     pane.show_collection(FAVORITES_KEY, LANDSCAPE)
 
@@ -265,7 +266,7 @@ def test_favorites_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
 def test_the_trash_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
     held = _sixty()
     pane, scroll = _pane(qtbot)
-    pane.set_model([], {}, [], [], held)
+    pane.set_model(PaneModel([], {}, [], [], held))
 
     pane.show_collection(TRASH_KEY)
 
@@ -276,7 +277,7 @@ def test_the_trash_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
 def test_the_experiments_draw_a_page_at_a_time_of_everything_they_list(qtbot):
     rows = _sixty()
     pane, scroll = _pane(qtbot, rows)
-    pane.set_model([], {}, [], rows, [])
+    pane.set_model(PaneModel([], {}, [], rows, []))
 
     pane.show_collection(EXPERIMENTS_KEY)
 
@@ -469,7 +470,7 @@ def test_a_video_tile_finds_its_start_frame_in_the_models_image_index(qtbot):
              "params_json": json.dumps({"input_image": "img.png [output]", "noise_seed": 2}),
              "output_files": json.dumps([{"filename": "vid.mp4", "subfolder": ""}])}
     pane, _scroll = _pane(qtbot, [image, video])
-    pane.set_model([], {}, [], [], [], image_index=gallery.build_image_config_index([image]))
+    pane.set_model(PaneModel([], {}, [], [], [], image_index=gallery.build_image_config_index([image])))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=[video]))
 
@@ -585,7 +586,7 @@ def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(
 def test_the_experiments_collection_heads_each_batch_it_collected(qtbot):
     rows = [_row("e1", 1, "2026-09-12 23:00:00"), _row("e2", 2, "2026-09-12 19:00:00")]
     pane, scroll = _pane(qtbot, rows)
-    pane.set_model([], {}, [], rows, [])
+    pane.set_model(PaneModel([], {}, [], rows, []))
 
     pane.show_collection(EXPERIMENTS_KEY)
 
@@ -597,7 +598,7 @@ def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
     latest = [_row("g1", 1)]
     held = [_row("d1", 9)]
     pane, _scroll = _pane(qtbot, latest)
-    pane.set_model(latest, {}, [], [], held)
+    pane.set_model(PaneModel(latest, {}, [], [], held))
     pane.show_collection(LATEST_KEY)
 
     assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"]
@@ -607,7 +608,7 @@ def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
     (gallery.ALL_KEY, "generations"), ("image", "images"), ("video/wan22_i2v", "videos")])
 def test_an_empty_latest_names_the_kind_its_folder_holds(qtbot, folder, kind):
     pane, scroll = _pane(qtbot)
-    pane.set_model([], {}, [], [], [])
+    pane.set_model(PaneModel([], {}, [], [], []))
 
     pane.show_collection(FolderCollection(LATEST_KEY, folder).key, LANDSCAPE)
 
@@ -616,7 +617,7 @@ def test_an_empty_latest_names_the_kind_its_folder_holds(qtbot, folder, kind):
 
 def test_the_empty_trash_hint_says_what_a_day_there_leaves(qtbot):
     pane, _scroll = _pane(qtbot)
-    pane.set_model([], {}, [], [], [])
+    pane.set_model(PaneModel([], {}, [], [], []))
 
     assert "After a day, only their thumbnails are kept" in pane._trash_empty_hint()
 
@@ -639,7 +640,7 @@ def test_a_folders_latest_lists_only_what_that_folder_holds(qtbot):
     rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, rows, [], []))
 
     pane.show_collection(FolderCollection(LATEST_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
@@ -651,7 +652,7 @@ def test_a_folders_trash_holds_what_was_deleted_from_that_folder(qtbot):
     deleted = [_made_with("a2", "alpha.safetensors"), _made_with("b2", "beta.safetensors")]
     tree = gallery.build_gallery_tree(kept)
     pane, _scroll = _pane(qtbot, kept)
-    pane.set_model(kept, {LANDSCAPE: tree}, kept, [], deleted)
+    pane.set_model(PaneModel(kept, {LANDSCAPE: tree}, kept, [], deleted))
     trash = FolderCollection(TRASH_KEY, _models(tree)["alpha"].key).key
 
     pane.show_collection(trash, LANDSCAPE)
@@ -669,7 +670,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot):
             _made_with("b1", "beta.safetensors"), _in_flight("b2", "beta.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows[::2], {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows[::2], {LANDSCAPE: tree}, rows, [], []))
 
     pane.show_collection(FolderCollection(LATEST_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
@@ -686,7 +687,7 @@ def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_bel
     (scene_two,) = [leaf for leaf in gallery.child_groups(lora) if leaf.rows[0]["prompt_id"] == "a2"]
     scene_two.favorite = True
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, rows, [], []))
     favorites = FolderCollection(FAVORITES_KEY, alpha.key).key
 
     pane.show_collection(favorites, LANDSCAPE)
@@ -706,7 +707,7 @@ def test_a_favorite_item_inside_a_favorite_folder_is_one_item_in_what_favorites_
     (scene_two,) = [leaf for leaf in gallery.child_groups(lora) if leaf.rows[0]["prompt_id"] == "a2"]
     scene_two.favorite = True
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, rows, [], []))
     favorites = FolderCollection(FAVORITES_KEY, alpha.key).key
 
     pane.show_collection(favorites, LANDSCAPE)
@@ -727,7 +728,7 @@ def test_a_folders_enhanced_lists_the_enhanced_images_under_it(qtbot):
             _enhanced_made_with("b1", "beta.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, rows, [], []))
     enhanced = FolderCollection(ENHANCED_KEY, _models(tree)["alpha"].key).key
 
     pane.show_collection(enhanced, LANDSCAPE)
@@ -742,7 +743,7 @@ def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
     tried = [_made_with("a2", "alpha.safetensors"), _made_with("b2", "beta.safetensors")]
     tree = gallery.build_gallery_tree(kept + tried)
     pane, _scroll = _pane(qtbot, kept + tried)
-    pane.set_model(kept, {LANDSCAPE: tree}, kept + tried, tried, [])
+    pane.set_model(PaneModel(kept, {LANDSCAPE: tree}, kept + tried, tried, []))
 
     pane.show_collection(FolderCollection(EXPERIMENTS_KEY, _models(tree)["beta"].key).key, LANDSCAPE)
 
@@ -774,7 +775,7 @@ def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeyp
                         lambda rows, shape: dealt.append(shape) or filter_rows(rows, shape))
     rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], []))
     latest = shaped_key(FolderCollection(LATEST_KEY, gallery.ALL_KEY).key, LANDSCAPE)
 
     pane.collection_counts(LANDSCAPE)
@@ -827,7 +828,7 @@ def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_collection(qtbot):
     (lora,) = gallery.child_groups(_models(tree)["alpha"])
     (leaf,) = gallery.child_groups(lora)
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, rows, [], []))
     pane.show_thumbnails(leaf)
     in_folder = pane._thumb_widgets["a1"]
 
@@ -848,7 +849,7 @@ def test_each_folders_collection_counts_what_that_collection_lists(qtbot):
         leaf.favorite = leaf.rows[0]["prompt_id"] == "b2"
     deleted = [_made_with("a4", "alpha.safetensors"), _made_with("b4", "beta.safetensors")]
     pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, listed, [rows[1]], deleted)
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, listed, [rows[1]], deleted))
 
     counts = pane.collection_counts(LANDSCAPE)
 
@@ -863,7 +864,7 @@ def test_each_folders_collection_counts_what_that_collection_lists(qtbot):
 def test_a_collection_square_wears_the_mark_its_row_wears(qtbot):
     rows = [_made_with("a1", "alpha.safetensors")]
     pane, scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], []))
 
     pane.show_folder_tiles([], collections=[shaped_key(TRASH_KEY, LANDSCAPE)])
 
@@ -876,7 +877,7 @@ def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_head
     rows = [_made_with("a1", "alpha.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, scroll = _pane(qtbot, rows)
-    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.set_model(PaneModel(rows, {LANDSCAPE: tree}, rows, [], []))
 
     pane.show_folder_tiles(tree, collections=[shaped_key(LATEST_KEY, LANDSCAPE),
                                               shaped_key(TRASH_KEY, LANDSCAPE)])
@@ -899,8 +900,7 @@ def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):
     tiles = [search.SearchTile(row=_row("a", 1)), search.SearchTile(row=_row("b", 2))]
     heading = search.group_by_model_lora(tiles)[0][0]
 
-    pane.show_search_results(
-        tiles, sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None,
-        collapsed={heading})
+    pane.show_search_results(tiles, search.SearchTerms(
+        sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None, collapsed={heading}))
 
     assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "b"]

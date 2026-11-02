@@ -351,6 +351,17 @@ def model_lora_heading(row: dict) -> str:
 
 
 @dataclass(frozen=True)
+class SearchTerms:
+    sort_mode: str
+    query: str
+    outcome: object
+    scope: str = ""
+    collapsed: object = ()
+    on_section_toggled: object = None
+    still_searching: bool = False
+
+
+@dataclass(frozen=True)
 class SearchTile:
     row: dict
     group: object | None = None

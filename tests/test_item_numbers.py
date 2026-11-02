@@ -1,7 +1,3 @@
-"""An item is named by its folder's code and its number in that folder.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from origenerator.gallery.item_numbers import (

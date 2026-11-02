@@ -65,8 +65,6 @@ def test_a_failed_run_points_at_the_item_too():
 
 
 def test_an_enhances_toast_points_at_the_image_it_improved():
-    # An enhance's own row is folded into the image it improved the moment it
-    # lands, so its own id is no way back to anything.
     row = {"workflow_name": "sdxl_t2i", "source": GenerationSource.GENERATED,
            "prompt_id": "enh-1", "enhance_of": "pic-9"}
 

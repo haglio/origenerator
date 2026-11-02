@@ -1,4 +1,3 @@
-"""What each item is called: its folder's code and its number in that folder."""
 from __future__ import annotations
 
 import re

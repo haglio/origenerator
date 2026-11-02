@@ -1,5 +1,3 @@
-"""What an image can be sorted as showing, and how its buttons are arranged,
-from the content overlay (``content.example.json`` documents both)."""
 from __future__ import annotations
 
 from typing import NamedTuple

@@ -1,15 +1,3 @@
-"""ComfyUI's websocket event pump, on a Qt thread.
-
-Live progress, the executing node, preview frames and completion come back over
-a websocket, and each is re-emitted as a Qt signal for the UI to connect to. The
-loop reconnects on its own, and ``stop`` cancels whatever it is awaiting so the
-process closing under it exits at once.
-
-The REST half is :mod:`origenerator.comfyui_api`, which needs no Qt at all;
-:class:`ComfyUIClient` holds one and forwards every call, so a consumer that
-already has a client is unaffected and one that needs only HTTP can take the api
-instead.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -18,9 +6,6 @@ import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-# Re-exported: the api's module-scope surface reached this app through here for
-# as long as there was only one module, and the gui package still imports two of
-# these from this name.
 from origenerator.comfyui_api import (  # noqa: F401
     _HTTP_TIMEOUT_S,
     _POLL_TIMEOUT_S,
@@ -33,10 +18,8 @@ from origenerator.comfyui_inputs import ComfyFolders
 
 logger = logging.getLogger(__name__)
 
-# ComfyUI binary websocket frames lead with a 4-byte big-endian event type.
+# ComfyUI binary frames: 4-byte big-endian event type, then (preview) a 4-byte image-format tag, then the image.
 _PREVIEW_IMAGE_EVENT = 1
-# A preview frame's payload is then a 4-byte image-format tag followed by the
-# encoded image, so the displayable bytes start at offset 8.
 _PREVIEW_IMAGE_OFFSET = 8
 _WHAT_THREW_AND_WHERE = ("node_id", "node_type", "exception_type", "exception_message",
                          "traceback")
@@ -44,35 +27,22 @@ _WHAT_THREW_AND_WHERE = ("node_id", "node_type", "exception_type", "exception_me
 class ComfyUIClient(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()
-    progress = pyqtSignal(str, str, int, int)  # prompt_id, node_id, value, max
-    node_executing = pyqtSignal(str, str)  # prompt_id, node_id
-    job_completed = pyqtSignal(str, dict)  # prompt_id, history_data
-    job_error = pyqtSignal(str, str)  # prompt_id, error_message
-    queue_status = pyqtSignal(int)  # queue_remaining
-    preview_image = pyqtSignal(str, bytes)  # executing prompt_id, image bytes
+    progress = pyqtSignal(str, str, int, int)
+    node_executing = pyqtSignal(str, str)
+    job_completed = pyqtSignal(str, dict)
+    job_error = pyqtSignal(str, str)
+    queue_status = pyqtSignal(int)
+    preview_image = pyqtSignal(str, bytes)
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
                  client_id: str | None = None, parent=None, *, folders: ComfyFolders):
         super().__init__(parent)
-        # A stable client id is what lets a relaunch reconnect to a job still
-        # running in ComfyUI: ComfyUI routes that job's progress, preview and
-        # completion messages only to the websocket client id that submitted it, so
-        # reusing the persisted id — rather than minting a fresh one each launch —
-        # keeps those live updates flowing to the reconnected session. A fresh uuid
-        # is minted when none is supplied (a read-only gallery, or a test).
+        # ComfyUI sends a job's messages only to the websocket client id that submitted it.
         self.api = ComfyUIApi(host, port, client_id, folders=folders)
         self._running = False
-        self._loop = None  # the thread's asyncio loop, for cross-thread wakeups
-        self._task = None  # the running _ws_loop task, so stop() can cancel it
-        # The prompt ComfyUI is currently executing, so preview frames (which
-        # carry no id of their own) can be attributed to the right job.
+        self._loop = None
+        self._task = None
         self._executing_prompt_id: str | None = None
-
-    # --- what the api answers for ------------------------------------------
-    #
-    # Forwarded rather than reached through, because every consumer of a client
-    # already spells these. A consumer that wants only these should take a
-    # :class:`~origenerator.comfyui_api.ComfyUIApi` instead of a client.
 
     host = property(lambda self: self.api.host)
     port = property(lambda self: self.api.port)
@@ -116,8 +86,6 @@ class ComfyUIClient(QThread):
     def clear_foreign_queue(self) -> int:
         return self.api.clear_foreign_queue()
 
-    # --- the websocket half -------------------------------------------------
-
     @property
     def ws_url(self) -> str:
         return f"ws://{self.host}:{self.port}/ws?clientId={self.client_id}"
@@ -156,17 +124,9 @@ class ComfyUIClient(QThread):
                     if self._running:
                         await asyncio.sleep(3)
         except asyncio.CancelledError:
-            pass  # stop() cancelled the loop; unwind quietly so the thread ends
+            pass
 
     def stop(self):
-        """Stop the websocket loop and end the thread without delay.
-
-        Flipping ``_running`` alone is not enough: the loop spends most of its
-        time awaiting a websocket message or parked in the reconnect sleep, and
-        would only see the flag once that await returns (up to 3s later).
-        Cancelling the task interrupts whatever it is awaiting right now, so the
-        thread — and the process closing under it — exits at once.
-        """
         self._running = False
         loop, task = self._loop, self._task
         if loop is None or task is None:
@@ -174,7 +134,7 @@ class ComfyUIClient(QThread):
         try:
             loop.call_soon_threadsafe(task.cancel)
         except RuntimeError:
-            pass  # loop already finished and closed — nothing left to interrupt
+            pass
 
     def _handle_ws_message(self, raw: str):
         msg = json.loads(raw)
@@ -197,19 +157,10 @@ class ComfyUIClient(QThread):
 
         elif msg_type == "progress":
             prompt_id = data.get("prompt_id", "")
-            # A progress event names the prompt currently executing. Adopt it as the
-            # executing prompt so preview frames (which carry no id of their own)
-            # attribute to the right job — in particular right after a reconnect,
-            # where ComfyUI's replayed "executing" arrives with no prompt_id and so
-            # can't set this itself.
+            # After a reconnect ComfyUI's replayed "executing" has no prompt_id; a progress event names it.
             if prompt_id:
                 self._executing_prompt_id = prompt_id
-            # The node is carried through because what a step costs depends on
-            # which sampler took it: a foley step and a WAN video step are the
-            # same event here and two orders of magnitude apart in the bar
-            # (see origenerator.progress). ComfyUI names it on every progress
-            # event, which a reconnect mid-pass depends on — the "executing"
-            # frame that would otherwise say so is long past by then.
+            # A reconnect mid-pass never sees the "executing" frame; ComfyUI names the node on every progress event.
             self.progress.emit(prompt_id, str(data.get("node") or ""),
                                data.get("value", 0), data.get("max", 0))
 
@@ -221,12 +172,6 @@ class ComfyUIClient(QThread):
             )
 
     def _handle_ws_binary(self, raw: bytes):
-        """Emit ComfyUI live-preview frames, tagged with the executing prompt.
-
-        Only preview-image frames are understood; any other binary event (and
-        truncated frames) are ignored. The frame carries no prompt id, so it is
-        attributed to whichever prompt is currently executing.
-        """
         if len(raw) < _PREVIEW_IMAGE_OFFSET:
             return
         event = int.from_bytes(raw[0:4], "big")

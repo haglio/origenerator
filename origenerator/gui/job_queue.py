@@ -708,10 +708,9 @@ class JobQueue(QObject):
         self._pump()
 
     def _on_image_finished(self, key, image_job, landed, video_workflow, video_params):
-        files, _thumb_path, _duration = landed
         self._drop(key, image_job)
         mark_generation_completed(self._db, image_job.prompt_id, *landed)
-        input_ref = gallery.output_file_reference(files)
+        input_ref = gallery.output_file_reference(landed[0])
         if input_ref is not None:
             video_params = {**video_params, "input_image": input_ref}
         self._launch(key, video_workflow, video_params, self._on_finished,

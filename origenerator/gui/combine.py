@@ -69,6 +69,17 @@ class CombineRequest:
     edit_first: bool = False
 
 
+@dataclass
+class CombineParts:
+    jobs: object
+    client: object
+    info_tabs_of: object
+    slideshows: object
+    starting: object
+    inbox: object = None
+    names: object = None
+
+
 class Combine(QWidget):
     combine_requested = pyqtSignal(object)
     animation_settings_requested = pyqtSignal()

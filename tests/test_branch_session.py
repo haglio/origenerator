@@ -1,10 +1,3 @@
-"""Branch sessions: the env flag the preview launcher sets, and what it still means.
-
-A preview runs on the live install's own library (see config.LIBRARY_STATE_DIR),
-so the flag no longer stands for a database of its own; it stands for the one
-thing a preview leaves to the live app -- ComfyUI's absence work, which would
-outlive the preview in a queue only the app that queued it can cancel.
-"""
 from __future__ import annotations
 
 import sys
@@ -44,9 +37,6 @@ def test_the_production_app_is_shown_as_no_preview_wherever_it_runs_from(monkeyp
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the Windows script host")
 def test_the_preview_launcher_marks_the_run_and_borrows_the_primary_venv():
-    """The launcher must set the branch flag (else the preview would schedule
-    ComfyUI's absence work as if it were the live app) and run the primary's venv
-    python (a worktree has no venv, and a bare PATH python lacks PyQt6)."""
     report = dry_run(_REPO_ROOT / "launch_preview_branch.vbs")
 
     primary = _REPO_ROOT.parents[2]

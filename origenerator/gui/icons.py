@@ -380,7 +380,7 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
     """The trash can in an item's lower-left corner: delete this item.
 
     Red under the cursor rather than the other two's light gray — it is the one
-    corner whose act takes something away, and it wears the very can, in the very
+    corner whose press takes something away, and it wears the very can, in the very
     red, that the Gallery pane buttons' Delete does."""
     return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
 

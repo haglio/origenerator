@@ -477,7 +477,7 @@ class PreviewWidget(QWidget):
                     enhance: str | None = None) -> None:
         """Arm the corner buttons and the right-click menu over the shown media.
 
-        ``prompt_id`` is the saved generation on screen — the row every act here
+        ``prompt_id`` is the saved generation on screen — the row every press here
         lands on — with the state its corners report beside it: whether it is
         favorited, and what its enhance corner has to say
         (:func:`~origenerator.gui.corner_buttons.enhance_state`). ``None`` leaves

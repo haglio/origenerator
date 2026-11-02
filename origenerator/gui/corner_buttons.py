@@ -1,7 +1,7 @@
 """The controls a generation wears in the corners of its thumbnail or preview.
 
 A thumbnail in the Gallery pane and the preview in a Generate tab are showing the
-same thing, so they offer the same three acts on it, in the same three corners:
+same thing, so they offer the same three controls on it, in the same three corners:
 favorite it (top right), trash it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
 Top-LEFT is not one of them: the item type icon has always lived there, and a
@@ -209,7 +209,7 @@ class CornerButtons(QObject):
         corner you have to go looking for, and two of these are reporting state
         as well as offering an action — a wall of thumbnails has to say which of
         them are favorited without being swept. The plus is the one that can be
-        absent, and only where there is no such act at all: a video, which the
+        absent, and only where there is no such thing to do at all: a video, which the
         enhancer cannot take.
         """
         self._star.setVisible(self._available)

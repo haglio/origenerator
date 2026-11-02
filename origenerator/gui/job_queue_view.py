@@ -125,9 +125,9 @@ def _made_from(item) -> Combination:
                        item.prompt_edited)
 
 
-def _offer(button: QPushButton, can_act: bool) -> None:
-    button.setEnabled(can_act)
-    button.setCursor(Qt.CursorShape.PointingHandCursor if can_act else Qt.CursorShape.ArrowCursor)
+def _offer(button: QPushButton, enabled: bool) -> None:
+    button.setEnabled(enabled)
+    button.setCursor(Qt.CursorShape.PointingHandCursor if enabled else Qt.CursorShape.ArrowCursor)
 
 
 class OpensAFolder:

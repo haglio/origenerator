@@ -1154,7 +1154,7 @@ def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
 
 
 def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
-    # A right-click on an unpicked row picks it first, so the menu always acts
+    # A right-click on an unpicked row picks it first, so the menu always works
     # on what it appeared over.
 
     versions = EnhanceVersions()

@@ -571,7 +571,7 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
 
     **The passes are what was asked for and what the image already carries —
     never what the pane happens to have checked.** A spoken fix is a targeted
-    act made with no view of the Enhance pane, so a folder configured to fix
+    request made with no view of the Enhance pane, so a folder configured to fix
     every part must not turn "fix teeth" into a pass over all of them: that is
     a redraw of the whole image in answer to a command about one part of it.
     The pane is still read for the *number* each part runs at, since nobody

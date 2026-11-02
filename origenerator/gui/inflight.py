@@ -279,14 +279,14 @@ def clear_queue_tooltip(foreign: int) -> str:
 def stop_auto_generate_text() -> str:
     """The menu entry that ends Auto-Generate and the run inside it.
 
-    A button carries one act, so while Auto-Generate is on its Cancel only
+    A button does one thing, so while Auto-Generate is on its Cancel only
     throws the seed away, and there is nowhere left on that surface to ask for
     a stop: the only one was the Auto switch, which is in the header rather
     than on the tile you are looking at. A menu has room for both, and this is
     the other one.
 
     It says Auto-Generate goes off rather than reading "Cancel", because switching a
-    standing instruction off is a bigger act than throwing one seed away, and it
+    standing instruction off is a bigger step than throwing one seed away, and it
     is not something to discover afterwards.
     """
     return "Cancel and stop auto-generating"

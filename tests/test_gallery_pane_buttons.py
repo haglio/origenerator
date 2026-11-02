@@ -21,7 +21,7 @@ from origenerator.gui import omnipause
 from origenerator.gui.gallery_pane_buttons import (
     AUTO_ELSEWHERE_TIP,
     Button,
-    ButtonActs,
+    ButtonHandlers,
     ButtonStates,
     GalleryPaneButtons,
 )
@@ -29,11 +29,11 @@ from origenerator.gui.stylesheet import build_stylesheet
 from tests.lit_switches import lit_in
 
 
-def _acts(**overrides) -> ButtonActs:
+def _handlers(**overrides) -> ButtonHandlers:
     """Handlers that record rather than act, so a press is observable."""
-    fields = {name: (lambda *a: None) for name in ButtonActs._fields}
+    fields = {name: (lambda *a: None) for name in ButtonHandlers._fields}
     fields.update(overrides)
-    return ButtonActs(**fields)
+    return ButtonHandlers(**fields)
 
 
 def _state(**overrides) -> ButtonStates:
@@ -48,8 +48,8 @@ def _state(**overrides) -> ButtonStates:
 
 @pytest.fixture
 def buttons(qtbot):
-    def build(acts=None, *, hosted=False):
-        made = GalleryPaneButtons(acts or _acts(), hosted=hosted)
+    def build(handlers=None, *, hosted=False):
+        made = GalleryPaneButtons(handlers or _handlers(), hosted=hosted)
         qtbot.addWidget(made)
         return made
     return build
@@ -158,7 +158,7 @@ def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(buttons
     # Blocked around the write, not around the press: a row of buttons re-aimed while
     # Auto-Generate is running must not toggle it off.
     pressed = []
-    made = buttons(_acts(toggle_auto=pressed.append))
+    made = buttons(_handlers(toggle_auto=pressed.append))
 
     made.apply(_state(auto=Button(checked=True, tip="running here")))
 
@@ -186,7 +186,7 @@ def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(
 
 def test_the_tip_s_link_leads_wherever_auto_generate_is_now(buttons):
     followed = []
-    made = buttons(_acts(go_to_auto_generating_folder=followed.append))
+    made = buttons(_handlers(go_to_auto_generating_folder=followed.append))
 
     made.auto_tip.link_activated.emit("auto")
 
@@ -219,7 +219,7 @@ def test_the_first_group_that_shows_is_the_one_left_unindented(buttons):
 
 def test_every_button_presses_its_own_handler(buttons):
     pressed = []
-    made = buttons(_acts(
+    made = buttons(_handlers(
         go_back=lambda: pressed.append("back"),
         undo=lambda: pressed.append("undo"),
         favorite=lambda: pressed.append("star"),
@@ -236,7 +236,7 @@ def test_every_button_presses_its_own_handler(buttons):
 
 def test_a_switch_hands_its_handler_the_state_it_landed_in(buttons):
     heard = []
-    made = buttons(_acts(toggle_radio=heard.append))
+    made = buttons(_handlers(toggle_radio=heard.append))
 
     made.radio.setChecked(True)
     made.radio.setChecked(False)

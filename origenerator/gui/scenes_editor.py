@@ -98,7 +98,7 @@ class _Scene(QFrame):
         # the row that would push the pane's floor past its cap (see
         # GenerateTab.minimumSizeHint). The title gives way first, and
         # the x is the flat mark the tabs wear rather than a dressed button --
-        # the same act, and a third of the width.
+        # the same press, and a third of the width.
         header = QHBoxLayout()
         self.title = ElidingLabel("")
         self.title.setObjectName("sceneTitle")

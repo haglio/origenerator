@@ -323,7 +323,7 @@ class GeneratePane(QTabWidget):
             offer_copy_names(menu, [tab.name()])
         if self.count() > 1:
             if not menu.isEmpty():
-                menu.addSeparator()  # the acts above the line, the closes below it
+                menu.addSeparator()  # the tab's own entries above the line, the closes below it
             menu.addAction("Close others").triggered.connect(
                 lambda: self._close_other_subtabs(index)
             )

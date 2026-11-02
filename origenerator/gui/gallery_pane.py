@@ -985,7 +985,7 @@ class GalleryPane(QObject):
     def _inflight_context_menu(self, key: str, global_pos):
         """Right-click a tile of work still being made: throw that run away.
 
-        The one act a queued or running tile has, and until now the one act it
+        The one thing a queued or running tile can do, and until now the one it
         offered nowhere: a finished tile answers a right-click with its own menu,
         and a tile answered with nothing, so stopping a run meant finding it again
         among the Job Queue's rows. The wording is the Job Queue's Cancel, which
@@ -1128,7 +1128,7 @@ class GalleryPane(QObject):
             media_type=gallery.media_type_of_row(row),  # an item type icon: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
-            controls=False,       # its two acts are restore and purge, in the corners
+            controls=False,       # its two controls are restore and purge, in the corners
             corner_buttons=corner_buttons,
         )
 
@@ -1137,8 +1137,8 @@ class GalleryPane(QObject):
         items — the same two actions its hover corners carry, reachable for a
         whole selection at once. Right-clicking a tile outside the selection
         first narrows to it, as the gallery's own tile menu does. The menu
-        itself is the view's (:meth:`GalleryView._trash_menu`), which owns both
-        acts."""
+        itself is the view's (:meth:`GalleryView._trash_menu`), which owns restore and purge
+        alike."""
         if not self._selection.holds(prompt_id):
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self.trash_menu_requested.emit(global_pos)

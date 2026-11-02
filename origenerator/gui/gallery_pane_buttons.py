@@ -93,7 +93,7 @@ class ButtonStates(NamedTuple):
     auto_tip: str = ""
 
 
-class ButtonActs(NamedTuple):
+class ButtonHandlers(NamedTuple):
     """What each button does when pressed — bound handlers, never names.
 
     By object rather than by attribute name, for the reason the spoken
@@ -167,46 +167,46 @@ class GalleryPaneButtons(QWidget):
     every surface.
     """
 
-    def __init__(self, acts: ButtonActs, *, hosted: bool):
+    def __init__(self, handlers: ButtonHandlers, *, hosted: bool):
         super().__init__()
         policy = self.sizePolicy()
         policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
         self.setSizePolicy(policy)
-        self.back = _tool_button(icons.back_icon(), "Back", acts.go_back)
-        self.forward = _tool_button(icons.forward_icon(), "Forward", acts.go_forward)
-        self.undo = _tool_button(icons.undo_icon(), "Undo", acts.undo)
-        self.redo = _tool_button(icons.redo_icon(), "Redo", acts.redo)
+        self.back = _tool_button(icons.back_icon(), "Back", handlers.go_back)
+        self.forward = _tool_button(icons.forward_icon(), "Forward", handlers.go_forward)
+        self.undo = _tool_button(icons.undo_icon(), "Undo", handlers.undo)
+        self.redo = _tool_button(icons.redo_icon(), "Redo", handlers.redo)
         # Shown wherever there's a collection of media to play — a folder, or the
         # Latest/Favorites collection — with its tooltip naming that subject.
         self.slideshow = _tool_button(
             icons.slideshow_icon(), "Play this folder as a slideshow",
-            acts.start_slideshow)
+            handlers.start_slideshow)
         self.slideshow.hide()
         self.auto = _tool_button(
             icons.auto_generate_icon(),
             "Auto-generate: repeatedly generate variations of this folder until "
             "toggled off",
-            acts.toggle_auto, checkable=True,
+            handlers.toggle_auto, checkable=True,
         )
         self.auto.setStyleSheet(_LIT)
         # Never hidden: Auto-Generate runs until it is stopped, and a switch that went
         # away with its folder left it running with nothing on screen to say so.
         # It grays instead when there is nothing to do.
         self.auto_tip = LinkTip(self.auto)
-        self.auto_tip.link_activated.connect(acts.go_to_auto_generating_folder)
+        self.auto_tip.link_activated.connect(handlers.go_to_auto_generating_folder)
         # Favorite, enhance, delete: the three things you can do to what is in front
         # of you, each aimed the same way — the picked thumbnails, else the
         # folder on screen. Colored, and grouped, because they are one set: gold
         # for keep, green for make-better, red for take-away.
-        self.favorite = _tool_button(icons.star_icon(filled=True), "Favorite", acts.favorite)
-        self.enhance = _tool_button(icons.enhance_icon(), "Enhance", acts.enhance)
+        self.favorite = _tool_button(icons.star_icon(filled=True), "Favorite", handlers.favorite)
+        self.enhance = _tool_button(icons.enhance_icon(), "Enhance", handlers.enhance)
         # Turn the folders picked in the tree into a folder of their own. Shown
         # only while several are picked — that selection IS the folder, unsaved.
         self.group = _tool_button(
             icons.custom_collection_icon(),
-            "Group the selected folders into a collection of your own", acts.group)
+            "Group the selected folders into a collection of your own", handlers.group)
         self.group.hide()
-        self.delete = _tool_button(icons.delete_icon(), "Delete", acts.delete)
+        self.delete = _tool_button(icons.delete_icon(), "Delete", handlers.delete)
         self.radio = None
         self.mic = None
         if not hosted:
@@ -216,7 +216,7 @@ class GalleryPaneButtons(QWidget):
                 icons.radio_icon(),
                 f"Origenerator Radio: play {RADIO_STATIONS} library videos at once, "
                 "sound only, shuffling endlessly",
-                acts.toggle_radio, checkable=True, kind=_SoundSwitch,
+                handlers.toggle_radio, checkable=True, kind=_SoundSwitch,
             )
             omnipause.holds(self.radio)
             # The microphone stands apart from the switches above: those are what
@@ -228,7 +228,7 @@ class GalleryPaneButtons(QWidget):
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
                 "“weird”, “lock”), and orders about the image (“enhance”, “fix "
                 "hands”, “animate as kino”)",
-                acts.toggle_mic, checkable=True,
+                handlers.toggle_mic, checkable=True,
             )
             self.mic.setStyleSheet(_LIT)
         # The family's own gap along a row, and its wider one between wrapped

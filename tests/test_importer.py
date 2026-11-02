@@ -957,6 +957,29 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
     assert Path(new).exists()
 
 
+def test_a_row_whose_output_is_gone_keeps_the_thumbnail_it_names(tmp_path):
+    thumb_dir = tmp_path / "thumbs"
+    thumb_dir.mkdir()
+    named = str(thumb_dir / "sdxl_t2i_6_.jpg")
+    db = Database(tmp_path / "test.db")
+    _completed(db, "nothing_left", "sdxl_t2i_6_.png", "", thumbnail_path=named)
+
+    assert backfill_shared_thumbnails(db, OutputPlaces.in_one_folder(tmp_path / "output"), thumb_dir) == 0
+    assert db.get_generation("nothing_left")["thumbnail_path"] == named
+
+
+def test_a_graph_that_is_only_a_refinement_still_reports_its_settings():
+    graph = {
+        "1": {"class_type": "VAEEncode", "inputs": {}},
+        "2": {"class_type": "KSampler",
+              "inputs": {"latent_image": ["1", 0], "steps": 12, "denoise": 0.3, "seed": 9}},
+    }
+
+    params = imp._graph_params(graph)
+
+    assert (params["steps"], params["denoise"], params["seed"]) == (12, 0.3, 9)
+
+
 def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
     graph = {
         "1": {"class_type": "UnetLoaderGGUF",

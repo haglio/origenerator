@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.source_tile import SourceTile
@@ -74,3 +74,27 @@ def test_renders_the_thumbnail_when_the_file_exists(tile, tmp_path):
 def test_survives_a_missing_thumbnail_file(tile):
     tile.show_source("img1", "C:/does/not/exist.png", "img1.png")  # must not raise
     assert not tile.isHidden()
+
+
+def test_a_relation_named_for_one_showing_does_not_carry_to_the_next(tile):
+    tile.show_source("vid1", None, "cycle.mp4", heading="Trimmed from", media_type="video")
+
+    tile.show_source("img1", None, "start.png")
+
+    assert tile._heading.text() == "From source image"
+    assert tile._item_type_icon.media_type == "image"
+
+
+def test_a_thumbnail_shown_only_for_its_settings_is_drained_of_color_and_the_next_is_not(tile, tmp_path):
+    thumb = tmp_path / "red.png"
+    red = QPixmap(32, 32)
+    red.fill(QColor(220, 20, 20))
+    red.save(str(thumb))
+
+    tile.show_source("vid1", str(thumb), "source.mp4", gray=True)
+    drained = tile._thumb.pixmap().toImage().pixelColor(16, 16)
+    tile.show_source("img1", str(thumb), "start.png")
+    kept = tile._thumb.pixmap().toImage().pixelColor(16, 16)
+
+    assert drained.red() == drained.green() == drained.blue()
+    assert kept.red() > kept.green()

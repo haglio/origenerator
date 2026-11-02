@@ -59,7 +59,6 @@ def test_a_grid_that_is_not_rows_leaves_every_action_to_the_row_after_it():
 
 
 def test_a_cell_reaching_across_two_columns_is_one_tile_as_wide_as_both():
-    """His sheet merges cells, and the cell after one keeps its column."""
     content = {"image_states": ["one", "two"],
                "image_state_grid": [[["one", 2], "two"]]}
 
@@ -67,7 +66,6 @@ def test_a_cell_reaching_across_two_columns_is_one_tile_as_wide_as_both():
 
 
 def test_an_empty_cell_is_a_hole_and_the_cell_after_it_keeps_its_column():
-    """His 4-wide grid has gaps in it, and an action beyond one keeps its column."""
     content = {"image_states": ["one", "two"],
                "image_state_grid": [["one", "", "two"]]}
 
@@ -75,7 +73,6 @@ def test_an_empty_cell_is_a_hole_and_the_cell_after_it_keeps_its_column():
 
 
 def test_a_cell_reaching_down_the_rows_is_one_tile_as_tall_as_all_of_them():
-    """The tile down the fourth column: his words, "vertically spans all rows"."""
     content = {"image_states": ["one", "two"],
                "image_state_grid": [[["one", 1, 9]], ["two"]]}
 

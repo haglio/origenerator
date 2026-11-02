@@ -2278,3 +2278,10 @@ def test_a_fix_is_redrawn_toward_the_prompts_its_settings_give_it():
 def test_only_a_workflow_with_scenes_tells_a_story():
     assert {name for name, workflow in WORKFLOW_REGISTRY.items() if workflow.tells_a_story()} == {
         "wan22_i2v", "wan22_flf2v_loop"}
+
+
+def test_a_part_the_enhance_fixes_runs_a_real_denoise_so_the_floor_of_the_range_is_above_zero():
+    fixes = next(pd for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()
+                 if pd.key == "enhance_detail_fixes")
+
+    assert fixes.min_val > 0

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -95,7 +94,7 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneItems
 from origenerator.image_states import state_names
 from origenerator.item_names import ItemNames
-from origenerator.library_views import LibraryViews
+from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
@@ -197,20 +196,17 @@ class GenerateTab(DropZones):
     versions_delete_requested = pyqtSignal(str, list)
     train_requested = pyqtSignal(str)
 
-    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None, heights=None,
-                 inbox: evolver_export.EvolverInbox | None = None,
-                 library: LibraryViews | None = None,
-                 names: ItemNames | None = None,
-                 animated_preview: Callable[[dict], str | None] | None = None):
-        super().__init__(parent=parent)
-        self._heights = heights
+    def __init__(self, client: ComfyUIClient | None, db: Database,
+                 *, fun_time=None, inbox: evolver_export.EvolverInbox | None = None,
+                 views: TabViews = NO_VIEWS):
+        super().__init__()
+        self._heights = views.heights
         self._inbox = inbox or evolver_export.default_inbox()
         self._client = client
         self._db = db
-        self._library = library or LibraryViews(db)
-        self._names = names or ItemNames(db)
-        self._animated_preview = animated_preview or (
+        self._library = views.library or LibraryViews(db)
+        self._names = views.names or ItemNames(db)
+        self._animated_preview = views.animated_preview or (
             lambda row: gallery.animated_preview_if_made(row, OUTPUT_PLACES, THUMB_DIR))
         self._param_form: ParamForm | None = None
         self._generating = False

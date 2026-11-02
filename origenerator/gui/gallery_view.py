@@ -122,7 +122,7 @@ from origenerator.gui.gallery_tree import (
     path_text,
 )
 from origenerator.gui.gallery_view_parts import NO_SHARED, Shared
-from origenerator.gui.generate_pane import GeneratePane
+from origenerator.gui.generate_pane import GeneratePane, TabViews
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.how_many import HOW_MANY
@@ -614,9 +614,10 @@ class GalleryView(QWidget):
         return browsing
 
     def _build_generate_pane(self):
-        self._generate_pane = GeneratePane(self._client, self._db, fun_time=self._fun_time,
-                                       heights=self._prompt_heights, names=self._item_names,
-                                       animated_preview=self.animated_preview)
+        self._generate_pane = GeneratePane(
+            self._client, self._db, fun_time=self._fun_time,
+            views=TabViews(heights=self._prompt_heights, names=self._item_names,
+                           animated_preview=self.animated_preview))
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
         if self._osr2_driver is not None:
             omnipause.holds(self._osr2_driver)

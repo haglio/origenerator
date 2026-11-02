@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from dataclasses import replace
 from typing import NamedTuple
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -20,7 +20,7 @@ from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mar
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.item_names import ItemNames
-from origenerator.library_views import LibraryViews
+from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
 from origenerator.workflows import workflow_named
 
@@ -60,18 +60,15 @@ class GeneratePane(QTabWidget):
     modify_requested = pyqtSignal(str, str, dict)
     folder_requested = pyqtSignal(str)
 
-    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None, heights=None, names: ItemNames | None = None,
-                 animated_preview: Callable[[dict], str | None] | None = None):
-        super().__init__(parent)
-        self._animated_preview = animated_preview
-        self._heights = heights
+    def __init__(self, client: ComfyUIClient | None, db: Database,
+                 *, fun_time=None, views: TabViews = NO_VIEWS):
+        super().__init__()
         self._client = client
         self._fun_time = fun_time
         self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
-        self._library = LibraryViews(db)
-        self._names = names or ItemNames(db)
+        self._views = replace(views, library=LibraryViews(db),
+                              names=views.names or ItemNames(db))
         # Qt drops setTabsClosable when the bar is swapped afterwards.
         self.setTabBar(ElidingTabBar())
         self.setTabsClosable(True)
@@ -123,9 +120,7 @@ class GeneratePane(QTabWidget):
         return widget if isinstance(widget, GenerateTab) else None
 
     def _add_subtab(self, *, preview: bool = False) -> GenerateTab:
-        tab = GenerateTab(self._client, self._db, fun_time=self._fun_time,
-                                    heights=self._heights, library=self._library,
-                                    names=self._names, animated_preview=self._animated_preview)
+        tab = GenerateTab(self._client, self._db, fun_time=self._fun_time, views=self._views)
         index = self.addTab(tab, tab_mark(tab.tab_icon()), tab.title())
         tab.title_changed.connect(lambda _text, p=tab: self._update_tab(p))
         tab.user_edited.connect(lambda p=tab: self._pin_tab(p))

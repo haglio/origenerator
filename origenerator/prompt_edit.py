@@ -233,7 +233,7 @@ def apply_request(positive: str, negative: str, request: str,
     parsed = parse_request(request)
     if parsed is None:
         return None
-    return _revised(unboxed(positive or ""), unboxed(negative or ""), request, parsed,
+    return _revised((unboxed(positive or ""), unboxed(negative or "")), request, parsed,
                     match, rewrite)
 
 
@@ -268,8 +268,8 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     return story_of(after)
 
 
-def _revised(positive: str, negative: str, request: str, parsed: tuple,
-             match, rewrite) -> PromptRevision:
+def _revised(prompts: tuple[str, str], request: str, parsed: tuple, match, rewrite) -> PromptRevision:
+    positive, negative = prompts
     polarity, term = parsed
 
     def made(new_positive, new_negative, action) -> PromptRevision:

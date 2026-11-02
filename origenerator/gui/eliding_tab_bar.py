@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon, QPainter, QPalette, QPixmap
+from PyQt6.QtGui import QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
@@ -52,14 +52,13 @@ class _PreviewTabStyle(QProxyStyle):
         # then re-wraps and deletes out from under Python.
         self.setParent(bar)
 
-    def drawItemText(self, painter, rect, flags, palette, enabled, text,
-                     text_role=QPalette.ColorRole.NoRole):
+    def drawItemText(self, painter, rect, *the_rest):
         font = painter.font()
         italic = self._bar.rect_is_preview_tab(rect)
         if font.italic() != italic:
             font.setItalic(italic)
             painter.setFont(font)
-        super().drawItemText(painter, rect, flags, palette, enabled, text, text_role)
+        super().drawItemText(painter, rect, *the_rest)
 
 
 class ElidingTabBar(QTabBar):

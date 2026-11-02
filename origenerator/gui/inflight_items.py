@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 from origenerator import gallery, timing
@@ -20,22 +21,35 @@ SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
 TRAINING_KEY = "fix training"
 
 
+@dataclass(frozen=True)
+class InFlightSources:
+    db: object
+    jobs: object
+    auto: object
+    tree: object
+
+
+@dataclass(frozen=True)
+class InFlightCallbacks:
+    cancel: Callable[[str], None]
+    reveal: Callable[[str], None]
+    go_to_item: Callable[[str], None]
+    shield: Callable[[str, bool], None]
+
+
 class InFlightItems:
-    def __init__(self, *, db, jobs, auto, tree, image_rows: Callable[[], list],
-                 image_index: Callable[[], dict],
-                 on_cancel: Callable[[str], None], on_reveal: Callable[[str], None],
-                 on_go_to_item: Callable[[str], None],
-                 on_shield: Callable[[str, bool], None]):
-        self._db = db
-        self._jobs = jobs
-        self._auto = auto
-        self._tree = tree
+    def __init__(self, sources: InFlightSources, image_rows: Callable[[], list],
+                 image_index: Callable[[], dict], callbacks: InFlightCallbacks):
+        self._db = sources.db
+        self._jobs = sources.jobs
+        self._auto = sources.auto
+        self._tree = sources.tree
         self._image_rows = image_rows
         self._image_index = image_index
-        self._on_cancel = on_cancel
-        self._on_reveal = on_reveal
-        self._on_go_to_item = on_go_to_item
-        self._on_shield = on_shield
+        self._on_cancel = callbacks.cancel
+        self._on_reveal = callbacks.reveal
+        self._on_go_to_item = callbacks.go_to_item
+        self._on_shield = callbacks.shield
 
     def build(self, rows=None, requests=None) -> list[InFlightItem]:
         job_by_pid = {job.prompt_id: (key, job)

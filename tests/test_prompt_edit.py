@@ -38,6 +38,8 @@ from origenerator.workflows.base import story_of
     ("add a red coat", ADD, "red coat"),
     ("give her braided hair", ADD, "braided hair"),
     ("can you please remove the hat, thanks", REMOVE, "hat"),
+    ("don't give her a hat", REMOVE, "hat"),
+    ("dont give her a hat", REMOVE, "hat"),
 ])
 def test_a_spoken_request_reads_as_a_polarity_and_a_term(request_text, polarity, term):
     assert parse_request(request_text) == (polarity, term)

@@ -1768,6 +1768,68 @@ def test_deleting_a_video_takes_its_soundless_copy_and_that_copys_still_along(tm
     assert output_disk_files(row, OutputPlaces.in_one_folder(out)) == [sounded, soundless, still]
 
 
+def test_binning_one_version_takes_only_the_files_named_and_their_sidecars(tmp_path):
+    out = tmp_path / "output"
+    out.mkdir()
+    binned = out / "binned_1_.png"
+    kept = out / "kept_1_.png"
+    sidecar = out / "binned_1_.mp4"
+    for file in (binned, kept, sidecar):
+        file.write_bytes(b"x")
+    row = _row(output_files=json.dumps([{"filename": "binned_1_.png", "subfolder": ""},
+                                        {"filename": "kept_1_.png", "subfolder": ""}]))
+
+    assert output_disk_files(row, OutputPlaces.in_one_folder(out),
+                             names={"binned_1_.png"}) == [binned, sidecar]
+
+
+def test_a_file_with_a_place_of_its_own_is_found_there_whatever_its_subfolder_says(tmp_path):
+    places = OutputPlaces.in_one_folder(tmp_path / "output")
+    kept = {"filename": "frame.png", "subfolder": "image", "path": str(tmp_path / "kept" / "frame.png")}
+    shown = {"filename": "clip.mp4", "subfolder": "video",
+             "library_path": str(tmp_path / "elsewhere" / "clip.mp4")}
+
+    assert gallery_output.output_file_path(kept, places) == tmp_path / "kept" / "frame.png"
+    assert gallery_output.output_file_path(shown, places) == tmp_path / "elsewhere" / "clip.mp4"
+
+
+def test_a_generation_that_wrote_no_file_has_produced_nothing():
+    assert output_files.produced_output(_row(output_files=json.dumps([{"filename": "a.png"}])))
+    for nothing in (None, "", "[]", "not json", '{"filename": "a.png"}'):
+        assert not output_files.produced_output(_row(output_files=nothing))
+
+
+@pytest.mark.parametrize("status, in_progress", [
+    ("pending", True), ("running", True), ("completed", False), ("error", False)])
+def test_a_row_is_in_progress_while_it_runs_or_waits_its_turn(status, in_progress):
+    assert gallery_output.is_in_progress(_row(status=status)) is in_progress
+
+
+def test_restored_files_come_back_under_the_new_names_in_every_list_that_names_them():
+    row = _row(output_files=json.dumps([{"filename": "a.png"}, {"filename": "b.png"}]),
+               original_files=json.dumps([{"filename": "a.png"}]),
+               enhance_history=json.dumps([{"filename": "c.png"}]),
+               thumbnail_path="a_thumb.jpg")
+
+    renamed = gallery_output.with_files_renamed(row, {"a.png": "a (2).png"})
+
+    assert gallery_output.parse_file_list(renamed["output_files"]) == [
+        {"filename": "a (2).png"}, {"filename": "b.png"}]
+    assert gallery_output.parse_file_list(renamed["original_files"]) == [{"filename": "a (2).png"}]
+    assert gallery_output.parse_file_list(renamed["enhance_history"]) == [{"filename": "c.png"}]
+    assert renamed["thumbnail_path"] == "a_thumb.jpg"
+    assert gallery_output.with_files_renamed(row, {}) is row
+
+
+def test_only_an_image_generation_can_be_started_from_as_an_input_image():
+    files = json.dumps([{"filename": "made_1_.png", "subfolder": "image"}])
+    video = json.dumps([{"filename": "made_1_.mp4", "subfolder": "video"}])
+
+    assert gallery_output.input_image_reference(_row(output_files=files)) == "image/made_1_.png [output]"
+    assert gallery_output.input_image_reference(_row(output_files=video)) is None
+    assert gallery_output.input_image_reference(None) is None
+
+
 def test_output_disk_files_omits_files_not_on_disk(tmp_path):
     out = tmp_path / "output"
     out.mkdir()

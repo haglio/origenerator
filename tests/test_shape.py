@@ -36,6 +36,7 @@ from origenerator.gui.stylesheet import CHOSEN, build_stylesheet
 from origenerator.item_shape import (
     base_of,
     filter_rows,
+    key_holds,
     row_shape,
     shape_of,
     shaped_key,
@@ -113,6 +114,27 @@ def test_a_video_goes_by_its_folders_start_frame_whatever_size_its_row_stored(tm
                   "width": 720, "height": 544},
                  "wan22_i2v_v2.mp4")
     assert row_shape(video) == "portrait"
+
+
+def test_a_video_with_a_thumbnail_goes_by_its_thumbnail_before_its_start_frame(tmp_path):
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (90, 160)).save(frame)
+    video = _row("v3", "wan22_i2v",
+                 {"positive_prompt": "scene six", "input_image": str(frame)},
+                 "wan22_i2v_v3.mp4")
+    _thumbed(video, tmp_path, 160, 90)
+
+    assert row_shape(video) == "landscape"
+
+
+def test_a_folder_holds_itself_and_the_folders_below_it_on_the_same_shape_only():
+    folder = shaped_key("image/sdxl_t2i", "portrait")
+
+    assert key_holds(folder, folder)
+    assert key_holds(folder, shaped_key("image/sdxl_t2i/m0011", "portrait"))
+    assert not key_holds(folder, shaped_key("image/sdxl_t2i/m0011", "landscape"))
+    assert not key_holds(folder, shaped_key("image/sdxl_t2i_other", "portrait"))
+    assert not key_holds(shaped_key("image/sdxl_t2i", "portrait"), "image/sdxl_t2i")
 
 
 def test_an_unreadable_shape_files_under_landscape():

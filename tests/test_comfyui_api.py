@@ -10,7 +10,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from origenerator.comfyui_api import ComfyUIApi, comfyui_responding, format_prompt_error
+from origenerator.comfyui_api import (
+    ComfyUIApi,
+    comfyui_responding,
+    format_execution_error,
+    format_prompt_error,
+)
 from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.output_places import OutputPlaces
@@ -396,6 +401,17 @@ def test_a_submit_answered_too_late_stands_once_the_prompt_is_in_history():
                                                "our-id") == "our-id"
 
 
+def test_a_submit_whose_connection_timed_out_is_waited_on_like_a_slow_answer():
+    clock = _Clock()
+    connect_timed_out = urllib.error.URLError(TimeoutError("timed out"))
+    listed = json.dumps({"queue_running": [_entry(1, "our-id", "ours-client")],
+                         "queue_pending": []}).encode()
+    with _answering(connect_timed_out, connect_timed_out, _mock_response(200, listed)):
+        assert _client_on(clock).submit_job({"1": {"class_type": "Test", "inputs": {}}},
+                                            "our-id") == "our-id"
+    assert clock.now > 0
+
+
 def test_a_submit_the_server_answers_without_the_prompt_fails_after_a_grace_period():
     clock = _Clock()
     with _by_url(queue={"queue_running": [], "queue_pending": []}, history={}), \
@@ -467,3 +483,16 @@ def test_no_client_is_made_without_the_folders_comfyui_opens_files_from():
 
     with pytest.raises(TypeError):
         ComfyUIApi(client_id="test-client")
+
+
+@pytest.mark.parametrize("message, said", [
+    (json.dumps({"node_type": "KSampler", "exception_message": "Out of memory\nTraceback (most recent call last):\n  ..."}),
+     "KSampler failed: Out of memory"),
+    (json.dumps({"exception_message": "  The file is gone  "}), "The file is gone"),
+    (json.dumps({"node_type": "VAEDecode"}), "VAEDecode failed."),
+    (json.dumps({}), "The run failed."),
+    ("the message as it came", "the message as it came"),
+    ("", "The run failed."),
+])
+def test_a_run_that_died_partway_is_reported_as_one_readable_line(message, said):
+    assert format_execution_error(message) == said

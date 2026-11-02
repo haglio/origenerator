@@ -34,7 +34,8 @@ def test_every_unfinished_row_of_the_source_is_dequeued_and_stopped_by_name_and_
     dropped = drop_in_flight(db, client, GenerationSource.BACKFILL, "backfill run")
 
     assert (dropped, sorted(client.cancelled), sorted(client.interrupted)) == (2, ["p1", "p2"], ["p1", "p2"])
-    assert db.get_generation("p1") is None and db.get_generation("p2") is None
+    assert db.get_generation("p1") is None
+    assert db.get_generation("p2") is None
 
 
 def test_a_row_the_server_would_not_let_go_of_is_kept(tmp_path):
@@ -58,4 +59,5 @@ def test_finished_rows_and_rows_of_another_source_are_untouched(tmp_path):
     dropped = drop_in_flight(db, client, GenerationSource.BACKFILL, "backfill run")
 
     assert (dropped, client.cancelled) == (0, [])
-    assert db.get_generation("done") is not None and db.get_generation("other") is not None
+    assert db.get_generation("done") is not None
+    assert db.get_generation("other") is not None

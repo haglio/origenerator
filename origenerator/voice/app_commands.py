@@ -60,14 +60,15 @@ class BarSetting:
 _PHRASES: dict[str, AppCommand | BarSetting] = {}
 
 
-def _say(command: AppCommand | BarSetting, *phrases: str) -> None:
+def _say(command: AppCommand | BarSetting, *phrases: str, said: dict | None = None) -> None:
+    said = _PHRASES if said is None else said
     for phrase in phrases:
-        taken = _PHRASES.get(phrase)
+        taken = said.get(phrase)
         if taken is not None and taken != command:
             raise RuntimeError(
                 f"“{phrase}” already means {taken}, cannot also mean {command}"
             )
-        _PHRASES[phrase] = command
+        said[phrase] = command
 
 
 _COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {

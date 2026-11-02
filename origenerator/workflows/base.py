@@ -32,7 +32,7 @@ SCHEDULER_OPTIONS = [
 DURATION_OPTIONS = [1, 5, 10, 15, 30, 60]
 LONGEST_VIDEO_FRAMES = 961
 # One window's activations grow with its length: 165 frames at the video pixel budget is 10.5 GB and
-# 481 is 31 GB on the 16 GB card, which Windows pages through system RAM at a crawl.
+# 481 is 31 GB on the 16 GB graphics card, which Windows pages through system RAM at a crawl.
 SINGLE_WINDOW_FRAMES = 161
 SCENE_BREAK = "---"
 FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]

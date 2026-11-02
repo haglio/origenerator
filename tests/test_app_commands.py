@@ -219,16 +219,16 @@ def test_every_bar_can_be_sent_to_every_stop_on_the_grid():
     }
 
 
-def test_a_phrase_cannot_mean_two_things(monkeypatch):
-    monkeypatch.setattr("origenerator.voice.app_commands._PHRASES", {})
-    _say(AppCommand.BACK, "step out")
+def test_a_phrase_cannot_mean_two_things():
+    said = {}
+    _say(AppCommand.BACK, "step out", said=said)
 
     with pytest.raises(RuntimeError):
-        _say(AppCommand.FORWARD, "step out")
+        _say(AppCommand.FORWARD, "step out", said=said)
 
 
-def test_two_equal_bar_settings_built_apart_agree_rather_than_collide(monkeypatch):
-    monkeypatch.setattr("origenerator.voice.app_commands._PHRASES", {})
-    _say(BarSetting("speed", 0), "speed zero")
+def test_two_equal_bar_settings_built_apart_agree_rather_than_collide():
+    said = {}
+    _say(BarSetting("speed", 0), "speed zero", said=said)
 
-    _say(BarSetting("speed", 0), "speed zero")
+    _say(BarSetting("speed", 0), "speed zero", said=said)

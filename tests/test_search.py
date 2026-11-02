@@ -48,7 +48,7 @@ def test_a_repeated_word_is_searched_once():
     assert search.query_words("beach beach sunset") == ("beach", "sunset")
 
 
-@pytest.mark.parametrize("plural, singular", [
+@pytest.mark.parametrize(("plural", "singular"), [
     ("dolls", "doll"), ("berries", "berry"), ("dresses", "dress"),
     ("women", "woman"), ("men", "man"), ("children", "child"),
 ])

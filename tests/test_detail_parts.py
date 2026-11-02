@@ -21,7 +21,7 @@ def _named(text):
 
 
 
-@pytest.mark.parametrize("text, part", [
+@pytest.mark.parametrize(("text", "part"), [
     ("Fix teeth.", "teeth"),
     ("fix the teeth", "teeth"),
     ("Fix her hands", "hands"),
@@ -37,7 +37,7 @@ def test_a_short_fix_utterance_names_its_part(text, part):
     assert _named(text) == [part]
 
 
-@pytest.mark.parametrize("text, parts", [
+@pytest.mark.parametrize(("text", "parts"), [
     ("fix hands and mouth", ["hands", "mouth"]),
     ("Fix her eyes and teeth.", ["teeth", "eyes"]),
     ("fix face, hands and eyes", ["faces", "hands", "eyes"]),
@@ -66,7 +66,7 @@ def test_anything_else_is_no_fix(text):
 
 
 
-@pytest.mark.parametrize("text, spelled", [
+@pytest.mark.parametrize(("text", "spelled"), [
     ("Fix teeth.", "fix teeth"),
     ("Fixed the eyes.", "fix the eyes"),
     ("six-teeth.", "fix teeth"),

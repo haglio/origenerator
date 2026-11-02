@@ -395,7 +395,7 @@ def test_a_thumbnail_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_
     field.hidePopup()
 
 
-@pytest.mark.parametrize("size, beside, within", [
+@pytest.mark.parametrize(("size", "beside", "within"), [
     ((400, 800), lambda middle, edge: (edge, middle), lambda middle, edge: (middle, edge + 4)),
     ((800, 400), lambda middle, edge: (middle, edge), lambda middle, edge: (edge + 4, middle)),
 ])
@@ -1036,7 +1036,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     assert form.get_values()["cfg"] == 0.85
 
 
-@pytest.mark.parametrize("pd, written, read_back", [
+@pytest.mark.parametrize(("pd", "written", "read_back"), [
     (ParamDef("enhance", "Enhance", "bool", True), False, False),
     (ParamDef("name", "Name", "str", ""), "a made-up name", "a made-up name"),
     (ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),

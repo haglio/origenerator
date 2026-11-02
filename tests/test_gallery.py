@@ -333,7 +333,7 @@ def test_settings_signature_ignores_the_audio_seed_like_the_sampler_seeds():
     assert settings_signature("wan22_i2v", a, {}) == settings_signature("wan22_i2v", b, {})
 
 
-@pytest.mark.parametrize("key, one, other", [
+@pytest.mark.parametrize(("key", "one", "other"), [
     ("audio_seed", 1, 2),
     ("enhance", False, True),
     ("enhance_scale", 2.0, 4.0),

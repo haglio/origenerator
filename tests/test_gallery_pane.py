@@ -597,7 +597,7 @@ def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
     assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"]
 
 
-@pytest.mark.parametrize("folder, kind", [
+@pytest.mark.parametrize(("folder", "kind"), [
     (gallery.ALL_KEY, "generations"), ("image", "images"), ("video/wan22_i2v", "videos")])
 def test_an_empty_latest_names_the_kind_its_folder_holds(qtbot, folder, kind):
     pane, scroll = _pane(qtbot)

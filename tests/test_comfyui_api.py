@@ -485,7 +485,7 @@ def test_no_client_is_made_without_the_folders_comfyui_opens_files_from():
         ComfyUIApi(client_id="test-client")
 
 
-@pytest.mark.parametrize("message, said", [
+@pytest.mark.parametrize(("message", "said"), [
     (json.dumps({"node_type": "KSampler", "exception_message": "Out of memory\nTraceback (most recent call last):\n  ..."}),
      "KSampler failed: Out of memory"),
     (json.dumps({"exception_message": "  The file is gone  "}), "The file is gone"),

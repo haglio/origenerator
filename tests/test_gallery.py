@@ -1799,7 +1799,7 @@ def test_a_generation_that_wrote_no_file_has_produced_nothing():
         assert not output_files.produced_output(_row(output_files=nothing))
 
 
-@pytest.mark.parametrize("status, in_progress", [
+@pytest.mark.parametrize(("status", "in_progress"), [
     ("pending", True), ("running", True), ("completed", False), ("error", False)])
 def test_a_row_is_in_progress_while_it_runs_or_waits_its_turn(status, in_progress):
     assert gallery_output.is_in_progress(_row(status=status)) is in_progress

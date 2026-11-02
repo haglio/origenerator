@@ -1,8 +1,3 @@
-"""The spoken "animate as" — the lane and the action it names, and what it leaves out.
-
-The actions are the committed example overlay's own (alpha, beta, gamma, dancing…),
-so nothing here is fixture vocabulary out of the library (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import pytest
@@ -46,8 +41,6 @@ def test_the_action_may_be_left_out_where_the_image_leaves_no_choice():
 
 
 def test_an_action_the_app_has_never_heard_of_is_no_command_at_all():
-    # Everything unmatched falls through to a prompt rewrite, and "animate as a
-    # painting would" is one of those.
     assert match_animate_command("animate as a painting would") is None
     assert match_animate_command("animate as zeta") is None
 

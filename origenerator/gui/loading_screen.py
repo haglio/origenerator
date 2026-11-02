@@ -1,5 +1,3 @@
-"""Origenerator's loading screen: the family's loading window, in a process of its own."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence

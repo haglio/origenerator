@@ -1,16 +1,3 @@
-"""The one way this package opens its database file.
-
-Every query in every store goes through :class:`SqliteFile.connect`, so the two
-things it promises — commit on the way out, close whatever happens — are worth
-one test each rather than being re-asserted in six store modules.
-
-Closing is the half with a bug under it: the plain ``with sqlite3.connect(...)``
-this replaced commits and then leaves the connection to the garbage collector,
-which on Windows keeps the file open long enough for the next rename or replace
-of it to be refused (see origenerator.db_salvage).
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import sqlite3
@@ -62,10 +49,15 @@ def test_a_block_that_raises_writes_nothing(file):
 
 
 def test_rows_come_back_by_column_name(file):
-    """Every store reads its rows as ``row["column"]``; a default connection
-    hands back plain tuples and every one of them would be a TypeError."""
     with file.connect() as conn:
         conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene three",))
         row = conn.execute("SELECT id, body FROM notes").fetchone()
 
     assert row["body"] == "scene three"
+
+
+def test_the_version_moves_with_every_commit_though_the_watcher_never_writes(file):
+    before = file.version()
+    with file.connect() as conn:
+        conn.execute("INSERT INTO notes (body) VALUES ('example')")
+    assert file.version() != before

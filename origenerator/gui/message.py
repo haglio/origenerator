@@ -1,23 +1,3 @@
-"""What a slideshow has to say, in the message Fun Time says it in.
-
-Fun Time flashes its messages — "Clip saved", "No other seeds", "Next seed" — at
-the top center of the Funestra they are about, in one shape everywhere: the
-secondary gray, a hairline of the text's own color, a bold heading face, rounded corners
-(Fun Time's own message, in its ``notice_overlay``). This is that message, worn by
-Origenerator's own: the request being spoken, and what a press or a
-spoken word just did. A plate of its own down at the foot of the slideshow would be
-a second dialect for the same job, said in the same room, on a surface that
-already wears the Funestras' own HUD.
-
-Matched through the tokens rather than by eye: the color, the face and the
-shape come out of :mod:`shared_ui` (its ``notice_shape``), which is where Fun
-Time takes them from too, so a change moves both at once.
-
-A child of the surface rather than a window of its own — Fun Time's is a
-top-level because it flashes over a *foreign* Funestra's window, and here the
-surface it belongs to is ours.
-"""
-
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
@@ -54,8 +34,6 @@ def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
 
 
 class Message(QLabel):
-    """One line, centered across the top of the surface it belongs to."""
-
     def __init__(self, host: QWidget):
         super().__init__(host)
         self.setFont(make_font(FONT_UI, NOTICE_TYPE_SIZE, bold=True))
@@ -64,7 +42,6 @@ class Message(QLabel):
         self.hide()
 
     def say(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
-        """Put *text* up, and keep it up until something says otherwise."""
         ink = _INK[kind].name()
         self.setStyleSheet(
             f"background-color: {BG_SECONDARY.name()};"

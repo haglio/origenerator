@@ -1,6 +1,3 @@
-"""Origenerator's loading screen: the family's loading window wearing this app's
-caption, name and icon, and walking the boot's own steps."""
-
 from __future__ import annotations
 
 import logging
@@ -46,8 +43,6 @@ def test_window_title_identifies_app(qtbot):
 
 
 def test_the_splash_never_wears_the_apps_own_caption(qtbot):
-    """A hosting Fun Time session resolves Core by that exact
-    caption, so a loading screen wearing it would be mistaken for the window."""
     screen = _screen()
     qtbot.addWidget(screen)
 
@@ -64,8 +59,6 @@ def test_it_opens_on_the_boots_first_words_offering_esc(qtbot):
 
 
 def test_every_line_the_boot_says_is_a_step_the_bar_knows():
-    """A line the screen has never heard of leaves the bar where it was, so
-    every status the boot announces has to be in its plan, in the boot's order."""
     said = [step for step, _weight in _STEPS]
 
     assert said[:2] == [STARTING_THE_SERVER, OPENING_THE_LIBRARY]

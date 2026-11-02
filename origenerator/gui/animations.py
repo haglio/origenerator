@@ -1,10 +1,3 @@
-"""A small gallery of the videos an image was animated into.
-
-Shown in the Generate pane when an image is selected: each video the image was used
-as the input for appears as a looping WebP preview (or its static thumbnail when
-no animation is available), and clicking one navigates to that video. WebP +
-``QMovie`` keeps many previews moving at once without a video player per tile.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -19,8 +12,6 @@ from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 
 class _VideoTile(QLabel):
-    """One clickable preview tile that reports its generation's id when clicked."""
-
     clicked = pyqtSignal(str)
 
     def __init__(self, prompt_id: str, parent=None):
@@ -41,14 +32,6 @@ def _show_heading(label, heading: str) -> None:
 
 
 class Animations(QWidget):
-    """Preview tiles for the videos an image was animated into.
-
-    ``show_videos`` takes ``(prompt_id, movie_path, still_path)`` triples — a
-    looping WebP when ``movie_path`` is set, else the static ``still_path`` — and
-    hides the whole row when there are none. Clicking a tile emits
-    ``video_activated`` with that video's prompt_id.
-    """
-
     video_activated = pyqtSignal(str)
 
     def __init__(self, parent=None):
@@ -69,8 +52,7 @@ class Animations(QWidget):
         _show_heading(self._heading, heading)
 
     def show_videos(self, items: list[tuple[str, object, object]]):
-        # Rebuild the tile host wholesale — deleting it stops and frees the old
-        # tiles' movies, the same replace-the-widget idiom the gallery uses.
+        # Deleting the old host stops and frees its tiles' movies.
         self._column.removeWidget(self._host)
         self._host.deleteLater()
         self._host = QWidget()

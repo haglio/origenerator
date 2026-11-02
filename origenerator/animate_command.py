@@ -1,9 +1,3 @@
-"""The spoken ``animate as [Video|Genau] [action]``, said over an image.
-
-The lane defaults to the full-length video and an action left unsaid comes back as
-``""`` for :mod:`origenerator.animation_paths` to settle against what the image
-shows. The loop lane answers to "go now" too and is said back as "Genau".
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,7 +7,7 @@ from origenerator import animation_paths
 from origenerator.action_settings import CATEGORIES, GENAU, VIDEO
 from origenerator.voice.text import sounds_like, words
 
-# The verb as whisper renders it, and every rendering of the loop lane's sound.
+# Whisper's renderings of the verb and of the loop lane's sound.
 _LEAD = ("animate", "animated")
 _LANE_WORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (VIDEO, ("kino", "video")),
@@ -21,7 +15,6 @@ _LANE_WORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
              "go now", "good now", "can now")),
 )
 
-# What the lane is said back as, and what is said for the loop one.
 _LANE_SPELLING = {VIDEO: "Kino", GENAU: "Genau"}
 
 
@@ -38,10 +31,6 @@ class AnimateRequest:
 
 
 class Answer(NamedTuple):
-    """What one request comes to for one image: the action to run, or the line to
-    say instead, and whether that line refuses something the image cannot do
-    (said as an error rather than as a question)."""
-
     action: str | None
     said: str = ""
     unsupported: bool = False
@@ -64,8 +53,6 @@ def _lane_of(rest: list[str]) -> tuple[str, list[str]]:
 
 
 def _action_of(rest: list[str], actions) -> str | None:
-    """The action ``rest`` names, ``""`` for an utterance that names none, and
-    ``None`` for words that are no action -- which is no command at all."""
     if not rest:
         return ""
     said = " ".join(rest)
@@ -95,9 +82,6 @@ def animate_command_phrases(actions=CATEGORIES) -> frozenset[str]:
 
 def what_to_animate(asked: AnimateRequest, state: str, *, content: dict | None = None
                     ) -> Answer:
-    """The action to run for an image already in ``state``, or what to say instead:
-    two questions (an unsorted image, an unsaid action with a choice to make) and
-    two refusals, which are marked so the surface says them as errors."""
     if not state:
         return Answer(None, "this image hasn't been sorted yet — say what it "
                             "shows, then ask again")
@@ -117,8 +101,6 @@ def what_to_animate(asked: AnimateRequest, state: str, *, content: dict | None =
 
 
 def animate_command_spelling(text: str, actions=CATEGORIES) -> str | None:
-    """The utterance in the words the app names them by -- "gunow" read back as
-    "Genau" -- or ``None`` when it is no animation."""
     asked = match_animate_command(text, actions)
     if asked is None:
         return None

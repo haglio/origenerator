@@ -247,12 +247,7 @@ def test_a_middle_click_closes_nothing_in_a_row_that_offers_no_close(qtbot):
 
 
 def _painted_label_font(bar, index):
-    """The font the bar's style would paint tab ``index``'s label with.
-
-    Read at the drawing call rather than off a rendered pixmap: the offscreen
-    platform this suite runs on paints italic and upright text identically, so a
-    grab of the bar cannot tell them apart.
-    """
+    """The font the bar's style would paint tab ``index``'s label with, read at the drawing call: Qt's offscreen platform paints italic and upright text identically."""
     pixmap = QPixmap(400, 60)
     painter = QPainter(pixmap)
     try:

@@ -302,7 +302,7 @@ _BELOW_NORMAL = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
 
 
 def _popen_the_fake(job):
-    """The real trainer runs below normal priority; a fake child at that priority can wait longer than a test may on a machine with full cores."""
+    """The real trainer runs below normal priority on Windows; a fake child at that priority can wait longer than a test may on a machine with full cores."""
     def popen(command, **options):
         options["creationflags"] = options.get("creationflags", 0) & ~_BELOW_NORMAL
         return subprocess.Popen([sys.executable, job["trainer_program"], *command], **options)

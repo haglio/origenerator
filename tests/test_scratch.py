@@ -43,7 +43,7 @@ def test_a_file_something_still_has_open_is_named_instead_of_left_behind(tmp_pat
 
 
 def test_a_file_linked_in_from_outside_keeps_its_read_only_bit(tmp_path: Path):
-    """Every link to a file shares that file's read-only bit, so clearing it on
+    """Windows gives every link to a file that file's read-only bit, so clearing it on
     the link would clear it on a file outside the scratch too."""
     outside = tmp_path / "elsewhere.txt"
     outside.write_bytes(b"a file its owner keeps read-only")

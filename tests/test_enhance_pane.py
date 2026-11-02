@@ -524,7 +524,7 @@ def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
 
 
 def _mean_ink(widget) -> float:
-    """Mean brightness over the app's background, rendered onto a filled pixmap since a bare ``grab`` leaves unpainted pixels uninitialized."""
+    """Mean brightness over the app's background, rendered onto a filled pixmap since a bare Qt ``grab`` leaves unpainted pixels uninitialized."""
     pixmap = QPixmap(widget.size())
     pixmap.fill(BG_PRIMARY)
     widget.render(pixmap, QPoint(), flags=QWidget.RenderFlag.DrawChildren)

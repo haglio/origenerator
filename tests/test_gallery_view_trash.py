@@ -186,7 +186,7 @@ def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert "only their thumbnails are kept" in view._gallery_pane._trash_empty_hint()
-    assert view._avg_label.text() == ""  # the hint already says it; don't say it twice
+    assert view._avg_label.text() == ""
 
 
 def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):

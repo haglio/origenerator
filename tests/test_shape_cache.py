@@ -76,8 +76,6 @@ def test_the_one_it_drops_is_the_one_nothing_has_asked_for():
 
     _measure("late")
 
-    # ``row_shape`` keys the cache by ``str(Path(thumbnail_path))``, so the
-    # separator is the platform's -- backslashes on Windows.  Assert against the
-    # same normalization the cache stores, not a raw POSIX literal.
+    # Windows spells the cache key's path with backslashes, so assert against the same normalization the cache stores.
     assert str(Path("/library/m0.png")) in item_shape._measured
     assert str(Path("/library/m1.png")) not in item_shape._measured

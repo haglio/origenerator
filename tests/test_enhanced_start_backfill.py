@@ -175,8 +175,6 @@ def _namesake(db, prompt_id, filename):
 
 
 def test_a_sent_video_sharing_its_name_with_another_is_left_alone(tmp_path):
-    # Evolver takes a send back by the video's name, so taking this one's back
-    # would take the namesake's copies with it.
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     _video(db, "video", made_from="image")

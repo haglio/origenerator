@@ -370,7 +370,7 @@ def _never_raise_the_runs_priority(monkeypatch):
 
 
 def refuse_the_dialogs_nobody_can_answer(setattr) -> None:
-    """An offscreen modal dialog spins a nested event loop nobody can end, so the run would hang instead of failing."""
+    """A Qt offscreen modal dialog spins a nested event loop nobody can end, so the run would hang instead of failing."""
     def refuse(name):
         def blocked(*_args, **_kwargs):
             raise AssertionError(

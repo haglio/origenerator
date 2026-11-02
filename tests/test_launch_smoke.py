@@ -37,7 +37,6 @@ def _run_in_a_fresh_interpreter(statements: list[str]) -> subprocess.CompletedPr
 
     driver = "\n".join(
         [
-            # Before any import that reads content: the launch comes up on the committed example.
             "import origenerator.content as _content",
             "_content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT",
             *statements,

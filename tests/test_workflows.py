@@ -1176,7 +1176,7 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
 
 
 def test_foley_duration_never_undercuts_the_models_one_second_floor():
-    # HunyuanFoley rejects durations under one second.
+    # ComfyUI's HunyuanFoley rejects durations under one second.
     wf = Wan22Flf2vLoopWorkflow()
     params = dict(wf.default_params(), frame_count=5, frame_rate=16.0)
     payload = wf.build_api_payload(params)
@@ -1499,7 +1499,7 @@ def test_sdxl_pose_transfer_pose_mode_swaps_depth_for_a_dwpose_skeleton():
 
 
 def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
-    # xinsir's pose ControlNets were trained on thicker skeleton sticks than the OpenPose standard.
+    # ComfyUI's xinsir pose ControlNets were trained on thicker skeleton sticks than the OpenPose standard.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(wf.default_params(), input_image="x.png", control_mode="pose")
     assert "xinsir" in params["controlnet"].lower()
@@ -1513,7 +1513,7 @@ def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
 
 
 def test_sdxl_pose_transfer_union_type_node_only_wraps_union_controlnets():
-    # A plain single-purpose ControlNet crashes on SetUnionControlNetType's extra argument.
+    # ComfyUI's plain single-purpose ControlNet crashes on SetUnionControlNetType's extra argument.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(
         wf.default_params(), input_image="x.png", control_mode="pose",

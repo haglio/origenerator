@@ -31,7 +31,6 @@ def _top_level_boxes(data: bytes):
 
 
 def write_mp4_with_a_comment_tag(path: Path, comment: str) -> Path:
-    """A video carrying *comment* as a container tag; cv2 writes ``moov`` last, so the tag is appended there without moving an offset the frames depend on."""
     data = bytearray(write_mp4(path).read_bytes())
     moov_at, moov_size, last_kind = list(_top_level_boxes(bytes(data)))[-1]
     assert last_kind == b"moov", f"cv2 wrote {last_kind!r} last, not moov"

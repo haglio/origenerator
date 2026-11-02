@@ -35,7 +35,7 @@ class TestRaiseWindowWithoutActivating:
 
         (hwnd, insert_after, *rect, flags), _kwargs = user32.SetWindowPos.call_args
         assert (hwnd.value, insert_after, rect) == (111, None, [0, 0, 0, 0])
-        assert flags == 0x0001 | 0x0002 | 0x0010  # SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+        assert flags == 0x0001 | 0x0002 | 0x0010  # Windows' SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
 
     def test_a_dead_handle_is_left_alone(self):
         with _user32_with_a_window(alive=False) as user32:
@@ -58,7 +58,7 @@ class TestPlaceWindowInDevicePixels:
 
         (hwnd, insert_after, *rect, flags), _kwargs = user32.SetWindowPos.call_args
         assert (hwnd.value, insert_after, rect) == (111, None, [0, 203, 716, 1237])
-        assert flags == 0x0004 | 0x0010  # SWP_NOZORDER | SWP_NOACTIVATE
+        assert flags == 0x0004 | 0x0010  # Windows' SWP_NOZORDER | SWP_NOACTIVATE
 
     def test_a_minimized_window_stays_minimized_and_comes_back_onto_the_rect(self):
         with _user32_with_a_window() as user32:
@@ -72,11 +72,11 @@ class TestPlaceWindowInDevicePixels:
         (hwnd, placement), _kwargs = user32.SetWindowPlacement.call_args
         assert hwnd == 111
         assert _edges(placement.contents.rcNormalPosition) == (0, 203, 716, 1440)
-        assert placement.contents.showCmd == 7  # SW_SHOWMINNOACTIVE
+        assert placement.contents.showCmd == 7  # Windows' SW_SHOWMINNOACTIVE
 
     def test_a_minimized_window_that_would_come_back_maximized_comes_back_onto_the_rect(self):
         def restores_maximized(hwnd, placement):
-            placement.contents.flags = 0x0002  # WPF_RESTORETOMAXIMIZED
+            placement.contents.flags = 0x0002  # Windows' WPF_RESTORETOMAXIMIZED
             return 1
 
         with _user32_with_a_window() as user32:

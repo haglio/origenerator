@@ -57,7 +57,6 @@ class TestWhichPathsMovedAndWhichDidNot:
 
 
 class TestTheValuesAnotherAppHoldsToo:
-    # Spelled out, not derived: a derived value reads the same before and after it moves.
 
     def test_the_shared_osr2_state_lives_in_fun_times_checkout(self):
         assert config.project_dir("fun_time") / "state" == osr2.SHARED_STATE_DIR

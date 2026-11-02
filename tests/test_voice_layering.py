@@ -4,7 +4,6 @@ from tests.children import run_python
 
 
 def _modules_loaded_by(module: str) -> set[str]:
-    # A fresh interpreter: the suite itself has already imported half the app.
     probe = (
         f"import importlib, sys; importlib.import_module({module!r}); "
         "print(' '.join(sorted(sys.modules)))"

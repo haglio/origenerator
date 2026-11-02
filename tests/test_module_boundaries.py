@@ -1,8 +1,6 @@
 """Which modules are allowed to need Qt, held as an equality.
 
 Each module is imported in a fresh interpreter, because PyQt6 is already loaded in this process.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 

@@ -214,7 +214,6 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
     db.upsert_folder_meta(key, custom_name=None, favorite=True,
                           level="settings", ref_prompt_id="p1")
 
-    # settings_folder_key and build_gallery_tree resolve folder_signature in gallery.tree, so it is patched there, not on the facade re-export.
     original = gallery.folder_signature
     monkeypatch.setattr(gallery.tree, "folder_signature",
                         lambda *a, **kw: original(*a, **kw) + "X")

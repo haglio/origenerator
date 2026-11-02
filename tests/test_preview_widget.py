@@ -66,7 +66,7 @@ def _make_animated_gif(path):
 
 @pytest.fixture
 def make_preview(qtbot):
-    # The real QtMultimedia backend deadlocks at session shutdown once a player has started
+    # The real Qt Multimedia backend deadlocks at session shutdown once a player has started
     def _make(**kwargs):
         w = PreviewWidget(player=MagicMock(), **kwargs)
         qtbot.addWidget(w)

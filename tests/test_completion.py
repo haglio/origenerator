@@ -49,8 +49,8 @@ def test_extracts_output_files(tmp_path):
         SDXL, SDXL_HISTORY, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs", "n1"
     )
     assert files == [{"filename": "a.png", "subfolder": ""}]
-    assert thumb is None  # a.png isn't on disk, so no thumbnail
-    assert duration is None  # no timing in this history
+    assert thumb is None
+    assert duration is None
 
 
 def test_renders_thumbnail_when_output_is_on_disk(tmp_path):
@@ -203,7 +203,7 @@ def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):
         lambda *a, **k: calls.append((a, k)),
     )
     extract_completion(SDXL, SDXL_HISTORY, OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs", "n1")
-    assert calls == []  # a still image has nothing to drive a device with
+    assert calls == []
 
 
 def test_a_script_that_cannot_be_written_never_strands_a_finished_video(tmp_path, monkeypatch):

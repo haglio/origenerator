@@ -375,7 +375,8 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
 def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_image(
         qtbot, tmp_path, monkeypatch):
-    by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
+    def by_id(row, places):
+        return (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
     monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
     client = _reroll_client()

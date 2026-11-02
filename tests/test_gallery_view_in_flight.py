@@ -544,7 +544,8 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
 
     done = tmp_path / "done.png"
     Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
-    landed = lambda row, places: (done, "image") if row["prompt_id"] == job.prompt_id else None
+    def landed(row, places):
+        return (done, "image") if row["prompt_id"] == job.prompt_id else None
     monkeypatch.setattr(generate_tab_module, "resolve_preview", landed)
     monkeypatch.setattr(gallery, "resolve_preview", landed)
 
@@ -559,7 +560,8 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
 
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
         qtbot, tmp_path, monkeypatch):
-    by_id = lambda row, places: (f"{row['prompt_id']}.png", "image")
+    def by_id(row, places):
+        return (f"{row['prompt_id']}.png", "image")
     monkeypatch.setattr(gallery, "resolve_preview", by_id)
     monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
     client = _reroll_client()

@@ -141,7 +141,8 @@ def test_wan_video_workflows_expose_model_dropdowns(monkeypatch):
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
         "loras": ["l.safetensors"],
     }
-    dropdown = lambda category, fallback, **terms: installed[category]
+    def dropdown(category, fallback, **terms):
+        return installed[category]
     monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
@@ -839,7 +840,8 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
 
 def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
-    dropdown = lambda category, fallback, **terms: installed.get(category, list(fallback))
+    def dropdown(category, fallback, **terms):
+        return installed.get(category, list(fallback))
     monkeypatch.setattr(dropdowns, "list_model_files", dropdown)
 
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):

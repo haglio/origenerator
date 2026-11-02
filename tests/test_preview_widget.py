@@ -853,7 +853,8 @@ def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, t
 
 def test_the_source_video_half_of_a_combination_loops_in_gray(make_preview, tmp_path):
     w = make_preview()
-    w.show(); w.resize(400, 200)
+    w.show()
+    w.resize(400, 200)
 
     w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
                                    _animated_webp(tmp_path / "source.webp")))

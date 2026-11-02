@@ -1,4 +1,3 @@
-"""Fixture values are fabricated throughout (see CLAUDE.md)."""
 from __future__ import annotations
 
 from origenerator.sorting_session import SortingSession

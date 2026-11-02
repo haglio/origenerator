@@ -73,7 +73,6 @@ def test_each_kind_holds_its_own_rows_in_their_order_and_all_holds_both():
 
 
 def test_the_videos_latest_reaches_a_lone_old_video():
-    # Nothing trims the list, so the one video under five images still surfaces.
     rows = [_image(f"i{n}", "alpha.safetensors", seed=n) for n in range(5)] + [_video("v1")]
     placement = _placement(_library(rows))
 

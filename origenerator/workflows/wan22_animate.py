@@ -31,12 +31,6 @@ _SEAM_FRAMES = 1
 
 
 class Wan22AnimateWorkflow(WorkflowTemplate):
-    """WAN 2.2 Animate: the person in the image performs a library video's movements.
-
-    ComfyUI's own ``video_wan2_2_14B_animate`` template in its animation mode, the
-    run shaped like the video and the image fitted into it, never cropped; the
-    video's sound and script (:meth:`authored_actions`) come along."""
-
     name = "wan22_animate"
     version = "v001"
     display_name = "WAN 2.2 I2V (Moves from a Library Video)"

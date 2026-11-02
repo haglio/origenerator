@@ -1,8 +1,3 @@
-"""Whether a file is there, answered from one listing of its folder for the
-length of one look.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import os

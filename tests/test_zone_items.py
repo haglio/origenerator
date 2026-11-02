@@ -1,4 +1,3 @@
-"""What a drop zone holds, as the gallery reads it. Fixture values are fabricated."""
 from __future__ import annotations
 
 import json

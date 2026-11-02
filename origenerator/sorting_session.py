@@ -1,4 +1,3 @@
-"""What each press in the sorting window does to the line of images."""
 from __future__ import annotations
 
 from collections import deque
@@ -20,7 +19,6 @@ class SortingSession:
 
     @property
     def last_state(self) -> str | None:
-        """The state the last answer gave, which :meth:`same` gives again."""
         return self._sorted[-1][1] if self._sorted else None
 
     @property

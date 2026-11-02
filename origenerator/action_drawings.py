@@ -1,5 +1,3 @@
-"""The drawing that stands for each action on a button: the user's own, named
-after the action, kept beside the library; an action without one simply has none."""
 from __future__ import annotations
 
 import re

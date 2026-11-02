@@ -110,7 +110,7 @@ class Combine(QWidget):
 
         self._build_the_intent_part()
 
-        self._lay_out_the_panel()
+        self._lay_out_the_combine()
         self._sync()
 
     def _build_the_video_part(self) -> None:
@@ -165,7 +165,7 @@ class Combine(QWidget):
         intent_row.addWidget(self._genau_radio)
         intent_row.addStretch(1)
 
-    def _lay_out_the_panel(self) -> None:
+    def _lay_out_the_combine(self) -> None:
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._emit)
         self._open_btn = QPushButton("Edit individual…")

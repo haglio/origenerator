@@ -25,7 +25,7 @@ from origenerator import (
     lora_training,
 )
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.gallery.collection import (
     LATEST_KEY,
 )
@@ -94,11 +94,11 @@ _IMG_REROLL_HISTORY = {"outputs": {"7": {"images": [
 
 def _insert_running_reroll(db, prompt_id="rr", seed=99):
     params = dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", seed=seed,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="running")
 
 
@@ -781,23 +781,23 @@ def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp
 
 def _seeded_i2v_db(tmp_path):
     db = Database(tmp_path / "i2v.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", negative_prompt="", seed=7,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=7, positive_prompt="a cat")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "img", status="completed",
         output_files=json.dumps([{"filename": "sdxl_src.png", "subfolder": "image"}]),
     )
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
         positive_prompt="dance", negative_prompt="", seed=3,
         params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
                                     positive_prompt="dance", input_image="sdxl_src.png")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "vid", status="completed",
         output_files=json.dumps([{"filename": "wan_src.mp4", "subfolder": "video"}]),
@@ -957,13 +957,13 @@ def test_poll_reconciles_a_reroll_whose_completion_signal_was_missed(qtbot, tmp_
 
 def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_path):
     db = Database(tmp_path / "i2v.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
         positive_prompt="dance", negative_prompt="", seed=3,
         params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
                                     positive_prompt="dance", input_image="outside.png")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "vid", status="completed",
         output_files=json.dumps([{"filename": "wan_src.mp4", "subfolder": "video"}]),
@@ -1449,8 +1449,8 @@ def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
 def test_a_job_a_spoken_request_queued_says_so(qtbot):
     db = FakeDB([_image("src", "a kite", 50, 1)])
     db.add(_running_row("asked", prompt="a kite, no string"))
-    db.record_request(prompt_id="asked", source_prompt_id="src",
-                      heard="Request, no string, over.")
+    db.record_request(NewRequest(prompt_id="asked", source_prompt_id="src",
+                      heard="Request, no string, over."))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1617,9 +1617,9 @@ def _running_folder_key(view):
 def _finished_row_db(tmp_path):
     db = Database(tmp_path / "t.db")
     p = dict(_SDXL.default_params(), seed=1, positive_prompt="a cat")
-    db.insert_generation(prompt_id="done", workflow_name="sdxl_t2i", workflow_version="v",
+    db.insert_generation(NewGeneration(prompt_id="done", workflow_name="sdxl_t2i", workflow_version="v",
                          positive_prompt="a cat", seed=1,
-                         params_json=json.dumps(p), workflow_json="{}")
+                         params_json=json.dumps(p), workflow_json="{}"))
     db.update_generation("done", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_t2i_done.png"}]))
     return db
@@ -1703,9 +1703,9 @@ def test_i2v_reroll_inflight_tile_follows_the_image_to_video_handoff(qtbot, tmp_
 def test_latest_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     db = _finished_row_db(tmp_path)
     p = dict(_SDXL.default_params(), seed=5, positive_prompt="a wolf")
-    db.insert_generation(prompt_id="rr_running", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="rr_running", workflow_name="sdxl_t2i",
                          workflow_version="v", positive_prompt="a wolf", seed=5,
-                         params_json=json.dumps(p), workflow_json="{}")
+                         params_json=json.dumps(p), workflow_json="{}"))
     db.update_generation("rr_running", status="running")
     gv = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(gv)
@@ -1733,9 +1733,9 @@ def _two_image_db(tmp_path, prompts=("the first one", "a completely different on
     db = Database(tmp_path / "t.db")
     for (pid, prompt), seed in zip(zip(("a", "b"), prompts, strict=True), (7, 8), strict=True):
         params = dict(_SDXL.default_params(), seed=seed, positive_prompt=prompt)
-        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i",
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="sdxl_t2i",
                              workflow_version=_SDXL.version, positive_prompt=prompt,
-                             seed=seed, params_json=json.dumps(params), workflow_json="{}")
+                             seed=seed, params_json=json.dumps(params), workflow_json="{}"))
         db.update_generation(pid, status="completed",
                              output_files=json.dumps([{"filename": f"sdxl_{pid}.png",
                                                        "subfolder": ""}]))
@@ -1933,9 +1933,9 @@ def test_canceling_a_generate_brings_back_how_the_prompt_differs_from_the_item_s
 def test_a_generate_with_words_in_the_request_stays_marked_against_what_they_asked_of(
         qtbot, tmp_path):
     db = _seeded_db(tmp_path)
-    db.record_request(prompt_id="orig", source_prompt_id="src", heard="", asked="no bird",
+    db.record_request(NewRequest(prompt_id="orig", source_prompt_id="src", heard="", asked="no bird",
                       old_positive="a bird", old_negative="",
-                      new_positive="a cat", new_negative="")
+                      new_positive="a cat", new_negative=""))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1989,11 +1989,11 @@ def test_a_landed_generation_tells_an_open_tab_its_seed_is_now_a_duplicate(qtbot
     qtbot.waitUntil(lambda: not tab._caption_timer.isActive())
     assert tab._generate_btn.text() == "Generate"
 
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="done", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="a cat", negative_prompt="", seed=42,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation("done", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_done.png", "subfolder": ""}]))
     view.refresh()
@@ -2331,8 +2331,8 @@ def test_cancel_all_leaves_auto_generate_on_to_start_its_next_seed(
 def test_restoring_an_emptied_item_runs_it_again_in_its_own_folder_and_brings_it_back(
         qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i", workflow_version="v1",
-                         params_json=json.dumps({"seed": 4242}), workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="p1", workflow_name="sdxl_t2i", workflow_version="v1",
+                         params_json=json.dumps({"seed": 4242}), workflow_json="{}"))
     db.set_generation_favorite("p1", True)
     db.update_generation("p1", status="completed",
                          output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))

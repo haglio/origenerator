@@ -6,7 +6,7 @@ import pytest
 
 from origenerator import enhance_presets
 from origenerator.app_state import AppState
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.enhance_presets import Preset
 from origenerator.gallery.enhance import most_used_enhancements
 from origenerator.gallery.enhance_fold import fold_enhancement
@@ -45,16 +45,16 @@ def test_an_image_enhanced_by_the_model_that_made_it_was_enhanced_matching_the_s
 
 def _library_of_one_image(tmp_path, own_params, *runs):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(prompt_id="src", workflow_name="flux_t2i", workflow_version="v001",
-                         params_json=json.dumps(own_params), workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="src", workflow_name="flux_t2i", workflow_version="v001",
+                         params_json=json.dumps(own_params), workflow_json="{}"))
     db.update_generation("src", status="completed", output_files=json.dumps(
         [{"filename": "src.png", "subfolder": "image", "type": "output"}]))
     for number, run in enumerate(runs, 1):
         prompt_id = f"enhance{number}"
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=prompt_id, workflow_name="image_enhance", workflow_version="v004",
             params_json=json.dumps({"input_image": "image/src.png [output]", **run}),
-            workflow_json="{}")
+            workflow_json="{}"))
         db.update_generation(prompt_id, status="completed", output_files=json.dumps(
             [{"filename": f"image_enhance_{number:05}_.png", "subfolder": "image",
               "type": "output"}]))

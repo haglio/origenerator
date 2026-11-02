@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.experiments.background import (
     EXPERIMENTS_QUEUED_PER_ABSENCE,
     cancel_experiments,
@@ -88,10 +88,10 @@ class FakeClient:
 
 
 def _row(db, prompt_id, *, status, source="generated"):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="fake_t2i", workflow_version="v001",
         params_json="{}", workflow_json="{}", source=source,
-    )
+    ))
     db.update_generation(prompt_id, status=status)
 
 

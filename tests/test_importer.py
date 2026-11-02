@@ -10,7 +10,7 @@ from PIL.PngImagePlugin import PngInfo
 
 import origenerator.importer as imp
 from origenerator.box_breaks import BOX_BREAK
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.importer import (
     backfill_import_params,
@@ -116,19 +116,19 @@ def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
         "16": {"class_type": "KSamplerAdvanced",
                "inputs": {"model": ["7", 0], "add_noise": "disable"}},
     }
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="wan22_i2v", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="fresh", workflow_name="wan22_i2v", workflow_version="v001",
         params_json=json.dumps({
             "unet_high": "u_h.safetensors", "unet_low": "u_l.safetensors",
             "lora_high": "l_h.safetensors", "lora_low": "l_l.safetensors",
         }),
         workflow_json=json.dumps(graph),
-    )
+    ))
 
     updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
@@ -144,16 +144,16 @@ def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
 
 def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a fox", "noise_seed": 1}),
         workflow_json=json.dumps(_SOUND_STAGE), source="imported",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="made", workflow_name="wan22_i2v", workflow_version="v002",
         params_json=json.dumps({**_SOUND_PARAMS, "audio_seed": 9}),
         workflow_json=json.dumps(_SOUND_STAGE),
-    )
+    ))
 
     updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
@@ -173,15 +173,15 @@ def test_backfill_gives_an_imported_video_back_the_seed_that_added_its_noise(tmp
         "16": {"class_type": "KSamplerAdvanced",
                "inputs": {"noise_seed": 0, "add_noise": "disable"}},
     }
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
         params_json=json.dumps({"seed": 555, "noise_seed": 0}),
         workflow_json=json.dumps(graph), source="imported",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="made", workflow_name="wan22_flf2v_loop", workflow_version="v009",
         params_json=json.dumps({"seed": 0, "noise_seed": 777}), workflow_json=json.dumps(graph),
-    )
+    ))
 
     updated = backfill_imported_video_seeds(db)
 
@@ -198,11 +198,11 @@ def test_backfill_fills_the_size_and_prompts_an_imports_graph_states(tmp_path):
         wf.default_params(), width=720, height=1280, seed=9,
         positive_prompt="a lighthouse", negative_prompt="fog",
     ))
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="sdxl_t2i", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a lighthouse", "seed": 9}),
         workflow_json=json.dumps(graph), source="imported",
-    )
+    ))
 
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
 
@@ -223,11 +223,11 @@ def test_backfill_gives_an_import_whose_graph_states_no_size_the_size_of_its_ima
         "4": {"class_type": "KSampler", "inputs": {"latent_image": ["3", 0], "seed": 9}},
     }
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="sdxl_t2i", workflow_version="imported",
         params_json=json.dumps({"seed": 9}), workflow_json=json.dumps(img2img),
         source="imported",
-    )
+    ))
     db.update_generation("old", output_files=json.dumps(
         [{"filename": "sdxl_t2i_00009_.png", "subfolder": "image", "type": "output"}]))
 
@@ -243,8 +243,8 @@ def test_backfill_splits_the_imports_of_no_known_workflow_by_their_shape(tmp_pat
     db = Database(tmp_path / "test.db")
     for name, size in (("tall", (480, 832)), ("wide", (832, 480))):
         Image.new("RGB", size).save(output_dir / "image" / f"{name}.png")
-        db.insert_generation(prompt_id=name, workflow_name="unknown", workflow_version="imported",
-                             params_json="{}", workflow_json="{}", source="imported")
+        db.insert_generation(NewGeneration(prompt_id=name, workflow_name="unknown", workflow_version="imported",
+                             params_json="{}", workflow_json="{}", source="imported"))
         db.update_generation(name, output_files=json.dumps(
             [{"filename": f"{name}.png", "subfolder": "image", "type": "output"}]))
 
@@ -261,22 +261,22 @@ def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
         "1": {"class_type": "LoadImage", "inputs": {"image": "sdxl_t2i_00022_.png"}},
         "5": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"start_image": ["1", 0]}},
     }
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="fresh", workflow_name="wan22_flf2v_loop", workflow_version="v005",
         params_json=json.dumps({"input_image": "video/x_00001.mp4 [output]"}),
         workflow_json=json.dumps(graph),
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="t2i", workflow_name="sdxl_t2i", workflow_version="imported",
         params_json=json.dumps({"seed": 9}),
         workflow_json=json.dumps({"5": {"class_type": "KSampler", "inputs": {}}}),
         source="imported",
-    )
+    ))
 
     updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
@@ -293,21 +293,21 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
     db = Database(tmp_path / "test.db")
 
     def add_unknown(prompt_id, filename):
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=prompt_id, workflow_name="unknown",
             workflow_version="imported", params_json="{}",
             workflow_json="{}", source="imported",
-        )
+        ))
         db.update_generation(prompt_id, output_files=json.dumps(
             [{"filename": filename, "subfolder": "video", "type": "output"}]
         ))
 
     add_unknown("bf-i2v", "wan22_i2v_842719365028413_00001_.mp4")
     add_unknown("bf-mystery", "mystery_00001.mp4")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="bf-known", workflow_name="wan22_flf2v_loop",
         workflow_version="v004", params_json="{}", workflow_json="{}",
-    )
+    ))
 
     updated = backfill_import_workflows(db)
 
@@ -318,10 +318,10 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
 
 
 def _add_import(db, prompt_id, workflow_name, filename):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=workflow_name, workflow_version="imported",
         params_json="{}", workflow_json="{}", source="imported",
-    )
+    ))
     db.update_generation(prompt_id, output_files=json.dumps(
         [{"filename": filename, "subfolder": "", "type": "output"}]
     ))
@@ -351,9 +351,9 @@ _A_FLUX_IMAGES_GRAPH = {
 
 
 def _import_filed_as_an_enhancement(db, prompt_id, graph):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="image_enhance",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="image_enhance",
                          workflow_version="imported", params_json="{}",
-                         workflow_json=json.dumps(graph), source="imported")
+                         workflow_json=json.dumps(graph), source="imported"))
 
 
 def test_an_import_filed_as_an_enhancement_that_a_flux_workflow_made_is_filed_under_flux(tmp_path):
@@ -372,9 +372,9 @@ def test_an_import_filed_as_an_enhancement_that_a_flux_workflow_made_is_filed_un
 def test_backfill_files_an_import_whose_name_says_nothing_under_the_workflow_its_graph_names(
         tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="flux-image", workflow_name="unknown",
+    db.insert_generation(NewGeneration(prompt_id="flux-image", workflow_name="unknown",
                          workflow_version="imported", params_json="{}",
-                         workflow_json=json.dumps(_A_FLUX_IMAGES_GRAPH), source="imported")
+                         workflow_json=json.dumps(_A_FLUX_IMAGES_GRAPH), source="imported"))
     db.update_generation("flux-image", output_files=json.dumps(
         [{"filename": "my_flux_00001_.png", "subfolder": "image", "type": "output"}]))
 
@@ -559,8 +559,8 @@ def test_the_import_scan_never_imports_a_file_a_replaced_or_left_out_video_lists
     output_dir.mkdir(parents=True)
     (output_dir / "old_00001.mp4").write_bytes(b"made before")
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="old", workflow_name="wan22_i2v", workflow_version="v1",
-                         params_json="{}", workflow_json="{}", source=source)
+    db.insert_generation(NewGeneration(prompt_id="old", workflow_name="wan22_i2v", workflow_version="v1",
+                         params_json="{}", workflow_json="{}", source=source))
     db.update_generation("old", status="completed", output_files=json.dumps(
         [{"filename": "old_00001.mp4", "subfolder": "video", "type": "output"}]))
 
@@ -647,8 +647,8 @@ def test_a_finished_videos_soundless_copy_and_image_are_not_found_as_a_new_item(
     (output_dir / "video" / "flf2v_loop_00001.mp4").write_bytes(b"")
     (output_dir / "video" / "flf2v_loop_00001-audio.mp4").write_bytes(b"")
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="made-here", workflow_name="wan22_flf2v_loop",
-                         workflow_version="v009", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="made-here", workflow_name="wan22_flf2v_loop",
+                         workflow_version="v009", params_json="{}", workflow_json="{}"))
     db.update_generation("made-here", status="completed", output_files=json.dumps(
         WORKFLOW_REGISTRY["wan22_flf2v_loop"].extract_output_info({"outputs": {"16": {"gifs": [
             {"filename": "flf2v_loop_00001-audio.mp4", "subfolder": "video", "type": "output",
@@ -659,12 +659,12 @@ def test_a_finished_videos_soundless_copy_and_image_are_not_found_as_a_new_item(
 
 
 def _completed(db, prompt_id, filename, subfolder, **fields):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=fields.get("workflow_name", "wan22_flf2v_loop"),
         workflow_version="imported", positive_prompt=fields.get("positive_prompt"),
         seed=fields.get("seed"), params_json=fields.get("params_json", "{}"),
         workflow_json=fields.get("workflow_json", "{}"), source="imported",
-    )
+    ))
     db.update_generation(
         prompt_id, status="completed",
         output_files=json.dumps([{"filename": filename, "subfolder": subfolder}]),
@@ -700,8 +700,8 @@ def test_merge_leaves_standalone_rows_untouched(tmp_path):
 
 
 def _made_here(db, prompt_id, filename, subfolder="video", starred=False):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
-                         workflow_version="v009", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+                         workflow_version="v009", params_json="{}", workflow_json="{}"))
     db.update_generation(prompt_id, status="completed", output_files=json.dumps(
         [{"filename": filename, "subfolder": subfolder, "type": "output"}]))
     if starred:
@@ -1036,10 +1036,10 @@ def test_a_krea2_images_own_graph_re_imports_as_krea2(tmp_path):
 
 def test_backfill_relabels_unknown_flux_import_by_filename(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="flux", workflow_name="unknown", workflow_version="imported",
         params_json="{}", workflow_json="{}", source="imported",
-    )
+    ))
     db.update_generation("flux", output_files=json.dumps(
         [{"filename": "flux_t2i_upscaled_00004_.png", "subfolder": "image", "type": "output"}]
     ))
@@ -1054,11 +1054,11 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
               "inputs": {"unet_name": "cyberrealisticFlux_v25GGUFQ80.gguf"}},
         "8": {"class_type": "KSampler", "inputs": {"seed": 1}},
     }
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a portrait", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
-    )
+    ))
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
     params = json.loads(db.get_generation("flux-old")["params_json"])
     assert params["unet"] == "cyberrealisticFlux_v25GGUFQ80.gguf"
@@ -1068,10 +1068,10 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
 
 def test_backfill_fills_the_prompt_strength_a_flux_imports_graph_was_guided_by(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
         params_json="{}", workflow_json=json.dumps(_A_FLUX_IMAGES_GRAPH), source="imported",
-    )
+    ))
 
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
     assert json.loads(db.get_generation("flux-old")["params_json"])["guidance"] == 3.5
@@ -1087,10 +1087,10 @@ def test_backfill_fills_the_lora_a_flux_imports_graph_loaded_at_the_strength_it_
         "8": {"class_type": "KSampler", "inputs": {"model": ["11", 0], "seed": 1}},
     }
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
         params_json="{}", workflow_json=json.dumps(graph), source="imported",
-    )
+    ))
 
     backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
@@ -1114,10 +1114,10 @@ def test_backfill_fills_the_strength_each_wan_stage_ran_its_lora_at(tmp_path):
                "inputs": {"model": ["7", 0], "add_noise": "disable"}},
     }
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="wan22_i2v", workflow_version="imported",
         params_json="{}", workflow_json=json.dumps(graph), source="imported",
-    )
+    ))
 
     backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
@@ -1300,11 +1300,11 @@ def test_an_imported_performance_gains_the_video_it_performed(tmp_path):
                           "skip_first_frames": 32, "frame_load_cap": 81}},
         "19": {"class_type": "WanAnimateToVideo", "inputs": {"length": 81}},
     }
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="performed", workflow_name="wan22_animate", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a person", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
-    )
+    ))
 
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
 

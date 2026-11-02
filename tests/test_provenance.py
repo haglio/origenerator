@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from origenerator import provenance
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -23,9 +23,9 @@ def _history(landed=LANDED):
 
 
 def _launched(db, prompt_id, *, workflow="sdxl_t2i", version="v003", **fields):
-    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow,
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow,
                          workflow_version=version, params_json="{}", workflow_json="{}",
-                         **fields)
+                         **fields))
 
 
 def _file(path):
@@ -36,9 +36,9 @@ def _file(path):
 def _imported(db, prompt_id, *, workflow="sdxl_t2i", file="image/sdxl_t2i_00001_.png",
               completed_at="2026-05-01T12:00:00+00:00", enhanced_from=None,
               version="imported", graph=None):
-    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow,
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow,
                          workflow_version=version, params_json="{}",
-                         workflow_json=json.dumps(graph or {}), source="imported")
+                         workflow_json=json.dumps(graph or {}), source="imported"))
     files = [_file(file)]
     folded = {}
     if enhanced_from:

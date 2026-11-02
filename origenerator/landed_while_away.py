@@ -5,7 +5,7 @@ import os
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from typing import NamedTuple
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 
@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 POLL_SECONDS = 15.0
 
 PATIENCE_SECONDS = 4 * 60 * 60
+
+THIS_LIBRARY = OutputFolders(OUTPUT_PLACES, THUMB_DIR)
 
 CARRIES_THE_IDENTITY = "ORIGENERATOR_TOAST_IDENTITY"
 
@@ -71,40 +73,37 @@ def _training_ended(job: dict, announce) -> bool:
     return True
 
 
-@dataclass(frozen=True)
-class Watch:
-    db: object
-    api: object
-    announce: Callable[[Toast], object]
-    app_is_running: Callable[[], bool]
+class Waiting(NamedTuple):
     sleep: Callable[[float], object] = time.sleep
-    folders: OutputFolders = OutputFolders(OUTPUT_PLACES, THUMB_DIR)
+    folders: OutputFolders = THIS_LIBRARY
     patience_seconds: float = PATIENCE_SECONDS
     trainings: list | None = None
 
-    def run(self) -> None:
-        training = list(running_trainings() if self.trainings is None else self.trainings)
-        giving_up_at = time.monotonic() + self.patience_seconds
-        while not self.app_is_running():
-            training = [job for job in training if not _training_ended(job, self.announce)]
-            waiting = runs_left_in_flight(self.db)
-            if not waiting and not training:
-                logger.info("Stopped waiting: every run left in flight has landed")
-                return
-            for row in waiting:
-                try:
-                    toast = take_what_landed(self.db, self.api, row, self.folders)
-                except Exception as e:
-                    logger.warning("Could not take in %s: %s", row.get("prompt_id"), e)
-                    continue
-                if toast is not None:
-                    self.announce(toast)
-            if time.monotonic() >= giving_up_at:
-                logger.info("Stopped waiting: gave up on %d run(s) still in flight",
-                            len(runs_left_in_flight(self.db)))
-                return
-            self.sleep(POLL_SECONDS)
-        logger.info("Stopped waiting: Origenerator is open again")
+
+def watch(db, api, *, announce, app_is_running, waiting: Waiting | None = None) -> None:
+    sleep, folders, patience_seconds, trainings = waiting or Waiting()
+    training = list(running_trainings() if trainings is None else trainings)
+    giving_up_at = time.monotonic() + patience_seconds
+    while not app_is_running():
+        training = [job for job in training if not _training_ended(job, announce)]
+        in_flight = runs_left_in_flight(db)
+        if not in_flight and not training:
+            logger.info("Stopped waiting: every run left in flight has landed")
+            return
+        for row in in_flight:
+            try:
+                toast = take_what_landed(db, api, row, folders)
+            except Exception as e:
+                logger.warning("Could not take in %s: %s", row.get("prompt_id"), e)
+                continue
+            if toast is not None:
+                announce(toast)
+        if time.monotonic() >= giving_up_at:
+            logger.info("Stopped waiting: gave up on %d run(s) still in flight",
+                        len(runs_left_in_flight(db)))
+            return
+        sleep(POLL_SECONDS)
+    logger.info("Stopped waiting: Origenerator is open again")
 
 
 def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
@@ -140,9 +139,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     _log_into_the_apps_file()
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
-    Watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT, folders=COMFYUI_FOLDERS),
+    watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT, folders=COMFYUI_FOLDERS),
           announce=lambda toast: raise_toast(identity, toast),
-          app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library).run()
+          app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library)
     return 0
 
 

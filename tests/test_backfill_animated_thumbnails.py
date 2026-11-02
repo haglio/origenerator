@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path
 from tests.media_files import write_mp4
@@ -14,12 +14,12 @@ def _library(tmp_path):
                                tmp_path / "thumbs")
     write_mp4(tmp_path / "out" / "scene_one.mp4")
     db = Database(db_path)
-    db.insert_generation(prompt_id="v1", workflow_name="wan22_i2v", workflow_version="1",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="v1", workflow_name="wan22_i2v", workflow_version="1",
+                         params_json="{}", workflow_json="{}"))
     db.update_generation("v1", status="completed", output_files=json.dumps(
         [{"filename": "scene_one.mp4", "subfolder": ""}]))
-    db.insert_generation(prompt_id="running", workflow_name="wan22_i2v", workflow_version="1",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="running", workflow_name="wan22_i2v", workflow_version="1",
+                         params_json="{}", workflow_json="{}"))
     return {"db_path": db_path, "places": places, "thumb_dir": thumbs}
 
 

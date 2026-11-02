@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from origenerator import landed_while_away
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.single_instance import Copies
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -21,10 +21,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _in_flight(db, prompt_id="vid", workflow_name="wan22_i2v", source="generated"):
     wf = WORKFLOW_REGISTRY[workflow_name]
-    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow_name,
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow_name,
                          workflow_version=wf.version, positive_prompt="it turns",
                          params_json=json.dumps(dict(wf.default_params())),
-                         workflow_json="{}", source=source)
+                         workflow_json="{}", source=source))
     db.update_generation(prompt_id, status="running")
     return db.get_generation(prompt_id)
 
@@ -50,13 +50,14 @@ class _Api:
 
 def _watch(db, api, tmp_path, **over):
     said = []
-    landed_while_away.Watch(
+    landed_while_away.watch(
         db, api,
         announce=said.append,
         app_is_running=over.pop("app_is_running", lambda: False),
-        sleep=over.pop("sleep", lambda _seconds: None),
-        folders=OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"),
-        **over).run()
+        waiting=landed_while_away.Waiting(
+            sleep=over.pop("sleep", lambda _seconds: None),
+            folders=OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"),
+            **over))
     return said
 
 

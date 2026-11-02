@@ -19,7 +19,7 @@ from origenerator.base_backfill import (
 )
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.core import Core
 from origenerator.gui.generation_job import GenerationJob
@@ -33,11 +33,11 @@ _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 
 def _add(db, prompt_id, *, params, files, original_files=None, workflow="sdxl_t2i",
          source="generated", status="completed"):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=workflow, workflow_version="v004",
         positive_prompt=params.get("positive_prompt", ""), seed=params.get("seed"),
         params_json=json.dumps(params), workflow_json="{}", source=source,
-    )
+    ))
     fields = {"status": status}
     if files is not None:
         fields["output_files"] = json.dumps(files)

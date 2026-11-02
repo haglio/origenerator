@@ -1,11 +1,11 @@
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 
 
 def _video(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid-001", workflow_name="wan22_i2v", workflow_version="v1",
-        params_json="{}", workflow_json="{}")
+        params_json="{}", workflow_json="{}"))
     return db
 
 

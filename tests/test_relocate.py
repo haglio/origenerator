@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app_support.funscript import read_actions
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.funscript import (
     funscript_of,
     funscript_path_for,
@@ -23,10 +23,10 @@ def _library(tmp_path, rows):
     output_dir.mkdir(exist_ok=True)
     db = Database(tmp_path / "test.db")
     for prompt_id, files in rows.items():
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="1",
             positive_prompt=None, negative_prompt=None, seed=None,
-            params_json="{}", workflow_json="{}", source="generated")
+            params_json="{}", workflow_json="{}", source="generated"))
         db.update_generation(prompt_id, status="completed",
                              output_files=json.dumps(files))
     return db, output_dir

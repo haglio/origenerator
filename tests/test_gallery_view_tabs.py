@@ -14,7 +14,7 @@ from origenerator import (
     gallery,
 )
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.animations import _VideoTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
@@ -183,11 +183,11 @@ def _current_form(view):
 def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     params = dict(_SDXL.default_params(), positive_prompt="a wizard", seed=123)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a wizard", seed=123,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
@@ -202,10 +202,10 @@ def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
 def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     params = dict(_SDXL.default_params(), positive_prompt="a wizard")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a wizard", params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
@@ -220,15 +220,15 @@ def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
 
 def test_selecting_an_unregistered_thumbnail_leaves_no_settings_from_before(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", params_json=json.dumps(dict(_SDXL.default_params())),
         workflow_json="{}",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
         params_json=json.dumps({"steps": 20}), workflow_json="{}",
-    )
+    ))
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
@@ -268,7 +268,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
 
 def _make_db(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="p1",
         workflow_name="sdxl_t2i",
         workflow_version="v002",
@@ -277,7 +277,7 @@ def _make_db(tmp_path):
         seed=7,
         params_json=json.dumps({"steps": 20}),
         workflow_json="{}",
-    )
+    ))
     return db
 
 
@@ -312,11 +312,11 @@ def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
 def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
     db = _make_db(tmp_path)
     for i, prompt in enumerate(["a dog", "a heron", "a fox"], start=2):
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=f"p{i}", workflow_name="sdxl_t2i", workflow_version="v002",
             positive_prompt=prompt, seed=i, params_json=json.dumps({"steps": 20}),
             workflow_json="{}",
-        )
+        ))
     view = GalleryView(db)
     qtbot.addWidget(view)
 
@@ -328,11 +328,11 @@ def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
 
 def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
     db = _make_db(tmp_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="p2", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a dog", seed=8, params_json=json.dumps({"steps": 20}),
         workflow_json="{}",
-    )
+    ))
     view = GalleryView(db)
     qtbot.addWidget(view)
 
@@ -346,10 +346,10 @@ def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
 
 def test_double_clicking_an_unregistered_thumbnail_still_pins_its_tab(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
         params_json=json.dumps({"steps": 20}), workflow_json="{}",
-    )
+    ))
     view = GalleryView(db)
     qtbot.addWidget(view)
 

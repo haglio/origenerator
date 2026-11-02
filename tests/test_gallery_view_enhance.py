@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 from origenerator import (
     gallery,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -64,11 +64,11 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     assert view._buttons.enhance.isEnabled()
     assert "1 not-yet-enhanced image" in view._buttons.enhance.toolTip()
 
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="e0", workflow_name="image_enhance", workflow_version="v001",
         params_json=json.dumps({"input_image": "image/sdxl_t2i_g0.png [output]"}),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("e0", status="completed",
                          output_files=json.dumps([{"filename": "image_enhance_e0.png"}]))
     view.refresh()
@@ -625,11 +625,11 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
     monkeypatch.setattr(gallery_view_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path / "output"))
     monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="g0", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", seed=0, workflow_json="{}", source="experiment",
         params_json=json.dumps({"positive_prompt": "a cat", "steps": 30, "seed": 0}),
-    )
+    ))
     db.update_generation("g0", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_t2i_g0.png",
                                                    "subfolder": "image",

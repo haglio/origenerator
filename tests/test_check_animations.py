@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from origenerator import check_animations, gallery
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
 
@@ -24,14 +24,14 @@ def _client():
 
 def _library(tmp_path):
     db = Database(tmp_path / "t.db")
-    db.insert_generation(prompt_id="image", workflow_name="sdxl_t2i", workflow_version="v",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="image", workflow_name="sdxl_t2i", workflow_version="v",
+                         params_json="{}", workflow_json="{}"))
     db.update_generation("image", status="completed", output_files=json.dumps(
         [{"filename": "image_00001_.png", "subfolder": "image", "type": "output"}]))
-    db.insert_generation(prompt_id="sample", workflow_name=_I2V.name,
+    db.insert_generation(NewGeneration(prompt_id="sample", workflow_name=_I2V.name,
                          workflow_version=_I2V.version, workflow_json="{}",
                          params_json=json.dumps({**_I2V.default_params(),
-                                                 "input_image": _IMAGE}))
+                                                 "input_image": _IMAGE})))
     db.update_generation("sample", status="completed",
                          output_files=json.dumps([{"filename": "sample.mp4"}]))
     return db

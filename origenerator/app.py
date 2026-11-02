@@ -713,13 +713,12 @@ def _boot_and_run(app, app_args, preview) -> int:
     )
 
     from origenerator import comfyui_launcher
-    from origenerator.comfyui_launcher import Address
     from origenerator.gui.loading_screen import LoadingCanceled
     window = None
     try:
         boot.say(STARTING_THE_SERVER)
         comfyui_launcher.ensure_comfyui_server(
-            logger, Address(COMFYUI_HOST, COMFYUI_PORT), COMFYUI_DIR,
+            logger, comfyui_launcher.Address(COMFYUI_HOST, COMFYUI_PORT), COMFYUI_DIR,
             on_status=boot.say, pump_events=app.processEvents,
         )
 

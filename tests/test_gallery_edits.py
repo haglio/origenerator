@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
@@ -11,10 +11,10 @@ from origenerator.trash import Trash
 
 
 def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=None):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     file_path = output_dir / subfolder / filename
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_bytes(b"data")
@@ -132,10 +132,10 @@ def test_delete_trashes_the_thumbnail_and_undo_brings_it_back(tmp_path):
 
 def test_delete_of_a_pending_row_without_files_is_still_undoable(tmp_path):
     actions, db, _ = _actions(tmp_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="pend", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     row = db.get_generation("pend")
 
     actions.delete_rows([row])

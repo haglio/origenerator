@@ -5,16 +5,16 @@ import json
 from PIL import Image
 
 from origenerator import gallery
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.output_places import OutputPlaces
 from origenerator.sort_images import waiting_images
 
 
 def test_each_waiting_image_carries_the_name_its_tile_wears(tmp_path):
     db = Database(tmp_path / "origenerator.db")
-    db.insert_generation(prompt_id="gen-one", workflow_name="sdxl_t2i", workflow_version="v1",
+    db.insert_generation(NewGeneration(prompt_id="gen-one", workflow_name="sdxl_t2i", workflow_version="v1",
                          seed=1, workflow_json="{}",
-                         params_json=json.dumps({"positive_prompt": "a red kite", "seed": 1}))
+                         params_json=json.dumps({"positive_prompt": "a red kite", "seed": 1})))
     db.update_generation("gen-one", status="completed",
                          output_files=json.dumps([{"filename": "gen-one.png", "subfolder": ""}]))
     row = db.get_generation("gen-one")
@@ -26,10 +26,10 @@ def test_each_waiting_image_carries_the_name_its_tile_wears(tmp_path):
 
 
 def _a_finished_image(db, prompt_id: str, seed: int) -> None:
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v1", seed=seed, workflow_json="{}",
                          params_json=json.dumps({"positive_prompt": "a red kite",
-                                                 "seed": seed}))
+                                                 "seed": seed})))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": f"{prompt_id}.png",
                                                    "subfolder": ""}]))

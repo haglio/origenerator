@@ -381,8 +381,8 @@ def test_the_funscript_sweep_writes_nothing_for_a_video_from_another_source(tmp_
     written = []
 
     funscript_backfill.backfill(Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(_comfyui_output(tmp_path)),
-                                write=lambda path, **_: written.append(path),
-                                rewrite=lambda *_args, **_kw: False)
+                                steps=funscript_backfill.Steps(write=lambda path, **_: written.append(path),
+                                                rewrite=lambda *_args, **_kw: False))
 
     assert written == []
 

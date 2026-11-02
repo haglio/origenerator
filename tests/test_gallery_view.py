@@ -34,7 +34,7 @@ from origenerator import (
 )
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
@@ -1852,10 +1852,10 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     for pid, prompt, steps in (("a", "alpha", 10), ("b", "beta", 20)):
-        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
                              positive_prompt=prompt, seed=1,
                              params_json=json.dumps({"positive_prompt": prompt, "seed": 1, "steps": steps}),
-                             workflow_json="{}")
+                             workflow_json="{}"))
         db.update_generation(pid, status="completed",
                              output_files=json.dumps([{"filename": f"{pid}.png", "subfolder": ""}]))
     actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"), Trash(tmp_path / "trash"))

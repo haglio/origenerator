@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.inflight import drop_in_flight
 
@@ -20,8 +20,8 @@ class FakeComfy:
 
 
 def _row(db, prompt_id, *, source=GenerationSource.BACKFILL, status="running"):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v",
-                         params_json="{}", workflow_json="{}", source=source)
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v",
+                         params_json="{}", workflow_json="{}", source=source))
     db.update_generation(prompt_id, status=status)
 
 

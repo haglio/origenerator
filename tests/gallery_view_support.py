@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from io import BytesIO
 from unittest.mock import MagicMock
 
@@ -33,7 +34,7 @@ from origenerator.config import (
     OUTPUT_PLACES,
     THUMB_DIR,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     TRASH_KEY,
 )
@@ -154,8 +155,8 @@ class FakeDB:
     def library_version(self):
         return object()
 
-    def record_seed_use(self, **use):
-        self._seed_uses.insert(0, use)
+    def record_seed_use(self, use):
+        self._seed_uses.insert(0, asdict(use))
 
     def list_seed_uses(self):
         return list(self._seed_uses)
@@ -245,13 +246,8 @@ class FakeDB:
     def forget_trashed(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
-    def record_request(self, *, prompt_id, source_prompt_id, heard, **fields):
-        self._requests[prompt_id] = {
-            "prompt_id": prompt_id, "source_prompt_id": source_prompt_id,
-            "heard": heard, "term": None, "polarity": None, "action": None,
-            "old_positive": "", "old_negative": "",
-            "new_positive": "", "new_negative": "", **fields,
-        }
+    def record_request(self, request):
+        self._requests[request.prompt_id] = asdict(request)
 
     def list_requests(self):
         return list(reversed(self._requests.values()))
@@ -615,7 +611,7 @@ def _select_first_leaf(view, shape=LANDSCAPE):
 
 def _seeded_db(tmp_path, seed=7):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="orig",
         workflow_name="sdxl_t2i",
         workflow_version=_SDXL.version,
@@ -624,7 +620,7 @@ def _seeded_db(tmp_path, seed=7):
         seed=seed,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "orig", status="completed",
         output_files=json.dumps([{"filename": "sdxl_orig.png", "subfolder": ""}]),
@@ -666,13 +662,13 @@ def _running_reroll(view, shape=LANDSCAPE):
 
 def _single_i2v_db(tmp_path, input_image):
     db = Database(tmp_path / "hp.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
         positive_prompt="dance", negative_prompt="", seed=3,
         params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
                                     positive_prompt="dance", input_image=input_image)),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("vid", status="completed",
                          output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
     return db
@@ -681,10 +677,10 @@ def _single_i2v_db(tmp_path, input_image):
 def _shown_view_with_one_image(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     output_dir = tmp_path / "output"
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json=json.dumps({"steps": 50}), workflow_json="{}",
-    )
+    ))
     file_path = output_dir / "sdxl_t2i_i1.png"
     file_path.parent.mkdir(parents=True)
     file_path.write_bytes(b"img")
@@ -755,22 +751,22 @@ def _menu_offering(monkeypatch, module, pick=None):
 
 def _combine_db(tmp_path, *, enhanced=True):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="img", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="a dog", seed=1,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=1, positive_prompt="a dog")),
         workflow_json="{}",
-    )
+    ))
     base = [{"filename": "sdxl_pick_base.png", "subfolder": "", "role": "original"}]
     db.update_generation("img", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_pick.png", "subfolder": ""}] + (base if enhanced else [])))
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version=_WAN_I2V.version,
         positive_prompt="dance", seed=42,
         params_json=json.dumps(dict(_WAN_I2V.default_params(),
                                     seed=42, noise_seed=99, positive_prompt="dance")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("vid", status="completed",
                          output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
     db.set_settings_source("vid", category="dancing")
@@ -803,12 +799,12 @@ def _enhanceable_db(tmp_path, count=2):
     db = Database(tmp_path / "test.db")
     for i in range(count):
         pid = f"g{i}"
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
             positive_prompt="a cat", seed=i,
             params_json=json.dumps({"positive_prompt": "a cat", "steps": 30, "seed": i}),
             workflow_json="{}",
-        )
+        ))
         db.update_generation(pid, status="completed",
                              output_files=json.dumps([{"filename": f"sdxl_t2i_g{i}.png",
                                                        "subfolder": "image",
@@ -1057,11 +1053,11 @@ def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
     db = Database(tmp_path / "test.db")
     params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
                   negative_prompt="blurry")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="orig", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt=prompt, negative_prompt="blurry", seed=7,
         params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation("orig", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_t2i_orig.png", "subfolder": "image", "type": "output"}]))
     return db
@@ -1093,23 +1089,23 @@ def _finish_reroll(view, job):
 def _genau_db(tmp_path):
     db = _combine_db(tmp_path)
     loop = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="loop", workflow_name="wan22_flf2v_loop", workflow_version=loop.version,
         positive_prompt="one cycle of it", seed=7,
         params_json=json.dumps(dict(loop.default_params(), seed=7, noise_seed=8,
                                     positive_prompt="one cycle of it")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("loop", status="completed",
                          output_files=json.dumps([{"filename": "flf2v_loop_1.mp4", "subfolder": ""}]))
     db.set_settings_source("loop", category="alpha")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="img_action", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="an image by the window", seed=2,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=2,
                                     positive_prompt="an image by the window")),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("img_action", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_action.png", "subfolder": ""},
          {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))

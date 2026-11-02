@@ -5,7 +5,7 @@ import json
 import pytest
 
 from origenerator import gallery
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.item_names import ItemNames
 
 
@@ -71,9 +71,9 @@ def test_an_item_in_the_trash_keeps_its_place_in_the_count(db):
 
 
 def _stored(db: Database, row: dict) -> dict:
-    db.insert_generation(prompt_id=row["prompt_id"], workflow_name=row["workflow_name"],
+    db.insert_generation(NewGeneration(prompt_id=row["prompt_id"], workflow_name=row["workflow_name"],
                          workflow_version=row["workflow_version"], seed=row["seed"],
-                         params_json=row["params_json"], workflow_json="{}")
+                         params_json=row["params_json"], workflow_json="{}"))
     db.update_generation(row["prompt_id"], status="completed", output_files=row["output_files"])
     return db.get_generation(row["prompt_id"])
 

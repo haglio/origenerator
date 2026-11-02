@@ -18,7 +18,7 @@ from origenerator import (
     action_settings,
     gallery,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     LATEST_KEY,
 )
@@ -56,12 +56,12 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 def _looping_video(db, prompt_id="loop"):
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name=wf.name, workflow_version=wf.version,
         positive_prompt="alpha", seed=8,
         params_json=json.dumps(dict(wf.default_params(), seed=8,
                                     positive_prompt="alpha")),
-        workflow_json="{}")
+        workflow_json="{}"))
     db.update_generation(prompt_id, status="completed", output_files=json.dumps(
         [{"filename": "flf2v_loop_01.mp4", "subfolder": "video"}]))
     return wf
@@ -238,11 +238,11 @@ def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
 
 
 def _insert_completed_video(db, prompt_id, params, filename):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version=_WAN_I2V.version,
         positive_prompt=params.get("positive_prompt", ""), negative_prompt="",
         seed=params.get("seed"), params_json=json.dumps(params), workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": filename, "subfolder": ""}]))
 
@@ -281,9 +281,9 @@ def test_combining_a_pair_already_made_makes_another_video(qtbot, tmp_path):
 
 def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
     db = _combine_db(tmp_path)
-    db.insert_generation(prompt_id="vx", workflow_name="mystery", workflow_version="v",
+    db.insert_generation(NewGeneration(prompt_id="vx", workflow_name="mystery", workflow_version="v",
                          positive_prompt="", seed=1, params_json=json.dumps({"seed": 1}),
-                         workflow_json="{}")
+                         workflow_json="{}"))
     db.update_generation("vx", status="completed",
                          output_files=json.dumps([{"filename": "mystery_vx.mp4", "subfolder": ""}]))
     view = GalleryView(db, client=_reroll_client())
@@ -371,8 +371,8 @@ def test_settings_from_a_dropped_video_name_that_video(qtbot, tmp_path):
 
 def test_recent_already_lists_a_video_generated_from_before_this_session(qtbot, tmp_path):
     db = _combine_db(tmp_path)
-    db.insert_generation(prompt_id="made", workflow_name="wan22_i2v",
-                         workflow_version=_WAN_I2V.version, params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="made", workflow_name="wan22_i2v",
+                         workflow_version=_WAN_I2V.version, params_json="{}", workflow_json="{}"))
     db.set_settings_source("made", video_prompt_id="vid")
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

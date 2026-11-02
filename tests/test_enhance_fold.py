@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from origenerator import gallery
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery import (
     fold_completed_enhancements,
     fold_enhancement,
@@ -15,12 +15,12 @@ from origenerator.output_places import OutputPlaces
 
 
 def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", seed=1,
         params_json=json.dumps({"positive_prompt": "a cat", "steps": 30, "seed": 1}),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed", thumbnail_path="src_thumb.jpg",
                          output_files=json.dumps([{"filename": filename,
                                                    "subfolder": "image",
@@ -32,11 +32,11 @@ def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False
 
 def _add_enhance(db, prompt_id, input_ref, filename, status="completed",
                  thumbnail="enh_thumb.jpg"):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="image_enhance", workflow_version="v001",
         params_json=json.dumps({"input_image": input_ref, "positive_prompt": "a cat"}),
         workflow_json="{}",
-    )
+    ))
     fields = {"status": status}
     if status == "completed":
         fields.update(
@@ -369,7 +369,7 @@ def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
 def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, **graph_kwargs):
     graph = _enhance_graph(**graph_kwargs)
     sampler = graph["9"]["inputs"]
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="imported",
         positive_prompt="a cat", seed=sampler["seed"],
         params_json=json.dumps({
@@ -381,7 +381,7 @@ def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, **graph_kwarg
         }),
         workflow_json=json.dumps(graph),
         source="imported",
-    )
+    ))
     db.update_generation(
         prompt_id, status="completed", thumbnail_path="imported_thumb.jpg",
         output_files=json.dumps([{"filename": filename, "subfolder": "image",

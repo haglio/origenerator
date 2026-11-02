@@ -36,7 +36,7 @@ from origenerator.config import (
     THUMB_DIR,
     TRASH_DIR,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewRequest
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
@@ -916,10 +916,10 @@ class GalleryView(QWidget):
                 if video_id and not category:
                     self._db.record_combine_video_use(intent, video_id, prompt_id)
                 if asked is not None:
-                    self._db.record_request(
+                    self._db.record_request(NewRequest(
                         prompt_id=prompt_id, heard="",
                         new_positive=batch[0].get("positive_prompt", ""),
-                        new_negative=batch[0].get("negative_prompt", ""), **asked)
+                        new_negative=batch[0].get("negative_prompt", ""), **asked))
                 launching.note_launched(prompt_id, made_of=None if asked else batch[0])
         self._stand_on_the_run_in(key, rebuild=True)
 
@@ -1607,13 +1607,13 @@ class GalleryView(QWidget):
             launched += 1
             if launching is not None:
                 launching.note_launched(prompt_id, made_of=params)
-            self._db.record_request(
+            self._db.record_request(NewRequest(
                 prompt_id=prompt_id, source_prompt_id=row["prompt_id"], heard="",
                 old_positive=was.get("positive_prompt", ""),
                 old_negative=was.get("negative_prompt", ""),
                 new_positive=run.get("positive_prompt", ""),
                 new_negative=run.get("negative_prompt", ""),
-            )
+            ))
         logger.info("Requested changes to %s: %d of %d images queued into %s",
                     folder_key, launched, len(rows), key)
         if launched:
@@ -1874,14 +1874,14 @@ class GalleryView(QWidget):
         job = self._jobs.newest_job_for(key)
         logger.info("Request on %s: term %s, queued as %s", row.get("prompt_id"),
                     revision.action, job.prompt_id)
-        self._db.record_request(
+        self._db.record_request(NewRequest(
             prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
             heard=spoken.heard, asked=spoken.text, term=revision.term,
             polarity=revision.polarity, action=revision.action,
             old_positive=params.get("positive_prompt", ""),
             old_negative=params.get("negative_prompt", ""),
             new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
-        )
+        ))
         self.refresh()
         return "Request submitted", INFO
 

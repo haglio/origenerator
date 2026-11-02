@@ -28,7 +28,7 @@ from origenerator.comfy_graph import (
     sound_params,
     texts_read,
 )
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery import (
     ENHANCE_WORKFLOW,
     media_type_of_row,
@@ -105,7 +105,7 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
             logger.warning("Thumbnail failed for %s: %s", fpath, e)
         animate_if_video(play_path, thumb_dir, name=prompt_id)
 
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=prompt_id,
             workflow_name=metadata.get("workflow_name", "unknown"),
             workflow_version=metadata.get("workflow_version", "imported"),
@@ -115,7 +115,7 @@ def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -
             params_json=json.dumps(metadata.get("params", {})),
             workflow_json=json.dumps(metadata.get("prompt_data", {})),
             source=GenerationSource.IMPORTED,
-        )
+        ))
         db.update_generation(
             prompt_id,
             status=GenerationStatus.COMPLETED,

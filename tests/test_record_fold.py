@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.record_fold import fold_record_into
 
 
 def _row(db: Database, prompt_id: str, **fields) -> None:
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
-                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}"))
     if fields:
         db.update_generation(prompt_id, **fields)
 

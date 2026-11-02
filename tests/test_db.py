@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from origenerator.box_breaks import BOX_BREAK
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_schema import STORED_NAMES
 from origenerator.provenance import WORKFLOW, WORKFLOW_VERSION
 
@@ -25,7 +25,7 @@ def test_schema_creates_generations_table(tmp_path):
 
 def test_insert_and_get_generation(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="test-uuid-001",
         workflow_name="sdxl_t2i",
         workflow_version="v002",
@@ -34,7 +34,7 @@ def test_insert_and_get_generation(tmp_path):
         seed=12345,
         params_json=json.dumps({"steps": 50}),
         workflow_json=json.dumps({"1": {}}),
-    )
+    ))
     row = db.get_generation("test-uuid-001")
     assert row is not None
     assert row["prompt_id"] == "test-uuid-001"
@@ -48,10 +48,10 @@ def test_insert_and_get_generation(tmp_path):
 def test_a_boxed_prompts_columns_hold_it_read_whole_and_its_settings_keep_its_boxes(tmp_path):
     db = Database(tmp_path / "test.db")
     params = {"positive_prompt": f"a cat,{BOX_BREAK}on a mat", "negative_prompt": f"ugly{BOX_BREAK}dim"}
-    db.insert_generation(prompt_id="boxed", workflow_name="sdxl_t2i", workflow_version="v002",
+    db.insert_generation(NewGeneration(prompt_id="boxed", workflow_name="sdxl_t2i", workflow_version="v002",
                          positive_prompt=params["positive_prompt"],
                          negative_prompt=params["negative_prompt"], seed=1,
-                         params_json=json.dumps(params), workflow_json="{}")
+                         params_json=json.dumps(params), workflow_json="{}"))
 
     row = db.get_generation("boxed")
 
@@ -63,19 +63,19 @@ def test_a_generation_goes_in_with_the_provenance_its_launch_stamped(tmp_path):
     db = Database(tmp_path / "test.db")
     block = json.dumps({WORKFLOW: "sdxl_t2i", WORKFLOW_VERSION: "v002"})
 
-    db.insert_generation(prompt_id="prov-001", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="prov-001", workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json="{}", workflow_json="{}",
-                         provenance=block)
+                         provenance=block))
 
     assert db.get_generation("prov-001")["provenance"] == block
 
 
 def test_settings_source_records_where_a_combine_got_its_settings(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="rec-001", workflow_name="wan22_i2v", workflow_version="v001",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     assert db.get_generation("rec-001")["action"] is None
 
     db.set_settings_source("rec-001", category="dancing", video_prompt_id="vid-9")
@@ -87,10 +87,10 @@ def test_settings_source_records_where_a_combine_got_its_settings(tmp_path):
 
 def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="enh-001", workflow_name="image_enhance", workflow_version="v001",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     assert db.get_generation("enh-001")["enhance_of"] is None
 
     db.set_enhance_target("enh-001", "img-007")
@@ -103,8 +103,8 @@ def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
 def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
     db = Database(tmp_path / "test.db")
     for pid in ("dropped", "curated"):
-        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
-                             workflow_version="v001", params_json="{}", workflow_json="{}")
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="wan22_i2v",
+                             workflow_version="v001", params_json="{}", workflow_json="{}"))
     db.set_settings_source("dropped", video_prompt_id="vid-9")
     db.set_settings_source("curated", category="dancing")
 
@@ -116,8 +116,8 @@ def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
 
 def test_an_image_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="pic-001", workflow_name="sdxl_t2i",
-                         workflow_version="v002", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="pic-001", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}"))
     assert db.get_generation("pic-001")["image_state"] is None
 
     db.set_image_state("pic-001", "state two")
@@ -129,13 +129,13 @@ def test_an_image_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_
 
 def test_update_generation(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="upd-001",
         workflow_name="sdxl_t2i",
         workflow_version="v002",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "upd-001",
         status="completed",
@@ -150,13 +150,13 @@ def test_update_generation(tmp_path):
 
 def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="upd-002",
         workflow_name="sdxl_t2i",
         workflow_version="v002",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
 
     with pytest.raises(ValueError, match="update_generation does not write workflow_name"):
         db.update_generation("upd-002", workflow_name="wan22_i2v")
@@ -166,13 +166,13 @@ def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
 
 def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="upd-003",
         workflow_name="sdxl_t2i",
         workflow_version="v002",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
 
     db.update_generation("upd-003")
 
@@ -181,13 +181,13 @@ def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
 
 def test_update_generation_stores_duration_seconds(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="dur-001",
         workflow_name="sdxl_t2i",
         workflow_version="v002",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     db.update_generation("dur-001", status="completed", duration_seconds=15.26)
     row = db.get_generation("dur-001")
     assert row["duration_seconds"] == 15.26
@@ -262,13 +262,13 @@ def test_the_generations_already_there_survive_the_migration(tmp_path):
 def test_mark_evolver_exported_persists_across_reopen(tmp_path):
     db_path = tmp_path / "test.db"
     db = Database(db_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid-001",
         workflow_name="wan22_i2v",
         workflow_version="v1",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     assert db.get_generation("vid-001")["evolver_exported_at"] is None
 
     db.mark_evolver_exported("vid-001")
@@ -280,13 +280,13 @@ def test_mark_evolver_exported_persists_across_reopen(tmp_path):
 def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
     db_path = tmp_path / "test.db"
     db = Database(db_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid-002",
         workflow_name="wan22_i2v",
         workflow_version="v1",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     db.mark_evolver_exported("vid-002")
 
     db.mark_evolver_unsent("vid-002")
@@ -298,13 +298,13 @@ def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
 
 def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="vid-003",
         workflow_name="wan22_i2v",
         workflow_version="v1",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     db.mark_evolver_exported("vid-003")
     db.mark_evolver_unsent("vid-003")
 
@@ -317,13 +317,13 @@ def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
 
 def test_taking_back_one_lane_leaves_the_other_send_standing(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="clip-002",
         workflow_name="wan22_flf2v_loop",
         workflow_version="v006",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     db.mark_evolver_exported("clip-002")
     db.mark_genau_exported("clip-002")
 
@@ -371,14 +371,14 @@ def test_opening_db_without_evolver_column_migrates_it(tmp_path):
 
 def test_set_workflow_name_relabels_row(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="relabel-001",
         workflow_name="unknown",
         workflow_version="imported",
         params_json="{}",
         workflow_json="{}",
         source="imported",
-    )
+    ))
     db.set_workflow_name("relabel-001", "wan22_i2v")
     row = db.get_generation("relabel-001")
     assert row["workflow_name"] == "wan22_i2v"
@@ -386,14 +386,14 @@ def test_set_workflow_name_relabels_row(tmp_path):
 
 def test_set_params_json_rewrites_row_params(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="fill-001",
         workflow_name="wan22_i2v",
         workflow_version="imported",
         params_json='{"seed": 1}',
         workflow_json="{}",
         source="imported",
-    )
+    ))
     db.set_params_json("fill-001", '{"seed": 1, "lora_high": "x.safetensors"}')
     row = db.get_generation("fill-001")
     assert json.loads(row["params_json"])["lora_high"] == "x.safetensors"
@@ -402,10 +402,10 @@ def test_set_params_json_rewrites_row_params(tmp_path):
 def test_favorite_generation_round_trips_across_reopen(tmp_path):
     db_path = tmp_path / "test.db"
     db = Database(db_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="s-001", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     assert not db.get_generation("s-001")["starred"]
 
     db.set_generation_favorite("s-001", True)
@@ -449,13 +449,13 @@ def test_opening_db_without_starred_column_migrates_it(tmp_path):
 
 
 def _add_completed(db, prompt_id, workflow_name, duration):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id,
         workflow_name=workflow_name,
         workflow_version="v002",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed", duration_seconds=duration)
 
 
@@ -464,10 +464,10 @@ def test_recent_durations_filters_by_workflow_newest_first(tmp_path):
     _add_completed(db, "a", "sdxl_t2i", 10.0)
     _add_completed(db, "b", "wan22_i2v", 900.0)
     _add_completed(db, "c", "sdxl_t2i", 12.0)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="d", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
-    )
+    ))
 
     assert db.recent_durations("sdxl_t2i") == [12.0, 10.0]
 
@@ -481,13 +481,13 @@ def test_recent_durations_respects_limit(tmp_path):
 
 def test_completed_without_duration_selects_backfill_candidates(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="needs", workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id="needs", workflow_name="sdxl_t2i",
                          workflow_version="imported", params_json="{}",
-                         workflow_json="{}", source="imported")
+                         workflow_json="{}", source="imported"))
     db.update_generation("needs", status="completed", completed_at="2026-06-29T12:00:00+00:00")
     _add_completed(db, "timed", "sdxl_t2i", 5.0)
-    db.insert_generation(prompt_id="running", workflow_name="sdxl_t2i",
-                         workflow_version="v002", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="running", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}"))
 
     rows = db.completed_without_duration()
     assert [r["prompt_id"] for r in rows] == ["needs"]
@@ -554,13 +554,13 @@ def test_delete_folder_meta_removes_the_row(tmp_path):
 def test_list_generations_ordered_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for i in range(3):
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=f"list-{i:03d}",
             workflow_name="sdxl_t2i",
             workflow_version="v002",
             params_json="{}",
             workflow_json="{}",
-        )
+        ))
     rows = db.list_generations()
     assert len(rows) == 3
     assert rows[0]["prompt_id"] == "list-002"
@@ -571,16 +571,16 @@ def test_the_rows_one_workflow_made_are_read_newest_first_without_the_rest(tmp_p
     db = Database(tmp_path / "test.db")
     for prompt_id, workflow_name in (("made-1", "image_enhance"), ("other", "sdxl_t2i"),
                                      ("made-2", "image_enhance")):
-        db.insert_generation(prompt_id=prompt_id, workflow_name=workflow_name,
-                             workflow_version="v002", params_json="{}", workflow_json="{}")
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow_name,
+                             workflow_version="v002", params_json="{}", workflow_json="{}"))
 
     assert [row["prompt_id"] for row in db.rows_made_by("image_enhance")] == [
         "made-2", "made-1"]
 
 
 def _add_listed(db, prompt_id):
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
-                         workflow_version="v002", params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}"))
 
 
 def test_a_generation_another_copy_of_the_app_adds_is_listed_at_once(tmp_path):
@@ -665,10 +665,10 @@ def test_opening_db_without_experiment_verdict_column_migrates_it(tmp_path):
 
 def test_experiment_verdict_round_trips(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="exp-001", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}", source="experiment",
-    )
+    ))
     assert db.get_generation("exp-001")["experiment_verdict"] is None
     db.set_experiment_verdict("exp-001", "up")
     assert db.get_generation("exp-001")["experiment_verdict"] == "up"
@@ -678,14 +678,14 @@ def test_experiment_verdict_round_trips(tmp_path):
 
 def test_delete_generation_removes_row(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="del-001", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
-    )
-    db.insert_generation(
+    ))
+    db.insert_generation(NewGeneration(
         prompt_id="del-002", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
-    )
+    ))
     db.delete_generation("del-001")
     assert db.get_generation("del-001") is None
     assert db.get_generation("del-002") is not None
@@ -695,10 +695,10 @@ def test_the_highest_id_issued_counts_the_rows_that_have_been_and_gone(tmp_path)
     db = Database(tmp_path / "test.db")
     assert db.highest_id_issued() == 0
     for i in range(3):
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=f"h-{i}", workflow_name="sdxl_t2i", workflow_version="v002",
             params_json="{}", workflow_json="{}",
-        )
+        ))
     newest = db.get_generation("h-2")["id"]
     db.delete_generation("h-2")
 
@@ -707,11 +707,11 @@ def test_the_highest_id_issued_counts_the_rows_that_have_been_and_gone(tmp_path)
 
 def test_restore_generation_brings_back_a_deleted_row_intact(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="r-001", workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", negative_prompt="ugly", seed=7,
         params_json=json.dumps({"steps": 20}), workflow_json="{}",
-    )
+    ))
     db.update_generation(
         "r-001", status="completed",
         output_files=json.dumps([{"filename": "out.png", "subfolder": ""}]),
@@ -730,10 +730,10 @@ def test_restore_generation_brings_back_a_deleted_row_intact(tmp_path):
 def test_restore_generation_preserves_newest_first_order(tmp_path):
     db = Database(tmp_path / "test.db")
     for i in range(3):
-        db.insert_generation(
+        db.insert_generation(NewGeneration(
             prompt_id=f"o-{i}", workflow_name="sdxl_t2i", workflow_version="v002",
             params_json="{}", workflow_json="{}",
-        )
+        ))
     middle = db.get_generation("o-1")
     db.delete_generation("o-1")
     db.restore_generation(middle)
@@ -743,8 +743,8 @@ def test_restore_generation_preserves_newest_first_order(tmp_path):
 
 def test_a_combine_deleted_and_restored_keeps_where_its_settings_came_from(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
+                         params_json="{}", workflow_json="{}"))
     db.set_settings_source("c-001", category="dancing", video_prompt_id="vid-9")
     original = db.get_generation("c-001")
     db.delete_generation("c-001")
@@ -761,8 +761,8 @@ def _as_read_before_the_rename(row: dict) -> dict:
 def test_a_trashed_item_held_since_before_two_columns_were_renamed_comes_back_under_the_new_names(
         tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
+                         params_json="{}", workflow_json="{}"))
     db.set_settings_source("c-001", category="dancing", video_prompt_id="vid-9")
     db.record_trashed("c-001", _as_read_before_the_rename(db.get_generation("c-001")), {})
     db.delete_generation("c-001")
@@ -776,8 +776,8 @@ def test_a_trashed_item_held_since_before_two_columns_were_renamed_comes_back_un
 def test_a_trashed_item_held_since_before_the_image_state_was_renamed_comes_back_with_its_state(
         tmp_path):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(prompt_id="pic-001", workflow_name="sdxl_t2i", workflow_version="v001",
-                         params_json="{}", workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id="pic-001", workflow_name="sdxl_t2i", workflow_version="v001",
+                         params_json="{}", workflow_json="{}"))
     db.set_image_state("pic-001", "state two")
     db.record_trashed("pic-001", _as_read_before_the_rename(db.get_generation("pic-001")), {})
     db.delete_generation("pic-001")
@@ -864,12 +864,12 @@ def test_a_file_gone_from_the_trash_is_not_found_there(tmp_path):
 
 
 def _record(db, prompt_id, source="src-1", heard="Request, no hat, over."):
-    db.record_request(
+    db.record_request(NewRequest(
         prompt_id=prompt_id, source_prompt_id=source, heard=heard,
         term="hat", polarity="remove", action="dropped",
         old_positive="a woman, a hat", old_negative="blurry",
         new_positive="a woman", new_negative="blurry",
-    )
+    ))
 
 
 def test_a_recorded_request_comes_back_whole(tmp_path):
@@ -887,8 +887,8 @@ def test_a_recorded_request_comes_back_whole(tmp_path):
 
 def test_a_request_keeps_its_own_words_beside_what_was_heard(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.record_request(prompt_id="gen-1", source_prompt_id="src-1", heard="",
-                      asked="two women")
+    db.record_request(NewRequest(prompt_id="gen-1", source_prompt_id="src-1", heard="",
+                      asked="two women"))
 
     assert db.get_request("gen-1")["asked"] == "two women"
 
@@ -925,13 +925,13 @@ def test_a_request_outlives_the_generation_it_queued(tmp_path):
 def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
     db_path = tmp_path / "test.db"
     db = Database(db_path)
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="clip-001",
         workflow_name="wan22_flf2v_loop",
         workflow_version="v006",
         params_json="{}",
         workflow_json="{}",
-    )
+    ))
     row = db.get_generation("clip-001")
     assert row["genau_requested_at"] is None
     assert row["genau_exported_at"] is None

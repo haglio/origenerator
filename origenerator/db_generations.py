@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from dataclasses import dataclass
 
 from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
@@ -25,6 +26,21 @@ _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
 _MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
 _LISTED = f"source NOT IN ({', '.join('?' * len(UNLISTED))})"
+
+
+@dataclass(frozen=True, kw_only=True)
+class NewGeneration:
+    prompt_id: str
+    workflow_name: str
+    workflow_version: str
+    positive_prompt: str | None = None
+    negative_prompt: str | None = None
+    seed: int | None = None
+    params_json: str
+    workflow_json: str
+    source: str = GenerationSource.GENERATED
+    provenance: str | None = None
+    shielded: bool = False
 
 
 def was_sent(row: dict) -> bool:
@@ -80,21 +96,7 @@ class GenerationStore(Store):
                 (prompt_id,),
             )
 
-    def insert_generation(
-        self,
-        *,
-        prompt_id: str,
-        workflow_name: str,
-        workflow_version: str,
-        positive_prompt: str | None = None,
-        negative_prompt: str | None = None,
-        seed: int | None = None,
-        params_json: str,
-        workflow_json: str,
-        source: str = GenerationSource.GENERATED,
-        provenance: str | None = None,
-        shielded: bool = False,
-    ):
+    def insert_generation(self, new: NewGeneration):
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO generations
@@ -102,9 +104,9 @@ class GenerationStore(Store):
                     positive_prompt, negative_prompt, seed,
                     params_json, workflow_json, provenance, shielded)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (prompt_id, source, workflow_name, workflow_version,
-                 _read_whole(positive_prompt), _read_whole(negative_prompt), seed,
-                 params_json, workflow_json, provenance, 1 if shielded else 0),
+                (new.prompt_id, new.source, new.workflow_name, new.workflow_version,
+                 _read_whole(new.positive_prompt), _read_whole(new.negative_prompt), new.seed,
+                 new.params_json, new.workflow_json, new.provenance, 1 if new.shielded else 0),
             )
 
     def update_generation(self, prompt_id: str, **fields):

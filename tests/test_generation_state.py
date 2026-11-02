@@ -3,14 +3,14 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 
 
 def _insert(db: Database, prompt_id: str = "a-generation", **fields) -> None:
-    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v001", params_json="{}", workflow_json="{}",
-                         **fields)
+                         **fields))
 
 
 def _stored(db: Database, column: str) -> tuple:

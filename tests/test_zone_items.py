@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gui.zone_items import FilesOnly, ZoneItems
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
@@ -38,8 +38,8 @@ def library(tmp_path):
 
 
 def _row(db, prompt_id, workflow, file, thumb, params=None):
-    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
-                         params_json=json.dumps(params or {}), workflow_json="{}")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
+                         params_json=json.dumps(params or {}), workflow_json="{}"))
     subfolder, name = file.split("/")
     db.update_generation(prompt_id, status="completed", thumbnail_path=thumb,
                          output_files=json.dumps([{"filename": name, "subfolder": subfolder,

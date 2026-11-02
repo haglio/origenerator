@@ -5,7 +5,7 @@ import json
 import pytest
 
 from origenerator import gallery
-from origenerator.db import Database
+from origenerator.db import Database, NewGeneration
 from origenerator.gallery.enhance import (
     displayed_versions,
     enhance_params_for,
@@ -133,22 +133,22 @@ def _enhance_row(prompt_id, filename, **settings):
 
 
 def _seed_source(db, filename="sdxl_t2i_src.png"):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id="src", workflow_name="sdxl_t2i", workflow_version="v004",
         positive_prompt="a lantern on a jetty", seed=1,
         params_json=json.dumps({"positive_prompt": "a lantern on a jetty"}),
         workflow_json="{}",
-    )
+    ))
     db.update_generation("src", status="completed", output_files=json.dumps(
         [{"filename": filename, "subfolder": "image", "type": "output"}]))
 
 
 def _add_and_fold(db, prompt_id, filename, **settings):
-    db.insert_generation(
+    db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="image_enhance", workflow_version="v001",
         params_json=json.dumps({"input_image": "image/sdxl_t2i_src.png [output]", **settings}),
         workflow_json="{}",
-    )
+    ))
     db.update_generation(prompt_id, status="completed", output_files=json.dumps(
         [{"filename": filename, "subfolder": "image", "type": "output"}]))
     return fold_enhancement(db, db.get_generation(prompt_id))

@@ -19,7 +19,7 @@ from origenerator.generation_config import filled_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.inflight import drop_in_flight
 from origenerator.media import MediaType, media_type_from_filename
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.outside_videos import mark_a_favorite
 from origenerator.record_fold import fold_record_into
 from origenerator.thumbnail import animated_thumbnail_path
@@ -93,7 +93,7 @@ def fold_completed_backfill(db, places: OutputPlaces, thumb_dir: Path, *, trash)
     for row in db.list_generations():
         old = (_old_video_of_a_finished_run(db, row, trash)
                if source_of(row) == GenerationSource.BACKFILL else _old_video_left_beside(db, row))
-        if old is not None and _remake_in_place(db, row, old, places, thumb_dir, trash):
+        if old is not None and _remake_in_place(db, row, old, OutputFolders(places, thumb_dir), trash):
             folded += 1
     return folded
 
@@ -149,8 +149,8 @@ def cancel_backfill(db, client) -> int:
     return drop_in_flight(db, client, GenerationSource.BACKFILL, "backfill run")
 
 
-def _remake_in_place(db, remade: dict, old: dict, places: OutputPlaces, thumb_dir: Path,
-                     trash) -> bool:
+def _remake_in_place(db, remade: dict, old: dict, folders: OutputFolders, trash) -> bool:
+    places, thumb_dir = folders
     if gallery.video_file_of(remade, places) is None:
         logger.warning("%s has no video on disk to remake %s with; both wait for the next "
                        "launch", remade["prompt_id"], old["prompt_id"])

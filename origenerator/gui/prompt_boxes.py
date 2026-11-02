@@ -17,7 +17,7 @@ from origenerator.box_breaks import (
 )
 from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
-from origenerator.gui.past_the_limit import mark_past_the_limit
+from origenerator.gui.prompt_marks import mark_past_the_limit
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
 COUNTING_DOWN_FROM = 15

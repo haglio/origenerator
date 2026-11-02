@@ -520,7 +520,10 @@ def test_a_canceled_launch_takes_back_its_offer_to_fun_time(qapp, monkeypatch, t
 def test_a_launch_canceled_once_connected_to_comfyui_disconnects(qapp):
     screens = []
     client = MagicMock()
-    client.start.side_effect = lambda: screens[0].reject()
+    def reject_the_screen_by_then_up():
+        screens[0].reject()
+
+    client.start.side_effect = reject_the_screen_by_then_up
 
     with _a_faked_boot([], **_real_loading_screens(screens),
                        **{"origenerator.comfyui_client.ComfyUIClient": MagicMock(return_value=client)}):

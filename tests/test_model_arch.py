@@ -123,7 +123,7 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
     assert model_arch.describe(path).arch == SDXL
     reads = []
-    monkeypatch.setattr(model_arch, "_tensor_shapes", lambda p: reads.append(p))
+    monkeypatch.setattr(model_arch, "_tensor_shapes", reads.append)
     model_arch._remembered.cache_clear()
 
     assert model_arch.describe(path).arch == SDXL

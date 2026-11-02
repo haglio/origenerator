@@ -246,9 +246,9 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
 
 
 def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
     filled = []
-    monkeypatch.setattr(view, "fill_the_region", filled.append)
+    monkeypatch.setattr(GalleryView, "fill_the_region", lambda _view, shape: filled.append(shape))
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
 
     (tmp_path / "origenerator_cmd.txt").write_text("portrait_open_slideshow\n", encoding="utf-8")
     bridge._tick()
@@ -268,14 +268,14 @@ def test_release_asks_for_the_app_back_from_the_session(qtbot, tmp_path):
 
 
 def test_a_released_bridge_answers_the_session_no_further(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
     paused = []
+    monkeypatch.setattr(GalleryView, "fill_the_region", lambda _view, shape: paused.append("filled"))
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
     monkeypatch.setattr(view, "set_room_paused", paused.append)
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     (tmp_path / "origenerator_cmd.txt").write_text("RELEASE\nportrait_open_slideshow\n",
                                                  encoding="utf-8")
-    monkeypatch.setattr(view, "fill_the_region", lambda shape: paused.append("filled"))
     bridge._tick()
 
     assert paused == []

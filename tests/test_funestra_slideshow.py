@@ -42,7 +42,11 @@ DRIVERS = ("origenerator/gui/slideshow_hud.py", "origenerator/fun_time_bridge.py
 
 
 def _into(said: list):
-    return lambda message, *, mark: said.append(message)
+    def say(message, *, mark):
+        assert isinstance(mark, str)
+        said.append(message)
+
+    return say
 
 
 def _marked_into(said: list):

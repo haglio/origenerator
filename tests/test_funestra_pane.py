@@ -245,7 +245,7 @@ def test_a_double_click_is_two_presses_and_the_second_says_it_came_again(qtbot, 
 
 
 def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_path):
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
+    pane = FunestraPane(channel=PaneChannel(), user=_Running, hud=lambda: None)
     qtbot.addWidget(pane)
     items = _items(tmp_path, "one")
     _hand_over(pane, items)
@@ -259,7 +259,7 @@ def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_pa
 
 
 def test_a_pane_with_no_window_to_draw_into_opens_no_engine(qtbot, tmp_path):
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
+    pane = FunestraPane(channel=PaneChannel(), user=_Running, hud=lambda: None)
     qtbot.addWidget(pane)
 
     pane.show()
@@ -269,7 +269,7 @@ def test_a_pane_with_no_window_to_draw_into_opens_no_engine(qtbot, tmp_path):
 
 
 def test_an_engine_that_will_not_open_leaves_the_pane_without_one(qtbot, tmp_path, monkeypatch, caplog):
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
+    pane = FunestraPane(channel=PaneChannel(), user=_Running, hud=lambda: None)
     qtbot.addWidget(pane)
     pane.show()
     monkeypatch.setattr(QApplication.instance(), "platformName", lambda: "windows")
@@ -427,7 +427,7 @@ def test_an_image_that_stops_moving_says_why_in_the_log(qtbot, tmp_path, caplog)
 
 def test_a_pass_handed_over_before_the_pane_is_shown_opens_the_moment_it_is(qtbot, tmp_path):
     engine = FakeEngine()
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None,
+    pane = FunestraPane(channel=PaneChannel(), user=_Running, hud=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)
     qtbot.addWidget(pane)
     items = _items(tmp_path, "one")
@@ -441,7 +441,7 @@ def test_a_pass_handed_over_before_the_pane_is_shown_opens_the_moment_it_is(qtbo
 
 def test_a_line_said_once_a_pass_is_owed_does_not_stand_in_front_of_the_slide(qtbot, tmp_path):
     engine = FakeEngine()
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None,
+    pane = FunestraPane(channel=PaneChannel(), user=_Running, hud=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)
     qtbot.addWidget(pane)
     items = _items(tmp_path, "one")
@@ -457,7 +457,7 @@ def test_a_line_said_once_a_pass_is_owed_does_not_stand_in_front_of_the_slide(qt
 def test_the_verbs_handed_over_before_the_funestra_opens_are_taken_the_moment_it_does(
         qtbot, tmp_path):
     engine = FakeEngine()
-    pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback),
+    pane = FunestraPane(channel=PaneChannel(), user=_Running,
                         hud=lambda: None,
                         engine_for=lambda wid: engine if pane._window.isVisible() else None)
     qtbot.addWidget(pane)

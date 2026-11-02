@@ -248,7 +248,7 @@ def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     asked = []
-    tile.context_requested.connect(lambda pos: asked.append(pos))
+    tile.context_requested.connect(asked.append)
 
     tile.customContextMenuRequested.emit(QPoint(5, 5))
 

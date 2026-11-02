@@ -96,7 +96,7 @@ class FunTimeBridge(QObject):
             TAKE_BACK: self.take_back_asked.emit,
         }
         self._shape_verbs = {
-            OPEN_SLIDESHOW: lambda shape: self._gallery.fill_the_region(shape),
+            OPEN_SLIDESHOW: self._gallery.fill_the_region,
             CLOSE_SLIDESHOW: self._close_the_slideshow,
         }
         self._request_shape: str | None = None

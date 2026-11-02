@@ -12,11 +12,9 @@ NO_PROGRAM = ("No training program is set up: content.local.json names no "
 
 
 class LookTrainingController:
-    def __init__(self, jobs, *, tabs: Callable[[], list], show_tab: Callable[[object], None],
-                 parent):
+    def __init__(self, jobs, *, info_tabs_of: Callable[[], object], parent):
         self._jobs = jobs
-        self._tabs = tabs
-        self._show_tab = show_tab
+        self._info_tabs_of = info_tabs_of
         self._parent = parent
         self._training: TrainingRun | None = None
 
@@ -48,7 +46,7 @@ class LookTrainingController:
     def _watch(self, job: dict, tab=None, key: str | None = None) -> TrainingRun:
         self._training = TrainingRun(
             job, self._jobs, look_training,
-            reveal=lambda: self._show_tab(tab) if tab is not None else None,
+            reveal=lambda: self._info_tabs_of().setCurrentWidget(tab) if tab is not None else None,
             parent=self._parent)
         self._training.progress.connect(lambda text: self._show(job["base"], text))
         self._training.finished.connect(lambda lora: self._ended(job, lora, tab, key))
@@ -57,7 +55,7 @@ class LookTrainingController:
         return self._training
 
     def _show(self, base: str, text: str | None) -> None:
-        for tab in self._tabs():
+        for tab in self._info_tabs_of().generate_tabs():
             tab.show_training(base, text)
 
     def _ended(self, job: dict, lora: str | None, tab, key, why: str = "") -> None:

@@ -216,6 +216,29 @@ def test_a_stored_record_survives_the_round_trip_through_the_database(tmp_path):
     assert Path(record["batch"]["subdir"]) == batch.subdir
 
 
+def test_an_item_deleted_restored_and_deleted_again_is_trashed_on_the_date_of_the_latest_delete(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.record_trashed("p1", {"prompt_id": "p1"}, {"moves": [], "subdir": None})
+    _age(db, "p1", 9)
+    earlier = db.get_trashed("p1")["deleted_at"]
+
+    db.record_trashed("p1", {"prompt_id": "p1"}, {"moves": [], "subdir": None})
+
+    assert db.get_trashed("p1")["deleted_at"] != earlier
+
+
+def test_rewriting_a_held_items_record_keeps_its_date(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.record_trashed("p1", {"prompt_id": "p1", "seed": 1}, {"moves": [], "subdir": None})
+    _age(db, "p1", 9)
+    earlier = db.get_trashed("p1")["deleted_at"]
+
+    db.record_trashed("p1", {"prompt_id": "p1", "seed": 2}, {"moves": [], "subdir": None}, deleted_at=earlier)
+
+    held = db.get_trashed("p1")
+    assert (held["deleted_at"], held["row"]["seed"]) == (earlier, 2)
+
+
 # --- what a day in the Trash leaves ----------------------------------------
 
 

@@ -45,6 +45,7 @@ from shared_ui.spacing import (
 )
 from shared_ui.type_scale import SIZE_TINY
 
+from origenerator.gui.hud_queue_thumbnails import empty_thumbnail, fitted_frame, fitted_thumbnail
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
     CANCEL_ALL_TIP,
@@ -110,7 +111,6 @@ _SHIELD_MARK = CTRL_BTN - 2 * BUTTON_ICON_INSET
 _MARK_TO_WORD = 3
 _HEIGHT = _FRAME + BLOCK_GAP + 2 * _MARK_H + ROWS * _ROW_H
 
-_EMPTY_CELL_ALPHA = 110
 
 
 @cache
@@ -129,6 +129,14 @@ def _line_height() -> int:
 
 def _word_width(word: str) -> int:
     return text_width(_tiny(), word) + 2 * _WORD_PAD
+
+
+@dataclass(frozen=True)
+class _Canvas:
+    image: Image.Image
+    draw: ImageDraw.ImageDraw
+    pointer: tuple[int, int] | None
+    targets: list
 
 
 def _on(rect, pointer) -> bool:
@@ -202,31 +210,29 @@ class QueueSection:
               pointer: tuple[int, int] | None) -> list[tuple[tuple, Button]]:
         targets: list[tuple[tuple, Button]] = []
         if not self.blank:
-            self._paint_whats_in_flight(image, x, y, width, pointer, targets)
+            self._paint_whats_in_flight(_Canvas(image, ImageDraw.Draw(image), pointer, targets), x, y, width)
         if self.pointer is not None:
             self.pointer.painted(targets, (x, y))
         return targets
 
-    def _paint_for_all(self, image, draw, x, y, pointer, targets) -> None:
+    def _paint_for_all(self, canvas, x, y) -> None:
         column = _for_all_width()
         top = y + (_FRAME - 2 * CTRL_BTN - BLOCK_GAP) // 2
-        _paint_shield_all(image, draw, (x, top, column, CTRL_BTN), pointer, targets,
-                          dim=not self.any_to_shield)
-        _paint_button(image, draw, (x, top + CTRL_BTN + BLOCK_GAP, column, CTRL_BTN),
+        _paint_shield_all(canvas, (x, top, column, CTRL_BTN), dim=not self.any_to_shield)
+        _paint_button(canvas, (x, top + CTRL_BTN + BLOCK_GAP, column, CTRL_BTN),
                       Button(CANCEL_ALL, CANCEL_ALL_TEXT, CANCEL_ALL_TIP, width=column,
-                             dim=not self.any_to_cancel),
-                      pointer, targets)
+                             dim=not self.any_to_cancel))
 
-    def _paint_whats_in_flight(self, image, x, y, width, pointer, targets) -> None:
-        draw = ImageDraw.Draw(image)
+    def _paint_whats_in_flight(self, canvas, x, y, width) -> None:
+        image, draw = canvas.image, canvas.draw
         if self.leader is not None or self.foreign:
-            self._paint_head(image, draw, x, y, width, pointer, targets)
+            self._paint_head(canvas, x, y, width)
         rows = y + _FRAME + BLOCK_GAP
         if not self.lines:
             self._paint_empty_note(draw, x, rows if self.foreign else y, width, y + _HEIGHT)
             return
         self._paint_mark(image, x, rows, width, self.first > 0)
-        self._paint_rows(image, draw, x, rows + _MARK_H, width, pointer, targets)
+        self._paint_rows(canvas, x, rows + _MARK_H, width)
         self._paint_mark(image, x, rows + _MARK_H + ROWS * _ROW_H, width,
                          self.first + ROWS < len(self.lines))
 
@@ -235,20 +241,21 @@ class QueueSection:
                   fit_text(_tiny(), self.empty_note, width), font=_tiny(), anchor="mm",
                   fill=(*TEXT_MUTED, 255))
 
-    def _paint_head(self, image, draw, x, y, width, pointer, targets) -> None:
+    def _paint_head(self, canvas, x, y, width) -> None:
+        draw = canvas.draw
         if self.lines:
             width = max(0, width - _GAP - _for_all_width())
-            self._paint_for_all(image, draw, x + width + _GAP, y, pointer, targets)
+            self._paint_for_all(canvas, x + width + _GAP, y)
         column, room = x, width
         if self.leader is not None:
-            frame_width = self._paint_frame(image, draw, x, y)
+            frame_width = self._paint_frame(canvas, x, y)
             rect = (x, y, frame_width, _FRAME)
-            targets.append((rect, Button(f"{FRAME}|{self.leader.key}", "", FRAME_TOOLTIP)))
+            canvas.targets.append((rect, Button(f"{FRAME}|{self.leader.key}", "", FRAME_TOOLTIP)))
             column = x + frame_width + _GAP
             room = max(0, x + width - column)
         if self.foreign:
             room = max(0, room - _GAP - self._paint_word(
-                image, draw, column + room, y, pointer, targets,
+                canvas, column + room, y,
                 Button(CLEAR, CLEAR_TEXT, clear_queue_tooltip(self.foreign))))
         if self.leader is not None:
             self._paint_bar(draw, column, y, room)
@@ -257,16 +264,16 @@ class QueueSection:
                 said = self._say(draw, column, middle, room, self.leader.wait)
                 if self.leader.start_now:
                     word = _word_width(START_NOW_TEXT)
-                    self._paint_word(image, draw, column + said + _GAP + word,
-                                     round(middle - CTRL_BTN / 2), pointer, targets,
+                    self._paint_word(canvas, column + said + _GAP + word,
+                                     round(middle - CTRL_BTN / 2),
                                      Button(START_NOW, START_NOW_TEXT, START_NOW_TOOLTIP))
             return
         if self.idle_note:
             self._say(draw, column, y + CTRL_BTN / 2, room, self.idle_note)
 
-    def _paint_word(self, image, draw, right, y, pointer, targets, button) -> int:
+    def _paint_word(self, canvas, right, y, button) -> int:
         word = _word_width(button.icon)
-        _paint_button(image, draw, (right - word, y, word, CTRL_BTN), button, pointer, targets)
+        _paint_button(canvas, (right - word, y, word, CTRL_BTN), button)
         return word
 
     def _say(self, draw, x, y, room, text) -> int:
@@ -297,38 +304,37 @@ class QueueSection:
         draw.text((x + width / 2, y + _BAR_H / 2), fit_text(_tiny(), caption, room),
                   font=_tiny(), anchor="mm", fill=(*TEXT_PRIMARY, 255))
 
-    def _paint_frame(self, image, draw, x, y) -> int:
-        live = _frame_image(self.leader.frame, _FRAME)
+    def _paint_frame(self, canvas, x, y) -> int:
+        image, draw = canvas.image, canvas.draw
+        live = fitted_frame(self.leader.frame, _FRAME)
         if live is not None:
             image.alpha_composite(live, (x, y + (_FRAME - live.height) // 2))
             return live.width
-        return _paint_source(image, draw, x, y, _FRAME, self.leader.source,
-                             self.leader.prompt_edited) or _empty_cell(draw, x, y, _FRAME)
+        return _paint_source(canvas, (x, y), _FRAME, self.leader.source,
+                             self.leader.prompt_edited) or empty_thumbnail(draw, x, y, _FRAME)
 
-    def _paint_rows(self, image, draw, x, y, width, pointer, targets) -> None:
+    def _paint_rows(self, canvas, x, y, width) -> None:
+        draw, targets = canvas.draw, canvas.targets
         for index, line in enumerate(self.drawn):
             row = y + index * _ROW_H
             cursor = x
             for verb, mark, tooltip, can_go in (
                     (UP, "chevron_up", MOVE_UP_TIP, line.can_move_up),
                     (DOWN, "chevron_down", MOVE_DOWN_TIP, line.can_move_down)):
-                _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
+                _paint_button(canvas, (cursor, row, CTRL_BTN, CTRL_BTN),
                               Button(f"{verb}|{line.key}", shared_icon(mark), tooltip,
-                                     width=CTRL_BTN, dim=not can_go),
-                              pointer, targets)
+                                     width=CTRL_BTN, dim=not can_go))
                 cursor += CTRL_BTN + _GAP
-            _paint_button(image, draw, (cursor, row, CTRL_BTN, CTRL_BTN),
+            _paint_button(canvas, (cursor, row, CTRL_BTN, CTRL_BTN),
                           Button(f"{SHIELD}|{line.key}", shared_icon("shield"), SHIELD_TIP,
-                                 width=CTRL_BTN, lit=line.shielded, dim=not line.shieldable),
-                          pointer, targets)
+                                 width=CTRL_BTN, lit=line.shielded, dim=not line.shieldable))
             cursor += CTRL_BTN + _GAP
             word = _word_width(CANCEL_TEXT)
-            _paint_button(image, draw, (cursor, row, word, CTRL_BTN),
+            _paint_button(canvas, (cursor, row, word, CTRL_BTN),
                           Button(f"{CANCEL}|{line.key}", CANCEL_TEXT, line.cancel_tooltip,
-                                 width=word, dim=not line.cancelable),
-                          pointer, targets)
+                                 width=word, dim=not line.cancelable))
             cursor += word + _GAP
-            _paint_thumbnails(image, draw, cursor, row, line)
+            _paint_thumbnails(canvas, cursor, row, line)
             cursor += _BLOCK_W + _GAP
             room = max(0, x + width - cursor)
             lead = fit_text(_tiny(), line.lead, room)
@@ -366,21 +372,22 @@ def _shield_all_width() -> int:
     return _SHIELD_MARK + _MARK_TO_WORD + _word_width(SHIELD_ALL_TEXT)
 
 
-def _paint_shield_all(image, draw, rect, pointer, targets, *, dim: bool) -> None:
+def _paint_shield_all(canvas, rect, *, dim: bool) -> None:
+    image, draw = canvas.image, canvas.draw
     x, y, width, height = rect
-    ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, pointer), dim=dim)
+    ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, canvas.pointer), dim=dim)
     left = x + (width - _shield_all_width()) // 2 + _WORD_PAD
     draw_icon(image, "shield", (left - BUTTON_ICON_INSET, y, height, height), ink)
     draw.text((left + _SHIELD_MARK + _MARK_TO_WORD, y + height / 2), SHIELD_ALL_TEXT,
               font=_tiny(), anchor="lm", fill=ink)
-    targets.append((rect, Button(SHIELD_ALL, SHIELD_ALL_TEXT, SHIELD_ALL_TIP, width=width,
+    canvas.targets.append((rect, Button(SHIELD_ALL, SHIELD_ALL_TEXT, SHIELD_ALL_TIP, width=width,
                                  dim=dim)))
 
 
-def _paint_button(image, draw, rect, button, pointer, targets) -> None:
-    draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
+def _paint_button(canvas, rect, button) -> None:
+    draw_button(canvas.image, canvas.draw, rect, button, hovered=_on(rect, canvas.pointer),
                 icon_font=_glyphs(), word_font=_tiny())
-    targets.append((rect, button))
+    canvas.targets.append((rect, button))
 
 
 def _fraction(progress) -> float | None:
@@ -389,60 +396,11 @@ def _fraction(progress) -> float | None:
     return min(1.0, max(0.0, progress[0] / progress[1]))
 
 
-def _empty_cell(draw, x, y, side) -> int:
-    draw.rectangle([x, y, x + side - 1, y + side - 1],
-                   fill=(*BORDER_SUBTLE, _EMPTY_CELL_ALPHA))
-    return side
-
-
-_CELLS: dict[tuple[str, int, bool, int | None], Image.Image | None] = {}
-
-
-def _written(path) -> int | None:
-    try:
-        return os.stat(path).st_mtime_ns
-    except OSError:
-        return None
-
-
-def _cell(path, side: int, gray: bool = False) -> Image.Image | None:
-    if not path:
-        return None
-    key = (str(path), side, gray, _written(path))
-    if key not in _CELLS:
-        _CELLS[key] = _fit(path, side, gray)
-    return _CELLS[key]
-
-
-def _fit(path, side: int, gray: bool) -> Image.Image | None:
-    try:
-        opened = Image.open(path).convert("RGBA")
-    except (OSError, ValueError):
-        return None
-    if gray:
-        opened = opened.convert("L").convert("RGBA")
-    opened.thumbnail((side, side))
-    cell = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    cell.paste(opened, ((side - opened.width) // 2, (side - opened.height) // 2))
-    return cell
-
-
-def _frame_image(frame: bytes | None, side: int) -> Image.Image | None:
-    if not frame:
-        return None
-    try:
-        opened = Image.open(io.BytesIO(frame)).convert("RGBA")
-    except (OSError, ValueError):
-        return None
-    opened.thumbnail((side, side))
-    cell = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    cell.paste(opened, ((side - opened.width) // 2, (side - opened.height) // 2))
-    return cell
-
-
-def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
-    frame = _cell(source[0], side)
-    source_video = _cell(source[1], side, gray=True)
+def _paint_source(canvas, at: tuple[int, int], side, source, prompt_edited: bool) -> int:
+    image, draw = canvas.image, canvas.draw
+    x, y = at
+    frame = fitted_thumbnail(source[0], side)
+    source_video = fitted_thumbnail(source[1], side, gray=True)
     if frame is None and source_video is None:
         return 0
     cursor = x
@@ -467,16 +425,17 @@ def _paint_source(image, draw, x, y, side, source, prompt_edited: bool) -> int:
     return cursor - x
 
 
-def _paint_thumbnails(image, draw, x, y, line: JobLine) -> None:
-    if _paint_source(image, draw, x, y, _CELL, line.source, line.prompt_edited):
+def _paint_thumbnails(canvas, x, y, line: JobLine) -> None:
+    image, draw = canvas.image, canvas.draw
+    if _paint_source(canvas, (x, y), _CELL, line.source, line.prompt_edited):
         return
     if not line.folder:
         return
     for index in range(FOLDER_CELLS):
         cell_x = x + index * (_CELL + _CELL_GAP)
-        drawn = _cell(line.folder[index], _CELL) if index < len(line.folder) else None
+        drawn = fitted_thumbnail(line.folder[index], _CELL) if index < len(line.folder) else None
         if drawn is None:
-            _empty_cell(draw, cell_x, y, _CELL)
+            empty_thumbnail(draw, cell_x, y, _CELL)
         else:
             image.alpha_composite(drawn, (cell_x, y))
 

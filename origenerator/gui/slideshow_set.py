@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import fields, replace
+from dataclasses import dataclass, fields, replace
 
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
@@ -35,12 +35,22 @@ _ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
 GENERATING = "Generating…"
 
 
+@dataclass(frozen=True)
+class SetDeal:
+    shuffle: object = None
+    start: int | None = None
+    opening: object = None
+
+
+NO_DEAL = SetDeal()
+
+
 class SlideshowSet:
-    def __init__(self, items, *, actions: SlideshowActions,
-                 shuffle=None, start=None, hud: HudFacts | None = None,
-                 opening=None,
+    def __init__(self, items, *, actions: SlideshowActions, deal: SetDeal = NO_DEAL,
+                 hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
-        self._shuffle = shuffle
+        start, opening = deal.start, deal.opening
+        self._shuffle = deal.shuffle
         self._on_pass_change = on_pass_change
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen

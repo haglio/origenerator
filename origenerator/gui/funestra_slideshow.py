@@ -34,6 +34,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
 from origenerator.gui.slideshow_playing import NO_HOSTING, Hosting, Playing, Seat
 from origenerator.gui.slideshow_set import (
+    SetDeal,
     SlideshowSet,
     item_note,
     looping_note,
@@ -108,8 +109,8 @@ class FunestraSlideshow(QObject):
     def _take_set(self, playing: Playing) -> None:
         self._following = None
         self._set = SlideshowSet(playing.items, actions=self._actions,
-                                 shuffle=playing.shuffle, start=playing.start, hud=playing.hud,
-                                 opening=playing.opening, on_pass_change=self._pass_changed)
+                                 deal=SetDeal(shuffle=playing.shuffle, start=playing.start, opening=playing.opening),
+                                 hud=playing.hud, on_pass_change=self._pass_changed)
 
     def play(self, playing: Playing) -> None:
         if playing.actions is not None:

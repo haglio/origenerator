@@ -7,7 +7,12 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED
 
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
-from origenerator.gui.slideshow_set import SlideshowSet, item_note, narrow_to_the_action_on_screen
+from origenerator.gui.slideshow_set import (
+    SetDeal,
+    SlideshowSet,
+    item_note,
+    narrow_to_the_action_on_screen,
+)
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests.slideshow_support import slides_named
@@ -20,7 +25,7 @@ def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
     dealt = []
     slideshow_set = SlideshowSet(items,
                                  actions=SlideshowActions(**asked_of_the_library),
-                                 shuffle=in_order, start=start, hud=hud,
+                                 deal=SetDeal(shuffle=in_order, start=start), hud=hud,
                                  on_pass_change=dealt.append)
     return slideshow_set, dealt
 
@@ -152,7 +157,7 @@ def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded
 
 def test_a_shuffled_pass_begun_on_a_slide_plays_every_other_one_before_coming_back(seeded):
     slideshow_set = SlideshowSet(_TWELVE, actions=SlideshowActions(),
-                                 start=5)
+                                 deal=SetDeal(start=5))
     played = [slideshow_set.current_prompt_id()]
     for _ in _TWELVE[1:]:
         slideshow_set.playlist.advance()

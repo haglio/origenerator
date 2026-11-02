@@ -1,9 +1,3 @@
-"""What a tab is asked to change about the image it shows, in a few words.
-
-Typed, or the words a spoken request was heard saying. A pause in the typing
-asks for the prompts to be rewritten to match, and "updating…" stands beside
-the words until they have been.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QTimer, pyqtSignal

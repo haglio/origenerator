@@ -1,16 +1,3 @@
-"""What this repo hands Evolver, held to what Evolver promises.
-
-A send copies the video into a folder of Evolver's and the gallery later reads
-Evolver's upscale back out of another -- both spelled here, from reading that
-repo's source, with nothing comparing them.  A folder renamed over there left
-this app dropping videos where nothing ingests them, and every suite stayed
-green.
-
-Evolver publishes ``evolver_contract.json`` at its checkout root now.  These
-hold this repo's paths and its half-written name to it.  Neither gate clones
-the other, so on a machine with no Evolver beside this one there is nothing to
-compare and the check says so.
-"""
 from __future__ import annotations
 
 import json
@@ -26,14 +13,6 @@ CONTRACT = Path("evolver") / "evolver_contract.json"
 
 
 def _promise() -> dict:
-    """Evolver's published document, found beside this checkout.
-
-    Walked up from here rather than resolved through the content overlay: the
-    overlay is git-ignored, so a worktree -- which is where every suite runs --
-    has only the placeholder one, pointing at a library that is not there.  The
-    walk lands on the checkout beside the primary from a worktree and from a
-    clone alike.
-    """
     for parent in Path(__file__).resolve().parents:
         published = parent / CONTRACT
         if published.is_file():
@@ -42,8 +21,6 @@ def _promise() -> dict:
 
 
 def test_the_folders_this_app_sends_to_are_the_ones_evolver_watches():
-    """Library-relative in the document, because the library root is private
-    and each app resolves it from its own overlay."""
     relative = _promise()["library_relative"]
 
     under_library = {name: config.LIBRARY_ROOT / Path(value)
@@ -54,8 +31,6 @@ def test_the_folders_this_app_sends_to_are_the_ones_evolver_watches():
 
 
 def test_a_copy_still_being_written_wears_the_name_evolver_walks_past():
-    """The marker is the whole of why a run of Evolver's pipeline never ingests
-    half a video, and it has to be IN the name, not merely near it."""
     marker = _promise()["partial_marker"]
 
     partial = evolver_export.partial_name(Path("some-clip.mp4"))
@@ -64,9 +39,6 @@ def test_a_copy_still_being_written_wears_the_name_evolver_walks_past():
 
 
 def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favorites(tmp_path):
-    """Evolver's favorites stage reads every journal in the folder it publishes,
-    in the fields it publishes, so a star set on another source's video here
-    reaches Fun Time's list the way the phone's favorites do."""
     promise = _promise()
     journals = promise["journals"]
     video, row = _another_sources_video(promise)

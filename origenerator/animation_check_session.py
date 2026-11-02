@@ -1,18 +1,14 @@
-"""Walking the animations one at a time, settling what each runs: best-attested
-first (:mod:`origenerator.animation_samples`), one with no sample coming up blank."""
 from __future__ import annotations
 
 import json
 
-Path = tuple[str, str, str]  # lane, action, state
+Path = tuple[str, str, str]
 
 
 class AnimationCheckSession:
 
     def __init__(self, paths: list[Path], samples: dict[Path, list[dict]], store,
                  *, pinned=None):
-        """``pinned(action, lane)`` answers the action's own settings, which an
-        animation nobody ever kept a video of starts from instead of a sample."""
         self._pinned = pinned or (lambda action, lane: None)
         self._paths = list(paths)
         self._ranks = {path: rank for rank, path in enumerate(self._paths)}
@@ -32,8 +28,6 @@ class AnimationCheckSession:
 
     @property
     def starting_point(self) -> dict | None:
-        """The settings on screen: what he has already assigned to this
-        animation, else the sample's own, else the action's."""
         here = self.path
         if here is None:
             return None
@@ -63,8 +57,6 @@ class AnimationCheckSession:
 
 
     def accept(self, *, positive: str, negative: str) -> None:
-        """Take the settings on screen, with the prompts as they now read (the
-        half he edits), as what this animation runs -- then move on."""
         here = self.path
         if here is None:
             return

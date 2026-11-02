@@ -16,24 +16,6 @@ from origenerator.workflows.prompt_readers import CLIP
 
 
 class SdxlT2iWorkflow(WorkflowTemplate):
-    """SDXL T2I, optionally finished by an upscale/enhance pass.
-
-    The base render is the plain SDXL workflow. With the ``enhance`` toggle on,
-    its decode then runs the shared enhance tail
-    (:meth:`WorkflowTemplate.enhance_image_nodes`): a model upscale for
-    sharpness, and a low-denoise second sampling pass in which the checkpoint
-    re-imagines the enlarged pixels — real generated texture rather than
-    interpolation, which is what keeps the result naturalistic. Toggled off
-    (its default), the graph ends at the plain decode.
-
-    The toggle defaults off because enhancement is now a *layer* the gallery
-    applies afterward — its Enhance pane, per folder, with the original
-    kept and every version listed. Baking the tail in here would produce an
-    enhanced image with no original to compare against and no version to name.
-    The param stays (an old run reproduces exactly what it recorded), but
-    nothing sets it by hand any more.
-    """
-
     name = "sdxl_t2i"
     version = "v004"
     display_name = "SDXL T2I"
@@ -41,9 +23,9 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     model_keys = ("checkpoint",)
     lora_keys = loras_keyed_only_when_named = LORA_KEYS
     text_reader = CLIP
-    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
+    extra_enhance_keys = ("upscale_model",)
     output_node_id = "7"
-    base_output_node_id = "15"  # the pre-enhance render, saved when the tail runs
+    base_output_node_id = "15"
 
     def default_params(self) -> dict:
         return {
@@ -65,9 +47,6 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            # Kept low deliberately: at 0.3 the enhance pass re-imagined creases
-            # and skin folds into wounds/disfigurements (user-reported). 0.15
-            # refines texture without redrawing anatomy.
             "enhance_denoise": 0.15,
             "filename_prefix": "image/sdxl_t2i",
         }
@@ -99,7 +78,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     def build_api_payload(self, params: dict) -> dict:
         loras = self.lora_chain("16", ["1", 0], picked_loras(params, LORA_KEYS), clip_ref=["1", 1])
         enhance_nodes: dict = {}
-        enhanced_ref = ["6", 0]  # enhance off: save the plain decode
+        enhanced_ref = ["6", 0]
         if params.get("enhance"):
             tail = self.enhance_image_nodes(
                 image_ref=["6", 0], model_ref=loras.model,
@@ -154,7 +133,5 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"vae_name": params["vae"]},
             },
             **enhance_nodes,
-            # With the tail on, keep the base render too — it is made on the way
-            # and would otherwise be discarded, leaving no original.
             **self.base_save_node(self.base_output_node_id, ["6", 0], params),
         }

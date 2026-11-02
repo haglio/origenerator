@@ -1,7 +1,3 @@
-"""Walking the table's animations one at a time, accepting the settings each runs.
-
-Acts and states are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -184,8 +180,6 @@ def test_an_animation_with_neither_a_sample_nor_pinned_action_settings_starts_fr
 
 
 def test_assigning_saves_the_prompts_he_typed_with_nothing_else_to_go_on():
-    """His words, on an animation with no kept video and no action settings behind
-    it: "assign should still save those prompts; that's not nothing"."""
     store = _Store()
     session = AnimationCheckSession(_ORDER, {}, store)
 
@@ -196,8 +190,6 @@ def test_assigning_saves_the_prompts_he_typed_with_nothing_else_to_go_on():
 
 
 def test_an_animation_he_has_assigned_opens_on_what_he_assigned():
-    """What he assigned is the answer for that animation, so it is what comes up
-    when the walk reaches it again -- not the sample's own prompts."""
     store = _Store()
     store.accepted[_ORDER[0]] = ("wan22_i2v", {"positive_prompt": "what he typed"})
     session = AnimationCheckSession(_ORDER, {_ORDER[0]: [_video("kept")]}, store)

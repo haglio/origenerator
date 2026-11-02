@@ -199,6 +199,10 @@ def _arch_from(shapes: dict[str, list[int] | None]) -> str | None:
         return LTX
     if has("transformer_blocks"):
         return QWEN
+    return _arch_after_the_transformer_families(shapes, keys, has, starts)
+
+
+def _arch_after_the_transformer_families(shapes, keys, has, starts) -> str | None:
     # Krea 2 before WAN: its single-stream `blocks.N` would read as WAN's. The text-fusion
     # adapter beside them is what only it has, and a LoRA trained on the blocks alone shows what only its blocks hold.
     if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):

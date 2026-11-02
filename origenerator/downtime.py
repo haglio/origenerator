@@ -36,25 +36,40 @@ class Turn:
     holds_the_graphics_card: bool
 
 
-def take_a_turn(*, app_open: Callable[[], bool], training_running: Callable[[], bool],
-                comfyui_busy: Callable[[], bool], batches_due: Callable[[], bool],
-                queue_batches: Callable[[], None], queue_more_backfill: Callable[[], int],
-                fix_to_train: Callable[[], object], train: Callable[[object], None]) -> Turn:
-    if app_open():
-        return Turn("nothing: Origenerator is open", training_running())
-    if training_running():
+@dataclass(frozen=True)
+class Machine:
+    app_open: Callable[[], bool]
+    training_running: Callable[[], bool]
+    comfyui_busy: Callable[[], bool]
+    batches_due: Callable[[], bool]
+    queue_batches: Callable[[], None]
+    queue_more_backfill: Callable[[], int]
+    fix_to_train: Callable[[], object]
+    train: Callable[[object], None]
+
+
+def _nothing_while_it_is_in_use(machine: Machine) -> Turn | None:
+    if machine.app_open():
+        return Turn("nothing: Origenerator is open", machine.training_running())
+    if machine.training_running():
         return Turn("nothing: a fix is training", True)
-    if comfyui_busy():
+    if machine.comfyui_busy():
         return Turn("nothing: ComfyUI is still working", False)
-    if batches_due():
-        queue_batches()
-        return Turn("handed ComfyUI the work Origenerator left as it closed", training_running())
-    if queue_more_backfill():
-        return Turn("handed ComfyUI the next videos the backfill remakes", training_running())
-    if (fix := fix_to_train()) is not None:
-        train(fix)
+    return None
+
+
+def take_a_turn(machine: Machine) -> Turn:
+    if (nothing := _nothing_while_it_is_in_use(machine)) is not None:
+        return nothing
+    if machine.batches_due():
+        machine.queue_batches()
+        return Turn("handed ComfyUI the work Origenerator left as it closed", machine.training_running())
+    if machine.queue_more_backfill():
+        return Turn("handed ComfyUI the next videos the backfill remakes", machine.training_running())
+    if (fix := machine.fix_to_train()) is not None:
+        machine.train(fix)
         return Turn(f"started training the {fix.name} fix", True)
-    return Turn("nothing to do", training_running())
+    return Turn("nothing to do", machine.training_running())
 
 
 def _left_work() -> Path:
@@ -199,13 +214,13 @@ def main() -> int:
     if not app_open():
         identity = taskbar_identity(APP_USER_MODEL_ID, None)
         announce_trainings_that_ended(lambda toast: raise_toast(identity, toast))
-    turn = take_a_turn(
+    turn = take_a_turn(Machine(
         app_open=app_open,
         training_running=lambda: bool(running_trainings()),
         comfyui_busy=lambda: _comfyui_busy(client), batches_due=work_left,
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
         queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client, ui),
-        fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui))
+        fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui)))
     print(json.dumps({"did": turn.did, "holds_the_graphics_card": turn.holds_the_graphics_card}))
     return 0
 

@@ -362,20 +362,18 @@ class JobQueue(QObject):
             job.start(None if self._closed else _off_the_gui_thread)
         except Exception as e:
             if self._key_of(job) is None:
-                return False
-            if comfyui_api.unreachable(e) and self._closed:
+                pass
+            elif comfyui_api.unreachable(e) and self._closed:
                 self._waiting.insert(0, job)
-                return False
-            if comfyui_api.unreachable(e) and self._bring_up_comfyui is not None:
+            elif comfyui_api.unreachable(e) and self._bring_up_comfyui is not None:
                 self._hold_for_comfyui(job)
-                return False
-            if self._closed and _the_users_own(job.source):
+            elif self._closed and _the_users_own(job.source):
                 logger.warning("Left %s for the next launch to send: ComfyUI refused it as "
                                "the app closed: %s", key, e)
                 self._drop(key, job)
-                return False
-            logger.warning("Re-roll submission failed for %s: %s", key, e)
-            self._refuse(key, job, str(e))
+            else:
+                logger.warning("Re-roll submission failed for %s: %s", key, e)
+                self._refuse(key, job, str(e))
             return False
         finally:
             self._in_flight = None

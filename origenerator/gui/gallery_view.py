@@ -153,7 +153,7 @@ from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.starting_rows import StartingRows
-from origenerator.gui.voice_router import VoiceRouter
+from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import (
     base_of as _base_of,
@@ -303,9 +303,10 @@ class GalleryView(QWidget):
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
         self._voice.bind_the_buttons(
-            auto=self._buttons.auto, radio=self._buttons.radio,
-            drive=self.osr2_control if self._osr2_motion is not None else None,
-            mic=self._buttons.mic,
+            VoiceSwitches(
+                auto=self._buttons.auto, radio=self._buttons.radio,
+                drive=self.osr2_control if self._osr2_motion is not None else None,
+                mic=self._buttons.mic),
             enhance=(self._buttons.enhance, self._enhance.enhance_the_selection),
             actions={
                 AppCommand.BACK: (self._buttons.back, self._navigation.go_back),
@@ -426,9 +427,10 @@ class GalleryView(QWidget):
             lambda image: self._enhance.enhance_items([image["prompt_id"]]))
         self._look_training = LookTrainingController(
             self._jobs, info_tabs_of=lambda: self._generate_pane, parent=self)
-        self._voice = VoiceRouter(self, parent=self, db=db, slideshows=self._slideshows,
-                                  client=client, motion=self._osr2_motion,
-                                  starting=self._starting)
+        self._voice = VoiceRouter(
+            self, VoiceSources(db=db, slideshows=self._slideshows, client=client,
+                               starting=self._starting),
+            parent=self, motion=self._osr2_motion)
         self._folder_history: list[str] = []
 
     def _intercept_the_rooms_keys(self, intercepting: bool):

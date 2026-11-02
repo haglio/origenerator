@@ -48,7 +48,12 @@ from origenerator.gui.inflight_items import (
     InFlightSources,
 )
 from origenerator.gui.inflight_tile import InFlightTile
-from origenerator.gui.item_tile import CornerButton, ItemTile, restore_offer_of
+from origenerator.gui.item_tile import (
+    CornerButton,
+    ItemTile,
+    TileAppearance,
+    restore_offer_of,
+)
 from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
@@ -642,30 +647,32 @@ class GalleryPane(QObject):
 
         return self._draw_tile(
             flow, row, _REVIEW_TILE if corner_buttons else _COLLECTION_TILE, wire,
-            media_type=gallery.media_type_of_row(row),
-            movie_path=self._host.animated_preview(row),
-            favorite=bool(row.get("starred")),
-            enhance=self._enhance_state(row),
-            enhancing=self._host.enhancing().run_of(row),
-            corner_buttons=corner_buttons,
+            TileAppearance(
+                media_type=gallery.media_type_of_row(row),
+                movie_path=self._host.animated_preview(row),
+                favorite=bool(row.get("starred")),
+                enhance=self._enhance_state(row),
+                enhancing=self._host.enhancing().run_of(row),
+                corner_buttons=corner_buttons),
         )
 
-    def _draw_tile(self, flow, row, wiring: str, wire, *, caption: str | None = None,
-                   **appearance) -> ItemTile:
+    def _draw_tile(self, flow, row, wiring: str, wire,
+                   appearance: TileAppearance) -> ItemTile:
         prompt_id = row["prompt_id"]
         thumb_path = row.get("thumbnail_path")
+        caption = appearance.caption
         if caption is None:
             caption = self._host.item_name(prompt_id)
         tile = self._kept.take(
-            prompt_id, ItemTile.look_of(prompt_id, thumb_path, caption, **appearance),
+            prompt_id, ItemTile.look_of(prompt_id, thumb_path, caption, appearance),
             wiring)
         if tile is None:
-            tile = ItemTile(prompt_id, thumb_path, caption, **appearance)
+            tile = ItemTile(prompt_id, thumb_path, caption, appearance)
             wire(tile)
         else:
-            tile.set_favorite(appearance.get("favorite", False))
-            tile.set_enhance(appearance.get("enhance"))
-            tile.set_enhancing(appearance.get("enhancing"))
+            tile.set_favorite(appearance.favorite)
+            tile.set_enhance(appearance.enhance)
+            tile.set_enhancing(appearance.enhancing)
         flow.addWidget(tile)
         tile.set_selected(self._selection.holds(prompt_id))
         self._thumb_widgets[prompt_id] = tile
@@ -794,11 +801,12 @@ class GalleryPane(QObject):
         name = self._host.item_name(row["prompt_id"])
         return self._draw_tile(
             flow, row, _TRASH_TILE, wire,
-            caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
-            media_type=gallery.media_type_of_row(row),
-            movie_path=self._host.animated_preview(row),
-            favorite=bool(row.get("starred")),
-            restore=restore_offer_of(row),
+            TileAppearance(
+                caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
+                media_type=gallery.media_type_of_row(row),
+                movie_path=self._host.animated_preview(row),
+                favorite=bool(row.get("starred")),
+                restore=restore_offer_of(row)),
         )
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
@@ -878,11 +886,12 @@ class GalleryPane(QObject):
         def draw(row):
             self._draw_tile(
                 flow, row, _SEEDS_TILE if i2v else _FOLDER_TILE, wire,
-                movie_path=self._host.animated_preview(row),
-                favorite=bool(row.get("starred")),
-                enhance=self._enhance_state(row),
-                enhancing=self._host.enhancing().run_of(row),
-                corner_buttons=self._seed_reroll_actions(row) if i2v else None,
+                TileAppearance(
+                    movie_path=self._host.animated_preview(row),
+                    favorite=bool(row.get("starred")),
+                    enhance=self._enhance_state(row),
+                    enhancing=self._host.enhancing().run_of(row),
+                    corner_buttons=self._seed_reroll_actions(row) if i2v else None),
             )
 
         finished = [row for row in group.rows if gallery.produced_output(row)]

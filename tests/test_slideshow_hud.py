@@ -161,9 +161,6 @@ class TestTheOneHudASlideshowWears:
         assert slideshow_hud_model("portrait", self._window(qtbot).slideshow).max_intensity is None
 
     def test_the_window_driving_the_device_is_the_funestra_skip_ahead_can_act_on(self, qtbot):
-        """Standalone the OSR2 follows this window, so its Skip ahead grays only
-        for a slide with no funscript; a slideshow driving nothing grays it
-        for the device too."""
         def skip_ahead(model):
             return next(button for row in model.rows for button in row
                         if button.command == "portrait_funscript_jump")

@@ -23,6 +23,7 @@ from collections.abc import Callable
 from typing import Any
 
 from funestra.console import ROW_LABEL_W, VALUE_W
+from funestra.funestra_verbs import NEXT_FUNSCRIPTED
 from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_controls import (
     browse_order_buttons,
@@ -129,10 +130,10 @@ _NEWER, _OLDER = -1, 1
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda host: host.slideshow_step(-1),
     "next": lambda host: host.slideshow_step(1),
-    "nudge_prev": lambda host: host.slideshow_nudge(-1),
-    "nudge_next": lambda host: host.slideshow_nudge(1),
-    "funscript_jump": lambda host: host.slideshow_funscript_jump(),
-    "next_funscripted": lambda host: host.slideshow_next_funscripted(),
+    "nudge_prev": lambda host: host.transport.nudge(-1),
+    "nudge_next": lambda host: host.transport.nudge(1),
+    "funscript_jump": lambda host: host.transport.funscript_jump(),
+    "next_funscripted": lambda host: host.slideshow_step(1, verb=NEXT_FUNSCRIPTED),
     "lock": lambda host: host.slideshow_toggle_lock(),
     "lock_on": lambda host: host.set_locked(True),
     "lock_off": lambda host: host.set_locked(False),

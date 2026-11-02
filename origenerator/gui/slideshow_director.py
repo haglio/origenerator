@@ -27,7 +27,6 @@ from typing import Protocol
 
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
-from funestra.modes import read_mode
 from funestra.volume import VolumeHud
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QWidget
@@ -61,8 +60,19 @@ from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
-from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
-from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
+from origenerator.gui.hud_places import (
+    HudPlaces,
+    as_saved,
+    collapsed,
+    has_the_osr2,
+    moved,
+    opened_in,
+    place_of,
+    restore,
+    told,
+)
+from origenerator.gui.level_stepper import Version
+from origenerator.gui.notice_overlay import FAVORITE, HEARD_MARK, NOTICE, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -91,7 +101,6 @@ from origenerator.slideshow import (
     SlideshowState,
     in_order,
 )
-from origenerator.slideshow_buttons import HAS_THE_OSR2, HUD_CORNER
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.dictation import words_of
 from origenerator.voice.slideshow_commands import SlideshowCommand
@@ -307,9 +316,7 @@ class SlideshowDirector:
         self._standalone_shape: str | None = None
         self._standalone_window_shape: str | None = None
         self._standalone_showing: str | None = None
-        self._hud_corners: dict[str, HudCorner] = {}
-        self._hud_minimized: dict[str, bool] = {}
-        self._has_osr2: dict[str, bool] = {}
+        self._huds = HudPlaces()
         # Every slideshow currently up, each with the collection/folder key it opened
         # from: what a landing generation is offered to, so a slideshow keeps up
         # with an auto-generating folder however far the Gallery pane has moved on.
@@ -637,6 +644,11 @@ class SlideshowDirector:
         """What a press on a slideshow asks the gallery to do on its behalf, and what
         the gallery says about the library the slideshow on *shape* is mapped
         against — that side's own shape of it."""
+        def at_its_regions_base(slideshow) -> bool:
+            shown_on = self._side_of(slideshow)
+            where = next((where for live, where in self._live_slideshows if live is slideshow), None)
+            return shown_on is None or where == self.base_location(shown_on)
+
         return SlideshowActions(
             queue_now=self._host.queue_now,
             delete=self._host.trash_generation,
@@ -648,7 +660,7 @@ class SlideshowDirector:
             lock=(self._show_the_locked_generation
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
-            at_base=(self.region_at_base if self._fun_time is not None else None),
+            at_base=(at_its_regions_base if self._fun_time is not None else None),
             reorder=self.reorder_slideshow,
             browse_all=self.browse_it_all,
             # The queue's own four: the block at the HUD's foot re-lines the
@@ -726,7 +738,7 @@ class SlideshowDirector:
         # way a window one does.
         if self._room_paused:
             slideshow.set_paused(True)
-        slideshow.set_has_osr2(self._has_osr2.get(side, False))
+        slideshow.transport.set_has_osr2(has_the_osr2(self._huds, side))
         return slideshow
 
     def _open_a_window(self, items, shape: str, *, window_shape: str, actions, hud, versions,
@@ -957,35 +969,26 @@ class SlideshowDirector:
         if self._room_paused:
             view.slideshow.set_paused(True)
         self._wear_the_hud(view, shape)
-        view.slideshow.set_has_osr2(self._has_osr2.get(shape, False))
+        slideshow = view.slideshow
+        slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
 
     def hud_place(self, shape: str) -> tuple[HudCorner, bool]:
-        return (self._hud_corners.get(shape, HudCorner.UPPER_LEFT),
-                self._hud_minimized.get(shape, False))
+        return place_of(self._huds, shape)
 
     def tell_the_hud(self, shape: str, action: str, argument: str) -> None:
-        """What the session says of *shape*'s HUD: where it sits, whether it is
-        parked, and whether that Funestra has the OSR2."""
-        corner, minimized = self.hud_place(shape)
-        if action == HUD_CORNER:
-            self._hud_corners[shape] = read_mode(HudCorner, argument, corner)
-        elif action == HAS_THE_OSR2:
-            self._has_osr2[shape] = argument == "1"
-        else:
-            self._hud_minimized[shape] = argument == "1"
+        told(self._huds, shape, action, argument)
         self._tell_the_slideshow_wearing_it(shape)
 
     def move_the_hud(self, direction: str, *, shape: str) -> None:
-        self._hud_corners[shape] = self.hud_place(shape)[0].toward(direction)
+        moved(self._huds, shape, direction)
         self._tell_the_slideshow_wearing_it(shape)
 
     def collapse_the_hud(self, minimized: bool, *, shape: str) -> None:
-        self._hud_minimized[shape] = minimized
+        collapsed(self._huds, shape, minimized)
         self._tell_the_slideshow_wearing_it(shape)
 
     def open_the_hud_in(self, corner: HudCorner, *, shape: str) -> None:
-        self._hud_corners[shape] = corner
-        self._hud_minimized[shape] = False
+        opened_in(self._huds, shape, corner)
         self._tell_the_slideshow_wearing_it(shape)
 
     def _tell_the_slideshow_wearing_it(self, shape: str) -> None:
@@ -994,7 +997,7 @@ class SlideshowDirector:
                 surface.shown.set_hud_place(*self.hud_place(shape))
         slideshow = self.region_slideshow(shape)
         if slideshow is not None:
-            slideshow.set_has_osr2(self._has_osr2.get(shape, False))
+            slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
 
     def _wear_the_hud(self, view, shape: str) -> None:
         """Put the Funestras' own HUD on *view* — the same HUD, rendered by the
@@ -1076,13 +1079,9 @@ class SlideshowDirector:
 
     def remembered(self) -> dict:
         state = self._place_left()
-        huds = {}
-        for shape in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
-            corner, minimized = self.hud_place(shape)
-            huds[shape] = {"corner": corner, "minimized": minimized}
         volume = self._volume_left_at
         return {"last_show": state.saved(), "filters": SlideshowFilters.saved(self._filters),
-                "panels": huds, "pace": self._pace.seconds,
+                "panels": as_saved(self._huds), "pace": self._pace.seconds,
                 "volume": None if volume is None else asdict(volume)}
 
     def remember(self, saved) -> None:
@@ -1093,12 +1092,7 @@ class SlideshowDirector:
         if type(saved.get("pace")) is int:
             self._pace.set_seconds(saved["pace"])
         self._volume_left_at = _volume_saved_as(saved.get("volume"))
-        huds = saved.get("panels")
-        for shape, place in (huds.items() if isinstance(huds, dict) else ()):
-            if isinstance(place, dict):
-                self._hud_corners[shape] = read_mode(HudCorner, place.get("corner"),
-                                                    HudCorner.UPPER_LEFT)
-                self._hud_minimized[shape] = place.get("minimized") is True
+        restore(self._huds, saved.get("panels"))
 
     def slideshow_showing_on(self) -> str | None:
         return None if self._slideshow is None else self._standalone_showing
@@ -1283,13 +1277,6 @@ class SlideshowDirector:
         """Which satellite region *slideshow* is holding, if it holds one."""
         return next((shape for shape, on_that_side in self._region_slideshows.items()
                      if on_that_side is slideshow), None)
-
-    def region_at_base(self, slideshow) -> bool:
-        """Whether *slideshow* is already playing its region's base state, which
-        leaves its reset nothing to go back to."""
-        side = self._side_of(slideshow)
-        where = next((where for live, where in self._live_slideshows if live is slideshow), None)
-        return side is None or where == self.base_location(side)
 
     def reset_region(self, slideshow) -> None:
         """A region's reset: back to the base state, not to the top of whatever

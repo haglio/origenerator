@@ -56,6 +56,11 @@ from tests.slideshow_hud_support import (
 )
 
 
+class _NoOsr2Word:
+    def set_has_osr2(self, has_it):
+        pass
+
+
 def _session(tmp_path=None):
     return FunTimeSession(
         main_rect=Rect(0, 206, 853, 1234),
@@ -443,7 +448,7 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     # Presenting mutes the window, holds its slideshow mid-freeze, and dresses it
     # in the Funestras' HUD, as a real SlideshowView answers.
     stub.set_audio_muted = lambda muted: None
-    stub.slideshow = SimpleNamespace(set_paused=lambda paused: None, set_has_osr2=lambda has_it: None)
+    stub.slideshow = SimpleNamespace(set_paused=lambda paused: None, transport=_NoOsr2Word())
     stub.wear_the_hud = lambda shape, **how: None  # told whose HUD it wears, and where
     view._slideshows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]

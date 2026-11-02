@@ -41,8 +41,7 @@ class SlideshowActions:
     the corner note goes on to say. ``lock`` takes one and is a session's: it
     opens the held item as a generate tab. ``reset`` takes the slideshow itself and
     is a session's too — hosted, "how it started" is the REGION's base state,
-    which only the gallery knows, and ``at_base`` asks it whether the slideshow
-    is there already, which fades the button. ``reorder`` takes the slideshow and whether to play
+    which only the gallery knows, and ``at_base`` whether it is there. ``reorder`` takes the slideshow and whether to play
     its side's library newest first; ``browse_all`` takes the slideshow alone and
     plays that library in the order it is in. ``drive_toggle`` takes nothing: Space goes to
     the app's one OSR2 switch rather than straight to this slideshow's motion, and

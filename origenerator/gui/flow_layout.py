@@ -14,28 +14,8 @@ class _Trailing(QWidgetItem):
 
 
 class FlowLayout(QLayout):
-    """Lay items out left-to-right, wrapping to a new row when the width runs out.
-
-    Unlike ``QGridLayout``'s fixed column count, this fits as many items per row
-    as the current width allows and reflows on resize, so a pane of fixed-size
-    tiles uses the whole width instead of stopping at an arbitrary column. And
-    unlike ``QHBoxLayout``, an item is always laid out at its own size hint: a row
-    of buttons wraps onto a second line rather than squeezing every label down to
-    an unreadable stub.
-
-    ``align_right`` pushes each row against the right edge, for a row of buttons
-    that sits in that corner — the rows stay ragged on the left, the way a button
-    row reads, instead of walking away from the corner as it wraps.
-    """
-
     def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,
                  align_right=False):
-        """*row_spacing* is the gap BETWEEN wrapped rows, defaulting to *spacing*.
-
-        They are separate because a row of buttons wants its items close and
-        its rows apart: at one gap for both, two wrapped rows read as a single
-        crowded block rather than as two rows.
-        """
         super().__init__(parent)
         self._items = []
         self._row_spacing = spacing if row_spacing is None else row_spacing
@@ -99,20 +79,13 @@ class FlowLayout(QLayout):
         return QRect(QPoint(0, 0), size).marginsAdded(self.contentsMargins()).size()
 
     def _do_layout(self, rect, place):
-        """Flow items across ``rect``; return the total height they occupy.
-
-        With ``place`` false, only measure (for :meth:`heightForWidth`); with it
-        true, also position each item — the path Qt drives on resize. The rows are
-        worked out first and placed after, because a right-aligned row cannot be
-        positioned until it is known how wide it ended up.
-        """
         area = rect.marginsRemoved(self.contentsMargins())
         margin_height = rect.height() - area.height()
         spacing = self.spacing()
         rows, row, x = [], [], area.x()
         for item in self._items:
             if item.isEmpty():
-                continue  # a hidden widget takes no place, and no gap where one was
+                continue
             if isinstance(item, _FullRow):
                 if row:
                     rows.append(row)
@@ -122,8 +95,8 @@ class FlowLayout(QLayout):
             hint = item.sizeHint()
             hint.setWidth(min(hint.width(), max(area.width(), item.minimumSize().width())))
             if row and x + hint.width() > area.right():
-                rows.append(row)            # won't fit
-                row, x = [], area.x()       # wrap
+                rows.append(row)
+                row, x = [], area.x()
             row.append((item, hint))
             x += hint.width() + spacing
         if row:

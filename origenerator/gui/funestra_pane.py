@@ -1,15 +1,3 @@
-"""The one Funestra a standalone Origenerator activates for a Slideshow, in a pane of the slideshow's window.
-
-The Funestra is the family's window (:class:`funestra.funestra.Funestra`), and the
-Slideshow drives it the way it drives one of a session's: through the pane's
-:class:`PaneChannel`, which answers the three calls a session's Funestra answers on
-its files, in this process.
-
-The engine is handed a window, so it cannot exist before there is one to hand
-it; a list handed over before then is kept and opened on the moment the pane
-is first shown.  A platform with no windows in it -- the suite's -- never
-shows one, and a test hands the pane an engine of its own instead.
-"""
 from __future__ import annotations
 
 import logging
@@ -17,7 +5,6 @@ import threading
 import time
 from contextlib import ExitStack
 
-from funestra.funestra import Channels, Funestra
 from funestra.funestra_verbs import RELOAD_PLAYLIST
 from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
@@ -30,6 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from funestra.funestra import Channels, Funestra
 from origenerator.funestras_engine import offer_the_copy_beside_the_checkouts
 from origenerator.running_ahead import ahead_while_playing
 
@@ -128,7 +116,7 @@ class FunestraPane(QWidget):
             return
         self._stack.setCurrentWidget(self._window)
         if self._funestra is not None:
-            return  # the window's first showing opened it
+            return
         engine = self._engine_for(int(self._window.winId())) if self._engine_for else self._open_engine()
         if engine is None:
             return
@@ -150,8 +138,6 @@ class FunestraPane(QWidget):
         self._mover.start()
 
     def _open_engine(self):
-        """The engine on this pane's window, or None where there is no window
-        to draw into or the engine will not open."""
         application = QApplication.instance()
         if (application is None or application.platformName() == "offscreen"
                 or not self._window.isVisible()):
@@ -197,11 +183,9 @@ class FunestraPane(QWidget):
             self._funestra.playback.set_paused(paused)
 
     def position(self) -> int:
-        """How far into the video on screen the Funestra has got, in milliseconds."""
         return 0 if self._funestra is None else int(self._funestra.playback.position_ms)
 
     def close_engine(self) -> None:
-        """Let the engine go, before the window it draws into is taken down."""
         self._stop_moving.set()
         if self._mover is not None:
             self._mover.join()
@@ -209,8 +193,6 @@ class FunestraPane(QWidget):
         if self._funestra is not None:
             self._funestra.close()
         self._running_ahead.close()
-
-    # --- the pointer, handed to the Funestra in its window's own pixels -----
 
     def press(self, position) -> None:
         if self._funestra is not None:
@@ -247,9 +229,7 @@ class FunestraPane(QWidget):
 
 
 class _FunestraWindow(QWidget):
-    """The window the engine draws into: native, because that is what the
-    engine is handed and what it paints, and asked for the moment it is first
-    shown, since a window that has never been on screen is not one to hand over."""
+    """Native, because the engine is handed a native window, and asked for at first show since a window never on screen is not one to hand over."""
 
     def __init__(self, pane: FunestraPane):
         super().__init__(pane)

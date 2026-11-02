@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
-
 from origenerator.gui.flow_layout import FlowLayout
+from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
 
 
 def test_flow_layout_tracks_and_releases_items(qtbot):
@@ -32,15 +31,12 @@ def test_flow_layout_fits_more_per_row_when_wider(qtbot):
         layout.addWidget(tile)
 
     assert layout.hasHeightForWidth()
-    narrow = layout.heightForWidth(200)   # one tile per row -> eight rows tall
-    wide = layout.heightForWidth(900)     # several per row -> only a couple rows
+    narrow = layout.heightForWidth(200)
+    wide = layout.heightForWidth(900)
     assert wide < narrow
 
 
 def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
-    """A row of buttons wants its items close and its rows apart.  At the one
-    gap this layout used for both, the gallery's button row wrapped into two
-    rows that all but touched."""
     host = QWidget()
     qtbot.addWidget(host)
     flow = FlowLayout(host, spacing=4, row_spacing=20)
@@ -48,12 +44,12 @@ def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
         button = QPushButton("x")
         button.setFixedSize(40, 20)
         flow.addWidget(button)
-    host.resize(100, 200)          # two per row
+    host.resize(100, 200)
     flow.setGeometry(host.rect())
 
     tops = sorted({flow.itemAt(i).geometry().top() for i in range(flow.count())})
     assert len(tops) > 1, "nothing wrapped, so there is no row gap to check"
-    assert tops[1] - tops[0] == 20 + 20   # a row's height plus the row gap
+    assert tops[1] - tops[0] == 20 + 20
 
 
 def test_the_row_gap_defaults_to_the_one_between_buttons(qtbot):
@@ -63,8 +59,6 @@ def test_the_row_gap_defaults_to_the_one_between_buttons(qtbot):
 
 
 def test_flow_layout_lays_every_item_out_at_its_own_size(qtbot):
-    # What a QHBoxLayout does instead: squeeze past the minimum and cut off, which is
-    # how a row of buttons of buttons came out reading "o fo", "to E", "ner".
     host = QWidget()
     qtbot.addWidget(host)
     layout = FlowLayout(host, spacing=6)
@@ -72,15 +66,13 @@ def test_flow_layout_lays_every_item_out_at_its_own_size(qtbot):
         tile = QWidget()
         tile.setFixedSize(120, 30)
         layout.addWidget(tile)
-    host.resize(150, 200)          # room for one across, not three
+    host.resize(150, 200)
     host.show()
 
     assert [w.width() for w in host.findChildren(QWidget)] == [120, 120, 120]
 
 
 def test_align_right_pushes_each_row_against_the_right_edge(qtbot):
-    # A button row sits in the lower-right corner, and has to stay there as it
-    # wraps rather than walk off to the left.
     host = QWidget()
     qtbot.addWidget(host)
     layout = FlowLayout(host, spacing=6, align_right=True)
@@ -90,12 +82,12 @@ def test_align_right_pushes_each_row_against_the_right_edge(qtbot):
         tile.setFixedSize(width, 30)
         layout.addWidget(tile)
         tiles.append(tile)
-    host.resize(150, 200)          # only one fits across: two rows
+    host.resize(150, 200)
     host.show()
 
-    assert tiles[0].y() < tiles[1].y()                       # it wrapped
+    assert tiles[0].y() < tiles[1].y()
     for tile in tiles:
-        assert tile.x() + tile.width() == host.width()       # ...against the edge
+        assert tile.x() + tile.width() == host.width()
 
 
 def test_a_trailing_item_sits_against_the_right_edge_of_whichever_row_it_lands_on(qtbot):
@@ -142,7 +134,7 @@ def test_a_full_row_sits_alone_across_the_whole_width_between_the_rows_of_tiles(
     layout.addWidget(above)
     layout.add_full_row(heading)
     layout.addWidget(below)
-    host.resize(300, 200)          # room for all three side by side, were it a tile
+    host.resize(300, 200)
     host.show()
 
     assert (heading.x(), heading.width()) == (0, 300)

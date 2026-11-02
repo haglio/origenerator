@@ -328,8 +328,7 @@ def _names_in(argument):
         yield from _names_in(argument.orelse)
 
 
-def test_every_mark_this_app_names_is_one_its_shared_ui_draws():
-    # shared_ui draws a mark it lacks as a stand-in without failing.
+def test_every_mark_this_app_names_is_one_its_shared_ui_draws_since_a_missing_one_is_silently_stood_in_for():
     named = set()
     for path in Path(origenerator.__file__).parent.rglob("*.py"):
         for call in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):

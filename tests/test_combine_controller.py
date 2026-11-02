@@ -618,8 +618,7 @@ def test_an_action_with_no_past_video_says_so_and_launches_nothing(combine,
                           "one first, or drop a specific video instead.")]
 
 
-def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
-                                                                       monkeypatch):
+def test_that_hint_lands_at_the_center_top_of_the_slideshow_rather_than_a_dialog(combine, monkeypatch):
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.action_settings, "most_used_video", lambda *a, **k: None)
     slideshows = FakeSlideshows(showing=object())

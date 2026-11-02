@@ -6,7 +6,6 @@ from io import BytesIO
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QEnterEvent, QMovie
-from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
@@ -15,9 +14,9 @@ from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile
 from origenerator.gui.item_type_icon import ItemTypeIcon
-from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
 from tests.heard_drags import HeardDrags
+from tests.tile_drawing import drawn_under_the_app_stylesheet
 
 
 def _corners(tile):
@@ -361,19 +360,13 @@ def test_thumbnail_starts_unselected(qtbot):
 
 
 def _picked_tile_drawn_under_the_app_stylesheet(qtbot):
-    app = QApplication.instance()
-    prior = app.styleSheet()
-    app.setStyleSheet(build_stylesheet())
-    try:
+    def build():
         tw = ItemTile("p1", None, "caption")
-        qtbot.addWidget(tw)
         tw.resize(180, 200)
         tw.set_selected(True)
-        with qtbot.waitExposed(tw):
-            tw.show()
-        return tw, tw.grab().toImage()
-    finally:
-        app.setStyleSheet(prior)
+        return tw, tw
+
+    return drawn_under_the_app_stylesheet(qtbot, build)
 
 
 def test_selecting_fills_the_whole_tile_with_the_familys_blue(qtbot):

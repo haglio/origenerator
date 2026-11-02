@@ -1111,9 +1111,9 @@ def test_the_session_says_which_funestra_has_the_osr2_and_the_slideshow_there_he
     assert slideshow.transport.has_osr2 is False
 
 
-def _radio_clips(tmp_path, count=6):
-    clips = tmp_path / "radio"
-    clips.mkdir()
+def _radio_videos(tmp_path, count=6):
+    videos = tmp_path / "radio"
+    videos.mkdir()
     for index in range(count):
         (videos / f"clip{index}.mp4").touch()
     return videos

@@ -38,7 +38,7 @@ class FunestraTransport:
     def has_osr2(self) -> bool:
         return self._has_osr2
 
-    def band_facts(self) -> dict:
+    def row_facts(self) -> dict:
         return {"longer_than_a_step": longer_than_a_step(self._duration_ms),
                 "image": self._image,
                 "has_funscript": self._has_funscript,

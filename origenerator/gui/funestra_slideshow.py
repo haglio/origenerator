@@ -41,8 +41,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_transport import FunestraTransport
-from origenerator.gui.level_stepper import LevelStepper
-from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.message import HEARD_MARK, INFO, WARNING
 from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace

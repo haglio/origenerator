@@ -16,7 +16,7 @@ import pytest
 
 from origenerator.gallery.collection import (
     FAVORITES_KEY,
-    RECENTS_KEY,
+    LATEST_KEY,
 )
 from origenerator.gallery.voice_commands import ENHANCE_COMMAND
 from origenerator.voice.commands import (
@@ -48,7 +48,7 @@ def test_a_fix_can_name_the_side_it_means(text, shape):
 @pytest.mark.parametrize("text, key, shape", [
     ("favorites", FAVORITES_KEY, None),
     ("landscape favorites", FAVORITES_KEY, "landscape"),
-    ("portrait latest", RECENTS_KEY, "portrait"),
+    ("portrait latest", LATEST_KEY, "portrait"),
 ])
 def test_a_collection_name_is_an_order_to_play_it(text, key, shape):
     command = match_voice_command(text)

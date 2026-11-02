@@ -7,7 +7,7 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.slideshow_buttons import HUD_FACTS, answer, slideshow_rows
 
-THE_BAND = [
+THE_ROW = [
     "prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash", "fmode",
     "enhanced", "reset", "shuffle", "latest", "cycle_version"]
 
@@ -21,12 +21,12 @@ def _names(buttons) -> list[str]:
 
 
 def _by_name(**fields) -> dict:
-    band = _band(**fields)
-    return dict(zip(_names(band), band, strict=True))
+    row = _button_row(**fields)
+    return dict(zip(_names(row), row, strict=True))
 
 
 def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
-    assert _names(_button_row()) == THE_BAND
+    assert _names(_button_row()) == THE_ROW
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
@@ -42,7 +42,7 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
     """A run of evenly spaced squares reads as one undifferentiated strip; the
-    wider gap opens at the seams the Funestras' own band opens them at, and
+    wider gap opens at the seams the Funestras' own row opens them at, and
     Enhanced only keeps Reset in its group."""
     assert [name for name, button in zip(_names(_button_row()), _button_row(), strict=True) if button.group_break] == [
         "lock", "enhanced", "shuffle", "cycle_version"]
@@ -52,70 +52,70 @@ def test_the_switches_light_and_the_things_done_never_do():
     """The lock and the two filters are states the slideshow sits in — the lock and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
     image's own yellow; a step, the bin and reset are things done."""
-    band = _by_name(locked=True, favorites_filter=True, enhanced=True)
+    row = _by_name(locked=True, favorites_filter=True, enhanced=True)
 
-    assert band["lock"].lit
-    assert band["lock"].favorite
-    assert band["fmode"].lit
-    assert band["fmode"].favorite
-    assert band["enhanced"].lit
-    assert band["enhanced"].enhanced
-    assert band["trash"].danger
-    assert not any(band[name].lit for name in ("prev", "next", "trash", "reset"))
+    assert row["lock"].lit
+    assert row["lock"].favorite
+    assert row["fmode"].lit
+    assert row["fmode"].favorite
+    assert row["enhanced"].lit
+    assert row["enhanced"].enhanced
+    assert row["trash"].danger
+    assert not any(row[name].lit for name in ("prev", "next", "trash", "reset"))
     at_rest = _by_name()
     assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
 
 
 def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
     for order, lit in ((SHUFFLE_LABEL, ["shuffle"]), (LATEST_LABEL, ["latest"])):
-        band = _button_row(order=order)
-        assert [name for name, button in zip(_names(band), band, strict=True)
+        row = _button_row(order=order)
+        assert [name for name, button in zip(_names(row), row, strict=True)
                 if name in ("shuffle", "latest") and button.lit] == lit, order
 
 
 class TestTheWords:
 
     def test_the_controls_both_modes_share_read_as_kino_reads_them(self):
-        band = _by_name(has_other_versions=True)
+        row = _by_name(has_other_versions=True)
 
-        assert band["prev"].tooltip == "Previous slide"
-        assert band["next"].tooltip == "Next slide"
-        assert band["nudge_prev"].tooltip.startswith("Back 10s")
-        assert band["nudge_next"].tooltip.startswith("Forward 10s")
-        assert band["funscript_jump"].tooltip.startswith(
+        assert row["prev"].tooltip == "Previous slide"
+        assert row["next"].tooltip == "Next slide"
+        assert row["nudge_prev"].tooltip.startswith("Back 10s")
+        assert row["nudge_next"].tooltip.startswith("Forward 10s")
+        assert row["funscript_jump"].tooltip.startswith(
             "Skip ahead to where this slide's scripting starts up again")
-        assert band["fmode"].tooltip == "F-Mode — browse only the favorites on this Funestra"
-        assert band["shuffle"].tooltip == f"{SHUFFLE_LABEL} — reshuffle what plays"
-        assert band["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
-        assert band["cycle_version"].tooltip == "Another version of this slide"
+        assert row["fmode"].tooltip == "F-Mode — browse only the favorites on this Funestra"
+        assert row["shuffle"].tooltip == f"{SHUFFLE_LABEL} — reshuffle what plays"
+        assert row["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
+        assert row["cycle_version"].tooltip == "Another version of this slide"
 
     def test_the_lock_and_the_trash_read_as_kinos_and_reset_says_what_it_does_here(self):
-        band = _by_name()
+        row = _by_name()
 
-        assert band["lock"].tooltip == lock_tooltip(False, "slide")
-        assert band["trash"].tooltip == TRASH_TOOLTIP
-        assert band["reset"].tooltip.startswith("Reset — ")
+        assert row["lock"].tooltip == lock_tooltip(False, "slide")
+        assert row["trash"].tooltip == TRASH_TOOLTIP
+        assert row["reset"].tooltip.startswith("Reset — ")
 
 
 class TestTheTenSecondSteps:
     def test_step_a_video_longer_than_ten_seconds(self):
-        band = _by_name(longer_than_a_step=True)
+        row = _by_name(longer_than_a_step=True)
 
-        assert [band[step].dim for step in ("nudge_prev", "nudge_next")] == [False, False]
+        assert [row[step].dim for step in ("nudge_prev", "nudge_next")] == [False, False]
 
     def test_are_faded_on_a_video_of_ten_seconds_or_shorter_and_say_so(self):
-        band = _by_name(longer_than_a_step=False)
+        row = _by_name(longer_than_a_step=False)
 
         for step in ("nudge_prev", "nudge_next"):
-            assert band[step].dim
-            assert band[step].tooltip.endswith("(this slide is 10s or shorter)")
+            assert row[step].dim
+            assert row[step].tooltip.endswith("(this slide is 10s or shorter)")
 
     def test_are_faded_on_an_image_and_say_so(self):
-        band = _by_name(longer_than_a_step=True, image=True)
+        row = _by_name(longer_than_a_step=True, image=True)
 
         for step in ("nudge_prev", "nudge_next"):
-            assert band[step].dim
-            assert band[step].tooltip.endswith(f"({AN_IMAGE})")
+            assert row[step].dim
+            assert row[step].tooltip.endswith(f"({AN_IMAGE})")
 
 
 class TestSkipAhead:
@@ -169,7 +169,7 @@ def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_i
     rows = slideshow_rows("portrait", hosted=True, own_window=False)
 
     assert len(rows) == 1
-    assert _names(rows[0]) == THE_BAND
+    assert _names(rows[0]) == THE_ROW
 
 
 class _Host:
@@ -337,7 +337,7 @@ def test_a_press_a_slideshow_has_no_answer_to_says_so():
 
 
 def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
-    """Hosted it is the region's base state — that side's whole library, the
+    """Hosted it is the region's base state — that shape's whole library, the
     way a Funestra's reset leaves it browsing its own; standalone there is no
     such state and it is this set from the top."""
     hosted = next(b for b in _button_row(hosted=True) if b.command == "portrait_reset")

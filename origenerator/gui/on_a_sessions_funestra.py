@@ -4,7 +4,7 @@ from funestra.file_channel import publish_whole
 from funestra.satellite_hud import hud_text
 
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
-from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE
+from origenerator.gui.message import HEARD_MARK, INFO
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 
 READER_HOLD_BUDGET_S = 1.0
@@ -15,9 +15,9 @@ class OnASessionsFunestra:
 
     player = None
 
-    def __init__(self, slideshow, side: str, channel, say=None, *, actions) -> None:
+    def __init__(self, slideshow, shape: str, channel, say=None, *, actions) -> None:
         self._slideshow = slideshow
-        self._side = side
+        self._side = shape
         self._hud_file = channel.hud_file
         self._say = say
         self._published = ""
@@ -26,7 +26,7 @@ class OnASessionsFunestra:
         self._set_the_foot = foot.set
         self._press_the_foot = foot.press
         self._foots_section = foot.section
-        published = JobQueueFile(channel.hud_file, side)
+        published = JobQueueFile(channel.hud_file, shape)
         self._publish_the_foot = published.of
         self._forget_the_foot = published.forget
 
@@ -37,12 +37,12 @@ class OnASessionsFunestra:
         if text != self._published and publish_whole(self._hud_file, text):
             self._published = text
 
-    def flash(self, text: str, *, kind: str = NOTICE, ms: int = 0, mark: str = "") -> None:
+    def flash(self, text: str, *, kind: str = INFO, ms: int = 0, mark: str = "") -> None:
         if self._say is not None:
             self._say(text, mark=mark)
 
     def request_line(self, message: str, request=None, *, working: bool = False,
-                     kind: str = NOTICE) -> None:
+                     kind: str = INFO) -> None:
         self.flash(message, kind=kind, mark=HEARD_MARK)
 
     def dictating(self, note: str) -> None:

@@ -231,3 +231,30 @@ def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_
     client.submit_job.assert_called_once()
     assert (tmp_path / scene_speech(_spoken_params())[0].file).exists()
     assert len(ticks) >= 5, "the window's events stopped while the voice spoke"
+
+
+def test_a_comfyui_that_keeps_its_models_still_gets_the_lines_spoken():
+    spoken = []
+    client = _client()
+
+    def keeps_its_models():
+        raise OSError("ComfyUI is busy")
+
+    client.free_memory = keeps_its_models
+
+    job_speaker.Speaker(client, lines_on_disk=spoken.append).speak_here({"made-up": "params"})
+
+    assert spoken == [{"made-up": "params"}]
+
+
+def test_a_voice_that_cannot_speak_answers_with_its_reason(qtbot):
+    def breaks(_params):
+        raise RuntimeError("the voice broke")
+
+    answers = []
+
+    speaker = job_speaker.Speaker(_client(), lines_on_disk=breaks)
+    speaker.speak({}, lambda: answers.append("done"), answers.append)
+    qtbot.waitUntil(lambda: bool(answers), timeout=5000)
+
+    assert answers == ["the voice broke"]

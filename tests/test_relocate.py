@@ -1,4 +1,3 @@
-"""The pass that follows an output file the user moved."""
 from __future__ import annotations
 
 import json
@@ -20,7 +19,6 @@ from origenerator.relocate import relocate_moved_outputs
 
 
 def _library(tmp_path, rows):
-    """A database holding *rows* (``prompt_id -> file records``) and an output dir."""
     output_dir = tmp_path / "output"
     output_dir.mkdir(exist_ok=True)
     db = Database(tmp_path / "test.db")
@@ -47,8 +45,6 @@ def _files(db, prompt_id, column="output_files"):
 
 
 def test_a_file_swept_into_a_subfolder_is_followed_there(tmp_path):
-    """The move that prompted this: loose output files tidied into per-type
-    subfolders, leaving every row that recorded one naming the root."""
     db, output_dir = _library(tmp_path, {"a": [_file("sdxl_t2i_00001_.png")]})
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
@@ -60,8 +56,6 @@ def test_a_file_swept_into_a_subfolder_is_followed_there(tmp_path):
 
 
 def test_it_follows_a_file_out_of_a_subfolder_too(tmp_path):
-    """Nothing here is about the direction of the tidy — only about where the
-    file is now versus where the row says."""
     db, output_dir = _library(tmp_path, {"a": [_file("clip.mp4", "video")]})
     (output_dir / "clip.mp4").write_bytes(b"mp4")
 
@@ -79,9 +73,6 @@ def test_a_record_that_still_resolves_is_left_untouched(tmp_path):
 
 
 def test_a_name_in_two_places_is_left_alone(tmp_path):
-    """ComfyUI counts per filename prefix, so one name really can name two
-    files. Repointing at the wrong one would show another generation's item
-    under this row's prompt, and nothing about it would look wrong."""
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00007_.mp4")]})
     for folder in ("video", "harem"):
         (output_dir / folder).mkdir()
@@ -99,9 +90,6 @@ def test_a_file_that_is_simply_gone_keeps_saying_where_it_was(tmp_path):
 
 
 def test_a_file_the_trash_holds_is_not_followed(tmp_path):
-    """A trashed file carries an absolute ``path`` of its own — its place inside
-    the trash. A copy left over in the output tree must not pull the row back
-    out of the Trash."""
     trashed = tmp_path / "trash" / "held.png"
     trashed.parent.mkdir()
     trashed.write_bytes(b"png")
@@ -114,8 +102,6 @@ def test_a_file_the_trash_holds_is_not_followed(tmp_path):
 
 
 def test_the_pre_enhance_original_is_followed_as_well(tmp_path):
-    """``original_files`` resolves through the same output dir — it is what the
-    Enhance pane's level 0 offers as "what this looked like before"."""
     db, output_dir = _library(tmp_path, {"a": [_file("enhanced.png")]})
     db.update_generation("a", original_files=json.dumps([_file("before.png")]))
     (output_dir / "image").mkdir()
@@ -141,14 +127,10 @@ def test_an_output_dir_that_is_not_there_costs_nothing(tmp_path):
 
     assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(tmp_path / "nowhere")) == 0
     assert _files(db, "a")[0]["subfolder"] == ""
-    assert output_dir.is_dir()  # the real one, untouched
+    assert output_dir.is_dir()
 
 
 def test_the_moved_file_is_not_then_imported_a_second_time(tmp_path):
-    """Why this runs before the import scan. The scan keys what it has already
-    seen by path under the output dir, so a file that moved reads as one it has
-    never seen — and it would rebuild a bare ``imported`` row beside the
-    generated row that still holds the prompt and the settings."""
     db, output_dir = _library(tmp_path, {"a": [_file("sdxl_t2i_00001_.png")]})
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
@@ -160,8 +142,6 @@ def test_the_moved_file_is_not_then_imported_a_second_time(tmp_path):
 
 
 def test_without_it_the_scan_does_duplicate_the_row(tmp_path):
-    """The other half of the pair above: the duplicate is real, so the pass is
-    load-bearing rather than a tidy-up of a symptom nothing else has."""
     db, output_dir = _library(tmp_path, {"a": [_file("sdxl_t2i_00001_.png")]})
     (output_dir / "image").mkdir()
     (output_dir / "image" / "sdxl_t2i_00001_.png").write_bytes(b"png")
@@ -170,8 +150,6 @@ def test_without_it_the_scan_does_duplicate_the_row(tmp_path):
 
 
 def test_a_followed_row_previews_again(tmp_path):
-    """The symptom the user sees: a row whose file moved shows its thumbnail and
-    nothing else, because every surface resolves through the recorded folder."""
     db, output_dir = _library(tmp_path, {"a": [_file("clip.mp4")]})
     (output_dir / "video").mkdir()
     (output_dir / "video" / "clip.mp4").write_bytes(b"mp4")

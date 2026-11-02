@@ -1,4 +1,3 @@
-"""Custom collections: the pure grouping model, and the storage under it."""
 from __future__ import annotations
 
 import json
@@ -33,14 +32,10 @@ def _tree(rows):
 
 
 def _lora_folder(tree):
-    """The "(no LoRA)" folder these rows all land under: Images -> workflow ->
-    model -> LoRA, whose children are the settings leaves."""
     (images,) = tree
     (workflow,) = gallery.child_groups(images)
     return gallery.child_groups(gallery.child_groups(workflow)[0])[0]
 
-
-# --- keys --------------------------------------------------------------------
 
 def test_a_custom_folder_key_round_trips_to_its_id():
     key = gallery.custom_collection_key(7)
@@ -53,11 +48,8 @@ def test_a_derived_or_collection_key_is_not_a_custom_folder(key):
 
 
 def test_the_live_selection_names_no_saved_folder():
-    # It renders like a saved folder while carrying nothing to save it under.
     assert gallery.custom_folder_id(gallery.SELECTION_KEY) is None
 
-
-# --- resolving a saved folder against the live tree --------------------------
 
 def test_a_custom_folder_resolves_its_folders_out_of_the_tree():
     rows = [_row("i1", "a cat"), _row("i2", "a dog")]
@@ -75,8 +67,6 @@ def test_a_custom_folder_resolves_its_folders_out_of_the_tree():
 
 
 def test_a_gathered_folder_that_is_gone_is_skipped_not_dropped():
-    # The folder may come back (an undone delete, a reconcile) — so the grouping
-    # renders without it rather than forgetting it was ever gathered.
     rows = [_row("i1", "a cat")]
     tree = _tree(rows)
     record = {"id": 1, "name": "Mixed",
@@ -85,13 +75,10 @@ def test_a_gathered_folder_that_is_gone_is_skipped_not_dropped():
     (folder,) = gallery.build_custom_collections(tree, [record])
 
     assert [g.key for g in gallery.child_groups(folder)] == ["image/sdxl_t2i"]
-    # untouched
     assert record["folders"] == ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]
 
 
 def test_an_empty_custom_folder_still_appears():
-    # A folder you have made and named but not yet filled is exactly where you
-    # are about to drop something.
     (folder,) = gallery.build_custom_collections(
         _tree([_row("i1", "a cat")]),
         [{"id": 1, "name": "Later", "folders": [], "items": []}]
@@ -111,8 +98,6 @@ def test_a_custom_folder_resolves_the_items_it_holds_out_of_the_tree():
 
 
 def test_a_custom_folders_own_items_lead_and_one_inside_a_gathered_folder_counts_once():
-    # The slideshow plays these in the order the tiles are drawn: the items
-    # first, then each gathered folder's.
     rows = [_row("i1", "a cat"), _row("i2", "a dog")]
     tree = _tree(rows)
     cat, dog = gallery.child_groups(_lora_folder(tree))
@@ -139,7 +124,6 @@ def test_a_custom_folder_inside_another_brings_what_it_holds():
 
 
 def test_two_custom_folders_saved_inside_each_other_resolve_without_looping():
-    # An undo and a redo can leave each holding the other; the later link is left out.
     tree = _tree([_row("i1", "a cat")])
     a, b = gallery.custom_collection_key(1), gallery.custom_collection_key(2)
 
@@ -154,8 +138,6 @@ def test_two_custom_folders_saved_inside_each_other_resolve_without_looping():
 
 
 def test_gathering_a_folder_and_its_parent_counts_each_item_once():
-    # Otherwise the slideshow would play the overlap twice and the tile would
-    # claim more items than the folder holds.
     rows = [_row("i1", "a cat"), _row("i2", "a dog")]
     tree = _tree(rows)
     lora = _lora_folder(tree)
@@ -173,11 +155,9 @@ def test_a_custom_folder_wears_no_folder_level_but_names_its_tier():
     (folder,) = gallery.build_custom_collections(
         _tree([_row("i1", "a cat")]), [{"id": 1, "name": "Mine", "folders": [], "items": []}]
     )
-    assert gallery.folder_level(folder) is None   # no TOC initial: it is no tier
+    assert gallery.folder_level(folder) is None
     assert gallery.group_level(folder) == "custom"
 
-
-# --- storage -----------------------------------------------------------------
 
 def _db_with_folder(tmp_path, name="Favorites", folders=(("image", "media", "i1"),)):
     db = Database(tmp_path / "t.db")
@@ -248,7 +228,7 @@ def test_re_adding_a_folder_keeps_its_place_rather_than_duplicating_it(tmp_path)
     (record,) = db.list_custom_collections()
     assert record["folders"] == ["a", "b"]
     identity = {m["folder_key"]: m["ref_prompt_id"] for m in db.folders_in_custom_collections()}
-    assert identity["a"] == "p9"  # the identity refreshes even though the order holds
+    assert identity["a"] == "p9"
 
 
 def test_removing_a_custom_folder_takes_what_it_gathered_with_it(tmp_path):
@@ -259,7 +239,7 @@ def test_removing_a_custom_folder_takes_what_it_gathered_with_it(tmp_path):
 
     assert db.list_custom_collections() == []
     assert db.folders_in_custom_collections() == []
-    db.create_custom_collection("Mine", folder_id)  # what an undone removal does
+    db.create_custom_collection("Mine", folder_id)
     (record,) = db.list_custom_collections()
     assert record["items"] == []
 
@@ -288,10 +268,8 @@ def test_repointing_onto_a_folder_it_already_gathers_merges_them(tmp_path):
                                        level="settings", ref_prompt_id="p1")
 
     (record,) = db.list_custom_collections()
-    assert record["folders"] == ["live"]  # one folder can only be in a grouping once
+    assert record["folders"] == ["live"]
 
-
-# --- undo --------------------------------------------------------------------
 
 def _actions(tmp_path):
     db = Database(tmp_path / "t.db")
@@ -299,7 +277,6 @@ def _actions(tmp_path):
 
 
 def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):
-    # At the same id, so a session saved while it was open still finds it.
     db, actions = _actions(tmp_path)
     folder_id = actions.custom_collections.create(
         "Favorites", [("a", "settings", "p1"), ("b", "settings", "p2")], PORTRAIT
@@ -354,8 +331,6 @@ def test_undoing_a_removal_of_items_puts_them_back(tmp_path):
 
 
 def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
-    # A saved session points at a custom collection by id, so a create that is undone
-    # and redone has to resolve to the same key rather than a fresh one.
     db, actions = _actions(tmp_path)
     folder_id = actions.custom_collections.create("Mine", [("image/sdxl_t2i", "model", None)],
                                               PORTRAIT)

@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import QColor, QDropEvent, QImage
+from PyQt6.QtGui import QColor, QDropEvent, QFocusEvent, QImage
 from PyQt6.QtWidgets import (
     QAbstractSlider,
     QApplication,
@@ -45,7 +45,7 @@ from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
-from origenerator.gui.prompt_marks import has_unpaired_parentheses
+from origenerator.gui.prompt_marks import RESOLVE_UNPAIRED_PARENTHESES, problem_to_resolve
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
@@ -1712,11 +1712,26 @@ def test_a_scenes_prompts_mark_unpaired_parentheses_and_its_spoken_line_does_not
     (line,) = editor.fields("scene_lines")
 
     prompt.setPlainText("a (dog")
-    assert has_unpaired_parentheses(prompt)
+    assert problem_to_resolve([prompt]) == RESOLVE_UNPAIRED_PARENTHESES
 
     prompt.setPlainText("a (dog)")
     line.setPlainText("oh :)")
-    assert not has_unpaired_parentheses(line)
+    assert problem_to_resolve([line]) is None
+
+
+def test_leaving_a_scenes_prompt_tidies_what_was_typed_and_leaves_its_spoken_line(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    (prompt,) = editor.fields("positive_prompt")
+    (line,) = editor.fields("scene_lines")
+    for field in (prompt, line):
+        QApplication.sendEvent(field, QFocusEvent(QEvent.Type.FocusIn))
+        field.setPlainText("a  b")
+        QApplication.sendEvent(field, QFocusEvent(QEvent.Type.FocusOut))
+
+    assert prompt.toPlainText() == "a b"
+    assert line.toPlainText() == "a  b"
 
 
 def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(qtbot):

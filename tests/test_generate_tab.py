@@ -839,7 +839,7 @@ def test_generate_refuses_an_unpaired_parenthesis_and_says_to_resolve_it(tab):
     tab._generate_btn.click()
 
     assert requested == []
-    assert tab._generate_btn.text() == "Resolve the unpaired parentheses first"
+    assert tab._generate_btn.text() == "Resolve parentheses first"
     assert tab._param_form.get_values()["seed"] == 42
 
     tab._param_form.set_values({"positive_prompt": "a (wizard)"})
@@ -855,6 +855,21 @@ def test_generate_refuses_an_unpaired_parenthesis_in_the_negative_prompt_too(tab
     tab._generate_btn.click()
 
     assert requested == []
+
+
+@pytest.mark.parametrize(("prompt", "says"), [
+    ("a, b, a", "Resolve duplicates first"),
+    ("a (b:high)", "Resolve bad numbers first"),
+])
+def test_generate_refuses_the_other_problems_it_highlights_and_says_which(tab, prompt, says):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    tab._param_form.set_values({"positive_prompt": prompt})
+
+    tab._generate_btn.click()
+
+    assert requested == []
+    assert tab._generate_btn.text() == says
 
 
 def test_generate_emits_generate_requested_with_workflow_and_params(tab):
@@ -3688,7 +3703,7 @@ def test_a_modify_whose_prompt_has_an_unpaired_parenthesis_asks_to_resolve_it(mo
     modifying._generate_btn.click()
 
     assert fired == []
-    assert modifying._generate_btn.text() == "Resolve the unpaired parentheses first"
+    assert modifying._generate_btn.text() == "Resolve parentheses first"
 
 
 def test_showing_a_generation_ends_the_modify(modifying, tmp_path):

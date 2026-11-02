@@ -10,7 +10,6 @@ from origenerator.box_breaks import (
     cut_into_boxes,
     flowed,
     prompt_boxes,
-    unpaired_parentheses,
     unboxed,
 )
 from origenerator.comfy_graph import texts_read
@@ -187,20 +186,3 @@ def test_an_unboxed_prompt_is_cut_into_boxes_where_its_reader_cut_it():
 def test_a_prompt_cut_where_its_reader_cut_it_is_no_change_to_itself():
     assert baselines_for("a quiet harbor", ["a quiet harb", "or"], "a quiet harbor") == [
         "a quiet harb", "or"]
-
-
-def test_a_parenthesis_with_no_partner_is_unpaired_wherever_it_stands():
-    assert unpaired_parentheses("a (b c") == (2,)
-    assert unpaired_parentheses("a b) c") == (3,)
-    assert unpaired_parentheses(")a(") == (0, 2)
-
-
-def test_parentheses_pair_off_however_deep_they_nest():
-    assert unpaired_parentheses("(a (b:1.2) c)") == ()
-    assert unpaired_parentheses("((a) b") == (0,)
-    assert unpaired_parentheses("(a)) b") == (3,)
-
-
-def test_an_escaped_parenthesis_is_a_plain_character_and_needs_no_partner():
-    assert unpaired_parentheses(r"a \(b") == ()
-    assert unpaired_parentheses(r"(a \) b") == (0,)

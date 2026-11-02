@@ -49,8 +49,16 @@ from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_dropdown import PresetDropdown
-from origenerator.gui.prompt_boxes import Countdown, count_down, set_in_use
+from origenerator.gui.prompt_boxes import (
+    Countdown,
+    TidiesOnLeaving,
+    count_down,
+    mark_problems_in,
+    reads_numbers,
+    set_in_use,
+)
 from origenerator.gui.prompt_field import PromptField
+from origenerator.prompt_checks import tidied
 from origenerator.prompt_tokens import PromptReading
 from origenerator.workflows.base import (
     ParamDef,
@@ -138,6 +146,7 @@ class _Scene(QFrame):
                 self._countdowns[key] = Countdown()
                 column.addWidget(self._countdowns[key])
                 field.textChanged.connect(lambda key=key: self._count_down(key))
+                TidiesOnLeaving(field, lambda changed, key=key: self._left_a_prompt(key, changed))
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
             # Every path that fills a line -- typing, loading settings, a voice
@@ -153,8 +162,19 @@ class _Scene(QFrame):
             self._count_down(key)
 
     def _count_down(self, key: str) -> None:
-        count_down(self._countdowns[key], self.fields[key], self._readings.get(key),
+        count_down(self._countdowns[key], self.fields[key], self._reading_of(key),
                    in_use=self._in_use(key))
+        mark_problems_in([self.fields[key]], in_use=self._in_use(key))
+
+    def _reading_of(self, key: str) -> PromptReading | None:
+        return self._readings.get(key)
+
+    def _left_a_prompt(self, key: str, changed: bool) -> None:
+        field = self.fields[key]
+        text = diff_text.live_text(field)
+        tidy = tidied(text, reads_numbers=reads_numbers(self._reading_of(key)))
+        if changed and tidy != text:
+            field.setPlainText(tidy)
 
     def _in_use(self, key: str) -> bool:
         return not self.speaking() and not self._shut_down.get(key)

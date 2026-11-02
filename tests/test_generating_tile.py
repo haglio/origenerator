@@ -5,12 +5,12 @@ from io import BytesIO
 
 from PIL import Image
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.generating_tile import GeneratingTile
-from origenerator.gui.stylesheet import build_stylesheet
+from tests.tile_drawing import drawn_under_the_app_stylesheet
 
 
 def _png_bytes(color=(10, 120, 200)):
@@ -111,20 +111,14 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
 
 
 def _picked_tile_drawn(qtbot):
-    app = QApplication.instance()
-    prior = app.styleSheet()
-    app.setStyleSheet(build_stylesheet())
-    try:
+    def build():
         holder = QWidget()
-        qtbot.addWidget(holder)
         tile = GeneratingTile(FakeJob(state="running"), holder)
         tile.set_selected(True)
         holder.resize(tile.size())
-        with qtbot.waitExposed(holder):
-            holder.show()
-        return tile, holder.grab().toImage()
-    finally:
-        app.setStyleSheet(prior)
+        return tile, holder
+
+    return drawn_under_the_app_stylesheet(qtbot, build)
 
 
 def test_a_picked_tile_is_filled_with_the_familys_blue(qtbot):

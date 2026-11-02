@@ -1649,7 +1649,7 @@ def test_a_spoken_pause_or_play_asks_a_hosting_session_for_omnipause_only_to_cha
     assert (sent.read_text(encoding="utf-8").split() if sent.exists() else []) == asked
 
 
-def test_a_spoken_word_is_answered_in_the_slideshows_own_corner(slideshows):
+def test_a_spoken_word_is_answered_at_the_center_top_of_the_slideshows_own_window(slideshows):
     director, host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
@@ -1659,7 +1659,7 @@ def test_a_spoken_word_is_answered_in_the_slideshows_own_corner(slideshows):
     assert host.said == []
 
 
-def test_an_answer_keeps_its_kind_in_the_slideshows_corner(slideshows):
+def test_an_answer_keeps_its_kind_at_the_center_top_of_the_slideshow(slideshows):
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 

@@ -373,7 +373,7 @@ def test_only_that_requests_own_answer_takes_its_promise_down(router):
     assert voice._working_status == ""
 
 
-def test_what_was_heard_reaches_the_caption_and_the_slideshows_corner(router):
+def test_what_was_heard_reaches_the_caption_and_the_center_top_of_the_slideshow(router):
     slideshow = FakeSlideshow()
     voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 

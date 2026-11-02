@@ -257,7 +257,7 @@ def test_client_id_is_stable_across_launches(tmp_path, qtbot):
     assert first.client_id == second.client_id
 
 
-def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
+def test_init_windows_taskbar_identity_sets_aumid_and_stamps_only_the_pin_named_origenerator_in_full():
     with patch("origenerator.app.sys.platform", "win32"), \
          app_id_claimed() as mock_set_id, \
          pinned_shortcuts_stamped(return_value={}) as mock_stamp:

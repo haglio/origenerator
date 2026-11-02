@@ -831,6 +831,32 @@ def test_a_pinned_seed_is_made_first_and_the_rest_of_the_press_draw_their_own(ta
     assert tab._param_form.seed_is_random() is True
 
 
+def test_generate_refuses_an_unpaired_parenthesis_and_says_to_resolve_it(tab):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    tab._param_form.set_values({"positive_prompt": "a (wizard", "seed": 42})
+
+    tab._generate_btn.click()
+
+    assert requested == []
+    assert tab._generate_btn.text() == "Resolve the unpaired parentheses first"
+    assert tab._param_form.get_values()["seed"] == 42
+
+    tab._param_form.set_values({"positive_prompt": "a (wizard)"})
+    tab._generate_btn.click()
+    assert len(requested) == 1
+
+
+def test_generate_refuses_an_unpaired_parenthesis_in_the_negative_prompt_too(tab):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    tab._param_form.set_values({"negative_prompt": "blurry)"})
+
+    tab._generate_btn.click()
+
+    assert requested == []
+
+
 def test_generate_emits_generate_requested_with_workflow_and_params(tab):
     # Clicking Generate no longer runs its own job — it asks the gallery to, by
     # emitting the workflow and the form's values (which the gallery launches as a
@@ -3652,6 +3678,17 @@ def test_a_modify_that_asked_for_nothing_says_so_instead_of_re_running_the_folde
 
     assert fired == []
     assert modifying._generate_btn.text() == "Rewrite the prompt first"
+
+
+def test_a_modify_whose_prompt_has_an_unpaired_parenthesis_asks_to_resolve_it(modifying):
+    fired = []
+    modifying.modify_requested.connect(lambda *a: fired.append(a))
+    modifying._param_form.set_values({"positive_prompt": "a (dog"})
+
+    modifying._generate_btn.click()
+
+    assert fired == []
+    assert modifying._generate_btn.text() == "Resolve the unpaired parentheses first"
 
 
 def test_showing_a_generation_ends_the_modify(modifying, tmp_path):

@@ -81,6 +81,7 @@ from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.prompt_marks import has_unpaired_parentheses
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.warning_mark import WarningMark
@@ -141,6 +142,7 @@ _WAITING_NOTE = "Waiting for preview…"
 # submit that many runs at once, which is worth being able to read, but what
 # the button asks for is one thing — this folder, said the way it now reads.
 _MODIFY_GUARD = "Rewrite the prompt first"
+_UNPAIRED_PARENTHESES_GUARD = "Resolve the unpaired parentheses first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
@@ -951,6 +953,9 @@ class GenerateTab(DropZones):
         as many times as the dropdown beside the button says."""
         if not self._can_generate():
             return  # no server, no workflow picked yet, or no image to start from
+        if any(has_unpaired_parentheses(field) for field in self.prompt_fields()):
+            self._generate_btn.flash_guard(_UNPAIRED_PARENTHESES_GUARD)
+            return
         key = self._workflow_dropdown.currentData()
         params = self._param_form.get_values()
         if self._folder_modify is not None:

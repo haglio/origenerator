@@ -19,6 +19,24 @@ def unboxed(text: str) -> str:
     return text.replace(BOX_BREAK, " ")
 
 
+def _parenthesis_at(text: str, index: int) -> int:
+    return 0 if index and text[index - 1] == "\\" else _DEPTH.get(text[index], 0)
+
+
+def unpaired_parentheses(text: str) -> tuple[int, ...]:
+    opened, closed_alone = [], []
+    for index in range(len(text)):
+        parenthesis = _parenthesis_at(text, index)
+        if parenthesis > 0:
+            opened.append(index)
+        elif parenthesis < 0:
+            if opened:
+                opened.pop()
+            else:
+                closed_alone.append(index)
+    return tuple(sorted(opened + closed_alone))
+
+
 def flowed(boxes: list[str], tokens: Callable[[str], int], *, limit: int, start: int = 0,
            caret: tuple[int, int] | None = None) -> tuple[list[str], tuple[int, int] | None]:
     texts = list(boxes)
@@ -115,8 +133,7 @@ def _units(text: str) -> list[str]:
                 current = ""
             spaced = False
         current += char
-        if not (index and text[index - 1] == "\\"):
-            depth = max(0, depth + _DEPTH.get(char, 0))
+        depth = max(0, depth + _parenthesis_at(text, index))
     if current:
         units.append(current)
     return units

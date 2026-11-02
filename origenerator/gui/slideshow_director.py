@@ -100,76 +100,55 @@ _SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
 
 
 class SlideshowHost(Protocol):
-    def slideshow_location(self) -> str | None:
-        pass
+    def slideshow_location(self) -> str | None: ...
 
-    def rows_to_play(self) -> list[dict]:
-        pass
+    def rows_to_play(self) -> list[dict]: ...
 
-    def slideshow_subject(self) -> str:
-        pass
+    def slideshow_subject(self) -> str: ...
 
-    def shape_in_view(self) -> str:
-        pass
+    def shape_in_view(self) -> str: ...
 
-    def group_for_key(self, key: str):
-        pass
+    def group_for_key(self, key: str): ...
 
-    def row_for(self, prompt_id: str) -> dict | None:
-        pass
+    def row_for(self, prompt_id: str) -> dict | None: ...
 
-    def image_config_index(self) -> dict:
-        pass
+    def image_config_index(self) -> dict: ...
 
-    def listed_prompt_ids(self) -> list[str]:
-        pass
+    def listed_prompt_ids(self) -> list[str]: ...
 
-    def selected_prompt_ids(self) -> list[str]:
-        pass
+    def selected_prompt_ids(self) -> list[str]: ...
 
     def off_thread(self, work, done) -> None: ...
 
-    def queue_now(self) -> tuple[list, int]:
-        pass
+    def queue_now(self) -> tuple[list, int]: ...
 
-    def clear_foreign_queue(self) -> None:
-        pass
+    def clear_foreign_queue(self) -> None: ...
 
     def start_now(self) -> None: ...
 
     def cancel_all(self) -> None: ...
 
-    def window(self):
-        pass
+    def window(self): ...
 
-    def follow_link(self, prompt_id: str) -> None:
-        pass
+    def follow_link(self, prompt_id: str) -> None: ...
 
-    def show_generation(self, prompt_id: str) -> None:
-        pass
+    def show_generation(self, prompt_id: str) -> None: ...
 
     def reveal(self, prompt_id: str) -> bool: ...
 
-    def trash_generation(self, prompt_id: str) -> None:
-        pass
+    def trash_generation(self, prompt_id: str) -> None: ...
 
-    def favorite_generation(self, prompt_id: str, favorite: bool = True) -> None:
-        pass
+    def favorite_generation(self, prompt_id: str, favorite: bool = True) -> None: ...
 
-    def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        pass
+    def enhance_from_slideshow(self, prompt_id: str) -> bool: ...
 
-    def toggle_osr2_drive(self) -> None:
-        pass
+    def toggle_osr2_drive(self) -> None: ...
 
-    def reconcile_osr2(self) -> None:
-        pass
+    def reconcile_osr2(self) -> None: ...
 
-    def set_room_paused(self, paused: bool) -> None:
-        pass
+    def set_room_paused(self, paused: bool) -> None: ...
 
-    def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
-        pass
+    def say(self, message: str, *, mark: str = HEARD_MARK) -> None: ...
 
 
 @dataclass(frozen=True)

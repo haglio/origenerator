@@ -93,8 +93,7 @@ def _without(indices: list, removed: int) -> list:
     return [i - 1 if i > removed else i for i in indices if i != removed]
 
 
-def in_order(order: list) -> None:
-    pass
+def in_order(order: list) -> None: ...
 
 
 class SlideshowPlaylist:

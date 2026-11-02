@@ -1,10 +1,3 @@
-"""The glossary names every thing on screen once, and the code says those names.
-
-``glossary.json`` carries one row per thing a person can see in Origenerator: the
-word on the screen, the word the user says, the words the code says today and the
-one word it is to say. These tests hold the code to it, so a name is a row he
-rules on rather than a word an agent invents.
-"""
 from __future__ import annotations
 
 import json
@@ -20,8 +13,6 @@ SCANNED = (ROOT / "origenerator", ROOT / "tools")
 STATUSES = {"ruled", "his_word", "agreed", "unruled", "kept"}
 REQUIRED = {"id", "thing", "screen", "his_word", "code_today", "code_word", "status"}
 
-# Nouns that name something drawn on a screen, as programmers reach for them.
-# One of these in the code is a thing the glossary has to have a row for.
 SCREEN_NOUNS = frozenset((
     "tile", "card", "badge", "chip", "scrim", "plate", "strip", "cell", "slot", "pane",
     "panel", "console", "band", "toast", "banner", "gutter", "shelf", "tray", "drawer",
@@ -47,7 +38,6 @@ def _source_lines():
 
 
 def _word_streams():
-    """Each source line as the lowercase words its identifiers are made of."""
     for where, number, line in _source_lines():
         tokens = _IDENTIFIER.findall(line)
         words = [w for token in tokens for w in _words_of(token)]
@@ -65,8 +55,6 @@ def streams():
 
 
 def _words_of_phrase(phrase: str) -> list[str]:
-    """A phrase as the words an identifier saying it would be made of, so
-    "osr2 controls" is found in ``Osr2Controls`` and ``osr2_controls`` alike."""
     return [w.lower() for token in phrase.split() for w in _words_of(token)]
 
 
@@ -76,13 +64,10 @@ def _said_somewhere(phrase: str, streams) -> bool:
 
 
 def _kept(token: str, line: str, keep: list[str]) -> bool:
-    """A keep that is one identifier spares the tokens holding it; one with a space
-    or a stop in it is a phrase, and spares the lines that say it."""
     return any(k.lower() in (token if _IDENTIFIER_ONLY.fullmatch(k) else line).lower() for k in keep)
 
 
 def _counted(word: str, token: str) -> bool:
-    """An acronym (CLIP, TOC, HUD) is not the word; a constant spelled in capitals is."""
     return not word.isupper() or (token.isupper() and "_" in token)
 
 
@@ -95,9 +80,6 @@ def _says(wanted: list[str], words: list[str]) -> bool:
 
 
 def _mentions(retired: str, keep: list[str], streams) -> list[str]:
-    """Where the code still says ``retired``, outside ``keep``: a word as a word of
-    its own, plural or not; a phrase as those words one after another, in one
-    identifier or across a line."""
     wanted = _words_of_phrase(retired)
     hits = []
     for where, number, tokens, _, line in streams:

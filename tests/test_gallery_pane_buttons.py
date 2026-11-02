@@ -176,8 +176,6 @@ def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(b
 
 
 def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(buttons):
-    # Only one of the two ever appears: naming the folder is no use when a name
-    # is a short code, so the tip offers to go there instead.
     made = buttons()
 
     made.apply(_state(auto=Button(tip=""), auto_tip=AUTO_ELSEWHERE_TIP))

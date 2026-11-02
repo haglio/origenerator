@@ -1,14 +1,3 @@
-"""Run one slow call off the UI thread and hand its result back on it.
-
-Deliberately tiny: Qt's global pool, or a daemon thread for a call that may wait
-minutes, does the running, and the result crosses back through a queued signal,
-so ``done`` runs on the calling thread, free to touch all the caller owns.
-
-Queued is what makes the carrier's lifetime the whole problem here: between the
-pool thread's emit and the delivery a turn later, anything that frees the
-handler leaves Qt to call a function that no longer exists. See
-:func:`run_off_thread`.
-"""
 from __future__ import annotations
 
 import logging
@@ -19,14 +8,11 @@ from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
-# Every carrier still waiting for its answer. Touched only on the thread that
-# calls run_off_thread, since that is also the thread the result is delivered on.
+# Touched only on the thread that calls run_off_thread, which is also where results are delivered.
 _in_flight = set()
 
 
 class _Result(QObject):
-    """Carries one finished call back to the thread that asked for it."""
-
     ready = pyqtSignal(object)
 
 
@@ -40,9 +26,6 @@ class _Task(QRunnable):
         try:
             value = self._work()
         except Exception:
-            # A failure is a result like any other: the caller's own fallback
-            # decides what no answer means, and a raised exception on a pool
-            # thread would simply be lost.
             logger.warning("Off-thread call failed", exc_info=True)
             value = None
         try:
@@ -52,29 +35,11 @@ class _Task(QRunnable):
 
 
 def run_off_thread(work, done, *, owner: QObject, waits_long: bool = False) -> None:
-    """Call ``work()`` on the global pool, then ``done(result)`` back on this
-    thread -- unless ``owner`` has been deleted by then.
-
-    The carrier is held in :data:`_in_flight` until it delivers, which is the
-    whole of what keeps it and its handler alive. A reference *cycle* is not
-    enough -- the handler closing over the carrier while the carrier's own
-    connection holds the handler is exactly the shape Python's cyclic collector
-    takes when nothing outside points at it. Collected mid-flight, the handler
-    is freed while the pool thread's emit is still queued, and the queued call
-    then arrives at a function object that has been
-    freed and its memory reused. That is not an exception. It is an access
-    violation inside the interpreter's own frame setup, no traceback, the
-    process simply gone -- and once the 1.5 s poll started running two of these
-    per tick it was a crash every few minutes (2026-09-03/04, seven of them
-    across the production app and four branch previews, all faulting on the same
-    instruction: the free-variable copy at the entry of a closure, reached
-    through a queued Qt metacall).
-    """
     result = _Result()
     _in_flight.add(result)
 
     def deliver(value):
-        _in_flight.discard(result)  # its last turn; the carrier can go now
+        _in_flight.discard(result)
         if sip.isdeleted(owner):
             logger.info("An off-thread answer came back after the %s that asked "
                         "for it was gone", type(owner).__name__)

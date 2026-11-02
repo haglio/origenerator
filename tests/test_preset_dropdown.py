@@ -41,14 +41,12 @@ def test_edited_fires_when_typing_ends_and_when_a_preset_is_picked(qtbot):
     qtbot.keyClick(dropdown.lineEdit(), Qt.Key.Key_Return)
     assert edits == [30]
 
-    qtbot.keyClick(dropdown, Qt.Key.Key_Down)   # step onto the next preset
+    qtbot.keyClick(dropdown, Qt.Key.Key_Down)
     assert edits == [30, 24]
 
 
 @pytest.fixture
 def _wearing_the_apps_own_chrome():
-    """Measure the box dressed the way the app dresses it: the sheet's padding
-    comes out of the very field this is about."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -58,12 +56,6 @@ def _wearing_the_apps_own_chrome():
 
 @pytest.mark.usefixtures("_wearing_the_apps_own_chrome")
 def test_the_longest_preset_fits_the_field_it_is_shown_in(qtbot):
-    """The dropdown is as wide as the longest length it offers, and then some.
-
-    Two pixels short of its widest text, the field scrolled rather than clipped:
-    "10 s" was drawn as "0 s", a length the dropdown never offered and the user
-    never chose.
-    """
     dropdown = PresetDropdown([1, 5, 10, 15, 30, 60], unit="s")
     host = QWidget()
     QHBoxLayout(host).addWidget(dropdown)
@@ -76,5 +68,17 @@ def test_the_longest_preset_fits_the_field_it_is_shown_in(qtbot):
     field = dropdown.lineEdit()
     widest = max(field.fontMetrics().horizontalAdvance(dropdown.itemText(index))
                  for index in range(dropdown.count()))
-    # The line edit keeps two pixels either side of the text it draws.
     assert field.width() > widest + 4
+
+
+def test_presets_made_unavailable_stay_listed_but_cannot_be_picked_and_say_why_on_hover(qtbot):
+    dropdown = PresetDropdown([16, 24, 32], unit="fps")
+    qtbot.addWidget(dropdown)
+
+    dropdown.set_unavailable([24], "example reason")
+
+    items = [dropdown.model().item(i) for i in range(dropdown.count())]
+    assert [(item.text(), item.isEnabled()) for item in items] == [
+        ("16 fps", True), ("24 fps", False), ("32 fps", True)]
+    assert items[1].toolTip() == "example reason"
+

@@ -1,4 +1,3 @@
-"""Handing one slow call to the pool — and what has to survive until it answers."""
 from __future__ import annotations
 
 import gc
@@ -28,12 +27,10 @@ def test_the_answer_comes_back_on_the_calling_thread(qtbot, owner):
                    owner=owner)
     _wait_for(qtbot, got)
 
-    assert got == [(42, here)]   # the value, on the thread that asked for it
+    assert got == [(42, here)]
 
 
 def test_a_raised_call_answers_none_rather_than_losing_the_caller(qtbot, owner):
-    # A failure is a result like any other; the caller's own fallback decides
-    # what no answer means, and an exception on a pool thread is simply lost.
     got = []
 
     def boom():
@@ -46,13 +43,6 @@ def test_a_raised_call_answers_none_rather_than_losing_the_caller(qtbot, owner):
 
 
 def test_a_collection_mid_flight_does_not_take_the_answer_with_it(qtbot, owner):
-    """The crash this module cost, in the small.
-
-    The carrier used to be kept alive by being a reference cycle and nothing
-    else, so a collection between the pool thread's emit and the delivery freed
-    the handler that the queued call was about to reach — an access violation
-    with no traceback, not a lost callback.
-    """
     started, release, got = threading.Event(), threading.Event(), []
 
     def slow():
@@ -63,7 +53,7 @@ def test_a_collection_mid_flight_does_not_take_the_answer_with_it(qtbot, owner):
     run_off_thread(slow, got.append, owner=owner)
     assert started.wait(5)
     for _ in range(3):
-        gc.collect()          # exactly what used to take it
+        gc.collect()
     release.set()
     _wait_for(qtbot, got)
 
@@ -71,8 +61,6 @@ def test_a_collection_mid_flight_does_not_take_the_answer_with_it(qtbot, owner):
 
 
 def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot, owner):
-    # Not a cycle: something outside points at it for as long as it may still be
-    # called, and nothing does once it has.
     got = []
     before = len(_in_flight)
 
@@ -85,7 +73,7 @@ def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot, owner):
 
 def test_an_answer_whose_carrier_the_app_took_on_its_way_out_is_let_go_of(qtbot):
     result = _Result()
-    sip.delete(result)  # what the interpreter's exit does to every carrier still waiting
+    sip.delete(result)
 
     _Task(lambda: "too late", result).run()
 

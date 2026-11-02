@@ -31,9 +31,18 @@ def test_the_scrim_lies_over_the_thumbnail_it_is_about(host):
     assert scrim.geometry() == thumbnail.geometry()
 
 
+def test_covering_again_follows_a_thumbnail_laid_out_since_the_last_time(host):
+    thumbnail = _thumbnail(host)
+    scrim = TileStatusScrim(host)
+    scrim.cover(thumbnail, "Generating…")
+
+    thumbnail.setGeometry(30, 40, 60, 50)
+    scrim.cover(thumbnail, "Generating…")
+
+    assert scrim.geometry() == thumbnail.geometry()
+
+
 def test_an_inset_holds_it_off_a_border_the_thumbnail_draws_itself(host):
-    # An in-flight tile's blue "being made" edge says something; the scrim has no
-    # business painting over it.
     thumbnail = _thumbnail(host)
     scrim = TileStatusScrim(host)
 
@@ -57,12 +66,9 @@ def test_a_scrim_starts_out_of_the_way(host):
 
 
 def test_clicks_fall_through_to_the_tile_underneath(host):
-    # It is a caption over the thumbnail, not a lid on it: the tile still selects,
-    # opens and drags with the scrim up.
     scrim = TileStatusScrim(host)
     assert scrim.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
 
 def test_the_message_wraps_rather_than_running_off_the_thumbnail(host):
-    # "Waiting on 2 jobs from another app" is a sentence, not a word.
     assert TileStatusScrim(host).wordWrap()

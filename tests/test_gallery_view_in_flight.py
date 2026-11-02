@@ -723,7 +723,7 @@ def test_start_now_on_the_job_queue_starts_the_video_waiting_out_the_minute(qtbo
 def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
     view, client = _waiting_view(qtbot, tmp_path, backlog=3)
     view._poll()
-    job = list(view._live_jobs.values())[0]
+    job = next(iter(view._live_jobs.values()))
     client.preview_image.emit(job.prompt_id, _png_bytes())
     _preview_of(view).show_message = MagicMock()
 

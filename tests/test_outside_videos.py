@@ -217,8 +217,8 @@ def test_a_video_made_from_an_image_shows_its_frame_as_that_image(tmp_path):
     db, _video = _bring_in(tmp_path, Record(image=Made({"model": "Image Model",
                                                           "style": "Image Style"})))
 
-    image = [row for row in db.list_generations()
-             if json.loads(row["output_files"])[0]["filename"].endswith(".jpg")][0]
+    image = next(row for row in db.list_generations()
+             if json.loads(row["output_files"])[0]["filename"].endswith(".jpg"))
     assert image["source"] == GenerationSource.OUTSIDE
     assert json.loads(image["params_json"]) == {"model": "Image Model", "style": "Image Style"}
 

@@ -576,7 +576,7 @@ class TestTheQueueOnTheOneHud:
 
         window.press(f"foot_wheel|-1|{x + width // 2}|{y + height // 2}")
 
-        assert [line.key for line in window._hud_model().foot.drawn][0] == "j1"
+        assert next(line.key for line in window._hud_model().foot.drawn) == "j1"
 
 
 class TestTheRowOnTheOneHud:

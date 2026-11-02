@@ -14,6 +14,7 @@ from origenerator.voice.app_commands import (
 )
 from origenerator.voice.commands import CollectionCommand, match_voice_command
 
+
 @pytest.mark.parametrize("said, wanted", [
     ("experiments", AppCommand.EXPERIMENTS),
     ("recents", AppCommand.LATEST),

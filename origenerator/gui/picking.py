@@ -104,6 +104,6 @@ class Picking:
         return self._picked
 
     def in_shown_order(self) -> list[Hashable]:
-        """The picked entries in the order they are shown — what an act on a whole
+        """The picked entries in the order they are shown — what anything done to a whole
         selection runs through, so it runs in the order the user sees."""
         return [entry for entry in self._shown if entry in self._picked]

@@ -102,7 +102,7 @@ from origenerator.gui.gallery_pane import (
 from origenerator.gui.gallery_pane_buttons import (
     AUTO_ELSEWHERE_TIP,
     Button,
-    ButtonActs,
+    ButtonHandlers,
     ButtonStates,
     GalleryPaneButtons,
 )
@@ -783,7 +783,7 @@ class GalleryView(QWidget):
         # It builds and lays out every button and is written from one state; what
         # each button depends on is gathered in :meth:`button_states`.
         self._buttons = GalleryPaneButtons(
-            ButtonActs(
+            ButtonHandlers(
                 go_back=self._navigation.go_back,
                 go_forward=self._navigation.go_forward,
                 undo=self._undo,
@@ -972,7 +972,7 @@ class GalleryView(QWidget):
         tab.set_folder_check(self._can_open_containing_folder)
         tab.set_making_one_check(
             lambda config: self._config_folder_key(config) in self._live_jobs)
-        # Its preview's corners and its right-click are the same acts, on the same
+        # Its preview's corners and its right-click do the same things, on the same
         # generation, as a Gallery pane thumbnail's — so they land in the same places.
         tab.item_action_requested.connect(self.run_item_action)
         tab.context_menu_requested.connect(
@@ -2373,7 +2373,7 @@ class GalleryView(QWidget):
     def _generating_tile_menu(self, key: str, global_pos):
         """Right-click a folder's live tile: throw away the run it is showing.
 
-        The same act as the button on its face, on the gesture the rest of the
+        The same thing as the button on its face, on the gesture the rest of the
         grid answers — a right-click that worked on every other tile and died on
         this one read as a tile that wasn't listening. The wording is the
         button's, so both say the same thing about the same press.
@@ -3067,7 +3067,7 @@ class GalleryView(QWidget):
         run_off_thread(work, done, owner=self)
 
     def enhance_offer_changed(self) -> None:
-        """Re-aim the Enhance button: what the act would run on has changed."""
+        """Re-aim the Enhance button: what an enhance would run on has changed."""
         self._re_aim()
 
     def enhance_settings(self) -> str:
@@ -3591,7 +3591,7 @@ class GalleryView(QWidget):
 
         One menu rather than one per surface: a thumbnail in the Gallery pane and
         the preview in a Generate tab are looking at the same generation, so a
-        right-click has to reach the same acts either way.
+        right-click has to reach the same entries either way.
 
         "Go to folder" is left off when the pane already IS that folder, which is
         what makes it appear exactly where it is worth having: in the collections and
@@ -3603,12 +3603,12 @@ class GalleryView(QWidget):
         reads Unfavorite only when every picked item is already favorited, and toggles
         the whole selection to the opposite state.
 
-        Another act appears only while something is being made of a picked image:
+        Another entry appears only while something is being made of a picked image:
         cancel the enhancement in flight. An enhancement has no tile of its own —
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
         it the run had to be hunted down among the Job Queue's rows. It sits
-        beside Enhance, the act that started it. And inside a custom collection, what
+        beside Enhance, the entry that started it. And inside a custom collection, what
         it holds on its own can be taken back out of it, as its folders can.
         """
         rows = [row for pid in prompt_ids

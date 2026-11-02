@@ -1,7 +1,7 @@
 """Combine: a video's settings run again on a dropped image.
 
 The fifth of the gallery's screen concerns to come out of the view that used to
-hold all of them. What lives here is the whole act -- Combine with its two drop
+hold all of them. What lives here is the whole business -- Combine with its two drop
 drop zones, what a dropped item lends each and how it shows there, the lane and
 the action picked beside them, and every way settings are found and launched: the
 dropped video's own, the settings assigned for an action, the action's most-used past

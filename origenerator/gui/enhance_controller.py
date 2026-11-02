@@ -10,11 +10,11 @@ streaming preview, and an open slideshow's corner.
 
 The spoken words that ask for one are here too -- "enhance" over an image, and
 "fix <part>" for the same image with a detail pass aimed at what was named --
-because both are this act with a different gate in front of them, and what they
+because both are this job with a different gate in front of them, and what they
 answer with is what this side knows.
 
 What stays with the host is what an enhancement is *of*: which images are
-picked, which folder is on screen, and the Gallery pane button that offers the act.
+picked, which folder is on screen, and the Gallery pane button that offers the enhancement.
 :class:`EnhanceHost` names each of those.
 """
 from __future__ import annotations
@@ -95,7 +95,7 @@ def _made_or_on_its_way(jobs, row: dict, params: dict) -> bool:
 class Offer(NamedTuple):
     """What the Enhance button would do right now, and what it says it would do.
 
-    A record rather than the button itself: what the act is aimed at is this
+    A record rather than the button itself: what the enhancement is aimed at is this
     side's answer, and lighting a button is the Gallery pane buttons'.
     """
 
@@ -447,7 +447,7 @@ class EnhanceController:
         fullscreen lock's Down uses — spoken over a slideshow, this is a gesture made
         with no view of the Enhance pane, and an image already carrying an
         enhancement someone chose must not be re-derived at whatever the settings
-        happen to say now. Re-enhancing stays a deliberate act made in front of
+        happen to say now. Re-enhancing stays a deliberate step made in front of
         the settings it will use (the thumbnail menu, the ``+ Enhance`` row).
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
@@ -493,7 +493,7 @@ class EnhanceController:
         else launch and say so.
 
         A targeted fix and a plain "enhance" differ in what they refuse and in
-        what they run; from here on they are one act. ``what`` names the run in
+        what they run; from here on they are one job. ``what`` names the run in
         a refusal ("teeth fix", "enhance"), ``doing`` is what the surface says
         while it runs.
         """

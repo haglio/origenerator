@@ -736,7 +736,7 @@ def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
 
 def test_a_spoken_enhance_refuses_an_image_that_already_has_one(enhance,
                                                                 monkeypatch):
-    # Re-enhancing stays a deliberate act made in front of the settings it uses.
+    # Re-enhancing stays a deliberate step made in front of the settings it uses.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
     controller, _host = enhance(db=FakeDB([_image("i1")]))

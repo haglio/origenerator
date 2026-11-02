@@ -6,7 +6,7 @@ version claims, when the run happened, and which workflow version made it. The
 model lives in :mod:`origenerator.generation_metadata`; this does the Qt rendering.
 
 The block is a titled set of ``label: value`` rows, led by the generation's "Go
-to folder" — the one act here that is the row's rather than one file's.
+to folder" — the one thing done here that is the row's rather than one file's.
 """
 from __future__ import annotations
 

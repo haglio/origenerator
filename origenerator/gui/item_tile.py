@@ -145,7 +145,7 @@ class ItemTile(QWidget):
         # of them up whenever there is an item under them. A Trash-collection tile
         # passes controls=False — its item is already deleted, so there is nothing
         # here to favorite, trash or enhance, and its own restore/purge controls are
-        # the two acts left.
+        # the two controls left.
         layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
         self._controls = CornerButtons(self) if controls else None
         if self._controls is not None:

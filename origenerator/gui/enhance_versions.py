@@ -628,7 +628,7 @@ class EnhanceVersions(QWidget):
     def _on_row_menu(self, position: int, global_pos: QPoint):
         """The right-click menu: Delete, over whatever is picked.
 
-        A right-click on an unpicked row picks it first, so the menu always acts
+        A right-click on an unpicked row picks it first, so the menu always works
         on what it appeared over — the same rule the thumbnail menu follows."""
         if position in self._originals:
             return

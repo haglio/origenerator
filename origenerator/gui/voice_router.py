@@ -573,10 +573,10 @@ class VoiceRouter(QObject):
             self._slideshows.answer(f"{command.value} is a slideshow's — none is up",
                                     kind=WARNING)
             return
-        button, act = self._buttons[command]
-        self._press_gallery_pane_button(button, act, _BUTTON_REFUSALS[command])
+        button, press = self._buttons[command]
+        self._press_gallery_pane_button(button, press, _BUTTON_REFUSALS[command])
 
-    def _press_gallery_pane_button(self, button, act, refusal: str | None = None) -> None:
+    def _press_gallery_pane_button(self, button, press, refusal: str | None = None) -> None:
         """Do what a Gallery pane button does, and answer in that button's own words.
 
         Its tip already says what it will do to what is in front of you — "Favorite
@@ -590,7 +590,7 @@ class VoiceRouter(QObject):
             self._slideshows.answer(refusal or button.toolTip(), kind=WARNING)
             return
         said = button.toolTip()  # read first: the action re-aims the buttons
-        act()
+        press()
         self._slideshows.answer(said)
 
     def _on_image_command(self, command, said_at: float | None = None) -> None:

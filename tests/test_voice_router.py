@@ -14,7 +14,7 @@ from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
-from origenerator.gui.voice_router import VoiceRouter
+from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
 from origenerator.voice.app_commands import (
     AppCommand,
     BarSetting,
@@ -283,15 +283,18 @@ def router(qtbot, monkeypatch, starting):
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
         qtbot.addWidget(parent)
-        router = VoiceRouter(host, parent=parent, db=db or FakeDB(), slideshows=slideshows,
-                             client=client, motion=motion, starting=starting)
+        router = VoiceRouter(
+            host, VoiceSources(db=db or FakeDB(), slideshows=slideshows, client=client,
+                               starting=starting),
+            parent=parent, motion=motion)
         built.append((parent, router))
         buttons = dict(buttons or {})
         router.bind_the_buttons(
-            auto=buttons.get("auto", FakeButton(tip="Auto-generate")),
-            radio=buttons.get("radio", FakeButton(tip="Origenerator Radio")),
-            drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
-            mic=buttons.get("mic", FakeButton(tip="Listen", checked=mic_on)),
+            VoiceSwitches(
+                auto=buttons.get("auto", FakeButton(tip="Auto-generate")),
+                radio=buttons.get("radio", FakeButton(tip="Origenerator Radio")),
+                drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
+                mic=buttons.get("mic", FakeButton(tip="Listen", checked=mic_on))),
             enhance=buttons.get("enhance",
                                 (FakeButton(tip="Enhance 2 images"), lambda: None)),
             actions=buttons.get("actions", {}),
@@ -323,8 +326,9 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
     voice.sync()
 
     assert voice.listener.commands_on is False
-    voice.bind_the_buttons(auto=None, radio=None, drive=None,
-                        mic=FakeButton(checked=True), enhance=None, actions={})
+    voice.bind_the_buttons(
+        VoiceSwitches(auto=None, radio=None, drive=None, mic=FakeButton(checked=True)),
+        enhance=None, actions={})
     voice.sync()
     assert voice.listener.commands_on is True
 

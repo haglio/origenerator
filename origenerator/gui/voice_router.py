@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Protocol
 
 from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
@@ -120,17 +121,32 @@ class VoiceHost(Protocol):
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]: ...
 
 
+@dataclass(frozen=True)
+class VoiceSources:
+    db: object
+    slideshows: object
+    client: object
+    starting: StartingRows
+
+
+@dataclass(frozen=True)
+class VoiceSwitches:
+    auto: QWidget | None
+    radio: QWidget | None
+    drive: QWidget | None
+    mic: QWidget | None
+
+
 class VoiceRouter(QObject):
     caption_shown = pyqtSignal(bool)
 
-    def __init__(self, host: VoiceHost, *, parent: QObject, db, slideshows, client,
-                 motion, starting: StartingRows):
+    def __init__(self, host: VoiceHost, sources: VoiceSources, *, parent: QObject, motion):
         super().__init__(parent)
         self._host = host
-        self._db = db
-        self._slideshows = slideshows
-        self._client = client
-        self._starting = starting
+        self._db = sources.db
+        self._slideshows = sources.slideshows
+        self._client = sources.client
+        self._starting = sources.starting
         self.listener = CommandAndRequestListener(
             command_matcher=match_voice_command,
             bare_matcher=shaped_app_command,
@@ -181,8 +197,9 @@ class VoiceRouter(QObject):
         self._hold_the_motion(motion)
         self._switches.update({_RADIO: radio, _DRIVE: drive, _MIC: mic})
 
-    def bind_the_buttons(self, *, auto, radio, drive, mic, actions, enhance) -> None:
-        self._switches = {_AUTO: auto, _RADIO: radio, _DRIVE: drive, _MIC: mic}
+    def bind_the_buttons(self, switches: VoiceSwitches, *, actions, enhance) -> None:
+        self._switches = {_AUTO: switches.auto, _RADIO: switches.radio,
+                          _DRIVE: switches.drive, _MIC: switches.mic}
         self._buttons = dict(actions)
         self._enhance = enhance
 

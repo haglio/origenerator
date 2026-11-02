@@ -1,26 +1,3 @@
-"""Heal the gallery favorites a folder-key formula change detached.
-
-A gallery folder has no id: its key is derived from the settings its generations
-share, so a change to that formula silently detaches every favorite keyed by the
-old one — a star, a name the user typed, a folder they gathered by hand. Both
-tables that hold such a key are reconciled at startup, and both the same way,
-for each stored key:
-
-  - **still matches a folder** → refresh its stored ``(level, ref)`` so a future
-    formula change can re-derive it from a generation under it;
-  - **dangles, stored ref still exists** → recompute the key at the stored tier
-    and move the favorite onto it (robust to *any* formula change);
-  - **dangles, no usable identity** → try the legacy key formulas, which
-    recovers favorites predating stored identity;
-  - **still nothing** → leave it alone. Its generations are gone, and a user's
-    star, name or grouping is never dropped.
-
-Both after the backfills, because a backfill can move a generation's folder by
-filling in its workflow, model or LoRA, so the tree they reconcile against has
-to be final. The other startup reconcile — resolving in-flight generations
-against ComfyUI — is :mod:`origenerator.inflight`, and shares nothing with this
-but the word.
-"""
 from __future__ import annotations
 
 import logging
@@ -40,31 +17,17 @@ _NOTHING = {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 @dataclass(frozen=True)
 class Folders:
-    """One reading of the gallery tree, indexed the ways a reconcile needs it.
-
-    Built once and used by every pass. Safe to share because none writes to
-    `generations` — each writes only to the favorite tables — so the tree a
-    later pass reads is the tree the first did. tests/test_reconcile.py
-    asserts that, since sharing it is what makes the assumption load-bearing.
-    """
-
-    #: folder key → ``(level, a prompt_id under it)``, for every folder there is.
     current: dict
-    #: every generation by prompt id, which is what a stored ref resolves to.
     rows_by_id: dict
-    #: the image-config index the key formulas need.
     image_index: dict
     tree: list
 
     @cached_property
     def legacy_keys(self) -> dict:
-        """A folder's keys under older formulas → its key today, worked out
-        only once a favorite has lost its folder."""
         return _legacy_keys(self.tree, self.image_index)
 
 
 def index_folders(db) -> Folders:
-    """Read the whole gallery tree once, and index it for both passes."""
     rows_by_id = {r["prompt_id"]: r for r in db.list_generations()}
     image_index = gallery.build_image_config_index(
         [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == MediaType.IMAGE]
@@ -88,10 +51,6 @@ def reconcile_favorites(db) -> dict:
 
 
 def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
-    """Re-point stars and custom names whose folder key no longer matches.
-
-    Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
-    """
     meta = db.folder_meta_full()
     if not meta:
         return dict(_NOTHING)
@@ -115,13 +74,6 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
 
 
 def reconcile_custom_collections(db, folders: Folders | None = None) -> dict:
-    """Re-point gathered folders whose folder key no longer matches.
-
-    A custom collection gathers folders by key, so it drifts exactly the way a star
-    does — and a grouping the user built by hand is worth no less than a star.
-
-    Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
-    """
     gathered = [held for held in db.folders_in_custom_collections()
                 if gallery.custom_folder_id(held["folder_key"]) is None]
     if not gathered:
@@ -158,13 +110,6 @@ def stamp_custom_collection_shapes(db, folders: Folders | None = None) -> int:
 
 
 def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
-    """The three-outcome pass both tables get, with the writes handed in.
-
-    *refresh* takes ``(row, identity)`` and *repoint* ``(row, target, identity)``,
-    where an identity is the ``(level, prompt_id)`` of a folder that is
-    there today. Everything else — which key is live, which dangles, and where a
-    dangling one belongs — is the same question for a star and for a gathered folder.
-    """
     summary = dict(_NOTHING)
     for row in rows:
         key = row["folder_key"]
@@ -199,9 +144,6 @@ def _legacy_keys(tree, image_index) -> dict:
                 gallery.legacy_settings_folder_key(folder_rows[0]),
                 gallery.legacy_preframe_settings_folder_key(folder_rows[0]),
                 gallery.legacy_preversion_settings_folder_key(folder_rows[0], image_index),
-                # Per row, not just the first: the enhancement split
-                # merged two folders into this one, and a star on either
-                # of them has to find its way here.
                 *gallery.legacy_preenhance_settings_folder_keys(folder_rows, image_index),
             ):
                 if legacy != group.key:
@@ -213,11 +155,6 @@ def _legacy_keys(tree, image_index) -> dict:
 
 
 def _repoint_target(row, folders: Folders):
-    """The current key a dangling favorite should move to, or ``None``.
-
-    Prefers recomputing from the favorite's stored identity — a row under it at its
-    tier, robust to any formula change — and falls back to a legacy key
-    formula for favorites that predate stored identity."""
     ref, level = row["ref_prompt_id"], row["level"]
     if ref and level and ref in folders.rows_by_id:
         candidate = gallery.folder_key_at_level(
@@ -228,8 +165,6 @@ def _repoint_target(row, folders: Folders):
 
 
 def _move_favorite(db, row, target, identity, meta_by_key):
-    """Move a favorite's star/name onto ``target`` (merging into any favorite
-    already there — a name and a star both survive), then drop its stale key."""
     level, ref = identity
     existing = meta_by_key.get(target)
     name = (existing["custom_name"] if existing else None) or row["custom_name"]

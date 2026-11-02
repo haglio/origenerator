@@ -611,11 +611,9 @@ def _band_button(slideshow, name: str):
 
 def test_the_ten_second_steps_and_skip_ahead_follow_what_the_funestra_says_is_on_screen(
         qtbot, tmp_path):
-    """A video longer than a step can be stepped through; an image cannot, and
-    has no funscript to skip ahead through either."""
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.mp4",
                                                 duration_ms=30_000, has_funscript=True)
-    slideshow.set_has_osr2(True)
+    slideshow.transport.set_has_osr2(True)
     assert [_band_button(slideshow, name).dim
             for name in ("nudge_prev", "nudge_next", "funscript_jump")] == [False, False, False]
 
@@ -633,7 +631,7 @@ def test_skip_ahead_is_faded_until_the_session_says_this_funestra_has_the_osr2(q
                                                 duration_ms=30_000, has_funscript=True)
     assert _band_button(slideshow, "funscript_jump").dim
 
-    slideshow.set_has_osr2(True)
+    slideshow.transport.set_has_osr2(True)
 
     assert not _band_button(slideshow, "funscript_jump").dim
 

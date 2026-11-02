@@ -18,38 +18,32 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from funestra.file_channel import publish_whole
 from funestra.funestra_verbs import (
     CLEAR_FRAME,
     HOLD_PICTURE,
-    JUMP_TO_FUNSCRIPT,
     LET_GO,
     LOCK_OFF,
     LOCK_ON,
     NEXT,
-    NEXT_FUNSCRIPTED,
     PREV,
     RELOAD_PLAYLIST,
-    SEEK_BACK,
-    SEEK_FWD,
     SET_PACE,
     SHOW_FRAME,
     TRASH,
     play_file,
 )
-from funestra.hud_controls import longer_than_a_step
 from funestra.hud_title import SHUFFLE_LABEL
 from funestra.loop_cycle import LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
-from funestra.satellite_hud import hud_text
-from funestra.status import FunestraStatus, parse_status
+from funestra.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
-from origenerator.gui.message import HEARD_MARK, INFO, WARNING
-from origenerator.gui.slideshow_hud import slideshow_hud_model
+from origenerator.gui.funestra_transport import FunestraTransport
+from origenerator.gui.level_stepper import LevelStepper
+from origenerator.gui.notice_overlay import HEARD_MARK, NOTICE, WARNING
+from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
@@ -73,8 +67,6 @@ logger = logging.getLogger(__name__)
 # rather than trailing it, and idle ticks cost a read and a comparison.
 _POLL_MS = 200
 
-READER_HOLD_BUDGET_S = 1.0
-_RETRY_SPACING_S = 0.005
 
 class FunestraSlideshow(QObject):
     """A slideshow driving one of the session's Funestras."""
@@ -112,9 +104,14 @@ class FunestraSlideshow(QObject):
         # What the Funestra last said it was showing: a slide that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
-        self._status = FunestraStatus()
-        self._has_funscript = False
-        self._has_osr2 = False
+        def at_defaults() -> bool:
+            at_base = self._actions.at_base
+            return (not self.locked and self._set.filters == SlideshowFilters()
+                    and self._set.order_label == SHUFFLE_LABEL
+                    and (at_base is None or at_base(self)))
+
+        self.transport = FunestraTransport(send=self._send, publish=self._publish,
+                                           at_defaults=at_defaults)
         self._funestra_locked = False
         self._locked = False
         self._keep_told: bool | None = None
@@ -251,8 +248,7 @@ class FunestraSlideshow(QObject):
 
     def _follow_the_funestra(self, fields: dict) -> None:
         status = parse_status(fields)
-        self._status = status
-        self._has_funscript = fields.get("has_funscript") == "1"
+        self.transport.heard(status, fields)
         self._funestra_locked = status.locked
         self._on_screen.observe(status.video, now=self._clock())
         if status.video and status.video != self._showing:
@@ -392,59 +388,16 @@ class FunestraSlideshow(QObject):
     def locked_on(self) -> str | None:
         return self._set.current_prompt_id() if self.locked else None
 
-    def slideshow_step(self, delta: int) -> None:
+    def slideshow_step(self, delta: int, *, verb: str | None = None) -> None:
         """Step the Funestra either way.  Moving off a locked slide releases the
         lock, the way the Funestras' own prev/next cancel a lock — and a loop
         down to the slide on screen is ended first, so what the Funestra is
         handed to step into is the set rather than a list of one."""
-        self._leave_the_slide(forward=delta > 0)
-        self._send(NEXT if delta > 0 else PREV)
-
-    def slideshow_next_funscripted(self) -> None:
-        self._leave_the_slide(forward=True)
-        self._send(NEXT_FUNSCRIPTED)
-
-    def _leave_the_slide(self, *, forward: bool) -> None:
         self._unlock()
-        if forward:
+        if delta > 0:
             self._set.end_a_loop_of_one()
         self._leave_the_versions()
-
-    def slideshow_nudge(self, delta: int) -> None:
-        """Ten seconds either way through the video on screen."""
-        self._send(SEEK_FWD if delta > 0 else SEEK_BACK)
-
-    def slideshow_funscript_jump(self) -> None:
-        self._send(JUMP_TO_FUNSCRIPT)
-
-    @property
-    def longer_than_a_step(self) -> bool:
-        return longer_than_a_step(self._status.duration_ms)
-
-    @property
-    def showing_image(self) -> bool:
-        return self._status.image
-
-    @property
-    def has_funscript(self) -> bool:
-        return self._has_funscript
-
-    @property
-    def has_osr2(self) -> bool:
-        """Whether the OSR2 follows the Funestra this slideshow is on, as the
-        session that owns the device says it."""
-        return self._has_osr2
-
-    def set_has_osr2(self, has_it: bool) -> None:
-        if has_it != self._has_osr2:
-            self._has_osr2 = has_it
-            self._publish()
-
-    @property
-    def nothing_to_reset(self) -> bool:
-        return (not self.locked and self._set.filters == SlideshowFilters()
-                and self._set.order_label == SHUFFLE_LABEL
-                and (self._actions.at_base is None or self._actions.at_base(self)))
+        self._send(verb or (NEXT if delta > 0 else PREV))
 
     def slideshow_toggle_lock(self) -> None:
         """Lock what is on screen, or let it go — the whole of the gesture."""
@@ -980,58 +933,3 @@ class FunestraSlideshow(QObject):
         self.closed.emit()
         if slide is not None:
             self.open_requested.emit(slide[2])
-
-
-class OnASessionsFunestra:
-    """Where a slideshow on one of a session's Funestras is seen: the HUD it
-    publishes for the session to draw over that Funestra, and the gallery's caption,
-    which is on screen beside the Funestras, for the lines it says.  The session
-    pauses its Funestras itself, and drives the OSR2 from its Main Funestra."""
-
-    player = None
-
-    def __init__(self, slideshow, shape: str, channel, say=None, *, actions) -> None:
-        self._slideshow = slideshow
-        self._shape = shape
-        self._channel = channel
-        self._say = say
-        self._published = ""
-        self.queue_foot = QueueFoot(actions)
-        self._job_queue_file = JobQueueFile(channel.hud_file, shape)
-
-    def hud_changed(self) -> None:
-        model = slideshow_hud_model(self._shape, self._slideshow, hosted=True, own_window=False,
-                                    foot=self._job_queue_file.of(self.queue_foot.section()))
-        text = hud_text(model) if model is not None else ""
-        if text != self._published and publish_whole(self._channel.hud_file, text):
-            self._published = text
-
-    def flash(self, text: str, *, kind: str = INFO, ms: int = 0, mark: str = "") -> None:
-        if self._say is not None:
-            self._say(text, mark=mark)
-
-    def request_line(self, message: str, request=None, *, working: bool = False,
-                     kind: str = INFO) -> None:
-        self.flash(message, kind=kind, mark=HEARD_MARK)
-
-    def dictating(self, note: str) -> None:
-        if note:
-            self.flash(note, mark=HEARD_MARK)
-
-    def room_paused(self, paused: bool) -> None:
-        pass
-
-    def set_queue(self, items, foreign_queued: int = 0) -> None:
-        self.queue_foot.set(items, foreign_queued)
-        self.hud_changed()
-
-    def press_the_queue(self, verb: str, payload: str) -> None:
-        self.queue_foot.press(verb, payload)
-        self.hud_changed()
-
-    def gone(self) -> None:
-        publish_whole(self._channel.hud_file, "",
-                      attempts=round(READER_HOLD_BUDGET_S / _RETRY_SPACING_S),
-                      delay_s=_RETRY_SPACING_S)
-        self._job_queue_file.forget()
-

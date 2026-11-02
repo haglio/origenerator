@@ -127,6 +127,7 @@ class FakeSlideshow:
         self.shown_locked = []
         self.done = []
         self.has_osr2 = None
+        self.transport = self
 
     # what a slideshow is, and what it holds
     def holds(self, prompt_id):
@@ -825,7 +826,6 @@ def test_one_of_two_hosted_slideshows_closing_leaves_the_other_showing(slideshow
 
 def test_what_the_session_says_of_a_sides_osr2_reaches_the_slideshow_there_whenever_it_opens(
         slideshows):
-    """Told before the slideshow opens, it opens knowing; told after, it hears."""
     director, _host, made = slideshows(fun_time=FakeSession())
     director.tell_the_hud(PORTRAIT, "osr2", "1")
 

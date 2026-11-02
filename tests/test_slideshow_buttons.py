@@ -1,5 +1,4 @@
-"""The buttons Origenerator declares on a slideshow's HUD: what each posts, its
-face, its tooltip and the state it draws."""
+"""The buttons Origenerator declares on a slideshow's HUD."""
 from __future__ import annotations
 
 import pytest
@@ -27,8 +26,6 @@ def _by_name(**fields) -> dict:
 
 
 def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
-    """The order a Satellite's HUD puts the same controls in, in Kino mode, with
-    the one only a slideshow has (Enhanced only) before Reset."""
     assert _names(_button_row()) == THE_BAND
 
 
@@ -77,9 +74,6 @@ def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
 
 
 class TestTheWords:
-    """A control that does on a slideshow what it does on a Satellite in Kino
-    reads the same, with "slide" for what it plays; one that does something
-    else here says so in this app's words."""
 
     def test_the_controls_both_modes_share_read_as_kino_reads_them(self):
         band = _by_name(has_other_versions=True)
@@ -183,18 +177,16 @@ class _Host:
 
     def __init__(self):
         self.calls = []
+        self.transport = self
 
-    def slideshow_step(self, delta):
-        self.calls.append(("step", delta))
+    def slideshow_step(self, delta, *, verb=None):
+        self.calls.append(("step", delta) if verb is None else ("step", delta, verb))
 
-    def slideshow_nudge(self, delta):
+    def nudge(self, delta):
         self.calls.append(("nudge", delta))
 
-    def slideshow_funscript_jump(self):
+    def funscript_jump(self):
         self.calls.append("funscript jump")
-
-    def slideshow_next_funscripted(self):
-        self.calls.append("next funscripted")
 
     def slideshow_toggle_lock(self):
         self.calls.append("lock")
@@ -295,13 +287,10 @@ def test_the_next_scripted_slide_is_a_key_and_a_spoken_word_with_no_button():
 
     assert answer(host, "next_funscripted")
 
-    assert host.calls == ["next funscripted"]
+    assert host.calls == [("step", 1, "NEXT_FUNSCRIPTED")]
 
 
 def test_the_session_tells_a_sides_hud_where_it_sits_and_whether_it_has_the_osr2():
-    """Facts about a side's HUD that only the session knows, each a line with
-    its value after the bar -- answered by the gallery for the side, never by a
-    slideshow's press table."""
     assert HUD_FACTS == {"hud_corner": "{corner}", "hud_minimized": "{on}", "osr2": "{has}"}
     assert not answer(_Host(), "osr2", "1")
 

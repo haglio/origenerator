@@ -1098,19 +1098,17 @@ def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
 
 def test_the_session_says_which_funestra_has_the_osr2_and_the_slideshow_there_hears_it(
         qtbot, tmp_path, monkeypatch):
-    """Only the session knows where the OSR2 is, and a slideshow's Skip ahead
-    grays by it: said of a shape before and after its slideshow opens alike."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     view._fun_time.command_file.write_text("portrait_osr2|1\n", encoding="utf-8")
     bridge._drain_commands()
 
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    assert slideshow.has_osr2 is True
+    assert slideshow.transport.has_osr2 is True
 
     view._fun_time.command_file.write_text("portrait_osr2|0\n", encoding="utf-8")
     bridge._drain_commands()
 
-    assert slideshow.has_osr2 is False
+    assert slideshow.transport.has_osr2 is False
 
 
 def _radio_clips(tmp_path, count=6):

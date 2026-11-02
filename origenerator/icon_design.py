@@ -1,14 +1,3 @@
-"""Generates the Origenerator app icon: a MAGENTA "O" on the suite's grid.
-
-Every app in the suite draws a single MAGENTA letter on a 5x5 grid inset 31px
-inside a 256px canvas, with each bar exactly one cell -- 1/5 of the
-letter grid -- thick and near-square corners.  This module renders Origenerator's
-"O" as a 1/5-thick square ring to match.
-
-Run ``python -m origenerator.icon_design`` to regenerate ``icon.ico``.  The
-contract the output must satisfy lives in ``tests/test_icon.py``.
-"""
-
 from __future__ import annotations
 
 from PIL import Image
@@ -19,12 +8,11 @@ from shared_ui.colors import MAGENTA
 
 from origenerator.config import PROJECT_DIR
 
-CORNER_RADIUS = 5  # renders to a ~3px outer corner, matching the suite
-ICON_SIZES = (16, 32, 48, 256)  # frames stored in the .ico
+CORNER_RADIUS = 5
+ICON_SIZES = (16, 32, 48, 256)
 
 
 def render_icon(size: int = CANVAS) -> Image.Image:
-    """Render the "O" ring at ``size``x``size`` as an RGBA Pillow image."""
     scale = size / CANVAS
     inset = INSET * scale
     grid = GRID * scale
@@ -51,7 +39,6 @@ def render_icon(size: int = CANVAS) -> Image.Image:
 
 
 def _to_pillow(qimg: QImage) -> Image.Image:
-    """Convert an RGBA8888 QImage to a Pillow image, dropping any row padding."""
     qimg = qimg.convertToFormat(QImage.Format.Format_RGBA8888)
     width, height, stride = qimg.width(), qimg.height(), qimg.bytesPerLine()
     buffer = qimg.constBits()
@@ -62,7 +49,6 @@ def _to_pillow(qimg: QImage) -> Image.Image:
 
 
 def save_ico(path) -> None:
-    """Write the multi-resolution ``.ico`` from the 256px master."""
     master = render_icon(CANVAS)
     master.save(path, format="ICO", sizes=[(s, s) for s in ICON_SIZES])
 

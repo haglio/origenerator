@@ -1,7 +1,3 @@
-"""Handing a label the looping video it shows.
-
-Fixture videos are fabricated (see CLAUDE.md): two frames of flat color.
-"""
 from __future__ import annotations
 
 import pytest
@@ -11,7 +7,7 @@ from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui import omnipause
-from origenerator.gui.looping_preview import play_in, set_in_sight
+from origenerator.gui.looping_preview import fit_size, looping_movie, play_in, set_in_sight
 
 
 def _loop(path, color="gray"):
@@ -29,9 +25,6 @@ def label(qtbot):
 
 
 def test_the_label_has_the_clip_before_it_runs(label, tmp_path, monkeypatch):
-    """A QLabel handed a movie that is already running leaves its own repaint to
-    that movie's first frame, which covers only the rect the frame fills -- so
-    the video before it stayed on screen around the new one."""
     held = []
     monkeypatch.setattr(QMovie, "start",
                         lambda movie: held.append(label.movie() is movie))
@@ -85,3 +78,36 @@ def test_a_clip_back_in_sight_stays_still_while_the_room_is_stopped(label, tmp_p
     set_in_sight(label, True)
 
     assert movie.state() == QMovie.MovieState.Paused
+
+
+def test_a_clip_started_for_a_caller_who_paints_it_is_held_still_while_the_room_is_stopped(label, tmp_path):
+    omnipause.freeze(True)
+    try:
+        movie = looping_movie(_loop(tmp_path / "one.webp"), QSize(40, 30), label)
+        held = movie.state()
+    finally:
+        omnipause.freeze(False)
+
+    assert held == QMovie.MovieState.Paused
+
+
+def test_a_clip_started_while_the_room_is_stopped_is_held_still(label, tmp_path):
+    omnipause.freeze(True)
+    try:
+        movie = play_in(label, _loop(tmp_path / "one.webp"), QSize(40, 30))
+        held = movie.state()
+    finally:
+        omnipause.freeze(False)
+
+    assert held == QMovie.MovieState.Paused
+
+
+def test_a_clip_for_a_caller_who_paints_it_is_parented_to_the_one_it_is_given(label, tmp_path):
+    movie = looping_movie(_loop(tmp_path / "one.webp"), QSize(40, 30), label)
+
+    assert movie.parent() is label
+
+
+def test_a_clip_whose_size_cannot_be_read_is_left_at_its_own_scale(tmp_path):
+    assert fit_size(str(tmp_path / "missing.webp"), QSize(40, 30)) is None
+

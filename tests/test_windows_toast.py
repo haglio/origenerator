@@ -1,14 +1,6 @@
-"""The toast Windows itself raises, and what it is told to draw.
-
-Nothing here shows one: a toast raised by a test is a toast on the user's
-screen and a line in their notification center, so what is exercised is
-everything up to the raising -- the document Windows reads, and the refusal of
-one it cannot.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
+# Nothing here raises a toast: it would appear on the user's screen.
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -46,8 +38,6 @@ def test_a_toast_about_no_item_has_no_link_for_a_click_to_follow():
 
 
 def test_a_workflow_name_with_markup_in_it_is_said_rather_than_read():
-    # Whatever a workflow is called is somebody's words, and
-    # Windows reads a toast as a document.
     xml = windows_toast.toast_xml("Image & <b>more</b>", 'a "quoted" workflow',
                                   link='origenerator:go-to?generation="x"',
                                   mark=Path(r"C:\marks\ready.png"))
@@ -58,8 +48,6 @@ def test_a_workflow_name_with_markup_in_it_is_said_rather_than_read():
 
 
 def test_windows_reads_what_a_toast_document_says():
-    # The document is Windows' own parser's, not this app's: a toast it cannot
-    # read is a toast that never appears, and there is nothing to see.
     document = windows_toast.document_of(
         windows_toast.toast_xml("Video ready", "Example Workflow · 4:12",
                                 link="origenerator:go-to?generation=alpha-1",

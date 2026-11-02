@@ -1,25 +1,3 @@
-"""Resolve generations left in flight by a previous session against ComfyUI.
-
-A job Origenerator hands ComfyUI keeps running there after the app closes, so on
-the next launch each still-``running`` DB row is checked against the server it
-was submitted to — matched by the shared prompt_id — and:
-
-  - **finished while we were away** → finalized from ``/history`` (its outputs,
-    thumbnail and duration), so it shows as a real result instead of a job stuck
-    forever at "generating";
-  - **still queued or executing** → left as-is, for the UI to reconnect to live;
-  - **gone** (ComfyUI forgets every run when it restarts) → finalized from what
-    it saved in its own folder, or deleted when it saved nothing there.
-
-Never raises: if ComfyUI can't be read, in-flight rows are left untouched for a
-later launch to resolve.
-
-The only startup reconcile that needs to reach ComfyUI at all; the favorite
-reconciles are :mod:`origenerator.favorite_reconcile`, and share nothing with
-this but the word. What it needs is the REST surface --
-:class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt -- and a
-``ComfyUIClient`` forwards every call of it, so either can be handed in.
-"""
 from __future__ import annotations
 
 import logging
@@ -37,16 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 def drop_in_flight(db, client, source: str, noun: str) -> int:
-    """Take the unfinished rows of ``source`` off ComfyUI and out of the
-    database, and say how many went.
-
-    What opening the app does with the work an absence queued: the GPU is the
-    user's again. Each row is dequeued and asked to stop by name; which one the
-    server is executing only it knows, since a ``running`` row was handed over,
-    not necessarily started. A row the server would not let go of is kept: the
-    prompt may still run, and the app adopts an in-flight row as a live job the
-    user's work can preempt. Finished rows are untouched.
-    """
     dropped = 0
     for row in db.list_generations():
         if row.get("source") != source or not is_in_progress(row):
@@ -66,15 +34,6 @@ def drop_in_flight(db, client, source: str, noun: str) -> int:
 
 
 def reconcile_in_flight(db, client, places: OutputPlaces, thumb_dir: Path) -> dict:
-    """Reconcile every submitted-and-unfinished DB row against ``client`` (ComfyUI).
-
-    Returns a summary ``{"finalized": n, "running": n, "cleared": n}``.
-    """
-    # Only rows whose prompt ComfyUI was given. A ``pending`` row is the other
-    # kind of in-flight: one the queue was still holding when the app closed,
-    # which the server has never heard of and cannot be asked about — the app
-    # takes those back itself (see :meth:`JobQueue.reconnect_running`),
-    # so checking them here would only delete a queue the user is still waiting on.
     return _reconcile(db, client, [r for r in db.list_generations()
                                    if r.get("status") == GenerationStatus.RUNNING],
                       places, thumb_dir, "in-flight generations")
@@ -137,10 +96,10 @@ def _reconcile_row(db, client, row, queued, places: OutputPlaces, thumb_dir: Pat
     if take_in_what_landed(db, client, row, places, thumb_dir):
         return "finalized"
     if row["prompt_id"] in queued:
-        return "running"  # still in flight; leave it for the UI to reconnect to
+        return "running"
     if take_in_what_its_folder_holds(db, row, places, thumb_dir):
         return "finalized"
-    db.delete_generation(row["prompt_id"])  # gone from the server with no output recorded
+    db.delete_generation(row["prompt_id"])
     return "cleared"
 
 

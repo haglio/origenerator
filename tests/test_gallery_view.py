@@ -248,10 +248,6 @@ def test_a_videos_source_folder_in_the_toc_wears_its_images_name(qtbot):
 
 
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
-    # The tree is six levels deep by the time it reaches a settings folder and it
-    # lives in the window's narrowest column, so every wasted pixel per level is
-    # six wasted at the foot. Each step is one indentation and no more.
-    #
     # Qt lays the text out after the icon, so the text's edge steps unevenly between rows with and without one.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
@@ -2709,3 +2705,94 @@ def test_the_shapes_chosen_before_the_first_draw_read_nothing(qtbot):
     view.set_toc_sides(list(TOGETHER))
 
     assert read == []
+
+
+def test_a_folder_drawn_again_where_it_stands_is_one_visit(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    visits = list(view._folder_history)
+
+    view.hand_pane_back()
+
+    assert view._folder_history == visits
+
+
+def test_with_nothing_selected_the_shape_in_view_is_the_one_holding_landscape(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+
+    assert view.shape_in_view() == LANDSCAPE
+
+
+def test_a_key_naming_a_drawn_shape_is_answered_by_that_shape_alone(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _key(view._leaf_by_id["i1"])
+
+    assert view._tree_item_for(shaped_key(key, LANDSCAPE)) is view._leaf_by_id["i1"]
+    assert view._tree_item_for(shaped_key(key, PORTRAIT)) is None
+
+
+def _a_folder_on_both_sides(qtbot):
+    shapes = {"i1": (1280, 720), "i2": (720, 1280)}
+    view = GalleryView(FakeDB([
+        _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": 50,
+                               "width": width, "height": height}, f"sdxl_t2i_{pid}.png")
+        for pid, (width, height) in shapes.items()]))
+    qtbot.addWidget(view)
+    view.refresh()
+    return view, _key(_image_workflow(view._tree))
+
+
+def test_a_folders_own_key_stays_on_the_shape_being_browsed(qtbot):
+    view, key = _a_folder_on_both_sides(qtbot)
+
+    for shape in (LANDSCAPE, PORTRAIT):
+        row = view._tree_item_for(shaped_key(key, shape))
+        view._tree.setCurrentItem(row)
+        assert view._tree_item_for(key) is row
+
+
+def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_under_it(qtbot):
+    view, key = _a_folder_on_both_sides(qtbot)
+    group = view.group_for_key(key)
+
+    keys = view._keys_under(group)
+
+    assert {shaped_key(key, LANDSCAPE), shaped_key(key, PORTRAIT)} <= keys
+    assert len(keys) > 2
+
+
+def test_a_folder_at_the_top_of_the_list_and_one_it_has_not_got_have_no_place_to_name(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._folder_context(view.selected_folder_key()) == ""
+    assert view._folder_context("image/no-such-folder") == ""
+
+
+def test_following_a_link_stops_nowhere_on_its_way_through_a_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("d1", "a dog", 50, 1), _image("d2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    (first, other) = [view.row_for(pid)["prompt_id"] for pid in ("d1", "d2")]
+
+    view.follow_link(other)
+    view._navigation.go_back()
+
+    assert first != other
+    assert view.selected_generation() == "i1"
+
+
+def test_an_item_the_tree_has_nowhere_to_put_has_no_folder_row(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._folder_row_for("no-such-item") is None

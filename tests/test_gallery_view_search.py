@@ -876,3 +876,16 @@ def test_an_open_find_counts_again_as_a_prompt_is_typed_in(qtbot, tmp_path):
     positive.setPlainText("a cat and a cat")
 
     assert _find_count(view) == "1 of 2"
+
+
+def test_following_a_link_puts_a_running_search_away(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    assert view._gallery_pane.showing_search()
+
+    view.follow_link("i2")
+
+    assert not view._gallery_pane.showing_search()
+    assert view._search.field.text() == ""

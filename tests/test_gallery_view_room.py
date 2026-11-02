@@ -62,6 +62,7 @@ from tests.gallery_view_support import (
 from tests.lit_switches import lit_in
 from tests.osr2_fakes import FakeBroker
 from tests.slideshow_hud_support import engine_of, funestra_of
+from tests.test_fun_time_gallery import _session
 from tests.test_osr2_driver import ACTIONS, FakePlayer
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -960,3 +961,10 @@ def test_quitting_lets_go_of_the_script_the_motion_and_the_radio(qtbot):
     assert not view._osr2_driver.active
     assert not view._osr2_motion.active
     assert radio.stops == 1
+
+
+def test_a_hosted_gallery_says_its_mic_is_off_since_the_session_owns_the_room_s_microphone(qtbot):
+    view = GalleryView(FakeDB([]), fun_time=_session())
+    qtbot.addWidget(view)
+
+    assert view.mic_enabled() is False

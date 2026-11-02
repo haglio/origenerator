@@ -37,6 +37,7 @@ from origenerator.gui.combine import CombineRequest
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight import InFlightItem, RunReading, cancel_tooltip
+from origenerator.item_shape import base_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
@@ -74,6 +75,7 @@ from tests.gallery_view_support import (
     _row,
     _running_reroll,
     _running_row,
+    _search_for,
     _seeded_db,
     _select_first_leaf,
     _selected_folder,

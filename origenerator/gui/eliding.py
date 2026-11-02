@@ -1,10 +1,6 @@
-"""Widgets that shorten their text rather than hold a pane open.
+"""Qt sizes a button or a label to its whole text as a floor; these elide to whatever width they are given.
 
-Qt sizes a button or a label to its whole text as a floor. These ask for a couple of
-characters at their narrowest and elide to whatever width they are given.
-
-Word wrap is no substitute: ``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its
-own full-line size hint without clamping it to the row.
+``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its own full-line size hint without clamping it to the row.
 """
 from __future__ import annotations
 
@@ -28,7 +24,7 @@ class ElidingButton(QPushButton):
     def __init__(self, text: str = "", parent=None):
         super().__init__(parent)
         self._raw = ""
-        # A layout takes the stock Minimum policy's full label as a floor; Preferred consults minimumSizeHint.
+        # A Qt layout takes the stock Minimum policy's full label as a floor; Preferred consults minimumSizeHint.
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)
         self.setSizePolicy(policy)
@@ -78,7 +74,7 @@ class ElidingButton(QPushButton):
 class ElidingLabel(QLabel):
     def __init__(self, text: str = "", parent=None, *, preferred_width: int = 0):
         super().__init__(text, parent)
-        # Asked through the size hint, since a minimum would refuse to give the width back.
+        # Qt: asked through the size hint, since a minimum would refuse to give the width back.
         self._preferred_width = preferred_width
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)

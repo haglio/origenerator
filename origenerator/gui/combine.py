@@ -45,7 +45,7 @@ def _text_inset(dropdown: QComboBox) -> int:
     field = dropdown.style().subControlRect(
         QStyle.ComplexControl.CC_ComboBox, opt,
         QStyle.SubControl.SC_ComboBoxEditField, dropdown)
-    return field.x() + 1  # the style insets the text a pixel before drawing it
+    return field.x() + 1  # Qt's style insets the text a pixel before drawing it
 
 
 def _keep_its_room_when_hidden(widget: QWidget) -> None:
@@ -195,7 +195,7 @@ class Combine(QWidget):
         self._video_radio.setChecked(intent != GENAU)
 
     def _on_intent_changed(self, _button, checked: bool):
-        # buttonToggled fires twice for one click, off for the old radio and on for the new.
+        # Qt's buttonToggled fires twice for one click, off for the old radio and on for the new.
         if checked:
             self._list_the_actions(self.selected_intent())
             if not self.selected_category():

@@ -768,10 +768,6 @@ class GalleryPane(QObject):
                 "what gets tried next.")
 
     def _render_trash(self):
-        """The Trash collection: every deleted item the Trash is still
-        holding, newest first, each tile wearing restore / delete-permanently
-        controls and captioned with how long it has left. A restored item
-        returns to its own folder; a purged one is gone for good."""
         container, flow = self._fresh_tile_pane()
         rows = self._open_collection_rows(TRASH_KEY)
         if not rows:
@@ -783,22 +779,6 @@ class GalleryPane(QObject):
             for row in rows])
 
     def _add_trash_thumbnail(self, flow, row):
-        """One deleted item's tile — a collection tile like any other, wired to
-        everything a deleted item can still do.
-
-        Until it is emptied its files are all in the trash, and the Trash kept its row
-        whole, so it previews on a click, loops if it's a video, opens full size and
-        fills a Generate tab with the settings that made it. Once emptied, its
-        thumbnail stands in wherever its file would have shown. Double-clicking opens it as a Generate tab (the gesture a folder's
-        tiles carry) rather than jumping to its folder, which is the one thing a
-        deleted item hasn't got.
-
-        What it doesn't get is the ordinary tile's right-click menu, its star or its
-        enhance — those all want a row in the gallery — and no drag to a Combine drop zone,
-        whose graphs read files out of ComfyUI's output folder, not ours. Its corners
-        and its menu offer the two things that do apply: restore, where the star goes,
-        or end it for good, where delete goes.
-        """
         def wire(tile):
             tile.pressed.connect(self.apply_selection)
             tile.clicked.connect(self.thumbnail_activated)
@@ -853,19 +833,6 @@ class GalleryPane(QObject):
         return label
 
     def collection_rows(self) -> list[dict] | None:
-        """Every generation the open collection gathers, in collection order — or ``None``
-        outside the collections, where a folder is what's on screen instead.
-
-        The slideshow plays these, so they have to match the tiles: Latest is its
-        listed items, Favorites is its favorited items plus everything under each
-        favorited folder, since a folder tile there stands for its whole folder,
-        Enhanced is its enhanced images, Experiments is its unreviewed queue, and
-        Trash is what the Trash is holding.
-        A favorited item inside a favorited folder is one item, so repeats drop out.
-        A running search gathers too — its hits are gathered exactly as a
-        collection's are, and sitting through what a search turned up is
-        one of the better reasons to have run it.
-        """
         if self.showing_search():
             return list(self._search_rows)
         return self.selected_collection_rows()

@@ -8,7 +8,6 @@ from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
-# Touched only on the thread that calls run_off_thread, which is also where results are delivered.
 _in_flight = set()
 
 

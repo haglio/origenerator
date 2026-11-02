@@ -95,7 +95,7 @@ class GeneratingTile(QFrame):
             self._image,
             "Generating…" if self._reading().rendering else "Waiting…",
         )
-        self._bar.raise_()  # the scrim was just raised over everything, and the bar sits on it
+        self._bar.raise_()
         self._render_timing()
 
     def _render_timing(self):

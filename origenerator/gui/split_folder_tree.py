@@ -36,7 +36,7 @@ from origenerator.gui.stylesheet import CHOSEN
 
 _MIN_SECTION_HEIGHT = 90
 _GAP_UNDER_THE_CHOICES = 2
-_UNDER_A_WORDS_INK = 5  # clear rows under a heading's word on Segoe UI and the offscreen font
+_UNDER_A_WORDS_INK = 5  # clear rows under a heading's word in Windows' Segoe UI and the offscreen font
 _HEADING_FOOT = GAP_MEDIUM - _UNDER_A_WORDS_INK
 
 _SEPARATE_WORD = "Separate"

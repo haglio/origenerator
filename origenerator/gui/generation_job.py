@@ -36,10 +36,6 @@ class JobState(StrEnum):
 
 
 def display_status(status: str) -> JobState:
-    """What the line calls a run in flight, from its job's state, or its row's
-    status where no job holds it: the database says pending for one waiting to
-    be sent, a job says idle or queued for one waiting here or on the server,
-    and the line says queued for all three."""
     if status == JobState.FINISHING:
         return JobState.RUNNING
     if status in (JobState.SPEAKING, JobState.RUNNING):

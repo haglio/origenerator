@@ -1,4 +1,4 @@
-"""A video plays on a native window, which no ordinary sibling widget paints over however it is stacked; an overlay made native itself stacks against the video by Z-order."""
+"""Qt widgets never paint over the native window a video plays on, however they are stacked; an overlay made native itself stacks against the video by Z-order."""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt

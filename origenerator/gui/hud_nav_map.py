@@ -80,7 +80,6 @@ def build_nav_map(current: Slide, loop: Loop | None,
 
 
 def actions_posted(query: str) -> str:
-    """The Funestras' HUD lower-cases a row's label and writes its spaces as underscores; a spoken action arrives the same way."""
     return " ".join(str(query or "").replace("_", " ").split()).lower()
 
 

@@ -11,7 +11,7 @@ def grayscale_pixmap(pixmap: QPixmap) -> QPixmap:
         QImage.Format.Format_ARGB32
     )
     if source.hasAlphaChannel():
-        # Format_Grayscale8 has no alpha, so the conversion back leaves every pixel opaque.
+        # Qt: Format_Grayscale8 has no alpha, so the conversion back leaves every pixel opaque.
         painter = QPainter(gray)
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
         painter.drawImage(0, 0, source)

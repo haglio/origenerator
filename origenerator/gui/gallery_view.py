@@ -459,7 +459,7 @@ class GalleryView(QWidget):
                                          on_drive_toggle=self.toggle_osr2_drive)):
                 self._osr2_controls.refresh()
                 return True
-        # An application-wide filter is handed events for objects being destroyed;
+        # Qt hands an application-wide filter events for objects being destroyed;
         # the base class's answer for one dereferences a freed C++ pointer and aborts.
         return False
 
@@ -949,7 +949,7 @@ class GalleryView(QWidget):
             self._poll_timer.stop()
 
     def closeEvent(self, event):
-        """A widget that was never shown is never hidden, so ``hideEvent`` alone leaves the poll and the key filter armed."""
+        """Qt never hides a widget that was never shown, so ``hideEvent`` alone leaves the poll and the key filter armed."""
         self._poll_timer.stop()
         self._intercept_the_rooms_keys(False)
         self.close_the_slideshows()
@@ -1749,11 +1749,6 @@ class GalleryView(QWidget):
             self._stand_on_the_run_in(key, rebuild=True)
 
     def rows_to_play(self) -> list[dict]:
-        """The generations the slideshow would play from the view on screen: the
-        collection's own rows in a collection, else everything under the selected
-        folder.  All of it: narrowing a slideshow to its favorites or its enhanced
-        images is the slideshow's own doing, from the two switches on its HUD.
-        """
         rows = [] if self._in_the_trash() else self._gallery_pane.collection_rows()
         if rows is None:
             group = self.current_group()
@@ -1857,9 +1852,6 @@ class GalleryView(QWidget):
         return all(row and row.get("starred") for row in rows)
 
     def _favorite_selection(self):
-        """The Gallery pane button's action: favorite the picked thumbnails, or the
-        folder on screen — and un-favorite them when they already are, so the one
-        button is the whole of the toggle."""
         if self._gallery_pane.selected_ids and not self._in_the_trash():
             pids = self.selected_prompt_ids()
             self.set_items_favorite(pids, not self._all_favorites(pids))
@@ -2361,13 +2353,6 @@ class GalleryView(QWidget):
         return True
 
     def _delete_selection(self):
-        """Delete picked thumbnails, or else the folder or picked folders on screen.
-
-        In the Trash collection the picked items are already deleted, so Delete means
-        the only deletion left: ending them for good. Same button, same key, the
-        one meaning it can have where it is standing — rather than a control that
-        looks live and quietly does nothing.
-        """
         if self._in_the_trash():
             self.purge_from_trash(self.selected_prompt_ids())
             return
@@ -2681,8 +2666,6 @@ class GalleryView(QWidget):
         self._selected_row = row
 
     def animated_preview(self, row: dict) -> str | None:
-        """The looping-WebP preview for a video ``row``, or ``None`` for an image or a
-        video with no animated thumbnail, whose tile shows its still."""
         thumb_dir = self._edits.thumb_dir
         return (gallery.animated_preview_if_made(row, self._edits.places, thumb_dir)
                 if thumb_dir is not None else None)

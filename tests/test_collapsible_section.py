@@ -56,7 +56,6 @@ def test_the_headers_chevron_is_drawn_before_its_title(qtbot):
 
 
 def test_header_escapes_an_ampersand_instead_of_making_it_a_mnemonic(qtbot):
-    # A raw "&" would be eaten as a QPushButton accelerator, showing "Models  LoRAs".
     section = CollapsibleSection("Models & LoRAs", collapsed=True)
     qtbot.addWidget(section)
     assert "Models && LoRAs" in section._header.text()
@@ -79,8 +78,6 @@ def test_clicking_the_header_toggles_and_emits(qtbot):
 
 
 def test_set_collapsed_drives_content_visibility_without_emitting(qtbot):
-    # Programmatic collapse (restoring a default) must not masquerade as a user
-    # toggle — nothing downstream should treat it as an interaction.
     section = CollapsibleSection("Frames", collapsed=False)
     qtbot.addWidget(section)
     fired = []
@@ -103,9 +100,6 @@ def test_rows_added_to_the_content_form_live_under_the_section(qtbot):
 
 
 def test_a_long_title_does_not_hold_the_form_open(qtbot):
-    # A header names the rows below it; it has no business deciding how narrow the
-    # pane can be squeezed. Its title elides instead — without this, "Enhancement
-    # levels" alone was enough to put a horizontal scroll bar under the form.
     title = "Enhancements"
     section = CollapsibleSection(title, collapsed=True)
     qtbot.addWidget(section)

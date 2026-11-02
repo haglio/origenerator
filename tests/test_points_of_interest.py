@@ -1,4 +1,3 @@
-"""The places an enhancement's fixes found, as the app keeps them with the file they were found in."""
 from __future__ import annotations
 
 import json

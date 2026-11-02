@@ -1,4 +1,3 @@
-"""The suite's own scratch goes when the suite does, whatever is in it."""
 from __future__ import annotations
 
 import os
@@ -61,9 +60,6 @@ def test_a_file_linked_in_from_outside_keeps_its_read_only_bit(tmp_path: Path):
 
 
 def test_the_suite_state_dir_goes_at_exit_with_the_apps_log_still_open_in_it(tmp_path: Path):
-    """The app opens its log in the state dir at import and nothing closes it
-    before the suite's exit hook runs: 811 origenerator-suite-* dirs were
-    standing in the system temp dir, each holding its origenerator.log."""
     state = _scratch_in(tmp_path)
 
     run_python(["-c", _A_SUITE_THAT_LOGS_INTO_ITS_STATE_DIR, str(state)], check=True)

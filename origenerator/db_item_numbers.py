@@ -1,4 +1,3 @@
-"""The number each item carries in its folder, kept after the item is gone."""
 from __future__ import annotations
 
 from collections.abc import Mapping

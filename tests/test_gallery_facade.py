@@ -1,10 +1,3 @@
-"""What the gallery package publishes, and what it does not do.
-
-``origenerator.gallery`` is a facade: ninety-odd names re-exported from a dozen
-submodules, reached by the GUI as ``gallery.X``. Splitting a submodule under it
-is meant to be invisible from outside, and these are what say so — the published
-surface held as an equality, and the one rule the package has about itself.
-"""
 from __future__ import annotations
 
 import ast
@@ -15,10 +8,6 @@ from origenerator import gallery
 ROOT = Path(__file__).resolve().parent.parent
 _PACKAGE = ROOT / "origenerator" / "gallery"
 
-# Every name the package publishes. Held as an equality rather than a floor: a
-# name added without a line here is as much a failure as one dropped, because
-# the GUI reaches most of these as gallery.X and nothing else records what the
-# facade owes its callers.
 PUBLISHED = {
     "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomCollection",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
@@ -76,25 +65,19 @@ def test_the_facade_publishes_exactly_the_names_written_down_here():
 
 
 def test_every_published_name_is_actually_there():
-    # __all__ is a promise, not a check: a name listed but never imported
-    # raises only when someone reaches for it, which for a facade this wide
-    # means at some point long after the split that dropped it.
     missing = [name for name in PUBLISHED if not hasattr(gallery, name)]
     assert missing == []
 
 
-# The one module of the package allowed to know a database exists.
 THE_DB_MODULE = "enhance_fold.py"
 
 
 def _modules(predicate) -> list[str]:
-    """The package's modules for which *predicate* holds of the parsed source."""
     return sorted(path.name for path in _PACKAGE.glob("*.py")
                   if predicate(ast.parse(path.read_text(encoding="utf-8"))))
 
 
 def _calls_a_db(tree) -> bool:
-    """Whether the module calls anything on a local named ``db``."""
     return any(isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                and isinstance(node.func.value, ast.Name)
                and node.func.value.id == "db"
@@ -102,7 +85,6 @@ def _calls_a_db(tree) -> bool:
 
 
 def _takes_a_db(tree) -> bool:
-    """Whether any function in the module is handed a database."""
     return any(arg.arg == "db"
                for node in ast.walk(tree)
                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -111,7 +93,6 @@ def _takes_a_db(tree) -> bool:
 
 
 def _imports_the_db_module(tree) -> bool:
-    """Whether the module reaches for :mod:`origenerator.db` at all."""
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and (node.module or "") == "origenerator.db":
             return True
@@ -122,19 +103,12 @@ def _imports_the_db_module(tree) -> bool:
 
 
 def test_only_one_module_of_the_gallery_package_is_handed_a_database():
-    # The package is otherwise pure: rows in, answers out. One module takes a
-    # db, so a reader looking for what the gallery can change has one file to
-    # read and a caller wanting the pure half can take it without a database.
     assert _modules(_takes_a_db) == [THE_DB_MODULE]
 
 
 def test_only_that_module_calls_anything_on_a_database():
-    # The same rule spelled a second way, because taking one and using one are
-    # two facts and a module could pick up either without the other.
     assert _modules(_calls_a_db) == [THE_DB_MODULE]
 
 
 def test_no_module_of_the_gallery_package_imports_the_database_module():
-    # And a third: the two above see a parameter named db, so a module that
-    # built its own connection would walk past both of them.
     assert _modules(_imports_the_db_module) == []

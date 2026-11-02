@@ -1,9 +1,3 @@
-"""The ``+`` leading a gallery settings folder: a fresh generation of the folder's
-settings with a new seed.
-
-While the folder is making one it stays where it is, grayed out, and the run gets
-a tile of its own (:class:`~origenerator.gui.generating_tile.GeneratingTile`).
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal

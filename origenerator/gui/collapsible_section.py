@@ -1,10 +1,3 @@
-"""A titled, collapsible group of form rows.
-
-A header button spans the section; clicking it folds or unfolds the content
-below, a ``QFormLayout`` callers fill with ``label: field`` rows. Used by
-:class:`~origenerator.gui.param_form.ParamForm` to group a workflow's params
-into the sections defined in :mod:`origenerator.gui.param_sections`.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
@@ -23,7 +16,6 @@ from origenerator.gui.eliding import ElidingButton
 from origenerator.gui.label_cells import LabelForm
 from origenerator.gui.warning_mark import WarningMark
 
-# Drawn before the header title so the fold state reads at a glance.
 FOLD = {False: "chevron_down", True: "chevron_right"}
 _MARK_GAP = GAP_SMALL
 
@@ -119,13 +111,6 @@ class FoldHeader(ElidingButton):
 
 
 class CollapsibleSection(QWidget):
-    """A header that folds a ``QFormLayout`` of rows open or shut.
-
-    ``toggled`` fires only on a user click of the header, not on a programmatic
-    :meth:`set_collapsed`, so a caller restoring a default state can't be mistaken
-    for an interaction (the param form repositions its swap button on real toggles).
-    """
-
     toggled = pyqtSignal()
 
     def __init__(self, title: str, collapsed: bool = False, parent=None):
@@ -137,8 +122,6 @@ class CollapsibleSection(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(GAP_SMALL)
 
-        # Elides its title rather than propping the whole form open at the
-        # title's own width; it also handles the "&" in "Models & LoRAs".
         self._header = FoldHeader()
         self._header.setObjectName("foldingSectionHeader")
         self._header.setFlat(True)
@@ -158,8 +141,6 @@ class CollapsibleSection(QWidget):
 
         self._apply_state()
 
-    # --- state ---------------------------------------------------------------
-
     def title(self) -> str:
         return self._title
 
@@ -167,7 +148,6 @@ class CollapsibleSection(QWidget):
         return self._collapsed
 
     def set_collapsed(self, collapsed: bool):
-        """Fold or unfold without announcing it as a user toggle."""
         self._collapsed = collapsed
         self._apply_state()
 
@@ -181,16 +161,11 @@ class CollapsibleSection(QWidget):
         self._header.set_fold(FOLD[self._collapsed])
         self._header.setText(self._title)
 
-    # --- content -------------------------------------------------------------
-
     def set_mark(self, mark: QPixmap | None, tip: str) -> None:
         self._header.set_mark(mark, tip)
 
     def content(self) -> QWidget:
-        """The widget holding the rows — the parent for any free-floating child
-        (e.g. the swap button) that should fold away with the section."""
         return self._content
 
     def content_form(self) -> LabelForm:
-        """The layout callers add ``label: field`` rows to."""
         return self._form

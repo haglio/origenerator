@@ -1,4 +1,3 @@
-"""A job whose story has lines speaks them before it is sent."""
 from __future__ import annotations
 
 import sys
@@ -20,8 +19,6 @@ I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 
 
 class _Speaker:
-    """Records what it was asked to speak; the test answers when it likes."""
-
     def __init__(self):
         self.asked = []
 
@@ -33,7 +30,6 @@ class _Speaker:
 
 
 def _from_a_window(post):
-    """How a queue with a window to keep alive hands start() the POST; made at once here."""
     post()
 
 
@@ -41,8 +37,6 @@ def _client():
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-A")
     client.free_memory = MagicMock()
-    # Every send asks after an earlier run of its id first; answered here,
-    # never by a server on the machine.
     client.fetch_history = MagicMock(return_value={})
     return client
 
@@ -144,8 +138,6 @@ def test_a_job_canceled_while_its_lines_are_spoken_is_not_sent(qtbot, tmp_path):
     assert job.state == "canceled"
 
 
-# ---- the voice at work, off the GUI thread ---------------------------------------
-
 
 def _spoken_file(params, input_dir):
     path = input_dir / scene_speech(params)[0].file
@@ -155,9 +147,6 @@ def _spoken_file(params, input_dir):
 
 
 def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, tmp_path, monkeypatch):
-    # The real speaker: a thread does the speaking (here a half-second stand-in)
-    # while the window keeps its events flowing, and the submit that follows
-    # happens back on the GUI thread, where every job's signals are wired.
     seen = {}
     gui_thread = threading.get_ident()
 
@@ -207,8 +196,6 @@ def test_the_voice_a_job_with_no_window_asks_for_speaks_on_the_starting_thread(
 
 
 def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_path, monkeypatch):
-    # The worker is a process the thread waits on; a stand-in worker here
-    # sleeps and writes the files the job asks for, the way the real one does.
     worker = tmp_path / "worker.py"
     worker.write_text(
         "import json, sys, time, pathlib\n"

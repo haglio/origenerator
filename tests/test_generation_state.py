@@ -1,11 +1,3 @@
-"""What a generations row says about itself, held to the bytes already on disk.
-
-Evolver opens this database read-only, and every user's rows were written long
-before these names existed, so a name is only right if it stands for the string
-that was always stored.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import sqlite3

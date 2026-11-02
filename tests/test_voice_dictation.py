@@ -1,8 +1,3 @@
-"""RequestDictation — collecting "Request … over" out of endpointed utterances.
-
-Every vocabulary here is invented: the point is the markers and the shape of the
-sentence between them, never any real prompt text.
-"""
 from __future__ import annotations
 
 from origenerator.voice.dictation import (
@@ -35,9 +30,6 @@ def test_a_whole_request_in_one_breath_completes_at_once():
 
 
 def test_a_state_is_one_of_the_four_named_states_and_not_a_word():
-    # A consumer that compared against a bare word would go on matching a value
-    # this dictation never returns; the states are a closed set, like the two
-    # command vocabularies beside them.
     spoken = RequestDictation().push("Request, no silver earrings, over.")
 
     assert isinstance(spoken.state, RequestState)
@@ -46,8 +38,6 @@ def test_a_state_is_one_of_the_four_named_states_and_not_a_word():
 
 
 def test_a_request_spoken_across_pauses_is_collected_whole():
-    # The mic endpoints on silence, so a sentence said with pauses arrives in
-    # pieces; the request is the join of them, markers stripped.
     dictation = RequestDictation()
 
     opened = dictation.push("Request.")
@@ -81,8 +71,6 @@ def test_a_request_said_in_one_breath_keeps_the_time_it_was_spoken():
 
 
 def test_every_utterance_of_an_open_request_is_swallowed():
-    # Which is what keeps the words of a request away from the "fix …" matcher:
-    # nothing in between falls through.
     dictation = RequestDictation()
     dictation.push("Request.")
 
@@ -91,7 +79,6 @@ def test_every_utterance_of_an_open_request_is_swallowed():
 
 
 def test_over_only_ends_a_request_as_the_last_word():
-    # "over" is an ordinary word mid-sentence and a sign-off at the end of one.
     dictation = RequestDictation()
     dictation.push("Request.")
 
@@ -102,15 +89,12 @@ def test_over_only_ends_a_request_as_the_last_word():
 
 
 def test_a_mangled_lead_word_still_opens_one():
-    # Off a quiet mic the base model lands the shape and misses a letter.
     dictation = RequestDictation()
 
     assert dictation.push("Requesf, no hat, over.").state == COMPLETED
 
 
 def test_a_request_that_never_hears_over_is_given_up_on():
-    # Otherwise a missed terminator would swallow every later utterance for the
-    # rest of the session, with nothing on screen to say why.
     dictation = RequestDictation(max_utterances=3)
     dictation.push("Request.")
     dictation.push("no hat")
@@ -119,14 +103,10 @@ def test_a_request_that_never_hears_over_is_given_up_on():
 
     assert spoken.state == ABANDONED
     assert not dictation.listening
-    assert dictation.push("a woman in a red coat") is None  # listening no more
+    assert dictation.push("a woman in a red coat") is None
 
 
 def test_the_shipped_limit_gives_up_after_eight_utterances():
-    # The test above hands in a limit of its own, so the number the app actually
-    # ships with ran in no test: raising it to a hundred restored the failure that
-    # comment describes. Eight is written out here rather than read off
-    # _MAX_UTTERANCES, which would hold at a hundred just as well.
     dictation = RequestDictation()
     assert dictation.push("Request.").state == OPENED
     for _ in range(6):
@@ -146,8 +126,6 @@ def test_reset_drops_a_half_said_request():
 
 
 def test_a_request_with_nothing_between_the_markers_still_completes():
-    # Empty, so the caller can say it didn't catch a term — rather than the
-    # dictation staying open forever on a false start.
     dictation = RequestDictation()
 
     spoken = dictation.push("Request. Over.")
@@ -164,13 +142,11 @@ def test_what_was_heard_reads_back_as_the_request_alone():
 def test_a_record_s_words_are_its_own_else_what_was_heard_between_the_markers():
     assert words_of({"asked": "two women", "heard": ""}) == "two women"
     assert words_of({"asked": None, "heard": "Request, no hat, over."}) == "no hat"
-    assert words_of({"asked": None, "heard": ""}) == ""  # a folder's Modify
+    assert words_of({"asked": None, "heard": ""}) == ""
     assert words_of(None) == ""
 
 
 def test_the_bias_names_both_markers():
-    # Whisper only lands the marker words off a quiet mic when told to expect
-    # them, and the whole feature hangs on hearing exactly these two.
     bias = request_bias().lower()
     assert "request" in bias
     assert "over" in bias

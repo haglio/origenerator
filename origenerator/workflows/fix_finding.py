@@ -5,9 +5,9 @@ import re
 from origenerator import points_of_interest
 from origenerator.workflows.detail_parts import DetailFixPass, DetailPart, detector_part, finder_of
 
-_DETECTOR_THRESHOLD = 0.5     # how sure the detector must be to call it a face
-_DETECTOR_CROP_FACTOR = 3.0   # how much context around the rect the sampler sees
-_DETECTOR_DROP_SIZE = 10      # rects smaller than this are noise, not anatomy
+_DETECTOR_THRESHOLD = 0.5
+_DETECTOR_CROP_FACTOR = 3.0
+_DETECTOR_DROP_SIZE = 10
 
 _DETECTOR_NODE = re.compile(r"fix(\d+)_detector")
 

@@ -46,8 +46,6 @@ def test_a_grayed_plus_starts_nothing_on_a_click(qtbot):
 
 
 def test_a_press_on_a_grayed_plus_does_not_put_the_picked_items_down(qtbot):
-    # The pane takes a press nothing kept for a press on the space between the
-    # items, and answers it by putting the picked ones down.
     pane = GalleryPaneScrollArea()
     qtbot.addWidget(pane)
     tile = NewTile(making_one=True)
@@ -61,7 +59,6 @@ def test_a_press_on_a_grayed_plus_does_not_put_the_picked_items_down(qtbot):
 
 
 def _ink(label):
-    """The color a label's text is painted in, in the state it is in."""
     palette = label.palette()
     return palette.color(palette.currentColorGroup(), QPalette.ColorRole.WindowText)
 

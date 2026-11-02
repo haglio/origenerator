@@ -1,7 +1,3 @@
-"""The look for other sources' videos, which runs while the window is up.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,8 +13,6 @@ _PLACES = Places(upscaled_dir=Path("L:/outbox"), records_folder=Path("L:/records
 
 
 class _Pool:
-    """Runs nothing until told to, the way Qt's pool runs a look later."""
-
     def __init__(self):
         self.waiting = []
 

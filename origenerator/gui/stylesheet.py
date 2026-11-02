@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shared_ui import palette
+from shared_ui import colors, palette
 from shared_ui.chrome import control_ground, family_stylesheet, field_rules, tool_button_rules
 from shared_ui.colors import (
     BG_SECONDARY,
@@ -12,7 +12,6 @@ from shared_ui.colors import (
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     YELLOW,
-    family_palette,
     hovered,
 )
 from shared_ui.preview import Preview
@@ -435,7 +434,6 @@ def dress_application(app, preview: Preview | None) -> None:
     is the third: a slideshow on a satellite region is a window of its own that sets
     none, and the window switcher drew it a blank page.
     """
-    app.setPalette(family_palette(app.palette()))
-    app.setStyleSheet(build_stylesheet())
+    colors.dress_application(app, build_stylesheet())
     app.setWindowIcon(app_icon(PROJECT_DIR / "icon.ico", preview))
     shape_long_tooltips(app)

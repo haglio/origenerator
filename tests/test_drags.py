@@ -1,4 +1,3 @@
-"""Every drag the app starts reaches every place a drop can land, start and end."""
 from __future__ import annotations
 
 import pytest

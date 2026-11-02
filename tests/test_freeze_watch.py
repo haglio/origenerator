@@ -80,8 +80,6 @@ def test_a_hand_over_is_marked_in_the_crash_log_so_stacks_under_the_mark_read_as
 
 
 def test_a_launch_waiting_on_a_closing_copy_outlasts_the_longest_close_the_watch_allows():
-    # Closing arms one deadline as the window goes, handing ComfyUI its work a
-    # second, and what comes after the hand-over the first again.
     longest_close_s = CLOSED_WITHIN_S + HANDED_OVER_WITHIN_S + CLOSED_WITHIN_S
 
     assert longest_close_s < single_instance.GIVE_UP_AFTER_S

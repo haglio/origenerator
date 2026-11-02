@@ -197,8 +197,6 @@ def test_an_offer_another_instance_overwrote_is_recorded_when_it_is_taken_back(
 
 
 def test_an_offer_simply_missing_is_put_back_without_a_word(qtbot, tmp_path, caplog):
-    # Withdrawn and renewed is the ordinary course of a session; only another
-    # writer is worth a line.
     watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
     offer = tmp_path / handoff.OFFER
 

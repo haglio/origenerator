@@ -1,11 +1,3 @@
-"""The standalone window's link to a Fun Time session, on one poll.
-
-Three things ride that tick: the offer a session takes this window over
-through, standing for as long as the window does; the takeover itself; and the
-session's standing claim on the OSR2.  The claim is read whether or not the
-takeover ever arrives, because it is the one device and a session that never
-reached this window is driving it anyway.
-"""
 from __future__ import annotations
 
 import logging

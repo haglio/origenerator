@@ -1,10 +1,3 @@
-"""An argv for a hosted launch, built from the contract rather than written out.
-
-A hosted launch carries every flag `fun_time_mode.required_flags` names and is
-refused without them, so a test that hand-wrote a handful of them went red the
-day one was added.  Built from the contract instead, a test names only what it
-actually cares about and the rest follows.
-"""
 from __future__ import annotations
 
 from origenerator.fun_time_mode import (
@@ -15,18 +8,12 @@ from origenerator.fun_time_mode import (
     required_flags,
 )
 
-#: A rect, a path, an identity: anything this file does not care about.
 _ANYTHING = "0"
 
 
 def hosted_launch(
     *, funestras: bool = False, headset: bool = False, **named: str,
 ) -> list[str]:
-    """Every required flag, with *named* overriding the ones a test cares about.
-
-    *Funestras* also hands both Satellite Funestras over, the way a session does,
-    and *headset* names the pair a room in the headset hands its window over by.
-    """
     argv = [MODE_FLAG]
     for flag in required_flags():
         if flag != MODE_FLAG:

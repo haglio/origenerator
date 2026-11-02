@@ -1,4 +1,3 @@
-"""What the drags a test starts announce to every place a drop can land."""
 from __future__ import annotations
 
 from origenerator.gui.drags import under_way

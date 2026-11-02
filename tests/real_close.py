@@ -1,13 +1,3 @@
-"""Origenerator opened and closed for real, in a process of its own.
-
-Run as ``python -m tests.real_close <file>`` by test_app's test of the close,
-with the state folder it is to use in ``ORIGENERATOR_STATE_DIR``. It writes to
-*file*, as JSON, how many of each kind of QObject Python still owned as the
-QApplication's own wrapper was freed: the moment PyQt deletes each of them itself.
-
-:func:`open_and_close` is the launch and the close alone, for a child that
-watches something else of the close (tests.real_close_handing_over).
-"""
 from __future__ import annotations
 
 import collections
@@ -74,9 +64,6 @@ def _close_once_its_loop_runs(window) -> None:
 
 
 def open_and_close(built) -> int:
-    """Run the app with everything a run must not reach kept off, close its
-    window as soon as its loop runs, and return what ``main`` returned.
-    *built* is handed the window as soon as it is built."""
     say_where_it_hangs()
     for keep_off in (suite.keep_the_microphone_shut, suite.refuse_the_comfyui_on_this_machine,
                      suite.start_no_comfyui_on_this_machine,

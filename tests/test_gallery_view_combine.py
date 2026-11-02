@@ -434,6 +434,15 @@ def test_recent_under_kino_leaves_out_a_looping_video_used_under_kino(qtbot, tmp
     assert _listed_under_recent(panel) == ["vid"]
 
 
+def test_recent_under_genau_lists_a_looping_video_used_under_kino(qtbot, tmp_path):
+    panel = _view_with_a_looping_video(qtbot, tmp_path)._combine.panel
+
+    panel.video_slot.set_item("looping")
+    panel.set_intent(act_settings.GENAU)
+
+    assert _listed_under_recent(panel) == ["looping"]
+
+
 def test_recent_under_genau_leaves_out_a_full_length_video_used_under_genau(qtbot, tmp_path):
     panel = _view_with_a_looping_video(qtbot, tmp_path)._combine.panel
     panel.set_intent(act_settings.GENAU)

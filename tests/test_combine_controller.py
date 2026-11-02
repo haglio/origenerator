@@ -27,6 +27,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
+from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
@@ -35,6 +36,7 @@ from tests.thumbnail_rows import square
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
+LOOP_WORKFLOW = "wan22_flf2v_loop"
 
 
 _A_CLIENT = object()
@@ -456,16 +458,28 @@ def test_a_video_put_in_the_slot_is_kept_in_the_library_under_its_lane(combine):
     assert db.uses == [(act_settings.GENAU, "clip", None)]
 
 
-def test_recent_lists_each_lanes_videos_out_of_the_library(combine):
-    db = FakeDB()
-    db.combinations = [{"prompt_id": "made", "source_video": "older",
-                        "created_at": "2026-10-01 00:00:00"}]
-    controller, _host = combine(db=db)
+def _recent_under(controller, intent):
+    return [video.item for video in controller.panel.history(intent)]
 
-    controller.panel.video_used.emit(act_settings.VIDEO, "clip")
 
-    assert controller.panel.history(act_settings.VIDEO) == ["clip", "older"]
-    assert controller.panel.history(act_settings.GENAU) == []
+def test_recent_lists_each_kinds_videos_out_of_the_library(combine):
+    videos = [_video("full"), _video("loop", workflow_name=LOOP_WORKFLOW)]
+    controller, _host = combine(db=FakeDB(videos))
+
+    assert _recent_under(controller, act_settings.VIDEO) == ["full"]
+    assert _recent_under(controller, act_settings.GENAU) == ["loop"]
+
+
+def test_recent_shows_each_video_with_its_own_thumbnail(combine):
+    controller, _host = combine(db=FakeDB([_video("full")]))
+
+    assert controller.panel.history(act_settings.VIDEO) == [RecentVideo("full", "full-thumb.png")]
+
+
+def test_recent_leaves_out_what_the_video_slot_would_not_take(combine):
+    controller, _host = combine(db=FakeDB([_image("img"), _video("running", status="running")]))
+
+    assert _recent_under(controller, act_settings.VIDEO) == []
 
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):

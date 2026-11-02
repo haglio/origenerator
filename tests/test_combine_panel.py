@@ -14,6 +14,7 @@ from origenerator.gui.action_picker import ACTION_LABEL
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_dropdown import THUMBNAILS_ROLE
 
@@ -31,7 +32,7 @@ class _Uses:
 
     def history(self, intent):
         newest_first = (video for lane, video in reversed(self.said) if lane == intent)
-        return list(dict.fromkeys(newest_first))
+        return [RecentVideo(video, None) for video in dict.fromkeys(newest_first)]
 
 
 def _panel(qtbot, start_images=None, *, fitting=None, preview=None, uses=None):
@@ -562,7 +563,6 @@ def test_a_binned_video_leaves_the_slot_empty_rather_than_bringing_back_an_older
     _pick_lane(panel, act_settings.VIDEO)
 
     assert panel.video_slot.current_id() is None
-    assert _listed_under_recent(panel) == ["vid1"]
 
 
 def test_each_lane_keeps_its_own_dropped_video(qtbot):
@@ -620,16 +620,6 @@ def test_recent_keeps_every_video_the_lane_has_had(qtbot):
         panel.video_slot.set_item(f"vid{n}")
 
     assert _listed_under_recent(panel) == [f"vid{n}" for n in range(39, -1, -1)]
-
-
-def test_a_video_that_no_longer_fits_the_slot_is_not_listed(qtbot):
-    fitting = {"vid1", "vid2"}
-    panel = _panel(qtbot, fitting=fitting)
-    panel.video_slot.set_item("vid1")
-    panel.video_slot.set_item("vid2")
-    fitting.discard("vid1")  # binned since
-
-    assert _listed_under_recent(panel) == ["vid2"]
 
 
 def test_picking_a_recent_video_puts_it_in_the_slot_and_lists_it_first(qtbot):

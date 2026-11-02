@@ -471,7 +471,7 @@ class GenerationStore(Store):
     def custom_combinations(self) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT prompt_id, recipe_video_id, created_at, workflow_name FROM generations"
+                "SELECT prompt_id, recipe_video_id, created_at FROM generations"
                 " WHERE recipe_video_id IS NOT NULL AND recipe_category IS NULL"
                 " ORDER BY id DESC"
             ).fetchall()

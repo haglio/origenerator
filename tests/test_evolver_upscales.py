@@ -82,8 +82,6 @@ def test_an_upscale_moved_away_since_the_library_was_read_is_no_upscale(tmp_path
 
 def test_a_folder_of_upscales_unchanged_since_its_last_reading_is_not_listed_again(
         tmp_path, monkeypatch):
-    # Listed afresh at every look, Evolver's folder of upscales was read three to
-    # eight times over before a double-clicked slideshow could open.
     filed_in = _upscale(tmp_path).parent
     os.utime(filed_in, _LONG_AGO)
     _upscales(tmp_path)

@@ -1,12 +1,3 @@
-"""The shapes the tree remembers, and what it forgets.
-
-``row_shape`` opens a file to find out which region its media belongs on,
-and keeps the answer against the path that gave it — a rebuild re-reads every row
-and the poll rebuilds every 1.5 s, so measuring afresh each time would mean a
-thumbnail opened per row per second.  Kept for ever, though, that is a dict with
-an entry for every file the app has looked at since it launched and no way for
-one to leave: a generation deleted an hour ago still holds its slot.
-"""
 from __future__ import annotations
 
 import json
@@ -20,8 +11,6 @@ from origenerator.gallery.shapes import PORTRAIT
 
 
 class _FakeImage:
-    """A stand-in for a decoded file: the size is all the shape is read from."""
-
     def __init__(self, size):
         self.size = size
 
@@ -34,14 +23,11 @@ class _FakeImage:
 
 @pytest.fixture(autouse=True)
 def _a_cache_of_this_files_own(monkeypatch):
-    """These tests fill the cache; nothing after them should inherit it."""
     monkeypatch.setattr(item_shape, "_measured", type(item_shape._measured)())
 
 
 @pytest.fixture(autouse=True)
 def _every_path_reads_as_a_tall_image(monkeypatch):
-    """Measure without a file: what is on disk is not what these tests are about,
-    and a thousand real PNGs would only be a slower way to ask the same thing."""
     monkeypatch.setattr(
         item_shape, "Image", SimpleNamespace(open=lambda path: _FakeImage((90, 160))))
 
@@ -58,10 +44,6 @@ def test_the_remembered_shapes_stop_piling_up():
 
 
 def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypatch):
-    """A slideshow on a Fun Time region re-sorts the whole library by shape on every
-    image a running generation streams; looking each item's file up on disk
-    again, for a shape already known, froze the window long enough for Windows
-    to close it."""
     row = {"thumbnail_path": "/library/known.png",
            "output_files": '[{"filename": "known.png", "subfolder": ""}]'}
     item_shape.row_shape(row)
@@ -88,13 +70,11 @@ def test_the_shape_a_row_asks_for_is_read_once_however_often_it_is_asked(monkeyp
 
 
 def test_the_one_it_drops_is_the_one_nothing_has_asked_for():
-    """A library past the cap still has one folder open in front of it, and the
-    rows the poll redraws must outlast the ones scrolled past once."""
     for n in range(item_shape._MEASURED_LIMIT):
         _measure(f"m{n}")
-    _measure("m0")  # asked for again, so no longer the oldest thing here
+    _measure("m0")
 
-    _measure("late")  # one over: something has to go
+    _measure("late")
 
     # ``row_shape`` keys the cache by ``str(Path(thumbnail_path))``, so the
     # separator is the platform's -- backslashes on Windows.  Assert against the

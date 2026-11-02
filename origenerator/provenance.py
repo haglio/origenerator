@@ -1,10 +1,3 @@
-"""What made each generation, kept on its row so a later change can find
-everything made before it and remake it.
-
-The block is the family's stamp (:mod:`app_support.provenance`) with the
-workflow as what ran, plus one key of this app's own saying how the workflow's
-version came to be known.
-"""
 from __future__ import annotations
 
 import inspect

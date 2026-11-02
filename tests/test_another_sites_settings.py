@@ -1,8 +1,3 @@
-"""A video another site made, and the image it was made from, show their own
-settings on a Generate tab the way anything made here does.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json

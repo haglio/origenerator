@@ -1,7 +1,3 @@
-"""Making a kept video again from its image's enhancement, when it started from the plain image.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -127,8 +123,6 @@ def test_an_experiment_waiting_for_its_verdict_is_left_alone_and_one_kept_is_bac
 
 def test_a_video_from_an_image_listing_its_own_file_as_its_original_is_not_remade_from_it(
         tmp_path):
-    # Such an image has no enhanced file to start from, so each remake started from
-    # the file the last one did, and one video was remade at every closing.
     db = Database(tmp_path / "t.db")
     _image(db, "image")
     db.update_generation("image", original_files=json.dumps([_plain("image")]))
@@ -213,8 +207,6 @@ def test_a_backfill_run_uses_the_old_settings_and_seeds_from_the_images_enhancem
 
 
 class _Absence:
-    """What the work left for while the app is closed hands ComfyUI, recorded."""
-
     def __init__(self):
         self.enhanced, self.launched = [], []
 
@@ -279,7 +271,6 @@ def test_an_absence_takes_as_many_backfill_runs_as_its_minutes_hold_and_always_o
 
 def test_the_work_left_for_while_closed_backfills_videos_and_enhances_their_images(qtbot, tmp_path,
                                                                           monkeypatch):
-    # Everything but the socket is the real path, as for the base re-renders.
     monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
     db = Database(tmp_path / "t.db")
     _image(db, "plain image")
@@ -328,8 +319,6 @@ def test_a_story_the_backfill_remakes_while_the_app_is_closed_is_spoken_before_c
 @pytest.mark.parametrize("status", ["running", "pending"])
 def test_a_backfill_run_comfyui_has_no_record_of_is_cleared_so_its_video_is_remade_while_closed(
         qtbot, tmp_path, monkeypatch, status):
-    # One ComfyUI lost, or one an earlier pass left waiting in its line, kept its
-    # video from being offered again until Origenerator next opened (2026-10-29).
     monkeypatch.setattr(downtime.config, "OUTPUT_PLACES", _places(tmp_path))
     monkeypatch.setattr(downtime.config, "THUMB_DIR", _thumbnails(tmp_path))
     client = _comfyui_taking_everything()
@@ -345,8 +334,6 @@ def test_a_backfill_run_comfyui_has_no_record_of_is_cleared_so_its_video_is_rema
     assert [(row["prompt_id"] == "lost", row["backfill_of"]) for row in db.list_generations()
             if row["source"] == GenerationSource.BACKFILL] == [(False, "video")]
 
-
-# --- putting a finished backfill run in the old video's place -----------------
 
 
 def _backfill_run(db, prompt_id, *, of, status="completed", made=True):

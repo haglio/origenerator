@@ -90,8 +90,6 @@ def test_a_finished_image_is_filed_in_the_images_folder_after_the_highest_number
 
 
 def test_a_number_an_image_in_trash_still_holds_is_passed_over(tmp_path):
-    # Undo and Restore put a deleted image back under its own name, over
-    # whatever new image had been given it.
     places = _places(tmp_path)
     places.images.mkdir(parents=True)
     (places.images / "alpha_t2i_00041_.png").write_bytes(b"old")

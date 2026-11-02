@@ -14,7 +14,6 @@ from origenerator.db import Database
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
 
-# When each version of a workflow landed, as its file's history would say.
 LANDED = [(datetime(2026, 4, 1, tzinfo=UTC), "v002"),
           (datetime(2026, 6, 1, tzinfo=UTC), "v003")]
 
@@ -307,8 +306,6 @@ def test_a_workflows_history_is_the_history_of_the_file_that_declares_it(
     assert asked == [Path(inspect.getsourcefile(type(WORKFLOW_REGISTRY["sdxl_t2i"])))]
 
 
-# --- a workflow's history, read from git ---------------------------------------
-
 _IDENTITY = ("-c", "user.email=test@example.com", "-c", "user.name=Test")
 
 
@@ -375,6 +372,5 @@ def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(name
 
 
 def test_the_stamp_keeps_what_ran_under_the_keys_it_was_first_written_with():
-    # Every row's block, and every library video's sidecar, holds them already.
     assert (WORKFLOW, WORKFLOW_VERSION, BASIS) == (
         "recipe", "recipe_version", "recipe_version_basis")

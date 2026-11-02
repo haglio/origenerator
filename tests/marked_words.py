@@ -1,4 +1,3 @@
-"""The words a label is showing, read past a family mark it leads with."""
 from __future__ import annotations
 
 import html

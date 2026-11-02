@@ -1,11 +1,8 @@
 # ruff: noqa: PLC0415 -- inside the functions, so naming this module costs nothing
-"""Open the sorting window on every image nobody has said what it shows yet,
-on its own (:mod:`origenerator.own_window`), beside the app or without it."""
 from __future__ import annotations
 
 
 def _image_of(row: dict, places):
-    """The full-size still where it is on disk, else the stored thumbnail."""
     from origenerator import gallery
     from origenerator.media import MediaType
 
@@ -31,8 +28,6 @@ def waiting_images(db, places, first: str = "") -> list[dict]:
 
 
 def the_sorting_window(first: str = ""):
-    """The sorting window on *first* and then every image nobody has said an
-    action for, or the sentence to say instead when there is none left."""
     from origenerator.action_drawings import drawing_for
     from origenerator.config import DB_PATH, OUTPUT_PLACES
     from origenerator.db import Database

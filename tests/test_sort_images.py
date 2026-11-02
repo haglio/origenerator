@@ -1,7 +1,3 @@
-"""The images the sorting window walks, as it is handed them.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -38,8 +34,6 @@ def _a_finished_image(db, prompt_id: str, seed: int) -> None:
 
 
 def test_the_line_starts_with_the_image_it_was_opened_on(tmp_path):
-    """His words: it "should start with the current image, then go on to the usual
-    queue" -- so the one in front of him comes first even with an action already."""
     db = Database(tmp_path / "origenerator.db")
     _a_finished_image(db, "gen-one", 1)
     _a_finished_image(db, "gen-two", 2)

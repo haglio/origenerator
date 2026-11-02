@@ -1,32 +1,3 @@
-"""Re-derive missing base renders now, instead of waiting for absences.
-
-The app does this on its own: closing it hands ComfyUI a batch of re-renders to
-work through while nothing else wants the GPU, and the next launch folds them in
-(:mod:`origenerator.base_backfill`, which is where the whole of how and why
-lives). A few rows a night, no wait ever paid for them.
-
-This is the same work run to completion in one sitting, for when you would
-rather have the backlog gone than have it drain quietly. It is GPU-bound — one
-full render per row, at whatever step count that row recorded — so run it with
-the app closed and expect it to take as long as generating the images did.
-
-    python tools/backfill_base_renders.py                # what it would do
-    python tools/backfill_base_renders.py --apply        # do it
-    python tools/backfill_base_renders.py --apply --limit 5
-
-``--db`` points it at another checkout's database, because the rows that need
-this are the live install's and a worktree's copy is a throwaway.
-
-Interrupting is safe: each row is folded as it lands, and a re-run — or the next
-absence — picks up whatever is left.
-
-Nothing about a repair is decided here. Which rows need one, what settings
-reproduce it, how one is run and how the result is attached are all
-:mod:`origenerator.base_backfill`, so this cannot answer a question differently
-from the way the app answers it; what is here is the argument parsing and the
-report.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -48,7 +19,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description="Re-derive missing base renders now, instead of waiting for absences. GPU-bound: one full render per row, so run it with the app closed.")
     parser.add_argument("--apply", action="store_true",
                         help="actually run them; without this, only report")
     parser.add_argument("--limit", type=int, default=0,
@@ -89,8 +60,6 @@ def main(argv=None) -> int:
             print(" produced nothing")
             failed += 1
             continue
-        # Attached through the app's own path, so a row repaired from here is
-        # indistinguishable from one repaired during an absence.
         attach_base(db, row["prompt_id"], files)
         done += 1
         print(f" -> {files[0].get('filename')}")

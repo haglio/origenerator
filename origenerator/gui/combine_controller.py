@@ -24,7 +24,6 @@ from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.recent_videos import RecentVideo
-from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType, media_type_from_filename

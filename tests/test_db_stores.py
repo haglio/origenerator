@@ -1,17 +1,3 @@
-"""Each table's queries, reached without the other five.
-
-`Database` was one 626-line class over six unrelated tables, so a unit that
-touches one of them — trash_collection reads only `deletions`, reconcile only
-`folder_meta` and `custom_folder_items` — had to be handed the whole surface,
-and could be given no narrow fake. The queries live one table to a module now, and these are the tests
-that a store is a whole object on its own, and that the facade over them is
-exactly a facade.
-
-What each store *does* is covered where it always was, in tests/test_db.py,
-through the facade every call site still uses. This file covers the seam.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import ast
@@ -34,8 +20,6 @@ from origenerator.db_schema import GENERATION_COLUMNS
 from origenerator.db_seed_uses import SeedUseStore
 from origenerator.db_trash import TrashStore
 
-# The attribute each store hangs off `Database` under, and a read that proves it
-# is talking to its own table.
 STORES = {
     "generations": (GenerationStore, lambda s: s.list_generations()),
     "deletions": (TrashStore, lambda s: s.list_trashed()),
@@ -50,14 +34,12 @@ STORES = {
 
 @pytest.fixture
 def file(tmp_path) -> SqliteFile:
-    """The database file, made once — a store queries, it does not create."""
     path = tmp_path / "origenerator.db"
     Database(path)
     return SqliteFile(path)
 
 
 def _public_methods(cls) -> set[str]:
-    """What the class itself defines, not what it inherits."""
     return {name for name, value in vars(cls).items()
             if inspect.isfunction(value) and not name.startswith("_")}
 
@@ -77,20 +59,12 @@ def test_the_facade_holds_one_of_each(file, attribute):
 
 
 def test_the_facade_forwards_exactly_what_the_stores_offer():
-    """Held as an equality, and it is the gate on the whole split. Below it, a
-    query moved out and its name went with it — breaking the several hundred
-    call sites the split promised not to touch. Above it, a method was written
-    on the facade rather than on the table it queries, which is how the
-    626-line class happened in the first place."""
     offered = set().union(*(_public_methods(store) for store, _ in STORES.values()))
 
     assert _public_methods(Database) == offered
 
 
 def test_every_store_is_one(file):
-    """A store reads and writes through the file's `connect`. One that reached
-    for a second table's store, or kept a connection of its own, would make the
-    'hand a unit the store it needs' above a promise rather than a fact."""
     for attribute, (store_class, _) in STORES.items():
         store = store_class(file)
 
@@ -101,9 +75,6 @@ def test_every_store_is_one(file):
 
 
 class TestTrashStore:
-    """trash_collection.py and gallery_edits.py are its only readers, and neither has
-    any business with `generations` or the custom collections."""
-
     def test_what_it_records_it_can_read_back(self, file):
         row = {"prompt_id": "gen-alpha", "workflow_name": "sdxl_t2i",
                "output_files": "alpha_00001_.png"}
@@ -138,20 +109,10 @@ class TestItemNumberStore:
         assert numbers.list_item_numbers() == {"gen-alpha": ("image/sdxl_t2i/ba9876543210", 3)}
 
 
-# The writers that interpolate a column name into their statement, and which of
-# their positional arguments is one: `_set` and `_stamp` take a single column,
-# `_record_send` the pair of stamps it moves together.
 COLUMN_ARGUMENTS = {"_set": (1,), "_stamp": (1,), "_record_send": (1, 2)}
 
 
 def test_every_column_written_by_name_is_a_literal_column_of_the_table():
-    """The writers above interpolate a column name straight into their
-    statement, which is safe exactly as long as every one of them is a literal
-    written in that file and a column that exists. Read off the syntax tree
-    rather than left to care: a name reaching one of them from a caller's
-    string, or a column that has been renamed out of the schema, fails here —
-    before the statement, rather than as an OperationalError mid-write.
-    """
     source = (Path(origenerator.db_generations.__file__)).read_text(encoding="utf-8")
     written = [
         node.args[position]

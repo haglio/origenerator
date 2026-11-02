@@ -71,8 +71,6 @@ def test_a_generation_goes_in_with_the_provenance_its_launch_stamped(tmp_path):
 
 
 def test_settings_source_records_where_a_combine_got_its_settings(tmp_path):
-    # Nothing else on the row says it: the params carry the settings' values, never
-    # which video they came from or what the user called the action.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="rec-001", workflow_name="wan22_i2v", workflow_version="v001",
@@ -88,8 +86,6 @@ def test_settings_source_records_where_a_combine_got_its_settings(tmp_path):
 
 
 def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
-    # The run's params name the file it reads, and a file name can belong to
-    # more than one row; the stamp is the one thing on the run that names the row.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="enh-001", workflow_name="image_enhance", workflow_version="v001",
@@ -100,13 +96,11 @@ def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
     db.set_enhance_target("enh-001", "img-007")
     assert db.get_generation("enh-001")["enhance_of"] == "img-007"
 
-    db.set_enhance_target("enh-001", None)  # cleared, as an empty value would be
+    db.set_enhance_target("enh-001", None)
     assert db.get_generation("enh-001")["enhance_of"] is None
 
 
 def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
-    # A dropped video names no action, and an action the overlay pins settings for is
-    # answered from no past video.
     db = Database(tmp_path / "test.db")
     for pid in ("dropped", "curated"):
         db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
@@ -155,10 +149,6 @@ def test_update_generation(tmp_path):
 
 
 def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
-    """It writes a job's lifecycle. Everything else on the row is provenance
-    fixed at insert, or a user's own mark, and each of those has its own named
-    method -- so a key outside the set is a caller reaching for the wrong one.
-    It used to be dropped in silence, which made a typo a no-op with no error."""
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="upd-002",
@@ -175,9 +165,6 @@ def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
 
 
 def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
-    """Callers build the field dict conditionally -- an version removed
-    from a row that had none yields ``{}`` -- so an empty update is a normal
-    outcome rather than a mistake."""
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="upd-003",
@@ -207,12 +194,6 @@ def test_update_generation_stores_duration_seconds(tmp_path):
 
 
 def _database_as_first_written(db_path):
-    """A database with the two tables as this app first wrote them, before any
-    column was added to either — and one generation already in it.
-
-    Every column since is patched in by ``Database._migrate``, whose whole job is
-    that a user's own library, made against this schema, still opens.
-    """
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("
@@ -246,15 +227,11 @@ def _database_as_first_written(db_path):
 
 
 def _columns(db_path, table):
-    # closing(), not the bare `with`: sqlite3's context manager commits and leaves
-    # the connection open — the very thing origenerator.db._connect exists to fix.
+    # sqlite3's own context manager commits but leaves the connection open, so closing() is used.
     with closing(sqlite3.connect(db_path)) as conn:
         return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
-# Every column the two tables have grown since. Seven of these could be dropped
-# from the migration with the whole suite still green, and each one dropped is a
-# user's own library failing to open on the next launch.
 @pytest.mark.parametrize("column", [
     "duration_seconds", "evolver_exported_at", "genau_exported_at",
     "genau_requested_at", "progress_json", "starred", "experiment_verdict",
@@ -275,8 +252,6 @@ def test_an_early_database_gains_every_folder_meta_column(tmp_path, column):
 
 
 def test_the_generations_already_there_survive_the_migration(tmp_path):
-    # The point of patching columns in rather than recreating the table: what the
-    # user already made stays, and the new columns are writable on it.
     db = Database(_database_as_first_written(tmp_path / "old.db"))
 
     db.update_generation("old-001", duration_seconds=9.5)
@@ -294,19 +269,15 @@ def test_mark_evolver_exported_persists_across_reopen(tmp_path):
         params_json="{}",
         workflow_json="{}",
     )
-    # A never-sent video carries no export timestamp.
     assert db.get_generation("vid-001")["evolver_exported_at"] is None
 
     db.mark_evolver_exported("vid-001")
 
-    # Reopening the file (a fresh app session) must still remember the send.
     reopened = Database(db_path)
     assert reopened.get_generation("vid-001")["evolver_exported_at"] is not None
 
 
 def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
-    # The two stamps are one fact read from both sides: this app's button asks
-    # whether the video is out there, and Evolver asks whether to delete it.
     db_path = tmp_path / "test.db"
     db = Database(db_path)
     db.insert_generation(
@@ -321,13 +292,11 @@ def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
     db.mark_evolver_unsent("vid-002")
 
     row = Database(db_path).get_generation("vid-002")
-    assert row["evolver_exported_at"] is None       # no longer out there
-    assert row["evolver_unsent_at"] is not None     # and Evolver is to delete it
+    assert row["evolver_exported_at"] is None
+    assert row["evolver_unsent_at"] is not None
 
 
 def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
-    # Re-sending must retract the withdrawal in the same breath, or Evolver
-    # deletes the copy that was just handed to it.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="vid-003",
@@ -347,8 +316,6 @@ def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
 
 
 def test_taking_back_one_lane_leaves_the_other_send_standing(tmp_path):
-    # A video can be in both apps' hands; withdrawing it from one says nothing
-    # about the other.
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="clip-002",
@@ -371,7 +338,6 @@ def test_taking_back_one_lane_leaves_the_other_send_standing(tmp_path):
 
 def test_opening_db_without_evolver_column_migrates_it(tmp_path):
     db_path = tmp_path / "old.db"
-    # Faithful pre-evolver schema: the table as it was before this column.
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("
@@ -440,10 +406,9 @@ def test_favorite_generation_round_trips_across_reopen(tmp_path):
         prompt_id="s-001", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
     )
-    assert not db.get_generation("s-001")["starred"]  # unfavorited by default
+    assert not db.get_generation("s-001")["starred"]
 
     db.set_generation_favorite("s-001", True)
-    # Reopening the file (a fresh app session) still remembers the star.
     assert Database(db_path).get_generation("s-001")["starred"]
 
     db.set_generation_favorite("s-001", False)
@@ -452,7 +417,6 @@ def test_favorite_generation_round_trips_across_reopen(tmp_path):
 
 def test_opening_db_without_starred_column_migrates_it(tmp_path):
     db_path = tmp_path / "old.db"
-    # Faithful pre-favorited schema: the table as it was before this column.
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("
@@ -479,7 +443,7 @@ def test_opening_db_without_starred_column_migrates_it(tmp_path):
     conn.close()
 
     db = Database(db_path)
-    assert not db.get_generation("old-001")["starred"]  # migrated in, defaulting off
+    assert not db.get_generation("old-001")["starred"]
     db.set_generation_favorite("old-001", True)
     assert db.get_generation("old-001")["starred"]
 
@@ -498,9 +462,8 @@ def _add_completed(db, prompt_id, workflow_name, duration):
 def test_recent_durations_filters_by_workflow_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     _add_completed(db, "a", "sdxl_t2i", 10.0)
-    _add_completed(db, "b", "wan22_i2v", 900.0)   # different workflow, excluded
+    _add_completed(db, "b", "wan22_i2v", 900.0)
     _add_completed(db, "c", "sdxl_t2i", 12.0)
-    # A still-running sdxl row has no duration and must be excluded.
     db.insert_generation(
         prompt_id="d", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
@@ -518,14 +481,11 @@ def test_recent_durations_respects_limit(tmp_path):
 
 def test_completed_without_duration_selects_backfill_candidates(tmp_path):
     db = Database(tmp_path / "test.db")
-    # Needs a duration: completed, has a completed_at, duration still NULL.
     db.insert_generation(prompt_id="needs", workflow_name="sdxl_t2i",
                          workflow_version="imported", params_json="{}",
                          workflow_json="{}", source="imported")
     db.update_generation("needs", status="completed", completed_at="2026-06-29T12:00:00+00:00")
-    # Already timed — excluded.
     _add_completed(db, "timed", "sdxl_t2i", 5.0)
-    # Still running — excluded.
     db.insert_generation(prompt_id="running", workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json="{}", workflow_json="{}")
 
@@ -547,7 +507,7 @@ def test_favorite_folder_round_trips_and_preserves_custom_name(tmp_path):
 
     meta = db.folder_meta_map()["image/sdxl_t2i"]
     assert meta["starred"] is True
-    assert meta["custom_name"] == "Portraits"  # favoriting must not wipe the name
+    assert meta["custom_name"] == "Portraits"
 
     db.set_folder_favorite("image/sdxl_t2i", False)
     assert db.folder_meta_map()["image/sdxl_t2i"]["starred"] is False
@@ -564,8 +524,6 @@ def test_folder_meta_full_reports_identity_columns(tmp_path):
 
 
 def test_a_favorite_set_through_the_plain_api_has_null_identity(tmp_path):
-    # The view stars by key alone; a favorite's identity (tier + a row under it)
-    # stays NULL until the reconcile backfills it, so folder_meta_full surfaces that.
     db = Database(tmp_path / "test.db")
     db.set_folder_favorite("image/sdxl_t2i", True)
     (row,) = db.folder_meta_full()
@@ -646,8 +604,6 @@ def test_a_change_to_a_listed_row_is_listed_at_once(tmp_path):
 
 
 def test_the_library_is_read_once_while_nothing_changes(tmp_path, monkeypatch):
-    """Restoring twenty open tabs at launch listed the library 187 times, each a
-    full read of every row, and left the loading window not responding."""
     db = Database(tmp_path / "test.db")
     _add_listed(db, "listed-1")
     statements: list[str] = []
@@ -675,7 +631,6 @@ def test_each_listing_hands_out_rows_of_its_own(tmp_path):
 
 def test_opening_db_without_experiment_verdict_column_migrates_it(tmp_path):
     db_path = tmp_path / "old.db"
-    # Faithful pre-experiment schema: the table as it was before this column.
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("
@@ -737,12 +692,8 @@ def test_delete_generation_removes_row(tmp_path):
 
 
 def test_the_highest_id_issued_counts_the_rows_that_have_been_and_gone(tmp_path):
-    """`max(id)` answers what is still here, and an enhancement's row is deleted
-    the moment it folds — so the id it ran under, which its level records, is
-    routinely one no longer in the table. The high-water mark is what says
-    whether such an id was ever this table's to give."""
     db = Database(tmp_path / "test.db")
-    assert db.highest_id_issued() == 0  # a table that has issued nothing
+    assert db.highest_id_issued() == 0
     for i in range(3):
         db.insert_generation(
             prompt_id=f"h-{i}", workflow_name="sdxl_t2i", workflow_version="v002",
@@ -773,8 +724,6 @@ def test_restore_generation_brings_back_a_deleted_row_intact(tmp_path):
     db.restore_generation(original)
 
     restored = db.get_generation("r-001")
-    # Every column survives the round-trip, id and created_at included, so the
-    # restored row sorts back into its original gallery position.
     assert restored == original
 
 
@@ -789,7 +738,6 @@ def test_restore_generation_preserves_newest_first_order(tmp_path):
     db.delete_generation("o-1")
     db.restore_generation(middle)
 
-    # Restored by its original id, the row lands back in the middle, not on top.
     assert [r["prompt_id"] for r in db.list_generations()] == ["o-2", "o-1", "o-0"]
 
 
@@ -812,8 +760,6 @@ def _as_read_before_the_rename(row: dict) -> dict:
 
 def test_a_trashed_item_held_since_before_two_columns_were_renamed_comes_back_under_the_new_names(
         tmp_path):
-    # A trashed item keeps its row as it was read then, and until the code
-    # called them action and source_video, rows were read under their stored names.
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="c-001", workflow_name="wan22_i2v", workflow_version="v001",
                          params_json="{}", workflow_json="{}")
@@ -842,8 +788,6 @@ def test_a_trashed_item_held_since_before_the_image_state_was_renamed_comes_back
     assert db.get_generation("pic-001")["image_state"] == "state two"
 
 
-# --- the Trash (trashed items) -------------------------------------
-
 
 def test_a_recorded_trashed_item_comes_back_as_data(tmp_path):
     db = Database(tmp_path / "test.db")
@@ -854,9 +798,9 @@ def test_a_recorded_trashed_item_comes_back_as_data(tmp_path):
 
     held = db.get_trashed("d-1")
     assert held["prompt_id"] == "d-1"
-    assert held["row"] == row       # JSON columns arrive parsed, not as strings
+    assert held["row"] == row
     assert held["batch"] == batch
-    assert held["deleted_at"]       # stamped, so the sweep can age it out
+    assert held["deleted_at"]
 
 
 def test_trashed_items_list_newest_first(tmp_path):
@@ -864,12 +808,10 @@ def test_trashed_items_list_newest_first(tmp_path):
     for prompt_id in ("d-1", "d-2", "d-3"):
         db.record_trashed(prompt_id, {"prompt_id": prompt_id}, {})
 
-    # Same-second stamps tie, so the insertion order is what breaks it.
     assert [r["prompt_id"] for r in db.list_trashed()] == ["d-3", "d-2", "d-1"]
 
 
 def test_re_deleting_an_item_restarts_its_window(tmp_path):
-    # Deleted, restored, deleted again: one record, held from the latest delete.
     db = Database(tmp_path / "test.db")
     db.record_trashed("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "first"})
     db.record_trashed("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "second"})
@@ -891,7 +833,7 @@ def test_forgetting_a_trashed_item_drops_it_from_the_trash(tmp_path):
 def test_an_unheld_trashed_item_is_simply_absent(tmp_path):
     db = Database(tmp_path / "test.db")
     assert db.get_trashed("never") is None
-    db.forget_trashed("never")  # must not raise
+    db.forget_trashed("never")
 
 
 def _held_in_the_trash(db, tmp_path, prompt_id: str, original: Path) -> Path:
@@ -919,8 +861,6 @@ def test_a_file_gone_from_the_trash_is_not_found_there(tmp_path):
 
     assert db.trashed_file(original) is None
 
-
-# --- spoken requests, and the folder-wide one typed on a tab -----------------
 
 
 def _record(db, prompt_id, source="src-1", heard="Request, no hat, over."):
@@ -976,8 +916,6 @@ def test_a_generation_nothing_asked_for_has_no_request(tmp_path):
 
 
 def test_a_request_outlives_the_generation_it_queued(tmp_path):
-    # A delete here is undoable, so the record has to be waiting if the item
-    # comes back; the collection skips what it can't resolve instead.
     db = Database(tmp_path / "test.db")
     _record(db, "gen-1")
 
@@ -998,19 +936,17 @@ def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
     assert row["genau_requested_at"] is None
     assert row["genau_exported_at"] is None
 
-    db.mark_genau_requested("clip-001")   # a spoken animation started this run
-    db.mark_genau_exported("clip-001")    # and it was handed on once it existed
+    db.mark_genau_requested("clip-001")
+    db.mark_genau_exported("clip-001")
 
     reopened = Database(db_path).get_generation("clip-001")
     assert reopened["genau_requested_at"] is not None
     assert reopened["genau_exported_at"] is not None
-    # The two lanes are separate errands: sending down one says nothing about the other.
     assert reopened["evolver_exported_at"] is None
 
 
 def test_opening_db_without_the_genau_columns_migrates_them(tmp_path):
     db_path = tmp_path / "old.db"
-    # The schema as it stood when Evolver was the only place a video could be sent.
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("

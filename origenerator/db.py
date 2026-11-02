@@ -1,21 +1,3 @@
-"""The app's database: every table of it, under one object.
-
-`Database` is a facade. Each table's queries live in their own module —
-:mod:`origenerator.db_generations`, :mod:`~origenerator.db_trash`,
-:mod:`~origenerator.db_requests`, :mod:`~origenerator.db_folder_meta`,
-:mod:`~origenerator.db_custom_collections` — and this holds one of each, forwarding the method names ~700 call sites across
-this package, the gui package and the suite already spell.
-
-**Hand a unit the store it needs, not this.** Every consumer here uses a
-disjoint slice: trash_collection and gallery_edits touch only `deletions`, reconcile
-only `folder_meta` and `custom_folder_items`. A store is whole on its own, so a unit that
-takes one can be given a narrow fake and a change to one table stops being a
-change to the file 24 modules import.
-
-The schema is :mod:`origenerator.db_schema` and the connection policy
-:mod:`origenerator.db_connection`; tests/test_db_schema.py holds the file on disk
-as a snapshot, because evolver reads it.
-"""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -36,8 +18,6 @@ from origenerator.generation_state import GenerationSource
 
 
 class Database:
-    """One store per table, and the method names that predate the split."""
-
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,8 +33,6 @@ class Database:
         self.folder_meta = FolderMetaStore(file)
         self.custom_collections = CustomCollectionStore(file)
         self.item_numbers = ItemNumberStore(file)
-
-    # --- generations (see origenerator.db_generations) -----------------------
 
     def insert_generation(self, *, prompt_id: str, workflow_name: str,
                           workflow_version: str, positive_prompt: str | None = None,
@@ -191,8 +169,6 @@ class Database:
     def list_seed_uses(self) -> list[dict]:
         return self.seed_uses.list_seed_uses()
 
-    # --- what Combine's drop zone was given (see origenerator.db_combine_video_uses) -
-
     def record_combine_video_use(self, intent: str, video_prompt_id: str,
                                  generation_prompt_id: str | None = None) -> None:
         return self.combine_video_uses.record_combine_video_use(
@@ -204,7 +180,6 @@ class Database:
     def list_combine_video_uses(self) -> list[dict]:
         return self.combine_video_uses.list_combine_video_uses()
 
-    # --- the Trash (see origenerator.db_trash) --------------------
 
     def record_trashed(self, prompt_id: str, row: dict, batch: dict, *,
                         deleted_at: str | None = None):
@@ -225,8 +200,6 @@ class Database:
     def trashed_library_paths(self) -> set[str]:
         return self.deletions.trashed_library_paths()
 
-    # --- item numbers (see origenerator.db_item_numbers) ---------------------
-
     def list_item_numbers(self) -> dict[str, tuple[str, int]]:
         return self.item_numbers.list_item_numbers()
 
@@ -235,8 +208,6 @@ class Database:
 
     def forget_item_numbers(self, prompt_ids: list[str]):
         return self.item_numbers.forget_item_numbers(prompt_ids)
-
-    # --- spoken requests (see origenerator.db_requests) ----------------------
 
     def record_request(self, *, prompt_id: str, source_prompt_id: str, heard: str,
                        term: str | None = None, polarity: str | None = None,
@@ -259,8 +230,6 @@ class Database:
         return self.requests.get_request(prompt_id)
 
 
-    # --- folder metadata (see origenerator.db_folder_meta) ------------------
-
     def folder_meta_map(self) -> dict[str, dict]:
         return self.folder_meta.folder_meta_map()
 
@@ -279,8 +248,6 @@ class Database:
     def delete_folder_meta(self, folder_key: str):
         return self.folder_meta.delete_folder_meta(folder_key)
 
-
-    # --- custom collections (see origenerator.db_custom_collections) ----------------
 
     def create_custom_collection(self, name: str, folder_id: int | None = None,
                              shape: str | None = None) -> int:

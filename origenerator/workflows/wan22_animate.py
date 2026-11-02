@@ -124,7 +124,8 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
         sized = self.image_size_nodes(["13", 0], params)
         width, height = sized.width, sized.height
 
-        def segment(index, scene, start, length, last, previous=None):
+        def segment(at):
+            index, _scene, start, length, _last, _previous = at
             animate_id, sample_id, trim_id, decode_id = (
                 ("19", "20", "21", "22") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("animate", "sample", "trim", "decode")))

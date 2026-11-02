@@ -67,7 +67,7 @@ from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
-from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
+from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
@@ -2046,8 +2046,8 @@ def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, mo
     file.parent.mkdir(parents=True)
     file.write_bytes(b"not really a video")
     db.insert_rows(rows_bringing_in(
-        OutsideVideo(file, "a-site"), Record(), frames_dir=tmp_path / "frames",
-        thumb_dir=tmp_path / "thumbs", grab=lambda _path: Image.new("RGB", (64, 96))))
+        OutsideVideo(file, "a-site"), Record(), FrameFolders(tmp_path / "frames", tmp_path / "thumbs"),
+        grab=lambda _path: Image.new("RGB", (64, 96))))
     [video] = [row for row in db.list_generations()
                if gallery_media_type(row) == MediaType.VIDEO]
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (file, "video"))

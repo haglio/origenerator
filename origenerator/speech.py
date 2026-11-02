@@ -17,6 +17,7 @@ PRESET_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 CLONE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 # Under ComfyUI's input folder, which is where its LoadAudio reads from.
 SPEECH_DIR = "origenerator_speech"
+SPEECH_DEVICE = "cuda"
 WORKER = Path(__file__).resolve().parents[1] / "tools" / "speech_worker.py"
 SPEECH_VERSION = 2
 # Windows flashes a console window for a bare subprocess.
@@ -75,8 +76,7 @@ def missing_speech(params: dict, input_dir: Path) -> list[SceneSpeech]:
 
 
 def ensure_speech_files(params: dict, *, input_dir: Path, python: Path | None,
-                        worker: Path | None = None, run=subprocess.run,
-                        device: str = "cuda") -> list[Path]:
+                        worker: Path | None = None, run=subprocess.run) -> list[Path]:
     worker = worker or WORKER
     missing = missing_speech(params, input_dir)
     if not missing:
@@ -93,7 +93,7 @@ def ensure_speech_files(params: dict, *, input_dir: Path, python: Path | None,
     speech_dir = input_dir / SPEECH_DIR
     speech_dir.mkdir(parents=True, exist_ok=True)
     job = {
-        "device": device,
+        "device": SPEECH_DEVICE,
         "seed": int(params.get("audio_seed") or 0),
         "voice": voice,
         "models": {"preset": PRESET_MODEL, "clone": CLONE_MODEL},

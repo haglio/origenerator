@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
@@ -46,28 +47,45 @@ RESET_TOOLTIPS = {
 }
 
 
-def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool = False,
-                   enhanced: bool = False, order: str = "", hosted: bool = False,
-                   own_window: bool = True, has_other_versions: bool = False,
-                   clip_seconds: int | None = None, longer_than_a_step: bool = False,
-                   image: bool = False, has_funscript: bool = False, has_osr2: bool = False,
-                   nothing_to_reset: bool = False) -> tuple[tuple[Button, ...], ...]:
-    mode_row = hosted and own_window
+@dataclass(frozen=True, kw_only=True)
+class SlideshowFacts:
+    locked: bool = False
+    favorites_filter: bool = False
+    enhanced: bool = False
+    order: str = ""
+    hosted: bool = False
+    own_window: bool = True
+    has_other_versions: bool = False
+    clip_seconds: int | None = None
+    longer_than_a_step: bool = False
+    image: bool = False
+    has_funscript: bool = False
+    has_osr2: bool = False
+    nothing_to_reset: bool = False
+
+
+def slideshow_rows(shape: str,
+                   facts: SlideshowFacts | None = None) -> tuple[tuple[Button, ...], ...]:
+    facts = facts or SlideshowFacts()
+    mode_row = facts.hosted and facts.own_window
     row = (
-        *transport(shape, noun=SLIDE, longer_than_a_step=longer_than_a_step, image=image),
-        funscript_jump_button(f"{shape}_funscript_jump", noun=SLIDE, has_osr2=has_osr2,
-                              has_funscript=has_funscript),
-        lock_button(shape, locked=locked, tooltip=lock_tooltip(locked, SLIDE)),
+        *transport(shape, noun=SLIDE, longer_than_a_step=facts.longer_than_a_step,
+                   image=facts.image),
+        funscript_jump_button(f"{shape}_funscript_jump", noun=SLIDE, has_osr2=facts.has_osr2,
+                              has_funscript=facts.has_funscript),
+        lock_button(shape, locked=facts.locked, tooltip=lock_tooltip(facts.locked, SLIDE)),
         trash_button(shape),
-        fmode_button(shape, favorites_only_tooltip(), lit=favorites_filter),
-        Button(f"{shape}_enhanced", ENHANCED_ICON, ENHANCED_TOOLTIP, lit=enhanced, enhanced=True,
-               group_break=True),
-        reset_button(shape, nothing_to_reset=nothing_to_reset, tooltip=RESET_TOOLTIPS[hosted],
-                     group_break=False),
-        *browse_order_buttons(shape, latest=order == LATEST_LABEL),
-        versions_button(f"{shape}_cycle_version", noun=SLIDE, has_other_versions=has_other_versions),
+        fmode_button(shape, favorites_only_tooltip(), lit=facts.favorites_filter),
+        Button(f"{shape}_enhanced", ENHANCED_ICON, ENHANCED_TOOLTIP, lit=facts.enhanced,
+               enhanced=True, group_break=True),
+        reset_button(shape, nothing_to_reset=facts.nothing_to_reset,
+                     tooltip=RESET_TOOLTIPS[facts.hosted], group_break=False),
+        *browse_order_buttons(shape, latest=facts.order == LATEST_LABEL),
+        versions_button(f"{shape}_cycle_version", noun=SLIDE,
+                        has_other_versions=facts.has_other_versions),
     )
-    pace = () if clip_seconds is None else (clip_seconds_row(shape, clip_seconds),)
+    pace = (() if facts.clip_seconds is None
+            else (clip_seconds_row(shape, facts.clip_seconds),))
     return (_mode_row(), row, *pace) if mode_row else (row, *pace)
 
 

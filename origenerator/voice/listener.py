@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import NamedTuple
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -10,17 +11,23 @@ from origenerator.voice.hearing import Hearing
 logger = logging.getLogger(__name__)
 
 
+class Phrases(NamedTuple):
+    heard: object = ()
+    never_repaired: object = ()
+    said_in: object = None
+
+
 class CommandAndRequestListener(QObject):
     error = pyqtSignal(str)
     heard = pyqtSignal(str)
     request = pyqtSignal(object)
 
     def __init__(self, *, hearing=None, command_matcher=None, bare_matcher=None,
-                 dictation=None, phrases=(), never_repaired=(), said_in=None,
-                 parent=None):
-        super().__init__(parent)
+                 dictation=None, phrases: Phrases | None = None):
+        super().__init__()
+        phrases = phrases or Phrases()
         self._hearing = hearing if hearing is not None else Hearing(
-            phrases, never_repaired=never_repaired, said_in=said_in)
+            phrases.heard, never_repaired=phrases.never_repaired, said_in=phrases.said_in)
         self._matcher = command_matcher
         self._bare_matcher = bare_matcher
         self._execute_command = None

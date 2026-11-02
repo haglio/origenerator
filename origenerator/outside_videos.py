@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 from app_support import favorites, haglio_settings
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
@@ -194,9 +195,9 @@ _THE_IMAGE_AND_THE_VIDEO = 2
 def _brought_in(video: OutsideVideo, record: Record, places: Places, images: dict, grab_and_kinds: tuple) -> list[dict]:
     grab, kinds = grab_and_kinds
     image = _image_of(video.source, record)
-    made = rows_bringing_in(video, record, frames_dir=places.frames_dir,
-                            thumb_dir=places.thumb_dir, grab=grab, image=images.get(image),
-                            kind=_named_kind(record, kinds[video.source]))
+    made = rows_bringing_in(video, record, FrameFolders(places.frames_dir, places.thumb_dir),
+                            grab=grab,
+                            lent=Lent(images.get(image), _named_kind(record, kinds[video.source])))
     if image is not None and image not in images and len(made) == _THE_IMAGE_AND_THE_VIDEO:
         images[image] = made[0]
     return made
@@ -375,9 +376,20 @@ def _acted_here(said: list[dict]) -> dict[str, tuple[float, str]]:
     return {event["path"]: (event["t"] / 1000, str(event.get("action") or "")) for event in picks}
 
 
-def rows_bringing_in(video: OutsideVideo, record: Record, *, frames_dir: Path, thumb_dir: Path,
-                     grab=first_frame_of, image: dict | None = None,
-                     kind: VideoKind | None = None) -> list[dict]:
+class FrameFolders(NamedTuple):
+    frames_dir: Path
+    thumb_dir: Path
+
+
+class Lent(NamedTuple):
+    image: dict | None = None
+    kind: VideoKind | None = None
+
+
+def rows_bringing_in(video: OutsideVideo, record: Record, folders: FrameFolders, *,
+                     grab=first_frame_of, lent: Lent | None = None) -> list[dict]:
+    frames_dir, thumb_dir = folders
+    image, kind = lent or Lent()
     frame = grab(video.path)
     if frame is None:
         return []

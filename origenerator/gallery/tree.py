@@ -332,34 +332,43 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
     return groups
 
 
-def _grouped_folders(tier: _Tier, rows, *, signature, key_for, label_for, children_for, cls):
+@dataclass(frozen=True)
+class _Level:
+    cls: type
+    signature: Callable
+    key_for: Callable
+    label_for: Callable
+    children_for: Callable
+
+
+def _grouped_folders(tier: _Tier, rows, level: _Level):
     groups = []
-    for sig, sub_rows in _group_by_creation(rows, signature):
-        key = key_for(sig)
+    for sig, sub_rows in _group_by_creation(rows, level.signature):
+        key = level.key_for(sig)
         params = parse_params(sub_rows[0].get("params_json"))
-        label, favorite = _overlay(label_for(params), key, tier.folder_meta)
-        groups.append(cls(key, label, children_for(sub_rows), favorite))
+        label, favorite = _overlay(level.label_for(params), key, tier.folder_meta)
+        groups.append(level.cls(key, label, level.children_for(sub_rows), favorite))
     return groups
 
 
 def _build_model_groups(tier: _Tier, rows: list[dict]) -> list[ModelGroup]:
-    return _grouped_folders(
-        tier, rows, cls=ModelGroup,
+    return _grouped_folders(tier, rows, _Level(
+        cls=ModelGroup,
         signature=lambda r: model_signature(tier.workflow_name, r.get("params_json")),
         key_for=lambda sig: model_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: model_label(tier.workflow_name, params),
         children_for=lambda sub: _build_lora_groups(tier, sub),
-    )
+    ))
 
 
 def _build_lora_groups(tier: _Tier, rows: list[dict]) -> list[LoraGroup]:
-    return _grouped_folders(
-        tier, rows, cls=LoraGroup,
+    return _grouped_folders(tier, rows, _Level(
+        cls=LoraGroup,
         signature=lambda r: _lora_place(tier.workflow_name, r.get("params_json")),
         key_for=lambda sig: lora_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: lora_label(tier.workflow_name, params),
         children_for=lambda sub: _build_leaves(tier, sub),
-    )
+    ))
 
 
 def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
@@ -369,14 +378,14 @@ def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
 
 
 def _build_source_image_groups(tier: _Tier, rows: list[dict]) -> list[SourceImageGroup]:
-    return _grouped_folders(
-        tier, rows, cls=SourceImageGroup,
+    return _grouped_folders(tier, rows, _Level(
+        cls=SourceImageGroup,
         signature=lambda r: _source_image_place(tier.workflow_name, r.get("params_json"),
                                                 tier.image_index),
         key_for=lambda sig: source_image_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: _source_image_label(params, tier.image_index, tier.name_of),
         children_for=lambda sub: _build_settings_groups(tier, sub),
-    )
+    ))
 
 
 def placeable_rows(rows: list[dict]) -> list[dict]:

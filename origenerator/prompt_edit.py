@@ -5,6 +5,7 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import partial
+from typing import NamedTuple
 
 from origenerator import local_llm
 from origenerator.box_breaks import unboxed
@@ -312,14 +313,20 @@ def _revised(prompts: tuple[str, str], request: str, parsed: tuple, match, rewri
     return rewritten() or made(_plus(positive, term), negative, ADDED)
 
 
+class Asking(NamedTuple):
+    base_url: str
+    model: str
+    system_prompt: str
+
+
 def work_out(positive: str, negative: str, request: str, *,
              in_scenes: bool = False) -> PromptRevision | None:
     return request_applier(in_scenes)(
         positive, negative, request,
-        match=partial(smart_match, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                      system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
-        rewrite=partial(rewrite_prompt, base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                        system_prompt=REQUEST_REWRITE_SYSTEM_PROMPT))
+        match=partial(smart_match, asking=Asking(LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL,
+                                                 VOICE_REQUEST_MATCH_SYSTEM_PROMPT)),
+        rewrite=partial(rewrite_prompt, asking=Asking(LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL,
+                                                      REQUEST_REWRITE_SYSTEM_PROMPT)))
 
 
 
@@ -347,14 +354,15 @@ def parse_match(data: dict, count: int) -> int | None:
     return choice
 
 
-def smart_match(terms: list[str], term: str, *, base_url: str, model: str,
-                system_prompt: str, timeout: float = 20.0) -> int | None:
+def smart_match(terms: list[str], term: str, asking: Asking, *,
+                timeout: float = 20.0) -> int | None:
     if not terms:
         return None
     try:
         chosen = parse_match(local_llm.ask_json(
-            build_match_messages(terms, term, system_prompt),
-            base_url=base_url, model=model, temperature=0.1, timeout=timeout), len(terms))
+            build_match_messages(terms, term, asking.system_prompt),
+            base_url=asking.base_url, model=asking.model, temperature=0.1, timeout=timeout),
+            len(terms))
     except Exception as exc:
         logger.warning("prompt_edit: could not match the request against the "
                        "prompt's %d terms (%s)", len(terms), exc)
@@ -381,11 +389,11 @@ def build_rewrite_messages(positive: str, negative: str, instruction: str,
     ]
 
 
-def rewrite_prompt(positive: str, negative: str, instruction: str, *, base_url: str,
-                   model: str, system_prompt: str, timeout: float = 30.0):
+def rewrite_prompt(positive: str, negative: str, instruction: str, asking: Asking, *,
+                   timeout: float = 30.0):
     obj = local_llm.answer_of(local_llm.ask_json(
-        build_rewrite_messages(positive, negative, instruction, system_prompt),
-        base_url=base_url, model=model, temperature=0.4, timeout=timeout))
+        build_rewrite_messages(positive, negative, instruction, asking.system_prompt),
+        base_url=asking.base_url, model=asking.model, temperature=0.4, timeout=timeout))
     new_positive = str(obj["positive"]).strip() if "positive" in obj else positive
     new_negative = str(obj["negative"]).strip() if "negative" in obj else negative
     return new_positive, new_negative

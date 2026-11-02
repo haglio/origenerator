@@ -22,7 +22,7 @@ from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
-from origenerator.outside_videos import OutsideVideo, Record, rows_bringing_in
+from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
 from tests.thumbnail_rows import square
 
 IMAGE_WORKFLOW = "sdxl_t2i"
@@ -329,8 +329,8 @@ def test_a_video_made_from_words_alone_lends_the_image_slot_its_starting_frame(c
     file.parent.mkdir(parents=True)
     file.write_bytes(b"not really a video")
     db.insert_rows(rows_bringing_in(
-        OutsideVideo(file, "a-site"), Record(), frames_dir=tmp_path / "frames",
-        thumb_dir=tmp_path / "thumbs", grab=lambda _path: Image.new("RGB", (64, 96))))
+        OutsideVideo(file, "a-site"), Record(), FrameFolders(tmp_path / "frames", tmp_path / "thumbs"),
+        grab=lambda _path: Image.new("RGB", (64, 96))))
     rows = db.list_generations()
     [shown] = [row for row in rows if gallery.media_type_of_row(row) == MediaType.VIDEO]
     controller, _host = combine(

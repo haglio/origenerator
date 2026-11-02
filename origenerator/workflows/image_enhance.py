@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate, prompt_conditioning
 from origenerator.workflows.derived_size import measure_image_size, override_size
@@ -7,6 +9,7 @@ from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
+from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import CLIP
 
 ENHANCE_MODEL_FAMILIES = (SDXL,)
@@ -72,16 +75,10 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         return round(size[0] * scale), round(size[1] * scale)
 
     def build_api_payload(self, params: dict) -> dict:
-        enhanced = self.enhance_image_nodes(
-            image_ref=["1", 0], model_ref=["2", 0],
-            positive_ref=["3", 0], negative_ref=["4", 0], vae_ref=["5", 0],
-            params=params, rescale_to=override_size(params),
-        )
-        detail, saved_ref = self.detail_fix_nodes(
-            image_ref=enhanced.image, model_ref=["2", 0], clip_ref=["2", 1],
-            vae_ref=["5", 0], positive_ref=["3", 0], negative_ref=["4", 0],
-            params=params,
-        )
+        refs = NodeRefs(image=["1", 0], model=["2", 0], positive=["3", 0],
+                        negative=["4", 0], vae=["5", 0], clip=["2", 1])
+        enhanced = self.enhance_image_nodes(refs, params, rescale_to=override_size(params))
+        detail, saved_ref = self.detail_fix_nodes(replace(refs, image=enhanced.image), params)
         return {
             "1": {
                 "class_type": "LoadImage",

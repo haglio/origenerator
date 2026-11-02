@@ -5,7 +5,7 @@ from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.slideshow_set import thumb_of
-from origenerator.slideshow_buttons import slideshow_rows
+from origenerator.slideshow_buttons import SlideshowFacts, slideshow_rows
 
 THE_SLIDESHOWS_OWN = frozenset({
     "fmode", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",
@@ -43,13 +43,12 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
                         filters=(action_filter,)),
         is_favorite=slideshow.hud_is_favorite,
         item_note=slideshow.hud_item_note,
-        rows=slideshow_rows(shape, locked=locked, favorites_filter=favorites_filter,
-                            enhanced=enhanced, order=order_label, hosted=hosted,
-                            own_window=own_window,
-                            has_other_versions=slideshow.has_other_versions,
-                            clip_seconds=slideshow.dwell_s,
-                            has_osr2=device is not None or slideshow.transport.has_osr2,
-                            **slideshow.transport.row_facts()),
+        rows=slideshow_rows(shape, SlideshowFacts(
+            locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,
+            order=order_label, hosted=hosted, own_window=own_window,
+            has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
+            has_osr2=device is not None or slideshow.transport.has_osr2,
+            **slideshow.transport.row_facts())),
         osr2_rows=device.osr2_rows if device is not None else (),
         osr2_controls=device.osr2_controls if device is not None else (),
         osr2=device.osr2 if device is not None else "",

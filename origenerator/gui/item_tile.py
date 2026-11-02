@@ -279,9 +279,9 @@ class ItemTile(QWidget):
         return self._corner_buttons + self._controls.buttons()
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.Leave and obj in self._hover_buttons():
-            if not self._cursor_over_tile():
-                self._set_corner_buttons_visible(False)
+        if (event.type() == QEvent.Type.Leave and obj in self._hover_buttons()
+                and not self._cursor_over_tile()):
+            self._set_corner_buttons_visible(False)
         return super().eventFilter(obj, event)
 
     def enterEvent(self, event):

@@ -18,7 +18,7 @@ def test_nothing_is_accepted_before_anything_has_been(held):
 
 def test_an_accepted_animation_reads_back_as_settings(held):
     animation_settings.remember(VIDEO, "alpha", "state one",
-                                workflow="wan22_i2v", params={"steps": 8}, path=held)
+                                animation_settings.Setting("wan22_i2v", {"steps": 8}), path=held)
 
     assert animation_settings.settings_for(VIDEO, "alpha", "state one", path=held) == {
         "workflow": "wan22_i2v", "params": {"steps": 8}}
@@ -27,7 +27,7 @@ def test_an_accepted_animation_reads_back_as_settings(held):
 
 def test_the_same_action_in_another_state_or_lane_is_another_animation(held):
     animation_settings.remember(VIDEO, "alpha", "state one",
-                                workflow="wan22_i2v", params={"steps": 8}, path=held)
+                                animation_settings.Setting("wan22_i2v", {"steps": 8}), path=held)
 
     assert animation_settings.settings_for(VIDEO, "alpha", "state two", path=held) is None
     assert animation_settings.settings_for(GENAU, "alpha", "state one", path=held) is None
@@ -35,9 +35,9 @@ def test_the_same_action_in_another_state_or_lane_is_another_animation(held):
 
 def test_accepting_again_replaces_what_the_animation_had(held):
     animation_settings.remember(VIDEO, "alpha", "state one",
-                                workflow="wan22_i2v", params={"steps": 8}, path=held)
+                                animation_settings.Setting("wan22_i2v", {"steps": 8}), path=held)
     animation_settings.remember(VIDEO, "alpha", "state one",
-                                workflow="wan22_i2v", params={"steps": 20}, path=held)
+                                animation_settings.Setting("wan22_i2v", {"steps": 20}), path=held)
 
     assert animation_settings.settings_for(
         VIDEO, "alpha", "state one", path=held)["params"] == {"steps": 20}
@@ -46,7 +46,7 @@ def test_accepting_again_replaces_what_the_animation_had(held):
 def test_taking_an_animation_back_leaves_the_rest_alone(held):
     for state in ("state one", "state two"):
         animation_settings.remember(VIDEO, "alpha", state,
-                                    workflow="wan22_i2v", params={}, path=held)
+                                    animation_settings.Setting("wan22_i2v", {}), path=held)
 
     animation_settings.forget(VIDEO, "alpha", "state one", path=held)
 
@@ -75,15 +75,14 @@ def test_a_file_that_will_not_parse_starts_empty_rather_than_refusing_to_open(he
 
 def test_a_reader_never_meets_a_half_written_file(held):
     animation_settings.remember(VIDEO, "alpha", "state one",
-                                workflow="wan22_i2v", params={}, path=held)
+                                animation_settings.Setting("wan22_i2v", {}), path=held)
 
     assert held.is_file()
     assert not held.with_suffix(".partial.json").exists()
 
 
 def test_an_animation_answered_by_prompts_alone_is_still_answered(held):
-    animation_settings.remember(VIDEO, "alpha", "state one", workflow="",
-                                params={"positive_prompt": "a scene"}, path=held)
+    animation_settings.remember(VIDEO, "alpha", "state one", animation_settings.Setting("", {"positive_prompt": "a scene"}), path=held)
 
     assert animation_settings.settings_for(VIDEO, "alpha", "state one", path=held) == {
         "workflow": "", "params": {"positive_prompt": "a scene"}}

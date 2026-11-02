@@ -4,7 +4,8 @@ import logging
 import os
 import sys
 import time
-from pathlib import Path
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 
@@ -22,7 +23,7 @@ from origenerator.config import (
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.inflight import take_in_what_landed
-from origenerator.output_places import OutputPlaces
+from origenerator.output_places import OutputFolders
 from origenerator.run_toast import Toast, outcome_of_row, toast_for
 from origenerator.single_instance import Copies
 from origenerator.toast_raising import raise_toast
@@ -42,8 +43,8 @@ def runs_left_in_flight(db) -> list[dict]:
             and source_of(row) != GenerationSource.BACKFILL]
 
 
-def take_what_landed(db, api, row: dict, *, places: OutputPlaces, thumb_dir: Path) -> Toast | None:
-    if not take_in_what_landed(db, api, row, places, thumb_dir):
+def take_what_landed(db, api, row: dict, folders: OutputFolders) -> Toast | None:
+    if not take_in_what_landed(db, api, row, folders):
         return None
     landed = db.get_generation(row["prompt_id"]) or row
     return toast_for(outcome_of_row(landed, ok=True, seconds=landed.get("duration_seconds")))
@@ -70,33 +71,40 @@ def _training_ended(job: dict, announce) -> bool:
     return True
 
 
-def watch(db, api, *, announce, app_is_running, sleep=time.sleep, now=time.monotonic,
-          places: OutputPlaces = OUTPUT_PLACES, thumb_dir: Path = THUMB_DIR,
-          poll_seconds: float = POLL_SECONDS,
-          patience_seconds: float = PATIENCE_SECONDS, trainings=None) -> None:
-    training = list(running_trainings() if trainings is None else trainings)
-    giving_up_at = now() + patience_seconds
-    while not app_is_running():
-        training = [job for job in training if not _training_ended(job, announce)]
-        waiting = runs_left_in_flight(db)
-        if not waiting and not training:
-            logger.info("Stopped waiting: every run left in flight has landed")
-            return
-        for row in waiting:
-            try:
-                toast = take_what_landed(db, api, row,
-                                          places=places, thumb_dir=thumb_dir)
-            except Exception as e:
-                logger.warning("Could not take in %s: %s", row.get("prompt_id"), e)
-                continue
-            if toast is not None:
-                announce(toast)
-        if now() >= giving_up_at:
-            logger.info("Stopped waiting: gave up on %d run(s) still in flight",
-                        len(runs_left_in_flight(db)))
-            return
-        sleep(poll_seconds)
-    logger.info("Stopped waiting: Origenerator is open again")
+@dataclass(frozen=True)
+class Watch:
+    db: object
+    api: object
+    announce: Callable[[Toast], object]
+    app_is_running: Callable[[], bool]
+    sleep: Callable[[float], object] = time.sleep
+    folders: OutputFolders = OutputFolders(OUTPUT_PLACES, THUMB_DIR)
+    patience_seconds: float = PATIENCE_SECONDS
+    trainings: list | None = None
+
+    def run(self) -> None:
+        training = list(running_trainings() if self.trainings is None else self.trainings)
+        giving_up_at = time.monotonic() + self.patience_seconds
+        while not self.app_is_running():
+            training = [job for job in training if not _training_ended(job, self.announce)]
+            waiting = runs_left_in_flight(self.db)
+            if not waiting and not training:
+                logger.info("Stopped waiting: every run left in flight has landed")
+                return
+            for row in waiting:
+                try:
+                    toast = take_what_landed(self.db, self.api, row, self.folders)
+                except Exception as e:
+                    logger.warning("Could not take in %s: %s", row.get("prompt_id"), e)
+                    continue
+                if toast is not None:
+                    self.announce(toast)
+            if time.monotonic() >= giving_up_at:
+                logger.info("Stopped waiting: gave up on %d run(s) still in flight",
+                            len(runs_left_in_flight(self.db)))
+                return
+            self.sleep(POLL_SECONDS)
+        logger.info("Stopped waiting: Origenerator is open again")
 
 
 def hand_over_what_is_in_flight(db, identity: str, *, spawn=None) -> bool:
@@ -132,9 +140,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     _log_into_the_apps_file()
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
-    watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT, folders=COMFYUI_FOLDERS),
+    Watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT, folders=COMFYUI_FOLDERS),
           announce=lambda toast: raise_toast(identity, toast),
-          app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library)
+          app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library).run()
     return 0
 
 

@@ -9,10 +9,16 @@ import importlib.util
 import socket
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 from origenerator.comfyui_api import comfyui_responding
 
 POLL_SECONDS = 1.0
+
+
+class Address(NamedTuple):
+    host: str
+    port: int
 
 
 def script(comfyui_dir: Path) -> Path:
@@ -26,7 +32,8 @@ def load(comfyui_dir: Path):
     return launcher
 
 
-def ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
+def ensure_comfyui_server(logger, address, comfyui_dir, on_status=None, pump_events=None):
+    host, port = address
     if comfyui_responding(host, port):
         logger.info("ComfyUI server already running on %s:%d", host, port)
         return
@@ -62,7 +69,7 @@ def ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_
 def bring_up(logger, host, port, comfyui_dir, *, sleep=time.sleep) -> bool:
     launcher = load(comfyui_dir)
     if not launcher.server_starting():
-        ensure_comfyui_server(logger, host, port, comfyui_dir)
+        ensure_comfyui_server(logger, Address(host, port), comfyui_dir)
     while not comfyui_responding(host, port):
         if not launcher.server_starting():
             logger.warning("ComfyUI stopped starting without answering on %s:%d", host, port)

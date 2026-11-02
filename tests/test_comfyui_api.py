@@ -380,7 +380,7 @@ class _Clock:
 
 
 def _client_on(clock: _Clock) -> ComfyUIApi:
-    return ComfyUIApi(client_id="ours-client", clock=clock, sleep=clock.sleep, folders=SUITE_FOLDERS)
+    return ComfyUIApi(client_id="ours-client", clock=clock, folders=SUITE_FOLDERS)
 
 
 def test_a_submit_answered_too_late_stands_once_comfyui_lists_the_prompt():

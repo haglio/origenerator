@@ -25,9 +25,9 @@ def library(tmp_path):
     write_mp4(output_dir / "video" / "run_00002_.mp4")
     thumb = square(tmp_path, "blue")
     db = Database(tmp_path / "t.db")
-    _row(db, "gen-pic", "sdxl_t2i", "image/pic_00001_.png", thumb)
-    _row(db, "gen-run", "wan22_i2v", "video/run_00002_.mp4", thumb)
-    _row(db, "gen-made", "wan22_i2v", "video/made_00003_.mp4", thumb,
+    _row(db, "gen-pic", "image/pic_00001_.png", thumb)
+    _row(db, "gen-run", "video/run_00002_.mp4", thumb)
+    _row(db, "gen-made", "video/made_00003_.mp4", thumb,
          params={"input_image": "image/pic_00001_.png [output]"})
     names = ItemNames.from_library(db)
     items = ZoneItems(
@@ -38,10 +38,11 @@ def library(tmp_path):
     return items, names, output_dir, thumb
 
 
-def _row(db, prompt_id, workflow, file, thumb, params=None):
+def _row(db, prompt_id, file, thumb, params=None):
+    subfolder, name = file.split("/")
+    workflow = {"image": "sdxl_t2i", "video": "wan22_i2v"}[subfolder]
     db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
                          params_json=json.dumps(params or {}), workflow_json="{}"))
-    subfolder, name = file.split("/")
     db.update_generation(prompt_id, status="completed", thumbnail_path=thumb,
                          output_files=json.dumps([{"filename": name, "subfolder": subfolder,
                                                    "type": "output"}]))

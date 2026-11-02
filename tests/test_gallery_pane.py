@@ -102,27 +102,29 @@ class _NothingEnhancing:
         return None
 
 
-def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None,
-          selected=None, animated_preview=lambda row: None):
+def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
+               animated_preview=lambda row: None):
+    return PaneHost(
+        image_rows=list,
+        animated_preview=animated_preview,
+        enhancing=_NothingEnhancing,
+        experiments_enabled=lambda: False,
+        lead_tiles=lead_tiles,
+        item_name=lambda prompt_id: f"item {prompt_id}",
+        tree=TreeNavigation(
+            selected_folder_key=lambda: selected,
+            folder_context=lambda key: "",
+            group_for_key=lambda key: None,
+        ),
+    )
+
+
+def _pane(qtbot, rows=(), *, scroll=None, jobs=None, host=None):
     if scroll is None:
         scroll = GalleryPaneScrollArea()
         qtbot.addWidget(scroll)
     pane = GalleryPane(
-        scroll, _StubDB(rows), jobs or _StubJobQueue(), _StubAuto(),
-        PaneHost(
-            image_rows=list,
-            animated_preview=animated_preview,
-            enhancing=_NothingEnhancing,
-            experiments_enabled=lambda: False,
-            lead_tiles=lead_tiles,
-            item_name=lambda prompt_id: f"item {prompt_id}",
-            tree=TreeNavigation(
-                selected_folder_key=lambda: selected,
-                folder_context=lambda key: "",
-                group_for_key=lambda key: None,
-            ),
-        ),
-    )
+        scroll, _StubDB(rows), jobs or _StubJobQueue(), _StubAuto(), host or _pane_host())
     return pane, scroll
 
 
@@ -343,7 +345,7 @@ def _tile_at(scroll, y):
 def test_only_the_videos_in_sight_play_their_loops(qtbot, tmp_path):
     video = looping_video(tmp_path)
     rows = [_row(f"g{n}", n) for n in range(200)]
-    pane, scroll = _pane(qtbot, rows, animated_preview=lambda row: video)
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(animated_preview=lambda row: video))
     scroll.setWidgetResizable(True)
     scroll.resize(800, 600)
     with qtbot.waitExposed(scroll):
@@ -419,8 +421,7 @@ def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtb
 
 def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot):
     jobs = _StubJobQueue(order=["j1", "j2"])
-    pane, _scroll = _pane(qtbot, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs,
-                          selected=LATEST_KEY)
+    pane, _scroll = _pane(qtbot, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs, host=_pane_host(selected=LATEST_KEY))
     _open_latest(pane, [])
     jobs.queue_order = ["j2", "j1"]
 
@@ -480,7 +481,7 @@ def test_a_video_tile_finds_its_start_frame_in_the_models_image_index(qtbot):
 
 def test_a_folder_last_made_a_long_while_ago_gives_its_new_tile_a_section_of_its_own(qtbot):
     rows = [_row("g1", 1, _ago(hours=5))]
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: LeadTiles(reroll=QLabel("new")))
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: LeadTiles(reroll=QLabel("new"))))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -490,7 +491,7 @@ def test_a_folder_last_made_a_long_while_ago_gives_its_new_tile_a_section_of_its
 
 def test_a_folder_made_lately_keeps_its_new_tile_in_the_newest_section(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: LeadTiles(reroll=QLabel("new")))
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: LeadTiles(reroll=QLabel("new"))))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -501,7 +502,7 @@ def test_a_folder_made_lately_keeps_its_new_tile_in_the_newest_section(qtbot):
 def test_the_modify_tile_stands_above_a_folders_sections_when_it_has_several(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
     tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: tiles))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -512,7 +513,7 @@ def test_the_modify_tile_stands_above_a_folders_sections_when_it_has_several(qtb
 def test_a_now_section_counts_toward_putting_the_modify_tile_above_the_sections(qtbot):
     rows = [_row("g1", 1, _ago(hours=5))]
     tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: tiles))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -523,7 +524,7 @@ def test_a_now_section_counts_toward_putting_the_modify_tile_above_the_sections(
 def test_the_modify_tile_stays_with_a_folders_only_section(qtbot):
     rows = [_row("g1", 1, _ago(minutes=5))]
     tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"))
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: tiles))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -535,7 +536,7 @@ def test_the_run_in_front_stands_after_the_modify_tile_where_its_image_will_land
     rows = [_row("g1", 1, _ago(minutes=5))]
     tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"),
                       generating=QLabel("generating"))
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: tiles))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -547,7 +548,7 @@ def test_the_run_in_front_stays_beside_the_plus_when_the_modify_tile_stands_abov
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
     tiles = LeadTiles(reroll=QLabel("new"), modify=QLabel("modify"),
                       generating=QLabel("generating"))
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+    pane, scroll = _pane(qtbot, rows, host=_pane_host(lead_tiles=lambda group: tiles))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
@@ -560,8 +561,7 @@ def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_las
     finished = _row("g1", 1, _ago(minutes=5))
     rows = [_running("r1", 2), _waiting("r2", 3), _waiting("r3", 4), finished]
     tiles = LeadTiles(reroll=QLabel("new"), generating=QLabel("generating"))
-    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles,
-                         jobs=_StubJobQueue(order=["r1", "r2", "r3"], leading="r1"))
+    pane, scroll = _pane(qtbot, rows, jobs=_StubJobQueue(order=["r1", "r2", "r3"], leading="r1"), host=_pane_host(lead_tiles=lambda group: tiles))
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 

@@ -33,28 +33,30 @@ def _file(path):
     return {"filename": filename, "subfolder": subfolder}
 
 
-def _imported(db, prompt_id, *, workflow="sdxl_t2i", file="image/sdxl_t2i_00001_.png",
-              completed_at="2026-05-01T12:00:00+00:00", enhanced_from=None,
-              version="imported", graph=None):
-    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow,
-                         workflow_version=version, params_json="{}",
-                         workflow_json=json.dumps(graph or {}), source="imported"))
-    files = [_file(file)]
+def _imported(db, prompt_id, **given):
+    enhanced_from = given.get("enhanced_from")
+    db.insert_generation(NewGeneration(prompt_id=prompt_id,
+                         workflow_name=given.get("workflow", "sdxl_t2i"),
+                         workflow_version=given.get("version", "imported"), params_json="{}",
+                         workflow_json=json.dumps(given.get("graph") or {}), source="imported"))
+    files = [_file(given.get("file", "image/sdxl_t2i_00001_.png"))]
     folded = {}
     if enhanced_from:
         files.append(_file(enhanced_from))
         folded["original_files"] = json.dumps([_file(enhanced_from)])
-    db.update_generation(prompt_id, status="completed", completed_at=completed_at,
+    db.update_generation(prompt_id, status="completed",
+                         completed_at=given.get("completed_at", "2026-05-01T12:00:00+00:00"),
                          output_files=json.dumps(files), **folded)
 
 
-def _ran(db, prompt_id, version, *, launched, finished, trimmed_from=None, graph=None):
+def _ran(db, prompt_id, version, *, launched, finished, **given):
+    graph = given.get("graph")
     db.restore_generation({
         "prompt_id": prompt_id, "source": "generated", "workflow_name": "sdxl_t2i",
         "workflow_version": version, "status": "completed", "params_json": "{}",
         "workflow_json": json.dumps(graph or {}), "created_at": launched,
         "completed_at": finished,
-        "trimmed_from": trimmed_from,
+        "trimmed_from": given.get("trimmed_from"),
         "provenance": json.dumps({WORKFLOW: "sdxl_t2i", WORKFLOW_VERSION: version})})
 
 

@@ -12,13 +12,14 @@ from origenerator.nav_map import (
 )
 
 
-def _image(prompt_id, prompt, *, seed, steps=50, checkpoint="model_a.safetensors",
-           shows=None):
+def _image(prompt_id, prompt, *, seed, **given):
+    steps = given.get("steps", 50)
+    checkpoint = given.get("checkpoint", "model_a.safetensors")
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "positive_prompt": prompt,
-        "image_state": shows,
+        "image_state": given.get("shows"),
         "seed": seed,
         "params_json": json.dumps({"positive_prompt": prompt, "seed": seed,
                                    "steps": steps, "checkpoint": checkpoint}),
@@ -40,12 +41,13 @@ def test_the_seed_row_is_the_rest_of_the_items_own_settings_folder():
     assert _ids(row) == ["g2", "g1"]
 
 
-def _video(prompt_id, prompt, *, noise_seed, frame, lora="lora_a", action=None):
+def _video(prompt_id, prompt, *, noise_seed, frame, **given):
+    lora = given.get("lora", "lora_a")
     return {
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
         "positive_prompt": prompt,
-        "action": action,
+        "action": given.get("action"),
         "seed": None,
         "params_json": json.dumps({
             "positive_prompt": prompt, "noise_seed": noise_seed, "input_image": frame,

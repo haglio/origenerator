@@ -145,10 +145,11 @@ def test_a_seed_drawn_and_never_generated_is_listed_with_no_thumbnail_at_its_siz
     assert seed_history(db.seed_history_rows(), "seed", db.list_seed_uses(), makes=VIDEOS) == []
 
 
-def _record(seed, created_at, *, kind="drawn", seed_key="seed", thumbnail_path=None,
-            media_type=IMAGES):
-    return {"kind": kind, "seed_key": seed_key, "seed": seed, "width": None, "height": None,
-            "thumbnail_path": thumbnail_path, "media_type": media_type, "created_at": created_at}
+def _record(seed, created_at, **given):
+    return {"kind": given.get("kind", "drawn"), "seed_key": given.get("seed_key", "seed"),
+            "seed": seed, "width": None, "height": None,
+            "thumbnail_path": given.get("thumbnail_path"),
+            "media_type": given.get("media_type", IMAGES), "created_at": created_at}
 
 
 def test_seeds_drawn_and_seeds_used_come_in_the_order_they_happened():

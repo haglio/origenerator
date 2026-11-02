@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import InitVar, asdict, dataclass
 from io import BytesIO
 from unittest.mock import MagicMock
 
@@ -697,20 +697,25 @@ def _shown_view_with_one_image(qtbot, tmp_path):
     return view, db, file_path
 
 
+@dataclass(eq=False)
 class _FakeRerollJob:
-    def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
-                 progress=(0, 0), foreign_ahead=None, started_at=None,
-                 pass_progress=None, stage=""):
-        self.prompt_id = prompt_id
-        self.origin = prompt_id
-        self.state = state
+    prompt_id: str
+    workflow_name: InitVar[str]
+    params: dict
+    state: str = "running"
+    frame: InitVar[bytes | None] = None
+    progress: InitVar[tuple] = (0, 0)
+    foreign_ahead: object = None
+    started_at: object = None
+    pass_progress: InitVar[object] = None
+    stage: InitVar[str] = ""
+
+    def __post_init__(self, workflow_name, frame, progress, pass_progress, stage):
+        self.origin = self.prompt_id
         self.last_preview = frame
         self.last_progress = progress
         self.last_pass_progress = pass_progress
         self.last_stage = stage
-        self.foreign_ahead = foreign_ahead
-        self.started_at = started_at
-        self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
         self.source = GenerationSource.GENERATED
         self.thumb_dir = THUMB_DIR

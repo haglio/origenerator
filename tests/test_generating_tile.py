@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from io import BytesIO
 
 from PIL import Image
@@ -19,44 +20,21 @@ def _png_bytes(color=(10, 120, 200)):
     return buf.getvalue()
 
 
+@dataclass(eq=False)
 class FakeJob(QObject):
+    state: str = "queued"
+    last_progress: tuple = (0, 0)
+    last_preview: bytes | None = None
+    started_at: float | None = None
+    last_pass_progress: tuple | None = None
+    last_stage: str = ""
+
     started = pyqtSignal()
     progress = pyqtSignal(int, int)
     preview = pyqtSignal(bytes)
 
-    def __init__(self, state="queued", last_progress=(0, 0), last_preview=None,
-                 started_at=None, last_pass_progress=None, last_stage=""):
+    def __post_init__(self):
         super().__init__()
-        self._state = state
-        self._last_progress = last_progress
-        self._last_pass_progress = last_pass_progress
-        self._last_stage = last_stage
-        self._last_preview = last_preview
-        self._started_at = started_at
-
-    @property
-    def state(self):
-        return self._state
-
-    @property
-    def last_progress(self):
-        return self._last_progress
-
-    @property
-    def last_pass_progress(self):
-        return self._last_pass_progress
-
-    @property
-    def last_stage(self):
-        return self._last_stage
-
-    @property
-    def last_preview(self):
-        return self._last_preview
-
-    @property
-    def started_at(self):
-        return self._started_at
 
 
 def _has_image(tile):
@@ -140,7 +118,7 @@ def test_started_signal_switches_the_scrim_to_generating(qtbot):
     job = FakeJob(state="queued")
     tile = GeneratingTile(job)
     qtbot.addWidget(tile)
-    job._state = "running"
+    job.state = "running"
     job.started.emit()
     assert tile._status_scrim.text() == "Generating…"
 
@@ -190,7 +168,7 @@ def test_progress_signal_advances_the_bar(qtbot):
     job = FakeJob(state="running", started_at=time.time() - 30.5)
     tile = GeneratingTile(job, typical_seconds=100.0)
     qtbot.addWidget(tile)
-    job._last_progress = (3, 10)
+    job.last_progress = (3, 10)
     job.progress.emit(3, 10)
     assert tile._bar.caption().startswith("30% · ")
     assert (tile._bar.value(), tile._bar.maximum()) == (3, 10)
@@ -209,7 +187,7 @@ def test_the_clock_advances_between_polls(qtbot):
     qtbot.addWidget(tile)
     assert tile._bar.caption() == "~1:34 left"
 
-    job._started_at -= 3
+    job.started_at -= 3
     tile._tick.timeout.emit()
     assert tile._bar.caption() == "~1:31 left"
 

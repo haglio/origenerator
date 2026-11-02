@@ -19,20 +19,19 @@ class _Faulthandler:
         self.armed.append((timeout, repeat, file, exit))
 
 
-def _watch(crash_log, faulthandler, *, clock=lambda: 0.0, stalled_after_s=10.0,
-           closed_within_s=10.0, handed_over_within_s=30.0):
-    return FreezeWatch(crash_log, timing=Timing(stalled_after_s=stalled_after_s,
-                                                closed_within_s=closed_within_s,
-                                                handed_over_within_s=handed_over_within_s,
-                                                beat_ms=60_000),
-                       clock=clock, arm=faulthandler.arm)
+_TIMING = Timing(stalled_after_s=10.0, closed_within_s=10.0, handed_over_within_s=30.0,
+                 beat_ms=60_000)
+
+
+def _watch(crash_log, faulthandler, *, clock=lambda: 0.0, timing=_TIMING):
+    return FreezeWatch(crash_log, timing=timing, clock=clock, arm=faulthandler.arm)
 
 
 def test_a_watch_arms_the_stack_dump_into_the_crash_log_for_one_stall(qapp):
     crash_log = io.StringIO()
     faulthandler = _Faulthandler()
 
-    _watch(crash_log, faulthandler, stalled_after_s=10.0)
+    _watch(crash_log, faulthandler)
 
     assert faulthandler.armed == [(10.0, False, crash_log, False)]
 
@@ -40,7 +39,7 @@ def test_a_watch_arms_the_stack_dump_into_the_crash_log_for_one_stall(qapp):
 def test_a_closed_window_gives_the_process_a_deadline_to_be_gone_by(qapp):
     crash_log = io.StringIO()
     faulthandler = _Faulthandler()
-    watch = _watch(crash_log, faulthandler, closed_within_s=7.0)
+    watch = _watch(crash_log, faulthandler, timing=_TIMING._replace(closed_within_s=7.0))
 
     watch.end_the_process_if_the_close_sticks()
 
@@ -49,7 +48,7 @@ def test_a_closed_window_gives_the_process_a_deadline_to_be_gone_by(qapp):
 
 def test_a_close_is_marked_in_the_crash_log_so_stacks_under_the_mark_read_as_a_stuck_close(qapp):
     crash_log = io.StringIO()
-    watch = _watch(crash_log, _Faulthandler(), closed_within_s=7.0)
+    watch = _watch(crash_log, _Faulthandler(), timing=_TIMING._replace(closed_within_s=7.0))
 
     watch.end_the_process_if_the_close_sticks()
 
@@ -61,7 +60,7 @@ def test_a_close_is_marked_in_the_crash_log_so_stacks_under_the_mark_read_as_a_s
 def test_handing_comfyui_its_work_gives_the_process_a_deadline_of_its_own(qapp):
     crash_log = io.StringIO()
     faulthandler = _Faulthandler()
-    watch = _watch(crash_log, faulthandler, closed_within_s=7.0, handed_over_within_s=25.0)
+    watch = _watch(crash_log, faulthandler, timing=_TIMING._replace(closed_within_s=7.0, handed_over_within_s=25.0))
 
     watch.end_the_process_if_the_hand_over_sticks()
 
@@ -71,7 +70,7 @@ def test_handing_comfyui_its_work_gives_the_process_a_deadline_of_its_own(qapp):
 def test_a_hand_over_is_marked_in_the_crash_log_so_stacks_under_the_mark_read_as_a_stuck_one(
         qapp):
     crash_log = io.StringIO()
-    watch = _watch(crash_log, _Faulthandler(), handed_over_within_s=25.0)
+    watch = _watch(crash_log, _Faulthandler(), timing=_TIMING._replace(handed_over_within_s=25.0))
 
     watch.end_the_process_if_the_hand_over_sticks()
 
@@ -117,7 +116,7 @@ def test_the_event_loop_beats_on_its_own(qtbot):
 def test_the_first_beat_after_a_stall_says_how_long_the_window_stopped_answering(qapp, caplog):
     now = [100.0]
     crash_log = io.StringIO()
-    watch = _watch(crash_log, _Faulthandler(), clock=lambda: now[0], stalled_after_s=10.0)
+    watch = _watch(crash_log, _Faulthandler(), clock=lambda: now[0])
 
     now[0] += 42.0
     with caplog.at_level(logging.WARNING, logger="origenerator.freeze_watch"):
@@ -130,7 +129,7 @@ def test_the_first_beat_after_a_stall_says_how_long_the_window_stopped_answering
 def test_a_beat_on_time_says_nothing(qapp, caplog):
     now = [100.0]
     crash_log = io.StringIO()
-    watch = _watch(crash_log, _Faulthandler(), clock=lambda: now[0], stalled_after_s=10.0)
+    watch = _watch(crash_log, _Faulthandler(), clock=lambda: now[0])
 
     now[0] += 9.0
     with caplog.at_level(logging.WARNING, logger="origenerator.freeze_watch"):

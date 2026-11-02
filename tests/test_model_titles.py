@@ -33,7 +33,7 @@ def test_a_fixs_lora_named_by_date_is_shown_as_that_fix_and_its_rank_among_its_d
     assert model_title(r"fixes\mouth 2026-10-19 1444.safetensors") == "Mouth fix 1.0"
 
     for name in ("hands 2026-10-19 0130", "hands 2026-10-21 1500", "mouth 2026-10-19 1444"):
-        installed_models.add("loras", f"fixes/{name}.safetensors", body=b"")
+        installed_models.add_bytes("loras", f"fixes/{name}.safetensors", b"")
 
     assert model_title(r"fixes\hands 2026-10-19 0130.safetensors") == "Hands fix 1.0"
     assert model_title(r"fixes\hands 2026-10-21 1500.safetensors") == "Hands fix 1.1"

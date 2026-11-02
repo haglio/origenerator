@@ -57,11 +57,10 @@ def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i", workflow_versio
     ))
 
 
-def _complete_gen(db, prompt_id, params, filename, subfolder="image",
-                  workflow_version=None):
+def _complete_gen(db, prompt_id, params, filename, workflow_version=None):
     _insert_gen(db, prompt_id, params, workflow_version=workflow_version)
     db.update_generation(prompt_id, status="completed",
-                         output_files=json.dumps([{"filename": filename, "subfolder": subfolder}]))
+                         output_files=json.dumps([{"filename": filename, "subfolder": "image"}]))
     return db.get_generation(prompt_id)
 
 

@@ -6,6 +6,7 @@ import re
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import NamedTuple
 
 import pytest
 from funestra.hud_placement import HudCorner
@@ -837,12 +838,22 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
     assert [slide[2] for slide in director.region_slideshow(LANDSCAPE).items] == ["g5"]
 
 
-@pytest.mark.parametrize(("shape", "shapes", "monitor", "carried_to", "the_other", "its_library"), [
-    (LANDSCAPE, (WIDE, WIDE), PORTRAIT_MONITOR, LANDSCAPE, PORTRAIT, ["g4"]),
-    (PORTRAIT, (TALL, TALL), LANDSCAPE_MONITOR, PORTRAIT, LANDSCAPE, ["g5"]),
+class _TakenOver(NamedTuple):
+    shape: str
+    shapes: tuple
+    monitor: object
+    the_other: str
+    its_library: list
+
+
+@pytest.mark.parametrize("case", [
+    _TakenOver(LANDSCAPE, (WIDE, WIDE), PORTRAIT_MONITOR, PORTRAIT, ["g4"]),
+    _TakenOver(PORTRAIT, (TALL, TALL), LANDSCAPE_MONITOR, LANDSCAPE, ["g5"]),
 ])
 def test_a_slideshow_taken_over_opens_on_the_funestra_of_its_shape_whatever_monitor_it_was_on(
-        slideshows, shape, shapes, monitor, carried_to, the_other, its_library):
+        slideshows, case):
+    shape, shapes, monitor, the_other, its_library = case
+    carried_to = shape
     director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(
         slideshows, shape=shape, shapes=shapes, monitor=monitor)
 
@@ -2027,7 +2038,8 @@ def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):
     assert [slideshow.released for slideshow in made] == [[["one.png"]], [["one.png"]]]
 
 
-def _image(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
+def _image(prompt_id, prompt, *, seed, steps=50, size=(100, 200)):
+    width, height = size
     params = {"positive_prompt": prompt, "seed": seed, "steps": steps,
               "width": width, "height": height}
     row = _row(prompt_id, params=params)
@@ -2035,7 +2047,8 @@ def _image(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
     return row
 
 
-def _animation(prompt_id, *, frame, action, tmp_path, width=100, height=200):
+def _animation(prompt_id, *, frame, action, tmp_path, size=(100, 200)):
+    width, height = size
     params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame}
     row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
                files=(f"{prompt_id}.mp4",))
@@ -2062,7 +2075,7 @@ def test_the_library_of_the_slideshows_side_answers_for_the_map_around_a_generat
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path),
             _animation("v3", frame="g1.png", action="beta", tmp_path=tmp_path),
-            _image("w1", "a red fox", seed=3, width=200, height=100)]
+            _image("w1", "a red fox", seed=3, size=(200, 100))]
     director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
 
     around = director.neighbors_of("g1", shape="portrait")

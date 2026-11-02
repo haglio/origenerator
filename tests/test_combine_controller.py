@@ -250,21 +250,22 @@ def _image(prompt_id="img", *, prompt="a doll on a couch", files=("one.png",),
     }
 
 
-def _video(prompt_id="clip", *, workflow_name=VIDEO_WORKFLOW, status="completed",
-           requested=None, exported=None, source_image=None, files=None, action=None):
+def _video(prompt_id="clip", **given):
+    files = given.get("files")
+    source_image = given.get("source_image")
     return {
         "prompt_id": prompt_id,
-        "action": action,
-        "workflow_name": workflow_name,
+        "action": given.get("action"),
+        "workflow_name": given.get("workflow_name", VIDEO_WORKFLOW),
         "positive_prompt": "a doll on a couch, waving",
-        "status": status,
+        "status": given.get("status", "completed"),
         "thumbnail_path": f"{prompt_id}-thumb.png",
         "output_files": json.dumps(
             [{"filename": name} for name in files] if files is not None
             else [{"filename": f"{prompt_id}.mp4"}]),
         "params_json": json.dumps({"input_image": source_image} if source_image else {}),
-        "genau_requested_at": requested,
-        "genau_exported_at": exported,
+        "genau_requested_at": given.get("requested"),
+        "genau_exported_at": given.get("exported"),
     }
 
 
@@ -276,21 +277,22 @@ def starting(qtbot):
 @pytest.fixture
 def combine(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "Combine", FakePanel)
-    built = []
 
-    def build(host=None, *, db=None, jobs=None, client=_A_CLIENT, slideshows=None,
-              tabs=None, inbox=None):
-        host = host or FakeHost()
-        parent = QWidget()
-        qtbot.addWidget(parent)
+    def build(host=None, *, db=None, jobs=None, slideshows=None, tabs=None):
         parts = CombineParts(
-            jobs=jobs or FakeReroll(), client=client, info_tabs_of=lambda: tabs or FakeTabs(),
-            slideshows=slideshows or FakeSlideshows(), starting=starting, inbox=inbox)
-        controller = CombineController(host, parts, parent=parent, db=db or FakeDB())
-        controller._after_painting = lambda work: work()
-        built.append((parent, controller))
-        return controller, host
+            jobs=jobs or FakeReroll(), client=_A_CLIENT, info_tabs_of=lambda: tabs or FakeTabs(),
+            slideshows=slideshows or FakeSlideshows(), starting=starting)
+        return _assembled(qtbot, host, parts, db)
     return build
+
+
+def _assembled(qtbot, host, parts, db):
+    host = host or FakeHost()
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    controller = CombineController(host, parts, parent=parent, db=db or FakeDB())
+    controller._after_painting = lambda work: work()
+    return controller, host
 
 
 
@@ -388,8 +390,10 @@ def test_a_dropped_item_shows_its_still_and_its_loop(combine):
     assert controller._zone_preview("gone") == (None, None)
 
 
-def test_a_panel_with_no_server_behind_it_hides(combine):
-    controller, _host = combine(client=None)
+def test_a_panel_with_no_server_behind_it_hides(qtbot, combine, starting):
+    parts = CombineParts(jobs=FakeReroll(), client=None, info_tabs_of=FakeTabs,
+                         slideshows=FakeSlideshows(), starting=starting)
+    controller, _host = _assembled(qtbot, None, parts, None)
 
     assert controller.widget.visible is False
 
@@ -825,15 +829,17 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
     assert db.exported == ["clip"]
 
 
-def test_the_clip_lands_in_the_inbox_this_controller_was_handed(combine, monkeypatch,
-                                                                tmp_path):
+def test_the_clip_lands_in_the_inbox_this_controller_was_handed(qtbot, combine, starting,
+                                                                monkeypatch, tmp_path):
     output = tmp_path / "output"
     output.mkdir()
     (output / "clip.mp4").write_bytes(b"pixels")
     monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     inbox = tmp_path / "somebody elses inbox"
-    controller, _host = combine(db=FakeDB(),
-                                inbox=evolver_export.EvolverInbox(inbox))
+    parts = CombineParts(jobs=FakeReroll(), client=_A_CLIENT, info_tabs_of=FakeTabs,
+                         slideshows=FakeSlideshows(), starting=starting,
+                         inbox=evolver_export.EvolverInbox(inbox))
+    controller, _host = _assembled(qtbot, None, parts, None)
 
     controller.send_to_genau_if_requested(_video("clip", requested="now"))
 

@@ -57,21 +57,21 @@ class FakeI2vWorkflow(FakeWorkflow):
 REGISTRY = {FakeWorkflow.name: FakeWorkflow(), FakeI2vWorkflow.name: FakeI2vWorkflow()}
 
 
-def make_row(prompt_id, *, workflow_name="fake_t2i", status="completed",
-             source="generated", params=None, output=True, favorite=False,
-             verdict=None, positive_prompt="a cat"):
+def make_row(prompt_id, **given):
+    positive_prompt = given.get("positive_prompt", "a cat")
     all_params = {"positive_prompt": positive_prompt, "negative_prompt": "",
                   "seed": 1, "steps": 20, "sampler_name": "euler"}
-    all_params.update(params or {})
+    all_params.update(given.get("params") or {})
     return {
         "prompt_id": prompt_id,
-        "workflow_name": workflow_name,
-        "status": status,
-        "source": source,
+        "workflow_name": given.get("workflow_name", "fake_t2i"),
+        "status": given.get("status", "completed"),
+        "source": given.get("source", "generated"),
         "params_json": json.dumps(all_params),
-        "output_files": json.dumps([{"filename": f"{prompt_id}.png"}]) if output else None,
-        "starred": 1 if favorite else 0,
-        "experiment_verdict": verdict,
+        "output_files": (json.dumps([{"filename": f"{prompt_id}.png"}])
+                         if given.get("output", True) else None),
+        "starred": 1 if given.get("favorite") else 0,
+        "experiment_verdict": given.get("verdict"),
         "positive_prompt": positive_prompt,
         "negative_prompt": "",
         "seed": 1,

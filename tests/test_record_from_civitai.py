@@ -157,8 +157,8 @@ def test_a_lora_civitai_also_lists_beside_another_models_own_file_takes_its_own_
 def _distinct_lora(installed_models, n: int):
     header = json.dumps({f"distinct{n}.lora_A.weight": {
         "dtype": "F16", "shape": [1], "data_offsets": [0, 2]}}).encode()
-    return installed_models.add("loras", f"example_{n:03d}.safetensors",
-                                body=struct.pack("<Q", len(header)) + header + b"\x00\x00")
+    return installed_models.add_bytes("loras", f"example_{n:03d}.safetensors",
+                                      struct.pack("<Q", len(header)) + header + b"\x00\x00")
 
 
 def test_civitai_is_asked_about_at_most_a_hundred_loras_at_a_time(installed_models):

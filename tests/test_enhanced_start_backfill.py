@@ -63,15 +63,17 @@ def _reference(file):
     return f"{file['subfolder']}/{file['filename']} [output]"
 
 
-def _video(db, prompt_id, *, made_from, starred=False, start=None, source="generated",
-           workflow="wan22_i2v", lines=None):
-    params = {"input_image": _reference(start or _plain(made_from)),
+def _video(db, prompt_id, *, made_from, **row):
+    lines = row.get("lines")
+    params = {"input_image": _reference(row.get("start") or _plain(made_from)),
               "noise_seed": 7, "audio_seed": 8, **({"scene_lines": lines} if lines else {})}
-    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow, workflow_version="v1",
-                         params_json=json.dumps(params), workflow_json="{}", source=source))
+    db.insert_generation(NewGeneration(
+        prompt_id=prompt_id, workflow_name=row.get("workflow", "wan22_i2v"),
+        workflow_version="v1", params_json=json.dumps(params), workflow_json="{}",
+        source=row.get("source", "generated")))
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([_file(f"{prompt_id}_00001.mp4", "video")]))
-    if starred:
+    if row.get("starred"):
         db.set_generation_favorite(prompt_id, True)
     return db.get_generation(prompt_id)
 

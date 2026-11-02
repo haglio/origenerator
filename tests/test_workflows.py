@@ -874,7 +874,7 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
                 category, f"fam_{family}.safetensors",
                 arch=family, lora=(category == "loras"),
             )
-    installed_models.add("upscale_models", "an_upscaler.pt", body=b"not a safetensors")
+    installed_models.add_bytes("upscale_models", "an_upscaler.pt", b"not a safetensors")
 
     planted = {f"fam_{family}.safetensors" for family in _FAMILIES}
     checked = 0

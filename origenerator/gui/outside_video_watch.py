@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from PyQt6.QtCore import QObject, QTimer
 
@@ -15,15 +16,25 @@ logger = logging.getLogger(__name__)
 LOOK_EVERY_MS = 10 * 60 * 1000
 
 
+@dataclass(frozen=True)
+class WatchWork:
+    run: Callable = run_off_thread
+    scan: Callable = outside_videos.scan
+    every_ms: int = LOOK_EVERY_MS
+
+
+USUAL_WORK = WatchWork()
+
+
 class OutsideVideoWatch(QObject):
-    def __init__(self, db, places: Callable[[], Places | None], *, parent: QObject | None = None,
-                 run=run_off_thread, scan=outside_videos.scan, every_ms: int = LOOK_EVERY_MS):
+    def __init__(self, db, places: Callable[[], Places | None], *,
+                 parent: QObject | None = None, work: WatchWork = USUAL_WORK):
         super().__init__(parent)
-        self._db, self._places, self._run, self._scan = db, places, run, scan
+        self._db, self._places, self._run, self._scan = db, places, work.run, work.scan
         self._looking = False
         self._closing = threading.Event()
         self._timer = QTimer(self)
-        self._timer.setInterval(every_ms)
+        self._timer.setInterval(work.every_ms)
         self._timer.timeout.connect(self.look)
 
     def start(self) -> None:

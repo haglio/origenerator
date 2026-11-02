@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, QThreadPool
 
-from origenerator.gui.outside_video_watch import LOOK_EVERY_MS, OutsideVideoWatch
+from origenerator.gui.outside_video_watch import LOOK_EVERY_MS, OutsideVideoWatch, WatchWork
 from origenerator.outside_videos import Places
 
 _PLACES = Places(upscaled_dir=Path("L:/outbox"), records_folder=Path("L:/records"),
@@ -27,8 +27,10 @@ class _Pool:
 def _watch(qtbot, *, places=_PLACES, every_ms=LOOK_EVERY_MS):
     pool, looks = _Pool(), []
     watch = OutsideVideoWatch(
-        "the library", lambda: places, run=pool, every_ms=every_ms,
-        scan=lambda db, where, **told: looks.append((db, where, told)) or 0)
+        "the library", lambda: places,
+        work=WatchWork(
+            run=pool, every_ms=every_ms,
+            scan=lambda db, where, **told: looks.append((db, where, told)) or 0))
     return watch, pool, looks
 
 
@@ -46,7 +48,8 @@ def test_a_look_runs_at_the_priority_every_off_thread_call_runs_at(qtbot):
     seen = []
     watch = OutsideVideoWatch(
         "the library", lambda: _PLACES,
-        scan=lambda *_args, **_told: seen.append(QThread.currentThread().priority()) or 0)
+        work=WatchWork(
+            scan=lambda *_args, **_told: seen.append(QThread.currentThread().priority()) or 0))
 
     watch.look()
     qtbot.waitUntil(lambda: bool(seen))

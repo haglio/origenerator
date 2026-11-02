@@ -1,9 +1,3 @@
-"""RevisionWorker — working out a request off the UI thread.
-
-The apply callable is injected, so the flow runs inline with no model and no
-server; what is under test is that a result comes back with its context and that
-a failure is answered rather than raised.
-"""
 from __future__ import annotations
 
 import logging
@@ -25,8 +19,6 @@ def test_the_revision_comes_back_with_the_callers_context(qtbot):
 
 
 def test_a_failure_answers_with_nothing_rather_than_raising(qtbot):
-    # A model that is down is the ordinary case here, not an error: the request
-    # is still applied, just by the words alone.
     def boom(pos, neg, req, **_told):
         raise RuntimeError("no LLM server")
 
@@ -73,18 +65,10 @@ def test_the_task_tells_the_revision_whether_the_prompt_tells_a_story(qtbot):
 
 
 def test_a_window_closed_mid_request_takes_its_answer_with_it(qtbot):
-    """A request is seconds of network wait by construction, so the window can
-    close while the model is still thinking — and closing it takes the worker's
-    C++ object with it.
-
-    The pool thread is then holding a handle to nothing. Raising there reaches
-    no caller at all: Qt's own handler prints it into whatever is running next,
-    which is how one abandoned request failed an unrelated test three files
-    later."""
     parent = QWidget()
     worker = RevisionWorker(lambda pos, neg, req, **_told: req.upper(), parent=parent)
     task = ReviseTask(worker, "ctx", "a woman", "", "no hat", in_scenes=False)
     parent.deleteLater()
-    sip.delete(parent)  # the window goes, and its worker with it
+    sip.delete(parent)
 
-    task.run()  # no raise: there is nothing left to answer to
+    task.run()

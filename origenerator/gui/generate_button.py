@@ -1,16 +1,3 @@
-"""The Generate button: it submits a run to the queue, and nothing more.
-
-Pressing it launches what was asked for and it is done — the Job Queue and
-the Gallery pane's in-flight tiles are where a run in flight is watched, each
-showing the same reading of it (:func:`origenerator.timing.progress_status_label`).
-The button does not fill with that run's progress: that would put a third,
-differently-worded account of one run on screen and tie the control that starts
-work to the state of work already going.
-
-Its resting caption is the tab's to set: settings that would re-create a past
-generation exactly make the press draw a fresh seed instead, and the button says
-so ("Generate with Random seed") rather than a dialog asking after the click.
-"""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -20,37 +7,26 @@ from PyQt6.QtWidgets import QPlainTextEdit, QPushButton
 
 from origenerator.gui.prompt_marks import problem_to_resolve
 
-_GUARD_MS = 2500  # how long a blocked-Generate guard message lingers on the button
+_GUARD_MS = 2500
 DEFAULT_CAPTION = "Generate"
 RANDOM_SEED_CAPTION = "Generate with Random seed"
 
 
 class GenerateButton(QPushButton):
-    """A Generate button that wears its caption whatever else is in flight."""
-
     def __init__(self, parent=None):
         super().__init__(DEFAULT_CAPTION, parent)
         self.setObjectName("generateBtn")
-        self._caption = DEFAULT_CAPTION      # the resting words (see set_caption)
+        self._caption = DEFAULT_CAPTION
         self._guard_timer = QTimer(self)
         self._guard_timer.setSingleShot(True)
         self._guard_timer.timeout.connect(self._clear_guard)
 
     def set_caption(self, text: str):
-        """Set the words the button rests on — "Generate", or "Generate with Random
-        seed" where the settings on the form would otherwise re-create a past
-        generation and the press will draw a fresh seed instead.
-
-        A guard message on the face keeps it until its own timer ends: the caption
-        is recomputed on a form edit, which is exactly what the user is doing while
-        a guard tells them what the form still needs.
-        """
         self._caption = text
         if not self._guard_timer.isActive():
             self.setText(text)
 
     def flash_guard(self, message: str):
-        """Show a form guard on the button for a moment, then revert to its caption."""
         self.setText(message)
         self._wear_warning(True)
         self._guard_timer.start(_GUARD_MS)

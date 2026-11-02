@@ -1,14 +1,6 @@
 """Which modules are allowed to need Qt, held as an equality.
 
-Most of this package is a Qt-free library with a Qt package (`origenerator.gui`)
-on top of it, and several modules say so in their own docstrings — `completion`
-claims it is "Qt-free so the reconciler can use it without a running UI". That
-was not true for anything downstream of `ComfyUIClient`, which is a `QThread`:
-its eleven HTTP calls needed nothing from Qt, but living on a thread meant every
-consumer of them carried Qt anyway.
-
-So this counts, in a fresh interpreter each time, because PyQt6 is loaded long
-before any test in this process runs.
+Each module is imported in a fresh interpreter, because PyQt6 is already loaded in this process.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
@@ -23,21 +15,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Top-level modules of `origenerator` that must load with no Qt at all. Held as
-# a list rather than a rule because the rule ("everything but the gui package")
-# is not quite true: `comfyui_client` IS the Qt thread and `icon_design` draws
-# with QPainter.
 QT_FREE = (
-    # It builds the QApplication -- inside main(), like every other import it
-    # makes, so the splash is already up before the slow ones run. Importing it
-    # costs nothing, which is what tests/test_launch_smoke.py replays off its AST.
     "origenerator.app",
-    # What a click on a toast runs: a fresh process every time, whose
-    # whole job is over before the app it starts has drawn anything.
     "origenerator.app_link",
     "origenerator.windows_toast",
-    # What a closing copy starts to wait out its runs in flight, the toast it
-    # raises when one lands, and the one-copy rule it asks whether the app is back.
     "origenerator.landed_while_away",
     "origenerator.toast_raising",
     "origenerator.single_instance",
@@ -57,9 +38,6 @@ QT_FREE = (
     "origenerator.undo_stack",
     "origenerator.gallery_edits",
     "origenerator.run_toast",
-    # Out of the widget package with the rest of the app's machinery, and
-    # needing no Qt once there: the orientation key scheme, the spin-arrow
-    # PNGs, the slideshow's press vocabulary and the OSR2 controls' press grammar.
     "origenerator.item_shape",
     "origenerator.spin_arrows",
     "origenerator.slideshow_buttons",
@@ -67,10 +45,6 @@ QT_FREE = (
     "origenerator.funestras_engine",
 )
 
-# The two that legitimately do, at import. `comfyui_client` is one because it is
-# the websocket pump: it emits Qt signals from a thread, which is the one thing
-# about ComfyUI that genuinely needs Qt. Its eleven HTTP calls do not, and no
-# longer live on it.
 NEEDS_QT = (
     "origenerator.comfyui_client",
     "origenerator.icon_design",
@@ -78,7 +52,6 @@ NEEDS_QT = (
 
 
 def _qt_after_importing(module: str) -> bool:
-    """Whether importing *module* in a fresh interpreter pulled PyQt6 in."""
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
@@ -102,16 +75,7 @@ def test_a_module_that_claims_to_be_qt_free_is(module):
 
 @pytest.mark.parametrize("module", NEEDS_QT)
 def test_the_modules_that_do_need_qt_are_only_these(module):
-    """The control. Without it the list above could pass by importing nothing at
-    all, and the boundary would be decorative."""
     assert _qt_after_importing(module) is True
-# The app's own machinery, which the widget package used to hold: the session's
-# file channels, the two device drivers, the radio, the orientation
-# key scheme, the spin-arrow PNGs and the shared press vocabulary. Held as an
-# equality so a driver cannot drift back in beside the widgets -- the reason
-# each left is that importing a `gui` module dragged device I/O and filesystem
-# IPC with it, and a reader after the app's IPC contract had to know to look
-# inside the widget package to find it.
 OUTSIDE_THE_WIDGETS = (
     "radio",
     "osr2_controls_commands",

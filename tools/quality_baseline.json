@@ -511,7 +511,6 @@
     "tests/test_image_sorting.py": 1,
     "tests/test_importer.py": 75,
     "tests/test_launch_smoke.py": 1,
-    "tests/test_launcher_contract.py": 1,
     "tests/test_library_filing.py": 2,
     "tests/test_library_views.py": 4,
     "tests/test_look_lora_trainer.py": 1,

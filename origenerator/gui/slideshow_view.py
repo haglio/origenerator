@@ -24,6 +24,7 @@ from origenerator.gui.message import HEARD_MARK, INFO, Message
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.osr2_controls_state import (
     REPAINT_MS,
+    Osr2Situation,
     osr2_controls_state,
     post_device_action,
 )
@@ -227,11 +228,11 @@ class SlideshowView(QWidget):
             return None
         control = self._actions.osr2_control
         return osr2_controls_state(
-            self._motion, device=osr2_device.device_mode(),
+            self._motion, Osr2Situation(device=osr2_device.device_mode(),
             trouble=osr2_device.device_trouble(),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None,
-            broker_running=osr2_device.broker_running())
+            broker_running=osr2_device.broker_running()))
 
     def press_osr2_controls(self, action: str) -> bool:
         if self._motion is None:

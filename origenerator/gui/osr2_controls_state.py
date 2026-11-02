@@ -61,15 +61,21 @@ def _bars_drawn(bars) -> dict:
                 **asdict(control_limits(bars)))
 
 
-def osr2_controls_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED, trouble: Osr2Trouble | None = None,
-                control: str = OSR2_CONTROL_UNANSWERED, script=None,
-                broker_running: bool = True) -> MainHud:
-    shown = osr2_controls_state(motion, device=device, trouble=trouble, control=control, script=script,
-                             broker_running=broker_running)
+@dataclass(frozen=True)
+class Osr2Situation:
+    device: Osr2Mode = Osr2Mode.CONTROLLED
+    trouble: Osr2Trouble | None = None
+    control: str = OSR2_CONTROL_UNANSWERED
+    script: object = None
+    broker_running: bool = True
+
+
+def osr2_controls_hud(motion, situation: Osr2Situation = Osr2Situation()) -> MainHud:
+    shown = osr2_controls_state(motion, situation)
     return MainHud(
         main_hud_model=MainHudModel(
             main_mode=MainMode.GENAU,
-            osr2=shown.osr2, osr2_control=control, paused=shown.paused,
+            osr2=shown.osr2, osr2_control=situation.control, paused=shown.paused,
             osr2_rows=shown.osr2_rows, osr2_controls=shown.osr2_controls,
             max_intensity=shown.max_intensity,
         ),
@@ -88,10 +94,9 @@ class Osr2ControlsState:
     osr2_controls: tuple = ()
 
 
-def osr2_controls_state(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
-                     trouble: Osr2Trouble | None = None,
-                     control: str = OSR2_CONTROL_UNANSWERED, script=None,
-                     broker_running: bool = True) -> Osr2ControlsState:
+def osr2_controls_state(motion, situation: Osr2Situation = Osr2Situation()) -> Osr2ControlsState:
+    device, trouble, control = situation.device, situation.trouble, situation.control
+    script, broker_running = situation.script, situation.broker_running
     on = device is not Osr2Mode.OFF
     scripted = script is not None and script.active and on
     driving = motion.active and on and not scripted
@@ -110,7 +115,7 @@ def osr2_controls_state(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
 
 def osr2_controls_room(motion) -> tuple[int, int]:
     driving = SimpleNamespace(active=True, state=motion.state, parked_by_the_pause=False)
-    return MainHudPainter(device_only=True).rgba(osr2_controls_hud(driving, control=OSR2_DRIVING))[1]
+    return MainHudPainter(device_only=True).rgba(osr2_controls_hud(driving, Osr2Situation(control=OSR2_DRIVING)))[1]
 
 
 def post_device_action(action: str, *, motion, control=None) -> bool:

@@ -9,6 +9,7 @@ from shared_ui.pressable_drawing import PressableDrawing
 from origenerator import osr2
 from origenerator.gui.osr2_controls_state import (
     REPAINT_MS,
+    Osr2Situation,
     osr2_controls_hud,
     osr2_controls_room,
     post_device_action,
@@ -85,8 +86,8 @@ class Osr2Controls(PressableDrawing):
         self._drawn_device = self._device()
         device, trouble, broker_running = self._drawn_device
         return self._painter.rgba(osr2_controls_hud(
-            self._motion, device=device, trouble=trouble,
-            control=self._osr2_control(), script=self._script(), broker_running=broker_running))
+            self._motion, Osr2Situation(device=device, trouble=trouble,
+            control=self._osr2_control(), script=self._script(), broker_running=broker_running)))
 
     def _redraw_if_the_device_switched(self) -> bool:
         if self._device() == self._drawn_device:

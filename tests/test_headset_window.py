@@ -140,7 +140,7 @@ class TestTheRoomsPressesReachTheWindow:
 
     def test_a_right_click_is_handed_over_without_waiting_for_what_it_opens(
             self, tmp_path, qtbot):
-        # menu.exec() runs an event loop of its own, so a click handed over inside the poll's tick never returns.
+        # Qt's menu.exec() runs an event loop of its own, so a click handed over inside the poll's tick never returns.
         window = self._window(qtbot)
         opened: list[str] = []
         window.contextMenuEvent = lambda event: opened.append("menu")
@@ -196,7 +196,7 @@ class TestTheRoomsPressesReachTheWindow:
         assert pressed == ["100,100"], "the press did not arrive where it was aimed"
 
     def test_a_hand_that_shakes_on_the_trigger_starts_no_drag(self, tmp_path, qtbot):
-        # A drag runs off the real mouse, which nobody holds in a headset, so the app would wait on it forever.
+        # A Qt drag runs off the real mouse, which nobody holds in a headset, so the app would wait on it forever.
         window = self._window(qtbot)
         label = window.findChild(QLabel, "target")
         gesture = DragOut()
@@ -333,7 +333,7 @@ class TestWhatOpensOverTheWindow:
             headset._heard("press 30 30")
             headset._heard("release")
             qtbot.waitUntil(dropdown.view().isVisible)
-            # A list ignores a release within a double-click interval of opening.
+            # A Qt list ignores a release within a double-click interval of opening.
             qtbot.wait(QApplication.doubleClickInterval() + 100)
             view = dropdown.view()
             item = view.visualRect(dropdown.model().index(2, 0)).center()

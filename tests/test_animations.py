@@ -35,7 +35,7 @@ def test_show_videos_replaces_the_previous_tiles(qtbot):
     animations = Animations()
     qtbot.addWidget(animations)
     animations.show_videos([("v1", None, None), ("v2", None, None)])
-    animations.show_videos([("v3", None, None)])  # a different image's animations
+    animations.show_videos([("v3", None, None)])
     assert len(animations.findChildren(_VideoTile)) == 1
 
 

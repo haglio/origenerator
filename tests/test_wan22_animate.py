@@ -58,7 +58,7 @@ def test_the_run_reads_the_library_video_from_its_start_at_the_models_rate_for_t
         "custom_width": 0,
         "custom_height": 0,
         "frame_load_cap": 81,
-        "skip_first_frames": 32,       # 2.0 s at 16 fps
+        "skip_first_frames": 32,
         "select_every_nth": 1,
         "format": "None",
     }
@@ -170,7 +170,7 @@ def test_a_clip_longer_than_one_window_goes_on_from_the_seam_frame_further_into_
     _loader_id, loader = _node(payload, "VHS_LoadVideoPath")
     assert loader["inputs"]["frame_load_cap"] == 321
     segments = dict(_nodes(payload, "WanAnimateToVideo"))
-    assert set(segments) == {"19", "s1_animate"}   # 161 frames, then 160 more past the seam
+    assert set(segments) == {"19", "s1_animate"}
     first, second = segments["19"], segments["s1_animate"]
     assert "continue_motion" not in first["inputs"]
     assert (first["inputs"]["length"], first["inputs"]["video_frame_offset"]) == (161, 0)

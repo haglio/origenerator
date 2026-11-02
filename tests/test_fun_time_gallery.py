@@ -384,7 +384,7 @@ def test_a_region_slideshows_volume_is_not_what_a_standing_one_opens_at(qtbot, t
 
 
 def test_a_presented_slideshow_takes_the_keyboard(qtbot):
-    # The offscreen platform cannot express real activation, so the contract is pinned at the seam: presenting raises and activates the window.
+    # Qt's offscreen platform cannot express real activation, so the contract is pinned at the seam: presenting raises and activates the window.
 
     view = _fun_time_view(qtbot)
     stub = QWidget()

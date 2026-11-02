@@ -262,7 +262,7 @@ def _create_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
         if not_null:
             parts.append("NOT NULL")
         if default is not None:
-            # sqlite needs parentheses around a function default such as datetime('now') and accepts them on a literal.
+            # SQLite needs parentheses around a function default such as datetime('now') and accepts them on a literal.
             parts.append(f"DEFAULT ({default})")
         columns.append(" ".join(parts))
     conn.execute(f"CREATE TABLE {table} ({', '.join(columns)})")

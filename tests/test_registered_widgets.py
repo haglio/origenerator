@@ -1,4 +1,4 @@
-"""A widget a test hands ``qtbot.addWidget`` lives until that test is torn down."""
+"""A widget a test hands pytest-qt's ``qtbot.addWidget`` lives until that test is torn down."""
 from __future__ import annotations
 
 import gc

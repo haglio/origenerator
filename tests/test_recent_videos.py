@@ -93,7 +93,7 @@ class _LitOverWhatItIsHanded(QProxyStyle):
 def test_the_row_under_the_mouse_is_lit_once_all_around_its_thumbnail(qtbot, tmp_path):
     dropdown = _dropdown(qtbot, [RecentVideo("vid1", square(tmp_path, "red"))])
     style = _LitOverWhatItIsHanded("fusion")
-    style.setParent(dropdown)  # gone with the view it styles, never before it
+    style.setParent(dropdown)
     dropdown.view().setStyle(style)
     dropdown.showPopup()
 

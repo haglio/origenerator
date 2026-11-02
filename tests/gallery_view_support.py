@@ -230,7 +230,7 @@ class FakeDB:
 
 
     def record_trashed(self, prompt_id, row, batch, *, deleted_at=None):
-        self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
+        self._deletions.pop(prompt_id, None)
         self._deletions[prompt_id] = {
             "prompt_id": prompt_id, "row": row, "batch": batch,
             "deleted_at": "2026-08-15 03:00:00",

@@ -1856,7 +1856,7 @@ def test_closing_lets_the_engine_go_before_what_it_draws_into(qtbot, tmp_path):
 
 
 def test_a_slideshow_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):
-    # The switcher draws a window with no icon of its own as a blank page
+    # Windows' task switcher draws a window with no icon of its own as a blank page
     before = qapp.windowIcon()
     qapp.setWindowIcon(QIcon())
     try:

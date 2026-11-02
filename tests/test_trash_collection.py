@@ -239,9 +239,6 @@ def test_rewriting_a_held_items_record_keeps_its_date(tmp_path):
     assert (held["deleted_at"], held["row"]["seed"]) == (earlier, 2)
 
 
-# --- what a day in the Trash leaves ----------------------------------------
-
-
 def _held_item(tmp_path, db, prompt_id="p1", *, days=2):
     video = _file(tmp_path / "out" / f"{prompt_id}.mp4", b"video")
     thumb = _file(tmp_path / "thumbs" / f"{prompt_id}.jpg", b"thumb")
@@ -351,9 +348,6 @@ def test_an_item_whose_thumbnail_cannot_be_made_keeps_its_file(tmp_path):
     assert not trash_collection.is_emptied(db.get_trashed("p1"))
 
 
-# --- making an emptied item again ------------------------------------------
-
-
 def _emptied_item_being_regenerated(tmp_path, db):
     _held_item(tmp_path, db)
     trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path))
@@ -421,9 +415,6 @@ def test_a_canceled_job_puts_the_item_back_in_the_trash(tmp_path):
     assert trash_collection.settle_regenerations(db) == 1
 
     assert [item["prompt_id"] for item in trash_collection.trash_items(db.list_trashed())] == ["p1"]
-
-
-# --- what each launch does to the Trash ------------------------------------
 
 
 def _places_with_trash(tmp_path):

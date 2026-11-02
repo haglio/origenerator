@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# Nothing here raises a toast: it would appear on the user's screen.
+# Windows would show a toast on the user's screen, so nothing here raises one.
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -77,5 +77,5 @@ def test_a_name_longer_than_windows_files_under_is_refused_before_anything_is_ra
 
 
 def test_taking_back_a_notification_nobody_raised_is_no_error():
-    # Under an app id nothing uses, so it reaches no toast of the user's.
+    # Under an app id nothing uses, so Windows reaches no toast of the user's.
     windows_toast.take_back("Example.NothingUsesThisId", tag="never-raised", group="runs")

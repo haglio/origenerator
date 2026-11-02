@@ -15,7 +15,7 @@ _LONG = "Show in Explorer"
 
 @pytest.fixture(autouse=True)
 def _wearing_the_apps_own_chrome():
-    """A stylesheet moves both widths of every comparison, so measure under the app's own."""
+    """A Qt stylesheet moves both widths of every comparison, so measure under the app's own."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())

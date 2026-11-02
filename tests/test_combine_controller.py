@@ -614,8 +614,8 @@ def test_an_action_with_no_past_video_says_so_and_launches_nothing(combine,
 
     assert jobs.prepared == []
     assert host.told == [("No past video yet",
-                          "No past “waving” video to take settings from yet — make "
-                          "one first, or drop a specific video instead.")]
+                          ("No past “waving” video to take settings from yet — make "
+                           "one first, or drop a specific video instead."))]
 
 
 def test_that_hint_lands_at_the_center_top_of_the_slideshow_rather_than_a_dialog(combine, monkeypatch):

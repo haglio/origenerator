@@ -29,8 +29,8 @@ _TIPS = {
     STAR: ("Favorite this item", "Unfavorite this item"),
     TRASH: ("Delete this item",),
     icons.ENHANCE_OPEN: ("Enhance this image (upscale + re-sample)",),
-    icons.ENHANCE_HELD: ("Already enhanced at these settings — "
-                         "change one to make a different version",),
+    icons.ENHANCE_HELD: (("Already enhanced at these settings — "
+                          "change one to make a different version"),),
     icons.ENHANCE_MORE: ("Enhance again, at the settings now on the panel",),
 }
 

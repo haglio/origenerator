@@ -478,8 +478,8 @@ def test_removing_a_folder_of_your_own_says_the_items_it_holds_are_kept(qtbot):
 
     view._remove_custom_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
 
-    assert asked == ["Remove the folder “Keepers”?\n\n"
-                     "The 1 folder and 1 item it holds are kept."]
+    assert asked == [("Remove the folder “Keepers”?\n\n"
+                      "The 1 folder and 1 item it holds are kept.")]
 
 
 def test_a_folder_of_your_own_says_folders_and_items_can_be_dropped_on_it(qtbot):

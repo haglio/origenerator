@@ -345,8 +345,8 @@ def test_a_purge_that_cannot_finish_says_why_and_keeps_the_item_picked(
     view.purge_from_trash(["d1"])
 
     assert said == [("Delete failed",
-                     "Could not permanently delete the selected item(s):"
-                     "\n\nthe trash folder is gone")]
+                     ("Could not permanently delete the selected item(s):"
+                      "\n\nthe trash folder is gone"))]
     assert view.selected_prompt_ids() == ["d1"]
 
 

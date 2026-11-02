@@ -59,8 +59,8 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     elif item.reading.typical_seconds is None:
         lines = ["No timing data for this workflow yet"]
     else:
-        lines = [f"About {queue_estimate_label(item.reading.typical_seconds).lstrip('~')}"
-                 " on this workflow's recent runs"]
+        lines = [(f"About {queue_estimate_label(item.reading.typical_seconds).lstrip('~')}"
+                 " on this workflow's recent runs")]
     lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
     if item.action:
         lines.append(f"The “{item.action}” action, picked in Combine")

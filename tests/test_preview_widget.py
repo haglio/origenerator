@@ -291,6 +291,18 @@ def test_show_frame_ignores_undecodable_bytes(make_preview):
     assert w._image_label.pixmap().isNull()
 
 
+def test_a_truncated_frame_leaves_what_is_on_screen_as_it_was(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_message("modified")
+    shown = w._image_label.pixmap().cacheKey()
+
+    w.show_frame(b"not an image")
+
+    assert w._image_label.pixmap().cacheKey() == shown
+    assert w._message.text() == "modified"
+
+
 def test_the_video_on_screen_is_named_by_the_run_it_came_from(make_preview, tmp_path):
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4", "alpha-1")

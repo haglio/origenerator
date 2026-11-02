@@ -1138,3 +1138,13 @@ def test_a_further_folder_picked_into_several_loads_nothing_of_its_own(qtbot):
     view._on_folder_selected(view._tree_item_for(bird), None)
 
     assert view.selected_generation() is None
+
+
+def test_several_folders_picked_have_no_star_to_set_until_they_are_saved(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+
+    _pick(view, cat, dog)
+
+    assert not view._buttons.favorite.isEnabled()
+    view._favorite_selection()
+    assert view._db.folder_meta_map() == {}

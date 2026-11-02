@@ -1043,3 +1043,17 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
     assert sip.isdeleted(tile)
     assert in_flight == {"zone lit": True, "drag alive": True}
     assert zone.property("dragActive") is False
+
+
+def test_a_job_launched_as_an_action_is_made_from_no_video_though_one_gave_its_settings(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._combine._generate_combination("img", "vid")
+    (job,) = view._jobs.all_jobs
+    assert view._job_made_from(job, lambda video: video["prompt_id"]).source_video == "vid"
+
+    db.set_settings_source(job.prompt_id, category="alpha", video_prompt_id="vid")
+
+    assert view._job_made_from(job, lambda video: video["prompt_id"]).source_video is None

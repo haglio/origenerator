@@ -44,6 +44,7 @@ from tests.gallery_view_support import (
     _open_latest,
     _png_bytes,
     _reroll_client,
+    _resolve_by_id,
     _select_first_leaf,
     _set_enhance,
 )
@@ -754,8 +755,7 @@ def test_a_tab_turned_to_an_image_being_enhanced_shows_that_run(qtbot, tmp_path)
 
 def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbot, tmp_path,
                                                                             monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
+    _resolve_by_id(monkeypatch)
     db = _enhanceable_db(tmp_path, count=1)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -775,3 +775,20 @@ def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbo
 
     assert slideshow.hud_item_note == "Enhancing…"
     slideshow.close()
+
+
+def test_a_landed_enhancement_retires_the_enhance_button_and_the_tabs_live_row(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    tab = view._generate_pane.current_generate_tab()
+    assert view._buttons.enhance.isEnabled()
+    view.enhance_items(["g0"])
+    (job,) = view._jobs.all_jobs
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    assert not view._buttons.enhance.isEnabled()
+    assert tab._pending_enhancement is None

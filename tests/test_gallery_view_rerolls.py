@@ -15,6 +15,7 @@ from origenerator import (
     evolver_export,
 )
 from origenerator.db import Database
+from origenerator.gallery.shapes import PORTRAIT
 from origenerator.gui import (
     combine_controller,
 )
@@ -29,6 +30,7 @@ from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
     FakeDB,
+    _alls,
     _at,
     _frame_shown,
     _front_panel,
@@ -43,6 +45,7 @@ from tests.gallery_view_support import (
     _png_bytes,
     _reroll_client,
     _row,
+    _running_reroll,
     _search_for,
     _seeded_db,
     _select_first_leaf,
@@ -1044,3 +1047,211 @@ def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tm
     view._on_generate_requested(config.workflow_name, [config.params])
 
     assert len(view._jobs.all_jobs) == 1
+
+
+def test_only_a_settings_folder_has_generations_to_rewrite(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert GalleryView._folder_modify_rows(_image_workflow(view._tree).data(0, _GROUP_ROLE)) == []
+
+
+def test_the_tile_counts_a_run_for_every_image_with_or_without_a_thumbnail(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    _request_tile(view).clicked.emit()
+
+    tab = view._generate_pane.current_generate_tab()
+    assert tab._folder_modify.count == 3
+
+
+def test_opening_a_folders_prompt_in_a_tab_puts_the_run_down_as_the_selection(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _running_reroll(view)
+    assert view._selected_reroll_key is not None
+
+    _request_tile(view).clicked.emit()
+
+    assert view._selected_reroll_key is None
+
+
+def test_a_rewrite_that_comfyui_refuses_for_one_image_still_sends_the_rest(qtbot, tmp_path):
+    client = _reroll_client()
+    sent = []
+
+    def refusing_the_first(payload, prompt_id):
+        sent.append(prompt_id)
+        if len(sent) == 1:
+            raise ConnectionError("made-up refusal")
+        return prompt_id
+
+    client.submit_job = refusing_the_first
+    db = _folder_db(tmp_path, seeds=(7, 8, 9))
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    assert len(db.list_requests()) == 2
+
+
+def test_a_rewrite_of_a_sparsely_recorded_image_keeps_its_own_seed_not_the_tabs(qtbot, tmp_path):
+    db = Database(tmp_path / "sparse.db")
+    db.insert_generation(
+        prompt_id="sparse", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="a cat", negative_prompt="", seed=5,
+        params_json=json.dumps({"positive_prompt": "a cat"}), workflow_json="{}")
+    db.update_generation("sparse", status="completed",
+                         output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._on_modify_requested(key, "sdxl_t2i", {"positive_prompt": "a dog", "seed": 123456})
+
+    (job,) = view._jobs.all_jobs
+    assert job.params["seed"] != 123456
+
+
+def test_a_rewrite_lands_in_the_folder_of_its_words_on_the_workflows_defaults(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._on_modify_requested(key, "sdxl_t2i", {"positive_prompt": "a dog"})
+
+    assert list(view._jobs.jobs_by_folder) == [view.folder_key_for(
+        "sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a dog"))]
+
+
+def test_auto_generate_switched_on_over_a_folder_already_making_one_stays_on(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+
+    view._toggle_auto(True)
+
+    assert view._auto.is_active(key)
+
+
+def test_switching_auto_generate_off_from_another_folder_stops_it_there(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+
+    view._toggle_auto(False)
+
+    assert not view._auto.is_active(key)
+
+
+def test_auto_generate_that_could_not_launch_forgets_the_settings_it_read(qtbot, tmp_path):
+    client = _reroll_client()
+
+    def refusing(payload, prompt_id):
+        raise ConnectionError("made-up refusal")
+
+    client.submit_job = refusing
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._toggle_auto(True)
+
+    assert view._auto_generate_settings == {}
+
+
+def test_auto_generate_ending_forgets_the_settings_it_ran_on(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    assert key in view._auto_generate_settings
+
+    view._toggle_auto(False)
+
+    assert view._auto_generate_settings == {}
+
+
+def test_watching_auto_generate_the_next_variation_is_the_selection_not_a_saved_item(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    _generating_tile(view).selected.emit()
+
+    client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
+
+    assert view.selected_generation() is None
+    assert view.selected_prompt_ids() == []
+
+
+def test_auto_generates_launches_are_remembered_only_while_they_can_still_finish(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+
+    view._cancel_reroll(key)
+
+    assert view._auto_origins == {view._live_jobs[key].origin}
+
+
+def test_with_auto_generate_running_elsewhere_the_switch_leaves_the_saying_to_its_tip(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._toggle_auto(True)
+    assert view._buttons.auto.toolTip() != ""
+
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+
+    assert view._buttons.auto.toolTip() == ""
+
+
+def test_a_seed_re_roll_into_a_folder_already_making_one_starts_nothing(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+    asked = []
+    view._jobs.reroll_image_seed = lambda *args: asked.append(args)
+
+    view._reroll_item_seed("orig", "image")
+
+    assert asked == []
+
+
+def test_a_launch_in_a_portrait_folder_is_shown_on_that_side_whichever_is_browsed(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    params = dict(_SDXL.default_params(), positive_prompt="a tall one", width=720, height=1280)
+    key = view.folder_key_for("sdxl_t2i", params)
+    view._jobs.start_prepared(key, _SDXL, params)
+
+    assert view._launched_side(key) == PORTRAIT

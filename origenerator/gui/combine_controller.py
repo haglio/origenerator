@@ -215,9 +215,10 @@ class CombineController(QObject):
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def _video_history(self, intent: str) -> list[RecentVideo]:
+        videos = [row for row in self.rebuildable_videos(self._db.list_generations())
+                  if gallery.produced_output(row)]
         return [RecentVideo(row["prompt_id"], row.get("thumbnail_path"))
-                for row in video_history(self.rebuildable_videos(self._db.list_generations()),
-                                         intent, self._db.custom_combinations(),
+                for row in video_history(videos, intent, self._db.custom_combinations(),
                                          self._db.list_combine_video_uses())]
 
     def reread_names(self) -> None:

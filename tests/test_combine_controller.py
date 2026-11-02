@@ -476,6 +476,13 @@ def test_recent_shows_each_video_with_its_own_thumbnail(combine):
     assert controller.panel.history(act_settings.VIDEO) == [RecentVideo("full", "full-thumb.png")]
 
 
+def test_recent_leaves_out_a_finished_row_with_no_file(combine):
+    fileless = {**_video("fileless"), "output_files": None}
+    controller, _host = combine(db=FakeDB([fileless]))
+
+    assert _recent_under(controller, act_settings.VIDEO) == []
+
+
 def test_recent_leaves_out_what_the_video_slot_would_not_take(combine):
     controller, _host = combine(db=FakeDB([_image("img"), _video("running", status="running")]))
 

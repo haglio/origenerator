@@ -18,7 +18,7 @@ from origenerator.config import FRAMES_BEING_MADE_DIR
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneChannel, PaneSound
-from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.message import HEARD_MARK, INFO, Message
 from origenerator.gui.motion_hud import apply_motion_key
@@ -100,10 +100,12 @@ class SlideshowView(QWidget):
 
         channel = PaneChannel()
         self.slideshow = FunestraSlideshow(
-            items, shape=shape, channel=channel, shown=self,
-            frames=frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen"),
-            actions=self._actions, hud=hud, pace=pace,
-            start=start, shuffle=shuffle, versions=versions, parent=self)
+            Playing(items, start=start, shuffle=shuffle, hud=hud, actions=self._actions,
+                    versions=versions),
+            Seat(shape, channel,
+                 frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")),
+            Hosting(pace=pace, shown=self),
+            parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._pane = FunestraPane(

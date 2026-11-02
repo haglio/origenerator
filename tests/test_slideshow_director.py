@@ -127,12 +127,12 @@ class FakeSlideshow:
     def is_showing(self):
         return self.visible
 
-    def play(self, items, *, hud=None, versions=None, **kwargs):
-        self.items = list(items)
-        self.hud = hud
-        self.versions = versions
-        self.played.append(list(items))
-        self.played_with = kwargs
+    def play(self, playing):
+        self.items = list(playing.items)
+        self.hud = playing.hud
+        self.versions = playing.versions
+        self.played.append(list(playing.items))
+        self.played_with = {"start": playing.start, "shuffle": playing.shuffle}
 
     def set_versions(self, versions):
         self.versions = versions
@@ -154,8 +154,8 @@ class FakeSlideshow:
         self.reordered = (list(items), latest, set(enhanced_ids))
         self.kept_the_slide = keep_slide
 
-    def note_added(self, path, media_type, prompt_id, thumb, *, favorite, enhanced):
-        self.added.append((prompt_id, favorite, enhanced))
+    def note_added(self, slide, *, favorite, enhanced):
+        self.added.append((slide.prompt_id, favorite, enhanced))
 
     def note_generating(self, prompt_id, frame):
         self.generating.append((prompt_id, frame))
@@ -557,8 +557,15 @@ def slideshows(monkeypatch):
     def build_window(items, *, motion=None, **kwargs):
         return FakeWindow(build_slideshow(items, **kwargs), motion=motion)
 
+    def build_funestra_slideshow(playing, seat, hosting):
+        return build_slideshow(
+            playing.items, actions=playing.actions, hud=playing.hud, versions=playing.versions,
+            opening=playing.opening, start=playing.start, shuffle=playing.shuffle,
+            shape=seat.shape, channel=seat.channel, frames=seat.frames,
+            pace=hosting.pace, say=hosting.say)
+
     monkeypatch.setattr(module, "SlideshowView", build_window)
-    monkeypatch.setattr(module, "FunestraSlideshow", build_slideshow)
+    monkeypatch.setattr(module, "FunestraSlideshow", build_funestra_slideshow)
     monkeypatch.setattr(module.SlideshowDirector, "_wear_the_hud", lambda self, view, shape: None)
     monkeypatch.setattr(module, "place_window_in_device_pixels",
                         lambda *args: None)
@@ -2576,8 +2583,7 @@ def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_follow
         funestras={PORTRAIT: object(), LANDSCAPE: object()}))
     host.queue = ([_being_made("g-run")], 0)
 
-    director.open([], folder_items=[("a.png", "image", "g1", None)], start=0,
-                  frame=b"frame")
+    director.open([], folder_items=[("a.png", "image", "g1", None)], start=0)
 
     assert made[0].items == [("a.png", "image", "g1", None)]
     assert made[0].generating == [("g-run", b"frame")]

@@ -74,7 +74,8 @@ class FunestraPane(QWidget):
         super().__init__()
         self._user = user
         self._hud = hud
-        self._sound = sound
+        self._radio, self._volume = sound.radio, sound.volume
+        self._on_volume_moved = sound.on_volume_moved
         self._engine_for = engine_for
         self._engine = None
         self._funestra: Funestra | None = None
@@ -133,11 +134,11 @@ class FunestraPane(QWidget):
         self._funestra = Funestra(
             engine, channels=Channels(), playlist=self.channel.items, audible=True,
             muted=self._muted, users={"slideshow": self._user}, hud=self._hud,
-            radio=None if self._sound.radio is None else self._sound.radio.held_by_a_slideshow(),
-            on_volume_moved=self._sound.on_volume_moved)
+            radio=None if self._radio is None else self._radio.held_by_a_slideshow(),
+            on_volume_moved=self._on_volume_moved)
         self._funestra.set_muted(self._muted)
-        if self._sound.volume is not None:
-            self._funestra.set_volume(self._sound.volume)
+        if self._volume is not None:
+            self._funestra.set_volume(self._volume)
         self._funestra.playback.set_paused(self._paused)
         self.channel.opened(self._funestra)
         self._running_ahead.enter_context(ahead_while_playing())

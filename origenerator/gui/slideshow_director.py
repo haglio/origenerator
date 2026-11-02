@@ -41,7 +41,7 @@ from origenerator.gallery.shapes import (
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
 from origenerator.generation_state import GenerationSource, in_sight, source_of
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_places import (
     HudPlaces,
@@ -571,12 +571,13 @@ class SlideshowDirector:
                             versions, opening=None, **kwargs):
         occupant = self.region_slideshow(shape)
         if occupant is not None:
-            occupant.play(items, hud=hud, versions=versions, **kwargs)
+            occupant.play(Playing(items, hud=hud, versions=versions, **kwargs))
             return occupant
-        slideshow = FunestraSlideshow(items, shape=shape, channel=channel,
-                          frames=FrameFiles(FRAMES_BEING_MADE_DIR / shape),
-                          actions=actions, pace=self._pace_on(shape), hud=hud,
-                          versions=versions, say=self._host.say, opening=opening, **kwargs)
+        slideshow = FunestraSlideshow(
+            Playing(items, actions=actions, hud=hud, versions=versions, opening=opening,
+                    **kwargs),
+            Seat(shape, channel, FrameFiles(FRAMES_BEING_MADE_DIR / shape)),
+            Hosting(pace=self._pace_on(shape), say=self._host.say))
         self._region_slideshows[shape] = slideshow
         if self._room_paused:
             slideshow.set_paused(True)
@@ -597,7 +598,8 @@ class SlideshowDirector:
                                  versions=versions, **self._the_sound_standing_on_its_own(),
                                  **kwargs)
         else:
-            view.slideshow.play(items, actions=actions, hud=hud, versions=versions, **kwargs)
+            view.slideshow.play(
+                Playing(items, actions=actions, hud=hud, versions=versions, **kwargs))
         if built:
             self._present_surface(view, shape)
         else:
@@ -1048,7 +1050,7 @@ class SlideshowDirector:
 
     def _hand_the_file_to(self, slideshow, row: dict) -> None:
         for item in self.items_of([row]):
-            slideshow.note_added(*item, favorite=bool(row.get("starred")),
+            slideshow.note_added(Slide(*item), favorite=bool(row.get("starred")),
                                  enhanced=gallery.is_enhanced_row(row))
 
     def note_generating(self, prompt_id: str, frame: bytes):

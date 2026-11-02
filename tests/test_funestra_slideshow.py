@@ -17,7 +17,7 @@ from origenerator.fun_time_mode import FunestraChannel
 from origenerator.funscript import funscript_path_for
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
 from origenerator.gui.message import HEARD_MARK
@@ -62,9 +62,14 @@ def _channel(tmp_path: Path) -> FunestraChannel:
     )
 
 
-def _slideshow(qtbot, tmp_path, items=_ITEMS, **fields) -> FunestraSlideshow:
-    slideshow = FunestraSlideshow(items, shape="portrait", channel=_channel(tmp_path),
-                      frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
+def _seat(tmp_path) -> Seat:
+    return Seat("portrait", _channel(tmp_path), FrameFiles(tmp_path / "frames"))
+
+
+def _slideshow(qtbot, tmp_path, items=_ITEMS, *, pace=None, say=None, clock=None,
+               **playing) -> FunestraSlideshow:
+    slideshow = FunestraSlideshow(Playing(items, shuffle=in_order, **playing), _seat(tmp_path),
+                                  Hosting(pace=pace, say=say, clock=clock))
     slideshow._timer.stop()
     return slideshow
 
@@ -776,7 +781,7 @@ def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, t
 def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order)
+    slideshow.play(Playing(_ITEMS, start=2, shuffle=in_order))
 
     assert _sent(slideshow) == ["SET_PACE 4", "PLAY_FILE three.png", "RELOAD_PLAYLIST"]
 
@@ -784,7 +789,7 @@ def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot
 def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="three.png")
 
-    slideshow.play(_ITEMS, start=2, shuffle=in_order)
+    slideshow.play(Playing(_ITEMS, start=2, shuffle=in_order))
 
     assert _sent(slideshow) == ["SET_PACE 4", "RELOAD_PLAYLIST"]
 
@@ -803,7 +808,7 @@ def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
     slideshow.set_locked(True)
     _sent(slideshow)
 
-    slideshow.play(_ITEMS, start=1, shuffle=in_order)
+    slideshow.play(Playing(_ITEMS, start=1, shuffle=in_order))
 
     assert _sent(slideshow)[0] == "LOCK_OFF"
     assert slideshow.locked is False
@@ -1644,7 +1649,7 @@ def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, t
     slideshow.pause_for_request(True)
     _sent(slideshow)
 
-    slideshow.note_added("four.png", "image", "id-4")
+    slideshow.note_added(Slide("four.png", "image", "id-4"))
 
     assert "LOCK_OFF" not in _sent(slideshow)
 
@@ -1798,7 +1803,7 @@ def test_a_run_that_lands_is_its_file_on_the_funestra_from_then_on(qtbot, tmp_pa
     slideshow = _slideshow_with_the_funestra_on_a_run(qtbot, tmp_path)
     first_frame = read_playlist(slideshow.channel.playlist)[1].path
 
-    slideshow.note_added("run.png", "image", "id-run")
+    slideshow.note_added(Slide("run.png", "image", "id-run"))
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["run.png", "two.png", "three.png", "one.png"]
@@ -1887,7 +1892,7 @@ def test_a_run_that_lands_after_the_funestra_moved_on_is_the_funestras_next_item
     _says(slideshow, video="two.png")
     slideshow.tick()
 
-    slideshow.note_added("run.png", "image", "id-run")
+    slideshow.note_added(Slide("run.png", "image", "id-run"))
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played[:2] == ["two.png", "run.png"]
@@ -1985,8 +1990,8 @@ def test_a_ready_opening_hands_over_its_scripts_without_looking_on_disk(
     monkeypatch.setattr(slideshow_pass, "funscript_of", looked)
 
     slideshow = FunestraSlideshow(
-        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
-        opening=_ready_opening(items, scripts={"clip.mp4": script, "other.mp4": None}))
+        Playing(items, opening=_ready_opening(items, scripts={"clip.mp4": script, "other.mp4": None})),
+        _seat(tmp_path))
     slideshow._timer.stop()
 
     assert {item.path.name: item.funscript for item in read_playlist(slideshow.channel.playlist)} == {
@@ -1997,13 +2002,13 @@ def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
         qtbot, tmp_path, monkeypatch):
     items = [("clip.mp4", "video", "id-1")]
     slideshow = FunestraSlideshow(
-        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
-        opening=_ready_opening(items, scripts={"clip.mp4": None}))
+        Playing(items, opening=_ready_opening(items, scripts={"clip.mp4": None})),
+        _seat(tmp_path))
     slideshow._timer.stop()
     scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
 
     qtbot.waitUntil(lambda: not slideshow._scripts_on_opening)
-    slideshow.play(items)
+    slideshow.play(Playing(items))
 
     assert read_playlist(slideshow.channel.playlist)[0].funscript == scripts["clip.mp4"]
 
@@ -2016,9 +2021,9 @@ def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tm
         raise AssertionError("walked the library for the first slide's map")
 
     slideshow = FunestraSlideshow(
-        items, shape="portrait", channel=_channel(tmp_path), frames=FrameFiles(tmp_path / "frames"),
-        actions=SlideshowActions(neighbors=walked),
-        opening=_ready_opening(items, lead=1, lead_neighbors=neighbors))
+        Playing(items, actions=SlideshowActions(neighbors=walked),
+                opening=_ready_opening(items, lead=1, lead_neighbors=neighbors)),
+        _seat(tmp_path))
     slideshow._timer.stop()
 
     assert read_playlist(slideshow.channel.playlist)[0].path.name == "two.png"

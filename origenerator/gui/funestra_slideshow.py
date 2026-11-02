@@ -26,13 +26,13 @@ from funestra.playlist import PlaylistItem
 from funestra.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_transport import FunestraTransport
 from origenerator.gui.message import HEARD_MARK, INFO, WARNING
 from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
+from origenerator.gui.slideshow_playing import NO_HOSTING, Hosting, Playing, Seat
 from origenerator.gui.slideshow_set import (
     SlideshowSet,
     item_note,
@@ -56,25 +56,22 @@ class FunestraSlideshow(QObject):
     closed = pyqtSignal()
     media_changed = pyqtSignal()
 
-    def __init__(self, items, *, shape: str, channel, frames: FrameFiles, actions=None,
-                 hud=None, pace=None, start=None, shuffle=None, versions=None,
-                 say=None, shown=None, clock=None, opening=None, parent=None):
+    def __init__(self, playing: Playing, seat: Seat, hosting: Hosting = NO_HOSTING, parent=None):
         super().__init__(parent)
-        self._clock = clock or time.monotonic
+        start, versions, opening = playing.start, playing.versions, playing.opening
+        self._clock = hosting.clock or time.monotonic
         self._on_screen = OnScreenHistory()
-        self._shape = shape
-        self.channel = channel
-        self._actions = actions if actions is not None else SlideshowActions()
-        self.shown = shown if shown is not None else OnASessionsFunestra(
-            self, shape, channel, say, actions=self._actions)
-        self._frames = frames
+        self._shape, self._frames, self.channel = seat.shape, seat.frames, seat.channel
+        self._actions = playing.actions if playing.actions is not None else SlideshowActions()
+        self.shown = hosting.shown if hosting.shown is not None else OnASessionsFunestra(
+            self, seat.shape, seat.channel, hosting.say, actions=self._actions)
         self._scripts_on_opening = opening.scripts if opening is not None else {}
         self._request_holds_it = False
         self._held_short = False
         self._frame_on_funestra: Path | None = None
-        self._pace = pace if pace is not None else SlideshowPace(parent=self)
+        self._pace = hosting.pace if hosting.pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
-        self._take_set(items, start=start, shuffle=shuffle, hud=hud, opening=opening)
+        self._take_set(playing)
         self._open = True
         self._showing = ""
         def at_defaults() -> bool:
@@ -108,19 +105,18 @@ class FunestraSlideshow(QObject):
     def _look_for_scripts_from_now_on(self) -> None:
         self._scripts_on_opening = {}
 
-    def _take_set(self, items, *, start, shuffle, hud, opening=None) -> None:
+    def _take_set(self, playing: Playing) -> None:
         self._following = None
-        self._set = SlideshowSet(items, actions=self._actions,
-                                 shuffle=shuffle, start=start, hud=hud, opening=opening,
-                                 on_pass_change=self._pass_changed)
+        self._set = SlideshowSet(playing.items, actions=self._actions,
+                                 shuffle=playing.shuffle, start=playing.start, hud=playing.hud,
+                                 opening=playing.opening, on_pass_change=self._pass_changed)
 
-    def play(self, items, *, start=None, shuffle=None, hud=None, actions=None,
-             versions=None) -> None:
-        if actions is not None:
-            self._actions = actions
+    def play(self, playing: Playing) -> None:
+        if playing.actions is not None:
+            self._actions = playing.actions
         self._unlock()
-        self._take_set(items, start=start, shuffle=shuffle, hud=hud)
-        self._versions_stepper.arm(versions or {})
+        self._take_set(replace(playing, opening=None))
+        self._versions_stepper.arm(playing.versions or {})
         self._hand_over(land=True)
         self._publish()
 
@@ -573,15 +569,14 @@ class FunestraSlideshow(QObject):
     def holds(self, prompt_id: str) -> bool:
         return self._set.playlist.holds(prompt_id)
 
-    def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
-                   favorite: bool = False, enhanced: bool = False) -> None:
+    def note_added(self, slide: Slide, *, favorite: bool = False, enhanced: bool = False) -> None:
+        prompt_id = slide.prompt_id
         if favorite:
             self._set.favorite_ids.add(prompt_id)
         if enhanced:
             self._set.enhanced_ids.add(prompt_id)
-        slide = Slide(path, media_type, prompt_id, still)
         self._set.remember(slide)
-        if self._set.playlist.replace_live(prompt_id, path, media_type, still):
+        if self._set.playlist.replace_live(prompt_id, slide.path, slide.media_type, slide.still):
             self._hand_over(land=True)
             self._frames.forget(prompt_id)
         elif self._set.passes(slide) and self._set.playlist.add(slide):

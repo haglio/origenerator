@@ -20,6 +20,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
+from origenerator.gui.funestra_slideshow import Playing
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.message import ERROR, FAVORITE, HEARD_MARK, WARNING, Message
@@ -174,9 +175,9 @@ def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_
     view.slideshow.set_enhanced_mode(True)
     _settle(view)
 
-    view.slideshow.note_added(_png(tmp_path / "c.png"), "image", "c", None)
+    view.slideshow.note_added(Slide(_png(tmp_path / "c.png"), "image", "c", None))
     _settle(view)
-    view.slideshow.note_added(_png(tmp_path / "d.png"), "image", "d", None, enhanced=True)
+    view.slideshow.note_added(Slide(_png(tmp_path / "d.png"), "image", "d", None), enhanced=True)
     _settle(view)
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "d"]
@@ -353,8 +354,8 @@ def test_the_osr2_controls_transport_releases_the_lock_too(qtbot):
 def test_a_new_set_played_into_an_open_slideshow_starts_it_over_on_that_set(qtbot):
     view = _view(qtbot, [("a.png", "image", "id-a")])
 
-    view.slideshow.play([("b.png", "image", "id-b"), ("c.png", "image", "id-c")],
-              shuffle=in_order)
+    view.slideshow.play(Playing([("b.png", "image", "id-b"), ("c.png", "image", "id-c")],
+                                shuffle=in_order))
 
     assert view.slideshow._set.playlist.current() == Slide("b.png", "image", "id-b")
     assert [slide.path for slide in view.slideshow._set.playlist.in_play_order()] == ["b.png", "c.png"]
@@ -366,7 +367,7 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
     _settle(view)
     assert view.slideshow.hud_favorites_filter
 
-    view.slideshow.play([("b.png", "image", "id-b")], shuffle=in_order)
+    view.slideshow.play(Playing([("b.png", "image", "id-b")], shuffle=in_order))
     _settle(view)
 
     assert not view.slideshow.hud_favorites_filter
@@ -506,7 +507,7 @@ def test_culling_the_last_slide_hands_nothing_over(qtbot):
 def test_a_generation_that_lands_joins_the_slideshow(qtbot):
     view = _view(qtbot, [("a.png", "image", "id-a")])
 
-    view.slideshow.note_added("new.png", "image", "id-new", None)
+    view.slideshow.note_added(Slide("new.png", "image", "id-new", None))
     _settle(view)
 
     assert len(view.slideshow._set.playlist) == 2
@@ -517,7 +518,7 @@ def test_a_generation_that_lands_joins_the_slideshow(qtbot):
 def test_a_generation_already_playing_does_not_join_twice(qtbot):
     view = _view(qtbot, [("a.png", "image", "id-a")])
 
-    view.slideshow.note_added("a.png", "image", "id-a", None)
+    view.slideshow.note_added(Slide("a.png", "image", "id-a", None))
     _settle(view)
 
     assert len(view.slideshow._set.playlist) == 1
@@ -528,7 +529,7 @@ def test_an_arrival_is_handed_to_the_funestra_to_play_next(qtbot, tmp_path):
     view = _view(qtbot, [(a, "image", "id-a")])
     assert _engine(view).staged_next == Path(a)
 
-    view.slideshow.note_added("new.mp4", "video", "id-new", _png(tmp_path / "new_thumb.png"))
+    view.slideshow.note_added(Slide("new.mp4", "video", "id-new", _png(tmp_path / "new_thumb.png")))
     _settle(view)
 
     assert _engine(view).staged_next == Path("new.mp4")
@@ -1787,7 +1788,7 @@ def test_the_landed_file_takes_over_from_the_frames(qtbot, tmp_path):
     changed = []
     view.slideshow.media_changed.connect(lambda: changed.append(True))
 
-    view.slideshow.note_added(png, "image", "id-run")
+    view.slideshow.note_added(Slide(png, "image", "id-run"))
     _settle(view)
 
     assert _media_on_screen(view) == png
@@ -1797,7 +1798,7 @@ def test_the_landed_file_takes_over_from_the_frames(qtbot, tmp_path):
 def test_frames_are_ignored_once_it_has_landed(qtbot, tmp_path):
     png = _png(tmp_path / "done.png")
     view = _following(qtbot)
-    view.slideshow.note_added(png, "image", "id-run")
+    view.slideshow.note_added(Slide(png, "image", "id-run"))
     _settle(view)
 
     view.slideshow.note_generating("id-run", _png_bytes())
@@ -2220,7 +2221,7 @@ def test_a_live_slide_becomes_the_file_when_the_run_lands(qtbot, tmp_path):
     _settle(view)
     _press(view, Qt.Key.Key_Right)
 
-    view.slideshow.note_added(landed, "image", "id-run", None)
+    view.slideshow.note_added(Slide(landed, "image", "id-run", None))
     _settle(view)
 
     assert len(view.slideshow._set.playlist) == 2
@@ -2699,7 +2700,7 @@ def test_a_run_the_slideshow_opened_on_comes_back_finished_after_the_image_on_sc
     _runs_out(view)
     moved_on_to = _media_on_screen(view)
 
-    view.slideshow.note_added("run.png", "image", "id-run")
+    view.slideshow.note_added(Slide("run.png", "image", "id-run"))
     _settle(view)
     _runs_out(view)
 
@@ -2714,7 +2715,7 @@ def test_a_finished_image_comes_up_before_the_next_runs_first_frames(qtbot):
     _runs_out(view)
     _runs_out(view)
 
-    view.slideshow.note_added("first.png", "image", "id-first")
+    view.slideshow.note_added(Slide("first.png", "image", "id-first"))
     _settle(view)
     view.slideshow.note_generating("id-second", _png_bytes(color=(200, 40, 40)))
     _settle(view)

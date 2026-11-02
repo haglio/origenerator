@@ -21,7 +21,7 @@ from origenerator.gui import corner_buttons, drag_thumbnail, icons, viewport
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_slideshow import FunestraSlideshow
+from origenerator.gui.funestra_slideshow import FunestraSlideshow, Playing, Seat
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.viewport import Viewport
 from origenerator.output_places import OutputPlaces
@@ -425,13 +425,14 @@ def test_fullscreen_opens_over_the_wait_before_the_first_frame(live_preview):
 
 
 def _slideshow_on_a_sessions_funestra(tmp_path):
-    slideshow = FunestraSlideshow([(str(tmp_path / "a.png"), "image", "id-a")], shape="landscape",
-                      channel=FunestraChannel(
-                          playlist=tmp_path / "landscape.tsv",
-                          command_file=tmp_path / "landscape_cmd.txt",
-                          status_file=tmp_path / "landscape_status.txt",
-                          hud_file=tmp_path / "origenerator_landscape_hud.json"),
-                      frames=FrameFiles(tmp_path / "frames"))
+    channel = FunestraChannel(
+        playlist=tmp_path / "landscape.tsv",
+        command_file=tmp_path / "landscape_cmd.txt",
+        status_file=tmp_path / "landscape_status.txt",
+        hud_file=tmp_path / "origenerator_landscape_hud.json")
+    slideshow = FunestraSlideshow(
+        Playing([(str(tmp_path / "a.png"), "image", "id-a")]),
+        Seat("landscape", channel, FrameFiles(tmp_path / "frames")))
     slideshow._timer.stop()
     return slideshow
 

@@ -13,6 +13,7 @@ from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
     NO_VIDEO_ENHANCER,
     EnhanceController,
+    EnhanceParts,
     Offer,
 )
 from origenerator.gui.message import ERROR, INFO, WARNING
@@ -264,10 +265,10 @@ def enhance(monkeypatch):
     def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None,
               tabs=None):
         host = host or FakeHost()
-        return EnhanceController(
-            host, db=db or FakeDB(), jobs=jobs or FakeReroll(),
-            gallery_pane=gallery_pane or FakeGalleryPane(), slideshows=slideshows or FakeSlideshows(),
-            info_tabs_of=lambda: tabs or FakeTabs()), host
+        parts = EnhanceParts(
+            jobs=jobs or FakeReroll(), gallery_pane=gallery_pane or FakeGalleryPane(),
+            slideshows=slideshows or FakeSlideshows(), info_tabs_of=lambda: tabs or FakeTabs())
+        return EnhanceController(host, parts, db=db or FakeDB()), host
     return build
 
 

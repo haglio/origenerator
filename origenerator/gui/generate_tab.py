@@ -87,7 +87,7 @@ from origenerator.gui.message import set_marked_text
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowTraits
-from origenerator.gui.related_media import RelatedMedia
+from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.viewport import Viewport
 from origenerator.gui.warning_mark import WarningMark
@@ -347,12 +347,13 @@ class GenerateTab(DropZones):
         body.addWidget(self._form_host)
 
     def _build_related_media(self, body: QVBoxLayout) -> None:
-        self._related = RelatedMedia(video_rows=self._video_rows,
-                                     row_of=self._db.get_generation,
-                                     held_rows=lambda: self._library.now().held_rows,
-                                     name_of=self._names.of, animated_preview=self._animated_preview,
-                                     request_of=self._db.get_request,
-                                     requests_about=self._db.requests_about)
+        self._related = RelatedMedia(RelatedLookups(
+            video_rows=self._video_rows,
+            row_of=self._db.get_generation,
+            held_rows=lambda: self._library.now().held_rows,
+            name_of=self._names.of, animated_preview=self._animated_preview,
+            request_of=self._db.get_request,
+            requests_about=self._db.requests_about))
         self._related.link_clicked.connect(self.link_clicked)
         body.addWidget(self._related)
         self._versions = EnhanceVersions()

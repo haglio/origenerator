@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.animations import _VideoTile
-from origenerator.gui.related_media import RelatedMedia
+from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.source_tile import SourceTile
 
 
@@ -63,16 +63,16 @@ def make_related(qtbot):
     def _make(*videos, rows=(), held=(), requests=()):
         by_id = {row["prompt_id"]: row for row in (*videos, *rows)}
         by_made = {record["prompt_id"]: record for record in requests}
-        widget = RelatedMedia(video_rows=lambda: (asks.append(True), videos)[1],
-                              row_of=lambda prompt_id: (looked_up.append(prompt_id),
-                                                        by_id.get(prompt_id))[1],
-                              held_rows=lambda: list(held),
-                              animated_preview=lambda row: None,
-                              name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get,
-                              request_of=by_made.get,
-                              requests_about=lambda prompt_id: [
-                                  record for record in requests
-                                  if record["source_prompt_id"] == prompt_id])
+        widget = RelatedMedia(RelatedLookups(
+            video_rows=lambda: (asks.append(True), videos)[1],
+            row_of=lambda prompt_id: (looked_up.append(prompt_id), by_id.get(prompt_id))[1],
+            held_rows=lambda: list(held),
+            animated_preview=lambda row: None,
+            name_of={"img1": "3FA9C0D2 004", "vid0": "77B2E1A0 012"}.get,
+            request_of=by_made.get,
+            requests_about=lambda prompt_id: [
+                record for record in requests
+                if record["source_prompt_id"] == prompt_id]))
         asks: list = []
         looked_up: list = []
         widget.asks = asks

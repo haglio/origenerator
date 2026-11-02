@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
@@ -55,24 +56,29 @@ class _Links(CollapsibleSection):
         return tile
 
 
+@dataclass(frozen=True, kw_only=True)
+class RelatedLookups:
+    row_of: Callable[[str], dict | None]
+    name_of: Callable[[str], str]
+    animated_preview: Callable[[dict], str | None]
+    request_of: Callable[[str], dict | None]
+    requests_about: Callable[[str], list[dict]]
+    video_rows: Callable[[], list[dict]] = list
+    held_rows: Callable[[], list[dict]] = list
+
+
 class RelatedMedia(QWidget):
     link_clicked = pyqtSignal(str)
 
-    def __init__(self, parent=None, *, video_rows=None,
-                 row_of: Callable[[str], dict | None],
-                 name_of: Callable[[str], str],
-                 held_rows: Callable[[], list[dict]] = list,
-                 animated_preview: Callable[[dict], str | None],
-                 request_of: Callable[[str], dict | None],
-                 requests_about: Callable[[str], list[dict]]):
+    def __init__(self, lookups: RelatedLookups, parent=None):
         super().__init__(parent)
-        self._video_rows = video_rows or list
-        self._row_of = row_of
-        self._name_of = name_of
-        self._held_rows = held_rows
-        self._animated_preview = animated_preview
-        self._request_of = request_of
-        self._requests_about = requests_about
+        self._video_rows = lookups.video_rows
+        self._row_of = lookups.row_of
+        self._name_of = lookups.name_of
+        self._held_rows = lookups.held_rows
+        self._animated_preview = lookups.animated_preview
+        self._request_of = lookups.request_of
+        self._requests_about = lookups.requests_about
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_MEDIUM)

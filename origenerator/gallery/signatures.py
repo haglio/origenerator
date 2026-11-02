@@ -10,8 +10,6 @@ from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY, workf
 from origenerator.workflows.lora_rows import strength_key_of
 from origenerator.workflows.model_files import is_no_lora
 
-READINGS_KEPT = 20_000
-
 INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 
 ENHANCE_KEYS = frozenset({"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"})

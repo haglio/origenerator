@@ -53,7 +53,7 @@ from origenerator.gui import (
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
-from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
+from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.item_shape import shaped_key
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
@@ -2422,8 +2422,7 @@ def test_with_room_to_spare_the_enhance_settings_under_the_thumbnails_open_whole
 
 def test_with_room_to_spare_the_hud_opens_whole_at_the_top_left_even_at_its_widest(
         qtbot, tmp_path):
-    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client(),
-                       osr2_motion=_SignalMotion())
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client(), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     view.resize(1500, 1100)
     view.show()

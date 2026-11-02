@@ -16,7 +16,7 @@ from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.shapes import SEPARATE, TOGETHER
-from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.message import INFO, WARNING
@@ -366,7 +366,7 @@ def test_a_region_slideshow_is_muted_like_every_satellite(qtbot, tmp_path):
 
 def _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path):
     radio = _FakeRadio()
-    view = GalleryView(FakeDB([]), fun_time=_session(), radio=radio)
+    view = GalleryView(FakeDB([]), fun_time=_session(), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
@@ -1252,7 +1252,7 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
 
 def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.osr2_control.setChecked(True)
     assert motion.active
@@ -1265,7 +1265,7 @@ def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(q
 
 def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.osr2_control.setChecked(True)
 
@@ -1279,7 +1279,7 @@ def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(
 
 def test_a_gallery_drives_again_once_the_session_beside_it_lets_the_device_go(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.osr2_control.the_session_has_it(True)
 
@@ -1337,7 +1337,7 @@ def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.become_hosted(_session())
 
@@ -1351,7 +1351,7 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
 
 def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_again(qtbot):
     radio = _FakeRadio()
-    view = GalleryView(FakeDB([]), radio=radio)
+    view = GalleryView(FakeDB([]), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     view.become_hosted(_session())
 
@@ -1393,7 +1393,7 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_ag
 
 def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
     radio, motion = _FakeRadio(), _SignalMotion()
-    view = GalleryView(FakeDB([]), radio=radio, osr2_motion=motion)
+    view = GalleryView(FakeDB([]), shared=Shared(radio=radio, osr2_motion=motion))
     qtbot.addWidget(view)
     view._buttons.radio.setChecked(True)
     view.osr2_control.setChecked(True)
@@ -1498,7 +1498,7 @@ def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satelli
 
 def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
 
     view.become_hosted(_session())

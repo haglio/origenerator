@@ -36,6 +36,9 @@ from origenerator.gui.drop_zone import DropZone
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_form import (
+    NO_TRAITS,
+    FormHelpers,
+    WorkflowTraits,
     BOTH_STRENGTHS_ONE_HELP,
     EVERY_SCENE_SPEAKS_HELP,
     STRENGTH_ONE_HELP,
@@ -226,7 +229,7 @@ def test_a_written_seed_pins_itself_by_default(qtbot):
 
 def test_a_form_that_does_not_pin_keeps_random_and_shows_a_fresh_seed_over_a_loaded_one(
         qtbot):
-    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], WorkflowTraits(pins_reused_seed=False))
     qtbot.addWidget(form)
 
     form.set_values({"seed": 12345})
@@ -238,7 +241,7 @@ def test_a_form_that_does_not_pin_keeps_random_and_shows_a_fresh_seed_over_a_loa
 
 
 def test_a_form_that_does_not_pin_locks_the_items_own_seed_when_random_is_unticked(qtbot):
-    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], WorkflowTraits(pins_reused_seed=False))
     qtbot.addWidget(form)
     form.set_values({"seed": 12345})
     form.show_item({"seed": 12345})
@@ -282,10 +285,10 @@ def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
     assert 0 <= copy_i < random_i
 
 
-def _seed_form(qtbot, history, **kwargs):
-    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)],
-                     seed_history=SeedHistory(lambda key: history, lambda item: None),
-                     **kwargs)
+def _seed_form(qtbot, history, traits=NO_TRAITS):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], traits,
+                     helpers=FormHelpers(
+                         seed_history=SeedHistory(lambda key: history, lambda item: None)))
     qtbot.addWidget(form)
     return form, form._widgets["seed"]
 
@@ -467,7 +470,7 @@ def test_opening_the_dropdown_is_no_edit_of_the_seed_in_the_field(qtbot):
 def test_picking_a_seed_from_the_dropdown_puts_it_in_the_field_and_pins_it(
         qtbot, pins_reused_seed):
     form, field = _seed_form(qtbot, [SeedUse(30, None), SeedUse(20, None)],
-                             pins_reused_seed=pins_reused_seed)
+                             WorkflowTraits(pins_reused_seed=pins_reused_seed))
     field.showPopup()
     view = field.view()
 
@@ -521,9 +524,8 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
 
 def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot):
     form = ParamForm([ParamDef("input_image", "Image", "image", ""),
-                      ParamDef("video", "Video to Perform", "video", "")],
-                     size_deriver=lambda values: (864, 480) if values.get("video") else None,
-                     size_source="video")
+                      ParamDef("video", "Video to Perform", "video", "")], WorkflowTraits(size_deriver=lambda values: (864, 480) if values.get("video") else None,
+                     size_source="video"))
     qtbot.addWidget(form)
     assert form._dim_value_labels["width"].text() == "—"
 
@@ -535,8 +537,7 @@ def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot)
 
 def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qtbot):
     form = ParamForm([ParamDef("input_image", "Start Image", "image", ""),
-                      ParamDef("seed", "Seed", "seed", 0)],
-                     size_deriver=lambda values: (400, 800) if values.get("input_image") else None)
+                      ParamDef("seed", "Seed", "seed", 0)], WorkflowTraits(size_deriver=lambda values: (400, 800) if values.get("input_image") else None))
     qtbot.addWidget(form)
 
     form._widgets["input_image"].set_item("frame.png")
@@ -718,8 +719,7 @@ def test_turning_random_on_from_outside_draws_and_off_puts_the_items_seed_back(q
 
 def test_a_form_sized_from_its_input_says_what_size_it_would_make(qtbot):
     form = ParamForm([ParamDef("input_image", "Input Image", "image", ""),
-                      ParamDef("noise_seed", "Seed", "seed", 0)],
-                     size_deriver=lambda values: (464, 912))
+                      ParamDef("noise_seed", "Seed", "seed", 0)], WorkflowTraits(size_deriver=lambda values: (464, 912)))
     qtbot.addWidget(form)
 
     assert form.output_size() == (464, 912)
@@ -820,9 +820,7 @@ def _image_def():
 
 def _sized_form(qtbot, size=(864, 480)):
     form = ParamForm(
-        [_image_def()],
-        size_deriver=lambda params: size if params.get("input_image") else None,
-    )
+        [_image_def()], WorkflowTraits(size_deriver=lambda params: size if params.get("input_image") else None))
     qtbot.addWidget(form)
     return form
 
@@ -842,8 +840,7 @@ def test_locked_dimensions_render_as_plain_values_not_input_fields(qtbot):
 
 
 def test_a_derived_size_names_the_image_it_is_read_from_as_the_form_does(qtbot):
-    form = ParamForm([ParamDef("input_image", "Start Image", "image", "")],
-                     size_deriver=lambda params: None)
+    form = ParamForm([ParamDef("input_image", "Start Image", "image", "")], WorkflowTraits(size_deriver=lambda params: None))
     qtbot.addWidget(form)
 
     assert form._dimensions_hint.text() == "Sized from the start image. Unlock to override."
@@ -1322,7 +1319,7 @@ def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
 def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     defs = wf.param_definitions()
-    form = ParamForm(defs, hidden_keys=wf.enhance_keys())
+    form = ParamForm(defs, WorkflowTraits(hidden_keys=wf.enhance_keys()))
     qtbot.addWidget(form)
     shown = [d.key for d in defs if d.key not in wf.enhance_keys()]
     assert form._keys_in_order() == sorted(shown, key=param_sections.key_rank)
@@ -1343,7 +1340,7 @@ def test_shared_sections_appear_in_the_same_order_across_workflows(qtbot):
 
 def test_hidden_params_get_no_field(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
-    form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
+    form = ParamForm(wf.param_definitions(), WorkflowTraits(hidden_keys=wf.enhance_keys()))
     qtbot.addWidget(form)
     shown = set(form._keys_in_order())
     assert shown.isdisjoint(set(wf.enhance_keys()))
@@ -1353,7 +1350,7 @@ def test_hidden_params_get_no_field(qtbot):
 def test_every_field_and_its_label_carry_the_params_help(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     definitions = wf.param_definitions()
-    form = ParamForm(definitions, hidden_keys=wf.enhance_keys())
+    form = ParamForm(definitions, WorkflowTraits(hidden_keys=wf.enhance_keys()))
     qtbot.addWidget(form)
     for pd in definitions:
         if pd.key in form._widgets:
@@ -1394,7 +1391,7 @@ def test_a_pages_recommendation_takes_the_good_ranges_place_until_it_goes(qtbot)
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
-    form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
+    form = ParamForm(wf.param_definitions(), WorkflowTraits(hidden_keys=wf.enhance_keys()))
     qtbot.addWidget(form)
     assert form.get_values()["enhance"] is False
 
@@ -2120,8 +2117,7 @@ _PROMPT_STRENGTH_ADVICE = {"cfg_high": Advice("Example Model's page recommends 3
 
 
 def _wan_form(qtbot):
-    return _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
-                                      size_deriver=lambda values: (464, 912)))
+    return _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(), WorkflowTraits(size_deriver=lambda values: (464, 912))))
 
 
 def test_clicking_a_sections_warning_resolves_every_warning_in_it_and_none_outside(qtbot):
@@ -2165,8 +2161,7 @@ def test_a_storys_length_off_its_good_range_warns_beside_its_scenes(qtbot):
 
 
 def test_the_scenes_tooltip_says_the_good_range_their_warning_holds_the_story_to(qtbot):
-    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
-                     size_deriver=lambda values: (464, 912))
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(), WorkflowTraits(size_deriver=lambda values: (464, 912)))
     qtbot.addWidget(form)
 
     assert " Good range: 5\u201310 s. " in form._labels["scene_frames"].toolTip()
@@ -2340,8 +2335,7 @@ def _shown_keys(form):
 
 
 def test_every_warning_mark_sits_in_one_column_whether_or_not_its_row_can_warn(qtbot):
-    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
-                                      size_deriver=lambda values: (464, 912)))
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(), WorkflowTraits(size_deriver=lambda values: (464, 912))))
 
     outside_the_size_margin = [key for key in _shown_keys(form)
                                if param_sections.section_title(key) != "Size"]
@@ -2357,8 +2351,7 @@ def _gap_after_label(form, key):
 
 
 def test_every_field_starts_as_far_from_its_label_whether_or_not_it_can_warn(qtbot):
-    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
-                                      size_deriver=lambda values: (464, 912)))
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(), WorkflowTraits(size_deriver=lambda values: (464, 912))))
 
     gaps = {key: _gap_after_label(form, key) for key in _shown_keys(form)}
     assert {"steps", "noise_seed", "width", "scene_frames"} <= set(gaps)
@@ -2444,7 +2437,7 @@ def test_an_image_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qt
 
 def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
     form = ParamForm([ParamDef("input_image", "Image", "image", ""),
-                      ParamDef("video", "Video to Perform", "video", "")], items=_Lends())
+                      ParamDef("video", "Video to Perform", "video", "")], helpers=FormHelpers(items=_Lends()))
     qtbot.addWidget(form)
     edits = []
     form.changed.connect(lambda: edits.append(form.get_values()))
@@ -2459,7 +2452,7 @@ def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
 
 
 def test_a_dropped_item_is_named_under_the_zones_image(qtbot):
-    form = ParamForm([ParamDef("input_image", "Image", "image", "")], items=_Lends())
+    form = ParamForm([ParamDef("input_image", "Image", "image", "")], helpers=FormHelpers(items=_Lends()))
     qtbot.addWidget(form)
 
     _let_go(form._widgets["input_image"], "image1")
@@ -2468,7 +2461,7 @@ def test_a_dropped_item_is_named_under_the_zones_image(qtbot):
 
 
 def test_clicking_a_held_item_leads_back_to_it(qtbot):
-    form = ParamForm([ParamDef("input_image", "Image", "image", "")], items=_Lends())
+    form = ParamForm([ParamDef("input_image", "Image", "image", "")], helpers=FormHelpers(items=_Lends()))
     qtbot.addWidget(form)
     led_to = []
     form.item_activated.connect(led_to.append)
@@ -2489,7 +2482,7 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
         installed_models.add("loras", f"{name}.safetensors", arch="krea2", lora=True,
                              metadata={"ss_training_finished_at": "1792851468.891"})
     form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA, options=[
-        NO_LORA, "example_look.safetensors", "example_style.safetensors"])], lora_keys=("lora",))
+        NO_LORA, "example_look.safetensors", "example_style.safetensors"])], WorkflowTraits(lora_keys=("lora",)))
     qtbot.addWidget(form)
     dropdown = form._widgets["lora"]
     trained = f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}."
@@ -2502,9 +2495,9 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
     assert dropdown.toolTip() == param_help("lora")
 
 
-def _lora_form(qtbot, **options):
+def _lora_form(qtbot, traits=NO_TRAITS):
     form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA,
-                               options=[NO_LORA, "example_look.safetensors"])], **options)
+                               options=[NO_LORA, "example_look.safetensors"])], traits)
     qtbot.addWidget(form)
     return form
 
@@ -2530,7 +2523,7 @@ def _model_and_its_lora(qtbot, recorded_base_models, model):
 
 
 def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot, tmp_path, monkeypatch):
-    form = _lora_form(qtbot, lora_keys=("lora",))
+    form = _lora_form(qtbot, WorkflowTraits(lora_keys=("lora",)))
     controls = form._training_controls["lora"]
     assert controls.isHidden()
     opened = []

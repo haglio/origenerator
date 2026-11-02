@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
 from typing import Protocol
 
 from PyQt6.QtCore import QObject
@@ -20,7 +19,7 @@ from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.export_lane import GENAU as GENAU_LANE
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
-from origenerator.gui.combine import Combine, ZoneLookups
+from origenerator.gui.combine import Combine, CombineParts, ZoneLookups
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.message import ERROR, INFO, WARNING
@@ -57,17 +56,6 @@ class CombineHost(Protocol):
     def follow_link(self, prompt_id: str) -> None: ...
 
     def tell(self, title: str, message: str) -> None: ...
-
-
-@dataclass
-class CombineParts:
-    jobs: object
-    client: object
-    info_tabs_of: object
-    slideshows: object
-    starting: StartingRows
-    inbox: evolver_export.EvolverInbox | None = None
-    names: ItemNames | None = None
 
 
 class CombineController(QObject):

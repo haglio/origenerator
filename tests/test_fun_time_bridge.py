@@ -980,7 +980,7 @@ def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
 def _a_line_like(template: str, tmp_path) -> str:
     return template.format(
         file=r"C:\library\scene one.png", row="alpha", words="favorites",
-        corner="lower_right", on="1", x="10", y="5", steps="-1",
+        corner="lower_right", on="1", has="1", x="10", y="5", steps="-1",
         frames=str(tmp_path / "frame.bin"), input=str(tmp_path / "input.txt"))
 
 
@@ -1096,9 +1096,26 @@ def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
     assert view.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
 
 
-def _radio_videos(tmp_path, count=6):
-    videos = tmp_path / "radio"
-    videos.mkdir()
+def test_the_session_says_which_funestra_has_the_osr2_and_the_slideshow_there_hears_it(
+        qtbot, tmp_path, monkeypatch):
+    """Only the session knows where the OSR2 is, and a slideshow's Skip ahead
+    grays by it: said of a shape before and after its slideshow opens alike."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    view._fun_time.command_file.write_text("portrait_osr2|1\n", encoding="utf-8")
+    bridge._drain_commands()
+
+    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    assert slideshow.has_osr2 is True
+
+    view._fun_time.command_file.write_text("portrait_osr2|0\n", encoding="utf-8")
+    bridge._drain_commands()
+
+    assert slideshow.has_osr2 is False
+
+
+def _radio_clips(tmp_path, count=6):
+    clips = tmp_path / "radio"
+    clips.mkdir()
     for index in range(count):
         (videos / f"clip{index}.mp4").touch()
     return videos

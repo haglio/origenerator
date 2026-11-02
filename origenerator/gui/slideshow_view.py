@@ -243,7 +243,8 @@ class SlideshowView(QWidget):
             return self._action_here(action)
         allowed = ("satellites_kino_activate", "origenerator_activate",
                    *(spelled_for(self._hud_shape, verb)
-                     for verb in ("prev", "next", "lock", "trash")))
+                     for verb in ("prev", "nudge_prev", "nudge_next", "next",
+                                  "funscript_jump", "lock", "trash")))
         if command not in allowed:
             return False
         append_command(self._dashboard_cmd_file, command)

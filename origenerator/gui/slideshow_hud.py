@@ -82,7 +82,12 @@ def slideshow_hud_model(shape: str, slideshow, *, hosted: bool = True,
                             enhanced=enhanced, order=order_label, hosted=hosted,
                             own_window=own_window,
                             has_other_versions=slideshow.has_other_versions,
-                            clip_seconds=slideshow.dwell_s),
+                            clip_seconds=slideshow.dwell_s,
+                            longer_than_a_step=slideshow.longer_than_a_step,
+                            image=slideshow.showing_image,
+                            has_funscript=slideshow.has_funscript,
+                            has_osr2=device is not None or slideshow.has_osr2,
+                            nothing_to_reset=slideshow.nothing_to_reset),
         # The device's own line and readout, where this window is the one
         # driving: on the HUD the set is on, so nothing is said twice.
         osr2_rows=device.osr2_rows if device is not None else (),

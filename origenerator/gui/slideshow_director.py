@@ -91,7 +91,7 @@ from origenerator.slideshow import (
     SlideshowState,
     in_order,
 )
-from origenerator.slideshow_buttons import HUD_CORNER
+from origenerator.slideshow_buttons import HAS_THE_OSR2, HUD_CORNER
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.dictation import words_of
 from origenerator.voice.slideshow_commands import SlideshowCommand
@@ -309,6 +309,7 @@ class SlideshowDirector:
         self._standalone_showing: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
         self._hud_minimized: dict[str, bool] = {}
+        self._has_osr2: dict[str, bool] = {}
         # Every slideshow currently up, each with the collection/folder key it opened
         # from: what a landing generation is offered to, so a slideshow keeps up
         # with an auto-generating folder however far the Gallery pane has moved on.
@@ -647,6 +648,7 @@ class SlideshowDirector:
             lock=(self._show_the_locked_generation
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
+            at_base=(self.region_at_base if self._fun_time is not None else None),
             reorder=self.reorder_slideshow,
             browse_all=self.browse_it_all,
             # The queue's own four: the block at the HUD's foot re-lines the
@@ -724,6 +726,7 @@ class SlideshowDirector:
         # way a window one does.
         if self._room_paused:
             slideshow.set_paused(True)
+        slideshow.set_has_osr2(self._has_osr2.get(side, False))
         return slideshow
 
     def _open_a_window(self, items, shape: str, *, window_shape: str, actions, hud, versions,
@@ -954,15 +957,20 @@ class SlideshowDirector:
         if self._room_paused:
             view.slideshow.set_paused(True)
         self._wear_the_hud(view, shape)
+        view.slideshow.set_has_osr2(self._has_osr2.get(shape, False))
 
     def hud_place(self, shape: str) -> tuple[HudCorner, bool]:
         return (self._hud_corners.get(shape, HudCorner.UPPER_LEFT),
                 self._hud_minimized.get(shape, False))
 
-    def place_a_hud(self, shape: str, action: str, argument: str) -> None:
+    def tell_the_hud(self, shape: str, action: str, argument: str) -> None:
+        """What the session says of *shape*'s HUD: where it sits, whether it is
+        parked, and whether that Funestra has the OSR2."""
         corner, minimized = self.hud_place(shape)
         if action == HUD_CORNER:
             self._hud_corners[shape] = read_mode(HudCorner, argument, corner)
+        elif action == HAS_THE_OSR2:
+            self._has_osr2[shape] = argument == "1"
         else:
             self._hud_minimized[shape] = argument == "1"
         self._tell_the_slideshow_wearing_it(shape)
@@ -984,6 +992,9 @@ class SlideshowDirector:
         for surface in self.surfaces():
             if getattr(surface.shown, "hud_shape", "") == shape:
                 surface.shown.set_hud_place(*self.hud_place(shape))
+        slideshow = self.region_slideshow(shape)
+        if slideshow is not None:
+            slideshow.set_has_osr2(self._has_osr2.get(shape, False))
 
     def _wear_the_hud(self, view, shape: str) -> None:
         """Put the Funestras' own HUD on *view* — the same HUD, rendered by the
@@ -1272,6 +1283,13 @@ class SlideshowDirector:
         """Which satellite region *slideshow* is holding, if it holds one."""
         return next((shape for shape, on_that_side in self._region_slideshows.items()
                      if on_that_side is slideshow), None)
+
+    def region_at_base(self, slideshow) -> bool:
+        """Whether *slideshow* is already playing its region's base state, which
+        leaves its reset nothing to go back to."""
+        side = self._side_of(slideshow)
+        where = next((where for live, where in self._live_slideshows if live is slideshow), None)
+        return side is None or where == self.base_location(side)
 
     def reset_region(self, slideshow) -> None:
         """A region's reset: back to the base state, not to the top of whatever

@@ -7,6 +7,11 @@ The verbs are the side's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that shape; standalone,
 the slideshow answers the same verb itself.
 
+The controls a Satellite's HUD carries in Kino mode too are
+:mod:`funestra.hud_controls`' declarations, in that HUD's order; this app adds
+its own words where a control does something else here (the lock, the trash,
+reset), and the two controls only a slideshow has (Enhanced only, Clip seconds).
+
 Only what a slideshow answers is declared, which depends on what is drawing the
 HUD: the session's mode pair is drawn by a slideshow covering a region — but
 not by one handed to a Funestra, whose HUD the session puts its own row on.  A
@@ -20,22 +25,25 @@ from typing import Any
 
 from funestra.console import ROW_LABEL_W, VALUE_W
 from funestra.hud_button import FIT_THE_WORD, Button
-from funestra.hud_marks import FMODE_ICON, LOCK_ICON, NEXT_ICON, PREVIOUS_ICON, shared_mark
+from funestra.hud_controls import (
+    browse_order_buttons,
+    favorites_only_tooltip,
+    fmode_button,
+    funscript_jump_button,
+    lock_button,
+    reset_button,
+    transport,
+    trash_button,
+    versions_button,
+)
+from funestra.hud_marks import shared_mark
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
-from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL
 
 from origenerator.osr2_controls_commands import FILTER, spelled_for
 
-# The HUD's button row, in the order the Funestras put the same controls in.  The tuples are
-# the groups the wider gap opens between.
-CONTROL_GROUPS = (
-    ("prev", "next"),
-    ("lock", "trash", "fmode"),
-    ("enhanced", "reset"),
-    ("shuffle", "latest"),
-    ("cycle_version",),
-)
-_GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
+# What a slideshow plays, in the word its HUD says.
+SLIDE = "slide"
 
 # The mode pair, which is about the SESSION rather than about this slideshow: the way
 # back to the Funestras' own videos, and this mode lit beside it.  Its verbs are
@@ -58,33 +66,14 @@ MODE_TOOLTIPS = {
         "Origenerator mode — Origenerator over the browser, its slideshows over the Funestras",
 }
 
-CONTROL_FACES = {
-    "prev": PREVIOUS_ICON, "next": NEXT_ICON, "lock": LOCK_ICON,
-    "trash": shared_mark("trash"), "fmode": FMODE_ICON,
-    "enhanced": shared_mark("enhance_filter"), "reset": shared_mark("reset"),
-    "shuffle": shared_mark("shuffle"), "latest": shared_mark("latest"),
-    "cycle_version": shared_mark("versions"),
-}
+ENHANCED_ICON = shared_mark("enhance_filter")
 
-# Said after the versions tooltip on an item filed once, so a faded button says
-# what is missing rather than looking broken.
-_NO_OTHER_VERSION = " (none for this one)"
-
-# What each one is, in this app's words rather than a Funestra's: these act on the
-# generations this app made, so the Trash is the Gallery pane buttons' Delete and the lock is
-# the whole of what locking a slide means here.
-CONTROL_TOOLTIPS = {
-    "prev": "Previous slide",
-    "next": "Next slide",
-    "lock": "Lock this one on screen — favoriting it, and asking for a better version",
-    "trash": "Delete this one and move on",
-    "fmode": f"{F_MODE_LABEL} — play only the favorites",
-    "enhanced": "Enhanced only — play just the images that have been enhanced",
-    "shuffle": f"{SHUFFLE_LABEL} — every image and video of this shape, shuffled",
-    "latest": f"{LATEST_LABEL} — every image and video of this shape, newest first",
-    "cycle_version": "Other versions of this one — an enhancement, the image it was "
-                "made from, the upscale Evolver made of a video",
-}
+# What the controls that do something else here do, in this app's words: these
+# act on the generations this app made, so the bin is the toolbar's Delete and
+# the lock is the whole of what locking a slide means here.
+LOCK_TOOLTIP = "Lock this one on screen — favoriting it, and asking for a better version"
+TRASH_TOOLTIP = "Delete this one and move on"
+ENHANCED_TOOLTIP = "Enhanced only — play just the images that have been enhanced"
 # Reset means what the shape goes back TO, which is not the same in both places:
 # hosted it is the region's base state — that side's whole library, the way a
 # Funestra's reset leaves it browsing its own — and standalone there is no such
@@ -98,7 +87,9 @@ RESET_TOOLTIPS = {
 def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool = False,
                    enhanced: bool = False, order: str = "", hosted: bool = False,
                    own_window: bool = True, has_other_versions: bool = False,
-                   clip_seconds: int | None = None) -> tuple[tuple[Button, ...], ...]:
+                   clip_seconds: int | None = None, longer_than_a_step: bool = False,
+                   image: bool = False, has_funscript: bool = False, has_osr2: bool = False,
+                   nothing_to_reset: bool = False) -> tuple[tuple[Button, ...], ...]:
     """The rows a slideshow's HUD draws, for the surface it is drawn on.
 
     *own_window* is whether this slideshow has a window of this app's.  Handed to
@@ -107,14 +98,19 @@ def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool =
     slideshow draws that pair itself.
     """
     mode_row = hosted and own_window
-    names = [name for group in CONTROL_GROUPS for name in group]
-    lit = {"lock": locked, "fmode": favorites_filter, "enhanced": enhanced,
-           "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
-    row = tuple(
-        _control(shape, name, hosted=hosted, lit=lit.get(name, False),
-                 dim=name == "cycle_version" and not has_other_versions,
-                 group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
-        for index, name in enumerate(names)
+    band = (
+        *transport(shape, noun=SLIDE, longer_than_a_step=longer_than_a_step, image=image),
+        funscript_jump_button(f"{shape}_funscript_jump", noun=SLIDE, has_osr2=has_osr2,
+                              has_funscript=has_funscript),
+        lock_button(shape, locked=locked, tooltip=LOCK_TOOLTIP),
+        trash_button(shape, TRASH_TOOLTIP),
+        fmode_button(shape, favorites_only_tooltip(), lit=favorites_filter),
+        Button(f"{shape}_enhanced", ENHANCED_ICON, ENHANCED_TOOLTIP, lit=enhanced, enhanced=True,
+               group_break=True),
+        reset_button(shape, nothing_to_reset=nothing_to_reset, tooltip=RESET_TOOLTIPS[hosted],
+                     group_break=False),
+        *browse_order_buttons(shape, latest=order == LATEST_LABEL),
+        versions_button(f"{shape}_cycle_version", noun=SLIDE, has_other_versions=has_other_versions),
     )
     pace = () if clip_seconds is None else (clip_seconds_row(shape, clip_seconds),)
     return (_mode_row(), row, *pace) if mode_row else (row, *pace)
@@ -138,6 +134,10 @@ _NEWER, _OLDER = -1, 1
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda host: host.slideshow_step(-1),
     "next": lambda host: host.slideshow_step(1),
+    "nudge_prev": lambda host: host.slideshow_nudge(-1),
+    "nudge_next": lambda host: host.slideshow_nudge(1),
+    "funscript_jump": lambda host: host.slideshow_funscript_jump(),
+    "next_funscripted": lambda host: host.slideshow_next_funscripted(),
     "lock": lambda host: host.slideshow_toggle_lock(),
     "lock_on": lambda host: host.set_locked(True),
     "lock_off": lambda host: host.set_locked(False),
@@ -172,9 +172,13 @@ _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
     "play_video": lambda host, path: host.show_item(path, lock=False),
     "lock_video": lambda host, path: host.show_item(path, lock=True),
 }
+# What a session tells a side's HUD about itself: where it sits, whether it
+# is parked in its corner, and whether that Funestra has the OSR2, which only
+# the session knows and the band's Skip ahead grays by.
 HUD_CORNER = "hud_corner"
 HUD_MINIMIZED = "hud_minimized"
-HUD_PLACES: dict[str, str] = {HUD_CORNER: "{corner}", HUD_MINIMIZED: "{on}"}
+HAS_THE_OSR2 = "osr2"
+HUD_FACTS: dict[str, str] = {HUD_CORNER: "{corner}", HUD_MINIMIZED: "{on}", HAS_THE_OSR2: "{has}"}
 
 PRESSES = tuple(_PRESSES)
 PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "seed_loop", "action_loop", "loop",
@@ -214,13 +218,3 @@ def _mode_row() -> tuple[Button, ...]:
         Button(action, label, MODE_TOOLTIPS[action], width=FIT_THE_WORD, lit=lit)
         for action, label, lit in MODE_BUTTONS
     )
-
-
-def _control(shape: str, name: str, *, hosted: bool, lit: bool, dim: bool,
-             group_break: bool) -> Button:
-    tooltip = RESET_TOOLTIPS[hosted] if name == "reset" else CONTROL_TOOLTIPS[name]
-    if dim:
-        tooltip += _NO_OTHER_VERSION
-    return Button(f"{shape}_{name}", CONTROL_FACES[name], tooltip, lit=lit, dim=dim,
-                  favorite=name in ("lock", "fmode"), enhanced=name == "enhanced",
-                  danger=name == "trash", group_break=group_break)

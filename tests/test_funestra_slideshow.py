@@ -596,10 +596,64 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
     assert model.corner.path == "one.png"
     assert model.seed_count == 1     # a set with no library under it maps the slide alone
     assert [[button.command for button in row] for row in model.rows] == [
-        ["portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
-         "portrait_fmode", "portrait_enhanced", "portrait_reset",
-         "portrait_shuffle", "portrait_latest", "portrait_cycle_version"],
+        ["portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
+         "portrait_funscript_jump", "portrait_lock", "portrait_trash", "portrait_fmode",
+         "portrait_enhanced", "portrait_reset", "portrait_shuffle", "portrait_latest",
+         "portrait_cycle_version"],
         ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up"]]
+
+
+def _band_button(slideshow, name: str):
+    model = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
+    return next(button for row in model.rows for button in row
+                if button.command == f"portrait_{name}")
+
+
+def test_the_ten_second_steps_and_skip_ahead_follow_what_the_funestra_says_is_on_screen(
+        qtbot, tmp_path):
+    """A video longer than a step can be stepped through; an image cannot, and
+    has no funscript to skip ahead through either."""
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.mp4",
+                                                duration_ms=30_000, has_funscript=True)
+    slideshow.set_has_osr2(True)
+    assert [_band_button(slideshow, name).dim
+            for name in ("nudge_prev", "nudge_next", "funscript_jump")] == [False, False, False]
+
+    _says(slideshow, video="one.png", image=True)
+    slideshow.tick()
+
+    assert [_band_button(slideshow, name).dim
+            for name in ("nudge_prev", "nudge_next", "funscript_jump")] == [True, True, True]
+    assert _band_button(slideshow, "funscript_jump").tooltip.endswith(
+        "(this slide has no funscript)")
+
+
+def test_skip_ahead_is_faded_until_the_session_says_this_funestra_has_the_osr2(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.mp4",
+                                                duration_ms=30_000, has_funscript=True)
+    assert _band_button(slideshow, "funscript_jump").dim
+
+    slideshow.set_has_osr2(True)
+
+    assert not _band_button(slideshow, "funscript_jump").dim
+
+
+def test_the_ten_second_steps_and_the_skips_reach_the_funestra_as_its_own_verbs(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.mp4")
+
+    for action in ("nudge_prev", "nudge_next", "funscript_jump", "next_funscripted"):
+        assert answer(slideshow, action), action
+
+    assert _sent(slideshow) == ["SEEK_BACK", "SEEK_FWD", "JUMP_TO_FUNSCRIPT", "NEXT_FUNSCRIPTED"]
+
+
+def test_reset_is_faded_while_the_slideshow_is_at_its_defaults(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+    assert _band_button(slideshow, "reset").dim
+
+    slideshow.set_locked(True)
+
+    assert not _band_button(slideshow, "reset").dim
 
 
 def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before_its_list(

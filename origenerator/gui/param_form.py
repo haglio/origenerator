@@ -60,9 +60,6 @@ from origenerator.workflows.derived_size import override_size
 from origenerator.workflows.lora_rows import lora_key_of, strength_without_its_lora
 
 _SEED_MAX = (1 << 63) - 1
-# The params one scenes editor speaks for: the story (stored as the positive
-# prompt), what each scene keeps out (stored as the negative prompt), each
-# scene's length, each scene's lines, and the video's length they add up to.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines",
                "frame_count")
 
@@ -106,48 +103,16 @@ _IN_USE_WHILE = {
     "audio_negative_prompt": _SOUND_IN_USE,
 }
 
-# The locked-dimension spinners span from a stride floor up past any realistic
-# derived or overridden size; 0 is reserved as "no size known yet" (shown as the
-# em dash) for a workflow whose input image can't be measured.
 _DIMENSION_MAX = 8192
 _DIMENSION_STEP = 16
-# The unlock toggle's face: a closed padlock while the derived size is locked, an
-# open one once the user has unlocked it to override.
 _PADLOCK = {False: "lock", True: "unlock"}
 
 class ParamForm(QWidget):
-    """The editable settings for one workflow, grouped into collapsible sections.
-
-    A workflow's :meth:`~origenerator.workflows.base.WorkflowTemplate.
-    param_definitions` gives the fields; they're laid out by the canonical order
-    in :mod:`origenerator.gui.param_sections` — not the workflow's own declaration
-    order — so every workflow presents the same kinds of settings in the same
-    sections, in the same place. Params a config carries but this workflow lays no
-    field for (its hidden VAE/CLIP, an import's extras) round-trip untouched and
-    are never shown.
-
-    ``hidden_keys`` are params this form deliberately doesn't present at all —
-    no field, and no value absorbed from a loaded config: they
-    are pinned at the workflow's own defaults, so what the form emits for them
-    is always the same. This is how the enhance params stay off a form whose
-    every other setting decides which gallery folder a run lands in. They belong
-    to the Enhance pane, which applies enhancement as a separate layer — and
-    pinning them is what stops a Generate seeded from an old enhanced run coming
-    out enhanced again with the Enhance pane's checkbox unchecked.
-
-    ``pins_reused_seed`` is the workflow's answer to
-    :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
-    whether a seed written in by :meth:`set_values` also clears its Random checkbox.
-    False (video) leaves the checkbox checked and a fresh seed in the field, so the
-    settings of a video loaded into a tab don't quietly pin every later run to its
-    seed.
-    """
-
-    changed = pyqtSignal()          # any field's value changed
-    train_requested = pyqtSignal(str)  # a LoRA row's Train was pressed (its key)
+    changed = pyqtSignal()
+    train_requested = pyqtSignal(str)
     text_fields_changed = pyqtSignal()
     seed_drawn = pyqtSignal(str, object)
-    item_activated = pyqtSignal(str)  # a zone's held gallery item was clicked (prompt_id)
+    item_activated = pyqtSignal(str)
 
     def __init__(
         self,
@@ -166,69 +131,38 @@ class ParamForm(QWidget):
         super().__init__(parent)
         self._lora_keys = tuple(lora_keys)
         self._training_controls: dict[str, TrainingControls] = {}
-        # Where a dragged prompt height is filed: the window's own set, handed
-        # down rather than reached for, so a form can be built at chosen sizes.
         self._heights = heights
         self._seed_history = seed_history
         self._items = items or FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
         self._item_seeds: dict[str, int] = {}
         self._item_thumbnail: str | None = None
         self._pins_reused_seed = pins_reused_seed
-        # Params carried but never shown, pinned at the definitions' own defaults
-        # — a loaded config never moves them (see the class docstring).
         self._hidden_keys = frozenset(hidden_keys)
         self._hidden = {
             pd.key: pd.default for pd in param_defs if pd.key in self._hidden_keys
         }
-        # When set (an i2v workflow), the output size is derived from the input
-        # image: the form shows a locked width/height pair filled from this
-        # callable, which the user can unlock to override. ``None`` for a
-        # manual-size or size-less workflow, leaving the Dimensions section to the
-        # workflow's own width/height params (if any).
         self._size_deriver = size_deriver
-        # The field the size is derived from: its edits refresh the pair.
         self._size_source_key = size_source
-        # The unlock toggle and hint for the derived-size pair, built only in
-        # derived mode. ``None`` otherwise. The toggle floats between the width and
-        # height rows like the swap button, so it links the pair without shrinking
-        # either field.
         self._unlock_btn: QToolButton | None = None
         self._dimensions_hint: QLabel | None = None
-        # Per derived dimension: the editable spinner (in ``_widgets``), the plain
-        # value label shown while locked, and the stack that swaps between them.
         self._dim_value_labels: dict[str, QLabel] = {}
         self._dim_stacks: dict[str, QStackedWidget] = {}
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, TickControl] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
-        # Copy-to-clipboard buttons on the fields worth lifting whole — the prompts
-        # and the seeds, the read-only inspect pane's copy targets before it merged
-        # into this editable form.
         self._copy_buttons: dict[str, CopyButton] = {}
         self._warning_marks: dict[str, WarningMark] = {}
         self._advice: dict[str, Advice | MissingTriggerWords] = {}
         self._labels: dict[str, ElidingLabel] = {}
         self._recommendations: dict[str, str] = {}
-        # A single swap-width-and-height button, built only when the workflow has
-        # both dimension params (t2i does; i2v derives its size in-graph). None
-        # when absent, so callers can tell whether the control exists. It floats as
-        # a free child of the Dimensions section, so it folds away with it.
         self._swap_dimensions_btn: QPushButton | None = None
-        # Params a config carries but this form has no widget for — the workflow's
-        # remaining hidden settings (VAE, CLIP…), or an import's extras. The form
-        # round-trips whatever value it was given, so reusing a generation
-        # reproduces them, without showing them.
         self._passthrough: dict = {}
         self._sections: dict[str, CollapsibleSection] = {}
         self._request_field: RequestField | None = None
-        # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
         self._shut_down: dict[str, str] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
-        # A workflow that tells a story in scenes hands both prompts, the scene
-        # lengths and the lines to one editor (see origenerator.gui.scenes_editor);
-        # None for a workflow with one prompt and one length.
         scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
         self._scenes: ScenesEditor | None = None
         self._scenes_row = scenes_def.key if scenes_def is not None else None
@@ -287,7 +221,6 @@ class ParamForm(QWidget):
             self._scenes.reflect_use()
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
-        """Show or hide one row, label and field together."""
         title = param_sections.section_title(key)
         keys = self._present_keys.get(title, [])
         if key in keys:
@@ -310,15 +243,13 @@ class ParamForm(QWidget):
             outer.addWidget(section)
             if title == "Prompts" and any(pd.key == "positive_prompt" for pd in self._param_defs):
                 outer.addWidget(self._build_request_section())
-        outer.addStretch(1)  # collect any slack at the foot, not between sections
+        outer.addStretch(1)
 
-        # Fields in canonical order, so the workflow's own declaration order can't
-        # reshuffle where a setting lands.
         for pd in sorted(self._param_defs, key=lambda d: param_sections.key_rank(d.key)):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             if widget is self._scenes:
-                if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
+                if pd.type == ParamType.SCENES:
                     self._add_row(pd.key, pd.label, widget)
                 continue
             if isinstance(widget, PresetDropdown):
@@ -326,8 +257,6 @@ class ParamForm(QWidget):
             self._add_row(pd.key, pd.label, widget, self._make_extras(pd))
         for pd in self._param_defs:
             if pd.rate and self._widgets[pd.key] is not self._scenes:
-                # A frame count is made as seconds, so show it as seconds — its
-                # widget was left blank until the conversion was available.
                 self._write_field(pd, pd.default)
         self._build_swap_button()
         self._build_derived_dimensions()
@@ -335,8 +264,6 @@ class ParamForm(QWidget):
         self._refresh_section_visibility()
 
     def _build_request_section(self) -> CollapsibleSection:
-        """The words the image on display is asked to change by, right under
-        the prompts they rewrite."""
         section = CollapsibleSection("Request")
         self._request_field = RequestField()
         section.content_form().addRow(self._request_field)
@@ -349,7 +276,6 @@ class ParamForm(QWidget):
         return self._scenes is not None
 
     def set_prompts(self, positive: str, negative: str, *, typed: bool = False) -> None:
-        """Write a prompt pair into its fields, as typing it in would."""
         for pd in self._param_defs:
             if pd.key not in ("positive_prompt", "negative_prompt"):
                 continue
@@ -371,18 +297,6 @@ class ParamForm(QWidget):
             edited.connect(self.changed)
 
     def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
-        """Insert one row (an input or a read-only value, then its ``extras``)
-        into its section at the canonical position among the rows already there,
-        its label after the place its warning mark shows in.
-
-        The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
-        as well as its input: the label is what you are looking at when you
-        wonder what a setting is, and hovering the word is the natural move.
-
-        The label elides. A phrase like "Enhance Redraw Amount" asks for three
-        hundred pixels on one line, and a plain label hands that on as a floor under
-        the whole form — which is how a narrow pane ended up scrolling sideways
-        instead of squeezing its fields."""
         title = param_sections.section_title(key)
         keys = self._present_keys[title]
         index = self._insert_index(keys, key)
@@ -403,7 +317,7 @@ class ParamForm(QWidget):
         if widget is not None and help_text and not isinstance(widget, DropZone):
             if key in self._lora_keys:
                 help_text = with_training_date(help_text, self._read_field(self._defs[key]))
-            widget.setToolTip(help_text)  # a zone's tooltip names what it holds
+            widget.setToolTip(help_text)
 
     def _explain_lora_picks(self) -> None:
         for key in self._lora_keys:
@@ -435,28 +349,15 @@ class ParamForm(QWidget):
 
     @staticmethod
     def _insert_index(present: list[str], key: str) -> int:
-        """The row index ``key`` belongs at among ``present`` (kept in canonical
-        order): the count of present keys that rank before it."""
         rank = param_sections.key_rank(key)
         return sum(1 for k in present if param_sections.key_rank(k) < rank)
 
     def _refresh_section_visibility(self):
-        """Show a section iff it holds any row; empty ones take no space. Then
-        re-place the floating dimension control, since the sections above it may
-        have moved."""
         for title, section in self._sections.items():
             section.setVisible(bool(self._present_keys[title]))
         self._position_dimension_controls()
 
     def _field_cell(self, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:
-        """The input, then its trailing controls.
-
-        The copy button leads (just right of the input), then the Random checkbox
-        (seed) or the Browse button (image). Each sits in a shared cell so the
-        label column stays aligned across every row. Next to a tall multiline
-        prompt the copy button hugs the top corner; next to a single-line seed
-        it centers so it lines up with the checkbox beside it.
-        """
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
         cell.addWidget(field, 1)
@@ -469,7 +370,6 @@ class ParamForm(QWidget):
         return cell
 
     def _make_extras(self, pd: ParamDef) -> list[QWidget]:
-        # Copy leads so it reads [field] [copy] [Random]/[Browse].
         kind = self._kind(pd)
         extras: list[QWidget] = []
         if kind.copyable:
@@ -485,8 +385,6 @@ class ParamForm(QWidget):
             self._randomize_checks[pd.key] = cb
             extras.append(cb)
         if kind.browse_filter and not kind.drops:
-            # Elides: it is the widest thing on any row, so a plain button would
-            # decide how narrow the whole form can be squeezed.
             browse = ElidingButton("Browse...")
             browse.clicked.connect(
                 lambda _checked=False, key=pd.key: self._browse_file(key)
@@ -576,14 +474,6 @@ class ParamForm(QWidget):
                          f"{found.said}" for key, found in self._advised_at(rows))
 
     def track_prompt_rewrites(self, made_with: dict) -> None:
-        """Mark every prompt on the form as a rewrite of ``made_with``'s text for
-        it, a scene's of its own part of the story, or of what it says right now
-        where that holds none (:mod:`origenerator.gui.tracked_prompt`).
-
-        Every prompt rather than a named pair: a workflow that grows another one
-        (the Foley audio prompts did) is marked the day it lands, for the same
-        reason :meth:`text_fields` asks the widgets what they are.
-        """
         scenes = (self._scenes.fields_beside_their_texts(made_with)
                   if self._scenes is not None else [])
         for widget, was in scenes:
@@ -595,7 +485,6 @@ class ParamForm(QWidget):
                 widget.track(was if isinstance(was, str) else widget.value())
 
     def clear_prompt_rewrites(self) -> None:
-        """Stop tracking every field, leaving each an ordinary prompt input."""
         for field in self._scenes.text_fields() if self._scenes is not None else []:
             tracked_prompt.untrack(field)
         for widget in self._widgets.values():
@@ -603,14 +492,6 @@ class ParamForm(QWidget):
                 widget.untrack()
 
     def text_fields(self) -> list[QPlainTextEdit]:
-        """The form's multiline text inputs — its prompts — in the order they lay
-        out down the form.
-
-        Every prompt this app has is a multiline ``str`` field (positive, negative,
-        and the Foley audio pair) and nothing else is one, so asking the widgets
-        what they are rather than naming keys means a workflow that grows another
-        prompt is searchable the day it lands. What Ctrl+F searches.
-        """
         scenes = self._scenes.text_fields() if self._scenes is not None else []
         return scenes + [box for widget in self._widgets.values()
                          if isinstance(widget, PromptBoxes) for box in widget.boxes()]
@@ -622,15 +503,6 @@ class ParamForm(QWidget):
         return key in self._defs
 
     def _build_swap_button(self):
-        """Add a swap-width-and-height button when the form has both dimensions.
-
-        It floats in a margin opened to the left of the two labels, midway between
-        their rows, so it reads as linking the pair rather than trailing either
-        field. As a free child of the Dimensions section's content (not a form
-        cell) it folds away with the section and needs manual placement — see
-        :meth:`_position_swap_button`. Absent for a workflow that derives its size
-        in-graph (i2v) and so has no dimensions to swap.
-        """
         if not (self._has_param("width") and self._has_param("height")):
             return
         content = self._sections["Size"].content()
@@ -640,34 +512,15 @@ class ParamForm(QWidget):
         btn.clicked.connect(self.swap_dimensions)
         btn.adjustSize()
         self._swap_dimensions_btn = btn
-        # The section's content lays its rows out on its own resize/show; follow
-        # those so the free-floating button tracks them even when it unfolds.
         content.installEventFilter(self)
 
     def _center_between_dimension_rows(self, btn, top_row, lower_row):
-        """Center ``btn`` between the width and height rows, inside a left margin
-        reserved for it so it sits clear of the "Width"/"Height" labels.
-
-        The margin is the section's left margin, sized to the button here (its
-        final width isn't known until its font and stylesheet apply, after
-        construction). Squeezing the button into whatever space the labels
-        happened to leave is what put it on top of the words. In the Dimensions
-        content's coordinates, the button's parent; called on every
-        resize/show/toggle since a free child gets no help from the layout, and
-        a no-op while the section is folded (the button hides with it).
-
-        ``top_row`` and ``lower_row`` are the two rows to sit between, which
-        differ by form: the spinners themselves where the size is typed, and the
-        stacks holding a derived size's plain reading where it is not.
-        """
         if self._sections["Size"].is_collapsed():
             return
         btn.adjustSize()
-        margin = btn.width() + 10  # room for the button plus a gap to the labels
+        margin = btn.width() + 10
         form = self._sections["Size"].content_form()
         if form.contentsMargins().left() != margin:
-            # Push the labels over to open the margin; the relayout re-invokes us
-            # with the rows in their new positions.
             form.setContentsMargins(margin, GAP_SMALL, 0, GAP_SMALL)
             return
         top, lower = top_row.geometry(), lower_row.geometry()
@@ -676,8 +529,6 @@ class ParamForm(QWidget):
         btn.raise_()
 
     def _position_swap_button(self):
-        """Place the swap button, which sits between the two spinners a typed
-        size is entered in. A no-op on a derived-size form, which has none."""
         if self._swap_dimensions_btn is None:
             return
         self._center_between_dimension_rows(
@@ -685,8 +536,6 @@ class ParamForm(QWidget):
             self._widgets["width"], self._widgets["height"])
 
     def eventFilter(self, obj, event):
-        # Installed on the Dimensions content: re-place the floating control (swap
-        # or unlock) whenever that content relays out (unfolding, or widening).
         if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
             self._position_dimension_controls()
         return super().eventFilter(obj, event)
@@ -700,57 +549,38 @@ class ParamForm(QWidget):
         self._position_dimension_controls()
 
     def _position_dimension_controls(self):
-        """Re-place whichever free-floating control the Dimensions section carries:
-        the swap button (manual-size workflow) or the unlock toggle (derived-size
-        workflow). Each no-ops when its control is absent, so this is safe to call
-        from every relayout hook regardless of which kind of form this is."""
         self._position_swap_button()
         self._position_unlock_button()
 
     def swap_dimensions(self):
-        """Exchange the width and height field values."""
         width, height = self._widgets["width"], self._widgets["height"]
         w, h = width.value(), height.value()
         width.setValue(h)
         height.setValue(w)
 
-    # --- derived dimensions: the input-image size, shown locked & unlockable ---
-
     def _build_derived_dimensions(self):
-        """For a size-deriving workflow, add a width/height pair to the Dimensions
-        section that reads as plain values while locked (like the read-only
-        passthrough rows — "864", not an input field) and turns into editable
-        spinners when unlocked. A floating padlock toggle, centered between the
-        two rows in a reserved left margin so it clears the labels, does the
-        unlocking. A no-op for a workflow that sets its size by hand (its own
-        width/height params already fill this section) or has none.
-        """
         if self._size_deriver is None:
             return
         for key, label_text in (("width", "Width"), ("height", "Height")):
             spinner = NoWheelSpinBox()
-            spinner.setMinimum(0)  # 0 == "size not yet known", shown as the em dash
+            spinner.setMinimum(0)
             spinner.setMaximum(_DIMENSION_MAX)
             spinner.setSingleStep(_DIMENSION_STEP)
             spinner.setSpecialValueText(NOT_KNOWN)
             spinner.valueChanged.connect(self.changed)
             self._widgets[key] = spinner
             value_label = QLabel(NOT_KNOWN)
-            value_label.setObjectName("readonlyParamValue")  # match the passthrough rows
+            value_label.setObjectName("readonlyParamValue")
             self._dim_value_labels[key] = value_label
-            # A stack so locking swaps the plain value for the spinner in place,
-            # keeping the row's height and position steady.
             stack = QStackedWidget()
-            stack.addWidget(value_label)   # index 0: locked, a plain value
-            stack.addWidget(spinner)           # index 1: unlocked, editable
+            stack.addWidget(value_label)
+            stack.addWidget(spinner)
             self._dim_stacks[key] = stack
             self._add_row(key, label_text, stack)
         self._dimensions_hint = QLabel(f"Sized from the {self._size_source()}. Unlock to override.")
         self._dimensions_hint.setObjectName("dimensionsHint")
         self._dimensions_hint.setWordWrap(True)
         self._sections["Size"].content_form().addRow(self._dimensions_hint)
-        # A free-floating padlock toggle, parented to the Dimensions content so it
-        # folds with the section; placed by :meth:`_position_unlock_button`.
         content = self._sections["Size"].content()
         btn = QToolButton(content)
         btn.setObjectName("dimensionUnlock")
@@ -762,12 +592,10 @@ class ParamForm(QWidget):
         btn.toggled.connect(self._on_dimensions_unlock_toggled)
         btn.adjustSize()
         self._unlock_btn = btn
-        content.installEventFilter(self)  # follow the section's own relayouts
+        content.installEventFilter(self)
         self._update_derived_display()
 
     def _position_unlock_button(self):
-        """Place the unlock toggle, which sits between the two rows a derived
-        size is read in. A no-op on a manual-size form, which has no toggle."""
         if self._unlock_btn is None:
             return
         self._center_between_dimension_rows(
@@ -775,7 +603,6 @@ class ParamForm(QWidget):
             self._dim_stacks["width"], self._dim_stacks["height"])
 
     def _dimensions_unlocked(self) -> bool:
-        """True when the user has unlocked the derived size to override it."""
         return self._unlock_btn is not None and self._unlock_btn.isChecked()
 
     def _size_source(self) -> str:
@@ -788,37 +615,27 @@ class ParamForm(QWidget):
         return f"Unlock to override the size derived from the {self._size_source()}"
 
     def _on_dimensions_unlock_toggled(self, unlocked: bool):
-        """Flip the padlock and swap each dimension between its plain locked value
-        and its editable spinner, re-locking back onto the derived size. Announces
-        the change so the tab refreshes with it."""
         self._unlock_btn.setIcon(qt_icon(_PADLOCK[unlocked]))
         self._unlock_btn.setToolTip(self._unlock_tip(unlocked))
         for stack in self._dim_stacks.values():
             stack.setCurrentIndex(1 if unlocked else 0)
         if not unlocked:
             self._update_derived_display()
-        self._position_unlock_button()  # the glyph swap can change the button's width
+        self._position_unlock_button()
         self.changed.emit()
 
     def _update_derived_display(self):
-        """Fill the locked width/height with the size the current input image
-        derives — the plain value label and the spinner under it both, so
-        unlocking starts from that value (0 → em dash when none can be measured).
-        A no-op while unlocked, so it never clobbers a value the user is editing."""
         if self._size_deriver is None or self._dimensions_unlocked():
             return
         size = self._size_deriver(self.get_values())
         for key, value in zip(("width", "height"), size or (0, 0), strict=True):
             spinner = self._widgets[key]
-            blocked = spinner.blockSignals(True)  # a display refresh isn't a user edit
+            blocked = spinner.blockSignals(True)
             spinner.setValue(value)
             spinner.blockSignals(blocked)
             self._dim_value_labels[key].setText(str(value) if value else NOT_KNOWN)
 
     def _override_dimensions(self) -> dict:
-        """The explicit width/height to emit — only when the pair is unlocked and
-        holds a real size. Locked (the default), the form emits nothing so the
-        payload derives the size in the usual way."""
         if not self._dimensions_unlocked():
             return {}
         width = self._widgets["width"].value()
@@ -826,9 +643,6 @@ class ParamForm(QWidget):
         return {"width": width, "height": height} if width > 0 and height > 0 else {}
 
     def _apply_dimension_values(self, params: dict):
-        """Reflect a loaded config's size in the derived pair: an explicit
-        width/height (a saved override) unlocks and shows them; their absence
-        re-locks the pair onto the derived size."""
         override = override_size(params)
         self._unlock_btn.setChecked(override is not None)
         if override is not None:
@@ -846,12 +660,6 @@ class ParamForm(QWidget):
 
     @staticmethod
     def _initial_browse_path(current: str, home: Path | None = None) -> str:
-        """Where the file dialog opens: the current value's own location when it
-        points at a real file (a full path, or a bare name from ComfyUI's input
-        folder), else the field's home folder — the one its ParamDef names, or
-        ComfyUI's input folder for a field naming none. A named folder that isn't
-        on this machine (a checkout without the library) falls back the same way,
-        since a dialog pointed at a missing path opens wherever it likes."""
         if current:
             full = Path(current)
             if full.is_file():
@@ -892,7 +700,6 @@ class ParamForm(QWidget):
                 self._sections[title].set_collapsed(collapsed)
 
     def seed_is_random(self) -> bool:
-        """True if any seed param's Random checkbox is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
 
     def set_seed_random(self, is_random: bool):
@@ -990,15 +797,9 @@ class ParamForm(QWidget):
             checkbox.setChecked(False)
 
     def _settle(self, pd: ParamDef) -> None:
-        """Show a field the value it will emit, once an edit of it has ended."""
         self._write_field(pd, self._read_field(pd))
 
     def _collect(self) -> dict:
-        # Start from the params this form carries without showing — the extras it
-        # has no field for, then the deliberately hidden ones (both disjoint from
-        # the widget keys) — then lay the live field values on top, then any
-        # unlocked size override, which is absent (so the payload derives the
-        # size) unless the user set one.
         result = dict(self._passthrough)
         result.update(self._hidden)
         for pd in self._param_defs:
@@ -1011,28 +812,18 @@ class ParamForm(QWidget):
         self.set_values({**{pd.key: pd.default for pd in self._param_defs}, **params})
 
     def set_values(self, params: dict, *, carried: bool = False):
-        # Retain any params without a field so they survive the read-back; the rest
-        # are applied to their widgets. A hidden key is dropped entirely — never
-        # absorbed — so the form keeps emitting the workflow's default for it.
         self._passthrough = {
             k: v for k, v in params.items()
             if k not in self._widgets and k not in self._hidden_keys
         }
         if (self._scenes is not None and "frame_count" in params
                 and len(params.get("scene_frames") or []) <= 1):
-            # A lone scene is the whole video and runs for the video length, which
-            # is all that settings from before scenes (or from the overlay) carry.
             params = {**params, "scene_frames": [params["frame_count"]]}
-        # The story first: it sets how many scenes there are, and every other
-        # per-scene value is laid over the scenes it made.
         for pd in sorted(self._param_defs, key=lambda d: d.key != "positive_prompt"):
             if pd.key in params:
                 self._write_field(pd, params[pd.key], carried=carried)
         for pd in self._seed_defs():
             if pd.key in params and self._randomize_checks[pd.key].isChecked():
                 self._draw(pd)
-        # The derived width/height aren't declared params, so apply them here:
-        # a saved override unlocks and shows, its absence re-locks onto the size
-        # the just-applied input image derives.
         if self._size_deriver is not None:
             self._apply_dimension_values(params)

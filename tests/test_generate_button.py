@@ -26,7 +26,7 @@ def styled_button(qtbot):
     host.resize(320, 60)
     with qtbot.waitExposed(host):
         host.show()
-    yield b
+    return b
 
 
 def _face(button):

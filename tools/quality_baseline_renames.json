@@ -3,6 +3,7 @@
   "origenerator/gui/browser_pane.py::BrowserPane": "origenerator/gui/gallery_pane.py::GalleryPane",
   "origenerator/gui/generate_config_panel.py::GenerateConfigPanel": "origenerator/gui/generate_tab.py::GenerateTab",
   "origenerator/gui/info_pane_tabs.py::InfoPaneTabs": "origenerator/gui/generate_pane.py::GeneratePane",
+  "origenerator/gui/preview_widget.py::PreviewWidget": "origenerator/gui/viewport.py::Viewport",
   "origenerator/notice_toast.py": "origenerator/toast_raising.py",
   "tests/test_action_picker.py": "tests/test_action_dropdown.py",
   "tests/test_combine_panel.py": "tests/test_combine.py",

@@ -513,7 +513,7 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
 
     view._combine._open_combination("img", "vid")
 
-    preview = _front_panel(view)._preview
+    preview = _front_panel(view)._viewport
     assert preview._stack.currentWidget() is preview._combination
 
 
@@ -580,7 +580,7 @@ def test_a_combination_opened_for_genau_has_its_source_video_in_parentheses_befo
         qtbot, tmp_path):
     _view, tab = _opened_combination(qtbot, tmp_path, intent=action_settings.GENAU)
 
-    assert not tab._preview._combination.open_paren_label.isHidden()
+    assert not tab._viewport._combination.open_paren_label.isHidden()
 
 
 @pytest.mark.parametrize(("key", "as_made", "edited"), [
@@ -590,7 +590,7 @@ def test_a_combination_opened_for_genau_has_its_source_video_in_parentheses_befo
 def test_the_clip_of_an_opened_combination_stands_in_parentheses_while_its_prompt_differs(
         qtbot, tmp_path, key, as_made, edited):
     _view, tab = _opened_combination(qtbot, tmp_path)
-    parens = tab._preview._combination.open_paren_label
+    parens = tab._viewport._combination.open_paren_label
     assert parens.isHidden()
 
     tab._param_form.set_values({key: edited})
@@ -646,7 +646,7 @@ def test_changing_a_setting_other_than_the_prompt_leaves_the_clip_out_of_parenth
 
     tab._param_form.set_values({"seed": 7})
 
-    assert tab._preview._combination.open_paren_label.isHidden()
+    assert tab._viewport._combination.open_paren_label.isHidden()
 
 
 @pytest.mark.parametrize(("zone_name", "prompt_id"), [("image_zone", "img"),
@@ -1009,7 +1009,7 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, 
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    preview = view._generate_pane.current_generate_tab()._preview
+    preview = view._generate_pane.current_generate_tab()._viewport
     combine = view._combine.widget
     mime = generation_mime("vid")
 

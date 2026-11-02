@@ -525,7 +525,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
 
     view._on_thumbnail_clicked("vid1")
     assert not _source_tile(view).isHidden()
@@ -856,7 +856,7 @@ def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
     _click_tile(view, "g0")
-    star = view._generate_pane.current_generate_tab()._preview._controls.buttons()[0]
+    star = view._generate_pane.current_generate_tab()._viewport._controls.buttons()[0]
 
     star.click()
 
@@ -869,7 +869,7 @@ def test_a_tabs_preview_plus_stops_offering_once_its_enhancement_lands(qtbot, tm
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    plus = view._generate_pane.current_generate_tab()._preview._controls.buttons()[2]
+    plus = view._generate_pane.current_generate_tab()._viewport._controls.buttons()[2]
     plus.click()
     (job,) = view._jobs.all_jobs
 

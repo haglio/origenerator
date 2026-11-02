@@ -1721,7 +1721,7 @@ def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
     _select_first_leaf(view)
 
     view._on_thumbnail_clicked("g2")
@@ -1736,7 +1736,7 @@ def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then
     view = GalleryView(FakeDB([row]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
     view._generate_pane.load_selection(row, [row])
 
     view.refresh()
@@ -1785,7 +1785,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _click_tile(view, "vid1")
     tabs = view._generate_pane.count()

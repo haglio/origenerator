@@ -1133,12 +1133,12 @@ def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_pa
     doomed = tmp_path / "doomed.png"
     doomed.write_bytes(b"x")
     covered = view._generate_pane.current_generate_tab()
-    covered._preview.show_image(doomed)
+    covered._viewport.show_image(doomed)
     view._generate_pane._add_subtab()
 
     view._release_held_media([doomed])
 
-    assert not covered._preview.is_showing_any([doomed])
+    assert not covered._viewport.is_showing_any([doomed])
 
 
 def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):

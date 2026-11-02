@@ -1218,18 +1218,23 @@
       "status": "agreed"
     },
     {
-      "id": "preview",
+      "id": "viewport",
       "thing": "the large image or video at the top of a tab",
       "screen": [
         "No preview available",
         "Select a generation to preview"
       ],
-      "his_word": "preview (2026-09-03)",
+      "his_word": "viewport (2026-11-02); preview (2026-09-03)",
       "code_today": [
-        "preview"
+        "viewport"
       ],
-      "code_word": "preview",
-      "status": "agreed"
+      "code_word": "viewport",
+      "status": "ruled",
+      "ruled": "2026-11-02, his words, for Scripture, Origenerator and Funestra",
+      "retired": [
+        "preview widget",
+        "preview pane"
+      ]
     },
     {
       "id": "slide",

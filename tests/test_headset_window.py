@@ -21,7 +21,7 @@ from origenerator.gui.headset_window import (
     windows_opened_over,
     within_the_cap,
 )
-from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.viewport import Viewport
 from tests.hosted_launch import hosted_launch
 
 
@@ -81,22 +81,22 @@ def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog
 
 
 def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path, qtbot):
-    preview = PreviewWidget(player=MagicMock())
-    qtbot.addWidget(preview)
-    preview.resize(200, 100)
-    preview.show()
-    preview.show_video(tmp_path / "clip.mp4")
+    viewport = Viewport(player=MagicMock())
+    qtbot.addWidget(viewport)
+    viewport.resize(200, 100)
+    viewport.show()
+    viewport.show_video(tmp_path / "clip.mp4")
     red = QImage(64, 36, QImage.Format.Format_RGB32)
     red.fill(QColor("red"))
-    preview._video.video_sink().setVideoFrame(QVideoFrame(red))
+    viewport._video.video_sink().setVideoFrame(QVideoFrame(red))
 
-    headset = HeadsetWindow(preview, _hosted(tmp_path))
+    headset = HeadsetWindow(viewport, _hosted(tmp_path))
     try:
         headset.publish(now=1.0)
     finally:
         headset.close()
 
-    middle = preview._video.mapTo(preview, preview._video.rect().center())
+    middle = viewport._video.mapTo(viewport, viewport._video.rect().center())
     assert _published_color(tmp_path, middle) == QColor("red")
 
 

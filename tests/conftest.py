@@ -143,7 +143,7 @@ class FakeCommandAndRequestListener(QObject):
     request = pyqtSignal(object)
 
     def __init__(self, *, command_matcher=None, bare_matcher=None, dictation=None,
-                 phrases=(), never_repaired=(), said_in=None):
+                 phrases=()):
         super().__init__()
         self.commands_on = False
         self._matcher = command_matcher

@@ -12,6 +12,7 @@ from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
+from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import CLIP
 
 
@@ -81,9 +82,9 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         enhanced_ref = ["6", 0]
         if params.get("enhance"):
             tail = self.enhance_image_nodes(
-                image_ref=["6", 0], model_ref=loras.model,
-                positive_ref=["2", 0], negative_ref=["3", 0], vae_ref=["8", 0],
-                params=params,
+                NodeRefs(image=["6", 0], model=loras.model, positive=["2", 0],
+                         negative=["3", 0], vae=["8", 0]),
+                params,
             )
             enhance_nodes, enhanced_ref = tail.nodes, tail.image
         return {

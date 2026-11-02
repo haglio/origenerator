@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.wan_experts import wan_expert_shift_param
 
@@ -70,9 +71,9 @@ class Wan22T2iWorkflow(WorkflowTemplate):
         enhanced_ref = ["13", 0]
         if params.get("enhance"):
             tail = self.enhance_image_nodes(
-                image_ref=["13", 0], model_ref=["6", 0],
-                positive_ref=["7", 0], negative_ref=["8", 0], vae_ref=["2", 0],
-                params=params,
+                NodeRefs(image=["13", 0], model=["6", 0], positive=["7", 0],
+                         negative=["8", 0], vae=["2", 0]),
+                params,
             )
             enhance_nodes, enhanced_ref = tail.nodes, tail.image
         return {

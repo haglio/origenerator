@@ -7,7 +7,7 @@ import textwrap
 from pathlib import Path
 
 from origenerator import single_instance
-from origenerator.freeze_watch import CLOSED_WITHIN_S, HANDED_OVER_WITHIN_S, FreezeWatch
+from origenerator.freeze_watch import CLOSED_WITHIN_S, HANDED_OVER_WITHIN_S, FreezeWatch, Timing
 from tests.children import run_python
 
 
@@ -21,9 +21,10 @@ class _Faulthandler:
 
 def _watch(crash_log, faulthandler, *, clock=lambda: 0.0, stalled_after_s=10.0,
            closed_within_s=10.0, handed_over_within_s=30.0):
-    return FreezeWatch(crash_log, stalled_after_s=stalled_after_s,
-                       closed_within_s=closed_within_s,
-                       handed_over_within_s=handed_over_within_s, beat_ms=60_000,
+    return FreezeWatch(crash_log, timing=Timing(stalled_after_s=stalled_after_s,
+                                                closed_within_s=closed_within_s,
+                                                handed_over_within_s=handed_over_within_s,
+                                                beat_ms=60_000),
                        clock=clock, arm=faulthandler.arm)
 
 
@@ -87,7 +88,7 @@ def test_a_launch_waiting_on_a_closing_copy_outlasts_the_longest_close_the_watch
 
 def test_once_the_window_has_closed_no_beat_puts_the_deadline_off(qtbot):
     faulthandler = _Faulthandler()
-    watch = FreezeWatch(io.StringIO(), beat_ms=10, arm=faulthandler.arm)
+    watch = FreezeWatch(io.StringIO(), timing=Timing(beat_ms=10), arm=faulthandler.arm)
 
     watch.end_the_process_if_the_close_sticks()
     qtbot.wait(100)
@@ -107,7 +108,7 @@ def test_every_beat_puts_the_dump_off_again_so_a_window_that_answers_never_reach
 
 def test_the_event_loop_beats_on_its_own(qtbot):
     faulthandler = _Faulthandler()
-    watch = FreezeWatch(io.StringIO(), beat_ms=10, arm=faulthandler.arm)
+    watch = FreezeWatch(io.StringIO(), timing=Timing(beat_ms=10), arm=faulthandler.arm)
 
     qtbot.waitUntil(lambda: len(faulthandler.armed) >= 3, timeout=5000)
     watch.deleteLater()
@@ -145,10 +146,10 @@ def test_a_window_stuck_in_a_slot_leaves_that_slot_in_the_crash_log(tmp_path):
         import sys, time
         sys.path.insert(0, {str(Path.cwd())!r})
         from PyQt6.QtCore import QCoreApplication, QTimer
-        from origenerator.freeze_watch import FreezeWatch
+        from origenerator.freeze_watch import FreezeWatch, Timing
         app = QCoreApplication([])
         watch = FreezeWatch(open({str(crash_log)!r}, "a", encoding="utf-8"),
-                            stalled_after_s=0.5, beat_ms=50)
+                            timing=Timing(stalled_after_s=0.5, beat_ms=50))
         def the_slot_that_stalls():
             time.sleep(4)
             QTimer.singleShot(300, app.quit)
@@ -171,7 +172,7 @@ def _close_a_window_whose_teardown_takes(seconds, *, closed_within_s, crash_log)
         sys.path.insert(0, {str(Path.cwd())!r})
         from PyQt6.QtCore import QTimer
         from PyQt6.QtWidgets import QApplication, QWidget
-        from origenerator.freeze_watch import watch_the_window
+        from origenerator.freeze_watch import Timing, watch_the_window
         app = QApplication([])
         window = QWidget()
         window.show()
@@ -179,7 +180,7 @@ def _close_a_window_whose_teardown_takes(seconds, *, closed_within_s, crash_log)
             time.sleep({seconds})
         app.aboutToQuit.connect(the_teardown)
         watch_the_window(app, open({str(crash_log)!r}, "a", encoding="utf-8"),
-                         closed_within_s={closed_within_s})
+                         Timing(closed_within_s={closed_within_s}))
         QTimer.singleShot(100, window.close)
         sys.exit(app.exec())
     """)
@@ -203,12 +204,12 @@ def test_a_hand_over_longer_than_the_closes_deadline_runs_to_its_end(tmp_path):
         sys.path.insert(0, {str(Path.cwd())!r})
         from PyQt6.QtCore import QTimer
         from PyQt6.QtWidgets import QApplication, QWidget
-        from origenerator.freeze_watch import watch_the_window
+        from origenerator.freeze_watch import Timing, watch_the_window
         app = QApplication([])
         window = QWidget()
         window.show()
         watch = watch_the_window(app, open({str(crash_log)!r}, "a", encoding="utf-8"),
-                                 closed_within_s=1, handed_over_within_s=20)
+                                 Timing(closed_within_s=1, handed_over_within_s=20))
         QTimer.singleShot(100, window.close)
         app.exec()
         watch.end_the_process_if_the_hand_over_sticks()

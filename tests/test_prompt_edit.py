@@ -11,6 +11,7 @@ from origenerator.prompt_edit import (
     ADD,
     ADDED,
     ALLOWED,
+    Asking,
     DROPPED,
     EXCLUDED,
     PUSHED,
@@ -394,8 +395,7 @@ def test_a_match_is_logged_by_where_the_term_stands_never_by_its_words(caplog):
     with _model_answering('{"choice": 1}'), \
             caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
         chosen = smart_match(["gamma form", "an example lantern", "soft light"], "lamp",
-                             base_url="http://model.invalid", model="m",
-                             system_prompt="RULES")
+                             Asking("http://model.invalid", "m", "RULES"))
 
     assert chosen == 1
     assert caplog.messages == ["prompt_edit: the request matched index 1 of the prompt's 3 terms"]
@@ -405,8 +405,7 @@ def test_a_match_that_fails_says_why_and_never_what_was_asked(caplog):
     with patch("urllib.request.urlopen", side_effect=OSError("model down")), \
             caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
         chosen = smart_match(["gamma form", "an example lantern"], "lamp",
-                             base_url="http://model.invalid", model="m",
-                             system_prompt="RULES")
+                             Asking("http://model.invalid", "m", "RULES"))
 
     assert chosen is None
     assert caplog.messages == [
@@ -443,7 +442,7 @@ def test_a_rewrite_sends_both_prompts_and_answers_with_both():
     with _model_answering('{"positive": "a woman", "negative": "tan lines"}') as urlopen:
         result = rewrite_prompt(
             "a woman, tan", "", "no tan lines",
-            base_url="http://localhost:11434/v1", model="dolphin", system_prompt="SYSTEM",
+            Asking("http://localhost:11434/v1", "dolphin", "SYSTEM"),
         )
 
     (request,), _ = urlopen.call_args
@@ -459,7 +458,7 @@ def test_rewrite_prompt_keeps_a_field_the_model_omits():
     with _model_answering('{"positive": "a man"}'):
         positive, negative = rewrite_prompt(
             "a woman", "existing negative", "make her a man",
-            base_url="http://x/v1", model="m", system_prompt="S",
+            Asking("http://x/v1", "m", "S"),
         )
 
     assert positive == "a man"

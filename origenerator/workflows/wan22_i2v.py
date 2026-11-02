@@ -160,8 +160,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 nodes[f"scene{index}_line"] = {"class_type": "LoadAudio", "inputs": {"audio": line.file}}
         return nodes
 
-    def _speaking_segment(self, index, scene, start, previous, length, offset,
-                          positive_ref, negative_ref, size, params):
+    def _speaking_segment(self, at, offset, prompts, size, params):
+        index, scene, start, length, _last, previous = at
+        positive_ref, negative_ref = prompts
         prefix = f"s{index}_"
         width_ref, height_ref = size
         heard, heard_ref = self.speech_window_nodes(
@@ -218,16 +219,16 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         spoken = scene_speech(params)
         offsets: dict[int, int] = {}
 
-        def segment(index, scene, start, length, last, previous=None):
-            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["10", 0])
+        def segment(at):
+            index, scene, start, length, _last, _previous = at
+            prompt_nodes, positive_ref = self.scene_prompt_nodes(at, scenes, ["1", 0], ["10", 0])
             negative_nodes, negative_ref = self.scene_prompt_nodes(
-                index, scene, negatives, ["1", 0], ["11", 0], role="negative")
+                at, negatives, ["1", 0], ["11", 0], role="negative")
             if spoken[scene] is not None:
                 offset = offsets.get(scene, 0)
                 offsets[scene] = offset + length - 1
                 nodes, frames = self._speaking_segment(
-                    index, scene, start, previous, length, offset,
-                    positive_ref, negative_ref, (width_ref, height_ref), params)
+                    at, offset, (positive_ref, negative_ref), (width_ref, height_ref), params)
                 return {**prompt_nodes, **negative_nodes, **nodes}, frames
             clip_vision_id, i2v_id, high_id, low_id, decode_id = (
                 ("13", "14", "15", "16", "17") if index == 0

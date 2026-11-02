@@ -310,9 +310,10 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
     voice, _host, _slideshows = router()
 
     built_with = voice.listener.built_with
-    assert built_with["phrases"] == spoken_phrases()
-    assert built_with["never_repaired"] == phrases_heard_only_outright()
-    assert built_with["said_in"] is said_in
+    phrases = built_with["phrases"]
+    assert phrases.heard == spoken_phrases()
+    assert phrases.never_repaired == phrases_heard_only_outright()
+    assert phrases.said_in is said_in
     assert "transcribe_bias" not in built_with
 
 

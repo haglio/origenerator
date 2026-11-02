@@ -14,7 +14,7 @@ from origenerator.gui.generate_pane import parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
 from origenerator.media import MediaType
-from origenerator.outside_videos import Made, OutsideVideo, Record, rows_bringing_in
+from origenerator.outside_videos import FrameFolders, Lent, Made, OutsideVideo, Record, rows_bringing_in
 from origenerator.workflows import WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.outside import VideoKind, outside_workflow
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -33,8 +33,8 @@ def _brought_in(db, tmp_path, name: str, record: Record,
     file.parent.mkdir(parents=True, exist_ok=True)
     file.write_bytes(b"not really a video")
     made = rows_bringing_in(OutsideVideo(file, "a-site"), record,
-                            frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
-                            grab=lambda _path: Image.new("RGB", (64, 96)), kind=kind)
+                            FrameFolders(tmp_path / "frames", tmp_path / "thumbs"),
+                            grab=lambda _path: Image.new("RGB", (64, 96)), lent=Lent(kind=kind))
     db.insert_rows(made)
     return [db.get_generation(row["prompt_id"]) for row in made]
 

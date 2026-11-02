@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from origenerator.voice.dictation import RequestDictation
-from origenerator.voice.listener import CommandAndRequestListener
+from origenerator.voice.listener import CommandAndRequestListener, Phrases
 from tests.conftest import FakeHearing
 
 
@@ -79,8 +79,8 @@ def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypat
 
     said_in = {"genau": "de"}.get
 
-    CommandAndRequestListener(phrases={"fix teeth", "mic off"}, never_repaired={"mic off"},
-                              said_in=said_in)
+    CommandAndRequestListener(
+        phrases=Phrases({"fix teeth", "mic off"}, {"mic off"}, said_in))
 
     built.assert_called_once_with({"fix teeth", "mic off"}, never_repaired={"mic off"},
                                   said_in=said_in)

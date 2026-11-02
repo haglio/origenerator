@@ -5,6 +5,7 @@ from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_dropdowns import model_dropdown
+from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import T5
 
 
@@ -75,9 +76,9 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         model_ref, clip_ref = loras.model, loras.clip_ref
         if params.get("enhance"):
             enhanced = self.enhance_image_nodes(
-                image_ref=["9", 0], model_ref=model_ref,
-                positive_ref=["5", 0], negative_ref=["6", 0], vae_ref=["3", 0],
-                params=params,
+                NodeRefs(image=["9", 0], model=model_ref, positive=["5", 0],
+                         negative=["6", 0], vae=["3", 0]),
+                params,
             )
             tail, saved_ref, upscaled_ref = enhanced.nodes, enhanced.image, enhanced.upscaled
         else:

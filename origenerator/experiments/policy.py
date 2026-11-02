@@ -152,7 +152,7 @@ class ExperimentPolicy:
                                                       row.get("negative_prompt") or "")))
             weights.append(1.0 + (_FAVORITE_BONUS if row.get("starred") else 0.0))
         choice = self._pick_value(
-            donors, workflow, "positive_prompt", rows,
+            donors, self._verdict_tallies(workflow, "positive_prompt", rows, None),
             value_of=lambda donor: donor[0], appeal=weights,
         )
         if choice is None:
@@ -164,7 +164,8 @@ class ExperimentPolicy:
         candidates = [o for o in pd.options if o != params.get(pd.key)
                       and not a_lora_filed_apart_from_its_model({**params, pd.key: o},
                                                                 definitions)]
-        choice = self._pick_value(candidates, workflow, pd.key, rows)
+        choice = self._pick_value(
+            candidates, self._verdict_tallies(workflow, pd.key, rows, None))
         if choice is None:
             return False
         params[pd.key] = choice
@@ -182,7 +183,8 @@ class ExperimentPolicy:
             value = self._snap(base + self._rng.gauss(0.0, sigma), pd)
             if value != params.get(pd.key) and value not in candidates:
                 candidates.append(value)
-        choice = self._pick_value(candidates, workflow, pd.key, rows, pd=pd)
+        choice = self._pick_value(
+            candidates, self._verdict_tallies(workflow, pd.key, rows, pd), pd=pd)
         if choice is None:
             return False
         params[pd.key] = choice
@@ -196,9 +198,7 @@ class ExperimentPolicy:
             value = max(pd.min_val, min(pd.max_val, value))
         return round(value) if pd.type == ParamType.INT else round(value, 4)
 
-    def _pick_value(self, candidates, workflow, key, rows, *, pd=None,
-                    value_of=lambda c: c, appeal=None):
-        tallies = self._verdict_tallies(workflow, key, rows, pd)
+    def _pick_value(self, candidates, tallies, *, pd=None, value_of=lambda c: c, appeal=None):
         pool = []
         weights = []
         for i, candidate in enumerate(candidates):

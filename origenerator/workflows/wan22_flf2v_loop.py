@@ -110,14 +110,15 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         scenes = scene_prompts(params["positive_prompt"])
         negatives = scene_prompts(params["negative_prompt"])
 
-        def segment(index, scene, start, length, last, previous=None):
+        def segment(at):
+            index, _scene, start, length, last, _previous = at
             flf_id, high_id, low_id, decode_id = (
                 ("12", "13", "14", "15") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("flf", "high", "low", "decode"))
             )
-            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["9", 0])
+            prompt_nodes, positive_ref = self.scene_prompt_nodes(at, scenes, ["1", 0], ["9", 0])
             negative_nodes, negative_ref = self.scene_prompt_nodes(
-                index, scene, negatives, ["1", 0], ["10", 0], role="negative")
+                at, negatives, ["1", 0], ["10", 0], role="negative")
             endpoints = {"start_image": start, **({"end_image": frame_ref} if last else {})}
             nodes = {
                 **prompt_nodes,

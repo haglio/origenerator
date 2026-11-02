@@ -4,6 +4,7 @@ import faulthandler
 import logging
 import time
 from datetime import datetime
+from typing import NamedTuple
 
 from PyQt6.QtCore import QObject, QTimer
 
@@ -15,23 +16,30 @@ HANDED_OVER_WITHIN_S = 30.0
 BEAT_MS = 1000
 
 
+class Timing(NamedTuple):
+    stalled_after_s: float = STALLED_AFTER_S
+    closed_within_s: float = CLOSED_WITHIN_S
+    handed_over_within_s: float = HANDED_OVER_WITHIN_S
+    beat_ms: int = BEAT_MS
+
+
+USUAL_TIMING = Timing()
+
+
 class FreezeWatch(QObject):
-    def __init__(self, crash_log, *, stalled_after_s: float = STALLED_AFTER_S,
-                 closed_within_s: float = CLOSED_WITHIN_S,
-                 handed_over_within_s: float = HANDED_OVER_WITHIN_S,
-                 beat_ms: int = BEAT_MS, clock=time.monotonic,
+    def __init__(self, crash_log, *, timing: Timing = USUAL_TIMING, clock=time.monotonic,
                  arm=faulthandler.dump_traceback_later, parent=None) -> None:
         super().__init__(parent)
         self._crash_log = crash_log
-        self._stalled_after_s = stalled_after_s
-        self._closed_within_s = closed_within_s
-        self._handed_over_within_s = handed_over_within_s
+        self._stalled_after_s = timing.stalled_after_s
+        self._closed_within_s = timing.closed_within_s
+        self._handed_over_within_s = timing.handed_over_within_s
         self._clock = clock
         self._arm = arm
         self._last_beat = clock()
         self._beats = QTimer(self)
         self._beats.timeout.connect(self.beat)
-        self._beats.start(beat_ms)
+        self._beats.start(timing.beat_ms)
         self._rearm()
 
     def beat(self) -> None:
@@ -73,7 +81,7 @@ def _now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def watch_the_window(app, crash_log, **settings) -> FreezeWatch:
-    watch = FreezeWatch(crash_log, parent=app, **settings)
+def watch_the_window(app, crash_log, timing: Timing = USUAL_TIMING) -> FreezeWatch:
+    watch = FreezeWatch(crash_log, timing=timing, parent=app)
     app.lastWindowClosed.connect(watch.end_the_process_if_the_close_sticks)
     return watch

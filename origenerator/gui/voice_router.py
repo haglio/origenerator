@@ -60,7 +60,7 @@ from origenerator.voice.commands import (
     spoken_phrases,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation
-from origenerator.voice.listener import CommandAndRequestListener
+from origenerator.voice.listener import CommandAndRequestListener, Phrases
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import name_parts
 
@@ -135,9 +135,7 @@ class VoiceRouter(QObject):
             command_matcher=match_voice_command,
             bare_matcher=shaped_app_command,
             dictation=RequestDictation(),
-            phrases=spoken_phrases(),
-            never_repaired=phrases_heard_only_outright(),
-            said_in=said_in,
+            phrases=Phrases(spoken_phrases(), phrases_heard_only_outright(), said_in),
         )
         self.listener.error.connect(lambda msg: logger.warning("Voice: %s", msg))
         self.listener.heard.connect(self._on_heard)

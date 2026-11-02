@@ -34,6 +34,7 @@ from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import (
     JOURNAL_NAME,
+    FrameFolders,
     Made,
     OutsideVideo,
     Places,
@@ -126,16 +127,17 @@ def test_a_video_made_from_words_alone_has_no_image_and_a_missing_record_says_no
 def _bring_in(tmp_path, record: Record, *, grab=lambda _path: Image.new("RGB", (64, 96))):
     db = Database(tmp_path / "test.db")
     video = OutsideVideo(_filed(tmp_path / "outbox", "portrait", "a-site", "c1_topaz.mp4"), "a-site")
-    db.insert_rows(rows_bringing_in(video, record, frames_dir=tmp_path / "frames",
-                                    thumb_dir=tmp_path / "thumbs", grab=grab))
+    db.insert_rows(rows_bringing_in(video, record,
+                                    FrameFolders(tmp_path / "frames", tmp_path / "thumbs"),
+                                    grab=grab))
     return db, video
 
 
 def test_a_video_brought_in_has_its_thumbnail_ready_to_animate(tmp_path):
     video = OutsideVideo(write_mp4(tmp_path / "outbox" / "c1_topaz.mp4"), "a-site")
 
-    rows = rows_bringing_in(video, Record(), frames_dir=tmp_path / "frames",
-                            thumb_dir=tmp_path / "thumbs")
+    rows = rows_bringing_in(video, Record(),
+                            FrameFolders(tmp_path / "frames", tmp_path / "thumbs"))
 
     assert animated_thumbnail_path(tmp_path / "thumbs", rows[-1]["prompt_id"]).exists()
 
@@ -897,7 +899,7 @@ def _brought_in_one_by_one(tmp_path, records: dict[str, dict]) -> Database:
         _record(tmp_path, video, recorded)
         db.insert_rows(rows_bringing_in(
             OutsideVideo(video, "a-site"), record_of(video, places.records_folder),
-            frames_dir=places.frames_dir, thumb_dir=places.thumb_dir, grab=_still))
+            FrameFolders(places.frames_dir, places.thumb_dir), grab=_still))
     return db
 
 

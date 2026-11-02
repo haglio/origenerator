@@ -15,6 +15,7 @@ from origenerator.workflows.derived_size import measure_derived_size, override_s
 from origenerator.workflows.detail_parts import detail_fix_passes, fix_prompts
 from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
+from origenerator.workflows.parts import NodeRefs, Segment
 
 SAMPLER_OPTIONS = [
     "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2",
@@ -278,12 +279,12 @@ class WorkflowTemplate(ABC):
         return LoraChain(nodes, model_ref, clip_ref)
 
     @staticmethod
-    def scene_prompt_nodes(index: int, scene: int, scenes: list[str], clip_ref, first_ref,
+    def scene_prompt_nodes(at: Segment, scenes: list[str], clip_ref, first_ref,
                            role: str = "prompt"):
-        text = scene_text(scenes, scene)
-        if index == 0 or text == scenes[0]:
+        text = scene_text(scenes, at.scene)
+        if at.index == 0 or text == scenes[0]:
             return {}, first_ref
-        node_id = f"s{index}_{role}"
+        node_id = f"s{at.index}_{role}"
         return {node_id: _text_encode(clip_ref, text)}, [node_id, 0]
 
     @classmethod
@@ -317,8 +318,7 @@ class WorkflowTemplate(ABC):
     def chain_segments(cls, params: dict, start_ref, render):
         plan = cls.scene_plan(params)
         first_length, first_scene = plan[0]
-        nodes, frames = render(0, first_scene, start_ref, first_length, len(plan) == 1,
-                               previous=None)
+        nodes, frames = render(Segment(0, first_scene, start_ref, first_length, len(plan) == 1))
         joined, previous, previous_length = frames, frames, first_length
         for index, (length, scene) in enumerate(plan[1:], start=1):
             prefix = f"s{index}_"
@@ -326,8 +326,8 @@ class WorkflowTemplate(ABC):
                 "class_type": "ImageFromBatch",
                 "inputs": {"image": previous, "batch_index": previous_length - 1, "length": 1},
             }
-            segment, frames = render(index, scene, [prefix + "last", 0], length,
-                                     index == len(plan) - 1, previous=previous)
+            segment, frames = render(Segment(index, scene, [prefix + "last", 0], length,
+                                             index == len(plan) - 1, previous))
             nodes.update(segment)
             nodes[prefix + "new"] = {
                 "class_type": "ImageFromBatch",
@@ -393,8 +393,7 @@ class WorkflowTemplate(ABC):
         return nodes, [union_id, 0]
 
     @staticmethod
-    def enhance_image_nodes(*, image_ref, model_ref, positive_ref, negative_ref,
-                            vae_ref, params: dict,
+    def enhance_image_nodes(refs: NodeRefs, params: dict,
                             rescale_to: tuple[int, int] | None = None) -> EnhanceTail:
         if rescale_to is None:
             rescale = {
@@ -424,19 +423,19 @@ class WorkflowTemplate(ABC):
             },
             _ENH_UPSCALE: {
                 "class_type": "ImageUpscaleWithModel",
-                "inputs": {"upscale_model": [_ENH_LOADER, 0], "image": image_ref},
+                "inputs": {"upscale_model": [_ENH_LOADER, 0], "image": refs.image},
             },
             _ENH_RESCALE: rescale,
             _ENH_ENCODE: {
                 "class_type": "VAEEncode",
-                "inputs": {"pixels": [_ENH_RESCALE, 0], "vae": vae_ref},
+                "inputs": {"pixels": [_ENH_RESCALE, 0], "vae": refs.vae},
             },
             _ENH_SAMPLER: {
                 "class_type": "KSampler",
                 "inputs": {
-                    "model": model_ref,
-                    "positive": positive_ref,
-                    "negative": negative_ref,
+                    "model": refs.model,
+                    "positive": refs.positive,
+                    "negative": refs.negative,
                     "latent_image": [_ENH_ENCODE, 0],
                     "seed": params["seed"],
                     "steps": params["enhance_steps"],
@@ -448,28 +447,27 @@ class WorkflowTemplate(ABC):
             },
             _ENH_DECODE: {
                 "class_type": "VAEDecode",
-                "inputs": {"samples": [_ENH_SAMPLER, 0], "vae": vae_ref},
+                "inputs": {"samples": [_ENH_SAMPLER, 0], "vae": refs.vae},
             },
         }
         return EnhanceTail(nodes, [_ENH_DECODE, 0], [_ENH_UPSCALE, 0])
 
     @staticmethod
-    def detail_fix_nodes(*, image_ref, model_ref, clip_ref, vae_ref,
-                         positive_ref, negative_ref, params: dict):
+    def detail_fix_nodes(refs: NodeRefs, params: dict):
         nodes: dict = {}
         prompts = fix_prompts(params)
-        original = image_ref
+        original = image_ref = refs.image
         for index, fix in enumerate(detail_fix_passes(params)):
             found, segs_ref = finding_nodes(index, fix, image_ref, original)
             nodes.update(found)
             detailer_id = f"fix{index}_detailer"
             own = prompts[fix.part.name]
             fixed = WorkflowTemplate.lora_chain(
-                f"fix{index}_lora", model_ref,
-                [(own["lora"], own["strength"])] if own["lora"] else [], clip_ref=clip_ref)
+                f"fix{index}_lora", refs.model,
+                [(own["lora"], own["strength"])] if own["lora"] else [], clip_ref=refs.clip)
             nodes.update(fixed.nodes)
             model, fixed_clip_ref = fixed.model, fixed.clip_ref
-            positive, negative = positive_ref, negative_ref
+            positive, negative = refs.positive, refs.negative
             if own["prompt"] or own["avoid"] or own["lora"]:
                 positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
                 nodes.update(prompt_conditioning(positive_id, fixed_clip_ref, params["positive_prompt"],
@@ -485,7 +483,7 @@ class WorkflowTemplate(ABC):
                     "segs": segs_ref,
                     "model": model,
                     "clip": fixed_clip_ref,
-                    "vae": vae_ref,
+                    "vae": refs.vae,
                     "guide_size": _DETAIL_GUIDE_SIZE,
                     "guide_size_for": True,
                     "max_size": _DETAIL_MAX_SIZE,

@@ -4,7 +4,7 @@ import pytest
 from funestra.hud_controls import AN_IMAGE, TRASH_TOOLTIP, lock_tooltip
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.slideshow_buttons import HUD_FACTS, answer, slideshow_rows
+from origenerator.slideshow_buttons import HUD_FACTS, SlideshowFacts, answer, slideshow_rows
 
 THE_ROW = [
     "prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash", "fmode",
@@ -12,7 +12,7 @@ THE_ROW = [
 
 
 def _button_row(**fields) -> tuple:
-    return slideshow_rows("portrait", **fields)[-1]
+    return slideshow_rows("portrait", SlideshowFacts(**fields))[-1]
 
 
 def _names(buttons) -> list[str]:
@@ -130,7 +130,7 @@ def test_reset_is_faded_with_nothing_to_put_back():
 
 
 def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize():
-    rows = slideshow_rows("portrait", hosted=True)
+    rows = slideshow_rows("portrait", SlideshowFacts(hosted=True))
     mode_row = [button.command for button in rows[0]]
 
     assert mode_row == ["satellites_kino_activate", "origenerator_activate"]
@@ -148,7 +148,7 @@ def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
 
 
 def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
-    rows = slideshow_rows("portrait", hosted=True, own_window=False)
+    rows = slideshow_rows("portrait", SlideshowFacts(hosted=True, own_window=False))
 
     assert len(rows) == 1
     assert _names(rows[0]) == THE_ROW
@@ -245,7 +245,7 @@ def test_the_versions_button_is_dim_where_the_item_has_only_itself():
 
 def test_every_declared_button_is_answered_by_the_slideshow():
     host = _Host()
-    for button in slideshow_rows("portrait", hosted=True, own_window=False)[0]:
+    for button in slideshow_rows("portrait", SlideshowFacts(hosted=True, own_window=False))[0]:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),

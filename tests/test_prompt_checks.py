@@ -119,12 +119,14 @@ def test_stacked_parentheses_stay_where_the_model_reads_no_numbers():
     ("x, ((a b)), y", ["((a b))"]),
     ("(((a)))", ["(((a)))"]),
     ("((a:1.2))", ["((a:1.2))"]),
-    ("((a:1.2) b)", ["(a:1.2)"]),
+    ("((a:1.2) b)", ["((a:1.2) b)"]),
+    ("(a), b", ["(a)"]),
+    ("(a) (b), c", ["(a)", "(b)"]),
 ])
 def test_emphasis_a_model_reads_as_plain_text_is_found_whole(text, unread):
     assert _spanned(text, unread_emphasis(text)) == unread
 
 
-@pytest.mark.parametrize("text", ["a, b", "(a), b", "((a) b)", r"\\((a))", "16:9"])
-def test_what_is_no_number_or_stack_of_parentheses_is_not_unread_emphasis(text):
+@pytest.mark.parametrize("text", ["a, b", r"\(a\)", "16:9", "a) (b"])
+def test_what_is_no_pair_of_parentheses_is_not_unread_emphasis(text):
     assert unread_emphasis(text) == ()

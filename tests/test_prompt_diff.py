@@ -1,7 +1,3 @@
-"""The before/after rendering a Requests tile shows.
-
-Invented prompts throughout — what is under test is the marking, not any words.
-"""
 from __future__ import annotations
 
 from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
@@ -34,8 +30,6 @@ def test_an_added_term_is_marked_added():
 
 
 def test_a_reweighted_term_marks_the_weight_not_the_term():
-    # The term itself did not change — the emphasis around it did, and that is
-    # what should light up.
     spans = diff_spans("a woman, freckles", "a woman, (freckles:1.1)")
 
     assert _joined(spans, (REMOVED,)) == ""
@@ -49,3 +43,18 @@ def test_identical_prompts_diff_to_one_unchanged_run():
 
 def test_a_prompt_arriving_from_nothing_is_all_added():
     assert diff_spans("", "a woman") == [(ADDED, "a woman")]
+
+
+def test_a_decimal_weight_is_one_piece_and_punctuation_moves_apart_from_its_word():
+    spans = diff_spans("a woman, freckles", "a woman, freckles:1.15")
+
+    assert _joined(spans, (REMOVED,)) == ""
+    assert _joined(spans, (ADDED,)) == ":1.15"
+    assert _joined(spans, (SAME,)) == "a woman, freckles"
+
+
+def test_a_run_of_changed_words_is_one_mark():
+    spans = diff_spans("a cat, soft light", "a dog with red fur, soft light")
+
+    assert [kind for kind, _ in spans].count(REMOVED) == 1
+    assert [kind for kind, _ in spans].count(ADDED) == 1

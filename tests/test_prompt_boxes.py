@@ -3,8 +3,8 @@ from __future__ import annotations
 from functools import partial
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QFocusEvent, QTextCursor
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BG_PRIMARY, RED, TEXT_MUTED, YELLOW
 from shared_ui.fonts import FONT_UI, SIZE_BODY
@@ -17,7 +17,12 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
 from origenerator.gui.prompt_boxes import Countdown, PromptBoxes, set_in_use
 from origenerator.gui.prompt_field import PromptField, PromptHeights
-from origenerator.gui.prompt_marks import has_unpaired_parentheses
+from origenerator.gui.prompt_marks import (
+    RESOLVE_BAD_WEIGHTS,
+    RESOLVE_DUPLICATES,
+    RESOLVE_UNPAIRED_PARENTHESES,
+    problem_to_resolve,
+)
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, story_of
@@ -576,7 +581,7 @@ def test_an_unpaired_parenthesis_is_highlighted_in_yellow_and_the_rest_of_the_pr
 
     (box,) = prompt.boxes()
     assert _past_the_limit(box) == [("(", YELLOW.name(), BG_PRIMARY.name())]
-    assert has_unpaired_parentheses(box)
+    assert problem_to_resolve([box]) == RESOLVE_UNPAIRED_PARENTHESES
 
 
 def test_paired_parentheses_are_left_plain(prompt):
@@ -584,7 +589,7 @@ def test_paired_parentheses_are_left_plain(prompt):
 
     (box,) = prompt.boxes()
     assert _past_the_limit(box) == []
-    assert not has_unpaired_parentheses(box)
+    assert problem_to_resolve([box]) is None
 
 
 def test_the_highlight_follows_the_typing(prompt):
@@ -593,7 +598,7 @@ def test_the_highlight_follows_the_typing(prompt):
 
     box.setPlainText("a (b) c")
     assert _past_the_limit(box) == []
-    assert not has_unpaired_parentheses(box)
+    assert problem_to_resolve([box]) is None
 
     box.setPlainText("a (b) c)")
     assert _past_the_limit(box) == [(")", YELLOW.name(), BG_PRIMARY.name())]
@@ -622,7 +627,7 @@ def test_a_prompt_made_before_the_boxes_highlights_its_unpaired_parentheses_as_i
     first, second = made_before_the_boxes.boxes()
     assert _yellow_in(first) == []
     assert _yellow_in(second) == [")"]
-    assert has_unpaired_parentheses(second)
+    assert problem_to_resolve([second]) == RESOLVE_UNPAIRED_PARENTHESES
 
 
 def test_a_parenthesis_in_words_taken_out_of_the_prompt_counts_for_nothing(prompt):
@@ -633,7 +638,7 @@ def test_a_parenthesis_in_words_taken_out_of_the_prompt_counts_for_nothing(promp
     (box,) = prompt.boxes()
     assert box.toPlainText() == "a (x b"
     assert _yellow_in(box) == []
-    assert not has_unpaired_parentheses(box)
+    assert problem_to_resolve([box]) is None
 
 
 def test_an_unpaired_parenthesis_among_words_added_to_a_shown_prompt_is_the_one_highlighted(prompt):
@@ -643,7 +648,7 @@ def test_an_unpaired_parenthesis_among_words_added_to_a_shown_prompt_is_the_one_
 
     (box,) = prompt.boxes()
     assert _yellow_in(box) == ["("]
-    assert has_unpaired_parentheses(box)
+    assert problem_to_resolve([box]) == RESOLVE_UNPAIRED_PARENTHESES
 
 
 def test_a_prompt_not_in_use_highlights_no_parenthesis(prompt):
@@ -653,4 +658,89 @@ def test_a_prompt_not_in_use_highlights_no_parenthesis(prompt):
 
     (box,) = prompt.boxes()
     assert _past_the_limit(box) == []
-    assert not has_unpaired_parentheses(box)
+    assert problem_to_resolve([box]) is None
+
+
+def test_a_badly_formatted_number_is_highlighted_whole_in_yellow(prompt):
+    prompt.set_value("a (b:high), c")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == [":high)"]
+    assert problem_to_resolve([box]) == RESOLVE_BAD_WEIGHTS
+
+
+def test_every_copy_of_a_duplicate_thing_is_highlighted_in_yellow(prompt):
+    prompt.set_value("red cat, a dog, red cat")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == ["red cat", "red cat"]
+    assert problem_to_resolve([box]) == RESOLVE_DUPLICATES
+
+
+def test_a_duplicate_is_found_across_the_boxes_of_one_prompt(prompt):
+    prompt.set_value(f"red cat, a dog,{BOX_BREAK}red cat")
+
+    first, second = prompt.boxes()
+    assert _yellow_in(first) == ["red cat"]
+    assert _yellow_in(second) == ["red cat"]
+
+
+def test_a_prompt_not_in_use_highlights_no_duplicate(prompt):
+    prompt.set_value("a, a")
+
+    prompt.set_in_use(False, "Nothing reads this")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == []
+
+
+def _leave(box, reason=Qt.FocusReason.MouseFocusReason) -> None:
+    QApplication.sendEvent(box, QFocusEvent(QEvent.Type.FocusOut, reason))
+
+
+def test_leaving_a_box_tidies_what_was_typed(prompt):
+    (box,) = prompt.boxes()
+    box.setPlainText("a  b,c")
+
+    _leave(box)
+
+    assert prompt.value() == "a b, c"
+
+
+def test_leaving_a_box_turns_stacked_parentheses_into_a_number_where_the_model_reads_numbers(prompt):
+    (box,) = prompt.boxes()
+    box.setPlainText("((a))")
+
+    _leave(box)
+
+    assert prompt.value() == "(a:1.21)"
+
+
+def test_leaving_a_box_keeps_stacked_parentheses_where_the_model_reads_no_numbers(qtbot):
+    sound = _prompt_fields("audio_prompt")
+    qtbot.addWidget(sound)
+    sound.set_reading(word_reading(76, CUT_OFF))
+    (box,) = sound.boxes()
+    box.setPlainText("((a))  b")
+
+    _leave(box)
+
+    assert sound.value() == "((a)) b"
+
+
+def test_a_stored_prompt_nobody_edited_is_not_tidied_by_clicking_through_it(prompt):
+    prompt.set_value("a  b,c")
+    (box,) = prompt.boxes()
+
+    _leave(box)
+
+    assert prompt.value() == "a  b,c"
+
+
+def test_switching_to_another_window_leaves_what_is_being_typed_as_it_is(prompt):
+    (box,) = prompt.boxes()
+    box.setPlainText("a ")
+
+    _leave(box, Qt.FocusReason.ActiveWindowFocusReason)
+
+    assert prompt.value() == "a "

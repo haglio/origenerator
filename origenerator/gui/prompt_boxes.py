@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QApplication, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 from shared_ui.colors import RED, YELLOW
 from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.spacing import GAP_SMALL
@@ -14,11 +14,16 @@ from origenerator.box_breaks import (
     cut_into_boxes,
     prompt_boxes,
     unboxed,
-    unpaired_parentheses,
 )
 from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
-from origenerator.gui.prompt_marks import mark_past_the_limit, mark_unpaired_parentheses
+from origenerator.gui.prompt_marks import PromptProblems, mark_past_the_limit, mark_problems
+from origenerator.prompt_checks import (
+    bad_weights,
+    duplicate_things,
+    tidied,
+    unpaired_parentheses,
+)
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
 COUNTING_DOWN_FROM = 15
@@ -48,12 +53,46 @@ def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReadi
     mark_past_the_limit(field, None if reading is None or not in_use
                         else reading.past_limit_at(text),
                         unread=reading is not None and reading.past_it == CUT_OFF)
-    _mark_parentheses(field, in_use=in_use)
 
 
-def _mark_parentheses(field: QPlainTextEdit, *, in_use: bool) -> None:
-    mark_unpaired_parentheses(
-        field, unpaired_parentheses(diff_text.live_text(field)) if in_use else ())
+def mark_problems_in(fields: list[QPlainTextEdit], *, in_use: bool) -> None:
+    if not in_use:
+        for field in fields:
+            mark_problems(field, PromptProblems())
+        return
+    texts = [diff_text.live_text(field) for field in fields]
+    duplicates = duplicate_things(" ".join(texts))
+    start = 0
+    for field, text in zip(fields, texts, strict=True):
+        end = start + len(text)
+        mark_problems(field, PromptProblems(
+            tuple((at, at + 1) for at in unpaired_parentheses(text)),
+            bad_weights(text),
+            tuple((max(first, start) - start, min(last, end) - start)
+                  for first, last in duplicates if first < end and last > start)))
+        start = end + 1
+
+
+def reads_numbers(reading: PromptReading | None) -> bool:
+    return reading is not None and reading.weighted
+
+
+class TidiesOnLeaving(QObject):
+    _STILL_BEING_TYPED_IN = (Qt.FocusReason.ActiveWindowFocusReason, Qt.FocusReason.PopupFocusReason)
+
+    def __init__(self, field: QPlainTextEdit, on_left: Callable[[bool], None]):
+        super().__init__(field)
+        self._on_left = on_left
+        self._on_entering = diff_text.live_text(field)
+        field.installEventFilter(self)
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() == QEvent.Type.FocusIn:
+            self._on_entering = diff_text.live_text(watched)
+        elif (event.type() == QEvent.Type.FocusOut
+              and event.reason() not in self._STILL_BEING_TYPED_IN):
+            self._on_left(diff_text.live_text(watched) != self._on_entering)
+        return False
 
 
 class PromptBoxes(QWidget):
@@ -203,6 +242,7 @@ class PromptBoxes(QWidget):
         box = self._make_box()
         box.setUndoRedoEnabled(False)
         self._history.watch(box)
+        TidiesOnLeaving(box, self._left_a_box)
         box.textChanged.connect(lambda box=box: self._edited(box))
         countdown = Countdown()
         self._column.insertWidget(self._column.count() - 1, box, 1)
@@ -285,13 +325,20 @@ class PromptBoxes(QWidget):
             tracked_prompt.put_caret_in_prompt(target, len(diff_text.live_text(target)))
         self.textChanged.emit()
 
+    def _left_a_box(self, _changed: bool) -> None:
+        if self._as_made or QApplication.focusWidget() in self._boxes:
+            return
+        value = BOX_BREAK.join(self._texts)
+        tidy = tidied(value, reads_numbers=reads_numbers(self._reading))
+        if tidy != value:
+            self.edit(tidy)
+
     def _count_down(self) -> None:
+        mark_problems_in(self._boxes, in_use=self._in_use)
         if self._cut_from is not None:
             for countdown, (_start, tokens) in zip(self._countdowns,
                                                    self._reading.pieces(self._cut_from), strict=True):
                 countdown.show_left(self._reading.reads_well - tokens if self._in_use else None)
-            for box in self._boxes:
-                _mark_parentheses(box, in_use=self._in_use)
             return
         for box, countdown in zip(self._boxes, self._countdowns, strict=True):
             count_down(countdown, box, self._reading, in_use=self._in_use)

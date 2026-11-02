@@ -1,25 +1,42 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import NamedTuple
+
 from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 from PyQt6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import BG_PRIMARY, TEXT_MUTED, YELLOW
 
 from origenerator.gui.tracked_prompt import prompt_ranges_from
 
+RESOLVE_UNPAIRED_PARENTHESES = "Resolve parentheses first"
+RESOLVE_BAD_WEIGHTS = "Resolve bad numbers first"
+RESOLVE_DUPLICATES = "Resolve duplicates first"
+
+_SAYS = (RESOLVE_UNPAIRED_PARENTHESES, RESOLVE_BAD_WEIGHTS, RESOLVE_DUPLICATES)
+
+Spans = tuple[tuple[int, int], ...]
+
+
+class PromptProblems(NamedTuple):
+    unpaired_parentheses: Spans = ()
+    bad_weights: Spans = ()
+    duplicates: Spans = ()
+
 
 class _PromptMarks(QSyntaxHighlighter):
     starts_at: int | None = None
     unread = False
-    unpaired: tuple[int, ...] = ()
+    problems = PromptProblems()
 
     def highlightBlock(self, text: str) -> None:
         field = self.parent()
         if self.starts_at is not None:
             ink = TEXT_MUTED if self.unread else BG_PRIMARY
             self._mark(text, prompt_ranges_from(field, self.starts_at), ink)
-        for at in self.unpaired:
-            for start, _end in prompt_ranges_from(field, at)[:1]:
-                self._mark(text, [(start, start + 1)], BG_PRIMARY)
+        for spans in self.problems:
+            for start, end in spans:
+                self._mark(text, _ranges_of(field, start, end), BG_PRIMARY)
 
     def _mark(self, text: str, ranges: list[tuple[int, int]], ink: QColor) -> None:
         marked = QTextCharFormat()
@@ -30,6 +47,17 @@ class _PromptMarks(QSyntaxHighlighter):
             begin, finish = max(start - block, 0), min(end - block, len(text))
             if begin < finish:
                 self.setFormat(begin, finish - begin, marked)
+
+
+def _ranges_of(field: QPlainTextEdit, start: int, end: int) -> list[tuple[int, int]]:
+    ranges, left = [], end - start
+    for begin, finish in prompt_ranges_from(field, start):
+        if left <= 0:
+            break
+        taken = min(finish - begin, left)
+        ranges.append((begin, begin + taken))
+        left -= taken
+    return ranges
 
 
 def _marks_on(field: QPlainTextEdit) -> _PromptMarks:
@@ -47,13 +75,15 @@ def mark_past_the_limit(field: QPlainTextEdit, starts_at: int | None, *, unread:
         marks.rehighlight()
 
 
-def mark_unpaired_parentheses(field: QPlainTextEdit, unpaired: tuple[int, ...]) -> None:
+def mark_problems(field: QPlainTextEdit, problems: PromptProblems) -> None:
     marks = _marks_on(field)
-    if marks.unpaired != unpaired:
-        marks.unpaired = unpaired
+    if marks.problems != problems:
+        marks.problems = problems
         marks.rehighlight()
 
 
-def has_unpaired_parentheses(field: QPlainTextEdit) -> bool:
-    marks = field.findChild(_PromptMarks)
-    return marks is not None and bool(marks.unpaired)
+def problem_to_resolve(fields: Iterable[QPlainTextEdit]) -> str | None:
+    found = [marks.problems for marks in (field.findChild(_PromptMarks) for field in fields)
+             if marks is not None]
+    return next((says for kind, says in enumerate(_SAYS)
+                 if any(problems[kind] for problems in found)), None)

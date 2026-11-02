@@ -13,8 +13,12 @@ so ("Generate with Random seed") rather than a dialog asking after the click.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import QPlainTextEdit, QPushButton
+
+from origenerator.gui.prompt_marks import problem_to_resolve
 
 _GUARD_MS = 2500  # how long a blocked-Generate guard message lingers on the button
 DEFAULT_CAPTION = "Generate"
@@ -52,3 +56,10 @@ class GenerateButton(QPushButton):
 
     def _clear_guard(self):
         self.setText(self._caption)
+
+
+def refused_over_prompts(button: GenerateButton, fields: Iterable[QPlainTextEdit]) -> bool:
+    problem = problem_to_resolve(fields)
+    if problem is not None:
+        button.flash_guard(problem)
+    return problem is not None

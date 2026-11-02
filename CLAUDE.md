@@ -731,15 +731,16 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   `gh pr create --fill`. Auto-merge arms itself; the queue rebases your PR onto
   `main`, runs the required check, and merges it when green. Don't ff-merge into
   the production checkout, don't push `main` directly, and never force-push `main`.
-- **Never merge `main` into your branch. Rebase — and if that hurts, squash
-  first.** The queue's merge method is REBASE, so a branch carrying merge
+- **Never merge `main` into your branch, and never collapse its commits into
+  one. Always rebase, resolving each conflict in the commit it belongs to.**
+  Each commit's message is the record of why, and one commit in place of many
+  throws that away. The queue's merge method is REBASE, so a branch carrying merge
   commits is replayed as its *original* commits onto a `main` they were never
   written against: the same conflicts, again, on every attempt, with
   `github-merge-queue` evicting it each time "due to a conflict with the base
-  branch". A branch that has drifted far collapses to one commit before it goes
-  near the queue — `git reset --hard origin/main && git merge --squash <old-tip>`
-  keeps the tree byte-for-byte and leaves a rebase with nothing to do. That
-  costs a force-push, so do it before opening the PR, not after. The near miss
+  branch". A branch already on origin that a rebase rewrites goes up under a new
+  name with a pull request of its own, since nothing here is ever force-pushed.
+  The near miss
   that still counts: reaching for `git merge origin/main` because it resolves
   the conflicts *once* instead of once per commit — cheaper today, unlandable
   forever, and it compounds every time `main` moves again (one branch merged

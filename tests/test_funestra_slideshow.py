@@ -1,9 +1,3 @@
-"""The slideshow, driving a Funestra over its channel.
-
-What this covers is the channel between the two: the list the Funestra is handed,
-the verbs a press sends it, the HUD this app publishes for it, and the slide
-on screen — which is the Funestra's answer, read back, not this app's own.
-"""
 from __future__ import annotations
 
 import ast
@@ -65,11 +59,6 @@ def _channel(tmp_path: Path) -> FunestraChannel:
 
 
 def _slideshow(qtbot, tmp_path, items=_ITEMS, **fields) -> FunestraSlideshow:
-    """A slideshow driving a Funestra whose files are this test's own.
-
-    Its poll timer is stopped and :meth:`FunestraSlideshow.tick` called by hand, so a
-    test says when the Funestra is next read rather than racing it.
-    """
     slideshow = FunestraSlideshow(items, shape="portrait", channel=_channel(tmp_path),
                       frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
     slideshow._timer.stop()
@@ -77,13 +66,10 @@ def _slideshow(qtbot, tmp_path, items=_ITEMS, **fields) -> FunestraSlideshow:
 
 
 def _sent(slideshow: FunestraSlideshow) -> list[str]:
-    """The verbs waiting on the Funestra's command file, drained as it drains
-    them — its own reader, so a spelling this app got wrong cannot pass."""
     return consume_command_file(slideshow.channel.command_file, uppercase=False)
 
 
 def _says(slideshow: FunestraSlideshow, **fields) -> None:
-    """The Funestra publishing what it is showing, as its status writer does."""
     _funestra_says(slideshow.channel, **fields)
 
 
@@ -190,8 +176,6 @@ def test_a_funestra_that_says_nothing_leaves_the_slideshow_as_it_was(qtbot, tmp_
 
 
 def test_a_file_the_funestra_would_not_open_is_stepped_past(qtbot, tmp_path):
-    """A video carries no pace of its own -- its length is its pace -- so a file the
-    Funestra cannot open would be a black screen for the rest of the slideshow."""
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     _says(slideshow, video="one.png", idle=True)
@@ -213,8 +197,6 @@ def test_each_file_that_would_not_open_is_stepped_past_once(qtbot, tmp_path):
 
 
 def test_a_file_that_would_not_open_is_stepped_past_even_while_locked(qtbot, tmp_path):
-    """A lock replays what it holds, so a locked file that cannot play would hold
-    the black screen for good; the item stays in the set, the lock comes off."""
     slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
 
     _says(slideshow, video="one.png", locked=True, idle=True)
@@ -225,8 +207,6 @@ def test_a_file_that_would_not_open_is_stepped_past_even_while_locked(qtbot, tmp
 
 def test_a_file_that_would_not_open_waits_out_a_paused_room_before_it_is_stepped_past(
         qtbot, tmp_path):
-    """A slideshow hunting through its set for something it can play is the room
-    moving while it is held, so the black screen waits for the room to play on."""
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     _says(slideshow, video="one.png", paused=True, idle=True)
     slideshow.tick()
@@ -239,8 +219,6 @@ def test_a_file_that_would_not_open_waits_out_a_paused_room_before_it_is_stepped
 
 
 def test_a_slideshow_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):
-    """The set, in the order this slideshow plays it, is the Funestra's playlist —
-    read back through the very reader the Funestra reads it with."""
     slideshow = _slideshow(qtbot, tmp_path)
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
@@ -273,8 +251,6 @@ def test_a_clip_is_handed_over_with_the_script_the_funestra_drives_the_osr2_by(
 
 def test_a_slideshow_opened_in_one_look_finds_its_videos_scripts_by_listing_their_folders(
         qtbot, tmp_path, monkeypatch):
-    # Asked after one at a time, the scripts of Latest's videos held a
-    # double-click for two seconds; each folder they could be in is listed once.
     scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
     items = [("clip.mp4", "video", "id-1"), ("bare.mp4", "video", "id-2")]
     is_file = Path.is_file
@@ -306,9 +282,6 @@ def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_
 
 
 def test_the_slideshow_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
-    """The Funestra walks the list by itself — an image's pace runs out, a video
-    ends — so which item the map lights, the star answers about and a spoken
-    "this one" means is the Funestra's answer, read back."""
     slideshow = _slideshow(qtbot, tmp_path)
 
     _says(slideshow, video="two.png")
@@ -365,8 +338,6 @@ def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
-    """Moving off a locked slide releases the lock, the way the Funestras' own
-    prev/next cancel a lock — else the Funestra would repeat the next one too."""
     slideshow = _slideshow(qtbot, tmp_path)
     slideshow.slideshow_toggle_lock()
     _sent(slideshow)
@@ -377,9 +348,6 @@ def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
 
 
 def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path):
-    """Locking is the whole gesture it is in a window: the Funestra repeats it,
-    and the slideshow favorites it, asks for the better version, and hands it to the
-    gallery to open."""
     asked = []
     slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
 
@@ -476,12 +444,12 @@ def test_a_step_off_a_lock_the_funestra_has_not_said_it_took_takes_the_lock_back
     _says(slideshow, video="one.png")
     slideshow.tick()
     slideshow.set_locked(True)
-    slideshow.tick()                                  # read before it took the lock
+    slideshow.tick()
     _sent(slideshow)
 
     slideshow.slideshow_step(1)
     sent = _sent(slideshow)
-    _says(slideshow, video="two.png", locked=True)    # had the lock gone with it
+    _says(slideshow, video="two.png", locked=True)
     slideshow.tick()
 
     assert sent == ["LOCK_OFF", "NEXT"]
@@ -503,9 +471,6 @@ def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_firs
 
 
 def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_path):
-    """The Funestra is playing that very file, and Windows will not move a file a
-    process still has open — so the Funestra is told to drop it before the
-    generation is condemned."""
     queued_at_delete, deleted = [], []
 
     def delete(prompt_id):
@@ -520,13 +485,10 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
     assert deleted == ["id-1"]
     assert queued_at_delete[:1] == ["TRASH"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
-    assert played == ["two.png", "three.png"]  # and it is off the list
+    assert played == ["two.png", "three.png"]
 
 
 def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
-    """The Trash asks every surface to let go of the files it moves; the
-    Funestra is already letting go of this one, so asking again would move it on
-    past the item after it as well."""
     released = []
 
     def delete(_prompt_id):
@@ -543,9 +505,6 @@ def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
 
 
 def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot, tmp_path):
-    """A Funestra with nothing else to move on to keeps its file open for good —
-    a delete refused, said where the speaker can see it, not an error only the
-    log ever hears of."""
     said = []
 
     def delete(_prompt_id):
@@ -562,8 +521,6 @@ def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot
 
 
 def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
-    """A switch is a narrowing of what the Funestra may reach, so the list it is
-    playing is written again with what survives."""
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
     _sent(slideshow)
 
@@ -585,16 +542,13 @@ def test_narrowing_reaches_a_funestra_partway_through_reading_the_last_list(qtbo
 
 
 def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
-    """The session draws the HUD on the Funestra, so this app publishes the
-    model for it: the slideshow's map, its title and the buttons it answers —
-    and not the mode pair, which is the session's own to add."""
     slideshow = _slideshow(qtbot, tmp_path)
 
     model = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
 
     assert model.funestra == "portrait"
     assert model.corner.path == "one.png"
-    assert model.seed_count == 1     # a set with no library under it maps the slide alone
+    assert model.seed_count == 1
     assert [[button.command for button in row] for row in model.rows] == [
         ["portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
          "portrait_funscript_jump", "portrait_lock", "portrait_trash", "portrait_fmode",
@@ -656,9 +610,6 @@ def test_reset_is_faded_while_the_slideshow_is_at_its_defaults(qtbot, tmp_path):
 
 def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before_its_list(
         qtbot, tmp_path, monkeypatch):
-    """The session draws whatever HUD is out when its Funestra takes the list,
-    so a HUD that came after the list, or filled in after it, was a Satellite
-    switching to Origenerator mode in stages (2026-10-29)."""
     out_when_the_list_went: list = []
     hand_the_list_over = FunestraChannel.write_playlist
 
@@ -768,8 +719,6 @@ def test_a_slide_shown_locked_plays_and_locks_and_neither_stars_nor_enhances(qtb
 
 
 def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
-    """The pace is the Funestra's to keep — it holds an image that long and then
-    ends the file, which is how a slide moves on at all."""
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)
 
@@ -790,8 +739,6 @@ def test_a_new_pace_is_the_clip_seconds_the_satellites_hud_shows_at_once(qtbot, 
 
 
 def test_a_slideshow_that_is_over_gives_the_side_back(qtbot, tmp_path):
-    """The HUD goes with it, so the session draws its own again on that
-    Funestra rather than leaving this app's last one up."""
     slideshow = _slideshow(qtbot, tmp_path)
 
     slideshow.close()
@@ -811,8 +758,6 @@ def test_a_slideshow_that_is_over_takes_its_hud_down_though_the_funestra_is_read
 
 
 def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, tmp_path):
-    # The same promise as the full-screen slideshow: whichever way a slideshow ends,
-    # the image it was on is the one to find in the gallery afterwards.
     slideshow = _slideshow(qtbot, tmp_path)
     handed = []
     slideshow.open_requested.connect(handed.append)
@@ -967,8 +912,6 @@ def test_a_slideshow_opened_on_a_slide_lands_the_funestra_on_it(qtbot, tmp_path)
 
 
 def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
-    """The Funestra holds the file open, so the way to let go is to move on —
-    what the gallery asks of every surface before it moves files."""
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     slideshow.release_media(["one.png"])
@@ -1039,9 +982,6 @@ _VERSIONS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
 
 
 class TestVersions:
-    """Stepping an item's own versions on the Funestra, the axis the shifted keys
-    and the HUD's versions button share with a slideshow in a window."""
-
     def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions(_VERSIONS)
@@ -1114,8 +1054,6 @@ class TestVersions:
 
     def test_the_sessions_shift_left_counts_the_enhancements_down_and_shift_right_up(
             self, qtbot, tmp_path):
-        """The session sends Shift+Left as cycle_version_back, and Shift+Right as
-        cycle_version, which the HUD's versions button sends too."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
                                           ("one_1.png", "image", "Enhancement 1/2"),
@@ -1132,8 +1070,6 @@ class TestVersions:
 
     def test_an_item_filed_once_is_left_alone_rather_than_stepping_the_set(
             self, qtbot, tmp_path):
-        """Nothing to compare it against, and the shift was the whole point of
-        the press — so it does nothing rather than walking to the neighbor."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
         slideshow.set_versions(_VERSIONS)
 
@@ -1152,8 +1088,6 @@ class TestVersions:
 
     def test_moving_to_another_item_starts_that_ones_versions_from_the_top(
             self, qtbot, tmp_path):
-        """A step on the new item must offer its own newest version, not carry the
-        place the last item was stepped to."""
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions({**_VERSIONS,
                               "two.png": [("two_enhanced.png", "image", "Enhancement 1/1"),
@@ -1169,11 +1103,7 @@ class TestVersions:
         assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE two.png"]
 
 
-# --- the map, and the loops along it ------------------------------------------
-
 def _around(prompt_id):
-    """A library in which the first item has one seed sibling and one other
-    action down its column, and the rest have nobody."""
     if prompt_id != "id-1":
         return NavMapNeighbors()
     other_action = Slide("one-x.png", "image", "id-1x")
@@ -1193,8 +1123,6 @@ def test_the_hud_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
 
 
 def test_a_loop_hands_the_funestra_the_row_to_play_and_its_ending_hands_back_the_set(qtbot, tmp_path):
-    """The row becomes the Funestra's list, the item on screen first so it keeps
-    playing; the loop key ends it and the set comes back the same way."""
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))
     _sent(slideshow)
@@ -1207,8 +1135,8 @@ def test_a_loop_hands_the_funestra_the_row_to_play_and_its_ending_hands_back_the
     assert said == ["Looping seeds: 2"]
     assert parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8")).active_loop == "seed"
 
-    slideshow.slideshow_loop_cycle()          # seeds -> configs
-    slideshow.slideshow_loop_cycle()          # configs -> off
+    slideshow.slideshow_loop_cycle()
+    slideshow.slideshow_loop_cycle()
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "two.png", "three.png"]
@@ -1234,19 +1162,15 @@ def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
 
 
 def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
-    """A row worn down to one image plays that image over and over, which
-    is the lock — so the cull that wore it down ends the loop and tells the
-    Funestra to lock what is left.  Only the lock: none of what a pressed lock
-    also does, since nobody pressed one."""
     asked, starred, opened = [], [], []
     slideshow = _slideshow(qtbot, tmp_path,
                            actions=SlideshowActions(neighbors=_around, delete=lambda prompt_id: None,
                                                     favorite=starred.append, lock=opened.append,
                                                     enhance=lambda prompt_id: asked.append(prompt_id) or True))
-    slideshow.slideshow_loop("seed")                       # the row: one.png and one-b.png
+    slideshow.slideshow_loop("seed")
     _sent(slideshow)
 
-    slideshow.slideshow_cull()                             # trash the image on screen
+    slideshow.slideshow_cull()
     sent = _sent(slideshow)
     _says(slideshow, video="one-b.png", locked=True)
     slideshow.tick()
@@ -1257,12 +1181,9 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
 
 
 def test_a_forward_step_in_a_row_down_to_one_image_hands_the_set_back(qtbot, tmp_path):
-    """A cull can leave the row holding only the image on screen, and a
-    Funestra stepping round a list of one plays that image again — so the step
-    ends the loop first, and what it steps into is the set coming back."""
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
-    slideshow.slideshow_loop("seed")                      # the row: one.png and one-b.png
-    slideshow.slideshow_cull()                            # down to the one image left
+    slideshow.slideshow_loop("seed")
+    slideshow.slideshow_cull()
     _sent(slideshow)
 
     slideshow.slideshow_step(1)
@@ -1274,8 +1195,6 @@ def test_a_forward_step_in_a_row_down_to_one_image_hands_the_set_back(qtbot, tmp
 
 
 def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qtbot, tmp_path):
-    """PLAY_FILE jumps to a file in the list and splices in one that is not —
-    which is where the pass put the cell too, so no list is handed over."""
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
     _sent(slideshow)
 
@@ -1306,7 +1225,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_action_and_hands_the_funest
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "three.png"]
-    assert _plays(slideshow) == []                       # the item on screen shows that action
+    assert _plays(slideshow) == []
     assert said == ["Filter: 'alpha' (2)"]
 
 
@@ -1342,9 +1261,6 @@ def test_a_row_naming_two_actions_is_posted_with_its_spaces_as_underscores(qtbot
 
 
 def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_path):
-    """Half the column is configurations, and their buttons mean what they
-    meant before the actions joined them: go to that configuration and play its
-    seeds round and round, rather than narrowing the slideshow to an action."""
     said = []
     a_configuration = Slide("one-x.png", "image", "id-1x")
     around = lambda pid: NavMapNeighbors(  # noqa: E731
@@ -1358,7 +1274,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
     slideshow.slideshow_filter("e629425b")
 
     assert slideshow.hud_prompt_id == "id-1x"
-    assert slideshow.hud_action_filter == ""            # a jump, not a narrowing
+    assert slideshow.hud_action_filter == ""
     assert said == ["Looping seeds: 2"]
 
 
@@ -1406,9 +1322,6 @@ def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
 
 
 def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
-    """A row holding only the image on screen cannot be looped, and the press
-    still means "this one" — so the Funestra is told to lock it, the way its own
-    loop button locks a video whose group holds only that video."""
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)
@@ -1521,8 +1434,6 @@ def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
 
 
 def test_trash_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
-    """The Funestras' own "trash": a favorite loses its star and the Funestra is
-    told to move on — nothing is dropped and nothing deleted."""
     unfavorited, deleted = [], []
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1"}),
                            actions=SlideshowActions(unfavorite=unfavorited.append, delete=deleted.append))
@@ -1533,7 +1444,7 @@ def test_trash_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     assert (unfavorited, deleted) == (["id-1"], [])
     assert _sent(slideshow) == ["NEXT"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
-    assert played == ["one.png", "two.png", "three.png"]   # still in the list
+    assert played == ["one.png", "two.png", "three.png"]
 
 
 def test_entering_a_loop_lets_go_of_a_locked_item_as_a_funestra_does(qtbot, tmp_path):
@@ -1567,8 +1478,6 @@ def test_a_folder_handed_to_a_funestra_publishes_its_seed_loop_lit(qtbot, tmp_pa
 
     assert (model.active_loop, model.filter_query) == ("seed", "fox")
 
-
-# --- what is being made of the item on screen ---------------------------------
 
 def _hud(slideshow: FunestraSlideshow):
     return parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
@@ -1666,7 +1575,6 @@ def _being_enhanced_on_screen(qtbot, tmp_path) -> FunestraSlideshow:
 
 
 def test_an_item_being_enhanced_is_held_for_half_the_pace_on_the_funestra(qtbot, tmp_path):
-    """So the Funestra moves on from it early, and its scrubber counts that half."""
     slideshow = _being_enhanced_on_screen(qtbot, tmp_path)
 
     assert "HOLD_PICTURE 2" in _sent(slideshow)
@@ -1846,8 +1754,6 @@ def test_the_funestra_is_sent_to_a_run_being_made_as_its_first_frame(qtbot, tmp_
 
 
 def _frame_shown(sent: list[str]) -> bytes | None:
-    """What the last SHOW_FRAME among *sent* has the Funestra paint, read off
-    the file it names."""
     shown = [line.removeprefix("SHOW_FRAME ") for line in sent
              if line.startswith("SHOW_FRAME ")]
     return Path(shown[-1]).read_bytes() if shown else None
@@ -1984,8 +1890,6 @@ def test_a_run_that_lands_after_the_funestra_moved_on_is_the_funestras_next_item
 
 
 def _row_only(prompt_id):
-    """A library holding one folder's row and nothing made of it, so the loop
-    key's stop after the seeds is off."""
     return (NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
             if prompt_id == "id-1" else NavMapNeighbors())
 
@@ -2029,8 +1933,6 @@ def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tm
 
 def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(
         qtbot, tmp_path, monkeypatch):
-    # Handed over before its versions were armed and again after, Latest's
-    # list cost a double-click four seconds more.
     written = []
     write = FunestraChannel.write_playlist
     monkeypatch.setattr(FunestraChannel, "write_playlist",

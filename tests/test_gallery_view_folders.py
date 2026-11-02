@@ -63,17 +63,15 @@ from tests.test_folder_tree import _shown
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
-# --- folders the user composes: multi-select, group, drop, remove -------------
-
 
 def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
 
     _pick(view, cat, dog)
 
-    assert view._gallery_pane._listed_folders == [cat, dog]  # both, as tiles
+    assert view._gallery_pane._listed_folders == [cat, dog]
     assert "2 folders" in view._folder_path.display_text()
-    assert not view._buttons.group.isHidden()  # offering to save the grouping
+    assert not view._buttons.group.isHidden()
 
 
 def test_the_slideshow_of_a_multi_selection_plays_every_picked_folder(qtbot):
@@ -88,10 +86,10 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
 
-    view._tree.setCurrentItem(view._tree_item_for(cat))  # a plain click on one row
+    view._tree.setCurrentItem(view._tree_item_for(cat))
 
     assert view._selection_group is None
-    assert view.listed_prompt_ids() == ["i1"]  # its own thumbnails, not tiles
+    assert view.listed_prompt_ids() == ["i1"]
     assert view._buttons.group.isHidden()
 
 
@@ -120,7 +118,6 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
     (record,) = view._db.list_custom_collections()
     assert record["name"] == "Favorites"
     assert record["folders"] == [cat, dog]
-    # ...and the view has landed on it, showing what it gathered.
     assert _top_level(view._tree)["Favorites"] is view._tree.currentItem()
     assert view._gallery_pane._listed_folders == [cat, dog]
 
@@ -209,13 +206,10 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
 
     (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat, dog]
-    assert view._gallery_pane._listed_folders == [cat, dog]  # landed on it
+    assert view._gallery_pane._listed_folders == [cat, dog]
 
 
 def _drop_on(row, mime) -> bool:
-    """Drag ``mime`` over a TOC row and let it go there, as a drag from anywhere
-    in the window ends; whether the row took it. The caller holds ``mime``: a
-    synthetic drop event does not own it."""
     tree = row.treeWidget()
     spot = QPointF(tree.visualRect(tree.indexFromItem(row)).center())
     move = QDragMoveEvent(spot.toPoint(), Qt.DropAction.CopyAction, mime,
@@ -241,7 +235,6 @@ def test_an_item_dropped_on_a_custom_folders_row_goes_in_and_the_folder_opens(qt
 
 
 def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
-    # The same rule a folder dragged out of the other half meets.
     view, _cat, _dog = _two_leaf_view(qtbot, extra=[_tall("t1", "a fish")])
     _make_folder(view, "Mine", [])
     with qtbot.waitExposed(view):
@@ -253,7 +246,6 @@ def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
 
 
 def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
-    # One in the Trash, or still being made: it would land and never be seen.
     view, _cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Mine", [])
     with qtbot.waitExposed(view):
@@ -265,9 +257,6 @@ def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
 
 
 def _drop_in_the_middle_pane(view, mime, source=None) -> bool:
-    """Drag ``mime`` over the middle pane and let it go there; whether the pane
-    took it. ``source`` stands in for where the drag started, as a real one
-    names it."""
     pane = view._scroll.viewport()
     spot = QPointF(pane.rect().center())
     held = (spot.toPoint(), Qt.DropAction.CopyAction, mime,
@@ -291,11 +280,10 @@ def test_an_item_dropped_into_an_open_custom_folder_goes_in(qtbot):
     assert _drop_in_the_middle_pane(view, mime)
 
     assert view._db.list_custom_collections()[0]["items"] == ["i1"]
-    assert view._gallery_pane.listed_prompt_ids() == ["i1"]  # drawn again with it
+    assert view._gallery_pane.listed_prompt_ids() == ["i1"]
 
 
 def _folder_drag(view, key):
-    """The payload a drag of ``key``'s row out of the TOC carries."""
     mime = QMimeData()
     mime.setData(FOLDER_KEYS_MIME, view._tree_item_for(key).data(0, TREE_KEY_ROLE).encode())
     return mime
@@ -336,7 +324,7 @@ def test_a_custom_folder_dropped_on_another_goes_inside_it(qtbot):
     outer = next(r for r in view._db.list_custom_collections() if r["name"] == "Outer")
     assert outer["folders"] == [cat, inner]
     assert _shown(_top_level(view._tree)["Outer"]) == "(2) Outer"
-    assert view._gallery_pane._listed_folders == [cat, inner]  # landed on it
+    assert view._gallery_pane._listed_folders == [cat, inner]
     assert "Inner" not in _top_level(view._tree)
 
 
@@ -358,7 +346,6 @@ def test_a_custom_folder_cannot_go_inside_one_it_holds(qtbot):
 
 
 def test_a_custom_folder_dragged_onto_favorites_is_refused(qtbot):
-    # Favorites stars what lands on it, and a custom collection takes no star.
     view, cat, _dog = _two_leaf_view(qtbot)
     mine = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
     with qtbot.waitExposed(view):
@@ -377,7 +364,6 @@ def test_open_favorites_takes_no_drop_though_its_row_does(qtbot):
 
 
 def _middle_pane_style(view, qtbot):
-    """The drop style the middle pane wears, read where nothing in it is drawn."""
     view.setStyleSheet(build_stylesheet())
     view.resize(1100, 1200)
     with qtbot.waitExposed(view):
@@ -439,8 +425,6 @@ def test_a_folder_the_user_made_dropped_onto_favorites_takes_no_favorite(qtbot):
 
 
 def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
-    # The other way of starring from the list, and it must cost the list no more
-    # than the star itself does: no redraw, so no jump under the dragging hand.
     view, cat, _dog = _two_leaf_view(qtbot)
     row = view._tree_item_for(cat)
 
@@ -451,8 +435,6 @@ def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
 
 
 def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
-    # Without (level, ref) a gathered folder cannot be re-derived when a key
-    # formula moves, and the grouping silently loses it.
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [])
 
@@ -471,7 +453,7 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
 
     (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat]
-    assert view._db.get_generation("i2") is not None  # the folder itself survives
+    assert view._db.get_generation("i2") is not None
 
 
 def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
@@ -520,8 +502,6 @@ def test_an_empty_folder_of_your_own_says_items_can_be_dragged_onto_it(qtbot):
 
 
 def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
-    # Delete trashes a folder's generations; a custom collection holds none of its own,
-    # so that path must never accept one.
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
@@ -538,7 +518,7 @@ def test_a_custom_folder_survives_a_rebuild_and_follows_its_items(qtbot):
     _make_folder(view, "Favorites", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
 
-    view._db.add(_image("i3", "a cat", 50, 9))  # a new seed joins the gathered folder
+    view._db.add(_image("i3", "a cat", 50, 9))
     view.refresh()
 
     assert view._tree.currentItem() is _top_level(view._tree)["Favorites"]
@@ -546,8 +526,6 @@ def test_a_custom_folder_survives_a_rebuild_and_follows_its_items(qtbot):
 
 
 def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
-    # A poll or a finished generation rebuilds the tree; collapsing the selection
-    # would throw away the folder the user is in the middle of composing.
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
 
@@ -558,11 +536,8 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
     assert len(view._gallery_pane._listed_folders) == 2
 
 
-# --- the tree's right-click menus: the only route to several of these actions --
-
 
 def _square_menu(view, key):
-    """Right-click the square a folder is drawn as in the pane beside the list."""
     _tall_on_screen(view)
     (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
                  if tile.key == key]
@@ -571,7 +546,6 @@ def _square_menu(view, key):
 
 
 def _open_square(view, key):
-    """Click the square a folder is drawn as in the pane beside the list."""
     _tall_on_screen(view)
     (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
                  if tile.key == key]
@@ -645,14 +619,14 @@ def test_a_custom_folder_inside_another_can_be_taken_back_out_of_it(qtbot, monke
     view, cat, _dog = _two_leaf_view(qtbot)
     inner = gallery.custom_collection_key(_make_folder(view, "Inner", [cat]))
     _make_folder(view, "Outer", [inner])
-    view._tree.setCurrentItem(_top_level(view._tree)["Outer"])  # standing inside it
+    view._tree.setCurrentItem(_top_level(view._tree)["Outer"])
     _answer_menu(monkeypatch, "Remove from “Outer”")
 
     _square_menu(view, inner)
 
     outer = next(r for r in view._db.list_custom_collections() if r["name"] == "Outer")
     assert outer["folders"] == []
-    assert "Inner" in _top_level(view._tree)  # taken out of it, not removed
+    assert "Inner" in _top_level(view._tree)
 
 
 def test_a_folders_menu_offers_its_name_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
@@ -662,8 +636,6 @@ def test_a_folders_menu_offers_its_name_favorite_and_a_delete_kept_apart(qtbot, 
 
     _tree_menu(view, cat)
 
-    # The separator is the point: the one entry that destroys anything sits below
-    # it, away from the one that costs nothing.
     assert labels == ["Copy name", "", "Favorite", "", "Delete folder…"]
 
 
@@ -693,7 +665,7 @@ def test_copy_name_on_a_folder_given_a_name_copies_that_name(qtbot, monkeypatch)
 
 def test_a_folder_squares_menu_copies_its_name_too(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(dog).parent())  # both, as squares
+    view._tree.setCurrentItem(view._tree_item_for(dog).parent())
     QApplication.clipboard().clear()
     _answer_menu(monkeypatch, "Copy name")
 
@@ -703,7 +675,6 @@ def test_a_folder_squares_menu_copies_its_name_too(qtbot, monkeypatch):
 
 
 def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
-    # A whole workflow's history must never go in one action.
     view, _cat, _dog = _two_leaf_view(qtbot)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -722,13 +693,13 @@ def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
 
     _tree_menu(view, cat)
 
-    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}  # its own row only
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
 def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _make_folder(view, "Keepers", [cat])
-    _answer_menu(monkeypatch, "Keepers")  # under "Add to collection"
+    _answer_menu(monkeypatch, "Keepers")
 
     _tree_menu(view, dog)
 
@@ -752,7 +723,7 @@ def test_a_folder_squares_menu_offers_the_folders_of_your_own_on_the_side_browse
         qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _make_folder(view, "Keepers", [cat])
-    view._tree.setCurrentItem(view._tree_item_for(dog).parent())  # both, as squares
+    view._tree.setCurrentItem(view._tree_item_for(dog).parent())
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -776,7 +747,7 @@ def test_a_folder_already_in_a_folder_of_your_own_is_not_offered_it_again(
 def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat, dog])
-    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])  # standing inside it
+    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])
     _answer_menu(monkeypatch, "Remove from “Keepers”")
 
     _square_menu(view, dog)
@@ -784,7 +755,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     (record,) = view._db.list_custom_collections()
     assert record["id"] == folder_id
     assert record["folders"] == [cat]
-    assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
+    assert view._db.get_generation("i2") is not None
 
 
 def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, monkeypatch):
@@ -792,7 +763,7 @@ def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, mo
     folder_id = _make_folder(view, "Keepers", [cat])
     view._db.add_items_to_custom_collection(folder_id, ["i2"])
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])  # standing inside it
+    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])
     _answer_menu(monkeypatch, "Remove from “Keepers”")
 
     view.generation_menu(["i2"], QPoint(0, 0))
@@ -800,12 +771,11 @@ def test_an_item_can_be_taken_out_of_the_folder_of_your_own_showing_it(qtbot, mo
     (record,) = view._db.list_custom_collections()
     assert record["items"] == []
     assert record["folders"] == [cat]
-    assert view._db.get_generation("i2") is not None  # taken out of it, not deleted
+    assert view._db.get_generation("i2") is not None
 
 
 def test_an_item_there_only_by_its_folder_offers_no_way_out_of_the_folder_of_your_own(
         qtbot, monkeypatch):
-    # It is in there because its folder is, so only that folder can be taken out.
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Keepers", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])
@@ -827,8 +797,6 @@ def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
 
     _tree_menu(view, gallery.custom_collection_key(folder_id))
 
-    # No star (a favorite of a favorite collection gathers nothing) and no delete —
-    # removing one of these must never reach the generations it gathers.
     assert labels == ["Copy name", "", "Remove collection…", "", "Collapse all", "Expand all"]
 
 
@@ -864,7 +832,7 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
     monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
-    _tree_menu(view)  # no row under the cursor
+    _tree_menu(view)
 
     (record,) = view._db.list_custom_collections()
     assert record["name"] == "Keepers"
@@ -916,7 +884,7 @@ def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkey
     _tree_menu(view, cat)
 
     (record,) = view._db.list_custom_collections()
-    assert record["folders"] == [cat, dog]  # both, not the one under the cursor
+    assert record["folders"] == [cat, dog]
 
 
 def test_copying_the_names_of_picked_folders_puts_them_one_to_a_line(qtbot, monkeypatch):
@@ -934,8 +902,6 @@ def test_copying_the_names_of_picked_folders_puts_them_one_to_a_line(qtbot, monk
 
 def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
         qtbot, monkeypatch):
-    # Otherwise a right-click on a folder the user did not pick would act on the
-    # ones they did, which is the same click meaning two different things.
     view, cat, dog = _two_leaf_view(qtbot, extra=[_image("i3", "a fish", 50, 1)])
     fish = _key(_at(_image_workflow(view._tree), 0, 0, 2))
     _pick(view, cat, dog)
@@ -998,8 +964,6 @@ def test_a_folder_squares_menu_offers_no_collapse_all_or_expand_all(qtbot, monke
 
 
 def _two_model_view(qtbot):
-    """A view whose image workflow holds two model folders, each with a folder
-    inside it, returned by key."""
     rows = [_row(prompt_id, "sdxl_t2i",
                  {"positive_prompt": "a cat", "steps": 50, "seed": 1, "checkpoint": checkpoint},
                  f"sdxl_t2i_{prompt_id}.png")
@@ -1064,8 +1028,6 @@ def test_deleting_the_picked_folders_asks_first_then_takes_them_all(qtbot, monke
 
 
 def _pick_by_clicks(view, first, *others):
-    """Pick folder rows as a mouse does: a click on the first, a Ctrl-click on
-    each of the others."""
     _tall_on_screen(view)
     for key, modifiers in ((first, Qt.KeyboardModifier.NoModifier),
                            *((key, Qt.KeyboardModifier.ControlModifier) for key in others)):

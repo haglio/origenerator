@@ -71,13 +71,9 @@ from tests.text_readers import clip_reader
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
-# --- the microphone, which its button alone opens and closes ----------------
-
 
 def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
         qtbot, tmp_path, monkeypatch):
-    # Neither a command nor a request, a sentence does nothing while Auto-Generate
-    # runs, exactly as when it does not: its prompt and its folder stay as they were.
     hearing = FakeHearing("make it a dog")
     monkeypatch.setattr(voice_router, "CommandAndRequestListener",
                         partial(CommandAndRequestListener, hearing=hearing))
@@ -108,12 +104,10 @@ def test_auto_generate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
     view._toggle_auto(True)
     view._toggle_auto(False)
 
-    assert view._voice.listener.commands_on    # the mic is the button's, still open
+    assert view._voice.listener.commands_on
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
-    # It used to come on with Auto-Generate and again with a fullscreen slideshow,
-    # which made "is it listening?" a thing to work out rather than to look at.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -162,8 +156,6 @@ def test_the_captions_section_is_up_only_while_the_caption_is(qtbot, tmp_path):
 
 
 def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
-    """The caption holds an utterance for a beat and then reverts — to "Listening"
-    while the mic is still open, and to nothing at all once it is closed."""
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -171,7 +163,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("no hat")
 
-    view._voice._flash_timer.timeout.emit()  # the beat is up
+    view._voice._flash_timer.timeout.emit()
 
     assert words(view._voice.status) == "Listening…"
     assert not view._voice.status.isHidden()
@@ -181,14 +173,10 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
 
     view._voice._flash_timer.timeout.emit()
 
-    assert view._voice.status.isHidden()  # no mic open, so nothing to say
+    assert view._voice.status.isHidden()
 
 
 def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
-    # Whisper renders a command several ways and the matcher answers to all of
-    # them, so printing the transcription showed a misspelling of a command that
-    # was understood perfectly well — "enhanced it" over a caption that then went
-    # and enhanced the image.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -199,21 +187,18 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
     assert "enhance it" in words(view._voice.status)
     assert "Enhanced" not in words(view._voice.status)
 
-    view._voice.listener.heard.emit("give her a wider hat")  # no command: as it was heard
+    view._voice.listener.heard.emit("give her a wider hat")
     assert "give her a wider hat" in words(view._voice.status)
 
 
 def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path):
-    # It used to float centered over the top of the view, landing squarely on the
-    # header buttons the user was trying to click. It now takes its own room at
-    # the top of the left pane, so it covers nothing however long the message.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     _on_screen(qtbot, view, 1200, 800)
     _select_first_leaf(view)
 
     view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("give her a much longer caption than the idle one")
-    qtbot.wait(1)  # let the layout settle around the grown caption
+    qtbot.wait(1)
 
     caption = QRect(view._voice.status.mapTo(view, QPoint(0, 0)), view._voice.status.size())
     for button in (view._buttons.back, view._buttons.forward, view._buttons.undo, view._buttons.delete):
@@ -223,25 +208,21 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
     assert caption.bottomLeft().y() <= view._search.field.mapTo(view, QPoint(0, 0)).y()
 
 
-# --- standalone enhance: the folder button, the selection action, the queue ---
-
 
 class _VoiceSurface:
-    """A slideshow standing in for the one being spoken over."""
-
     def __init__(self, prompt_id, *, favoritable=True):
         self._prompt_id = prompt_id
         self._favoritable = favoritable
         self.noted = None
         self.enhancing = {}
-        self.said = None    # what a spoken command was answered with
-        self.steps = []     # the transport moves it was asked for, in order
+        self.said = None
+        self.steps = []
         self.culled = 0
         self.favorited = 0
         self.locked = False
-        self.queued = []     # what the poll last fed its corner queue
+        self.queued = []
         self.in_flight = set()
-        self.shown = self    # and where it is seen, whose corner shows the queue
+        self.shown = self
 
     def is_showing(self):
         return True
@@ -280,10 +261,6 @@ class _VoiceSurface:
         self.locked = locked
         return True
 
-    # The gallery's poll feeds every open slideshow its queue and what is in flight,
-    # and it fires while these tests run: a stand-in that answered none of that
-    # blew up inside the Qt event loop, on whichever test the timer happened to
-    # land in.
     def set_queue(self, items, foreign_queued=0):
         self.queued = list(items)
 
@@ -293,10 +270,6 @@ class _VoiceSurface:
     def note_in_flight(self, prompt_ids):
         self.in_flight = set(prompt_ids)
 
-    # A real slideshow is a FunestraSlideshow, which answers all of these, and the
-    # view calls them without asking first. A stand-in that answered fewer would
-    # have to be guarded against in production, which is the same as saying the
-    # guards would exist for this class alone.
     def state(self):
         return None
 
@@ -315,10 +288,6 @@ class _VoiceSurface:
 
 
 def test_the_poll_runs_over_a_slideshow_being_spoken_to(qtbot, tmp_path):
-    # The 1.5s poll feeds every open slideshow, and it lands mid-test wherever it
-    # lands: a stand-in that had drifted out of step with what a slideshow answers
-    # raised inside the Qt event loop, failing whichever test it fired in rather
-    # than the one that let it drift.
     view = GalleryView(_enhanceable_db(tmp_path, count=1))
     qtbot.addWidget(view)
     view.refresh()
@@ -331,8 +300,6 @@ def test_the_poll_runs_over_a_slideshow_being_spoken_to(qtbot, tmp_path):
 
 def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
         qtbot, tmp_path, monkeypatch):
-    # It used to arm the mic and disarm it again, which is what left "start
-    # slideshow" unhearable in the one state it is for.
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
@@ -348,7 +315,7 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
 
     view._slideshows.showing.close()
     assert view._slideshows.showing is None
-    assert view._voice.listener.commands_on  # still on, because the button still is
+    assert view._voice.listener.commands_on
 
 
 def test_a_closed_gallery_leaves_the_mic_shut_and_its_button_as_it_was(qtbot, tmp_path):
@@ -377,8 +344,6 @@ def test_a_slideshow_with_the_mic_off_hears_nothing(qtbot, tmp_path):
 
 
 def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
-    """A gallery playing one image fullscreen with the mic on, and exactly these
-    detectors installed — the state every spoken fix is said into."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("g0.png", "image"))
     monkeypatch.setattr(detail_parts, "list_detector_files",
@@ -409,7 +374,6 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
 
 def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
         qtbot, tmp_path, monkeypatch):
-    # Two bad parts in one image is one command, and one run that fixes both.
     view = _fix_slideshow(qtbot, tmp_path, monkeypatch,
                           "teeth_yolov8n.pt", "hand_yolov8s.pt")
 
@@ -423,8 +387,6 @@ def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
 
 def test_fix_all_goes_over_every_part_something_can_find(
         qtbot, tmp_path, monkeypatch):
-    # The whole table in a breath — minus the parts nothing installed can find,
-    # which the caption leaves out rather than claiming a pass that can't run.
     view = _fix_slideshow(qtbot, tmp_path, monkeypatch,
                           "teeth_yolov8n.pt", "hand_yolov8s.pt")
 
@@ -446,11 +408,8 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
     assert "no teeth detector" in words(view._slideshows.showing.shown._note)
 
 
-# --- spoken slideshow control: start it, pause it, close it -----------------
-
 
 def _voiceable(qtbot, tmp_path, monkeypatch):
-    """A gallery on a playable folder with the microphone switched on."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
@@ -507,7 +466,7 @@ def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_pl
     view._voice.listener.speak_command("pause slideshow")
     assert omnipause.frozen()
     assert slideshow.shown._paused
-    assert view._slideshows.showing is slideshow  # paused, not closed
+    assert view._slideshows.showing is slideshow
     assert slideshow.dwell_s == DEFAULT_S
 
     view._voice.listener.speak_command("play slideshow")
@@ -533,8 +492,6 @@ def test_stopping_the_slideshow_closes_it(qtbot, tmp_path, monkeypatch, said):
 
 def test_a_slideshow_command_with_no_slideshow_up_answers_in_the_gallery(
         qtbot, tmp_path, monkeypatch):
-    # There is no note to write on, so the caption that carries every other
-    # voice answer says it instead.
     view = _voiceable(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak_command("close slideshow")
@@ -544,8 +501,6 @@ def test_a_slideshow_command_with_no_slideshow_up_answers_in_the_gallery(
 
 def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
         qtbot, tmp_path, monkeypatch):
-    # The mic hears commands with nothing on screen too, so "fix teeth" is
-    # claimed there — it must not disappear silently.
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["teeth_yolov8n.pt"])
     view = _voiceable(qtbot, tmp_path, monkeypatch)
@@ -558,7 +513,6 @@ def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
 
 def test_start_slideshow_is_heard_with_no_slideshow_and_no_auto_generate(qtbot, tmp_path,
                                                           monkeypatch):
-    # The state the command is for: nothing playing, nothing generating, mic on.
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     assert view._slideshows.showing is None
 
@@ -569,19 +523,8 @@ def test_start_slideshow_is_heard_with_no_slideshow_and_no_auto_generate(qtbot, 
     view._slideshows.showing.close()
 
 
-# --- spoken requests: "Request … over" over what's on screen -----------------
-
 
 def _speak_request(view, qtbot, *utterances):
-    """Say a request and wait for the app to have answered it — the revision is
-    worked out off the UI thread, so the answer arrives a hop later.
-
-    Answered means the promise the slideshow holds while it works is taken down,
-    which only that request's own answer does.  It used to wait for the words
-    "working out" to leave the corner, inside a budget that was exactly the
-    note's own flash time -- which told answered from timed out only because
-    a hidden message happens not to clear its text (bug 44).
-    """
     for text in utterances:
         view._voice.listener.speak(text)
     qtbot.waitUntil(lambda: view._slideshows.showing.shown._working_request is None, timeout=5000)
@@ -603,7 +546,7 @@ def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     shown = view._slideshows.showing.shown
 
-    view._voice.listener.speak("Request, no hat, over.")  # answered a hop later
+    view._voice.listener.speak("Request, no hat, over.")
 
     (standing,) = view._queue._items
     assert standing.starting
@@ -618,8 +561,6 @@ def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
 
 def test_a_finished_request_queues_the_revision_with_the_same_seed(
         qtbot, tmp_path, monkeypatch):
-    # "the same image but without X" means the image, so the one thing not
-    # re-rolled is the seed that draws it.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     _speak_request(view, qtbot, "Request, no hat, over.")
@@ -717,8 +658,6 @@ def test_a_queued_request_is_logged_by_the_images_it_joins_never_by_its_words(
 
 def test_the_request_lands_on_the_slide_it_was_opened_over(
         qtbot, tmp_path, monkeypatch):
-    # The words take seconds; the slideshow holds, but the target is taken when the
-    # request opens rather than when it runs out.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak("Request.")
 
@@ -755,14 +694,12 @@ def test_a_request_naming_nothing_is_answered_not_generated(
 
 def test_the_words_of_a_request_never_reach_the_fix_matcher(
         qtbot, tmp_path, monkeypatch):
-    # An open request swallows what it hears; "fix teeth" said inside one is
-    # part of the sentence, not a command.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak("Request.")
 
     view._voice.listener.speak("fix teeth")
 
-    assert view._live_jobs == {}  # no enhance launched
+    assert view._live_jobs == {}
 
 
 def test_a_request_item_links_back_to_what_it_was_asked_about(
@@ -786,7 +723,7 @@ def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     slideshow = view._slideshows.showing
-    slideshow.show_item("orig.png", lock=True)  # the double-click on the map
+    slideshow.show_item("orig.png", lock=True)
     (job,) = view._live_jobs.values()
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
@@ -812,8 +749,6 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
 
 def test_what_the_microphone_heard_reaches_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    # From a slideshow this window is invisible, so a mic that heard nothing and
-    # one that heard the wrong words used to look exactly alike.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.heard.emit("something off the mic")
@@ -831,7 +766,6 @@ def test_a_voice_failure_reaches_the_slideshow_too(qtbot, tmp_path, monkeypatch)
 
 def test_the_slideshow_shows_the_request_as_it_is_being_said(
         qtbot, tmp_path, monkeypatch):
-    # What was missing when a spoken request looked like nothing happening.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
@@ -841,8 +775,6 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
     assert "no hat" in words(view._slideshows.showing.shown._note)
 
 
-# --- "animate as go now", spoken over a fullscreen image -------------------
-
 
 _SPOKEN_LOOP = AnimateRequest(action_settings.GENAU, "")
 
@@ -851,8 +783,6 @@ def test_a_spoken_loop_takes_the_one_action_the_sorted_image_leaves(qtbot, tmp_p
                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    # "img_action" is sorted, and its state leaves the Genau lane one action, so the
-    # command needs none said.
     prompt_id, message, kind = view.animate_it("img_action", _SPOKEN_LOOP)
 
     assert prompt_id == "img_action"
@@ -861,7 +791,6 @@ def test_a_spoken_loop_takes_the_one_action_the_sorted_image_leaves(qtbot, tmp_p
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_action.png [output]"
-    # Spoken, so it hands itself on: whoever said it is not at the keyboard.
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"]
 
 
@@ -869,18 +798,17 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
                                                                   monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view.animate_it("img", _SPOKEN_LOOP)  # never sorted
+    prompt_id, message, kind = view.animate_it("img", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "hasn't been sorted" in message
     assert kind == WARNING
-    assert not view._live_jobs  # nothing was launched on a guess
+    assert not view._live_jobs
 
 
 def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_path,
                                                                   monkeypatch):
     db = _genau_db(tmp_path)
-    # A sorted image of a state whose action the gallery holds no looping video of.
     db.insert_generation(
         prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="another image", seed=3,
@@ -891,7 +819,7 @@ def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_
     db.update_generation("img_delta", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
     db.set_image_state("img_delta", "state two")
-    db.set_settings_source("loop", category=None)  # nothing left to mine a loop from
+    db.set_settings_source("loop", category=None)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -924,23 +852,16 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
-    # Answered in the surface's own corner, not in a dialog over it — the speaker
-    # is looking at the image, not at this pane.
     assert surface.noted[0] == "img_action"
     assert "alpha" in surface.noted[1]
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
 def _spoken_genau_rows(view):
-    """Every run a spoken animation has launched into the Genau lane, landed or not."""
     return [r for r in view._db.list_generations() if r.get("genau_requested_at")]
 
 
 def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, monkeypatch):
-    # Saying it twice is what you do when the first time appeared to do nothing,
-    # and it does appear to: the video queues after whatever the machine is on
-    # and the image on screen doesn't change. Two identical runs would spend
-    # minutes of the one GPU making a video that is already coming.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
@@ -956,8 +877,6 @@ def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, mo
 
 def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    # A video that has arrived is still a video of this image — asking again
-    # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_action")
     view._slideshows._slideshow = surface
@@ -975,8 +894,6 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
-    # Asking again is the only way to get a video after a failure, so a row that
-    # produced nothing must not read as this image having been Genau'd.
     view = _genau_view(qtbot, tmp_path)
     view._slideshows._slideshow = _VoiceSurface("img_action")
 
@@ -991,8 +908,6 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
 
 def test_a_pressed_generate_of_the_same_action_is_not_what_the_guard_counts(
         qtbot, tmp_path, monkeypatch):
-    # Only a spoken one is stamped, and only a spoken one can be said again into
-    # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path)
     view._combine.generate_category("img_action", "alpha", action_settings.GENAU)
     view._slideshows._slideshow = _VoiceSurface("img_action")
@@ -1003,7 +918,6 @@ def test_a_pressed_generate_of_the_same_action_is_not_what_the_guard_counts(
 
 
 def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_path):
-    # The spoken form of the Enhance button, aimed at the image being watched.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -1017,14 +931,10 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
-    # Answered in the slideshow's own corner: the speaker is looking at the image.
     assert surface.noted == ("g0", "enhancing…", INFO)
 
 
 def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
-    # Said over a slideshow, this is a gesture made with no view of the Enhance pane
-    # — the same reason a hold's Down leaves one alone — so it says so rather
-    # than re-deriving the image at whatever the settings happen to read now.
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps([
         {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
@@ -1060,8 +970,6 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
 
 
 def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path):
-    # A row can hold an output entry with no name; it reads as a finished image
-    # everywhere else, and there is nothing to feed the enhancer.
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps(
         [{"subfolder": "image", "type": "output"}]))
@@ -1078,9 +986,6 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
 
 
 def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tmp_path):
-    # The word names a Gallery pane button as well as the image on screen, and with no
-    # image filling the screen it is the button — aimed the way a click aims
-    # it, at the folder's images that have never been enhanced.
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1095,9 +1000,6 @@ def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tm
 
 
 def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
-    # The utterance has already been claimed as a command by the time it gets
-    # here, so it is answered in this pane rather than vanishing — in the
-    # button's own words, which is what a speaker not looking at it needs.
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -1109,27 +1011,17 @@ def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
 
 
 def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
-    # One matcher reaches the mic for everything that tolerates a filler word, so
-    # a verb added to the vocabulary lands there without this module listing the
-    # parts a second time and drifting from it.  It wraps what it matches with
-    # the shape the utterance named, which is how a room with two slideshows in it
-    # says which image is meant.
-
     assert match("enhance").command == gallery.ENHANCE_COMMAND
     assert match("animate as alpha").command.action == "alpha"
     assert [part.name for part in match("fix teeth").command] == ["teeth"]
     assert match("start slideshow") is not None
-    assert match("make her hair longer") is None    # a sentence, not a command
-    # The bare words are not in this one: they match whole utterances only,
-    # which is what lets them be asked ahead of an opening request instead.
+    assert match("make her hair longer") is None
     assert match("trash") is None
 
 
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
-    # The folder is read off the lane, so a spoken send and a pressed one cannot
-    # differ about where a video lands.
     view = _genau_view(qtbot, tmp_path)
-    view._db.mark_genau_requested("loop")   # as a spoken launch would have
+    view._db.mark_genau_requested("loop")
     video = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (video, "video"))
@@ -1160,8 +1052,6 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
 
 
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
-    # The inbox copy is the only thing that failed; the video itself is fine, and
-    # Send-to-Genau is still there to retry with.
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
@@ -1172,17 +1062,13 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
 
     monkeypatch.setattr(combine_controller.evolver_export, "export_video", boom)
 
-    view._on_reroll_finished("k", "loop")  # must not raise
+    view._on_reroll_finished("k", "loop")
 
     assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
-# --- the bare vocabulary: a collection, a Gallery pane button, a word over the slideshow ---
-
 
 def _listening(qtbot, tmp_path, db=None):
-    """A gallery with the mic armed — the one switch that opens it — and its
-    tree drawn, so a collection name has a row to land on."""
     view = GalleryView(db if db is not None else _seeded_db(tmp_path),
                        client=_reroll_client())
     qtbot.addWidget(view)
@@ -1207,8 +1093,6 @@ def test_a_spoken_collection_name_stands_you_in_that_collection(qtbot, tmp_path,
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
         qtbot, tmp_path):
-    # Favorites appears only once there are folders; a word for a row that isn't
-    # there must not vanish, having already been claimed as a command.
     db = Database(tmp_path / "empty.db")
     view = _listening(qtbot, tmp_path, db=db)
 
@@ -1218,8 +1102,6 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
 
 
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
-    # "trash" condemns what is on screen and a lock holds it — the two rooms are
-    # one room to whoever is speaking.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface
@@ -1232,7 +1114,7 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     assert surface.said == "locked this one"
 
     view._voice.listener.speak("lock")
-    assert surface.said == "already locked"  # asked for a state, not a flip
+    assert surface.said == "already locked"
 
     view._voice.listener.speak("unlock")
     assert not surface.locked
@@ -1262,11 +1144,9 @@ def test_a_spoken_favorite_over_a_slideshow_favorites_the_slide(qtbot, tmp_path)
 
 
 def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_path):
-    # The active shape, with two shapes: over a slideshow "back" is the slide before,
-    # and in the gallery it is the stop before — both are the one before.
     view = _listening(qtbot, tmp_path)
     first = _select_first_leaf(view)
-    view._voice.listener.speak("experiments")      # a second stop to come back from
+    view._voice.listener.speak("experiments")
 
     view._voice.listener.speak("back")
 
@@ -1274,8 +1154,6 @@ def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_pat
 
 
 def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
-    # Back and Forward wear bare labels, so they carry their own refusal rather
-    # than reading their tooltip back.
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("forward")
@@ -1285,11 +1163,9 @@ def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
 
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
         qtbot, tmp_path):
-    # The tip already names the target it is aimed at, which is exactly what a
-    # speaker who is not looking at the Gallery pane buttons needs told back.
     view = _listening(qtbot, tmp_path)
     _select_first_leaf(view)
-    _click_off(view)                               # so the button is the folder's
+    _click_off(view)
     aimed = view._buttons.favorite.toolTip()
     assert aimed.startswith("Favorite folder")
 
@@ -1316,18 +1192,16 @@ def test_locking_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
-    # Set through the button rather than around it, so a spoken switch and a
-    # clicked one are the same event and the Gallery pane buttons lights the same way.
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("drive on")
     assert view.osr2_control.isChecked()
     assert words(view._voice.status) == "OSR2 on"
 
-    view._voice.listener.speak("drive")           # bare: flips whichever way it stands
+    view._voice.listener.speak("drive")
     assert not view.osr2_control.isChecked()
 
-    view._voice.listener.speak("drive off")       # already off: still ends up off
+    view._voice.listener.speak("drive off")
     assert not view.osr2_control.isChecked()
 
 
@@ -1342,8 +1216,6 @@ def test_osr2_off_parks_the_device_as_the_osr2_controls_switch_does(qtbot, tmp_p
 
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
-    # And only shut: a mic that hears nothing cannot hear "mic on", so the
-    # Gallery pane buttons' switch is the only way back.
     view = _listening(qtbot, tmp_path)
     assert view._voice.listener.commands_on
 
@@ -1358,25 +1230,22 @@ def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
     bars = view._osr2_motion.state.state
     amplitude, center = bars.amplitude, bars.center
 
-    view._voice.listener.speak("amp down")   # travel opens at its widest, so down from there
+    view._voice.listener.speak("amp down")
     view._voice.listener.speak("center up")
 
     assert bars.amplitude == amplitude - 10
     assert bars.center == center + 5
-    # Answered with what the device now reads, which is the tab's own line.
     assert words(view._voice.status) == view._osr2_motion.status_text()
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
-    # The nudges walk a bar five or ten at a time, which never arrives from the
-    # far end; the number said outright is what Fun Time answers with too.
     view = _listening(qtbot, tmp_path)
     bars = view._osr2_motion.state.state
 
     view._voice.listener.speak("amp fifty")
     assert bars.amplitude == 50
 
-    view._voice.listener.speak("center 30")   # whisper writes the number either way
+    view._voice.listener.speak("center 30")
     assert bars.intended_center == 30
 
     view._voice.listener.speak("max speed")
@@ -1385,8 +1254,6 @@ def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
 
 
 def test_min_speed_lands_on_the_slowest_the_bar_actually_moves(qtbot, tmp_path):
-    # The vocabulary says nought and the bar says what its floor is; the
-    # clamping is the bar's business, which is why the grid can be uniform.
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("min speed")
@@ -1400,7 +1267,7 @@ def test_human_inspired_motion_can_be_asked_for_outright_rather_than_flipped(qtb
     view._voice.listener.speak("human inspired on")
     assert view._osr2_motion.state.learned.active
 
-    view._voice.listener.speak("human inspired on")       # already on: still ends up on
+    view._voice.listener.speak("human inspired on")
     assert view._osr2_motion.state.learned.active
 
     view._voice.listener.speak("human inspired off")
@@ -1408,8 +1275,6 @@ def test_human_inspired_motion_can_be_asked_for_outright_rather_than_flipped(qtb
 
 
 def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
-    # The driver is app-wide, so its words belong to no surface — but the answer
-    # goes where the speaker is looking.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface
@@ -1420,8 +1285,6 @@ def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
 
 
 def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):
-    # Nothing in the bare vocabulary matches anything but the whole utterance,
-    # so a sentence holding one of its words asks for nothing.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface

@@ -81,7 +81,7 @@ from origenerator.gui import corner_buttons, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
-from origenerator.gui.combine_controller import CombineController
+from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import ALREADY_AT_THESE_SETTINGS, EnhanceController, Offer
@@ -408,9 +408,12 @@ class GalleryView(QWidget):
         self._starting = StartingRows(self)
         self._starting.changed.connect(self._update_queue)
         self._combine = CombineController(
-            self, parent=self, db=db, jobs=self._jobs, client=client,
-            info_tabs_of=lambda: self._generate_pane, slideshows=self._slideshows,
-            starting=self._starting, names=self._item_names)
+            self,
+            CombineParts(
+                jobs=self._jobs, client=client, info_tabs_of=lambda: self._generate_pane,
+                slideshows=self._slideshows, starting=self._starting,
+                names=self._item_names),
+            parent=self, db=db)
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, gallery_pane=self._gallery_pane,
             slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane)

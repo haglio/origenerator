@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -78,6 +79,16 @@ class DropZones(QWidget):
             event.ignore()
 
 
+@dataclass(frozen=True)
+class ZoneLookups:
+    lent_by: Callable[[str], str | None]
+    preview: Callable[[str], tuple[str | None, str | None]]
+    named: Callable[[str], str | None] = lambda name: None
+    name_of: Callable[[str], str] = lambda held: ""
+    browse: Callable[[], None] | None = None
+    leads_to: Callable[[str], str | None] = lambda held: held
+
+
 class DropZone(DropZones):
     changed = pyqtSignal()
     activated = pyqtSignal(str)
@@ -85,24 +96,20 @@ class DropZone(DropZones):
     def __init__(
         self,
         kind: str,
-        lent_by: Callable[[str], str | None],
-        preview: Callable[[str], tuple[str | None, str | None]],
+        lookups: ZoneLookups,
         placeholder: str,
         parent=None,
+        *,
         grayscale: bool = False,
-        named: Callable[[str], str | None] = lambda name: None,
-        name_of: Callable[[str], str] = lambda held: "",
-        browse: Callable[[], None] | None = None,
-        leads_to: Callable[[str], str | None] = lambda held: held,
     ):
         super().__init__(parent=parent)
-        self._lent_by = lent_by
-        self._preview = preview
+        self._lent_by = lookups.lent_by
+        self._preview = lookups.preview
         self._placeholder = placeholder
-        self._named = named
-        self._name_of = name_of
-        self._browse = browse
-        self._leads_to = leads_to
+        self._named = lookups.named
+        self._name_of = lookups.name_of
+        self._browse = lookups.browse
+        self._leads_to = lookups.leads_to
         self._go_to_tip = f"Click to go to this {kind}"
         self._grayscale = grayscale
         self._current_id: str | None = None

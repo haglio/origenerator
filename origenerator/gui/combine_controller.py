@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Protocol
 
 from PyQt6.QtCore import QObject
@@ -19,7 +20,7 @@ from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.export_lane import GENAU as GENAU_LANE
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
-from origenerator.gui.combine import Combine
+from origenerator.gui.combine import Combine, ZoneLookups
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.message import ERROR, INFO, WARNING
@@ -58,26 +59,35 @@ class CombineHost(Protocol):
     def tell(self, title: str, message: str) -> None: ...
 
 
+@dataclass
+class CombineParts:
+    jobs: object
+    client: object
+    info_tabs_of: object
+    slideshows: object
+    starting: StartingRows
+    inbox: evolver_export.EvolverInbox | None = None
+    names: ItemNames | None = None
+
+
 class CombineController(QObject):
-    def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
-                 info_tabs_of, slideshows, starting: StartingRows,
-                 inbox: evolver_export.EvolverInbox | None = None,
-                 names: ItemNames | None = None):
+    def __init__(self, host: CombineHost, parts: CombineParts, *, parent: QObject, db):
         super().__init__(parent)
         self._host = host
         self._db = db
-        self._jobs = jobs
-        self._starting = starting
-        self._names = names or ItemNames(db)
+        self._jobs = parts.jobs
+        self._starting = parts.starting
+        self._names = parts.names or ItemNames(db)
         self._files = FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
-        self._inbox = inbox or evolver_export.default_inbox()
-        self._client = client
-        self._generate_pane_of = info_tabs_of
-        self._slideshows = slideshows
+        self._inbox = parts.inbox or evolver_export.default_inbox()
+        self._generate_pane_of = parts.info_tabs_of
+        self._slideshows = parts.slideshows
+        shared = {"preview": self._zone_preview, "named": self._names.prompt_id_of,
+                  "name_of": self._name_of, "leads_to": self._item_held}
         self.widget = Combine(
-            self._image_lent_by, self._video_lent_by, self._zone_preview,
-            self._video_history, named=self._names.prompt_id_of, name_of=self._name_of,
-            browse_image=self._browse_image, leads_to=self._item_held)
+            ZoneLookups(self._image_lent_by, browse=self._browse_image, **shared),
+            ZoneLookups(self._video_lent_by, **shared),
+            self._video_history)
         self.widget.video_used.connect(self._db.record_combine_video_use)
         self.widget.combine_requested.connect(self._on_request)
         self._animation_settings = None
@@ -86,7 +96,7 @@ class CombineController(QObject):
         self.widget.intent_changed.connect(self._on_intent_changed)
         self.widget.image_zone.changed.connect(self.image_dropped)
         self.widget.video_zone.changed.connect(self.reconcile_generating)
-        if client is None:
+        if parts.client is None:
             self.widget.hide()
 
     def _on_animation_settings(self) -> None:

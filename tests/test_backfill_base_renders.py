@@ -1,11 +1,3 @@
-"""Re-deriving the base render for images the inline enhance tail finished.
-
-Those rows kept one file and no "before". The base is recoverable because it is
-reproducible: the same seed and settings with the tail off reproduce the pixels
-that pass made, and attaching it gives the row the ``Original`` / ``Enhancement 1/1``
-pair it should have had. The work rides the absence the background experimenter
-uses, since it is a full render per row and there are a great many of them.
-"""
 from __future__ import annotations
 
 import json
@@ -65,8 +57,6 @@ def _baked(db, prompt_id="baked", seed=1, filename=None):
                 files=[_file(filename or f"sdxl_t2i_{prompt_id}.png")])
 
 
-# --- which rows need one ---------------------------------------------------
-
 
 def test_it_picks_exactly_the_rows_that_lost_their_base(tmp_path):
     db = Database(tmp_path / "t.db")
@@ -82,8 +72,6 @@ def test_it_picks_exactly_the_rows_that_lost_their_base(tmp_path):
 
 
 def test_an_unrebuildable_import_is_left_alone(tmp_path):
-    # No registered template, so there are no settings to re-run — and guessing them
-    # would produce a "base" that is not this image's base at all.
     db = Database(tmp_path / "t.db")
     _add(db, "import", params={"enhance": True}, files=[_file("mystery.png")],
          workflow="unknown")
@@ -100,8 +88,6 @@ def test_a_re_render_in_flight_is_not_itself_something_to_repair(tmp_path):
         == ["baked"]
 
 
-# --- what one runs at ------------------------------------------------------
-
 
 def test_the_rerun_is_the_recorded_settings_with_the_tail_off(tmp_path):
     db = Database(tmp_path / "t.db")
@@ -112,26 +98,21 @@ def test_the_rerun_is_the_recorded_settings_with_the_tail_off(tmp_path):
 
     params = base_params_for(row, _SDXL)
 
-    assert params["enhance"] is False   # the one thing that changes
-    # Everything the pixels depend on is reproduced exactly, the seed above all.
+    assert params["enhance"] is False
     assert params["seed"] == 4242
     assert params["steps"] == 37
     assert params["cfg"] == 6.5
     assert params["positive_prompt"] == "a lantern"
-    assert params[TARGET_KEY] == "baked"   # and it knows what it repairs
+    assert params[TARGET_KEY] == "baked"
 
 
 def test_the_target_key_cannot_split_a_folder(tmp_path):
-    # It rides in the params, so it has to be invisible to the grouping: the
-    # gallery only ever asks a workflow for the keys it declares.
     db = Database(tmp_path / "t.db")
     row = _baked(db, "baked")
     before = gallery.settings_folder_key(row)
     repaired = dict(row, params_json=json.dumps(base_params_for(row, _SDXL)))
     assert gallery.settings_folder_key(repaired) == before
 
-
-# --- the absence batch -----------------------------------------------------
 
 
 def test_an_absence_queues_a_batch_and_stops_at_the_limit(tmp_path):
@@ -157,7 +138,6 @@ def test_a_refused_launch_is_not_counted(tmp_path):
 
 
 def test_a_row_already_being_repaired_is_not_queued_again(tmp_path):
-    # Two short absences in a row must not put the same repair in twice.
     db = Database(tmp_path / "t.db")
     _baked(db, "baked")
     _add(db, "repair", params={TARGET_KEY: "baked"}, files=None,
@@ -165,8 +145,6 @@ def test_a_row_already_being_repaired_is_not_queued_again(tmp_path):
 
     assert queue_base_renders(db.list_generations(), lambda wf, p: "p") == 0
 
-
-# --- folding what the absence finished -------------------------------------
 
 
 def test_attaching_the_base_gives_the_row_its_two_levels(tmp_path):
@@ -176,8 +154,6 @@ def test_attaching_the_base_gives_the_row_its_two_levels(tmp_path):
     assert attach_base(db, "baked", [_file("sdxl_t2i_a_base.png")]) is True
 
     upgraded = db.get_generation("baked")
-    # The enhanced file keeps its place at the head — it is still what the row
-    # shows — and the base joins under it as the original.
     assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
         ["sdxl_t2i_a.png", "sdxl_t2i_a_base.png"]
     assert [lvl.label for lvl in gallery.enhancement_versions(upgraded)] == \
@@ -186,8 +162,6 @@ def test_attaching_the_base_gives_the_row_its_two_levels(tmp_path):
 
 
 def test_a_repaired_row_is_not_offered_again(tmp_path):
-    # Interrupting is safe: each row is attached as it lands, and the next
-    # absence picks up only what is left.
     db = Database(tmp_path / "t.db")
     _baked(db, "baked", filename="sdxl_t2i_a.png")
     attach_base(db, "baked", [_file("sdxl_t2i_a_base.png")])
@@ -202,13 +176,11 @@ def test_folding_drops_the_repair_row_it_came_from(tmp_path):
 
     assert fold_base_render(db, repair) == "baked"
 
-    assert db.get_generation("repair") is None   # a repair leaves no trace
+    assert db.get_generation("repair") is None
     assert gallery.original_files_of(db.get_generation("baked"))
 
 
 def test_a_repair_whose_target_is_gone_is_left_alone(tmp_path):
-    # Deleted while the absence ran: leave the row rather than half-migrate it,
-    # so it can be found and cleared by hand.
     db = Database(tmp_path / "t.db")
     repair = _add(db, "repair", params={TARGET_KEY: "vanished"},
                   files=[_file("orphan_base.png")], source=GenerationSource.BASE_RENDER)
@@ -232,8 +204,6 @@ def test_the_startup_sweep_folds_the_finished_and_leaves_the_running(tmp_path):
     assert gallery.original_files_of(db.get_generation("one"))
     assert not gallery.original_files_of(db.get_generation("two"))
 
-
-# --- and clearing the rest when the app opens ------------------------------
 
 
 class _FakeClient:
@@ -260,14 +230,10 @@ def test_opening_the_app_drops_what_the_absence_had_not_reached(tmp_path):
 
     assert client.cancelled == ["queued"]
     assert db.get_generation("queued") is None
-    assert db.get_generation("done") is not None  # a finished repair still folds
+    assert db.get_generation("done") is not None
 
 
 def test_one_caught_mid_render_is_stopped_by_name_too(tmp_path):
-    # Dequeuing alone would leave it holding the GPU the user just came back
-    # for. Which repair the server is executing it alone knows, so each is asked
-    # to stop by name -- never with the nameless interrupt, which would stop
-    # whatever is running, another app's included.
     db = Database(tmp_path / "t.db")
     _baked(db, "one")
     _add(db, "running", params={TARGET_KEY: "one"}, files=None,
@@ -279,8 +245,6 @@ def test_one_caught_mid_render_is_stopped_by_name_too(tmp_path):
 
 
 def test_a_repair_never_grows_a_folder_of_its_own(tmp_path):
-    # It is a repair of an existing image, not an image: a half-finished one
-    # must never show as a duplicate tile beside what it repairs.
     db = Database(tmp_path / "t.db")
     _baked(db, "one")
     _add(db, "running", params=dict(_SDXL.default_params(), enhance=False,
@@ -295,11 +259,7 @@ def test_a_repair_never_grows_a_folder_of_its_own(tmp_path):
     assert shown == ["one"]
 
 
-# --- how much of the backlog one absence takes ------------------------------
-
 def _timed(db, prompt_id, *, seconds, workflow="sdxl_t2i"):
-    """A finished generation the library has a duration for — what the batch
-    prices its repairs from."""
     row = _add(db, prompt_id, params={"seed": 1}, files=[_file(f"{prompt_id}.png")],
                workflow=workflow)
     db.update_generation(prompt_id, duration_seconds=seconds)
@@ -307,13 +267,10 @@ def _timed(db, prompt_id, *, seconds, workflow="sdxl_t2i"):
 
 
 def test_the_batch_is_priced_from_what_the_renders_actually_take(tmp_path):
-    # Sized in GPU minutes, not rows: the first version handed out six per
-    # absence believing one repair was a night's work, which would have drained
-    # a 147-row backlog of eight-second images over twenty-five evenings.
     db = Database(tmp_path / "t.db")
     for i in range(40):
         _baked(db, f"baked{i}", seed=i)
-    _timed(db, "timed", seconds=60)  # a minute a render, as this library records it
+    _timed(db, "timed", seconds=60)
     launched = []
 
     queued = queue_base_renders(
@@ -326,8 +283,6 @@ def test_the_batch_is_priced_from_what_the_renders_actually_take(tmp_path):
 
 
 def test_an_untimed_workflow_is_priced_high_rather_than_guessed_low(tmp_path):
-    # Nothing timed here at all: queue few. Too large a batch is thrown away by
-    # the next launch; too small a one only costs another absence.
     db = Database(tmp_path / "t.db")
     for i in range(40):
         _baked(db, f"baked{i}", seed=i)
@@ -339,8 +294,6 @@ def test_an_untimed_workflow_is_priced_high_rather_than_guessed_low(tmp_path):
 
 
 def test_one_repair_always_goes_however_slow(tmp_path):
-    # A budget under the cost of a single render still moves the backlog by one,
-    # or a library of slow renders would never repair anything at all.
     db = Database(tmp_path / "t.db")
     _baked(db, "baked")
     _timed(db, "timed", seconds=600)
@@ -351,7 +304,7 @@ def test_one_repair_always_goes_however_slow(tmp_path):
 
 def test_typical_seconds_is_the_median_of_what_was_recorded(tmp_path):
     db = Database(tmp_path / "t.db")
-    for i, seconds in enumerate((5, 6, 7, 8, 400)):  # one cold-start outlier
+    for i, seconds in enumerate((5, 6, 7, 8, 400)):
         _timed(db, f"t{i}", seconds=seconds)
 
     rows = db.list_generations()
@@ -359,17 +312,7 @@ def test_typical_seconds_is_the_median_of_what_was_recorded(tmp_path):
     assert typical_seconds(rows, "wan22_i2v") == UNTIMED_SECONDS
 
 
-# --- the batch a real close actually hands over -----------------------------
-
 def test_the_work_left_for_while_closed_reaches_the_queue(qtbot, tmp_path, monkeypatch):
-    # The batch runs where an exception is shown to nobody, so the wiring between
-    # it and the queue is checked here rather than left to the one place it can
-    # fail in silence. It failed exactly that way once: the launch adapter named
-    # a base-render source constant the gallery package never exported, and
-    # three days of closes queued no repair at all.
-    #
-    # Everything but the socket is the real path: the submit is stubbed,
-    # because a job the server refuses is dropped from the line.
     monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
     db = Database(tmp_path / "t.db")
     for i in range(3):
@@ -415,9 +358,6 @@ def test_a_branch_sessions_close_leaves_no_work_for_while_closed(qtbot, tmp_path
 
 def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
                                                              monkeypatch):
-    # What a close is actually for is the session — the open tabs, the folder,
-    # the window's place on its monitor. An errand for the coming absence that
-    # raises must cost its own batch and nothing else.
     def boom():
         raise AttributeError("module 'origenerator.gallery' has no attribute 'X'")
 
@@ -434,11 +374,7 @@ def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
     assert json.loads(state_path.read_text())["gallery_selection"] == "xyz"
 
 
-# --- the tool: the same repair, run to completion in one sitting -------------
-
 class _PollingClient:
-    """A ComfyUI that takes a payload and hands back history after ``after`` polls."""
-
     def __init__(self, *, after=1, history=None, submit_error=None):
         self.submitted = []
         self._after = after
@@ -461,7 +397,6 @@ def _base_params():
 
 
 def _clock():
-    """A monotonic clock a sleep can wind forward, so a wait costs no real time."""
     now = [0.0]
 
     def monotonic():
@@ -489,8 +424,6 @@ def test_a_repair_run_submits_the_base_settings_and_names_the_files_it_made(tmp_
 
 def test_a_repair_run_now_waits_for_history_rather_than_reading_an_empty_one(
         tmp_path, monkeypatch):
-    # ComfyUI answers /history with nothing at all until the prompt finishes, so
-    # an empty answer is "not yet", never "produced nothing".
     monkeypatch.setattr(
         base_backfill, "extract_completion",
         lambda *a, **k: ([_file("base.png")], None, 4.0))
@@ -504,8 +437,6 @@ def test_a_repair_run_now_waits_for_history_rather_than_reading_an_empty_one(
 
 
 def test_a_repair_that_never_finishes_gives_up_rather_than_waiting_forever():
-    # One still, however slow the model. A render that has not landed by then is
-    # a ComfyUI that is wedged or working on something else entirely.
     client = _PollingClient(after=10**9)
     monotonic, sleep = _clock()
 
@@ -516,7 +447,6 @@ def test_a_repair_that_never_finishes_gives_up_rather_than_waiting_forever():
 
 
 def _repairable_db(tmp_path):
-    """A database holding one enhanced image whose base render was thrown away."""
     db = Database(tmp_path / "repair.db")
     _add(db, "gone", params=dict(_SDXL.default_params(), seed=3, enhance=True),
          files=[_file("enhanced.png")])
@@ -550,8 +480,6 @@ def test_the_tool_folds_each_repair_into_the_row_it_belongs_to(tmp_path, monkeyp
 
 def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(
         tmp_path, monkeypatch, capsys):
-    # A wedged ComfyUI must not leave the row looking repaired, and the exit
-    # code has to say so: this is run unattended over a long backlog.
     db = _repairable_db(tmp_path)
     monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda folders: object())
     monkeypatch.setattr(backfill_tool, "render_base_now",

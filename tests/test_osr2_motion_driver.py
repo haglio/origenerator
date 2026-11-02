@@ -1,4 +1,3 @@
-"""Osr2MotionDriver — broker etiquette and the self-generated position stream."""
 from __future__ import annotations
 
 import threading
@@ -31,8 +30,6 @@ class FakeClock:
 
 
 class FakeTicker:
-    """Stands in for the clock thread: the test ticks by calling poll itself."""
-
     def __init__(self, tick, interval_s):
         self.tick = tick
         self.interval_s = interval_s
@@ -65,9 +62,9 @@ def test_starting_takes_the_device(qtbot):
     driver.active_changed.connect(handovers.append)
     assert driver.toggle() is True
     assert driver.active
-    assert broker.asked == [RESUME]  # taking the device lets go of any hold
-    assert handovers == [True]  # announced, so the funscript drive stands down
-    assert driver.tickers[0].started == 1  # and the clock is running
+    assert broker.asked == [RESUME]
+    assert handovers == [True]
+    assert driver.tickers[0].started == 1
 
 
 def test_the_motion_holds_the_brokers_slot_while_it_drives_and_lets_go_when_stopped(qtbot):
@@ -96,11 +93,6 @@ def test_a_frozen_room_or_a_hold_lets_go_of_the_slot_and_driving_again_wants_it_
 
 
 def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
-    # Aimed at where the motion already is, the device can only ever chase: by
-    # the time the command lands the motion has moved on. Every command names
-    # the place the motion will have reached when its own interval runs out —
-    # through the takeover glide as much as after it, so being given longer
-    # means being sent further rather than trailing the motion.
     driver, broker, clock = _driver(qtbot)
     driver.start()
     for step in (0.025, 0.025, 0.5, 0.025):
@@ -108,33 +100,26 @@ def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
         driver.poll()
         pos, interval = broker.positions[-1]
         assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
-    assert interval == _LOOKAHEAD_MS  # the last one, well past the glide
-    assert pos > motion_engine.position(driver.state)  # ahead, on the way up
+    assert interval == _LOOKAHEAD_MS
+    assert pos > motion_engine.position(driver.state)
 
 
 def test_the_takeover_keeps_streaming_and_eases_its_interval_out(qtbot):
-    # The device is parked wherever the last thing to hold it left it, so the
-    # first target can be the length of the axis away. Holding the stream back
-    # for the glide is what turned the seam into a slam: the device sat still
-    # while the motion ran on, then had to cover all of it in one tick.
     driver, broker, clock = _driver(qtbot)
     driver.start()
-    assert broker.positions[0][1] == _HANDOFF_MS  # the whole glide to arrive
+    assert broker.positions[0][1] == _HANDOFF_MS
     for _ in range(4):
         clock.t += 0.025
         driver.poll()
     intervals = [i for _pos, i in broker.positions]
-    assert intervals == sorted(intervals, reverse=True)  # eases out, never steps
+    assert intervals == sorted(intervals, reverse=True)
     assert all(i >= _LOOKAHEAD_MS for i in intervals)
     clock.t += 0.5
     driver.poll()
-    assert broker.positions[-1][1] == _LOOKAHEAD_MS  # glide over: ordinary again
+    assert broker.positions[-1][1] == _LOOKAHEAD_MS
 
 
 def test_a_late_tick_still_sends_over_the_lookahead(qtbot):
-    # The interval is what the device is *given*, not what just elapsed: handing
-    # it the gap that already went by asks it to spend a long stall crawling and
-    # then sprint when the next tick lands early.
     driver, broker, clock = _driver(qtbot)
     driver.start()
     clock.t += 0.5
@@ -151,18 +136,15 @@ def test_stopping_parks_the_device(qtbot):
     handovers = []
     driver.active_changed.connect(handovers.append)
     assert driver.toggle() is False
-    assert driver.tickers[0].stopped == 1  # the clock is waited out...
-    assert broker.parked == 1              # ...before the park, so it sticks
-    assert handovers == [False]  # announced, so the funscript drive may re-aim
-    driver.stop()  # already stopped: releasing again must not park twice
+    assert driver.tickers[0].stopped == 1
     assert broker.parked == 1
-    assert handovers == [False]  # and a redundant stop announces nothing
+    assert handovers == [False]
+    driver.stop()
+    assert broker.parked == 1
+    assert handovers == [False]
 
 
 def test_the_clock_runs_off_the_gui_thread(qtbot):
-    # A slideshow decodes a full-size image on the GUI thread every few seconds;
-    # a tick living there is starved for as long as that takes, and the device
-    # feels it as a freeze and then a lunge.
     seen = []
     ticker = _TickThread(lambda: seen.append(threading.current_thread()), 0.001)
     ticker.start()
@@ -175,9 +157,6 @@ def test_the_clock_runs_off_the_gui_thread(qtbot):
 
 
 def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
-    # A machine that suspends (or a laptop lid) comes back seconds late. The
-    # loop owes those ticks to nobody: firing them all at once would fling the
-    # device through a burst of stale positions.
     stalls, clock, ticks = [1.0], [0.0], []
 
     def now():
@@ -194,7 +173,7 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
             ticker.stop()
 
     ticker = _TickThread(tick, 0.025, now=now, sleep=sleep)
-    ticker._run()  # the loop itself, on this thread, against a scripted clock
+    ticker._run()
     gaps = [b - a for a, b in pairwise(ticks)]
     assert gaps
     assert all(abs(g - 0.025) < 1e-9 for g in gaps)
@@ -203,17 +182,14 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
 def test_the_bars_shape_the_status_line(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.start()
-    driver.adjust_speed(50)          # bar to the top: 200 cycles/min
-    driver.adjust_amplitude(-40)     # 100 -> 60
-    driver.adjust_center(-100)       # slides down to the sweep's floor (30)
-    driver.cycle_shape()             # sine -> triangle
+    driver.adjust_speed(50)
+    driver.adjust_amplitude(-40)
+    driver.adjust_center(-100)
+    driver.cycle_shape()
     assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30"
 
 
 def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):
-    """The bars are readable and tunable before the motion starts.  Stopped is
-    all it says: a funscript may have the device meanwhile, and "OSR2 off" read
-    as the device -- or the app's control of it -- being off."""
     driver, _broker, _clock = _driver(qtbot)
     driver.adjust_speed(50)
     assert driver.status_text() == (
@@ -221,10 +197,6 @@ def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):
 
 
 def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
-    # Hands off to the scripts: the tick streams where the phrases will have
-    # the device when the command's own interval runs out, inside the bars'
-    # range.
-
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
     driver, broker, clock = _driver(qtbot)
     driver.state.learned.model = LearnedModel(
@@ -238,7 +210,7 @@ def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtb
         pos, interval = broker.positions[-1]
         assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
     assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
-    assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
+    assert len({round(pos) for pos, _i in broker.positions}) > 5
     assert "human inspired" in driver.status_text()
     driver.set_learned(False)
     assert not driver.state.learned.active

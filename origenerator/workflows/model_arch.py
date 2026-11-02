@@ -1,7 +1,3 @@
-"""Read what a model file *is* off its own header, so a dropdown can offer only
-the files the graph under it can actually run -- never off its name, and never
-guessing: an unrecognized file reads as ``None``, which every dropdown keeps.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -19,25 +15,15 @@ SD15 = "sd15"
 FLUX = "flux"
 QWEN = "qwen"
 WAN = "wan"
-# WAN 2.2's speech-to-video model: the WAN layout plus the audio injector that
-# lets it lip-sync, and a family of its own because it is one -- an i2v dropdown
-# that took it would run without the audio it needs, and the speech dropdown must
-# not offer the i2v experts, which have no ear.
 WAN_S2V = "wan_s2v"
-# WAN 2.2 Animate: WAN with the pose embedding that follows a video's person.
 WAN_ANIMATE = "wan_animate"
 WAN_T2V = "wan_t2v"
 WAN_FUN_CONTROL = "wan_fun_control"
 LTX = "ltx"
 KREA2 = "krea2"
 
-# No real header comes near this (the largest installed is under 500 KB). A
-# length past it means a corrupt or misidentified file, and honoring it would
-# pull the whole model into memory to answer a question about its index.
 _MAX_HEADER_BYTES = 32 * 1024 * 1024
 
-# Enough tensor names to recognize any architecture; a full-size model lists
-# thousands, and reading them all would be work for no extra certainty.
 _MAX_TENSOR_NAMES = 400
 
 # Prefixes that wrap an otherwise-normal state dict. The same WAN model ships
@@ -84,26 +70,17 @@ _WAN_LATENT_CHANNELS = 16
 
 @dataclass(frozen=True)
 class ModelFile:
-    """What one file on disk turned out to be.
-
-    ``arch`` is ``None`` when the header could not be read or matched no
-    signature — the "we could not tell" case every filter treats as a keep.
-    """
-
     arch: str | None
     is_lora: bool
-    expert: str | None   # "high" / "low" when the name says so, else None
+    expert: str | None
     is_shard: bool
 
 
-# What each model file turned out to be, kept between launches: a header is a
-# file of gigabytes opened, and a file unchanged in size and time reads the same.
 _HEADERS_PATH = config.STATE_DIR / "model_headers.json"
 _READER_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
 
 
 def describe(path: Path) -> ModelFile:
-    """Classify *path* from its header and its name, without loading weights."""
     try:
         stat = path.stat()
     except OSError:
@@ -149,7 +126,7 @@ def _remember(described: dict[tuple[str, int, int], ModelFile]) -> None:
                            encoding="utf-8")
         written.replace(_HEADERS_PATH)
     except OSError:
-        return  # a launch that cannot write its state reads the headers again
+        return
 
 
 def _describe(path: Path) -> ModelFile:
@@ -168,11 +145,6 @@ def _describe(path: Path) -> ModelFile:
 
 
 def _expert_from_name(name: str) -> str | None:
-    """Which WAN 2.2 expert the filename claims, or ``None`` when it says nothing.
-
-    A name carrying both markers claims nothing usable, so it reads as unmarked
-    and stays offered in either dropdown.
-    """
     found = {
         match.group(0).lower().strip("-_. ")
         for match in (*_EXPERT_BOUNDED.finditer(name), *_EXPERT_CAMEL.finditer(name))
@@ -184,12 +156,6 @@ def _expert_from_name(name: str) -> str | None:
 
 
 def _components(keys: list[str]) -> set[str]:
-    """The leading component of every tensor name, wrappers stripped.
-
-    kohya-form LoRAs flatten a whole module path into one component
-    (``lora_unet_double_blocks_0_img_attn_qkv``), so the signatures below test
-    these by prefix as well as by equality.
-    """
     return {_unwrapped(key).split(".")[0] for key in keys}
 
 
@@ -211,12 +177,6 @@ def _wan_kind(shapes: dict[str, list[int] | None]) -> str:
 
 
 def _arch_from(shapes: dict[str, list[int] | None]) -> str | None:
-    """The architecture these tensor names belong to, or ``None`` if unrecognized.
-
-    Order is load-bearing: several families share a component name and are told
-    apart only by a marker one of them also has, so the more specific signature
-    has to be asked first. Each rule below says which collision it settles.
-    """
     keys = list(shapes)
     components = _components(keys)
 
@@ -272,12 +232,6 @@ def _arch_from(shapes: dict[str, list[int] | None]) -> str | None:
 
 
 def _tensor_shapes(path: Path) -> dict[str, list[int] | None] | None:
-    """Each tensor name in *path* and its shape, or ``None`` when they can't be read.
-
-    ``None`` covers every "we could not tell" case — a format with no readable
-    index (``.ckpt``, ``.pt``), a truncated or corrupt file, a header too large
-    to be a header — and callers keep those rather than judging them.
-    """
     try:
         if path.suffix == ".safetensors":
             return _safetensors_shapes(path)
@@ -290,7 +244,6 @@ def _tensor_shapes(path: Path) -> dict[str, list[int] | None] | None:
 
 
 def _safetensors_header(path: Path) -> dict | None:
-    """safetensors: a little-endian u64 byte length, then that much JSON."""
     with path.open("rb") as handle:
         (length,) = struct.unpack("<Q", handle.read(8))
         if length > _MAX_HEADER_BYTES:
@@ -327,7 +280,6 @@ _GGUF_ARRAY = 9
 
 
 def _gguf_names(path: Path) -> list[str] | None:
-    """GGUF: magic and counts, then its metadata, then the tensor index."""
     with path.open("rb") as handle:
         if handle.read(4) != b"GGUF":
             return None
@@ -348,7 +300,6 @@ def _gguf_names(path: Path) -> list[str] | None:
 
 
 def _gguf_skip(handle, value_type: int) -> None:
-    """Step over one metadata value without decoding it."""
     if value_type == _GGUF_STRING:
         (length,) = struct.unpack("<Q", handle.read(8))
         handle.read(length)

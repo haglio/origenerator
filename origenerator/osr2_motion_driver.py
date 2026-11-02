@@ -1,26 +1,3 @@
-"""Drive the OSR2 from a self-generated motion — no video, no funscript.
-
-The counterpart to :class:`~origenerator.osr2_driver.Osr2Driver` for stills:
-where that one follows a playing video's script, this one *is* the motion
-source, advancing a :class:`~origenerator.motion_engine.Motion` on a clock
-of its own and streaming each sampled position as T-code, and parking the device
-when it stops. The gallery owns the one instance, app-global — every surface (Core, the fullscreen slideshow) drives it through the shared key cluster in
-:mod:`origenerator.gui.motion_hud`, and the motion outlives any of them: closing
-a view leaves the device running until Space stops it.
-
-Two things make the motion read as motion rather than as lurching, and both were
-missing while this drove off a GUI-thread timer aimed at the present:
-
-* **Its own clock.** A slideshow decodes a full-size image (and its neighbors)
-  on the GUI thread every few seconds, and every such stall starves a timer
-  living there. The device feels that as a freeze followed by a lunge to catch
-  up. The clock here answers to nothing but the wall.
-* **Aiming ahead.** Each command says *be at this place in this long*, so the
-  place has to be one the motion is due to reach when the time is up. Aimed at
-  where the motion already is, the device can only chase, and every wobble in
-  the tick spacing becomes a stall and then a sprint.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -39,28 +16,12 @@ from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
 
-_TICK_MS = 25  # the motion's own clock — 40 Hz, a beat under genau's own loop
-# How far ahead of now each command aims, and so how long the device is given to
-# get there. Comfortably more than a tick, so a tick that runs a little late
-# still finds the device short of its target and simply re-aims it — under a
-# tick and the device arrives early, stands still, then sprints for the next.
+_TICK_MS = 25
 _LOOKAHEAD_MS = 40
-# The device is parked wherever the last thing to hold it left it, and the
-# motion's first target can be the length of the axis away. Every command inside
-# this window is given a longer interval, easing out to the ordinary lookahead
-# as the window closes, so the seam is a movement rather than a slam. (Genau's
-# HandoffGlide, minus its cliff edge at the end.)
 _HANDOFF_MS = 300
 
 
 class _TickThread:
-    """The motion's clock, off the GUI thread.
-
-    A plain sleeping loop rather than a ``QTimer``: it needs the wall clock, the
-    motion state and a datagram socket, none of which belong to Qt, and living
-    outside the GUI thread is the whole point — see this module's docstring.
-    """
-
     def __init__(self, tick, interval_s: float, *,
                  now=time.monotonic, sleep=time.sleep):
         self._tick = tick
@@ -75,8 +36,6 @@ class _TickThread:
         self._thread.start()
 
     def stop(self) -> None:
-        """Ask the loop to finish and wait for it, so nothing is still in flight
-        when the caller goes on to park the device."""
         self._stopping.set()
         if self._thread.is_alive():
             self._thread.join(timeout=1.0)
@@ -87,9 +46,6 @@ class _TickThread:
             due += self._interval
             now = self._now()
             if due < now - self._interval:
-                # A long way late — a machine suspend, say. Those ticks are
-                # owed to nobody: firing the backlog would fling the device
-                # through a burst of stale positions. Pick the beat up here.
                 due = now + self._interval
             delay = due - now
             if delay > 0:
@@ -100,8 +56,6 @@ class _TickThread:
 
 
 class Osr2MotionDriver(QObject):
-    # The device changed hands: the funscript reconcile stands down while the
-    # motion holds it, and every surface's caption follows along.
     active_changed = pyqtSignal(bool)
 
     def __init__(self, broker=None, *, interval_ms: int = _TICK_MS,
@@ -110,12 +64,11 @@ class Osr2MotionDriver(QObject):
         self._broker = broker or Osr2Broker()
         self._state = Motion()
         self._active = False
-        self._streaming = False  # a one-shot "first T-code sent" log per start
+        self._streaming = False
         self._now = now_source
         self._last_tick = 0.0
-        self._glide_until = 0.0  # takeover: intervals ease out until this passes
-        # The bars are moved on the GUI thread while the clock samples the
-        # state on its own, so both go through this.
+        self._glide_until = 0.0
+        # The bars are moved on the GUI thread while the clock thread samples the state.
         self._lock = threading.RLock()
         self._interval_s = interval_ms / 1000.0
         self._make_ticker = ticker_factory or _TickThread
@@ -134,7 +87,6 @@ class Osr2MotionDriver(QObject):
         self._run_the_clock_while_sending()
 
     def toggle(self) -> bool:
-        """Start or stop driving; returns whether the motion is now running."""
         if self._active:
             self.stop()
         else:
@@ -142,7 +94,6 @@ class Osr2MotionDriver(QObject):
         return self._active
 
     def start(self) -> None:
-        """Take the device: start streaming the motion."""
         if self._active:
             return
         self._active = True
@@ -153,7 +104,6 @@ class Osr2MotionDriver(QObject):
         self.active_changed.emit(True)
 
     def stop(self) -> None:
-        """Release the device: stop streaming and park it."""
         if not self._active:
             return
         self._active = False
@@ -179,7 +129,7 @@ class Osr2MotionDriver(QObject):
                 now = self._now()
                 self._last_tick = now
                 self._glide_from(now)
-                self.poll()  # move on the keypress, not a tick later
+                self.poll()
                 self._running_ahead.enter_context(ahead_while_playing())
                 self._ticker = self._make_ticker(self.poll, self._interval_s)
                 self._ticker.start()
@@ -200,23 +150,10 @@ class Osr2MotionDriver(QObject):
     def _stop_the_clock(self) -> None:
         ticker, self._ticker = self._ticker, None
         if ticker is not None:
-            ticker.stop()  # waits, so no tick can land after a park
+            ticker.stop()
         self._running_ahead.close()
 
     def poll(self) -> None:
-        """One tick: carry the phase up to now, then name where the motion will
-        be when the time this command is given runs out.
-
-        The place and the time are the same number twice — aim as far ahead as
-        the device is allowed to take. That is what keeps it on the motion
-        rather than trailing it, through the glide as much as after it: given
-        longer, it is also sent further, so it arrives where the motion has got
-        to instead of where the motion was when the command left.
-
-        A tick that lands after the device was given up sends nothing: the park
-        stop() asked the broker for is where whoever has it next expects to find
-        the device, and one stale position after it takes the device back.
-        """
         if not self._sending():
             return
         now = self._now()
@@ -232,10 +169,6 @@ class Osr2MotionDriver(QObject):
             logger.info("OSR2 motion streaming: first T-code pos=%.0f", pos)
 
     def _lead_for(self, now: float) -> int:
-        """How far ahead this command aims, and so how long the device is given
-        to get there: the ordinary lookahead, stretched while the takeover glide
-        is still running and easing back to it as the glide closes — so there's
-        no step at the moment it ends."""
         left = self._glide_until - now
         if left <= 0:
             return _LOOKAHEAD_MS
@@ -244,8 +177,6 @@ class Osr2MotionDriver(QObject):
 
     @property
     def state(self) -> Motion:
-        """The live motion, for the OSR2 controls to draw. Read-only by
-        convention — the setters below are how it changes."""
         return self._state
 
     def adjust_speed(self, delta: int) -> None:
@@ -289,15 +220,10 @@ class Osr2MotionDriver(QObject):
             motion_engine.take_settings(self._state, saved)
 
     def toggle_learned(self) -> None:
-        """Hands off to the scripts: the learned motion takes the motion over
-        (genau's ``;``)."""
         with self._lock:
             motion_engine.toggle_learned_motion(self._state)
 
     def set_learned(self, on: bool) -> None:
-        """Put the learned motion the way asked, whichever way it is standing —
-        what a spoken "human inspired on" is, where the toggle above is what a
-        key press is."""
         with self._lock:
             if on:
                 motion_engine.enable_learned_motion(self._state)
@@ -320,9 +246,6 @@ class Osr2MotionDriver(QObject):
         self._glide_until = now + _HANDOFF_MS / 1000.0
 
     def status_text(self) -> str:
-        """One line of what the device is (or would be) doing, for the
-        slideshow's standing caption — the bars read the same either way, so
-        the motion can be tuned before it's started."""
         state = self._state.state
         caption = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
                  f" · travel {state.amplitude} around {state.center}")

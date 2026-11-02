@@ -72,7 +72,7 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
 from origenerator.gui.eliding import ElidingLabel
-from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
+from origenerator.gui.enhance_versions import Dating, EnhanceOffer, EnhanceVersions, RunningEnhancement
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_modify import FolderModify
 from origenerator.gui.generate_button import (
@@ -1398,15 +1398,15 @@ class GenerateTab(DropZones):
             self._listed_versions = displayed_versions(row, self._upscale_of(row))
             self._versions.show_versions(
                 [(version, row.get("thumbnail_path")) for version in self._listed_versions],
-                created_fallback=str(row.get("created_at", "")),
-                held_days=row.get("days_in_trash"), deletable=False,
+                dating=Dating(str(row.get("created_at", "")), row.get("days_in_trash")),
+                deletable=False,
             )
             return
         self._listed_versions = displayed_versions(row)
         self._versions.show_versions(
             [(version, self._version_path(version)) for version in self._listed_versions],
             self._pending_enhancement, self._add_row_for(row),
-            str(row.get("created_at", "")), row.get("days_in_trash"),
+            Dating(str(row.get("created_at", "")), row.get("days_in_trash")),
         )
 
     def _upscale_of(self, row: dict) -> Path | None:

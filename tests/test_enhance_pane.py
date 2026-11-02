@@ -53,6 +53,7 @@ from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.enhance_pane import EnhancePane
 from origenerator.gui.enhance_versions import (
+    Dating,
     EnhanceOffer,
     EnhanceVersions,
     RunningEnhancement,
@@ -650,7 +651,7 @@ def test_each_version_carries_its_own_file_and_created_rows(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0})),
-                         created_fallback="2026-08-01")
+                         dating=Dating("2026-08-01"))
 
     facts = _facts(_rows(versions)[0])
     assert "Enhancement" in facts
@@ -697,7 +698,7 @@ def _click(qtbot, row, modifier=Qt.KeyboardModifier.NoModifier):
 def test_clicking_anywhere_on_a_row_picks_it(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), created_fallback="2026-08-01")
+    versions.show_versions(_items(_versions(1)), dating=Dating("2026-08-01"))
     row = _rows(versions)[0]
 
     targets = [row._thumbnail, row._title]
@@ -722,7 +723,7 @@ def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
 def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), created_fallback="2026-08-01")
+    versions.show_versions(_items(_versions(1)), dating=Dating("2026-08-01"))
     row = _rows(versions)[0]
 
     for label in row.findChildren(QLabel):

@@ -18,7 +18,7 @@ from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
-from origenerator.generation_metadata import BasicItem, created_item, file_item
+from origenerator.generation_metadata import UNDATED, BasicItem, Dating, created_item, file_item
 from origenerator.gui import icons, palette
 from origenerator.gui.basic_section import basic_cells, label_column_width
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -192,9 +192,9 @@ class _VersionRow(_Row):
     context_requested = pyqtSignal(int, QPoint)
     delete_pressed = pyqtSignal(int)
 
-    def __init__(self, version, position: int, image_path, created_fallback: str = "",
-                 held_days: int | None = None, deletable: bool = False, parent=None):
-        super().__init__(version.label, parent)
+    def __init__(self, version, position: int, image_path, dating=UNDATED,
+                 deletable: bool = False):
+        super().__init__(version.label)
         self._position = position
         self._params = dict(version.params)
         self.drag_out = DragOut()
@@ -208,8 +208,8 @@ class _VersionRow(_Row):
         items = []
         if version.settings:
             items.append(BasicItem("Enhancement", version.settings))
-        items.append(file_item(version.file, held_days=held_days))
-        items.append(created_item(version.file, created_fallback))
+        items.append(file_item(version.file, held_days=dating.held_days))
+        items.append(created_item(version.file, dating.created_fallback))
         trash = None
         if deletable:
             trash = IconButton(icons.delete_icon(), "Delete this version", "deleteButton")
@@ -349,8 +349,7 @@ class EnhanceVersions(QWidget):
         self._section.set_collapsed(collapsed)
 
     def show_versions(self, items: list[tuple], pending: RunningEnhancement | None = None,
-                    add: EnhanceOffer | None = None, created_fallback: str = "",
-                    held_days: int | None = None, deletable: bool = True):
+                    add: EnhanceOffer | None = None, dating=UNDATED, deletable: bool = True):
         form = self._section.content_form()
         form.removeRow(self._host)
         self._host = QWidget()
@@ -377,7 +376,7 @@ class EnhanceVersions(QWidget):
                 lambda on, at=add.duplicate_of: self._highlight_version(at, on))
             column.addWidget(self._enhance_row)
         for position, (version, image_path) in enumerate(items):
-            row = _VersionRow(version, position, image_path, created_fallback, held_days,
+            row = _VersionRow(version, position, image_path, dating,
                             deletable=bool(self._deleted_by([position])))
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)

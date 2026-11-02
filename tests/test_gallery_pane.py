@@ -94,6 +94,13 @@ class _StubAuto:
         return False
 
 
+class _NothingEnhancing:
+    settings = gallery.EnhanceSettings()
+
+    def run_of(self, _row):
+        return None
+
+
 def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, jobs=None,
           selected=None, animated_preview=lambda row: None):
     if scroll is None:
@@ -109,8 +116,7 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None, job
         PaneHost(
             image_rows=list,
             animated_preview=animated_preview,
-            enhancing_run=lambda row: None,
-            enhance_settings=lambda: gallery.EnhanceSettings(),
+            enhancing=_NothingEnhancing,
             experiments_enabled=lambda: False,
             lead_tiles=lead_tiles,
             item_name=lambda prompt_id: f"item {prompt_id}",

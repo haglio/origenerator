@@ -136,7 +136,7 @@ def test_file_row_reveals_the_output_file_in_explorer(block, monkeypatch, tmp_pa
     monkeypatch.setattr(config, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     (tmp_path / "out.mp4").write_bytes(b"x")
     revealed = []
-    monkeypatch.setattr(basic_section_module, "show_in_explorer", lambda p: revealed.append(p))
+    monkeypatch.setattr(basic_section_module, "show_in_explorer", revealed.append)
 
     block.show_row(_row(output_files=json.dumps(
         [{"filename": "out.mp4", "subfolder": ""}])))

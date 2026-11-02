@@ -1135,7 +1135,7 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
     qtbot.addWidget(parent)
     controller = CombineController(
         FakeHost(), parent=parent, db=FakeDB(), jobs=FakeReroll(), client=object(),
-        info_tabs_of=lambda: FakeTabs(), slideshows=FakeSlideshows(),
+        info_tabs_of=FakeTabs, slideshows=FakeSlideshows(),
         starting=StartingRows())
 
     controller.widget._defaults_btn.click()

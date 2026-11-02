@@ -225,7 +225,7 @@ class DropZone(DropZones):
         paste.setEnabled(pasted is not None)
         paste.triggered.connect(lambda: self.set_item(pasted))
         if self._browse is not None:
-            menu.addAction(BROWSE).triggered.connect(lambda: self._browse())
+            menu.addAction(BROWSE).triggered.connect(self._browse)
         return menu
 
     def _pasted(self) -> str | None:

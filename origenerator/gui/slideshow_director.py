@@ -246,10 +246,10 @@ def _shape_it_opens_on(shape: str, rows, items, opened_on: str | None) -> str:
 
 class SlideshowDirector:
     def __init__(self, host: SlideshowHost, *, db, gallery_pane, jobs, pace, motion,
-                 fun_time, names: ItemNames, radio=None, turn_the_radio_on=None):
+                 fun_time, names: ItemNames, radio=None, buttons_of=None):
         self._host = host
         self._radio = radio
-        self._turn_the_radio_on = turn_the_radio_on
+        self._buttons_of = buttons_of
         self._volume_left_at: VolumeHud | None = None
         self._db = db
         self._names = names
@@ -538,8 +538,8 @@ class SlideshowDirector:
 
     def _volume_moved(self, volume: VolumeHud) -> None:
         self._volume_left_at = volume
-        if self._turn_the_radio_on is not None:
-            self._turn_the_radio_on()
+        if self._buttons_of is not None:
+            self._buttons_of().turn_the_radio_on()
 
 
     def _note_filters(self, filters: SlideshowFilters) -> None:

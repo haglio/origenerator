@@ -13,7 +13,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools import card_claim  # noqa: E402
+from tools import card_claim
 
 PICTURE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
 LONG_SIDE = 1536

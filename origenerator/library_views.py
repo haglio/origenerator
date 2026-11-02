@@ -55,5 +55,5 @@ class LibraryViews:
         if self._snapshot is None or version != self._version:
             self._version = version
             self._snapshot = LibrarySnapshot(self._db.list_generations(),
-                                             lambda: self._db.list_trashed())
+                                             self._db.list_trashed)
         return self._snapshot

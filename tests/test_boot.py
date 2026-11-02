@@ -52,7 +52,7 @@ def _copies(claim, *, closing=False, after_the_closing_one=None):
 def _a_loading_screen_saying_when_it_goes_down(boot, events):
     boot.loading = MagicMock()
     boot.loading.done.side_effect = lambda: events.append("loading screen down")
-    boot.loading.say.side_effect = lambda step: events.append(step)
+    boot.loading.say.side_effect = events.append
     return boot.loading
 
 

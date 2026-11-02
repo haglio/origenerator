@@ -255,8 +255,7 @@ class LeadTiles:
 class PaneHost:
     image_rows: Callable[[], list]
     animated_preview: Callable[[dict], str | None]
-    enhancing_run: Callable[[dict], object]
-    enhance_settings: Callable[[], object]
+    enhancing: Callable[[], object]
     experiments_enabled: Callable[[], bool]
     lead_tiles: Callable[[object], LeadTiles]
     item_name: Callable[[str], str]
@@ -641,7 +640,7 @@ class GalleryPane(QObject):
             movie_path=self._host.animated_preview(row),
             favorite=bool(row.get("starred")),
             enhance=self._enhance_state(row),
-            enhancing=self._host.enhancing_run(row),
+            enhancing=self._host.enhancing().run_of(row),
             corner_buttons=corner_buttons,
         )
 
@@ -876,7 +875,7 @@ class GalleryPane(QObject):
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
                 enhance=self._enhance_state(row),
-                enhancing=self._host.enhancing_run(row),
+                enhancing=self._host.enhancing().run_of(row),
                 corner_buttons=self._seed_reroll_actions(row) if i2v else None,
             )
 
@@ -1009,7 +1008,7 @@ class GalleryPane(QObject):
         self.item_action_triggered.emit(prompt_id, action)
 
     def _enhance_state(self, row) -> str | None:
-        return enhance_state(row, self._host.enhance_settings())
+        return enhance_state(row, self._host.enhancing().settings)
 
     def refresh_corners(self):
         for prompt_id, tile in self._thumb_widgets.items():

@@ -69,9 +69,20 @@ def look(monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     return folder
 
 
+class _InfoTabs:
+    def __init__(self, tabs, shown):
+        self.tabs, self.shown = tabs, shown
+
+    def generate_tabs(self):
+        return self.tabs
+
+    def setCurrentWidget(self, tab):
+        self.shown.append(tab)
+
+
 def _controller(tabs, shown=None):
-    return LookTrainingController(SimpleNamespace(), tabs=lambda: tabs,
-                                  show_tab=([] if shown is None else shown).append, parent=None)
+    info_tabs = _InfoTabs(tabs, [] if shown is None else shown)
+    return LookTrainingController(SimpleNamespace(), info_tabs_of=lambda: info_tabs, parent=None)
 
 
 def _told(monkeypatch, kind="information") -> list:

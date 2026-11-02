@@ -278,15 +278,15 @@ class GalleryView(QWidget):
         self._pace = SlideshowPace(parent=self)
         self._reconciling_osr2 = False
         self._build_the_queue_of_runs(db, client)
+        self._forget_the_listing()
+        self._build_the_panes(db, client, search_expander)
         self._edits = actions or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
-                cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
+                cancel_enhancements=self._enhance.cancel_for_delete,
             ),
         )
-        self._forget_the_listing()
-        self._build_the_panes(db, client, search_expander)
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
         self._voice.bind_the_buttons(
@@ -317,7 +317,6 @@ class GalleryView(QWidget):
         self._jobs = JobQueue(db, client)
         self._jobs.changed.connect(self._rerender_current_leaf)
         self._jobs.changed.connect(self._reconcile_generating)
-        self._jobs.changed.connect(lambda: self._enhance.reconcile())
         self._jobs.preview.connect(self._on_reroll_preview)
         self._jobs.finished.connect(self._on_reroll_finished)
         self._jobs.failed.connect(self._on_reroll_failed)
@@ -354,11 +353,10 @@ class GalleryView(QWidget):
             ),
             PaneHost(
                 image_rows=lambda: self._image_rows,
-                animated_preview=lambda row: self.animated_preview(row),
-                enhancing_run=lambda row: self._enhance.run_of(row),
-                enhance_settings=lambda: self._enhance.settings,
-                experiments_enabled=lambda: self.experiments_enabled(),
-                lead_tiles=lambda group: self._lead_tiles(group),
+                animated_preview=self.animated_preview,
+                enhancing=lambda: self._enhance,
+                experiments_enabled=self.experiments_enabled,
+                lead_tiles=self._lead_tiles,
                 item_name=self._item_names.of,
             ),
         )
@@ -395,7 +393,7 @@ class GalleryView(QWidget):
             self, db=db, gallery_pane=self._gallery_pane, jobs=self._jobs,
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
             names=self._item_names, radio=self._radio,
-            turn_the_radio_on=lambda: self._buttons.turn_the_radio_on())
+            buttons_of=lambda: self._buttons)
         self._starting = StartingRows(self)
         self._starting.changed.connect(self._update_queue)
         self._combine = CombineController(
@@ -405,11 +403,11 @@ class GalleryView(QWidget):
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, gallery_pane=self._gallery_pane,
             slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane)
+        self._jobs.changed.connect(self._enhance.reconcile)
         self._jobs.enhance_images_with(
             lambda image: self._enhance.enhance_items([image["prompt_id"]]))
         self._look_training = LookTrainingController(
-            self._jobs, tabs=lambda: self._generate_pane.generate_tabs(),
-            show_tab=lambda tab: self._generate_pane.setCurrentWidget(tab), parent=self)
+            self._jobs, info_tabs_of=lambda: self._generate_pane, parent=self)
         self._voice = VoiceRouter(self, parent=self, db=db, slideshows=self._slideshows,
                                   client=client, motion=self._osr2_motion,
                                   starting=self._starting)
@@ -693,7 +691,7 @@ class GalleryView(QWidget):
         tab.context_menu_requested.connect(
             lambda prompt_id, pos: self.generation_menu([prompt_id], pos))
         tab.displayed_changed.connect(self.reconcile_osr2)
-        tab.displayed_changed.connect(lambda: self._enhance.reconcile())
+        tab.displayed_changed.connect(self._enhance.reconcile)
         tab.displayed_changed.connect(self._reconcile_generating)
         tab.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
         tab.versions_delete_requested.connect(self.delete_enhance_versions)

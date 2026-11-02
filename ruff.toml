@@ -7,12 +7,11 @@ ignore = ["E501", "BLE001", "S110",
     # This repo's ratchet: each rule the family config still finds here, and its places today.
     "PLR0913",  # 131
     "RUF001",  # 117
-    "PLW0108",  # 28
     "PLR0917",  # 46
     "PLR0915",  # 7
     "PLR0911",  # 6
 ]
-external = ["ARG", "N", "S", "E501", "BLE001", "S110", "PLR0913", "RUF001", "PLW0108", "PLR0917", "PLR0915", "PLR0911"]
+external = ["ARG", "N", "S", "E501", "BLE001", "S110", "PLR0913", "RUF001", "PLR0917", "PLR0915", "PLR0911"]
 
 [lint.per-file-ignores]
 "**/vulture_whitelist.py" = ["B018", "F821"]

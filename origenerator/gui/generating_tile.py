@@ -53,7 +53,7 @@ class GeneratingTile(QFrame):
 
         self._cancel = QPushButton(CANCEL_TEXT)
         self._cancel.setToolTip(cancel_tooltip(auto_generating))
-        self._cancel.clicked.connect(lambda: self.cancel_requested.emit())
+        self._cancel.clicked.connect(self.cancel_requested.emit)
         layout.addWidget(self._cancel)
 
         self._status_scrim = TileStatusScrim(self)

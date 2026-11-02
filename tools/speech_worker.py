@@ -14,7 +14,7 @@ import time
 def fit_to_seconds(wave, rate: int, seconds: float):
     import numpy as np  # noqa: PLC0415
 
-    wanted = int(round(seconds * rate))
+    wanted = round(seconds * rate)
     wave = np.asarray(wave, dtype=np.float32).reshape(-1)
     if len(wave) >= wanted:
         return wave[:wanted]

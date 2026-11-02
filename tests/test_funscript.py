@@ -288,7 +288,7 @@ def _scripted_video(tmp_path, actions):
 
 def _synthesized_the_old_way(duration_s, hz=1.2):
     half_period = 500.0 / hz
-    return [{"at": int(round(i * half_period)), "pos": 0 if i % 2 == 0 else 100}
+    return [{"at": round(i * half_period), "pos": 0 if i % 2 == 0 else 100}
             for i in range(int(duration_s * 1000 // half_period) + 1)]
 
 

@@ -65,13 +65,13 @@ def _script_of_upscaled(stem: str, places: OutputPlaces) -> Path | None:
 
 
 def synthesize_actions(duration_s: float, *, hz: float) -> list[dict]:
-    duration_ms = int(round(duration_s * 1000))
+    duration_ms = round(duration_s * 1000)
     if duration_ms <= 0 or hz <= 0:
         return []
     halves = 2 * max(1, round(duration_s * hz))
     half_period_ms = duration_ms / halves
     return [
-        {"at": int(round(i * half_period_ms)), "pos": 0 if i % 2 == 0 else 100}
+        {"at": round(i * half_period_ms), "pos": 0 if i % 2 == 0 else 100}
         for i in range(halves + 1)
     ]
 

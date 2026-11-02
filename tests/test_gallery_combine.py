@@ -1,4 +1,3 @@
-"""Pure logic for combining a gallery image + a video's settings into new params."""
 from __future__ import annotations
 
 import json
@@ -14,7 +13,6 @@ _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 
 
 def _video_row(**params):
-    """A completed i2v video row whose params_json carries the given values."""
     return {
         "prompt_id": "vid",
         "workflow_name": "wan22_i2v",
@@ -24,7 +22,6 @@ def _video_row(**params):
 
 
 def _image(files):
-    """The reference a dropped image with the given output_files lends."""
     return gallery.output_file_reference(files or [])
 
 
@@ -42,7 +39,6 @@ def test_a_combination_runs_the_settings_on_the_dropped_image_with_fresh_seeds()
 
 
 def test_combined_params_fills_missing_params_from_workflow_defaults():
-    # A sparse video row (e.g. an import) still builds full, submittable settings.
     video = _video_row(seed=3, noise_seed=9)
     image = _image([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -68,9 +64,6 @@ def test_combined_params_references_the_images_subfolder_output():
 
 
 def test_combined_params_drops_the_videos_stored_size():
-    # A source video carrying a size — an import's scraped one, or an unlocked
-    # override — sized the frame IT ran on. Carried onto a differently shaped
-    # image it would stretch it, so the swap drops it.
     video = _video_row(seed=3, noise_seed=9, width=720, height=928)
     image = _image([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -81,9 +74,6 @@ def test_combined_params_drops_the_videos_stored_size():
 
 
 def test_combined_params_payload_derives_the_size_from_the_dropped_image():
-    # The end of the same story: with no size carried over, the built graph
-    # scales to the pixel budget and reads the size back off the result, rather
-    # than forcing the video's WxH onto an image of another shape.
     video = _video_row(seed=3, noise_seed=9, width=720, height=928)
     image = _image([{"filename": "sdxl_new.png", "subfolder": ""}])
 
@@ -99,8 +89,6 @@ def test_combined_params_payload_derives_the_size_from_the_dropped_image():
 
 
 def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
-    # The drop is gated on the workflow deriving its size, not on the key names:
-    # a workflow that sizes by hand has width/height as real settings.
     class _ManualSize:
         derives_size_from_input = False
 
@@ -119,8 +107,6 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
     params = gallery.combined_params(video, image, _ManualSize())
 
     assert (params["width"], params["height"]) == (720, 928)
-
-# --- whether a run still says what its source video said --------------------
 
 
 def _source_video_run(**video_params):
@@ -172,8 +158,6 @@ def test_the_words_the_genau_lane_adds_are_words_the_source_video_never_said():
 
     assert gallery.prompts_differ_from(gallery.cycle_shaped(params, _I2V), video, _I2V)
 
-# --- written_params: written-down settings on a dropped image ----------------
-
 
 _SPEC = {
     "workflow": "wan22_i2v",
@@ -188,15 +172,13 @@ def test_written_params_lays_the_spec_over_defaults_and_swaps_the_image():
     params = gallery.written_params(_SPEC, image, _I2V)
 
     assert params["input_image"] == "sdxl_new.png [output]"
-    assert params["positive_prompt"] == "gamma form scene"          # from the spec
-    assert params["steps"] == 24                                    # from the spec
-    assert params["lora_high"] == "example-action-high.safetensors"    # from the spec
-    assert params["shift_high"] == _I2V.default_params()["shift_high"]  # unnamed → default
+    assert params["positive_prompt"] == "gamma form scene"
+    assert params["steps"] == 24
+    assert params["lora_high"] == "example-action-high.safetensors"
+    assert params["shift_high"] == _I2V.default_params()["shift_high"]
 
 
 def test_written_params_rerolls_every_seed():
-    # Written-down settings have no exemplar run to reproduce; a pinned seed would
-    # render the identical video for the same image every time.
     image = _image([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.written_params(_SPEC, image, _I2V)
@@ -211,9 +193,6 @@ def test_an_image_with_no_file_on_disk_runs_nothing():
 
 
 def test_settings_written_against_the_shared_strength_still_render_at_it():
-    # Curated settings stored before the stages had their own strength name one
-    # shared number and a zero per stage; the workflow reads those the way it
-    # always did, so the settings keep producing what it was tuned to produce.
     spec = {"workflow": "wan22_i2v",
             "params": {"cfg": 1.0, "cfg_high": 0.0, "cfg_low": 0.0, "steps": 8}}
 
@@ -223,8 +202,6 @@ def test_settings_written_against_the_shared_strength_still_render_at_it():
 
     assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]
 
-# --- shaping settings into one cycle, for the lane that scrubs them ---------
-
 _LOOP = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
 
 
@@ -233,25 +210,14 @@ def _shaped(category="", **over):
 
 
 def test_genau_settings_are_generated_at_the_shortest_length_that_closes():
-    """Genau steers whatever it is given as ONE cycle, so the ideal video is the
-    shortest that holds exactly one — 13 frames by the cadence arithmetic. It is
-    29 because the model cannot CLOSE a loop that short: measured at a fixed
-    seed, the last frame lands 2% off the first at 13 frames and 0.2% off at 29,
-    and under 29 the lighting pops on every repeat."""
     assert _shaped()["frame_count"] == combine.CYCLE_FRAMES == 29
 
 
 def test_genau_settings_play_at_the_top_rate_the_writer_allows():
-    """29 frames of one cycle is far too coarse to scrub slowly, which is most
-    of what Genau is for. The frames in between are interpolated after decode, so
-    asking for the top rate costs a pass rather than sampler time."""
     assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS
 
 
 def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
-    """At 29 frames the model fits about two cycles left to itself, so the lane
-    asks for one outright. Added to the video's prompt rather than replacing it:
-    the prompt says what the video is OF, and this says how it moves."""
     shaped = _shaped(positive_prompt="alpha form", negative_prompt="beta")
 
     assert shaped["positive_prompt"].startswith("alpha form ")
@@ -260,9 +226,6 @@ def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
 
 
 def test_an_action_with_its_own_words_gets_them_and_the_rest_get_the_default():
-    """A cycle is not one motion: what made the difference on the action it was
-    tuned on was naming the cycle in STAGES, and the stages are different parts of
-    the body from one action to the next."""
     own = combine.cycle_words("beta")
     default = combine.cycle_words("")
 
@@ -272,8 +235,6 @@ def test_an_action_with_its_own_words_gets_them_and_the_rest_get_the_default():
 
 
 def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkeypatch):
-    # The wording is the library's, not this repo's, so a checkout without it
-    # still shapes the length and the rate and says nothing about the motion.
     monkeypatch.setattr(combine, "_CYCLE_WORDS", {})
     params = dict(_LOOP.default_params(), positive_prompt="alpha", negative_prompt="")
 
@@ -284,8 +245,6 @@ def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkey
 
 
 def test_settings_with_nothing_to_shape_are_handed_back_as_they_are():
-    # This shapes settings; it does not invent them. A workflow with no length and
-    # no rate to set has neither.
     params = {"positive_prompt": "alpha", "seed": 3}
 
     assert gallery.cycle_shaped(params, WORKFLOW_REGISTRY["sdxl_t2i"]) == params

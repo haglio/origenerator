@@ -7,8 +7,6 @@ from PyQt6.QtGui import QFont, QPainter, QPixmap
 from shared_ui.colors import TEXT_MUTED
 from shared_ui.icons import draw_icon
 
-# The plus, as a fraction of a cell's side — big enough to read as the operator
-# joining them rather than as a mark on one of the cells.
 _PLUS_SHARE = 0.28
 _MIN_PLUS_SIDE = 12
 _PAREN_SHARE = 0.25

@@ -1,17 +1,7 @@
-"""Speak lines with Qwen3-TTS, for Origenerator -- run by path, under the
-Python of the environment Qwen3-TTS lives in, never imported by the app.
+"""Speak lines with Qwen3-TTS, for Origenerator: run by path under the Python of the
+environment Qwen3-TTS lives in, never imported by the app (the tests import only fit_to_seconds).
 
     python speech_worker.py job.json
-
-The job names the voice (a preset speaker, or a recording to copy and what it
-says), the seed, the device, the two model names, and the lines: each with the
-seconds its scene runs, which is exactly how long its file comes out -- the
-words, then silence to the end, so the mouth that follows this audio closes
-when the line is done rather than mouthing on. A line longer than its scene is
-cut at the scene's end; the log says so.
-
-Only :func:`fit_to_seconds` is imported by the app's tests; everything heavy
-is imported inside :func:`main`, so this file loads anywhere.
 """
 
 from __future__ import annotations
@@ -22,7 +12,6 @@ import time
 
 
 def fit_to_seconds(wave, rate: int, seconds: float):
-    """``wave`` padded with silence, or cut, to exactly ``seconds`` at ``rate``."""
     import numpy as np  # noqa: PLC0415
 
     wanted = int(round(seconds * rate))
@@ -33,8 +22,6 @@ def fit_to_seconds(wave, rate: int, seconds: float):
 
 
 def _load(model_name: str, device: str):
-    # torch is seconds plus a GPU handshake, and the model package comes with
-    # it: this worker is spawned per job, so neither is paid until there is one.
     import torch  # noqa: PLC0415
     from qwen_tts import Qwen3TTSModel  # noqa: PLC0415
 

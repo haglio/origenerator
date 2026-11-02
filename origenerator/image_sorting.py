@@ -1,4 +1,3 @@
-"""Which images still want an action said for them, and in what order."""
 from __future__ import annotations
 
 from origenerator import gallery
@@ -16,8 +15,6 @@ def _wants_sorting(row: dict) -> bool:
 
 
 def images_to_sort(rows: list[dict]) -> list[dict]:
-    """Every image nobody has said an action for: the favorites first, newest
-    backwards, and then the rest, newest backwards."""
     waiting = [row for row in rows if _wants_sorting(row)]
     return sorted(waiting, reverse=True,
                   key=lambda row: (bool(row.get("starred")),

@@ -1,10 +1,3 @@
-"""Persist small bits of UI state (open tabs, gallery folder) across launches.
-
-A thin JSON-backed key/value store kept deliberately Qt-free so the persistence
-logic is unit-testable on its own. Lives next to the generations database in the
-gitignored ``state/`` directory.
-"""
-
 from __future__ import annotations
 
 import json
@@ -31,8 +24,6 @@ class AppState:
         self._data[key] = value
 
     def save(self) -> None:
-        """Write the state to disk if it has changed since this store last wrote
-        it, replacing the file atomically."""
         text = json.dumps(self._data, indent=2)
         if text == self._last_written:
             return

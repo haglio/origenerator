@@ -1,18 +1,7 @@
 """The up/down triangles a styled spinner needs, drawn to disk once.
 
-Qt's stylesheet engine is not a web browser's: the CSS trick of collapsing an element to
-zero size and letting its borders meet as a triangle draws a filled rectangle
-here, which is exactly what appeared over the step buttons. And Qt takes an
-arrow only as an image — no data URIs, no shapes — so the arrows have to
-exist as files somewhere the stylesheet can name.
-
-They are generated rather than committed because they are two triangles: a few
-lines of code beats a pair of binaries in the tree, and generating them means
-the color comes from the same token the rest of the stylesheet uses instead of
-drifting from it the first time the palette moves.
-
-Written under ``state/ui`` (gitignored, alongside the thumbnail cache) once per
-color, and skipped when they are already there.
+Qt's stylesheet engine draws the CSS border-triangle trick as a filled rectangle, and takes an
+arrow only as an image file, so the arrows are written under ``state/ui`` for the stylesheet to name.
 """
 
 from __future__ import annotations
@@ -24,7 +13,7 @@ from origenerator.config import STATE_DIR
 
 logger = logging.getLogger(__name__)
 
-_WIDTH, _HEIGHT = 9, 5  # a small triangle, sized to sit in a 16px-wide button
+_WIDTH, _HEIGHT = 9, 5
 
 
 def _draw(path: Path, color: tuple, pointing_down: bool) -> None:
@@ -33,7 +22,6 @@ def _draw(path: Path, color: tuple, pointing_down: bool) -> None:
     image = Image.new("RGBA", (_WIDTH, _HEIGHT), (0, 0, 0, 0))
     pixels = image.load()
     for row in range(_HEIGHT):
-        # Widest at the base, one pixel narrower each row toward the point.
         inset = row if pointing_down else _HEIGHT - 1 - row
         for column in range(inset, _WIDTH - inset):
             pixels[column, row] = color
@@ -42,12 +30,6 @@ def _draw(path: Path, color: tuple, pointing_down: bool) -> None:
 
 
 def arrow_paths(color) -> tuple[str, str] | None:
-    """``(up, down)`` as stylesheet-ready paths, or ``None`` if they can't be made.
-
-    ``None`` leaves the caller to omit its arrow rules altogether, which is the
-    right fallback: Qt then draws its own arrow, and a native arrow of uncertain
-    color still beats a white rectangle.
-    """
     rgb = (color.red(), color.green(), color.blue(), 255)
     stem = f"spin_arrow_{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
     directory = STATE_DIR / "ui"
@@ -60,5 +42,5 @@ def arrow_paths(color) -> tuple[str, str] | None:
     except Exception as e:
         logger.warning("Could not draw the spinner arrows: %s", e)
         return None
-    # Forward slashes: a Windows backslash in a Qt stylesheet url() is an escape.
+    # Qt reads a backslash in a stylesheet url() as an escape.
     return up.as_posix(), down.as_posix()

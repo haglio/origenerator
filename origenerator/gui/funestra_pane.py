@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 from contextlib import ExitStack
+from dataclasses import dataclass
 
 from funestra.funestra import Channels, Funestra
 from funestra.funestra_verbs import RELOAD_PLAYLIST
@@ -57,15 +58,23 @@ class PaneChannel:
             self.send(verb)
 
 
+@dataclass(frozen=True)
+class PaneSound:
+    radio: object = None
+    volume: object = None
+    on_volume_moved: object = None
+
+
+NO_SOUND = PaneSound()
+
+
 class FunestraPane(QWidget):
-    def __init__(self, parent=None, *, channel: PaneChannel, user, hud, engine_for=None,
-                 radio=None, volume=None, on_volume_moved=None):
-        super().__init__(parent)
+    def __init__(self, *, channel: PaneChannel, user, hud, engine_for=None,
+                 sound: PaneSound = NO_SOUND):
+        super().__init__()
         self._user = user
         self._hud = hud
-        self._radio = radio
-        self._volume = volume
-        self._on_volume_moved = on_volume_moved
+        self._sound = sound
         self._engine_for = engine_for
         self._engine = None
         self._funestra: Funestra | None = None
@@ -124,11 +133,11 @@ class FunestraPane(QWidget):
         self._funestra = Funestra(
             engine, channels=Channels(), playlist=self.channel.items, audible=True,
             muted=self._muted, users={"slideshow": self._user}, hud=self._hud,
-            radio=None if self._radio is None else self._radio.held_by_a_slideshow(),
-            on_volume_moved=self._on_volume_moved)
+            radio=None if self._sound.radio is None else self._sound.radio.held_by_a_slideshow(),
+            on_volume_moved=self._sound.on_volume_moved)
         self._funestra.set_muted(self._muted)
-        if self._volume is not None:
-            self._funestra.set_volume(self._volume)
+        if self._sound.volume is not None:
+            self._funestra.set_volume(self._sound.volume)
         self._funestra.playback.set_paused(self._paused)
         self.channel.opened(self._funestra)
         self._running_ahead.enter_context(ahead_while_playing())

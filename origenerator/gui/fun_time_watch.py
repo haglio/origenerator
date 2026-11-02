@@ -18,9 +18,8 @@ class FunTimeWatch(QObject):
     def __init__(self, state_dir: Path, *, take_over: Callable[[FunTimeSession], None],
                  device_claimed: Callable[[bool], None] | None = None,
                  showing_on: Callable[[], str | None] | None = None,
-                 library_state_dir: Path | None = None,
-                 parent: QObject | None = None):
-        super().__init__(parent)
+                 library_state_dir: Path | None = None):
+        super().__init__()
         self._me = handoff.this_process()
         self._state_dirs = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
         self._take_over = take_over

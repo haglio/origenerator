@@ -226,7 +226,7 @@ class GalleryPaneButtons(QWidget):
                 icons.mic_icon(),
                 "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
-                "“weird”, “lock”), and orders about the image (“enhance”, “fix "
+                "“trash”, “lock”), and orders about the image (“enhance”, “fix "
                 "hands”, “animate as kino”)",
                 handlers.toggle_mic, checkable=True,
             )

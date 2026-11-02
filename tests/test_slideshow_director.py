@@ -1838,7 +1838,7 @@ def test_a_lock_said_over_a_slide_since_left_puts_that_slide_back_and_locks_it(s
     assert made[0].done == [("back to", 7.5), ("lock", True)]
 
 
-def test_weird_said_over_a_slide_since_left_puts_that_slide_back_and_takes_it_away(slideshows):
+def test_trash_said_over_a_slide_since_left_puts_that_slide_back_and_takes_it_away(slideshows):
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
@@ -2296,7 +2296,7 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(slideshows):
 def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows):
     """What a slideshow asks the gallery on its own behalf now includes what the
     library says about an item — and the star's undoing, for the Funestras'
-    "weird" over a favorite."""
+    "trash" over a favorite."""
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a red fox", seed=2)]
     director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows))
 

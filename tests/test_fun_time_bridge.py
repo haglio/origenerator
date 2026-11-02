@@ -219,13 +219,13 @@ class _SaidOverShow:
         self.done.append(("back to", said_at))
 
     def slideshow_cull(self):
-        self.done.append(("weird",))
+        self.done.append(("trash",))
 
     def set_locked(self, locked):
         self.done.append(("locked", locked))
 
 
-def test_a_spoken_weird_goes_back_to_the_slide_it_was_said_over_first(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_trash_goes_back_to_the_slide_it_was_said_over_first(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _SaidOverShow()
     monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
@@ -235,7 +235,7 @@ def test_a_spoken_weird_goes_back_to_the_slide_it_was_said_over_first(qtbot, tmp
         f"portrait_trash @{five_seconds_ago:.3f}\n", encoding="utf-8")
     bridge._tick()
 
-    assert show.done == [("back to", pytest.approx(time.monotonic() - 5.0, abs=1.0)), ("weird",)]
+    assert show.done == [("back to", pytest.approx(time.monotonic() - 5.0, abs=1.0)), ("trash",)]
 
 
 def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, tmp_path,

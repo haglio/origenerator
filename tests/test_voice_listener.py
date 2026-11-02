@@ -221,7 +221,7 @@ def _bare_listener(says):
         hearing=hearing, dictation=RequestDictation(),
         command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
         bare_matcher=lambda text: (
-            text.strip().lower() if text.strip().lower() in ("requests", "weird") else None
+            text.strip().lower() if text.strip().lower() in ("requests", "trash") else None
         ),
     )
     return listener, hearing
@@ -241,14 +241,14 @@ def test_a_word_a_request_opens_on_opens_one_whatever_else_it_matches(qtbot):
 
 
 def test_a_bare_command_word_is_the_command(qtbot):
-    listener, hearing = _bare_listener("weird")
+    listener, hearing = _bare_listener("trash")
     ran, spoken = [], []
     listener.request.connect(spoken.append)
     listener.start_commands(_into(ran))
 
     hearing.hear()
 
-    assert ran == ["weird"]
+    assert ran == ["trash"]
     assert spoken == []
 
 

@@ -9,8 +9,7 @@ the slideshow answers the same verb itself.
 
 The controls a Satellite's HUD carries in Kino mode too are
 :mod:`funestra.hud_controls`' declarations, in that HUD's order; this app adds
-its own words where a control does something else here (the lock, the trash,
-reset), and the two controls only a slideshow has (Enhanced only, Clip seconds).
+its own words where a control means something else here (reset), and the two controls only a slideshow has (Enhanced only, Clip seconds).
 
 Only what a slideshow answers is declared, which depends on what is drawing the
 HUD: the session's mode pair is drawn by a slideshow covering a region — but
@@ -31,6 +30,7 @@ from funestra.hud_controls import (
     fmode_button,
     funscript_jump_button,
     lock_button,
+    lock_tooltip,
     reset_button,
     transport,
     trash_button,
@@ -68,11 +68,6 @@ MODE_TOOLTIPS = {
 
 ENHANCED_ICON = shared_mark("enhance_filter")
 
-# What the controls that do something else here do, in this app's words: these
-# act on the generations this app made, so the bin is the toolbar's Delete and
-# the lock is the whole of what locking a slide means here.
-LOCK_TOOLTIP = "Lock this one on screen — favoriting it, and asking for a better version"
-TRASH_TOOLTIP = "Delete this one and move on"
 ENHANCED_TOOLTIP = "Enhanced only — play just the images that have been enhanced"
 # Reset means what the shape goes back TO, which is not the same in both places:
 # hosted it is the region's base state — that side's whole library, the way a
@@ -102,8 +97,8 @@ def slideshow_rows(shape: str, *, locked: bool = False, favorites_filter: bool =
         *transport(shape, noun=SLIDE, longer_than_a_step=longer_than_a_step, image=image),
         funscript_jump_button(f"{shape}_funscript_jump", noun=SLIDE, has_osr2=has_osr2,
                               has_funscript=has_funscript),
-        lock_button(shape, locked=locked, tooltip=LOCK_TOOLTIP),
-        trash_button(shape, TRASH_TOOLTIP),
+        lock_button(shape, locked=locked, tooltip=lock_tooltip(locked, SLIDE)),
+        trash_button(shape),
         fmode_button(shape, favorites_only_tooltip(), lit=favorites_filter),
         Button(f"{shape}_enhanced", ENHANCED_ICON, ENHANCED_TOOLTIP, lit=enhanced, enhanced=True,
                group_break=True),

@@ -686,7 +686,7 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot):
                                           enhance=lambda prompt_id: asked.append(prompt_id) or True))
     _press(view, Qt.Key.Key_E)                   # loop the seed row: id-a, id-b
 
-    view.slideshow.cull()                                  # weird the image on screen
+    view.slideshow.cull()                                  # trash the image on screen
     _settle(view)
 
     assert view.slideshow.locked is True
@@ -703,7 +703,7 @@ def test_an_image_taken_away_leaves_the_map_of_the_row_it_was_playing(qtbot):
                  actions=SlideshowActions(neighbors=_around, delete=deleted.append))
     _press(view, Qt.Key.Key_E)                   # play the seed row round: id-a, id-b
 
-    view.slideshow.cull()                                  # weird the image on screen
+    view.slideshow.cull()                                  # trash the image on screen
     _settle(view)
 
     assert deleted == ["id-a"]
@@ -959,7 +959,7 @@ def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbo
 
 
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_image(qtbot):
-    # The Funestras' "weird": a favorite loses its star and the slideshow moves on;
+    # The Funestras' "trash": a favorite loses its star and the slideshow moves on;
     # only an image wearing no star is condemned — so locking a slide, which
     # stars it, takes two presses of Up to undo all the way.
     unfavorited, deleted = [], []

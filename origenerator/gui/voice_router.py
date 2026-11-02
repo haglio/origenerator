@@ -41,9 +41,6 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     LATEST_KEY as _LATEST_KEY,
 )
-from origenerator.gallery.collection import (
-    TRASH_KEY as _TRASH_KEY,
-)
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
@@ -105,7 +102,6 @@ _COLLECTIONS = {
     AppCommand.LATEST: _LATEST_KEY,
     AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
-    AppCommand.TRASH: _TRASH_KEY,
 }
 
 # The driver's setter for each bar the numeric grid names

@@ -3007,9 +3007,9 @@ class GalleryView(QWidget):
         return self._slideshows.region_slideshow(shape)
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True):
-        """Favorite a generation from a fullscreen slideshow (its Down key) — the same
-        star the gallery's own control sets — or take the favorite back (its Up
-        key over a favorite, the Funestras' "weird" on one)."""
+        """Bookmark a generation from a fullscreen slideshow (its Down key) — the same
+        star the gallery's own control sets — or take the bookmark back (its Up
+        key over a favorite, the Funestras' "trash" on one)."""
         self.set_items_favorite([prompt_id], favorite)
 
     def trash_generation(self, prompt_id: str):

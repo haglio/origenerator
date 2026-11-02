@@ -29,8 +29,7 @@ from origenerator.db import Database
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
-    TRASH_KEY,
+    RECENTS_KEY,
 )
 from origenerator.gui import (
     combine_controller,
@@ -1123,7 +1122,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     assert match("make her hair longer") is None    # a sentence, not a command
     # The bare words are not in this one: they match whole utterances only,
     # which is what lets them be asked ahead of an opening request instead.
-    assert match("weird") is None
+    assert match("trash") is None
 
 
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
@@ -1194,8 +1193,7 @@ def _listening(qtbot, tmp_path, db=None):
 
 @pytest.mark.parametrize("said, key", [
     ("experiments", EXPERIMENTS_KEY),
-    ("trash", TRASH_KEY),
-    ("recents", LATEST_KEY),
+    ("recents", RECENTS_KEY),
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])
@@ -1220,13 +1218,13 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
 
 
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
-    # "weird" condemns what is on screen and a lock holds it — the two rooms are
+    # "trash" condemns what is on screen and a lock holds it — the two rooms are
     # one room to whoever is speaking.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._slideshows._slideshow = surface
 
-    view._voice.listener.speak("weird")
+    view._voice.listener.speak("trash")
     assert surface.culled == 1
 
     view._voice.listener.speak("lock")
@@ -1268,7 +1266,7 @@ def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_pat
     # and in the gallery it is the stop before — both are the one before.
     view = _listening(qtbot, tmp_path)
     first = _select_first_leaf(view)
-    view._voice.listener.speak("trash")            # a second stop to come back from
+    view._voice.listener.speak("experiments")      # a second stop to come back from
 
     view._voice.listener.speak("back")
 

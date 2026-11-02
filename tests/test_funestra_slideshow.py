@@ -1248,7 +1248,7 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
     slideshow.slideshow_loop("seed")                       # the row: one.png and one-b.png
     _sent(slideshow)
 
-    slideshow.slideshow_cull()                             # weird the image on screen
+    slideshow.slideshow_cull()                             # trash the image on screen
     sent = _sent(slideshow)
     _says(slideshow, video="one-b.png", locked=True)
     slideshow.tick()
@@ -1522,8 +1522,8 @@ def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
     assert (_sent(slideshow), said) == ([], ["Nothing that way"])
 
 
-def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
-    """The Funestras' own "weird": a favorite loses its star and the Funestra is
+def test_trash_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
+    """The Funestras' own "trash": a favorite loses its star and the Funestra is
     told to move on — nothing is dropped and nothing deleted."""
     unfavorited, deleted = [], []
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1"}),

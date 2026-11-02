@@ -942,6 +942,24 @@ def test_unlocking_lets_the_user_override_the_size(qtbot):
     assert values["height"] == 576
 
 
+def test_a_size_the_user_is_overriding_is_not_overwritten_when_the_input_image_changes(qtbot):
+    form = _sized_form(qtbot, size=(864, 480))
+    form._widgets["input_image"].set_item("frame.png")
+    form._unlock_btn.setChecked(True)
+    form._widgets["width"].setValue(1024)
+
+    form._widgets["input_image"].set_item("other.png")
+
+    assert form._widgets["width"].value() == 1024
+
+
+def test_every_label_elides_so_no_long_name_sets_a_floor_under_the_whole_form(qtbot):
+    form = _sized_form(qtbot)
+
+    assert form._labels
+    assert all(isinstance(label, ElidingLabel) for label in form._labels.values())
+
+
 def test_relocking_drops_the_override_and_restores_the_derived_size(qtbot):
     form = _sized_form(qtbot, size=(864, 480))
     form._widgets["input_image"].set_item("frame.png")

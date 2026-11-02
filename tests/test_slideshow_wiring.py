@@ -7,7 +7,7 @@ from funestra.testing import FakeEngine
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 
 _ITEMS = [("a.png", "image", "id-a", None), ("b.png", "image", "id-b", None)]
@@ -37,8 +37,8 @@ def wired(qtbot):
         reset=record("reset"),
         drive_toggle=record("drive_toggle"),
     )
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         actions=actions)
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
+                         actions=actions), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     return view, calls
 
@@ -59,7 +59,7 @@ def test_the_six_acts_travel_as_one_record_and_land_where_they_did(wired):
 
 
 def test_a_slideshow_handed_no_acts_at_all_just_does_less(qtbot):
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     _press(view, Qt.Key.Key_Down)
@@ -68,8 +68,8 @@ def test_a_slideshow_handed_no_acts_at_all_just_does_less(qtbot):
 
 
 def test_the_hud_facts_travel_as_one_record(qtbot):
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest", favorite_ids={"id-b"}))
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
+                         hud=HudFacts(order_label="Latest", favorite_ids={"id-b"})), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     assert view.slideshow.hud_order_label == "Latest"
@@ -80,7 +80,7 @@ def test_the_hud_facts_travel_as_one_record(qtbot):
 
 
 def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     assert (view.slideshow.hud_order_label, view.slideshow.hud_map().loop) == ("Shuffle", "")
@@ -88,8 +88,8 @@ def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
 
 
 def test_retuning_a_slideshow_dresses_it_as_a_base_state(qtbot):
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest", favorite_ids={"id-c"}))
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
+                         hud=HudFacts(order_label="Latest", favorite_ids={"id-c"})), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     view.slideshow.retune([("c.png", "image", "id-c", None)])

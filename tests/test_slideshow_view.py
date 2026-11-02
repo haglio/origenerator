@@ -25,7 +25,7 @@ from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.message import ERROR, FAVORITE, HEARD_MARK, WARNING, Message
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
@@ -59,7 +59,9 @@ class _Clock:
 
 def _view(qtbot, items=_ITEMS, **kw):
     kw.setdefault("shuffle", lambda order: None)
-    view = SlideshowView(items, engine=FakeEngine(), clock=_Clock(), **_wired(kw))
+    kw = _wired(kw)
+    wiring = {name: kw.pop(name) for name in ("motion", "radio", "volume") if name in kw}
+    view = SlideshowView(items, ViewShow(**kw), ViewWiring(engine=FakeEngine(), clock=_Clock(), **wiring))
     qtbot.addWidget(view)
     view.slideshow._timer.stop()
     return view
@@ -376,8 +378,8 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
 
 def test_culling_releases_the_lock(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None,
-                         actions=SlideshowActions(delete=lambda prompt_id: None))
+    view = SlideshowView(items, ViewShow(shuffle=lambda order: None,
+                         actions=SlideshowActions(delete=lambda prompt_id: None)), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Up)
@@ -387,8 +389,8 @@ def test_culling_releases_the_lock(qtbot):
 
 def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     motion = FakeMotion()
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         motion=motion)
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine(),
+                         motion=motion))
     qtbot.addWidget(view)
     assert view.hud_device is not None
     _press(view, Qt.Key.Key_Space)
@@ -408,8 +410,8 @@ def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
     deleted = []
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
              ("c.png", "image", "id-c")]
-    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None,
-                         actions=SlideshowActions(delete=deleted.append))
+    view = SlideshowView(items, ViewShow(shuffle=lambda order: None,
+                         actions=SlideshowActions(delete=deleted.append)), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     assert view.slideshow._set.playlist.current()[2] == "id-a"
 
@@ -422,7 +424,7 @@ def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
 
 def test_enter_leaves_for_the_shown_items_folder(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
+    view = SlideshowView(items, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     view.show()
     opened = []
@@ -436,7 +438,7 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
 
 def _collection_view(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
+    view = SlideshowView(items, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     _on_screen_wearing_its_hud(qtbot, view)
     opened = []
@@ -490,8 +492,7 @@ def test_closing_a_slideshow_twice_hands_over_once(qtbot):
 
 def test_culling_the_last_slide_hands_nothing_over(qtbot):
     deleted = []
-    view = SlideshowView([("a.png", "image", "id-a")], engine=FakeEngine(),
-                         shuffle=lambda order: None, actions=SlideshowActions(delete=deleted.append))
+    view = SlideshowView([("a.png", "image", "id-a")], ViewShow(shuffle=lambda order: None, actions=SlideshowActions(delete=deleted.append)), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     view.show()
     opened = []
@@ -1893,8 +1894,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
                     synthesize_actions(2.0, hz=1.0))
-    view = SlideshowView([(str(vid), "video")], engine=FakeEngine(),
-                         shuffle=lambda order: None)
+    view = SlideshowView([(str(vid), "video")], ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     target = view.slideshow.osr2_drive_target()
@@ -2372,9 +2372,8 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
 class TestMovingTheSlideshowsHud:
     @staticmethod
     def _slideshow(qtbot, moves):
-        slideshow = SlideshowView([("scene one.png", "image")], engine=FakeEngine(),
-                                  shuffle=in_order,
-                                  actions=SlideshowActions(move_hud=moves.append))
+        slideshow = SlideshowView([("scene one.png", "image")], ViewShow(shuffle=in_order,
+                                  actions=SlideshowActions(move_hud=moves.append)), ViewWiring(engine=FakeEngine()))
         qtbot.addWidget(slideshow)
         return slideshow
 
@@ -2681,7 +2680,7 @@ def test_a_closing_slideshow_is_off_the_screen_before_its_engine_lets_go(qtbot):
             super().close()
             seen["slideshow visible"] = view.isVisible()
 
-    view = SlideshowView(_ITEMS, engine=RecordingEngine(), shuffle=in_order)
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=in_order), ViewWiring(engine=RecordingEngine()))
     qtbot.addWidget(view)
     view.show()
 
@@ -2785,7 +2784,7 @@ def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_n
 
 
 def test_a_funestra_that_opens_after_the_pass_is_handed_over_takes_the_pace(qtbot):
-    view = SlideshowView(_ITEMS, shuffle=lambda order: None, clock=_Clock())
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(clock=_Clock()))
     qtbot.addWidget(view)
     assert _engine(view) is None
     engine = FakeEngine()

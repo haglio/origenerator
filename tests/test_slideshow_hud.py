@@ -22,7 +22,7 @@ from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
-from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import in_order
 from tests import gestures
@@ -40,7 +40,9 @@ def _inflight(key="j1", status="queued", cancel=None, **kw):
 
 def _window(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")), **kw):
     kw.setdefault("engine", FakeEngine())
-    window = SlideshowView(list(items), shuffle=in_order, **kw)
+    wiring = {name: kw.pop(name) for name in ("engine", "motion", "radio", "volume", "clock")
+              if name in kw}
+    window = SlideshowView(list(items), ViewShow(shuffle=in_order, **kw), ViewWiring(**wiring))
     qtbot.addWidget(window)
     return window
 
@@ -50,7 +52,7 @@ def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image"
     wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "open_in", "label_for")
             if name in kw}
     window = _window(qtbot, items, **kw)
-    window.wear_the_hud(shape, **wear)
+    window.wear_the_hud(shape, HudWear(**wear))
     return window
 
 
@@ -97,7 +99,7 @@ def test_an_undressed_slideshow_wears_nothing(qtbot):
 
 
 def test_a_slideshow_whose_funestra_is_not_open_yet_still_has_its_hud_ready(qtbot):
-    window = SlideshowView([("scene one.mp4", "video")], shuffle=in_order)
+    window = SlideshowView([("scene one.mp4", "video")], ViewShow(shuffle=in_order))
     qtbot.addWidget(window)
     window.wear_the_hud("portrait")
 
@@ -248,7 +250,7 @@ class TestTheOneHudASlideshowWears:
     def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
         window = self._window(qtbot)
         channel = tmp_path / "dashboard_cmd.txt"
-        window.wear_the_hud("portrait", dashboard_cmd_file=channel)
+        window.wear_the_hud("portrait", HudWear(dashboard_cmd_file=channel))
 
         window.press("portrait_next")
 
@@ -673,7 +675,7 @@ class TestASlideshowOverASessionsRegion:
         window.resize(900, 700)
         with qtbot.waitExposed(window):
             window.show()
-        window.wear_the_hud("portrait", dashboard_cmd_file=tmp_path / "dashboard_cmd.txt")
+        window.wear_the_hud("portrait", HudWear(dashboard_cmd_file=tmp_path / "dashboard_cmd.txt"))
         window._pane.tick()
         return window
 

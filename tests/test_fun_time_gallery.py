@@ -402,7 +402,7 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     stub.activateWindow = lambda: calls.append("activate")
     stub.set_audio_muted = lambda muted: None
     stub.slideshow = SimpleNamespace(set_paused=lambda paused: None, transport=_NoOsr2Word())
-    stub.wear_the_hud = lambda shape, **how: None
+    stub.wear_the_hud = lambda shape, wear: None
     view._slideshows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 
@@ -1635,8 +1635,8 @@ def _hud_label_for(view):
     worn = {}
 
     class _Slideshow:
-        def wear_the_hud(self, shape, **furnishings):
-            worn.update(furnishings)
+        def wear_the_hud(self, shape, wear):
+            worn.update(vars(wear))
 
     view._slideshows._wear_the_hud(_Slideshow(), "landscape")
     return worn["label_for"]

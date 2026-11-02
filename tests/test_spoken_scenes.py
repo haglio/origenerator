@@ -1,5 +1,3 @@
-"""Her lines, spoken: a scene with a line renders on the speech model, hearing
-the line, and the line plays over the foley in the file."""
 from __future__ import annotations
 
 import pytest
@@ -27,7 +25,6 @@ def _writer_audio(payload):
 
 
 def _model_chain(payload, node):
-    """The class names from a sampler's model input back to its loader."""
     chain = []
     ref = node["inputs"]["model"]
     while ref is not None:
@@ -38,9 +35,6 @@ def _model_chain(payload, node):
 
 
 def test_a_scene_with_a_line_renders_on_the_speech_model_hearing_that_line():
-    # Scenes one and three speak, so their segments render on the speech
-    # model, each hearing its scene's line for its own frames; scene two says
-    # nothing and renders on the two experts as it always has.
     params = _spoken_params()
     payload = Wan22I2vWorkflow().build_api_payload(params)
     spoken = _nodes(payload, "WanSoundImageToVideo")
@@ -57,7 +51,6 @@ def test_a_scene_with_a_line_renders_on_the_speech_model_hearing_that_line():
         assert (cut["inputs"]["start_index"], cut["inputs"]["duration"]) == (0.0, pytest.approx(161 / 16))
         line = payload[cut["inputs"]["audio"][0]]
         assert (line["class_type"], line["inputs"]["audio"]) == ("LoadAudio", file)
-    # its own scene's text, and the size every segment shares
     assert payload[spoken[1]["inputs"]["positive"][0]]["inputs"]["text"] == "she speaks"
     assert spoken[0]["inputs"]["width"] == _nodes(payload, "WanImageToVideo")[0]["inputs"]["width"]
 
@@ -75,13 +68,10 @@ def test_a_speaking_segment_samples_the_speech_model_under_its_lightning_lora():
         loader = payload[lora["inputs"]["model"][0]]
         assert loader["inputs"]["unet_name"] == "wan2.2_s2v_14B_fp8_scaled.safetensors"
         assert "lightx2v" in lora["inputs"]["lora_name"]
-    # the experts still sample the silent scene, on their own models
     assert len(_nodes(payload, "KSamplerAdvanced")) == 2
 
 
 def test_a_speaking_segment_starts_on_the_frame_before_it_and_carries_its_motion():
-    # The speech model takes the last frame as its reference and, given the
-    # frames before it, continues their motion rather than starting still.
     payload = Wan22I2vWorkflow().build_api_payload(_spoken_params())
     first, third = _nodes(payload, "WanSoundImageToVideo")
     scaled = next(nid for nid, n in payload.items()
@@ -103,18 +93,11 @@ def test_a_spoken_scene_longer_than_one_window_hears_its_line_window_by_window()
                for seg in spoken]
     assert [(w["start_index"], w["duration"]) for w in windows] == [
         (0.0, pytest.approx(161 / 16)), (pytest.approx(160 / 16), pytest.approx(81 / 16))]
-    # both windows read the one file the scene's line is
     assert len({payload[w["audio"][0]]["inputs"]["audio"] for w in windows}) == 1
-    # and the second carries the first's motion
     assert spoken[1]["inputs"]["ref_motion"] == payload[spoken[1]["inputs"]["ref_image"][0]]["inputs"]["image"]
 
 
 def test_the_writer_hears_her_line_where_she_speaks_and_the_foley_where_she_does_not():
-    # The foley scores what it sees, and shown a woman talking it scores a
-    # garbled voice under hers; so the file's track is her line for a scene
-    # that speaks, and the foley's own stretch for one that does not: scene
-    # one's line cut to the frames it adds, the foley from 10 s for scene two,
-    # scene three's whole line, end to end.
     payload = Wan22I2vWorkflow().build_api_payload(_spoken_params())
     join = _writer_audio(payload)
     assert join["class_type"] == "AudioConcat"

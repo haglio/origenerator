@@ -22,8 +22,6 @@ def test_copies_fixed_text(qtbot):
 
 
 def test_copies_a_live_value_read_at_click_time(qtbot):
-    # An editable field's value changes after the button is built; the copy must
-    # reflect what's in the field when clicked, not what it held at construction.
     edited = {"value": "first"}
     btn = CopyButton(lambda: edited["value"])
     qtbot.addWidget(btn)
@@ -40,10 +38,6 @@ def test_is_a_button_tagged_for_styling_and_lookup(qtbot):
 
 
 def test_wears_the_familys_copy_mark(qtbot):
-    # Fun Time's log panel has a copy button too, and each app drew its own
-    # two-sheets glyph at its own proportions -- the same drift the microphone
-    # had. Both now come out of shared_ui, so the mark is one drawing.
-
     btn = CopyButton("x")
     qtbot.addWidget(btn)
     side = int(CANVAS)

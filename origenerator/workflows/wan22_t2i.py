@@ -7,32 +7,15 @@ from origenerator.workflows.wan_experts import wan_expert_shift_param
 
 
 class Wan22T2iWorkflow(WorkflowTemplate):
-    """WAN 2.2 14B T2I, dual-noise (high/low) sampling.
-
-    The WAN 2.2 T2V model has no still-image mode, so this coaxes one out of it:
-    a tiny ``EmptyHunyuanLatentVideo`` is denoised by two ``KSamplerAdvanced``
-    passes (high-noise model for the first half of the steps, low-noise for the
-    second), and ``ImageFromBatch`` keeps the first frame, which ``SaveImage``
-    writes as a PNG. No input image and no CLIP-Vision — conditioning is text
-    only, which is what separates it from :class:`Wan22I2vWorkflow`.
-
-    The ``enhance`` toggle (off by default) appends the shared enhance tail
-    (:meth:`WorkflowTemplate.enhance_image_nodes`) to the kept frame: a model
-    upscale, then a low-denoise re-sample on the LOW-noise model's chain — the
-    stage WAN 2.2 itself uses for late-step refinement — with the same text
-    conditioning and VAE, so the enlargement carries generated texture rather
-    than interpolated pixels.
-    """
-
     name = "wan22_t2i"
     version = "v002"
     display_name = "WAN 2.2 T2I"
     output_type = MediaType.IMAGE
     model_keys = ("unet_high", "unet_low")
     text_reader = UMT5
-    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
+    extra_enhance_keys = ("upscale_model",)
     output_node_id = "14"
-    base_output_node_id = "21"  # the pre-enhance frame, saved when the tail runs
+    base_output_node_id = "21"
 
     def default_params(self) -> dict:
         return {
@@ -84,12 +67,8 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     def build_api_payload(self, params: dict) -> dict:
         half_steps = params["steps"] // 2
         enhance_nodes: dict = {}
-        enhanced_ref = ["13", 0]  # enhance off: save the kept frame as-is
+        enhanced_ref = ["13", 0]
         if params.get("enhance"):
-            # Re-sample on the low-noise chain ("6") — WAN 2.2's own refinement
-            # stage — with the same conditioning and VAE as the base pass. The
-            # WAN VAE encodes the kept frame as a one-frame video latent, which
-            # is exactly the shape the t2i pass itself denoises.
             tail = self.enhance_image_nodes(
                 image_ref=["13", 0], model_ref=["6", 0],
                 positive_ref=["7", 0], negative_ref=["8", 0], vae_ref=["2", 0],
@@ -194,7 +173,5 @@ class Wan22T2iWorkflow(WorkflowTemplate):
                 },
             },
             **enhance_nodes,
-            # With the tail on, keep the base frame too — it is made on the way
-            # and would otherwise be discarded, leaving no original.
             **self.base_save_node(self.base_output_node_id, ["13", 0], params),
         }

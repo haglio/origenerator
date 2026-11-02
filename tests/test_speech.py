@@ -1,4 +1,3 @@
-"""Her lines, spoken: which files a story's scenes need and how they are made."""
 from __future__ import annotations
 
 import json
@@ -19,8 +18,6 @@ def _params(**overrides):
             **overrides}
 
 
-# ---- what each scene says ----------------------------------------------------
-
 
 def test_a_scene_with_no_line_says_nothing():
     assert scene_speech(_params()) == [None]
@@ -28,8 +25,6 @@ def test_a_scene_with_no_line_says_nothing():
 
 
 def test_a_workflow_without_lines_has_no_scenes_to_speak():
-    # A still's settings carry no scene_lines (nor a frame count to read them
-    # against), so nothing in them speaks.
     assert scene_speech({"positive_prompt": "a still", "seed": 1}) == []
     assert speech.missing_speech({"positive_prompt": "a still"}, Path("nowhere")) == []
 
@@ -45,8 +40,6 @@ def test_each_scene_speaks_its_own_line_for_its_own_seconds():
 
 
 def test_a_lone_scene_speaks_for_the_clip_length_whatever_its_own_entry_says():
-    # The graph runs a lone scene for the video length (scene_plan), so its
-    # line lasts that long too.
     spoken = scene_speech(_params(frame_count=121, scene_frames=[81], scene_lines=["hi"]))
     assert spoken[0].frames == 121
 
@@ -62,10 +55,17 @@ def test_a_lines_file_is_named_from_everything_that_shapes_it():
                                 voice_sample="C:/v/her.wav"))[0].file != base
 
 
+def test_lines_already_on_disk_are_spoken_again_after_the_worker_changes_what_it_says(monkeypatch):
+    before = scene_speech(_params(scene_lines=["hi"]))[0].file
+
+    monkeypatch.setattr(speech, "SPEECH_VERSION", speech.SPEECH_VERSION + 1)
+
+    assert scene_speech(_params(scene_lines=["hi"]))[0].file != before
+
+
 def test_the_voice_is_a_preset_unless_the_custom_one_is_chosen():
     assert voice_request(_params()) == {"mode": "preset", "speaker": "Vivian"}
     assert voice_request(_params(voice=""))["speaker"] == speech.VOICE_PRESETS[0]
-    # a recording named under a preset voice is not what speaks
     assert voice_request(_params(voice="Serena", voice_sample="C:/v/her.wav"))["mode"] == "preset"
     assert voice_request(_params(voice=speech.CUSTOM_VOICE, voice_sample=" C:/v/her.wav ",
                                  voice_sample_text=" Hello. ")) == {
@@ -83,12 +83,8 @@ def test_a_custom_voice_without_a_recording_is_a_plain_error(tmp_path):
             input_dir=tmp_path, python=Path("py"), run=run)
 
 
-# ---- making the files --------------------------------------------------------
-
 
 def _speaking_run(input_dir):
-    """A stand-in for the worker: writes the files the job names, and records
-    what it was run with."""
     calls = []
 
     def run(cmd, **kwargs):
@@ -131,7 +127,7 @@ def test_the_missing_lines_are_spoken_by_the_worker_under_the_speech_python(tmp_
     assert [(item["text"], item["seconds"]) for item in job["items"]] == [
         ("Come in.", pytest.approx(161 / 16)), ("Sit.", pytest.approx(81 / 16))]
     assert [item["out"] for item in job["items"]] == [str(path) for path in made]
-    assert not list((tmp_path / SPEECH_DIR).glob("job_*.json"))  # the job file is cleared
+    assert not list((tmp_path / SPEECH_DIR).glob("job_*.json"))
 
 
 def test_only_the_lines_without_a_file_are_spoken(tmp_path):
@@ -166,8 +162,6 @@ def test_a_worker_that_fails_or_writes_nothing_is_an_error_with_its_words(tmp_pa
         speech.ensure_speech_files(_params(scene_lines=["hi"]), input_dir=tmp_path,
                                    python=Path("py"), run=silent)
 
-
-# ---- the worker's own arithmetic ------------------------------------------------
 
 
 def test_a_line_is_padded_with_silence_or_cut_to_its_scenes_seconds():

@@ -1,5 +1,3 @@
-"""What else in the library a shown generation is tied to: the links under a
-Generate tab's settings form, fed one row at a time."""
 from __future__ import annotations
 
 import pytest
@@ -35,8 +33,6 @@ def _video_row(prompt_id="vid1", input_image="sdxl_t2i_img1.png"):
 
 
 def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.png"):
-    """One cycle cut out of a video. It carries the video's params, start frame
-    and all — which is what makes the order of the links matter."""
     return {
         "prompt_id": prompt_id, "workflow_name": "wan22_i2v",
         "created_at": "2026-01-02 03:06:07",
@@ -53,22 +49,17 @@ def _combined_row(prompt_id="made1", source_video="vid0"):
 
 
 def _request(prompt_id, source_prompt_id, asked=""):
-    """The record a request leaves, with its words, or a folder's Modify, with none."""
     return {"prompt_id": prompt_id, "source_prompt_id": source_prompt_id,
             "heard": "", "asked": asked}
 
 
 def _links(section):
-    """(heading, prompt id) for each link a section shows, in its order."""
     return [(tile._heading.text(), tile._prompt_id)
             for tile in section.findChildren(SourceTile) if not tile.isHidden()]
 
 
 @pytest.fixture
 def make_related(qtbot):
-    """Build a RelatedMedia over a given set of the library's videos, any other
-    rows, the items the Trash holds and the request records it can look up,
-    counting every time it asks for the videos."""
     def _make(*videos, rows=(), held=(), requests=()):
         by_id = {row["prompt_id"]: row for row in (*videos, *rows)}
         by_made = {record["prompt_id"]: record for record in requests}
@@ -110,7 +101,7 @@ def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
 
     assert not related._source_tile.isHidden()
     assert related._source_tile._prompt_id == "img1"
-    assert related._animations.isHidden()   # a video is animated into nothing
+    assert related._animations.isHidden()
 
 
 def test_the_start_image_is_called_by_its_name_not_its_file(related):
@@ -212,16 +203,14 @@ def test_an_image_lists_the_videos_it_was_animated_into(make_related):
 
     assert not related._animations.isHidden()
     assert len(related._animations.findChildren(_VideoTile)) == 1
-    assert related._source_tile.isHidden()      # an image has no start frame
+    assert related._source_tile.isHidden()
 
 
 def _animated(related):
-    """The prompt id of each video in the image's Animations, in its order."""
     return [tile._prompt_id for tile in related._animations._host.findChildren(_VideoTile)]
 
 
 def _drawn_links(related, row, image_rows):
-    """(made from, made into) for each link the pane draws on *row*."""
     related.show_row(row, image_rows)
     QApplication.processEvents()
     shown = row["prompt_id"]
@@ -276,7 +265,6 @@ def test_an_image_lists_the_videos_in_the_trash_it_was_animated_into(make_relate
 
 
 def test_a_cut_is_not_among_the_animations_of_the_image_its_clip_was_made_from(make_related):
-    # The cut's own link goes to its clip, so the image has no link to give back.
     image = _image_row()
     related = make_related(_video_row(), _trim_row())
 
@@ -390,8 +378,6 @@ def test_a_click_on_a_requested_into_link_names_that_image(make_related):
 
 
 def test_a_click_that_shows_the_image_it_names_outlives_its_own_link(make_related, qtbot):
-    # Following the link shows that image, whose links replace the one clicked
-    # while its click is still being handled.
     made = _image_row("img2", "sdxl_t2i_img2.png")
     related = make_related(rows=[_image_row(), made],
                            requests=[_request("img2", "img1", asked="two dogs")])
@@ -465,7 +451,6 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
     assert not related._source_tile.isHidden()
     assert related._source_tile._prompt_id == "vid1"
     assert related._source_tile._heading.text() == "Trimmed from"
-    # The first source that is a video, so the item type icon has to follow what it shows.
     assert related._source_tile._item_type_icon.media_type == "video"
 
 
@@ -480,9 +465,6 @@ def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
 
 
 def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):
-    # A cut carries its source's params, start frame included. Asking for a start
-    # frame first would answer with the image the ORIGINAL was animated from and
-    # quietly send the link past the video the user is actually looking for.
     video = _video_row()
     related = make_related(video)
 
@@ -492,8 +474,6 @@ def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_rela
 
 
 def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
-    # The video was deleted out from under it. The relation it can still show is
-    # the one its copied params carry, rather than an empty drop zone.
     related = make_related()
 
     related.show_row(_trim_row(trimmed_from="deleted"), [_image_row()])
@@ -652,7 +632,6 @@ def test_a_source_video_in_the_trash_keeps_its_link(make_related):
 
 
 def test_an_image_lists_every_video_it_was_animated_into_however_many(make_related):
-    # Each of them links back to the image, so each is linked from it.
     image = _image_row()
     videos = [_video_row(f"vid{n}") for n in range(20)]
     related = make_related(*videos)

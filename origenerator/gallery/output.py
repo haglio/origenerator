@@ -8,24 +8,15 @@ from pathlib import Path
 
 from origenerator.evolver_upscales import UPSCALE_SUFFIX
 from origenerator.file_refs import frame_name
-from origenerator.gallery.signatures import READINGS_KEPT, workflow_output_type
+from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.one_look import is_file
+from origenerator.output_files import READINGS_KEPT, parse_file_list
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path, generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
-
-def parse_file_list(raw) -> list[dict]:
-    if not raw:
-        return []
-    try:
-        files = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return []
-    return files if isinstance(files, list) else []
-
 
 def row_output_files(row: dict) -> list[dict]:
     return parse_file_list(row.get("output_files"))
@@ -52,15 +43,6 @@ def _renamed(entry, renamed: dict[str, str]):
 def frame_names_of(output_files: str | None) -> tuple[str, ...]:
     names = (frame_name(f.get("filename")) for f in parse_file_list(output_files))
     return tuple(name for name in names if name)
-
-
-def produced_output(row: dict) -> bool:
-    return _lists_a_file(row.get("output_files"))
-
-
-@lru_cache(maxsize=READINGS_KEPT)
-def _lists_a_file(output_files: str | None) -> bool:
-    return bool(parse_file_list(output_files))
 
 
 def is_in_progress(row: dict) -> bool:

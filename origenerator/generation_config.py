@@ -5,6 +5,7 @@ import random
 from dataclasses import dataclass
 
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.output_files import produced_output
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
 
@@ -72,15 +73,6 @@ def configs_match(a: ConfigSnapshot, b: ConfigSnapshot) -> bool:
             and _params_identical(a.params, b.params))
 
 
-def _recorded_an_output(row: dict) -> bool:
-    # Not gallery.output.produced_output: origenerator.gallery imports this module
-    try:
-        files = json.loads(row.get("output_files") or "[]")
-    except (json.JSONDecodeError, TypeError):
-        return False
-    return isinstance(files, list) and bool(files)
-
-
 def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     if snapshot.seed_is_random:
         return None
@@ -96,7 +88,7 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
 
 def reproducible(row: dict) -> bool:
     return (row.get("status") == GenerationStatus.COMPLETED
-            and _recorded_an_output(row)
+            and produced_output(row)
             and source_of(row) == GenerationSource.GENERATED)
 
 

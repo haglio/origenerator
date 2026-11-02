@@ -349,7 +349,7 @@ def test_a_folder_left_open_inside_a_folder_of_your_own_is_open_again_after_a_re
 
 
 def test_all_opens_on_the_first_build_and_stays_shut_once_the_user_shuts_it(qtbot):
-    pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")], lambda _model: ())
+    _pane, tree, model = _gathered_tree(qtbot, [_image("i1", "a cat")], lambda _model: ())
     [all_row] = [tree.item_by_key[key] for key in tree.keys_for_folder(gallery.ALL_KEY)
                  if base_of(key) == gallery.ALL_KEY and shape_of(key) == LANDSCAPE]
     assert all_row.isExpanded()

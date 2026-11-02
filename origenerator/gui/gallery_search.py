@@ -24,7 +24,7 @@ class SearchHost(Protocol):
 
     def group_for_key(self, key: str): ...
 
-    def show_search_results(self, tiles, **terms) -> None: ...
+    def show_search_results(self, tiles, terms: search.SearchTerms) -> None: ...
 
     def name_search_on_screen(self, query: str, scope) -> None: ...
 
@@ -122,13 +122,12 @@ class GallerySearchController(QObject):
         self._host.name_search_on_screen(self._query, scope)
         self._count.setText(self._count_text())
         self.bar.show()
-        self._host.show_search_results(
-            self._tiles, sort_mode=self._sort,
-            query=self._query, outcome=self._outcome,
+        self._host.show_search_results(self._tiles, search.SearchTerms(
+            sort_mode=self._sort, query=self._query, outcome=self._outcome,
             scope=scope.path, collapsed=self._collapsed,
             on_section_toggled=self._on_section_toggled,
             still_searching=self._widening_awaited,
-        )
+        ))
         self._host.search_results_drawn()
 
     def leave(self, *_args) -> None:

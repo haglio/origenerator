@@ -28,7 +28,7 @@ from origenerator.gallery.collection import (
     FolderCollection,
     folder_collection,
 )
-from origenerator.gallery.placement import Placement
+from origenerator.gallery.placement import PaneModel, Placement
 from origenerator.gui import icons
 from origenerator.gui.collapsible_section import FOLD, FoldHeader
 from origenerator.gui.corner_buttons import enhance_state
@@ -252,6 +252,13 @@ class LeadTiles:
 
 
 @dataclass(frozen=True)
+class TreeNavigation:
+    selected_folder_key: Callable[[], str | None]
+    folder_context: Callable[[str], str]
+    group_for_key: Callable[[str], object]
+
+
+@dataclass(frozen=True)
 class PaneHost:
     image_rows: Callable[[], list]
     animated_preview: Callable[[dict], str | None]
@@ -259,13 +266,7 @@ class PaneHost:
     experiments_enabled: Callable[[], bool]
     lead_tiles: Callable[[object], LeadTiles]
     item_name: Callable[[str], str]
-
-
-@dataclass(frozen=True)
-class TreeNavigation:
-    selected_folder_key: Callable[[], str | None]
-    folder_context: Callable[[str], str]
-    group_for_key: Callable[[str], object]
+    tree: TreeNavigation
 
 
 @dataclass(frozen=True)
@@ -291,17 +292,15 @@ class GalleryPane(QObject):
     selection_changed = pyqtSignal()
     pane_reset = pyqtSignal()
 
-    def __init__(self, scroll, db, jobs, auto, tree: TreeNavigation,
-                 host: PaneHost):
+    def __init__(self, scroll, db, jobs, auto, host: PaneHost):
         super().__init__()
         self._scroll = scroll
         self._db = db
         self._jobs = jobs
-        self._auto = auto
-        self._tree = tree
+        self._tree = host.tree
         self._host = host
         self._queue_model = InFlightItems(
-            db=db, jobs=jobs, auto=auto, tree=tree,
+            db=db, jobs=jobs, auto=auto, tree=self._tree,
             image_rows=host.image_rows,
             image_index=lambda: self._image_index,
             on_cancel=self.cancel_requested.emit,
@@ -358,17 +357,16 @@ class GalleryPane(QObject):
     def model_stamp(self) -> int:
         return self._models_taken
 
-    def set_model(self, recent_rows, shape_trees, listed_rows, experiment_rows,
-                  trash_rows, image_index=None):
+    def set_model(self, model: PaneModel):
         self._models_taken += 1
-        self._recent_rows = _Listing(recent_rows)
-        self._listed = _Listing(listed_rows)
-        self._enhanced_rows = _Listing(gallery.enhanced_generations(listed_rows))
-        self._experiment_rows = _Listing(experiment_rows)
-        self._trash_rows = _Listing(trash_rows)
-        self._image_index = image_index or {}
+        self._recent_rows = _Listing(model.recent_rows)
+        self._listed = _Listing(model.listed_rows)
+        self._enhanced_rows = _Listing(gallery.enhanced_generations(model.listed_rows))
+        self._experiment_rows = _Listing(model.experiment_rows)
+        self._trash_rows = _Listing(model.trash_rows)
+        self._image_index = model.image_index or {}
         self._placements = {shape: Placement(gallery.all_group(tree), self._image_index)
-                            for shape, tree in shape_trees.items()}
+                            for shape, tree in model.shape_trees.items()}
 
     def _open_collection_rows(self, collection: str) -> list[dict]:
         return self._collections[collection].rows(self._collection_shape,
@@ -499,18 +497,17 @@ class GalleryPane(QObject):
               for row in rows),
             *(_Entry(folder(group), folder=group.key) for group in groups)])
 
-    def show_search_results(self, tiles, *, sort_mode: str, query: str, outcome,
-                            scope: str = "", collapsed=(), on_section_toggled=None,
-                            still_searching: bool = False):
+    def show_search_results(self, tiles, terms: search.SearchTerms):
         self._reset_pane_state()
         if not tiles:
             self.show_widget(self._empty_state(
-                "" if still_searching else _search_empty_hint(outcome, query, scope)))
+                "" if terms.still_searching
+                else _search_empty_hint(terms.outcome, terms.query, terms.scope)))
             self._showing_search = True
             return
         drawn = list(tiles)[:SEARCH_DRAW_LIMIT]
-        container = self._sectioned_results(drawn, collapsed, on_section_toggled) \
-            if sort_mode == search.SORT_MODEL_LORA else self._flat_results(drawn)
+        container = self._sectioned_results(drawn, terms.collapsed, terms.on_section_toggled) \
+            if terms.sort_mode == search.SORT_MODEL_LORA else self._flat_results(drawn)
         self.show_widget(container)
         self._showing_search = True
 

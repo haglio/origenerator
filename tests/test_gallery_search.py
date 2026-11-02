@@ -53,8 +53,8 @@ class FakeHost:
     def group_for_key(self, key: str):
         return self.groups.get(key)
 
-    def show_search_results(self, tiles, **terms):
-        self.shown.append((list(tiles), terms))
+    def show_search_results(self, tiles, terms):
+        self.shown.append((list(tiles), vars(terms)))
 
     def name_search_on_screen(self, query: str, scope) -> None:
         self.headers.append((query, scope.path))

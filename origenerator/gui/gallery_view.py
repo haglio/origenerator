@@ -101,6 +101,7 @@ from origenerator.gui.gallery_pane import (
     GalleryPaneScrollArea,
     LeadTiles,
     PaneHost,
+    PaneModel,
     TreeNavigation,
 )
 from origenerator.gui.gallery_pane_buttons import (
@@ -362,11 +363,6 @@ class GalleryView(QWidget):
         DropTarget(self._scroll, self._landing_in_the_open_custom_collection, self._on_dropped)
         self._gallery_pane = GalleryPane(
             self._scroll, db, self._jobs, self._auto,
-            TreeNavigation(
-                selected_folder_key=self.selected_folder_key,
-                folder_context=self._folder_context,
-                group_for_key=self.group_for_key,
-            ),
             PaneHost(
                 image_rows=lambda: self._image_rows,
                 animated_preview=self.animated_preview,
@@ -374,6 +370,11 @@ class GalleryView(QWidget):
                 experiments_enabled=self.experiments_enabled,
                 lead_tiles=self._lead_tiles,
                 item_name=self._item_names.of,
+                tree=TreeNavigation(
+                    selected_folder_key=self.selected_folder_key,
+                    folder_context=self._folder_context,
+                    group_for_key=self.group_for_key,
+                ),
             ),
         )
         self._gallery_pane.pane_reset.connect(self._forget_generating_tile)
@@ -1062,14 +1063,14 @@ class GalleryView(QWidget):
             self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()
         bumped = gallery.enhancement_recency(rows)
-        self._gallery_pane.set_model(
+        self._gallery_pane.set_model(PaneModel(
             gallery.recent_generations(rows, bumped=bumped),
             trees,
             rows,
             self._review_queue(rows),
             self._held_rows,
             image_index=start_frames,
-        )
+        ))
         self._tree_view.populate(
             self._build_sides(trees), folder_meta=meta,
             recently_worked=gallery.recently_worked_folders(trees, rows, bumped=bumped),
@@ -1179,8 +1180,8 @@ class GalleryView(QWidget):
         self._avg_label.setText("")
         self._experiments_bar.hide()
 
-    def show_search_results(self, tiles, **terms) -> None:
-        self._gallery_pane.show_search_results(tiles, **terms)
+    def show_search_results(self, tiles, terms) -> None:
+        self._gallery_pane.show_search_results(tiles, terms)
 
     def search_results_drawn(self) -> None:
         self._re_aim()

@@ -1,16 +1,3 @@
-"""Working out what a request changes, off the UI thread.
-
-Applying a request is arithmetic on two strings until the prompt doesn't happen
-to contain the words the speaker used — at which point the local LLM is asked
-which of the prompt's own terms they meant, and that is a second or two of
-network wait. On the UI thread that is a second or two of frozen slideshow,
-mid-sentence, which is the one moment the app must not stutter.
-
-So the whole revision runs on the global pool, as an utterance's transcription
-already does, and comes back through a signal. :class:`RevisionWorker` carries
-one injected ``apply`` callable so the flow unit-tests inline, without a model
-or a server; :class:`ReviseTask` is one run of it on the pool.
-"""
 from __future__ import annotations
 
 import logging
@@ -21,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class RevisionWorker(QObject):
-    # (context, revision-or-None) — the caller's own context handed straight
-    # back, so it can pick up where it left off without holding state here.
     revised = pyqtSignal(object, object)
 
     def __init__(self, apply_fn, parent=None):
@@ -32,13 +17,6 @@ class RevisionWorker(QObject):
     @pyqtSlot(object, str, str, str, bool)
     def revise(self, context, positive: str, negative: str, request: str,
                in_scenes: bool = False) -> None:
-        """Work out what ``request`` does to the prompt pair and emit it.
-
-        Never raises: a model that is down or answers nonsense is the ordinary
-        case here, not an error — the request is still applied, just by the
-        words alone. A revision of ``None`` means the request named nothing to
-        act on, which the caller says out loud.
-        """
         try:
             revision = self._apply(positive, negative, request, in_scenes=in_scenes)
         except Exception as exc:
@@ -48,9 +26,6 @@ class RevisionWorker(QObject):
 
 
 class ReviseTask(QRunnable):
-    """Runs one ``RevisionWorker.revise`` off the UI thread; the worker's signal
-    carries the result back to the thread that owns it."""
-
     def __init__(self, worker: RevisionWorker, *asked, in_scenes: bool):
         super().__init__()
         self._worker = worker
@@ -58,15 +33,7 @@ class ReviseTask(QRunnable):
         self._in_scenes = in_scenes
 
     def run(self):
-        """Work the revision out, and let go of an answer nobody is left to hear.
-
-        The window can close while the model is still thinking — the request is
-        seconds of network wait by construction — and closing it takes the
-        worker's C++ object with it. This thread is then holding a handle to
-        nothing, and the emit raises on a pool thread where nothing catches it:
-        Qt's own handler prints it into whatever is running next, which is how
-        one abandoned request failed an unrelated test three files later.
-        """
+        """Closing the window deletes the worker's C++ object, and the emit then raises on a pool thread, where Qt prints it into whatever runs next."""
         try:
             self._worker.revise(*self._asked, self._in_scenes)
         except RuntimeError:

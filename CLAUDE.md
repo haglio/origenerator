@@ -385,7 +385,7 @@ both run the primary's venv with `ORIGENERATOR_BRANCH_SESSION=1`, and both read
 and write the LIVE install's library from whichever checkout starts them
 (`config.LIBRARY_STATE_DIR`). That last part is deliberate: a branch's own
 database is one nobody will ever animate from, so a run of either spent on it
-would be lost. `tests/test_launcher_contract.py` holds both to that.
+would be lost. `tests/test_the_library_windows_launchers.py` holds both to that.
 
 - `sort_images.vbs` -> `origenerator.sort_images` -- says what each image
   shows, a press apiece. The vocabulary is the overlay's `image_states` and

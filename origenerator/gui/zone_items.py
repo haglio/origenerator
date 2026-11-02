@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator import gallery
@@ -42,15 +43,21 @@ class FilesOnly:
         return reference_path(held, places=self._places, input_dir=self._input_dir)
 
 
+@dataclass(frozen=True)
+class ZoneFolders:
+    places: OutputPlaces
+    input_dir: Path
+    thumb_dir: Path
+
+
 class ZoneItems(FilesOnly):
-    def __init__(self, db, names, library: LibraryViews, *,
-                 places: OutputPlaces, input_dir: Path, thumb_dir: Path,
+    def __init__(self, db, names, library: LibraryViews, folders: ZoneFolders, *,
                  moving_preview: Callable[[dict], str | None]):
-        super().__init__(places=places, input_dir=input_dir)
+        super().__init__(places=folders.places, input_dir=folders.input_dir)
         self._db = db
         self._names = names
         self._library = library
-        self._thumb_dir = thumb_dir
+        self._thumb_dir = folders.thumb_dir
         self._moving_preview = moving_preview
 
     def lends(self, prompt_id: str, kind: MediaType) -> str | None:

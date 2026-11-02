@@ -2360,3 +2360,221 @@ def test_restoring_an_emptied_item_runs_it_again_in_its_own_folder_and_brings_it
     assert (back["output_files"], back["starred"]) == (new_files, 1)
     assert db.get_generation(job_prompt_id) is None
     assert db.get_trashed("p1") is None
+
+
+def test_a_completion_the_poll_found_is_still_drawn_when_that_tick_ends(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+    (job,) = view._jobs.all_jobs
+    client.fetch_history = lambda prompt_id: _REROLL_HISTORY
+
+    view._poll()
+
+    assert job.prompt_id in view.listed_prompt_ids()
+
+
+def test_a_tabs_cancel_stops_the_oldest_of_its_runs_still_alive(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tab = _front_panel(view)
+    tab.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    tab.use_random_seed()
+    tab._how_many.set_how_many(4)
+    tab._on_generate()
+    oldest, *others = tab.launched_runs()
+
+    tab._cancel_btn.click()
+
+    assert view._db.get_generation(oldest) is None
+    assert all(view._db.get_generation(run) is not None for run in others)
+
+
+def test_a_tabs_cancel_hover_answers_for_the_oldest_of_its_runs_in_two_folders(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tab = _front_panel(view)
+    for prompt in ("a first prompt", "a second prompt"):
+        tab.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt=prompt))
+        tab.use_random_seed()
+        tab._on_generate()
+    _oldest, newest = tab.launched_runs()
+    newest_folder = view._job_folder_key(view._jobs.job_for_origin(newest))
+
+    view._auto.start(newest_folder)
+    view._sync_cancel_buttons()
+
+    assert tab._cancel_btn.toolTip() == cancel_tooltip(False)
+
+
+class _JobFromAFrame:
+    prompt_id = "a-job-nobody-asked-for-in-words"
+
+    def __init__(self, frame):
+        self.params = {"input_image": str(frame)}
+
+
+def test_a_job_with_no_request_behind_it_stands_on_the_frame_it_starts_from(qtbot, tmp_path):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    frame = tmp_path / "start_frame.png"
+    frame.write_bytes(_png_bytes())
+
+    assert view._job_source_image(_JobFromAFrame(frame)) == str(frame)
+
+
+def test_going_to_a_runs_folder_is_a_stop_and_a_visit(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    workflow = _image_workflow(view._tree)
+    view._tree.setCurrentItem(workflow)
+    view._folder_history.clear()
+
+    view._reveal_reroll(key)
+
+    assert [base_of(visit) for visit in view._folder_history] == [key]
+    view._navigation.go_back()
+    assert view._tree.currentItem() is _image_workflow(view._tree)
+
+
+def test_clicking_a_runs_tile_puts_a_running_search_away(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    _search_for(view, "cat")
+    assert view._gallery_pane.showing_search()
+
+    view._reveal_reroll(key)
+
+    assert not view._gallery_pane.showing_search()
+    assert view._search.field.text() == ""
+
+
+def test_a_run_in_a_folder_the_tree_has_not_drawn_yet_is_gone_to_all_the_same(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    db.add(_running_row("gen1", prompt="a dog"))
+    folder = gallery.settings_folder_key(
+        db.get_generation("gen1"), gallery.build_image_config_index(view._image_rows))
+
+    view._reveal_reroll(folder)
+
+    assert _selected_folder(view) == folder
+
+
+def test_a_runs_tile_goes_to_the_tab_following_it_before_the_tab_that_launched_it(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    launcher = _front_panel(view)
+    launcher.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a new prompt"))
+    launcher.use_random_seed()
+    launcher._on_generate()
+    (key,) = view._live_jobs
+    launcher.stop_watching()
+    following = view._generate_pane._add_subtab()
+    following.watch_folder(key, None)
+    view._generate_pane.setCurrentWidget(launcher)
+
+    view._select_reroll(key)
+
+    assert view._generate_pane.current_generate_tab() is following
+
+
+def test_a_run_no_tab_launched_lands_in_the_front_tab_when_it_stands_on_that_folder(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    front = view._generate_pane.current_generate_tab()
+    view._generate_pane.pin_tab(front)
+    view._jobs.start_reroll(key, view.group_for_key(key), view._image_rows)
+    count = view._generate_pane.count()
+
+    view._select_reroll(key)
+
+    assert view._generate_pane.current_generate_tab() is front
+    assert view._generate_pane.count() == count
+
+
+def test_a_run_that_made_no_file_is_not_loaded_into_the_tab_that_launched_it(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tab = _front_panel(view)
+    tab.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    tab.use_random_seed()
+    tab._on_generate()
+    ((key, job),) = view._live_jobs.items()
+    following = view._generate_pane._add_subtab()
+    following.watch_folder(key, None)
+    shown = []
+    tab.show_completed_result = lambda row, rows: shown.append(row)
+    following.show_finished_media = shown.append
+
+    view._on_reroll_finished(key, job.prompt_id)
+
+    assert shown == []
+
+
+def test_auto_generate_in_a_video_folder_runs_the_settings_it_read_with_no_image_stage(qtbot,
+                                                                                       tmp_path):
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")
+
+    view._toggle_auto(True)
+
+    names = {job.workflow.name for job in view._jobs.all_jobs}
+    assert "wan22_i2v" in names
+    assert "sdxl_t2i" not in names
+
+
+def test_flushing_the_queue_hands_comfyui_what_it_is_still_holding_and_says_how_many(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    tab = _front_panel(view)
+    tab.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    tab.use_random_seed()
+    tab._how_many.set_how_many(4)
+    tab._on_generate()
+    sent = client.submit_job.call_count
+    assert sent < 4
+
+    assert view.flush_queue_to_server() == 4 - sent
+    assert client.submit_job.call_count == 4
+
+
+def test_a_landing_shows_in_the_tabs_following_it_and_the_launcher_only_its_end_state(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    launcher = _front_panel(view)
+    launcher.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    launcher.use_random_seed()
+    launcher._on_generate()
+    ((key, job),) = view._live_jobs.items()
+    following = view._generate_pane._add_subtab()
+    following.watch_folder(key, None)
+    told = []
+    launcher.show_finished_media = lambda row: told.append(("launcher", row["prompt_id"]))
+    following.show_finished_media = lambda row: told.append(("following", row["prompt_id"]))
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert told == [("following", job.prompt_id)]

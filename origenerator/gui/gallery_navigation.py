@@ -7,29 +7,21 @@ from origenerator.navigation import Location, NavigationHistory
 
 
 class NavigationHost(Protocol):
-    def selected_folder_key(self) -> str | None:
-        pass
+    def selected_folder_key(self) -> str | None: ...
 
-    def selected_prompt_id(self) -> str | None:
-        pass
+    def selected_prompt_id(self) -> str | None: ...
 
-    def pane_holds(self, prompt_id: str) -> bool:
-        pass
+    def pane_holds(self, prompt_id: str) -> bool: ...
 
-    def show_folder(self, key: str) -> bool:
-        pass
+    def show_folder(self, key: str) -> bool: ...
 
-    def go_to_generation(self, prompt_id: str) -> None:
-        pass
+    def go_to_generation(self, prompt_id: str) -> None: ...
 
-    def reveal(self, prompt_id: str) -> bool:
-        pass
+    def reveal(self, prompt_id: str) -> bool: ...
 
-    def clear_selection(self) -> None:
-        pass
+    def clear_selection(self) -> None: ...
 
-    def nav_state_changed(self, can_go_back: bool, can_go_forward: bool) -> None:
-        pass
+    def nav_state_changed(self, can_go_back: bool, can_go_forward: bool) -> None: ...
 
 
 class NavigationController:

@@ -720,14 +720,11 @@ class _FakeRerollJob:
         self.thumb_dir = THUMB_DIR
         self.shielded = False
 
-    def reconcile_with(self, history):
-        pass
+    def reconcile_with(self, history): ...
 
-    def take_backlog(self, foreign_ahead):
-        pass
+    def take_backlog(self, foreign_ahead): ...
 
-    def take_executing(self, executing):
-        pass
+    def take_executing(self, executing): ...
 
     def cancel(self):
         self.state = "canceled"

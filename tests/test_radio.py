@@ -16,8 +16,7 @@ def _videos(*names):
     return [Path(name) for name in names]
 
 
-def _kept_in_order(target):
-    pass
+def _kept_in_order(target): ...
 
 
 def _reversed(target):

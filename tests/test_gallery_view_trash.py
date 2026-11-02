@@ -1310,3 +1310,36 @@ def test_a_restore_that_cannot_run_is_drawn_dimmer_than_the_delete_beside_it(qtb
                    for x in range(image.width()) for y in range(image.height()))
 
     assert strongest_ink(restore) < strongest_ink(delete) * 0.6
+
+
+def test_redoing_a_delete_draws_the_folder_without_the_item_at_once(qtbot, tmp_path):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    (row,) = view._db.list_generations()
+    view._delete_rows([row])
+    view._undo()
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
+    trash_before = view.listed_prompt_ids()
+
+    view._redo()
+
+    assert trash_before == []
+    assert view.listed_prompt_ids() == ["i1"]
+
+
+def test_a_deleted_item_picked_in_the_trash_has_nothing_to_favorite(qtbot):
+    view = _trash_collection_view(qtbot, FakeActions())
+
+    assert view.selected_prompt_ids() == ["d1"]
+    assert not view._buttons.favorite.isEnabled()
+    assert view._buttons.favorite.toolTip() == "Nothing here to favorite"
+
+
+def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):
+    actions = FakeActions()
+    view = _trash_collection_view(qtbot, actions)
+
+    view.trash_generation("d1")
+
+    assert actions.deleted == []
+    assert actions.rejected == []

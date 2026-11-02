@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from funestra.hud_overlay import HUD_OVERLAY_ID
+from funestra.testing import FakeEngine
 from funestra.timeline import TIMELINE_HEIGHT
 from funestra.volume import CHIP_H, chip_xy
 from PyQt6.QtCore import QPoint
 
 from origenerator.fun_time_mode import SIDES
-from tests.funestra_fakes import FakeEngine
 
 
 def open_both_sides(gallery_or_director) -> None:

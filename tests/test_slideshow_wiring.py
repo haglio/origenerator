@@ -12,12 +12,12 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError
 
 import pytest
+from funestra.testing import FakeEngine
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
-from tests.funestra_fakes import FakeEngine
 
 _ITEMS = [("a.png", "image", "id-a", None), ("b.png", "image", "id-b", None)]
 

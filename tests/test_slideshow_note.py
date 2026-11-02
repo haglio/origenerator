@@ -8,13 +8,13 @@ no HUD is indistinguishable from the request having been dropped.
 """
 from __future__ import annotations
 
+from funestra.testing import FakeEngine
 from PyQt6.QtCore import QRunnable
 from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
 
 from origenerator.gui import voice_router
 from origenerator.gui.notice_overlay import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView
-from tests.funestra_fakes import FakeEngine
 from tests.gallery_view_support import _requesting_view
 from tests.marked_words import words
 

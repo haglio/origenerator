@@ -1,4 +1,3 @@
-"""The pane holds no view: the back-pointer the split cut stays cut."""
 from __future__ import annotations
 
 import ast
@@ -20,8 +19,8 @@ def test_the_pane_holds_no_view():
         | {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} \
         | {a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
            for a in n.names}
-    assert "GalleryView" not in named  # docstring prose may say it; code may not
-    assert "_v" not in named  # the handle itself, under the name it had
+    assert "GalleryView" not in named
+    assert "_v" not in named
     init = next(n for n in _class_def(PANE, "GalleryPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [

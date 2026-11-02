@@ -1,23 +1,3 @@
-"""The Gallery pane — the middle column showing a folder's contents.
-
-Renders whatever the selected tree row calls for: a branch folder's child tiles, a
-settings leaf's thumbnail grid (with its re-roll tile), or the Latest / Favorites /
-Enhanced / Experiments / Trash collection overviews. Owns the thumbnail multi-selection
-and the live in-flight tiles.
-
-One thing it renders comes from no tree row at all: the gallery search's results,
-which take the pane over while a query is running and hand it back when it clears.
-That is the whole point of searching here rather than in the tree — the answer to
-"where is the one with the two of them on the couch" is a wall of thumbnails you
-recognize, not a list of folder names you have to open one by one.
-
-It stands alone: everything it works with arrives at construction — its scroll
-area, the database, the re-roll and auto-generate controllers, and two narrow
-records of what it may ask the gallery around it (:class:`TreeNavigation`,
-:class:`PaneHost`). Every gesture made on a tile leaves as a signal; the view
-connects them and answers — the Generate pane on a click, the tree on a drill, the
-delete on a menu.
-"""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -79,53 +59,27 @@ from origenerator.media import MediaType
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
 
-_TILE_SPACING = GAP_MEDIUM   # gap between tiles in the flowing main view
-_PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
-# A pane draws its tiles a page at a time and adds the next once scrolled within
-# _REACH pixels of the end — far enough ahead (three tile rows) that the next page
-# is there before the user arrives at it, rather than after a visible stop.
+_TILE_SPACING = GAP_MEDIUM
+_PREVIEW_COUNT = 4
 _PAGE = 50
-_NEIGHBORS_PAST_A_REVEAL = 12  # three rows at the pane's widest, six at its narrowest
+_NEIGHBORS_PAST_A_REVEAL = 12
 _REACH = 600
-# Room above a search section's heading, so the headings read as the dividers
-# they are rather than as captions stuck to the row of tiles above them.
 _SECTION_SPACING = GAP_DIALOG
-# The most result tiles a search draws at once. A one-word query over a full
-# library can match most of it, and building thousands of thumbnails in a single
-# pass locks the window for seconds — the folders page for the same reason.
-# Search doesn't page: it is a narrowing tool, so the useful answer to
-# "too many to draw" is another word, and the count label says exactly that
-# rather than quietly showing a slice.
 SEARCH_DRAW_LIMIT = 200
 
 
 class GalleryPaneScrollArea(QScrollArea):
-    """The middle pane's scroll area, which says when a click landed on nothing.
-
-    Every tile in here answers its own press and keeps it, so a press that
-    arrives at this widget travelled the whole pane without meeting one: the
-    background between the tiles, or the room under the last row. That is the
-    gesture every file manager answers by putting the selection down, and this
-    pane needs it for more than tidiness — Favorite, Enhance and Delete all aim at
-    the picked thumbnails when there are any and at the folder on screen when
-    there are none, so "Enhance every image in this folder" is out of reach
-    while a single tile stays picked, with nothing on screen saying why.
-    """
-
     background_clicked = pyqtSignal()
 
     def mousePressEvent(self, event):
-        # Left only: a right-click opens a context menu, and losing the
-        # selection out from under one would aim it at nothing.
         if event.button() == Qt.MouseButton.LeftButton:
             self.background_clicked.emit()
-            event.accept()  # nothing above wants it — end the walk up here
+            event.accept()
             return
         super().mousePressEvent(event)
 
 
 def _unique_rows(rows) -> list[dict]:
-    """``rows`` in order with later repeats of a generation dropped."""
     seen = set()
     unique = []
     for row in rows:
@@ -136,16 +90,6 @@ def _unique_rows(rows) -> list[dict]:
 
 
 def _search_empty_hint(outcome, query: str, scope: str) -> str:
-    """What an empty search says. Naming the words that reached nothing is the
-    whole of it: a search needs every word satisfied, so with four words typed
-    and no results the one thing worth knowing is which word to drop — and
-    "nothing matched" alone leaves the user re-typing the query at random.
-
-    ``scope`` is the folder being searched, named in both messages: a query that
-    would answer elsewhere in the gallery looks identical to one that answers
-    nowhere, and the fix for the first is to pick a wider folder rather than to
-    change a single word.
-    """
     if outcome.unmatched:
         missing = ", ".join(f"“{word}”" for word in outcome.unmatched)
         return (f"Nothing in {scope} matches {missing}.\n\nEvery word has to be "
@@ -264,8 +208,6 @@ def _back_of_the_line_first(items, keys) -> list:
 
 
 def _inflight_signature(items) -> tuple:
-    """The in-flight runs in the order drawn, so a frame-only change refreshes
-    tiles in place while a run added, taken away or moved forces a re-render."""
     return tuple(it.key for it in items)
 
 
@@ -311,102 +253,54 @@ class LeadTiles:
 
 @dataclass(frozen=True)
 class PaneHost:
-    """The questions the pane may ask the gallery it fills, bound to the view's
-    answers at construction.
-
-    Callables rather than pushed values so each is read at the moment a tile is
-    built: the enhance settings and the in-flight runs both move between
-    renders, and several tiles are built mid-rebuild, where a value captured
-    earlier would already be the old one.
-    """
-
-    # Every image row of the current model — what places an untracked run.
     image_rows: Callable[[], list]
-    # The looping-preview path for a video row, or None (the tile shows its still).
     animated_preview: Callable[[dict], str | None]
-    # The standalone enhance being made of this image right now, or None.
     enhancing_run: Callable[[dict], object]
-    # What every enhance runs at, app-wide — the Enhance pane's value.
     enhance_settings: Callable[[], object]
-    # Whether the background experimenter is on (the empty collection teaches off it).
     experiments_enabled: Callable[[], bool]
-    # A settings folder's own tiles from the view — the re-roll tile, its request
-    # mirror and the run in front of its line, each None where the folder has
-    # none — for the pane to place.
     lead_tiles: Callable[[object], LeadTiles]
-    # What an item is called wherever it is named, by its prompt_id.
     item_name: Callable[[str], str]
 
 
 @dataclass(frozen=True)
 class TreeNavigation:
-    """The whole of what the pane may ask about the folder tree, as three
-    questions bound to the view's own answers at construction.
-
-    A record of callables rather than a back-reference: the pane used to walk
-    ``view._tree_view`` and ``view._tree_item_for`` for these, which put the
-    tree's item model and the view's cross-shape key resolution inside the
-    pane's reach. Three named questions are the actual dependency — and a test
-    can stand the pane up by answering them alone.
-    """
-
-    # The tree key of the selected row (a folder's, or a collection's), or ``None``.
     selected_folder_key: Callable[[], str | None]
-    # Where folder ``key`` lives — the folder path of its parent, "" at the top.
-    # What a tile drawn far from the tree is captioned with, so identically
-    # named folders from opposite corners stay tellable apart.
     folder_context: Callable[[str], str]
-    # The folder ``key`` names, as the shape being browsed holds it, or ``None``.
     group_for_key: Callable[[str], object]
 
 
 @dataclass(frozen=True)
 class PaneCollection:
-    """One collection: what it gathers, and how it draws that.
-
-    Five collections were five parallel places each -- a branch in the renderer's
-    dispatch, a branch in the row gatherer, and a method apiece. Both branches
-    read this instead, so a sixth collection is one entry rather than an edit in two
-    chains, and neither chain can answer for a collection the other does not.
-    """
-
     rows: Callable[[str | None, str], list[dict]]
     render: Callable[[], None]
 
 
 class GalleryPane(QObject):
-    """Fills the middle scroll area (folder tiles / thumbnail grid / collections) and
-    owns the thumbnail multi-selection and in-flight tiles. Held by the GalleryView,
-    which connects the signals below to its own handlers — a gesture on a tile is
-    the pane's to see and the view's to answer."""
-
-    thumbnail_activated = pyqtSignal(str)   # a tile was clicked: preview this item
-    tab_pin_requested = pyqtSignal()        # an "I'm staying" gesture: keep the tab
-    item_jump_requested = pyqtSignal(str)   # go to this item, in its own folder
-    folder_open_requested = pyqtSignal(str)  # a folder tile was clicked: open it
-    reveal_reroll_requested = pyqtSignal(str)  # open this re-roll's folder + tile
-    folder_menu_requested = pyqtSignal(str, QPoint)  # right-click on a folder tile
-    menu_requested = pyqtSignal(list, QPoint)  # right-click: the generation menu
-    trash_menu_requested = pyqtSignal(QPoint)  # right-click on a deleted tile
-    item_action_triggered = pyqtSignal(str, str)   # a tile's corner button
-    seed_reroll_requested = pyqtSignal(str, str)   # an i2v tile's seed corner
-    experiment_verdict = pyqtSignal(str, str)      # a review tile's keep/reject
-    trash_action_triggered = pyqtSignal(str, str)  # a deleted tile's restore/purge
-    cancel_requested = pyqtSignal(str)      # an in-flight row's ✕: drop that run
-    selection_changed = pyqtSignal()        # the multi-selection moved or cleared
-    pane_reset = pyqtSignal()  # the outgoing pane's state is being dropped
+    thumbnail_activated = pyqtSignal(str)
+    tab_pin_requested = pyqtSignal()
+    item_jump_requested = pyqtSignal(str)
+    folder_open_requested = pyqtSignal(str)
+    reveal_reroll_requested = pyqtSignal(str)
+    folder_menu_requested = pyqtSignal(str, QPoint)
+    menu_requested = pyqtSignal(list, QPoint)
+    trash_menu_requested = pyqtSignal(QPoint)
+    item_action_triggered = pyqtSignal(str, str)
+    seed_reroll_requested = pyqtSignal(str, str)
+    experiment_verdict = pyqtSignal(str, str)
+    trash_action_triggered = pyqtSignal(str, str)
+    cancel_requested = pyqtSignal(str)
+    selection_changed = pyqtSignal()
+    pane_reset = pyqtSignal()
 
     def __init__(self, scroll, db, jobs, auto, tree: TreeNavigation,
                  host: PaneHost):
         super().__init__()
-        self._scroll = scroll  # the pane's canvas: the middle scroll area it fills
-        self._db = db          # the generations the tiles and corners re-read
-        self._jobs = jobs  # the live jobs and the queue's own line
-        self._auto = auto      # whether a folder is auto-generating (its tile says)
-        self._tree = tree      # the three questions the pane may ask the tree
-        self._host = host      # the rest of what it asks the gallery (see PaneHost)
-        # The queue's tiles are a join over four sources and no rendering at all,
-        # so they are built outside the pane and handed the same collaborators.
+        self._scroll = scroll
+        self._db = db
+        self._jobs = jobs
+        self._auto = auto
+        self._tree = tree
+        self._host = host
         self._queue_model = InFlightItems(
             db=db, jobs=jobs, auto=auto, tree=tree,
             image_rows=host.image_rows,
@@ -416,9 +310,6 @@ class GalleryPane(QObject):
             on_go_to_item=self.item_jump_requested.emit,
             on_shield=jobs.shield,
         )
-        # What each collection gathers and how it draws that, bound rather than
-        # named: a renamed renderer is an AttributeError at construction instead
-        # of a collection that quietly draws nothing.
         self._collections = {
             LATEST_KEY: PaneCollection(
                 rows=lambda shape, folder: self._in_folder(self._recent_rows, shape, folder),
@@ -441,25 +332,22 @@ class GalleryPane(QObject):
                 rows=lambda shape, folder: self._in_folder(self._trash_rows, shape, folder),
                 render=self._render_trash),
         }
-        # Which tiles are picked, the anchor a Shift-click measures its run
-        # from, and what it lists in the order shown
-        # (:mod:`origenerator.gui.picking`).
         self._selection = Picking()
-        self._listed_folders: list[str] = []  # the folders it lists, as tiles
+        self._listed_folders: list[str] = []
         self._thumb_widgets: dict[str, ItemTile] = {}
-        self._wired: dict[str, str] = {}      # how each drawn tile is wired
-        self._kept = _KeptTiles()             # the last pane's tiles, while a new one draws
-        self._inflight_tiles: dict[str, InFlightTile] = {}   # live in-flight tiles, by job key
-        self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
-        self._inflight_signature: tuple = ()  # the in-flight set now drawn in the collection
-        self._recent_rows = _Listing()      # every generated row, newest first
-        self._pages = _Pages()              # the open pane's tiles, drawn a page at a time
+        self._wired: dict[str, str] = {}
+        self._kept = _KeptTiles()
+        self._inflight_tiles: dict[str, InFlightTile] = {}
+        self._inflight_by_key: dict[str, InFlightItem] = {}
+        self._inflight_signature: tuple = ()
+        self._recent_rows = _Listing()
+        self._pages = _Pages()
         self._listed = _Listing()
-        self._enhanced_rows = _Listing()    # every enhanced image, newest first
-        self._experiment_rows = _Listing()  # unreviewed experiments, newest first
-        self._trash_rows = _Listing()       # trashed items, newest first
-        self._search_rows: list[dict] = []  # the open search's hits, in shown order
-        self._showing_search = False        # a query owns the pane, whatever the tree says
+        self._enhanced_rows = _Listing()
+        self._experiment_rows = _Listing()
+        self._trash_rows = _Listing()
+        self._search_rows: list[dict] = []
+        self._showing_search = False
         self._collection_shape: str | None = None
         self._collection_folder = gallery.ALL_KEY
         self._placements: dict[str | None, Placement] = {}
@@ -473,12 +361,6 @@ class GalleryPane(QObject):
 
     def set_model(self, recent_rows, shape_trees, listed_rows, experiment_rows,
                   trash_rows, image_index=None):
-        """Take the newly rebuilt gallery model the collections render from.
-
-        ``shape_trees`` is per shape (``{shape: [folders]}``): a folder is
-        drawn on whichever shapes hold rows of that shape, so each Favorites collection
-        collects the copies of the favorites its own shape has.
-        """
         self._models_taken += 1
         self._recent_rows = _Listing(recent_rows)
         self._listed = _Listing(listed_rows)
@@ -494,8 +376,6 @@ class GalleryPane(QObject):
                                                   self._collection_folder)
 
     def _in_folder(self, listing: _Listing, shape: str | None, folder: str) -> list[dict]:
-        """What *folder* holds of *listing* on *shape* -- under Images or Videos,
-        that kind alone."""
         return self._placement(shape).held_by(folder, listing.on(shape))
 
     def _placement(self, shape: str | None) -> Placement:
@@ -505,24 +385,13 @@ class GalleryPane(QObject):
         return placement
 
     def show_enhancing(self, runs: dict):
-        """Hand every visible tile the enhancement being made of its image.
-
-        ``runs`` is ``{prompt_id: RunReading}`` for the enhances in flight
-        right now — the latest frame, how far along the run is, and how long it
-        has been going. A tile not named there is handed ``None`` and goes back
-        to resting. The tile keeps its own thumbnail until a frame arrives — the
-        base render is out and worth looking at, which is the point of
-        generating it first — and gets it back when the run ends.
-        """
         for prompt_id, tile in self._thumb_widgets.items():
             tile.set_enhancing(runs.get(prompt_id))
 
-    # --- folder-tile overview ----------------------------------------------
-
     def show_widget(self, widget: QWidget):
-        self._kept = _KeptTiles()  # what the new pane did not take goes with the old
-        self._pages = self._pages.ended()  # nothing more is drawn into what goes
-        self._scroll.setWidget(widget)  # replaces & deletes the previous widget
+        self._kept = _KeptTiles()
+        self._pages = self._pages.ended()
+        self._scroll.setWidget(widget)  # Qt deletes the previous widget
 
     def _show_paged(self, container: QWidget, entries) -> None:
         pages = _Pages(self._tree.selected_folder_key(), entries)
@@ -535,24 +404,16 @@ class GalleryPane(QObject):
         self.show_widget(container)
         self._pages = pages
         self.follow_the_scroll()
-        defer(self._scroll, self.follow_the_scroll)  # again, the pages it drew laid out
+        defer(self._scroll, self.follow_the_scroll)
 
     def show_empty(self):
-        """Clear the pane to nothing on screen — no folder selected."""
         self._reset_pane_state()
         self.show_widget(QWidget())
 
     def _reset_pane_state(self):
-        """Forget what the outgoing pane held, before the incoming one fills it.
-
-        Every renderer here starts by calling this (through :meth:`_fresh_tile_pane`
-        or directly), so no renderer has to remember to clear the state of the one
-        it is replacing — which is how a stale selection or a stale search flag
-        would otherwise outlive the tiles it referred to.
-        """
         self.clear_selection()
-        self.pane_reset.emit()  # the view drops its generating tile with the old pane
-        self._inflight_tiles = {}    # ...as are the live tiles, by whichever pane draws them
+        self.pane_reset.emit()
+        self._inflight_tiles = {}
         self._inflight_by_key = {}
         self._selection.forget_what_was_shown()
         self._listed_folders = []
@@ -560,7 +421,6 @@ class GalleryPane(QObject):
         self._showing_search = False
 
     def _fresh_tile_pane(self):
-        """A fresh container whose tiles flow to fill the pane's width."""
         container = QWidget()
         flow = FlowLayout(container, spacing=_TILE_SPACING)
         self._kept = _KeptTiles(self._thumb_widgets, self._wired)
@@ -568,7 +428,6 @@ class GalleryPane(QObject):
         return container, flow
 
     def _add_folder_tile(self, flow, group, *, favorite, context=""):
-        """Build one folder tile and wire its click/context signals."""
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)), favorite=favorite, context=context,
@@ -579,12 +438,11 @@ class GalleryPane(QObject):
         flow.addWidget(tile)
 
     def reveal_folder(self, folder_key: str) -> bool:
-        """Mark the drawn square that holds this folder and scroll it into view."""
         self._pages.draw_past(lambda entry: entry.folder is not None
                               and key_holds(entry.folder, folder_key))
         drawn = self._scroll.widget()
         if drawn is None:
-            return False  # a pane with nothing in it: a slideshow closing as the app does
+            return False
         for tile in drawn.findChildren(FolderTile):
             if key_holds(tile.key, folder_key):
                 self._mark_only_this_folder(drawn, tile)
@@ -620,24 +478,13 @@ class GalleryPane(QObject):
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 
-    # --- a folder the user composed: what it gathers, wherever that lives ---
-
     def show_custom_collection(self, group):
-        """Render a custom collection (saved, or the live multi-selection) the way
-        Favorites shows what it gathers."""
         self._show_gathered(group.rows, gallery.child_groups(group), show_favorites=True,
                             empty=f"“{group.label}” is empty.\n\nDrag folders from the list, "
                                   "or items, onto it, or pick several folders with "
                                   "Shift/Ctrl and group them.")
 
     def _show_gathered(self, rows, groups, *, show_favorites: bool, empty: str):
-        """Items as thumbnails, then a tile per folder, each captioned with its
-        folder path.
-
-        The folder path is what makes this readable at all — a grouping can hold two
-        folders that are both called "30 steps" from opposite corners of the tree,
-        so the bare label the hierarchy relies on isn't enough here.
-        """
         container, flow = self._fresh_tile_pane()
         if not (rows or groups):
             self.show_widget(self._empty_state(empty))
@@ -653,35 +500,9 @@ class GalleryPane(QObject):
               for row in rows),
             *(_Entry(folder(group), folder=group.key) for group in groups)])
 
-    # --- the search results: whatever the query reached, wherever it lives ---
-
     def show_search_results(self, tiles, *, sort_mode: str, query: str, outcome,
                             scope: str = "", collapsed=(), on_section_toggled=None,
                             still_searching: bool = False):
-        """Fill the pane with ``tiles`` — the whole point of searching here rather
-        than in the tree, since a thumbnail is recognizable and a folder name is
-        not.
-
-        Two orders, because a search answers two different questions. Newest-first
-        is "where is the one I made recently"; Model / LoRA is "which model and LoRA
-        was that", and there the tiles are cut into a labelled section per
-        combination rather than interleaved, so the answer is the heading you
-        stopped scrolling at. Those sections fold shut on their headers — with a
-        dozen combinations under a broad query, being able to shut the ones you
-        are not asking about is what makes the sort usable rather than merely
-        sorted. ``collapsed`` is the set of headings to open shut, and
-        ``on_section_toggled(heading, collapsed)`` reports each click so the view
-        can remember it across a redraw. ``scope`` names the folder that was
-        searched, for an empty result to be honest about.
-
-        Either way the tiles behave exactly as they do elsewhere in the gallery: a
-        folder drills in on a click, and an item previews here, opens its own
-        folder on a double-click, drags to a Combine drop zone and right-clicks for
-        star / enhance / delete — a result is the same thing wherever it was found.
-
-        At most :data:`SEARCH_DRAW_LIMIT` tiles are drawn, newest first; the
-        header's count names the whole number so a capped search reads as one.
-        """
         self._reset_pane_state()
         if not tiles:
             self.show_widget(self._empty_state(
@@ -695,7 +516,6 @@ class GalleryPane(QObject):
         self._showing_search = True
 
     def _flat_results(self, tiles) -> QWidget:
-        """Every tile in one flow, newest first."""
         container = QWidget()
         flow = FlowLayout(container, spacing=_TILE_SPACING)
         for tile in tiles:
@@ -703,12 +523,6 @@ class GalleryPane(QObject):
         return container
 
     def _sectioned_results(self, tiles, collapsed, on_toggled) -> QWidget:
-        """The tiles under one foldable heading per model + LoRA combination.
-
-        A column of flows rather than one flow with headings in it, because the
-        column is what makes folding cheap: a section is one widget to hide rather
-        than a run of tiles to pick out of a shared layout.
-        """
         container = QWidget()
         column = QVBoxLayout(container)
         column.setContentsMargins(0, 0, 0, 0)
@@ -719,27 +533,16 @@ class GalleryPane(QObject):
             shut = heading in collapsed
             column.addWidget(
                 self._section_header(heading, len(section), section_widget, shut, on_toggled))
-            # A shut section's tiles are still built and still counted: they are the
-            # results, and folding is about what you are looking at, not what the
-            # search found — so unfolding is instant and the shown order (which
-            # Shift-select and the slideshow read) stays the order on screen.
             for tile in section:
                 self._add_search_tile(section_flow, tile)
             section_widget.setVisible(not shut)
             column.addWidget(section_widget)
-        column.addStretch(1)  # sections stay their own height; slack falls to the end
+        column.addStretch(1)
         return container
 
     @staticmethod
     def _section_header(heading: str, count: int, section_widget: QWidget, shut: bool,
                         on_toggled) -> FoldHeader:
-        """The section's foldable header: the family's chevron, the model and LoRA, and how
-        many are in it.
-
-        A flat, full-width button rather than a label — the whole row is the
-        target, which is what a fold control has to be when the sections are tall
-        enough that you are aiming at it after a scroll.
-        """
         button = FoldHeader(warns=False)
         button.setObjectName("tileGroupHeading")
         button.setFlat(True)
@@ -749,10 +552,7 @@ class GalleryPane(QObject):
         def paint(collapsed: bool):
             button.set_fold(FOLD[collapsed])
 
-        # The fold state is carried here rather than read back off the section: a
-        # widget whose window hasn't been shown yet reports isVisible() false
-        # however it was set, so asking it would make the first click on a
-        # freshly drawn pane a no-op.
+        # Qt: isVisible() is False for any widget whose window is not yet shown, so the fold state is kept here.
         state = {"shut": shut}
 
         def toggle():
@@ -767,12 +567,6 @@ class GalleryPane(QObject):
         return button
 
     def _add_search_tile(self, flow, tile: search.SearchTile):
-        """Draw one result — a folder tile or a single item — and record its place.
-
-        The shown order matters beyond the drawing: Shift-select and the slideshow
-        both read it, so it has to be the order the sections were laid out in rather
-        than the order the search scored them.
-        """
         if tile.group is not None:
             self._add_folder_tile(flow, tile.group, favorite=tile.group.favorite,
                                   context=self._tree.folder_context(tile.group.key))
@@ -784,12 +578,7 @@ class GalleryPane(QObject):
         self._search_rows.extend(tile.rows or [tile.row])
 
     def showing_search(self) -> bool:
-        """Whether a query owns the pane. Unlike the collections this is not a tree
-        row, so it is answered by what was last drawn rather than by what is
-        selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
-
-    # --- the collections: Latest / Favorites / Enhanced / Experiments / Trash ---
 
     def show_collection(self, key: str, shape: str | None = None):
         collection = folder_collection(key)
@@ -800,16 +589,6 @@ class GalleryPane(QObject):
         self._collections[collection.which].render()
 
     def _render_latest(self):
-        """The Latest collection: a tile for every in-flight generation (queued or
-        running, from a Generate tab or a gallery re-roll) atop the recently
-        finished items. Clicking an in-flight tile reveals where its job runs; a
-        finished one previews in the Generate pane, right here in the collection, the way
-        a thumbnail does inside a folder — and double-clicking it jumps to its
-        own folder.
-
-        In-flight tiles first (the newest work, still in flight), then the
-        finished thumbnails; a hint when there is neither.
-        """
         container, flow = self._fresh_tile_pane()
         rows = self._open_collection_rows(LATEST_KEY)
         items = self._latest_inflight_items()
@@ -825,7 +604,6 @@ class GalleryPane(QObject):
         _open_sections(flow, headings,
                        opens_now=bool(items) and gallery.new_work_opens_a_section(rows),
                        draw_leading=draw_leading)
-        # An empty collection teaches how to fill it rather than showing a blank pane.
         if not (items or rows):
             self.show_widget(self._empty_state(self._latest_empty_hint()))
             return
@@ -833,45 +611,25 @@ class GalleryPane(QObject):
             flow, rows, headings, lambda row: self._add_collection_thumbnail(flow, row)))
 
     def follow_the_scroll(self, *_):
-        """Draw on a page at a time until the tiles reach _REACH past the foot of
-        what is seen — what makes a pane keep going instead of stopping at a fixed
-        count, and fills a pane taller than a page — and play only the looping
-        videos within _REACH of it.
-
-        Measured off the tiles drawn rather than off the scroll bar, whose range
-        trails the drawing until the pane is laid out again. Wired to the bar's
-        value for the scrolling itself, and to its range for a pane that changed
-        size under the reader.
-        """
         drawn, seen = self._scroll.widget(), self._scroll.viewport()
         if drawn is None:
-            return  # between one pane and the next
+            return
         top = self._scroll_bar().value()
         while self._pages.more() and (_drawn_height(drawn, seen.width())
                                       - top - seen.height() < _REACH):
             self._pages.draw(_PAGE)
-            show_the_tiles_qt_queued_to_show(drawn)  # or the page measures as nothing
+            show_the_tiles_qt_queued_to_show(drawn)
         _play_only_what_is_in_sight(drawn, self._thumb_widgets.values(),
                                     top - _REACH, top + seen.height() + _REACH)
 
     def _scroll_bar(self):
-        """The Gallery pane's vertical scroll bar: what a pane grows off, and what a
-        redraw puts back where the user was reading."""
         return self._scroll.verticalScrollBar()
 
     def _add_collection_thumbnail(self, flow, row, corner_buttons=None):
-        """Build one finished-item tile for a collection (Latest/Favorites/Experiments):
-        preview it here on a click, open its own folder on a double-click, drag it
-        to a Combine drop zone, and right-click it for the same star / enhance / delete
-        menu a tile inside a folder offers; ``corner_buttons`` become the tile's
-        hover controls (a review's keep/reject, wired to the verdict)."""
         def wire(tw):
             tw.pressed.connect(self.apply_selection)
-            tw.clicked.connect(self.thumbnail_activated)  # preview it here, in the collection
-            tw.double_clicked.connect(self._collection_double_clicked)  # or open its folder
-            # Every collection gets the folder menu — an item is no less actionable for
-            # being listed by when it was made or by its favorite rather than by its
-            # settings.
+            tw.clicked.connect(self.thumbnail_activated)
+            tw.double_clicked.connect(self._collection_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
             if corner_buttons:
@@ -879,18 +637,16 @@ class GalleryPane(QObject):
 
         return self._draw_tile(
             flow, row, _REVIEW_TILE if corner_buttons else _COLLECTION_TILE, wire,
-            media_type=gallery.media_type_of_row(row),  # an item type icon: image or video
-            movie_path=self._host.animated_preview(row),  # videos loop; images stay still
+            media_type=gallery.media_type_of_row(row),
+            movie_path=self._host.animated_preview(row),
             favorite=bool(row.get("starred")),
-            enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
-            enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
+            enhance=self._enhance_state(row),
+            enhancing=self._host.enhancing_run(row),
             corner_buttons=corner_buttons,
         )
 
     def _draw_tile(self, flow, row, wiring: str, wire, *, caption: str | None = None,
                    **appearance) -> ItemTile:
-        """The last pane's tile for *row*, when it would be built again the same and
-        wired the same way, else a new one *wire* connects."""
         prompt_id = row["prompt_id"]
         thumb_path = row.get("thumbnail_path")
         if caption is None:
@@ -912,14 +668,10 @@ class GalleryPane(QObject):
         return tile
 
     def _tile_items(self, rows=None, requests=None) -> list[InFlightItem]:
-        """The runs in flight that get a tile: all but the enhancements, each of
-        which shows on the tile of the image it upgrades instead."""
         return [item for item in self.inflight_items(rows, requests)
                 if item.job_kind != gallery.JobKind.ENHANCE]
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
-        """The open Latest's tiles: the runs it will list once they land, held to
-        its shape and its folder exactly as its finished items are."""
         if rows is None:
             rows = self._db.list_generations()
         held = {row["prompt_id"] for row in self._in_folder(
@@ -928,8 +680,6 @@ class GalleryPane(QObject):
         return _back_of_the_line_first(self._tile_items(rows, requests), held)
 
     def _latest_empty_hint(self) -> str:
-        """The teaching hint for an empty collection, worded for the kind its
-        folder holds."""
         noun = next((label.lower() for kind, label in gallery.MEDIA_LABELS.items()
                      if key_holds(kind, self._collection_folder)), "generations")
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
@@ -939,17 +689,6 @@ class GalleryPane(QObject):
         return base_of(self._tree.selected_folder_key()) == LATEST_KEY
 
     def refresh_inflight(self, rows=None, requests=None):
-        """Between rebuilds, keep the in-flight tiles live: push each tracked
-        re-roll's latest frame into its tile. The poll passes the listing it
-        already read (``rows``/``requests``); left off, they are read here.
-
-        Whichever pane drew them — the Latest collection, or a settings folder with
-        a batch in flight. Only the collection re-renders on a change to the
-        *set* of jobs (a defensive guard — a started or finished re-roll
-        normally moves the DB fingerprint and forces a full rebuild anyway); a
-        folder is rebuilt by that same fingerprint and must not be redrawn as
-        the collection. A pane holding no tiles asks the database nothing.
-        """
         if not self._inflight_tiles and not self.showing_latest():
             return
         items = (self._latest_inflight_items(rows, requests) if self.showing_latest()
@@ -961,15 +700,12 @@ class GalleryPane(QObject):
             self.return_to(place)
             return
         for item in items:
-            self._inflight_by_key[item.key] = item  # keep the reveal current
+            self._inflight_by_key[item.key] = item
             tile = self._inflight_tiles.get(item.key)
             if tile is not None:
                 tile.update_item(item)
 
     def inflight_items(self, rows=None, requests=None) -> list:
-        """Every queued/running generation as a tile model, in the order the
-        queue will work through them
-        (:class:`~origenerator.gui.inflight_items.InFlightItems`)."""
         return self._queue_model.build(rows=rows, requests=requests)
 
     def _on_inflight_clicked(self, key: str):
@@ -978,26 +714,6 @@ class GalleryPane(QObject):
             item.reveal()
 
     def _inflight_context_menu(self, key: str, global_pos):
-        """Right-click a tile of work still being made: throw that run away.
-
-        The one thing a queued or running tile can do, and until now the one it
-        offered nowhere: a finished tile answers a right-click with its own menu,
-        and a tile answered with nothing, so stopping a run meant finding it again
-        among the Job Queue's rows. The wording is the Job Queue's Cancel, which
-        while the folder is auto-generating starts another seed rather than
-        stopping anything.
-
-        Which is exactly why an auto-generating folder's tile gets a second entry
-        (:func:`inflight.stop_auto_generate_text`): a menu, unlike the one button those
-        surfaces have room for, can carry both the discard and a real stop, so a
-        run made while Auto-Generate is on can be ended without going to the header
-        for the Auto switch. Auto-Generate goes off first — a discard while it is still on is
-        the cue for the next seed, so canceling first would start one.
-
-        No menu at all for a running row this session holds no job for — one a
-        restart hasn't re-adopted: there is nothing here to cancel it with, and
-        a menu saying so would be a menu that cannot act.
-        """
         item = self._inflight_by_key.get(key)
         if item is None or item.cancel is None:
             return
@@ -1016,25 +732,10 @@ class GalleryPane(QObject):
             item.cancel()
 
     def _collection_double_clicked(self, prompt_id: str):
-        """A collection tile's double-click: go to the item's own folder, and keep the
-        tab that lands there — its tile picked, highlighted and scrolled to, as
-        if you'd navigated in and clicked it (:meth:`GalleryView.follow_link`
-        answers the jump).
-
-        Double-click means the same thing everywhere in the pane — this tab is
-        one I'm staying on — whether it opens a folder on the way or not."""
         self.item_jump_requested.emit(prompt_id)
         self.tab_pin_requested.emit()
 
-    # --- the Experiments collection: unreviewed background experiments -------
-
     def _render_experiments(self):
-        """The Experiments collection: what the background experimenter has come up
-        with since the user last looked, newest first, each tile wearing
-        keep/reject hover controls. A kept item just leaves the queue — it has
-        been in its own folder since it ran; a rejected one is trashed and
-        teaches the policy what to avoid. Clicking previews the item right here
-        and double-clicking opens its folder, like the other collections."""
         container, flow = self._fresh_tile_pane()
         actions = [
             CornerButton("keep", icons.experiment_verdict_icon("up"),
@@ -1065,8 +766,6 @@ class GalleryPane(QObject):
                 "work — new prompts on proven settings, nudged parameters, other "
                 "models. Results collect here; your keep/reject verdicts steer "
                 "what gets tried next.")
-
-    # --- the Trash collection: deleted items, still in the Trash --------------
 
     def _render_trash(self):
         """The Trash collection: every deleted item the Trash is still
@@ -1102,8 +801,8 @@ class GalleryPane(QObject):
         """
         def wire(tile):
             tile.pressed.connect(self.apply_selection)
-            tile.clicked.connect(self.thumbnail_activated)          # preview it here
-            tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
+            tile.clicked.connect(self.thumbnail_activated)
+            tile.double_clicked.connect(self._thumbnail_double_clicked)
             tile.context_requested.connect(self._trash_context_menu)
             tile.control_triggered.connect(self.trash_action_triggered)
 
@@ -1111,19 +810,13 @@ class GalleryPane(QObject):
         return self._draw_tile(
             flow, row, _TRASH_TILE, wire,
             caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
-            media_type=gallery.media_type_of_row(row),  # an item type icon: image or video
-            movie_path=self._host.animated_preview(row),  # videos loop; images stay still
+            media_type=gallery.media_type_of_row(row),
+            movie_path=self._host.animated_preview(row),
             favorite=bool(row.get("starred")),
             restore=restore_offer_of(row),
         )
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
-        """Right-click a deleted tile: restore or permanently delete the picked
-        items — the same two actions its hover corners carry, reachable for a
-        whole selection at once. Right-clicking a tile outside the selection
-        first narrows to it, as the gallery's own tile menu does. The menu
-        itself is the view's (:meth:`GalleryView._trash_menu`), which owns restore and purge
-        alike."""
         if not self._selection.holds(prompt_id):
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self.trash_menu_requested.emit(global_pos)
@@ -1135,8 +828,6 @@ class GalleryPane(QObject):
 
     def showing_trash(self) -> bool:
         return base_of(self._tree.selected_folder_key()) == TRASH_KEY
-
-    # --- the Favorites collection: every favorite — items and folders — in one place ---
 
     def _favorite_items(self, shape: str | None, folder: str) -> list[dict]:
         return self._placement(shape).held_by(folder, gallery.favorite_generations(
@@ -1154,15 +845,12 @@ class GalleryPane(QObject):
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:
-        """A centered hint filling an otherwise-blank collection pane."""
         label = QLabel(text)
         label.setObjectName("estimateLabel")
         label.setWordWrap(True)
         label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         label.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
         return label
-
-    # --- what the open collection gathers (the slideshow plays it) ----------
 
     def collection_rows(self) -> list[dict] | None:
         """Every generation the open collection gathers, in collection order — or ``None``
@@ -1192,44 +880,17 @@ class GalleryPane(QObject):
                 for collection, tally in tallies.items() for folder, count in tally.items()}
 
     def selected_collection_rows(self) -> list[dict] | None:
-        """What the *selected* collection gathers, whatever is currently drawn.
-
-        The same answer as :meth:`collection_rows` off a search, and the one that
-        matters during one: a search standing in a collection is scoped to that
-        collection's items, and the results now on screen are no use for working out
-        what those are.
-
-        Asked of the selected row's own key, which is the same key the collection was
-        rendered for. Written out again here, it was the five answers below a
-        second time over, once against the shape the key names and once against
-        the shape the render remembered.
-        """
         return self.rows_for_collection(self._tree.selected_folder_key())
 
     def rows_for_collection(self, key: str | None) -> list[dict] | None:
-        """What the collection *key* gathers right now — :meth:`collection_rows` for a
-        collection that is not the one on screen.
-
-        Named rather than "what is showing" because a hosted slideshow outlives the
-        selection that opened it: inside Fun Time the slideshows run on the satellite
-        regions while the Gallery pane goes on being used elsewhere, so keeping a
-        running slideshow fed — and answering a spoken "landscape favorites" — both
-        need a collection's rows asked for by name.
-        """
         base, shape = split_key(key)
         collection = folder_collection(base)
         if collection is None:
             return None
         return self._collections[collection.which].rows(shape, collection.folder)
 
-    # --- the thumbnail grid: a settings leaf's generations ------------------
-
     def show_thumbnails(self, group):
         container, flow = self._fresh_tile_pane()
-        # An i2v folder's items carry per-seed re-roll hover controls; its rows
-        # all share the one workflow, so the kind is decided once. Media-gated
-        # because the enhancer is image-conditioned too, but its items have no
-        # video seed to offer.
         i2v = bool(group.rows) \
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
             and gallery.media_type_of_row(group.rows[0]) == MediaType.VIDEO
@@ -1245,17 +906,13 @@ class GalleryPane(QObject):
         def draw(row):
             self._draw_tile(
                 flow, row, _SEEDS_TILE if i2v else _FOLDER_TILE, wire,
-                movie_path=self._host.animated_preview(row),  # videos loop; images stay still
+                movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
-                enhance=self._enhance_state(row),           # the plus in the thumbnail's corner
-                enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
+                enhance=self._enhance_state(row),
+                enhancing=self._host.enhancing_run(row),
                 corner_buttons=self._seed_reroll_actions(row) if i2v else None,
             )
 
-        # The + leads, and the run in front of this folder's line stands last,
-        # where its tile will land; the runs waiting after it stand before it.
-        # Rows still in flight stay out of the grid below rather than standing in
-        # it as broken, output-less thumbnails.
         finished = [row for row in group.rows if gallery.produced_output(row)]
         headings = gallery.section_headings(finished)
         lead = self._host.lead_tiles(group)
@@ -1280,16 +937,6 @@ class GalleryPane(QObject):
         self._show_paged(container, _between_headings(flow, finished, headings, draw))
 
     def _folder_inflight_items(self, group) -> list[InFlightItem]:
-        """Every other run of this folder still in flight, for a tile each.
-
-        The generating tile shows the one in front, and used to be the whole of
-        what a folder said about work in flight — so a request over a folder,
-        which queues a run per image at once, showed up as a single tile the
-        images then arrived through one at a time. They are all being made;
-        the folder shows them all, each on the image it was asked of
-        (:mod:`origenerator.gui.blurred`), and each turns into its own
-        thumbnail where it stands.
-        """
         leading = self._jobs.job_for(group.key)
         in_front = leading.prompt_id if leading is not None else None
         waiting = {row["prompt_id"] for row in group.rows
@@ -1319,31 +966,16 @@ class GalleryPane(QObject):
         return _thumbnails_of(gallery.rows_under(group))
 
     def _drill_into(self, key: str):
-        """Open a folder tile's folder — the view answers by selecting its tree
-        row (:meth:`GalleryView._go_to_folder`)."""
         self.folder_open_requested.emit(key)
 
     def listed_prompt_ids(self) -> list[str]:
         return self._selection.shown
 
-    # --- multi-selection ---------------------------------------------------
-
     def _thumbnail_double_clicked(self, prompt_id: str):
-        """Open a thumbnail as a Generate tab and keep that tab.
-
-        The first click has already loaded it into the pane's preview tab; the
-        second says to stay there, so the tab stops being the one the next click
-        replaces. Browsing costs one tab however far you go; deciding to work on
-        something costs the double-click that keeps it."""
-        self.thumbnail_activated.emit(prompt_id)  # make it the selected generation
+        self.thumbnail_activated.emit(prompt_id)
         self.tab_pin_requested.emit()
 
     def apply_selection(self, prompt_id: str, modifiers):
-        """Update the multi-select set the way the held modifiers dictate.
-
-        Ctrl toggles one tile; Shift extends a contiguous run from the anchor;
-        a plain click resets to just this tile. Mirrors a typical file manager.
-        """
         self._selection.apply(
             prompt_id,
             ctrl=bool(modifiers & Qt.KeyboardModifier.ControlModifier),
@@ -1352,28 +984,16 @@ class GalleryPane(QObject):
         self._refresh_selection_highlights()
 
     def reveal_tile(self, prompt_id: str) -> bool:
-        """Land on a tile the way arriving from elsewhere should: picked, and
-        scrolled to if it sits outside the visible part of the pane. What a
-        followed link needs — a folder of dozens otherwise leaves you looking at
-        its newest items with the one you asked for highlighted off-screen.
-
-        False where this pane has no tile of its own for it."""
         self._pages.draw_past(lambda entry: entry.item == prompt_id, _NEIGHBORS_PAST_A_REVEAL)
         widget = self._thumb_widgets.get(prompt_id)
         if widget is None:
-            return False  # nothing drawn for it here: an in-flight row, or a folder
+            return False
         self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self._scroll_to(widget)
-        # The pane it was just drawn in hasn't been laid out yet, so that first
-        # attempt had no real tile position to aim at — hence a second one once
-        # this turn's layout has run (as :meth:`return_to` does).
         defer(self._scroll, lambda: self._reapply_reveal(prompt_id, widget))
         return True
 
     def _reapply_reveal(self, prompt_id: str, widget):
-        """Scroll to a revealed tile again after layout — unless the pane has since
-        been redrawn or navigated away from, in which case that tile is gone and
-        the user's new view is not ours to move."""
         if self._thumb_widgets.get(prompt_id) is widget:
             self._scroll_to(widget)
 
@@ -1388,7 +1008,6 @@ class GalleryPane(QObject):
         self._refresh_selection_highlights()
         drawn = self._scroll.widget()
         stand_at(self._scroll, self._thumb_widgets, place, drawn)
-        # Again once laid out: a pane drawn this turn has no tile positions yet.
         defer(self._scroll, lambda: stand_at(self._scroll, self._thumb_widgets, place, drawn))
 
     def _refresh_selection_highlights(self):
@@ -1403,56 +1022,29 @@ class GalleryPane(QObject):
         self.selection_changed.emit()
 
     def clear_thumbnail_selection(self):
-        """Drop the thumbnail multi-selection and its highlights while keeping the
-        on-screen tiles (unlike a rebuild), so picking the re-roll deselects them."""
         self._selection.clear()
         self._refresh_selection_highlights()
 
     @property
     def selected_ids(self) -> set:
-        """The picked thumbnails' prompt_ids (read-only), for the delete button."""
         return self._selection.picked
 
     def selected_prompt_ids(self) -> list[str]:
         return self._selection.in_shown_order()
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        """Right-click menu for a thumbnail: go to its folder, favorite/unfavorite,
-        enhance or delete the picked item(s).
-
-        Right-clicking a tile that isn't part of the current selection first
-        selects just it, so the menu always acts on something visible. The menu
-        itself is the gallery's, not this pane's — the preview in a Generate tab
-        raises the very same one over the very same generation
-        (:meth:`~origenerator.gui.gallery_view.GalleryView.generation_menu`).
-        """
         if not self._selection.holds(prompt_id):
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
             self.thumbnail_activated.emit(prompt_id)
         self.menu_requested.emit(self.selected_prompt_ids(), global_pos)
 
     def _on_tile_control(self, prompt_id: str, action: str):
-        """A tile's corner button was pressed: favorite, trash or enhance THIS one.
-
-        One item, never the selection — the control is drawn on a particular
-        thumbnail, in that thumbnail's own corner, so it has already said which item
-        it is about. The menu is where a whole selection is acted on.
-        """
         self.item_action_triggered.emit(prompt_id, action)
 
     def _enhance_state(self, row) -> str | None:
-        """What the plus in this row's lower-right corner has to say, at the
-        Enhance pane's current settings (:func:`corner_buttons.enhance_state`)."""
         return enhance_state(row, self._host.enhance_settings())
 
     def refresh_corners(self):
-        """Re-read every drawn tile's enhance corner, without rebuilding the pane.
-
-        Turning a setting in the Enhance pane changes what every item on
-        screen would get from a press — an image holding the version the pane
-        described a moment ago is now one enhancement short of the new one — and
-        none of those tiles were touched, so nothing else would tell them.
-        """
         for prompt_id, tile in self._thumb_widgets.items():
             row = self._db.get_generation(prompt_id)
             if row is not None:

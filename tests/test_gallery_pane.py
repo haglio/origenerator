@@ -1,15 +1,3 @@
-"""The Gallery pane, constructed alone — no GalleryView anywhere in sight.
-
-Until the coupling inversion this file could not exist: GalleryPane took the
-whole view and reached into it 93 times, so its 668 statements were exercised
-only from inside tests/test_gallery_view.py. Now it takes six narrow
-collaborators, and the stubs below are the whole of what standing one up
-costs. The wider behavior — how the view answers the pane's signals — stays
-pinned where the view is built; what lives here is the pane's own promise:
-its selection model, its collections, and what each collection gathers.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -22,7 +10,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator import gallery
+from origenerator import gallery, search
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -51,7 +39,6 @@ _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
 def _row(prompt_id, seed, created_at=None):
-    """One finished, fabricated image row — the least a collection tile needs."""
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
@@ -72,8 +59,6 @@ def _ago(**elapsed):
 
 
 class _StubDB:
-    """Answers the four questions the pane asks a database, from a list."""
-
     def __init__(self, rows=()):
         self.rows = list(rows)
 
@@ -155,7 +140,7 @@ def _named(widget):
 def test_the_pane_stands_alone_on_six_stubs(qtbot):
     pane, scroll = _pane(qtbot)
     pane.show_empty()
-    assert scroll.widget() is not None       # the pane filled its own canvas
+    assert scroll.widget() is not None
     assert pane.listed_prompt_ids() == []
 
 
@@ -190,7 +175,7 @@ def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot):
     pane.apply_selection("g3", _CTRL)
     assert pane.selected_prompt_ids() == ["g1", "g3"]
 
-    pane.apply_selection("g1", _CTRL)          # toggles it back off
+    pane.apply_selection("g1", _CTRL)
     assert pane.selected_prompt_ids() == ["g3"]
 
 
@@ -200,7 +185,7 @@ def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot):
     _open_latest(pane, rows)
     elsewhere = QWidget()
     qtbot.addWidget(elsewhere)
-    qtbot.keyClick(elsewhere, Qt.Key.Key_Z, _CTRL)  # Qt Test leaves Ctrl down app-wide
+    qtbot.keyClick(elsewhere, Qt.Key.Key_Z, _CTRL)
 
     qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)
     qtbot.mouseClick(pane._thumb_widgets["g2"], Qt.MouseButton.LeftButton, _NO_MOD)
@@ -230,7 +215,7 @@ def test_clearing_the_thumbnail_selection_announces_it(qtbot):
     pane.clear_thumbnail_selection()
 
     assert pane.selected_prompt_ids() == []
-    assert heard  # the view re-aims its buttons off exactly this
+    assert heard
 
 
 def _sixty():
@@ -398,7 +383,6 @@ def test_latest_heads_each_batch_with_when_it_was_made(qtbot):
 
 
 def _running(prompt_id, seed, created_at=None):
-    """A fabricated run still going: no file of its own yet."""
     return dict(_row(prompt_id, seed, created_at), status="running",
                 output_files=json.dumps([]))
 
@@ -413,14 +397,10 @@ def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_i
 
 
 def _waiting(prompt_id, seed, created_at=None):
-    """A fabricated run still in this app's line."""
     return dict(_running(prompt_id, seed, created_at), status="pending")
 
 
 def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtbot):
-    # Latest reads newest first, and the run being made is the next to land, so
-    # its tile stands beside the newest finished item, where it will go; the
-    # last run in the line stands farthest from it.
     finished = [_row("g1", 1, _ago(minutes=5))]
     rows = [_running("j1", 2), _waiting("j2", 3), _waiting("j3", 4), *finished]
     pane, _scroll = _pane(qtbot, rows, jobs=_StubJobQueue(order=["j1", "j2", "j3"]))
@@ -431,8 +411,6 @@ def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtb
 
 
 def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot):
-    # A drag in the queue, or a run ComfyUI turns out to be making, moves runs
-    # without adding or taking away any.
     jobs = _StubJobQueue(order=["j1", "j2"])
     pane, _scroll = _pane(qtbot, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs,
                           selected=LATEST_KEY)
@@ -465,7 +443,7 @@ def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot):
     first, second = [heading for heading in gallery.section_headings(rows) if heading]
     shown = _shown_in_order(scroll)
     assert shown[0] == first
-    assert shown[shown.index("a50") - 1] == "a49"   # the batch carries on over the page
+    assert shown[shown.index("a50") - 1] == "a49"
     assert shown[shown.index("b0") - 1] == second
 
 
@@ -572,8 +550,6 @@ def test_the_run_in_front_stays_beside_the_plus_when_the_modify_tile_stands_abov
 
 
 def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_last(qtbot):
-    # The run in front lands next, beside the newest item, so the runs
-    # waiting after it stand before it rather than between it and that item.
     finished = _row("g1", 1, _ago(minutes=5))
     rows = [_running("r1", 2), _waiting("r2", 3), _waiting("r3", 4), finished]
     tiles = LeadTiles(reroll=QLabel("new"), generating=QLabel("generating"))
@@ -768,9 +744,6 @@ def _folders_of_folders(tree):
 
 
 def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeypatch):
-    # Every collection of a shape asks for its rows on each rebuild, and each ask
-    # dealt the whole listing out to the shape afresh: thirteen passes over the
-    # library per rebuild for five collections.
     dealt = []
     filter_rows = gallery_pane.filter_rows
     monkeypatch.setattr(gallery_pane, "filter_rows",
@@ -790,8 +763,6 @@ def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeyp
 
 
 def test_a_redraw_of_the_latest_collection_keeps_the_tiles_it_already_drew(qtbot):
-    # Every landing redraws the collection from a fresh model, and every tile the
-    # user had scrolled into view was built again from its thumbnail.
     rows = [_row("a", 1), _row("b", 2)]
     pane, _scroll = _pane(qtbot, rows)
     _open_latest(pane, rows)
@@ -827,8 +798,6 @@ def test_a_tile_whose_thumbnail_changed_is_drawn_afresh(qtbot):
 
 
 def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_collection(qtbot):
-    # A folder's tile and a collection's answer a double-click differently, so one is
-    # never wired for the other.
     rows = [_made_with("a1", "alpha.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     (lora,) = gallery.child_groups(_models(tree)["alpha"])
@@ -896,8 +865,18 @@ def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_head
 
 
 def test_a_pane_with_nothing_drawn_marks_no_folder_square(qtbot):
-    # A slideshow closing as the app itself closes hands its slide to a pane that has
-    # nothing in it, and asking an empty pane for its squares took the app down.
     pane, _scroll = _pane(qtbot)
 
     assert pane.reveal_folder("image/sdxl_t2i/abc::landscape") is False
+
+
+def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):
+    pane, _scroll = _pane(qtbot)
+    tiles = [search.SearchTile(row=_row("a", 1)), search.SearchTile(row=_row("b", 2))]
+    heading = search.group_by_model_lora(tiles)[0][0]
+
+    pane.show_search_results(
+        tiles, sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None,
+        collapsed={heading})
+
+    assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "b"]

@@ -19,7 +19,6 @@ from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.drop_style_seen import worn
 
-
 _NO_LOOKUPS = ZoneLookups(lent_by=lambda pid: pid, preview=lambda pid: (None, None))
 
 

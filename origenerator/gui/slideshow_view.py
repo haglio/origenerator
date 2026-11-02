@@ -17,7 +17,7 @@ from origenerator import osr2 as osr2_device
 from origenerator.config import FRAMES_BEING_MADE_DIR
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
+from origenerator.gui.funestra_pane import FunestraPane, PaneChannel, PaneSound
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.message import HEARD_MARK, INFO, Message
@@ -107,10 +107,10 @@ class SlideshowView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._pane = FunestraPane(
-            self, channel=channel, user=lambda _playback: _TheWindowsPresses(self),
+            channel=channel, user=lambda _playback: _TheWindowsPresses(self),
             hud=self._hud_model,
             engine_for=None if engine is None else (lambda _window_id: engine),
-            radio=radio, volume=volume, on_volume_moved=self._volume_moved)
+            sound=PaneSound(radio, volume, self._volume_moved))
         layout.addWidget(self._pane, 1)
         self.slideshow.tick()
 

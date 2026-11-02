@@ -106,6 +106,14 @@ class Combine(QWidget):
         self._recent_videos.picked.connect(self.video_zone.set_item)
         _keep_its_room_when_hidden(self._recent_videos)
 
+        self._build_the_video_part()
+
+        self._build_the_intent_part()
+
+        self._lay_out_the_panel()
+        self._sync()
+
+    def _build_the_video_part(self) -> None:
         self._category = QComboBox()
         self._list_the_actions(VIDEO)
         open_the_list_in_full(self._category)
@@ -134,6 +142,7 @@ class Combine(QWidget):
         video_row.addWidget(self._action_part, 1)
         video_row.addWidget(self.video_zone, 1)
 
+    def _build_the_intent_part(self) -> None:
         self._video_radio = QRadioButton("Kino")
         self._video_radio.setToolTip(
             "Make a full-length video for the Satellite Funestras."
@@ -156,6 +165,7 @@ class Combine(QWidget):
         intent_row.addWidget(self._genau_radio)
         intent_row.addStretch(1)
 
+    def _lay_out_the_panel(self) -> None:
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._emit)
         self._open_btn = QPushButton("Edit individual…")
@@ -185,7 +195,6 @@ class Combine(QWidget):
         layout.addWidget(self._generate_btn)
         layout.addWidget(self._open_btn)
         layout.addWidget(self._defaults_btn)
-        self._sync()
 
     def selected_intent(self) -> str:
         return GENAU if self._genau_radio.isChecked() else VIDEO

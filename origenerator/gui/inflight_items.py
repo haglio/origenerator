@@ -128,6 +128,9 @@ class InFlightItems:
             ))
             if row.get("status") == GenerationStatus.RUNNING:
                 sent.add(pid)
+        return self._in_queue_order(items, sent)
+
+    def _in_queue_order(self, items: list[InFlightItem], sent: set[str]) -> list[InFlightItem]:
         place = {pid: i for i, pid in enumerate(self._jobs.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    not it.reading.rendering))

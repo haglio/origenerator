@@ -1379,7 +1379,7 @@ def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     assert config.CUSTOM_POSES_DIR == config.LIBRARY_ROOT / "images" / "custom_poses"
 
 
-def test_sdxl_pose_transfer_build_api_payload_structure():
+def _sdxl_pose_transfer_payload() -> tuple[dict, dict]:
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(
         wf.default_params(),
@@ -1392,7 +1392,11 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
         enhance=True,
     )
     assert params["control_mode"] == "depth"
-    payload = wf.build_api_payload(params)
+    return params, wf.build_api_payload(params)
+
+
+def test_sdxl_pose_transfer_reads_depth_off_its_image_and_controls_with_it():
+    params, payload = _sdxl_pose_transfer_payload()
 
     load_id = _node_id(payload, "LoadImage")
     scale_id = _node_id(payload, "ImageScaleToTotalPixels")
@@ -1424,6 +1428,11 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     assert apply["inputs"]["strength"] == 0.65
     assert apply["inputs"]["start_percent"] == 0.0
     assert apply["inputs"]["end_percent"] == 0.9
+
+
+def test_sdxl_pose_transfer_samples_through_its_control_and_saves_the_final_decode():
+    params, payload = _sdxl_pose_transfer_payload()
+    apply = _find_node(payload, "ControlNetApplyAdvanced")
 
     encodes = {
         n["inputs"]["text"]: nid for nid, n in payload.items()

@@ -37,24 +37,6 @@ from origenerator.win32 import (
 
 logger = logging.getLogger(__name__)
 
-# Everything the session remembers about the view, as (its key in the state file,
-# what the view is asked for it on the way out, what the view is told on the way
-# back in). One list rather than three: a key used to be declared, then restored
-# by a hand-written line, then saved by another twenty lines away, and a
-# preference restored but never saved — or the reverse — failed silently and
-# stayed that way. The pair is named as the view's own methods rather than by
-# name, so a half-wired preference is an import error and the dead-code gate can
-# still see who calls them.
-#
-# The keys are the state file's public surface and cannot change, "generate_tabs"
-# included: it is from before the Generate and Gallery views merged, and a
-# session saved then still opens. "osr2_enabled" is the same: it holds whether
-# the OSR2 switch was left driving or parked, and reads the True or False the
-# switch held before it had four states, and the retracted and control off of
-# those four, as parked.
-#
-# The order is the restore order and is load-bearing: the tabs before the folder
-# before the generation, each later one needing what the earlier ones put up.
 SESSION_UI_STATE = (
     ("generate_tabs", GalleryView.capture_generate_tabs, GalleryView.restore_generate_tabs),
     ("toc_shapes", GalleryView.toc_shapes, GalleryView.set_toc_sides),
@@ -66,29 +48,14 @@ SESSION_UI_STATE = (
     ("max_intensity", GalleryView.max_intensity, GalleryView.set_max_intensity),
     ("motion", GalleryView.motion_settings, GalleryView.set_motion_settings),
     ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
-    # Origenerator Radio's switch, under the name it was saved by before it was
-    # the radio: a saved session keeps the word it was written with.
     ("audio_enabled", GalleryView.radio_enabled, GalleryView.set_radio_enabled),
-    # The mic switch. Absent from a session saved before it was persisted — and
-    # from a first launch — which is the app's default of on (see set_mic_enabled).
     ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),
-    # The Enhance pane's settings. App-wide, so they belong to the session
-    # rather than to any folder's row in the database.
     ("enhance_settings", GalleryView.enhance_settings, GalleryView.set_enhance_settings),
-    # How the gallery search lays its results out (newest first, or banded by
-    # model + LoRA). The query itself is deliberately not saved — a search is
-    # something you are doing, not somewhere you were — but which way you like to
-    # read the answer is a preference, and re-picking it every launch is the kind
-    # of small friction that makes a control feel unfinished.
     ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
     ("slideshows", GalleryView.remembered_slideshows, GalleryView.remember_slideshows),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
 )
 
-# The three the view does not own. Geometry and where each border was dragged
-# are the window's own, and the prompt heights are a module-level store read
-# before the first form is built (see __init__), so none is a view getter and
-# none belongs in the table.
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
 _PANE_SIZES_KEY = "pane_sizes"
 _KEYS_THE_SESSION_OWNS = frozenset(
@@ -117,39 +84,20 @@ class Core(QMainWindow):
         self._fun_time = fun_time
         self._taskbar = taskbar
 
-        # Before anything below builds a param form: a prompt field reads its
-        # height as it is constructed, and the view built a few lines down brings
-        # its first one with it.
         PROMPT_HEIGHTS.restore(app_state.get(_PROMPT_HEIGHTS_KEY))
         self.setWindowTitle(WINDOW_TITLE if fun_time else window_title(WINDOW_TITLE, preview))
-        # A small floor (not the old 1000x700) so a tiling window manager can snap
-        # the window into a monitor third (~853px) or a portrait-monitor half
-        # (~720px) — Qt maps this straight to the window's min track size. The
-        # gallery's own pane floors keep content readable at those tiling sizes; only
-        # a manual drag below that compresses it.
         self.setMinimumSize(600, 400)
-        # The rect this window is pinned to once shown, or None standalone.
         self._device_rect = None
         if fun_time is not None:
             self._wear_the_session(fun_time)
 
-        # One unified view: the gallery, whose Generate pane now holds the editable
-        # Generate tabs that used to be a separate Generate tab. A clicked
-        # thumbnail, the New tile, and the Combine all feed it.
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
                                          prompt_heights=PROMPT_HEIGHTS)
         self.setCentralWidget(self._gallery_view)
-        # Where a run that outlasted the user's attention reports itself: the
-        # window's own icon, on a tray icon that lives as long as the app does.
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
         self._gallery_view.run_ended.connect(self._toasts.note)
         if fun_time is not None:
-            # The session's channels: its verbs onto the region slideshows, the
-            # paused flag over them, and the occupancy status back. Built here
-            # rather than by the boot, which had to reach through this window
-            # for the gallery to hand over. Parented to the window, so it lives
-            # exactly as long as the app.
             self._answer_the_crossings(
                 FunTimeBridge(fun_time, self._gallery_view, parent=self))
         self.hands_its_window_over: HeadsetWindow | None = None
@@ -164,33 +112,16 @@ class Core(QMainWindow):
 
         self._restore_session()
         self._persist_the_session_as_it_changes()
-        # Background experiments belong to the closed app, so the ones the last
-        # absence left in ComfyUI's queue are dropped before anything is adopted:
-        # an open app never has one competing for the GPU. The production app's
-        # alone, both ends of it: the rows a branch session would clear are the
-        # production app's experiments, running in the ComfyUI they share.
         if not is_branch_session():
             cancel_experiments(db, client)
-        # The same absence carried a batch of base re-renders. Fold the ones that
-        # finished into the images they repair — before the first refresh builds
-        # the tree, so a repaired image is already showing both its versions when
-        # it is drawn — and drop the rest: the GPU is the user's again.
         fold_completed_base_renders(db)
         cancel_base_renders(db, client)
         places_backfill.fold_found_places(db, client, places_backfill.RECORD)
         if not is_branch_session():
             downtime.forget_work_left()
-        # Reconnect to any generation left running by the previous session. A tab's
-        # Generate is itself a re-roll, so every in-flight row is the gallery's to
-        # re-adopt — the tabs restore their configs only, owning no jobs.
         self._gallery_view.reconnect_running_jobs()
 
     def _restore_session(self):
-        """Put the window back where it was — same monitor, size, and maximized
-        state — and reopen the last session's Generate tabs, gallery folder, and
-        selected generation.  Inside a Fun Time session the geometry is the
-        session's to dictate, so the saved one is neither restored nor (see
-        ``closeEvent``) overwritten -- except in a headset, which names no rect."""
         if self._fun_time is None or self._fun_time.in_a_headset:
             self._restore_geometry()
         for key, _getter, setter in SESSION_UI_STATE:
@@ -212,42 +143,20 @@ class Core(QMainWindow):
             logger.warning("Could not save the session; trying again shortly: %s", e)
 
     def _restore_geometry(self):
-        """Reapply the saved window geometry: screen, size, and maximized state.
-
-        Qt's ``saveGeometry`` blob is stored base64-encoded in the JSON state.
-        A missing or corrupt value just leaves the window at its default size.
-        """
         blob = self._app_state.get(GEOMETRY_KEY)
         if not isinstance(blob, str):
             return
         try:
             self.restoreGeometry(QByteArray(base64.b64decode(blob)))
         except ValueError:
-            pass  # corrupt/hand-edited state — fall back to the default size
+            pass
 
     def showEvent(self, event):
-        """Pin the window to the DEVICE rect the session named.
-
-        Qt has already placed it by then, in its own coordinates, which in a
-        scaled process cannot name a point on a second monitor unambiguously
-        (origenerator.win32.place_window_in_device_pixels says why).  So the
-        rect is re-applied through Win32 every time the window is shown --
-        cheap, and it survives a reparent or a flag change putting Qt's own
-        geometry back.
-        """
         super().showEvent(event)
         if self._device_rect is not None:
             place_window_in_device_pixels(int(self.winId()), *self._device_rect)
 
     def go_to_generation(self, prompt_id: str) -> None:
-        """Put a generation in front of the user, from outside this window.
-
-        What a clicked toast comes to (:mod:`origenerator.app_link`).
-        Standalone that means this window over whatever they had moved on to;
-        hosted, the window is the session's to show and taking the foreground
-        for it would put it over the room instead, so the gallery asks the room
-        for it, as it does for a lock in the room.
-        """
         if self._fun_time is None:
             self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
             self.show()
@@ -255,7 +164,6 @@ class Core(QMainWindow):
         self._gallery_view.show_generation(prompt_id)
 
     def the_session_has_the_device(self, held: bool) -> None:
-        """A Fun Time session running beside this window has the OSR2, or not."""
         self._gallery_view.osr2_control.the_session_has_it(held)
 
     def slideshow_showing_on(self) -> str | None:
@@ -282,10 +190,6 @@ class Core(QMainWindow):
             self.showMinimized()
 
     def _hand_the_window_over(self, session: FunTimeSession) -> None:
-        """Publish this window's frame for a room in the headset, which has no
-        monitor to put it on.  Shown, because Qt draws nothing for a window
-        Windows has unmapped, and out of sight, because he is not in front of
-        it."""
         self.show()
         keep_out_of_sight(int(self.winId()))
         self.hands_its_window_over = HeadsetWindow(self, session, parent=self)
@@ -351,10 +255,6 @@ class Core(QMainWindow):
                 self.showMinimized()
 
     def _wear_the_session(self, session: FunTimeSession) -> None:
-        # A managed window of the hosting session: frameless so the client
-        # area IS the rect Fun Time named (the Random Favs Browser's), and
-        # in the topmost layer where every managed window lives — Fun Time
-        # decides who within the layer is in front.
         self._dress_for_the_room(session)
         if session.in_a_headset:
             self._fill_the_frame_cap()
@@ -385,10 +285,6 @@ class Core(QMainWindow):
         self.resize(round(width * grow), round(height * grow))
 
     def _sit_at_the_sessions_rect(self, rect: Rect) -> None:
-        # Set here so the window opens near the right size, then pinned to
-        # the exact DEVICE rect once it is shown (see showEvent): a scaled
-        # process cannot say a second monitor's coordinates in Qt's space at
-        # all (origenerator.win32.place_window_in_device_pixels).
         self.setGeometry(rect.x, rect.y, rect.width, rect.height)
         self._device_rect = (rect.x, rect.y, rect.width, rect.height)
 
@@ -432,8 +328,6 @@ class Core(QMainWindow):
             self._borders.keep_where_they_are()
         self._app_state.set(_PANE_SIZES_KEY, self._borders.sizes())
         if self._fun_time is None and self.isVisible():
-            # Hosted, the geometry is the session's to decide, so remembering
-            # this launch's would overwrite the window the user actually sizes.
             self._app_state.set(
                 GEOMETRY_KEY,
                 base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),

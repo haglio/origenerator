@@ -1,29 +1,3 @@
-"""Fun Time's hands on a hosted Origenerator: the file channels, polled.
-
-Fun Time drives its Satellite Funestras through a command file, a paused flag
-and a status file (``funestra.file_channel`` / ``funestra.status``); a
-hosted Origenerator answers the same idioms so the session reaches the region
-slideshows the way it reaches the Funestras:
-
-* ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
-  steps the Portrait Funestra — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
-  and the landscape shape.  ``PORTRAIT_OPEN_SLIDESHOW`` fills that region (its
-  Funestra switching INTO origenerator mode), ``PORTRAIT_CLOSE_SLIDESHOW``
-  clears it again and ``CLOSE_SLIDESHOWS`` clears both;
-  ``FILTER_ENHANCED`` flips the enhanced-only switch a slideshow's HUD and the
-  session's console both carry; ``GO_TO|<file>`` puts the generation a file
-  is a copy of in front of him, asking the room for this window's place;
-  ``RELEASE`` gives a taken-over window back to standalone.  Every line it
-  answers is declared in :mod:`origenerator.fun_time_mode`, which publishes them.
-* The paused flag freezes the slideshows the way it freezes the Funestras, so
-  OmniPause is one write here too — held by the gallery, not just edged onto
-  the open slideshows, so a slideshow opened mid-pause opens frozen.
-* The status file says which regions are occupied (and by what) — a readout
-  for the hosting session's diagnostics.
-* A click on a slideshow asks the room for OmniPause (:func:`ask_for_omnipause`) on
-  the dashboard channel, where a Funestra's click on what it shows asks for it.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -79,21 +53,11 @@ def ask_for_the_funestra(dashboard_cmd_file, shape: str) -> None:
 
 
 def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
-    """Ask the room to show this app — the mode its own HUD button asks for.
-
-    The session parks this window under the players in video mode, so anything
-    that has to be seen here (a clicked toast, arriving from outside the
-    room entirely) has to ask for the mode before it shows anything. An older
-    session names no channel to ask on, and there the asking is simply skipped.
-    """
     if dashboard_cmd_file is not None:
         append_command(dashboard_cmd_file, ORIGENERATOR_MODE)
 
 
 def _split_argument(line: str) -> tuple[str, str, str]:
-    """A verb, its marker, and what it carries: the words of a spoken phrase
-    after a ":", the path of a thumbnail after a "|" — whichever comes first,
-    since a Windows path carries a colon of its own."""
     cuts = [line.find(mark) for mark in ":|" if mark in line]
     if not cuts:
         return line, "", ""
@@ -113,22 +77,18 @@ def _without_when_said(said: str) -> tuple[str, float | None]:
 
 
 class FunTimeBridge(QObject):
-    """Polls the session's channels and routes them onto the gallery's slideshows."""
-
     released = pyqtSignal()
-    hand_over_asked = pyqtSignal(Path, Path)  # the frames file, the input file
+    hand_over_asked = pyqtSignal(Path, Path)
     take_back_asked = pyqtSignal()
 
     def __init__(self, session: FunTimeSession, gallery, parent=None, *, radio_dir=RADIO_DIR):
         super().__init__(parent)
         self._session = session
         self._radio_dir = radio_dir
-        # The radio files dealt to the session's Funestras, None until dealt.
         self._radio: list[Path] | None = None
         self._gallery = gallery
         self._paused = False
         self._published = False
-        # The verbs about the session's slideshows as a whole, rather than one side's.
         self._session_verbs = {
             CLOSE_SLIDESHOWS: self._close_the_slideshows,
             FILTER_ENHANCED: self._filter_enhanced,
@@ -157,12 +117,7 @@ class FunTimeBridge(QObject):
         self._apply_paused()
         self._publish_status()
 
-    # --- Origenerator Radio --------------------------------------------------
-
     def _deal_the_radio_once(self) -> None:
-        """Deal each Funestra the session handed over its own stations, the
-        moment this app is up: they play on out of earshot from then, so an
-        image tunes in wherever its station has got to."""
         if self._radio is not None:
             return
         playlists = {shape: channel.playlist for shape in SHAPES
@@ -170,9 +125,6 @@ class FunTimeBridge(QObject):
         self._radio = deal_to_the_funestras(playlists, videos_dir=self._radio_dir)
 
     def take_the_radio_back(self) -> None:
-        """Silence the stations dealt to the session's Funestras: this app is
-        going, and a radio with nothing of this app's to tune in for is six
-        streams played for no one."""
         for path in self._radio or ():
             try:
                 path.unlink(missing_ok=True)
@@ -180,15 +132,7 @@ class FunTimeBridge(QObject):
                 logger.warning("Could not take back the radio dealt in %s: %s", path, refused)
         self._radio = []
 
-    # --- commands in --------------------------------------------------------
-
     def _drain_commands(self) -> None:
-        """Take the queued verbs, keeping the case of what a verb carries.
-
-        The Funestras fold the whole payload, which suits verbs that carry no
-        argument; one here does — a spoken phrase, which is words rather than a
-        keyword — so the keyword alone is folded (see :meth:`_apply`).
-        """
         if self._session.command_file is None:
             return
         for verb in consume_command_file(self._session.command_file, logger=logger,
@@ -206,7 +150,7 @@ class FunTimeBridge(QObject):
             argument, said_at = _without_when_said(argument)
         elif not marker:
             keyword, said_at = _without_when_said(keyword)
-        keyword = keyword.upper()  # what it carries keeps its case
+        keyword = keyword.upper()
         if keyword == HAND_OVER and marker == "|":
             frames, _, taken = argument.partition("|")
             self.hand_over_asked.emit(Path(frames), Path(taken))
@@ -229,10 +173,6 @@ class FunTimeBridge(QObject):
             self._gallery.tell_the_hud(shape, action, argument)
             return
         if action == SAY and marker == ":":
-            # The session owns the microphone for the whole room, so a spoken
-            # command about one of these regions is heard THERE and sent here
-            # as the words themselves — matched by this app's own vocabulary,
-            # which is the only place that knows its collections and its parts.
             self._run_what_was_said(shape, argument, said_at)
             return
         self._apply_shape(shape, action, argument, line, said_at)
@@ -252,9 +192,6 @@ class FunTimeBridge(QObject):
         self._gallery.close_the_slideshow(shape)
 
     def _close_the_slideshows(self) -> None:
-        # Through the gallery, not slideshow by slideshow: it has to stop WANTING the
-        # regions first, or each close it makes here is answered by the
-        # base state opening again underneath it.
         self._drop_the_request_said_to(self._request_shape)
         self._gallery.close_the_slideshows()
 
@@ -277,14 +214,6 @@ class FunTimeBridge(QObject):
         self.released.emit()
 
     def _filter_enhanced(self) -> None:
-        """The session's enhanced-only switch, pressed there and landing here.
-
-        One switch in the session and two regions under it, so the press moves
-        both and reads the pair to decide which way: anything narrowed widens,
-        nothing narrowed narrows.  Flipped side by side they could disagree — a
-        region whose set has nothing enhanced in it refuses the narrowing — and
-        one lit switch cannot say that a room is half narrowed.
-        """
         slideshows = [slideshow for slideshow in map(self._gallery.region_slideshow, SHAPES)
                       if slideshow is not None]
         enhanced_only = not any(slideshow.hud_enhanced_mode for slideshow in slideshows)
@@ -293,22 +222,13 @@ class FunTimeBridge(QObject):
 
     def _apply_shape(self, shape: str, action: str, argument: str, line: str,
                     said_at: float | None) -> None:
-        """A press on *shape*'s HUD, onto whatever holds that shape.
-
-        The same answers a slideshow's own HUD gets
-        (:func:`~origenerator.slideshow_buttons.answer`): the session routes a
-        Funestra's presses back here verbatim, and its own hotkeys spell the
-        transport the same way, so one table says what every one of them means.
-        """
         slideshow = self._gallery.region_slideshow(shape)
         if slideshow is None:
-            return  # an empty region has nothing to drive
+            return
         if action in PRESSES_ABOUT_THE_SLIDE:
             slideshow.back_to_what_was_said_over(said_at)
         if not answer(slideshow, action, argument):
             logger.warning("Unanswered press for the %s slideshow dropped: %s", shape, line)
-
-    # --- the paused flag ----------------------------------------------------
 
     def _apply_paused(self) -> None:
         if self._session.paused_file is None:
@@ -317,27 +237,13 @@ class FunTimeBridge(QObject):
         if paused == self._paused:
             return
         self._paused = paused
-        # The gallery holds the flag and fans it out, so a slideshow opened between
-        # this edge and the next one still opens frozen — the edge alone once
-        # left a mid-pause slideshow playing.
         self._gallery.set_room_paused(paused)
 
-    # --- status out ---------------------------------------------------------
-
-    #: The whole of it: this app is up and answering.  It published six keys
-    #: for years -- which shape held a slideshow, what it was showing, whether it was
-    #: locked -- and the session read none of them; it waits on this file
-    #: appearing, and nothing else, to know the mode can be opened.  The owner
-    #: settled that on 2026-09-05 (audit Q13): nothing was to be wired to read
-    #: those six, so the channel goes and the signal stays.
     READY = "ready=1"
 
     def _publish_status(self) -> None:
         if self._session.status_file is None:
             return
-        # Republished when it is not there as well as when it changes: the
-        # session clears this file as it opens the mode, and a signal written
-        # once would never come back for the session that cleared it.
         if self._published and self._session.status_file.exists():
             return
         self._published = publish_whole(self._session.status_file,

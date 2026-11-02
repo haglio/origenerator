@@ -1,24 +1,3 @@
-"""The controls a generation wears in the corners of its thumbnail or preview.
-
-A thumbnail in the Gallery pane and the preview in a Generate tab are showing the
-same thing, so they offer the same three controls on it, in the same three corners:
-favorite it (top right), trash it (lower left), enhance it (lower right). Learn
-them once and they are in the same places wherever a generation is on screen.
-Top-LEFT is not one of them: the item type icon has always lived there, and a
-control that landed on it would be a control that moves depending on which collection
-you happened to open.
-
-Each mark is the state and the button at once. A filled green star IS the
-favorite, and pressing it is what takes the favorite away; the yellow plus IS
-the enhancement the image holds. That is why the signs these replaced are gone
-rather than sitting beside them: an item can no longer carry a sign saying
-one thing next to a control doing another, because there is only the one mark.
-
-All three are up whenever there is a generation under them — they are not
-hover-revealed. Each reacts to the cursor on ITSELF and to nothing else, so
-which one you are about to press is answered by the one that lit, not by a set
-that appeared when you crossed the tile.
-"""
 from __future__ import annotations
 
 from typing import NamedTuple
@@ -36,20 +15,11 @@ TRASH = "trash"
 ENHANCE = "enhance"
 RESTORE = "restore"
 
-# The geometry the Gallery pane's other hover controls (a tile's per-seed
-# re-rolls, a review collection's keep/reject) already use, shared so the star can sit
-# in a row with them along the top of a tile and read as one row rather than as
-# a stray button beside two matching ones.
 CORNER_SIZE = BUTTON_SIZE
 CORNER_GAP = BUTTON_GAP
-# How far a control sits inside the item it is laid over. Small: the corners
-# of the item are what these mark, and a control floated well inside one
-# reads as sitting ON the image rather than as belonging to its corner.
 CORNER_INSET = GAP_SMALL
 _GLYPH_SIZE = CORNER_SIZE - 8
 
-# The translucent ground every hover control sits on, so white or colored line art
-# reads over a thumbnail of any color.
 GROUND_CSS = (
     f"QPushButton {{ background: {as_rgba(BLACK, 0.55)}; border: none; border-radius: {BUTTON_RADIUS}px; }}"
 )
@@ -71,18 +41,6 @@ class RestoreOffer(NamedTuple):
 
 
 def enhance_state(row: dict, settings) -> str | None:
-    """Which of :mod:`~origenerator.gui.icons`' three readings the enhance corner
-    shows for ``row`` at ``settings`` — or ``None`` for an item the enhancer
-    cannot take at all, which grows no plus.
-
-    The middle answer is the one worth having: an image that already holds an
-    enhancement is not finished with the enhancer, it is finished with *these
-    settings*. So the corner says "you have this one" only while the pane would
-    reproduce what is already there, and goes back to offering another the moment
-    a setting moves — which is the same question the version list's ``+ Enhance``
-    row and the Gallery pane buttons' Enhance both answer
-    (:func:`~origenerator.gallery.enhance.version_matching_settings`).
-    """
     if not gallery.is_enhanceable_row(row):
         return None
     if not gallery.is_enhanced_row(row):
@@ -131,14 +89,7 @@ class _CornerButtonFace(QPushButton):
 
 
 class CornerButtons(QObject):
-    """The three controls laid over the item one host widget shows.
-
-    The host says where the item currently is (:meth:`place`), because only
-    the host knows — the item in a thumbnail is a fixed rectangle and the one in a
-    preview moves with every resize and every change of aspect ratio.
-    """
-
-    triggered = pyqtSignal(str)  # STAR / TRASH / ENHANCE
+    triggered = pyqtSignal(str)
 
     def __init__(self, host: QWidget, *, restore: RestoreOffer | None = None):
         super().__init__(host)
@@ -162,37 +113,25 @@ class CornerButtons(QObject):
         self._retip()
 
     def buttons(self) -> list[QPushButton]:
-        """The three, for a host that has to know its own children — telling a
-        cursor that left for a button from one that left the item entirely."""
         return [self._star, self._trash, self._enhance_button]
 
     def show_for(self, *, favorite: bool, enhance: str | None):
-        """Arm the controls for the generation now on show, in its current state."""
         self._available = True
         self._favorite = favorite
         self._enhance = enhance
         self._redraw()
 
     def hide_all(self):
-        """Nothing here to act on — a live frame, a message, an empty pane."""
         self._available = False
         self._sync()
 
     def set_enhance(self, enhance: str | None):
-        """Follow the enhance corner's reading changing under the item — which a
-        turn of the Enhance pane's settings does to every item on screen at
-        once, without any of them being touched."""
         if enhance == self._enhance:
             return
         self._enhance = enhance
         self._redraw()
 
     def place(self, area: QRect):
-        """Put each control in its own corner of ``area``, in host coordinates.
-
-        Three of the four: top-left belongs to the item type icon, and to the
-        review controls a collection lays along that edge.
-        """
         inner = area.adjusted(CORNER_INSET, CORNER_INSET,
                               -CORNER_INSET, -CORNER_INSET)
         right = inner.right() - CORNER_SIZE + 1
@@ -216,20 +155,7 @@ class CornerButtons(QObject):
             self._enhance_button.setToolTip(_TIPS[self._enhance][0])
 
     def _sync(self):
-        """Show each control there is something for it to act on.
-
-        Always, not on hover: a corner that comes and goes with the cursor is a
-        corner you have to go looking for, and two of these are reporting state
-        as well as offering an action — a wall of thumbnails has to say which of
-        them are favorited without being swept. The plus is the one that can be
-        absent, and only where there is no such thing to do at all: a video, which the
-        enhancer cannot take.
-        """
         self._star.setVisible(self._available)
         self._trash.setVisible(self._available)
         self._enhance_button.setVisible(self._available and self._enhance is not None)
-        # The solid plus is a finished statement rather than an offer: this image
-        # already holds the very version the pane describes, so pressing would
-        # spend a generation arriving at the image that is already there. Turn
-        # any setting and it becomes an offer again.
         self._enhance_button.setEnabled(self._enhance != icons.ENHANCE_HELD)

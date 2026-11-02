@@ -1,4 +1,3 @@
-"""The Trash — what the collection sees, and what the launch reclaims."""
 from __future__ import annotations
 
 import json
@@ -21,7 +20,6 @@ _NOW = datetime(2026, 8, 15, 3, 0, 0, tzinfo=UTC).replace(tzinfo=None)
 
 
 def _record(prompt_id="p1", *, deleted_at=_NOW, row=None, batch=None):
-    """One trashed item, shaped the way Database.list_trashed returns it."""
     return {
         "prompt_id": prompt_id,
         "row": row if row is not None else {"prompt_id": prompt_id},
@@ -37,11 +35,8 @@ def _file(path, data=b"x"):
     return path
 
 
-# --- how long it has been sitting there ------------------------------------
-
 
 def test_a_fresh_delete_has_been_in_the_trash_no_days_at_all():
-    # Rounded down: "I trashed this an hour ago" is not a day in the trash.
     assert trash_collection.days_held(_record(deleted_at=_NOW - timedelta(hours=5)), _NOW) == 0
 
 
@@ -54,23 +49,19 @@ def test_an_undateable_record_reads_as_freshly_deleted():
     assert trash_collection.days_held(_record(deleted_at="not a date"), _NOW) == 0
 
 
-# --- what the collection draws ---------------------------------------------
-
 
 def test_a_trash_item_is_the_deleted_row_plus_when_it_was_deleted():
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i", "starred": 1,
            "output_files": json.dumps([{"filename": "a.png", "subfolder": ""}])}
     (item,) = trash_collection.trash_items([_record(row=row)], _NOW)
 
-    assert item["workflow_name"] == "sdxl_t2i"   # still the row it always was
+    assert item["workflow_name"] == "sdxl_t2i"
     assert item["starred"] == 1
     assert item["deleted_at"]
-    assert "days_left" not in item   # nothing counts down; it stays until told
+    assert "days_left" not in item
 
 
 def test_a_trash_items_thumbnail_points_at_where_the_file_actually_is():
-    # The tile has to draw something, and the delete moved the thumbnail into
-    # the trash — the row's own path leads nowhere now.
     original, trashed = r"C:\thumbs\p1.jpg", r"C:\state\trash\abc\1_p1.jpg"
     record = _record(
         row={"prompt_id": "p1", "thumbnail_path": original},
@@ -81,15 +72,12 @@ def test_a_trash_items_thumbnail_points_at_where_the_file_actually_is():
 
 
 def test_a_trash_item_keeps_its_path_when_the_delete_moved_nothing():
-    # A delete whose files were already gone moved nothing, so there is nothing to re-point.
     record = _record(row={"prompt_id": "p1", "thumbnail_path": r"C:\thumbs\p1.jpg"})
     (item,) = trash_collection.trash_items([record], _NOW)
     assert item["thumbnail_path"] == r"C:\thumbs\p1.jpg"
 
 
 def test_a_trash_items_output_files_point_at_where_they_actually_are():
-    # What makes a deleted item as watchable as any other: its video is in the
-    # trash, so the row that plays it has to say so.
     trashed = r"C:\state\trash\abc\0_clip.mp4"
     record = _record(
         row={"prompt_id": "p1",
@@ -100,8 +88,6 @@ def test_a_trash_items_output_files_point_at_where_they_actually_are():
     (f,) = json.loads(item["output_files"])
 
     assert f["path"] == trashed
-    # And it still says what the generation produced — the name the Generate pane
-    # shows and the copy button hands over is the file's own, not the trash's.
     assert (f["filename"], f["subfolder"]) == ("clip.mp4", "video")
 
 
@@ -125,8 +111,6 @@ def test_trash_items_keeps_the_order_it_was_given():
     items = trash_collection.trash_items([_record("p2"), _record("p1")], _NOW)
     assert [i["prompt_id"] for i in items] == ["p2", "p1"]
 
-
-# --- restoring and ending one ----------------------------------------------
 
 
 def test_restore_puts_the_row_and_its_files_back(tmp_path):
@@ -177,13 +161,8 @@ def test_purge_takes_the_held_files_and_forgets_the_record(tmp_path):
     assert db.get_trashed("p1") is None
 
 
-# --- what the launch reclaims ----------------------------------------------
-
 
 def test_the_launch_reclaims_a_batch_no_record_names(tmp_path):
-    # A rejected experiment's batch that fell off the undo stack, or one left by
-    # a crash between the move and the record: nothing can reach it, and nothing
-    # else would ever clear it.
     db = Database(tmp_path / "test.db")
     trash = Trash(tmp_path / "trash")
     held = trash.store([_file(tmp_path / "out" / "held.png")])
@@ -215,7 +194,6 @@ def test_reclaiming_with_an_empty_trash_is_a_harmless_noop(tmp_path):
 
 
 def _age(db: Database, prompt_id: str, days: int):
-    """Back-date a trashed item, without a fixture that has to sit around."""
     stamp = (trash_collection._now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with SqliteFile(db.path).connect() as conn:
         conn.execute("UPDATE deletions SET deleted_at = ? WHERE prompt_id = ?",
@@ -223,8 +201,6 @@ def _age(db: Database, prompt_id: str, days: int):
 
 
 def test_a_stored_record_survives_the_round_trip_through_the_database(tmp_path):
-    # The whole promise rests on this: a session that never performed the delete
-    # can still put it back, because the row and the moves were written down.
     db = Database(tmp_path / "test.db")
     source = _file(tmp_path / "out" / "a.png", b"data")
     batch = Trash(tmp_path / "trash").store([source])

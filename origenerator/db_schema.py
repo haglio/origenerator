@@ -1,14 +1,3 @@
-"""The app's database: the schema it writes, and how it is opened.
-
-The DDL and the migration are here rather than beside any one store because
-they are the whole file, not any table of it -- ``salvage_if_malformed`` rebuilds
-from this text, and ``migrate`` patches every table at once.
-
-tests/test_db_schema.py holds all of it as a snapshot: another app reads this
-database (mounted read-only, selecting off ``generations`` by name -- what it
-may rely on is :mod:`origenerator.gallery_contract`), and every user's database
-is migrated in place rather than rebuilt.
-"""
 from __future__ import annotations
 
 from origenerator.db_seed_uses import (
@@ -253,14 +242,6 @@ CREATE TABLE IF NOT EXISTS combine_video_uses (
 );
 """
 
-# Columns added to a table after it first shipped, and how the DDL above
-# declares each one. ``CREATE TABLE IF NOT EXISTS`` leaves a user's existing
-# table exactly as it was, so these reach an older database only through
-# ``migrate`` — as data rather than as a copy of one `if` per column, so that
-# adding a column is one entry rather than a fourth place to remember.
-# tests/test_db_schema.py holds this against the schema from both sides: an
-# older table gains every one of them, and each arrives with the type, NOT NULL
-# and default the DDL gives it.
 ADDED_COLUMNS = {
     "generations": {
         "duration_seconds": "REAL",
@@ -301,13 +282,8 @@ ADDED_COLUMNS = {
     },
 }
 
-# Tables under a name this app has stopped using, and the name they carry now.
-# History, like FIRST_SHIPPED in tests/test_db_schema.py: an entry stays here
-# for as long as a database written before the rename might still be opened.
 RENAMED_TABLES = {"custom_collection_members": "custom_folder_items"}
 
-# Every column of the generations table, in declaration order. Used to restore a
-# previously-captured row verbatim (see ``restore_generation``).
 GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
@@ -321,7 +297,6 @@ GENERATION_COLUMNS = (
 )
 
 
-# Every copy of the app opens this database, older ones too, so the columns keep their names.
 STORED_NAMES = {"action": "recipe_category", "source_video": "recipe_video_id",
                 "image_state": "picture_state"}
 
@@ -343,20 +318,12 @@ def as_stored(row: dict) -> dict:
 
 
 def create(conn) -> None:
-    """Make every table and index this app needs, if they are not there already."""
     rename_tables(conn)
     conn.executescript(f"BEGIN;\n{SCHEMA}\nCOMMIT;")
     migrate(conn)
 
 
 def rename_tables(conn) -> None:
-    """Move a table an older database spells differently onto its current name.
-
-    Before the schema script, not after: CREATE TABLE IF NOT EXISTS would
-    otherwise stand an empty table up beside the user's populated one, and every
-    row in it -- every custom collection they have ever composed -- would read as
-    gone while still sitting in the file.
-    """
     have = {row[0] for row in conn.execute(
         "SELECT name FROM sqlite_master WHERE type = 'table'")}
     for old, new in RENAMED_TABLES.items():
@@ -365,20 +332,12 @@ def rename_tables(conn) -> None:
 
 
 def migrate(conn) -> None:
-    """Bring an older database up to the current schema.
-
-    ``CREATE TABLE IF NOT EXISTS`` leaves a pre-existing table untouched, so
-    every column in ``ADDED_COLUMNS`` is patched in here. Guarded against what
-    the table already has, so this stays idempotent.
-    """
     for table, columns in ADDED_COLUMNS.items():
         existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         for column, declaration in columns.items():
             if column not in existing:
                 conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
-    # What each worktree's copied database had favorited, kept for adoption at
-    # the next live launch; a branch session runs on this database now.
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     give_old_seed_uses_their_kind(conn)
     forget_the_seeds_tabs_picked_for_their_next_press(conn)

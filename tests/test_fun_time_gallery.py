@@ -72,6 +72,14 @@ def _as_items(rows):
             for row in rows]
 
 
+def _a_gallery_showing(webp):
+    class _Showing(GalleryView):
+        def animated_preview(self, row):
+            return str(webp)
+
+    return _Showing
+
+
 def _fun_time_view(qtbot, rows=()):
     view = GalleryView(FakeDB(list(rows)), fun_time=_session())
     qtbot.addWidget(view)
@@ -1079,8 +1087,8 @@ def _moving_thumbnails(view):
 
 def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
     rows, webp = _a_looping_video(tmp_path)
-    view = _fun_time_view(qtbot, rows)
-    view.animated_preview = lambda row: str(webp)
+    view = _a_gallery_showing(webp)(FakeDB(rows), fun_time=_session())
+    qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
     assert _moving_thumbnails(view), "nothing was moving, so the sweep would prove nothing"
@@ -1371,9 +1379,8 @@ def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_
 
 def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_again(qtbot, tmp_path):
     rows, webp = _a_looping_video(tmp_path)
-    view = GalleryView(FakeDB(rows))
+    view = _a_gallery_showing(webp)(FakeDB(rows))
     qtbot.addWidget(view)
-    view.animated_preview = lambda row: str(webp)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
     view.become_hosted(_session())

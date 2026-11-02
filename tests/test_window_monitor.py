@@ -1,4 +1,3 @@
-"""Which monitor Origenerator's window comes up on, which its loading screen opens on."""
 from __future__ import annotations
 
 import base64

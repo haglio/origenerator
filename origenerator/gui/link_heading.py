@@ -1,4 +1,3 @@
-"""The bold line that names each of the links under a tab's form."""
 from __future__ import annotations
 
 from PyQt6.QtWidgets import QLabel

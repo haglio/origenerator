@@ -1,6 +1,3 @@
-"""One reading of a file reference for the whole app: the file a ``LoadImage``
-value names, the key two spellings of one file agree under, and where on disk
-the reference points."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,9 +23,6 @@ def test_split_annotation_takes_the_type_tag_off_and_nothing_else():
 
 
 def test_frame_name_is_the_key_a_stored_file_and_a_reference_share():
-    # A row records {"filename": "gen_00001_.png", "subfolder": "image"}; an i2v
-    # or an enhance built on it records "image/gen_00001_.png [output]"; a
-    # re-roll's params may carry either. All three name one file.
     assert frame_name("image/gen_00001_.png [output]") == "gen_00001_.png"
     assert frame_name("gen_00001_.png") == "gen_00001_.png"
     assert frame_name("C:\\comfy\\output\\image\\GEN_00001_.PNG") == "gen_00001_.png"
@@ -53,9 +47,9 @@ def test_reference_path_routes_the_way_comfyuis_loadimage_does(tmp_path):
 
     assert resolve("image/gen.png [output]") == out_dir / "image" / "gen.png"
     assert resolve("frame.png [input]") == in_dir / "frame.png"
-    assert resolve("frame.png") == in_dir / "frame.png"       # unannotated: the input dir
-    assert resolve("image/gen.png") is None                    # not in the input dir
-    assert resolve(str(in_dir / "frame.png")) == in_dir / "frame.png"  # absolute, as-is
+    assert resolve("frame.png") == in_dir / "frame.png"
+    assert resolve("image/gen.png") is None
+    assert resolve(str(in_dir / "frame.png")) == in_dir / "frame.png"
     assert resolve("missing.png [output]") is None
     assert resolve("") is None
     assert resolve(None) is None
@@ -63,10 +57,6 @@ def test_reference_path_routes_the_way_comfyuis_loadimage_does(tmp_path):
 
 
 def test_reference_path_routes_a_temp_reference_under_the_temp_dir(tmp_path):
-    """The third annotation ComfyUI's LoadImage writes.  A ``[temp]`` name was
-    a valid frame name to the gallery and resolved to nothing here, so the
-    derived size and the Dimensions field silently did nothing for that image
-    (bug 28)."""
     out_dir, in_dir, temp_dir = tmp_path / "output", tmp_path / "input", tmp_path / "temp"
     for d in (out_dir, in_dir, temp_dir):
         d.mkdir()

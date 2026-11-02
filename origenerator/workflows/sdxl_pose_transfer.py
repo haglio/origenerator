@@ -16,49 +16,16 @@ from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
 from origenerator.workflows.prompt_readers import CLIP
 
-# The pixel budget the output is scaled to. SDXL is trained at ~1 megapixel, so
-# the pose image's aspect ratio is kept at that budget — unlike the video
-# workflows' 0.4 MP, which would starve SDXL of resolution.
 _TARGET_MEGAPIXELS = 1.0
 
 
 class SdxlPoseTransferWorkflow(WorkflowTemplate):
     """SDXL T2I steered by the structure of an input image.
 
-    A variation of :class:`~origenerator.workflows.sdxl_t2i.SdxlT2iWorkflow`
-    that re-skins an image: a structure map extracted from the input is applied
-    through an SDXL ControlNet, so the render keeps the input's pose, angle and
-    proportions while the prompt and checkpoint replace everything else about
-    how it looks. Only the map crosses over — the sampler still denoises from
-    scratch (denoise 1.0), which is what lets the presentation change
-    completely while the structure holds.
-
-    Two structure modes. "depth" (the default) conditions on a DepthAnythingV2
-    map: it captures every body, their contact and the camera angle no matter
-    how entangled or tightly framed the scene, and carries no color or texture
-    to leak through. "pose" conditions on a DWPose skeleton instead — a looser
-    rein that only pins the figure, but DWPose's person detector collapses on
-    close-ups and horizontal, overlapping bodies (observed fusing two people
-    into one figure), so it fits single mostly-upright subjects only. The union
-    ControlNet serves both modes through one file; SetUnionControlNetType picks
-    the head, and is added only for union files because a plain single-purpose
-    ControlNet crashes on the extra argument.
-
-    The output size is derived from the input image (its aspect ratio at the
-    SDXL pixel budget), the same locked-Dimensions treatment the i2v workflows
-    get, because the structure map is stretched to the output canvas — a
-    hand-set size with a different aspect would distort the very structure it
-    exists to preserve.
-
-    Like sdxl_t2i, the render is optionally finished by the shared
-    upscale/enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`) via the
-    ``enhance`` toggle — off by default, since enhancement is a layer the
-    gallery's Enhance pane applies per folder afterward. Its second
-    sampling pass reuses the ControlNet-applied conditioning, so the structure
-    stays pinned while the checkpoint sharpens and re-textures the enlarged
-    image.
+    DWPose's person detector collapses on close-ups and overlapping bodies, which is why
+    depth is the default mode. SetUnionControlNetType is added only for union
+    ControlNets: a plain single-purpose one crashes on the extra argument.
     """
-
     name = "sdxl_pose_transfer"
     version = "v004"
     display_name = "SDXL Pose Transfer"
@@ -67,10 +34,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     model_keys = ("checkpoint",)
     lora_keys = loras_keyed_only_when_named = LORA_KEYS
     text_reader = CLIP
-    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
+    extra_enhance_keys = ("upscale_model",)
     output_node_id = "14"
-    # The pre-enhance render, saved when the tail runs. 21 is the union
-    # ControlNet and 22/23 the depth pair, so this sits clear of both.
     base_output_node_id = "24"
 
     def default_params(self) -> dict:
@@ -99,9 +64,6 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            # Kept low deliberately: at 0.3 the enhance pass re-imagined creases
-            # and skin folds into wounds/disfigurements (user-reported). 0.15
-            # refines texture without redrawing anatomy.
             "enhance_denoise": 0.15,
             "filename_prefix": "image/sdxl_pose_transfer",
         }
@@ -139,20 +101,12 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
-        """The pose image's size at the SDXL budget — the base measurement, on
-        this workflow's megapixels rather than the video default, so the locked
-        Dimensions field shows exactly what the in-graph scaling will render."""
         return measure_derived_size(
             params.get("input_image", ""), megapixels=_TARGET_MEGAPIXELS
         )
 
     @staticmethod
     def _structure_nodes(params: dict, scaled_ref) -> tuple[dict, list]:
-        """The mode's extractor subgraph and the hint-image ref it produces.
-
-        Both modes read the already-scaled image, so the map they draw shares
-        the latent's aspect exactly.
-        """
         if params["control_mode"] == "pose":
             nodes = {
                 "8": {
@@ -165,10 +119,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                         "resolution": 1024,
                         "bbox_detector": params["pose_bbox_detector"],
                         "pose_estimator": params["pose_estimator"],
-                        # xinsir's SDXL ControlNets are trained on thicker
-                        # skeleton sticks; the toggle follows the picked file so
-                        # a swapped-in non-xinsir ControlNet gets standard
-                        # sticks automatically.
+                        # xinsir's SDXL ControlNets are trained on thicker skeleton sticks.
                         "scale_stick_for_xinsr_cn": (
                             "enable" if "xinsir" in params["controlnet"].lower()
                             else "disable"
@@ -190,9 +141,6 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         return nodes, ["23", 0]
 
     def build_api_payload(self, params: dict) -> dict:
-        # Size the still off the input image: derived in-graph at the SDXL
-        # budget by default, or scaled to the user's explicit WxH when the
-        # derived size was unlocked.
         sized = self.image_size_nodes(["1", 0], params, megapixels=_TARGET_MEGAPIXELS)
         size_nodes, scaled_ref = sized.nodes, sized.image
         width_ref, height_ref = sized.width, sized.height
@@ -203,10 +151,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         )
         loras = self.lora_chain("25", ["4", 0], picked_loras(params, LORA_KEYS), clip_ref=["4", 1])
         enhance_nodes: dict = {}
-        enhanced_ref = ["13", 0]  # enhance off: save the plain decode
+        enhanced_ref = ["13", 0]
         if params.get("enhance"):
-            # The enhance pass re-samples on the ControlNet-applied conditioning
-            # (node 9), so the upscale can't drift off the structure map.
             tail = self.enhance_image_nodes(
                 image_ref=["13", 0], model_ref=loras.model,
                 positive_ref=["9", 0], negative_ref=["9", 1], vae_ref=["12", 0],
@@ -279,7 +225,5 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                 },
             },
             **enhance_nodes,
-            # With the tail on, keep the base render too — it is made on the way
-            # and would otherwise be discarded, leaving no original.
             **self.base_save_node(self.base_output_node_id, ["13", 0], params),
         }

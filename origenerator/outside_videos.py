@@ -25,7 +25,11 @@ from origenerator.gallery.source_image import videos_from_source_image
 from origenerator.gallery.tree import settings_folder_key, start_frame_index
 from origenerator.generation_state import GenerationSource, GenerationStatus, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
-from origenerator.thumbnail import first_frame_of, generate_thumbnail
+from origenerator.thumbnail import (
+    first_frame_of,
+    generate_animated_thumbnail,
+    generate_thumbnail,
+)
 from origenerator.workflows.outside import (
     PLACES,
     VideoKind,
@@ -391,6 +395,7 @@ def rows_bringing_in(video: OutsideVideo, record: Record, *, frames_dir: Path, t
                                                             thumb_dir, name=frame_id))}]
     else:
         frame_path, frames = Path(_kept_file(image)), []
+    generate_animated_thumbnail(video.path, thumb_dir, name=video_id)
     return [*frames, {
         **_video_fields(record, filed, str(frame_path), video.source, kind), **_as_brought_in(),
         "prompt_id": video_id,

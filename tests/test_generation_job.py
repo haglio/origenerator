@@ -16,12 +16,16 @@ from origenerator.gui.generation_job import (
     display_status,
     insert_generation_row,
 )
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
+from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.media_files import write_mp4
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
+I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
 
 
@@ -224,6 +228,94 @@ def test_completion_generates_thumbnail_when_output_exists(qtbot, tmp_path):
     _files, thumb, _dur = finished[0]
     assert thumb is not None
     assert Path(thumb).exists()
+
+
+class _Later:
+    def __init__(self):
+        self.waiting = []
+
+    def __call__(self, work, done, *, owner):
+        self.waiting.append((work, done))
+
+    def finish_next(self):
+        work, done = self.waiting.pop(0)
+        done(work())
+
+
+def _video_job_that_has_rendered(tmp_path, *, run):
+    places = OutputPlaces.in_one_folder(tmp_path / "out")
+    job = GenerationJob(_client(), I2V, I2V.default_params(), places=places,
+                        thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A", run=run)
+    job.start()
+    subfolder = places.run("comfy-A").relative_to(places.comfyui).as_posix() + "/video"
+    saved = write_mp4(places.comfyui / subfolder / "wan22_i2v_00001_.mp4")
+    return job, saved, {"outputs": {"19": {"images": [{"filename": saved.name,
+                                                       "subfolder": subfolder}]}}}
+
+
+def test_a_video_is_not_complete_until_its_thumbnail_is_ready_to_animate(qtbot, tmp_path):
+    later = _Later()
+    job, _saved, history = _video_job_that_has_rendered(tmp_path, run=later)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+
+    job._client.job_completed.emit("comfy-A", history)
+
+    assert finished == []
+    later.finish_next()
+    assert len(finished) == 1
+    assert animated_thumbnail_path(tmp_path / "thumbs", "comfy-A").exists()
+
+
+def test_a_video_making_its_thumbnail_still_reads_as_running_in_the_line(qtbot, tmp_path):
+    job, _saved, history = _video_job_that_has_rendered(tmp_path, run=_Later())
+
+    job._client.job_completed.emit("comfy-A", history)
+
+    assert job.state == JobState.FINISHING
+    assert display_status(job.state) == JobState.RUNNING
+
+
+def test_a_video_making_its_thumbnail_on_a_real_thread_finishes_without_holding_the_window(
+        qtbot, tmp_path):
+    job, _saved, history = _video_job_that_has_rendered(tmp_path, run=run_off_thread)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+
+    job._client.job_completed.emit("comfy-A", history)
+
+    assert finished == []
+    qtbot.waitUntil(lambda: bool(finished))
+
+
+def test_a_video_canceled_while_making_its_thumbnail_stays_where_comfyui_saved_it(qtbot, tmp_path):
+    later = _Later()
+    job, saved, history = _video_job_that_has_rendered(tmp_path, run=later)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    job._client.job_completed.emit("comfy-A", history)
+
+    job.cancel()
+    later.finish_next()
+
+    assert finished == []
+    assert job.state == JobState.CANCELED
+    assert saved.exists()
+
+
+def test_a_video_making_its_thumbnail_finishes_once_and_cannot_be_set_aside(qtbot, tmp_path):
+    later = _Later()
+    job, _saved, history = _video_job_that_has_rendered(tmp_path, run=later)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    job._client.job_completed.emit("comfy-A", history)
+
+    job.reconcile_with(history)
+    assert later.waiting[1:] == []
+    assert job.defer() is False
+    later.finish_next()
+
+    assert len(finished) == 1
 
 
 def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
@@ -723,4 +815,4 @@ def test_a_job_waiting_here_or_on_the_server_is_called_queued_on_screen():
 
 def test_every_state_a_job_walks_through_is_named_once():
     assert {state.value for state in JobState} == {
-        "idle", "speaking", "queued", "running", "finished", "failed", "canceled"}
+        "idle", "speaking", "queued", "running", "finishing", "finished", "failed", "canceled"}

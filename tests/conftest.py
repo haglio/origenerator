@@ -76,7 +76,7 @@ from origenerator import (
     running_ahead,
     toast_raising,
 )
-from origenerator.gui import job_queue, omnipause, osr2_controls, toasts, voice_router
+from origenerator.gui import generation_job, job_queue, omnipause, osr2_controls, toasts, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
@@ -409,9 +409,14 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)
 
 
+def finish_every_video_on_the_tests_own_thread(setattr) -> None:
+    setattr(generation_job, "run_off_thread", lambda work, done, *, owner: done(work()))
+
+
 @pytest.fixture(autouse=True)
 def _never_take_the_real_device(monkeypatch):
     keep_off_the_device(monkeypatch.setattr)
+    finish_every_video_on_the_tests_own_thread(monkeypatch.setattr)
 
 
 def keep_out_of_windows(setattr) -> None:

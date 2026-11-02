@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
 from shared_ui.palette import BG_BUTTON
 
-from origenerator.media import MediaType
+from origenerator.media import MediaType, media_type_from_filename
+
+logger = logging.getLogger(__name__)
 
 _THUMB_MAX = 256
 
@@ -63,23 +66,34 @@ def generate_animated_thumbnail(
     ``thumb_dir / f"{name}_anim.webp"`` — the moving preview the gallery shows for
     the videos an image was animated into.
 
-    Cached: an existing file is returned untouched. ``None`` when no frames can be
-    read (a missing or unreadable video), so the caller falls back to the static
+    Cached: an existing file is returned untouched. ``None`` when it cannot be made
+    (a missing or unreadable video), so the caller falls back to the static
     thumbnail. WebP + ``QMovie`` playback keeps many previews light and avoids a
     video player per tile.
     """
-    thumb_dir.mkdir(parents=True, exist_ok=True)
     dest = animated_thumbnail_path(thumb_dir, name)
     if dest.exists():
         return dest
-    images = _sample_video_frames(source_path, frames, _THUMB_MAX)
-    if not images:
+    being_written = dest.with_name(f"{name}.partial.anim")
+    try:
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        images = _sample_video_frames(source_path, frames, _THUMB_MAX)
+        if not images:
+            return None
+        images[0].save(
+            being_written, format="WEBP", save_all=True, append_images=images[1:],
+            duration=duration_ms, loop=0,
+        )
+        being_written.replace(dest)
+    except Exception as e:
+        logger.warning("Animated thumbnail failed for %s: %s", name, e)
         return None
-    images[0].save(
-        dest, format="WEBP", save_all=True, append_images=images[1:],
-        duration=duration_ms, loop=0,
-    )
     return dest
+
+
+def animate_if_video(path: Path, thumb_dir: Path, *, name: str) -> None:
+    if media_type_from_filename(path.name) == MediaType.VIDEO:
+        generate_animated_thumbnail(path, thumb_dir, name=name)
 
 
 def animated_thumbnail_path(thumb_dir: Path, name: str) -> Path:

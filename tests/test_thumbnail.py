@@ -11,6 +11,7 @@ from origenerator.thumbnail import (
     generate_animated_thumbnail,
     generate_thumbnail,
 )
+from tests.media_files import write_mp4
 
 
 def test_generate_thumbnail_from_image(tmp_path):
@@ -102,3 +103,11 @@ def test_a_streamed_frame_is_kept_as_a_thumbnail(tmp_path):
 def test_a_frame_that_will_not_decode_keeps_no_thumbnail(tmp_path):
     assert frame_thumbnail(b"not an image", tmp_path, name="run1_canceled") is None
     assert list(tmp_path.iterdir()) == []
+
+
+def test_an_animated_thumbnail_that_cannot_be_written_leaves_the_still_to_show(tmp_path):
+    video = write_mp4(tmp_path / "scene_one.mp4")
+    a_file_in_the_way = tmp_path / "thumbs"
+    a_file_in_the_way.write_bytes(b"not a folder")
+
+    assert generate_animated_thumbnail(video, a_file_in_the_way, name="v1") is None

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 from PyQt6.QtCore import QTimer
 
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.gui import generation_job
+from origenerator.gui import generation_job, job_speaker
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.speech import scene_speech
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -167,7 +167,7 @@ def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, 
         return _spoken_file(params, input_dir)
 
     monkeypatch.setattr(generation_job.speech, "ensure_speech_files", slow_speak)
-    monkeypatch.setattr(generation_job, "COMFYUI_INPUT_DIR", tmp_path)
+    monkeypatch.setattr(job_speaker, "COMFYUI_INPUT_DIR", tmp_path)
     client = _client()
     client.submit_job = MagicMock(side_effect=lambda *a: seen.setdefault("sent_on", threading.get_ident()))
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
@@ -196,7 +196,7 @@ def test_the_voice_a_job_with_no_window_asks_for_speaks_on_the_starting_thread(
         return _spoken_file(params, input_dir)
 
     monkeypatch.setattr(generation_job.speech, "ensure_speech_files", speak)
-    monkeypatch.setattr(generation_job, "COMFYUI_INPUT_DIR", tmp_path)
+    monkeypatch.setattr(job_speaker, "COMFYUI_INPUT_DIR", tmp_path)
     client = _client()
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
     job.start()
@@ -217,8 +217,8 @@ def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_
         "    pathlib.Path(item['out']).write_bytes(b'RIFF')\n",
         encoding="utf-8")
     monkeypatch.setattr(generation_job.speech, "WORKER", worker)
-    monkeypatch.setattr(generation_job, "COMFYUI_INPUT_DIR", tmp_path)
-    monkeypatch.setattr(generation_job, "SPEECH_PYTHON", sys.executable)
+    monkeypatch.setattr(job_speaker, "COMFYUI_INPUT_DIR", tmp_path)
+    monkeypatch.setattr(job_speaker, "SPEECH_PYTHON", sys.executable)
     client = _client()
     job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
     ticks = []

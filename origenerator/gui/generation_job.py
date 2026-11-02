@@ -22,15 +22,18 @@ import uuid
 from enum import StrEnum
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import comfyui_api, provenance, speech
-from origenerator.completion import extract_completion
-from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, SPEECH_PYTHON, THUMB_DIR
+from origenerator.completion import animate_before_filing, extract_completion
+from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES, THUMB_DIR
 from origenerator.file_refs import frame_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
+from origenerator.gui.job_speaker import Speaker
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.library_filing import saving_into_its_run_folder
+from origenerator.media import MediaType
 from origenerator.progress import ProgressTracker, stage_names
 from origenerator.seed_history import SeedUseKind, output_size
 from origenerator.thumbnail import frame_thumbnail
@@ -43,6 +46,7 @@ class JobState(StrEnum):
     SPEAKING = "speaking"
     QUEUED = "queued"
     RUNNING = "running"
+    FINISHING = "finishing"
     FINISHED = "finished"
     FAILED = "failed"
     CANCELED = "canceled"
@@ -53,6 +57,8 @@ def display_status(status: str) -> JobState:
     status where no job holds it: the database says pending for one waiting to
     be sent, a job says idle or queued for one waiting here or on the server,
     and the line says queued for all three."""
+    if status == JobState.FINISHING:
+        return JobState.RUNNING
     if status in (JobState.SPEAKING, JobState.RUNNING):
         return JobState(status)
     return JobState.QUEUED
@@ -120,9 +126,10 @@ class GenerationJob(QObject):
 
     def __init__(self, client, workflow, params, *, source=GenerationSource.GENERATED,
                  places=OUTPUT_PLACES, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
-                 speaker=None, prompt_id=None, parent=None):
+                 speaker=None, prompt_id=None, run=None, parent=None):
         super().__init__(parent)
         self._client = client
+        self._run = run or run_off_thread
         self.workflow = workflow
         self.params = dict(params)
         # Where ComfyUI reads a story's spoken lines from, and who speaks the
@@ -149,7 +156,7 @@ class GenerationJob(QObject):
         self.run_media_type = self.media_type
         self.shielded = False
         self._thumb_dir = thumb_dir
-        # idle -> queued -> running -> finished/failed/canceled; and back to idle
+        # idle -> queued -> running -> finishing -> finished/failed/canceled; and back to idle
         # from queued or running when the job is set aside (see defer()).
         self._state = JobState.IDLE
         # What the app is doing right now, by the node ComfyUI says it is running
@@ -585,18 +592,31 @@ class GenerationJob(QObject):
         """:meth:`_complete` past its guard -- for a run a second send finds
         already finished, which no state of the job's own announces."""
         self._detach()
-        # Thumbnail and duration are best-effort inside extract_completion — a
-        # failure in either yields None rather than stranding a real completion.
-        files, thumb, duration = extract_completion(
-            self.workflow, history_data, self._places, self._thumb_dir,
-            self.prompt_id, params=self.params,
-        )
-        if not files:
-            self._state = JobState.FAILED
-            self.failed.emit(_NO_OUTPUT_MESSAGE)
+
+        def record_what_it_made(_nothing=None):
+            if self._state == JobState.CANCELED:
+                return
+            # Thumbnail and duration are best-effort inside extract_completion — a
+            # failure in either yields None rather than stranding a real completion.
+            files, thumb, duration = extract_completion(
+                self.workflow, history_data, self._places, self._thumb_dir,
+                self.prompt_id, params=self.params,
+            )
+            if not files:
+                self._state = JobState.FAILED
+                self.failed.emit(_NO_OUTPUT_MESSAGE)
+                return
+            self._state = JobState.FINISHED
+            self.finished.emit(files, thumb, duration)
+
+        if self.media_type != MediaType.VIDEO:
+            record_what_it_made()
             return
-        self._state = JobState.FINISHED
-        self.finished.emit(files, thumb, duration)
+        self._state = JobState.FINISHING
+        workflow, places, thumb_dir, prompt_id = (self.workflow, self._places, self._thumb_dir,
+                                                  self.prompt_id)
+        self._run(lambda: animate_before_filing(workflow, history_data, places, thumb_dir, prompt_id),
+                  record_what_it_made, owner=self)
 
     def _on_error(self, prompt_id: str, message: str):
         if not self._is_mine(prompt_id):
@@ -604,57 +624,3 @@ class GenerationJob(QObject):
         self._detach()
         self._state = JobState.FAILED
         self.failed.emit(message)
-
-
-def _speak(client, params: dict) -> None:
-    """ComfyUI asked to give the GPU back first (its resident models would leave
-    the voice no room), then every line the settings still lack spoken to disk."""
-    try:
-        client.free_memory()
-    except Exception as e:  # noqa: BLE001 -- a voice with less room, not a failed job
-        logger.info("ComfyUI kept its models while the lines were spoken: %s", e)
-    speech.ensure_speech_files(params, input_dir=COMFYUI_INPUT_DIR, python=SPEECH_PYTHON)
-
-
-class _Speaking(QThread):
-    def __init__(self, client, params, parent=None):
-        super().__init__(parent)
-        self._client = client
-        self._params = params
-        self.error: str | None = None
-
-    def run(self):
-        try:
-            _speak(self._client, self._params)
-        except Exception as e:  # noqa: BLE001 -- reported to the job, whatever it was
-            self.error = str(e)
-
-
-class Speaker(QObject):
-    """Speaks a job's lines, on a thread of their own answering on the GUI's, or here.
-
-    ``speak(params, done, failed)`` returns at once; ``done()`` or
-    ``failed(message)`` is called on this object's thread when the voice has
-    finished, which is what lets a job submit itself from the callback.
-    """
-
-    def __init__(self, client, parent=None):
-        super().__init__(parent)
-        self._client = client
-        self._speaking: list[_Speaking] = []  # alive until they answer
-
-    def speak(self, params: dict, done, failed) -> None:
-        thread = _Speaking(self._client, params)
-        thread.finished.connect(lambda: self._answer(thread, done, failed))
-        self._speaking.append(thread)
-        thread.start()
-
-    def speak_here(self, params: dict) -> None:
-        _speak(self._client, params)
-
-    def _answer(self, thread, done, failed) -> None:
-        self._speaking.remove(thread)
-        if thread.error is None:
-            done()
-        else:
-            failed(thread.error)

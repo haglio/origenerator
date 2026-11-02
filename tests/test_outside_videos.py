@@ -52,7 +52,9 @@ from origenerator.outside_videos import (
 )
 from origenerator.provenance import stamp_unstamped
 from origenerator.relocate import relocate_moved_outputs
+from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows.outside import outside_workflow
+from tests.media_files import write_mp4
 
 
 def _filed(root, orientation: str, source: str, name: str):
@@ -131,6 +133,15 @@ def _bring_in(tmp_path, record: Record, *, grab=lambda _path: Image.new("RGB", (
     db.insert_rows(rows_bringing_in(video, record, frames_dir=tmp_path / "frames",
                                     thumb_dir=tmp_path / "thumbs", grab=grab))
     return db, video
+
+
+def test_a_video_brought_in_has_its_thumbnail_ready_to_animate(tmp_path):
+    video = OutsideVideo(write_mp4(tmp_path / "outbox" / "c1_topaz.mp4"), "a-site")
+
+    rows = rows_bringing_in(video, Record(), frames_dir=tmp_path / "frames",
+                            thumb_dir=tmp_path / "thumbs")
+
+    assert animated_thumbnail_path(tmp_path / "thumbs", rows[-1]["prompt_id"]).exists()
 
 
 def _by_source(db) -> dict:

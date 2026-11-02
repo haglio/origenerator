@@ -3,6 +3,7 @@ from __future__ import annotations
 from shared_ui import colors, palette
 from shared_ui.chrome import control_ground, family_stylesheet, field_rules, tool_button_rules
 from shared_ui.colors import (
+    BG_PRIMARY,
     BG_SECONDARY,
     BG_TERTIARY,
     BLUE,
@@ -224,6 +225,10 @@ def build_stylesheet() -> str:
     QFrame#generateWithHowMany QPushButton#generateBtn {{
         background-color: transparent;
         border: none;
+    }}
+    QFrame#generateWithHowMany QPushButton#generateBtn[warning="true"] {{
+        background-color: {_h(YELLOW)};
+        color: {_h(BG_PRIMARY)};
     }}
     QComboBox#howMany {{
         background-color: transparent;

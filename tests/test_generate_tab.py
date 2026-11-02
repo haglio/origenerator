@@ -872,6 +872,24 @@ def test_generate_refuses_the_other_problems_it_highlights_and_says_which(tab, p
     assert tab._generate_btn.text() == says
 
 
+def _generate_color(tab):
+    button = tab._generate_btn
+    return button.grab().toImage().pixelColor(4, button.height() // 2)
+
+
+def test_generate_is_yellow_while_it_says_what_to_resolve_and_then_goes_back(app_chrome, tab):
+    tab.resize(900, 900)
+    tab.show()
+    resting = _generate_color(tab)
+    tab._param_form.set_values({"positive_prompt": "a, b, a"})
+
+    tab._generate_btn.click()
+    assert _generate_color(tab) == YELLOW
+
+    tab._generate_btn._guard_timer.timeout.emit()
+    assert _generate_color(tab) == resting != YELLOW
+
+
 def test_generate_emits_generate_requested_with_workflow_and_params(tab):
     # Clicking Generate no longer runs its own job — it asks the gallery to, by
     # emitting the workflow and the form's values (which the gallery launches as a

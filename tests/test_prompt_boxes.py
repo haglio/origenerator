@@ -21,6 +21,7 @@ from origenerator.gui.prompt_marks import (
     RESOLVE_BAD_WEIGHTS,
     RESOLVE_DUPLICATES,
     RESOLVE_UNPAIRED_PARENTHESES,
+    RESOLVE_UNREAD_EMPHASIS,
     problem_to_resolve,
 )
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, READ_WHOLE, prompt_reading
@@ -744,3 +745,32 @@ def test_switching_to_another_window_leaves_what_is_being_typed_as_it_is(prompt)
     _leave(box, Qt.FocusReason.ActiveWindowFocusReason)
 
     assert prompt.value() == "a "
+
+
+def test_emphasis_is_highlighted_and_refused_where_the_model_reads_it_as_plain_text(qtbot):
+    sound = _prompt_fields("audio_prompt")
+    qtbot.addWidget(sound)
+    sound.set_reading(word_reading(76, CUT_OFF))
+
+    sound.set_value("(a:1.2), ((b)), c")
+
+    (box,) = sound.boxes()
+    assert _yellow_in(box) == ["(a:1.2)", "((b))"]
+    assert problem_to_resolve([box]) == RESOLVE_UNREAD_EMPHASIS
+
+
+def test_emphasis_is_left_plain_where_the_model_reads_it(prompt):
+    prompt.set_value("(a:1.2), ((b)), c")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == []
+    assert problem_to_resolve([box]) is None
+
+
+def test_emphasis_is_left_plain_where_the_app_cannot_tell_what_reads_the_prompt(prompt):
+    prompt.set_reading(None)
+
+    prompt.set_value("(a:1.2)")
+
+    (box,) = prompt.boxes()
+    assert _yellow_in(box) == []

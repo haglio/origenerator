@@ -211,8 +211,8 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
 
     assert not tab._versions._host.findChildren(_PendingRow)
     assert tab._versions._host.findChildren(_AddRow)
-    assert not tab._preview._live
-    assert tab._preview.is_showing_any([image])
+    assert not tab._viewport._live
+    assert tab._viewport.is_showing_any([image])
 
 
 def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbot, tmp_path):

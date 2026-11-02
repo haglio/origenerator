@@ -17,13 +17,13 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import corner_buttons, drag_thumbnail, icons, preview_widget
+from origenerator.gui import corner_buttons, drag_thumbnail, icons, viewport
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.generation_drag import GENERATION_MIME
-from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.viewport import Viewport
 from origenerator.output_places import OutputPlaces
 from tests.heard_drags import HeardDrags
 
@@ -68,7 +68,7 @@ def _make_animated_gif(path):
 def make_preview(qtbot):
     # The real Qt Multimedia backend deadlocks at session shutdown once a player has started
     def _make(**kwargs):
-        w = PreviewWidget(player=MagicMock(), **kwargs)
+        w = Viewport(player=MagicMock(), **kwargs)
         qtbot.addWidget(w)
         return w
 
@@ -98,7 +98,7 @@ def test_show_image_displays_scaled_pixmap(make_preview, tmp_path):
 
 
 def test_show_image_fits_the_pane_without_clipping(qtbot, tmp_path):
-    w = PreviewWidget(player=MagicMock())
+    w = Viewport(player=MagicMock())
     qtbot.addWidget(w)
     w._image_label.resize(400, 300)
     w.show_image(_make_tall_png(tmp_path / "tall.png"))
@@ -109,7 +109,7 @@ def test_show_image_fits_the_pane_without_clipping(qtbot, tmp_path):
 
 
 def test_image_refits_when_the_pane_grows(qtbot, tmp_path):
-    w = PreviewWidget(player=MagicMock())
+    w = Viewport(player=MagicMock())
     qtbot.addWidget(w)
     w._image_label.resize(80, 240)
     w.show_image(_make_tall_png(tmp_path / "tall.png"))
@@ -453,7 +453,7 @@ def test_a_pane_whose_item_went_to_a_sessions_funestra_goes_on_taking_runs_and_f
 
 
 def _scrubber_preview(qtbot):
-    w = PreviewWidget(player=MagicMock(), show_scrubber=True)
+    w = Viewport(player=MagicMock(), show_scrubber=True)
     qtbot.addWidget(w)
     return w
 
@@ -472,7 +472,7 @@ def test_a_scripted_video_fills_its_timeline_with_the_motion(qtbot, tmp_path):
 
 
 def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(preview_widget, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    monkeypatch.setattr(viewport, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     vid = tmp_path / "video" / "filed.mp4"
     vid.parent.mkdir()
     write_funscript(funscript_path_for(vid, places=OutputPlaces.in_one_folder(tmp_path)),
@@ -522,7 +522,7 @@ def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp
     player = MagicMock()
     player.metaData.return_value.value.side_effect = (
         lambda key: QSize(480, 864) if key == QMediaMetaData.Key.Resolution else None)
-    w = PreviewWidget(player=player, show_scrubber=True)
+    w = Viewport(player=player, show_scrubber=True)
     qtbot.addWidget(w)
     w.resize(320, 480)
     w.show()
@@ -890,7 +890,7 @@ def test_the_pair_asks_for_no_more_width_than_its_pane_has(qtbot, tmp_path, edit
     host = QWidget()
     qtbot.addWidget(host)
     host.setFixedSize(440, 320)
-    w = PreviewWidget(player=MagicMock(), parent=host)
+    w = Viewport(player=MagicMock(), parent=host)
     w.setGeometry(0, 0, 440, 320)
     host.show()
 
@@ -1161,7 +1161,7 @@ def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
 def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
     # Qt destroys a widget's children in the order they were parented; the real player must be parented before the video surface it renders to
 
-    w = PreviewWidget()
+    w = Viewport()
     order = []
     w._player.destroyed.connect(lambda *_: order.append("player"))
     w._video.destroyed.connect(lambda *_: order.append("surface"))

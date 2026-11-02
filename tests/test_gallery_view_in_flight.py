@@ -69,7 +69,6 @@ from tests.gallery_view_support import (
     _new_tile,
     _open_latest,
     _png_bytes,
-    _preview_of,
     _reroll_client,
     _resolve_by_id,
     _row,
@@ -82,6 +81,7 @@ from tests.gallery_view_support import (
     _single_i2v_db,
     _struck_and_lit,
     _tab_with_prompts,
+    _viewport_of,
 )
 from tests.slideshow_hud_support import engine_of, funestra_of
 
@@ -373,11 +373,11 @@ def test_selecting_a_running_reroll_shows_its_live_preview_in_the_generate_pane(
     _key, job = _running_reroll(view)
     frame = _png_bytes()
     client.preview_image.emit(job.prompt_id, frame)
-    _preview_of(view).show_frame = MagicMock()
+    _viewport_of(view).show_frame = MagicMock()
 
     _generating_tile(view).selected.emit()
 
-    _preview_of(view).show_frame.assert_called_once_with(frame)
+    _viewport_of(view).show_frame.assert_called_once_with(frame)
 
 
 def test_new_frames_route_to_the_generate_pane_while_the_reroll_is_selected(qtbot, tmp_path):
@@ -387,11 +387,11 @@ def test_new_frames_route_to_the_generate_pane_while_the_reroll_is_selected(qtbo
     view.refresh()
     _key, job = _running_reroll(view)
     _generating_tile(view).selected.emit()
-    _preview_of(view).show_frame = MagicMock()
+    _viewport_of(view).show_frame = MagicMock()
 
     client.preview_image.emit(job.prompt_id, _png_bytes())
 
-    _preview_of(view).show_frame.assert_called_once_with(_png_bytes())
+    _viewport_of(view).show_frame.assert_called_once_with(_png_bytes())
 
 
 def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_generate_pane(qtbot, tmp_path):
@@ -402,10 +402,10 @@ def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_generate_pane(q
     _key, job = _running_reroll(view)
     view._on_thumbnail_clicked("orig")
 
-    _preview_of(view).show_frame = MagicMock()
+    _viewport_of(view).show_frame = MagicMock()
     client.preview_image.emit(job.prompt_id, _png_bytes())
 
-    _preview_of(view).show_frame.assert_not_called()
+    _viewport_of(view).show_frame.assert_not_called()
     assert view._selected_reroll_key is None
 
 
@@ -531,7 +531,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     client.preview_image.emit(job.prompt_id, _png_bytes())
     view._poll()
 
-    win = _preview_of(view).open_fullscreen()
+    win = _viewport_of(view).open_fullscreen()
     qtbot.addWidget(win.shown)
     assert win._set.current_prompt_id() == job.prompt_id
     assert engine_of(win.shown).on_screen.read_bytes() == _png_bytes()
@@ -572,7 +572,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
     view._poll()
-    slideshow = _preview_of(view).open_fullscreen()
+    slideshow = _viewport_of(view).open_fullscreen()
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
@@ -640,14 +640,14 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     view.refresh()
     _running_reroll(view)
     painted = []
-    _preview_of(view).clear = MagicMock(side_effect=lambda: painted.append("(placeholder)"))
-    _preview_of(view).show_message = MagicMock(
+    _viewport_of(view).clear = MagicMock(side_effect=lambda: painted.append("(placeholder)"))
+    _viewport_of(view).show_message = MagicMock(
         side_effect=lambda text, **kwargs: painted.append(text))
 
     _generating_tile(view).selected.emit()
 
     assert painted[-1] == "Waiting for preview…"
-    assert _preview_of(view).show_message.call_args == (("Waiting for preview…",), {"live": True})
+    assert _viewport_of(view).show_message.call_args == (("Waiting for preview…",), {"live": True})
 
 
 def _waiting_view(qtbot, tmp_path, backlog):
@@ -658,7 +658,7 @@ def _waiting_view(qtbot, tmp_path, backlog):
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)
-    _preview_of(view).show_message = MagicMock()
+    _viewport_of(view).show_message = MagicMock()
     _generating_tile(view).selected.emit()
     return view, client
 
@@ -668,7 +668,7 @@ def test_a_run_stuck_behind_another_app_says_how_much_is_ahead(qtbot, tmp_path):
 
     view._poll()
 
-    assert _preview_of(view).show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
+    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
 
 
 def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
@@ -678,7 +678,7 @@ def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
     client.foreign_backlog = MagicMock(return_value=1)
     view._poll()
 
-    assert _preview_of(view).show_message.call_args.args[0] == "Waiting on 1 job from another app"
+    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting on 1 job from another app"
 
 
 def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_path):
@@ -686,7 +686,7 @@ def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_
 
     view._poll()
 
-    assert _preview_of(view).show_message.call_args.args[0] == "Waiting for preview…"
+    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting for preview…"
 
 
 def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(
@@ -699,7 +699,7 @@ def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(
 
     view._poll()
 
-    assert _preview_of(view).show_message.call_args.args[0] == "Starts in 0:43"
+    assert _viewport_of(view).show_message.call_args.args[0] == "Starts in 0:43"
 
 
 def test_start_now_on_the_job_queue_starts_the_video_waiting_out_the_minute(qtbot, tmp_path):
@@ -725,11 +725,11 @@ def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
     view._poll()
     job = next(iter(view._live_jobs.values()))
     client.preview_image.emit(job.prompt_id, _png_bytes())
-    _preview_of(view).show_message = MagicMock()
+    _viewport_of(view).show_message = MagicMock()
 
     view._poll()
 
-    _preview_of(view).show_message.assert_not_called()
+    _viewport_of(view).show_message.assert_not_called()
 
 
 def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tmp_path):
@@ -744,7 +744,7 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     _generating_tile(view).selected.emit()
     tab = view._generate_pane.current_generate_tab()
     assert tab.watched_key() == key
-    assert _frame_shown(tab._preview, frame)
+    assert _frame_shown(tab._viewport, frame)
 
     view._poll()
 
@@ -752,7 +752,7 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     assert _generating_tile(view)._selected
     assert view._generate_pane.current_generate_tab() is tab
     assert tab.watched_key() == key
-    assert _frame_shown(tab._preview, frame)
+    assert _frame_shown(tab._viewport, frame)
 
 
 def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp_path):
@@ -776,7 +776,7 @@ def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp
     assert view._selected_reroll_key == key
     tab = view._generate_pane.current_generate_tab()
     assert tab.watched_key() == key
-    assert _frame_shown(tab._preview, image_frame)
+    assert _frame_shown(tab._viewport, image_frame)
 
 
 def _seeded_i2v_db(tmp_path):

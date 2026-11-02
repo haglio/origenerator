@@ -405,11 +405,11 @@ def test_a_preview_double_click_opens_the_slideshow_on_a_region(qtbot, tmp_path)
     tab = view._generate_pane.current_generate_tab()
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
-    tab._preview.show_media(str(wide), "image")
+    tab._viewport.show_media(str(wide), "image")
 
-    qtbot.mouseDClick(tab._preview, Qt.MouseButton.LeftButton,
-                      pos=QPoint(tab._preview.width() // 2,
-                                 tab._preview.height() // 2))
+    qtbot.mouseDClick(tab._viewport, Qt.MouseButton.LeftButton,
+                      pos=QPoint(tab._viewport.width() // 2,
+                                 tab._viewport.height() // 2))
 
     slideshow = view.region_slideshow("landscape")
     assert slideshow is not None
@@ -1126,29 +1126,29 @@ def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
     qtbot.addWidget(tab)
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
 
     assert tab._media_split.orientation() == Qt.Orientation.Horizontal
     assert tab._media_split.indexOf(tab._settings_pane) == 0
-    assert tab._media_split.indexOf(tab._preview_pane) == 1
+    assert tab._media_split.indexOf(tab._viewport_pane) == 1
 
 
 def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
     tab = GenerateTab(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tab)
 
-    tab._preview._pixmap = QPixmap(1200, 700)
+    tab._viewport._pixmap = QPixmap(1200, 700)
     tab._reflow_for_the_media()
 
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
-    assert tab._media_split.indexOf(tab._preview_pane) == 0
+    assert tab._media_split.indexOf(tab._viewport_pane) == 0
 
 
 def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(qtbot):
     tab = GenerateTab(None, FakeDB([]))
     qtbot.addWidget(tab)
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
 
     tab.become_hosted(_session())
@@ -1160,27 +1160,27 @@ def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(
 def test_a_panel_handed_back_from_a_session_stacks_its_portrait_image_over_the_form(qtbot):
     tab = GenerateTab(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tab)
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
 
     tab.become_standalone()
     tab.refresh_media_layout()
 
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
-    assert tab._media_split.indexOf(tab._preview_pane) == 0
+    assert tab._media_split.indexOf(tab._viewport_pane) == 0
 
 
 def test_an_image_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
     tab = GenerateTab(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tab)
     tab.resize(600, 1000)
-    tab._preview._pixmap = QPixmap(1200, 700)
+    tab._viewport._pixmap = QPixmap(1200, 700)
     tab.show()
     qtbot.wait(1)
 
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
-    tab._preview._pixmap = QPixmap(1200, 700)
+    tab._viewport._pixmap = QPixmap(1200, 700)
     tab._reflow_for_the_media()
     qtbot.wait(1)
 
@@ -1192,11 +1192,11 @@ def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opene
     tabs = GeneratePane(None, FakeDB([]))
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
-    first._preview._pixmap = QPixmap(400, 900)
+    first._viewport._pixmap = QPixmap(400, 900)
 
     tabs.become_hosted(_session())
     later = tabs._add_subtab()
-    later._preview._pixmap = QPixmap(400, 900)
+    later._viewport._pixmap = QPixmap(400, 900)
     later.refresh_media_layout()
 
     assert first._media_split.orientation() == Qt.Orientation.Horizontal
@@ -1207,12 +1207,12 @@ def test_tabs_handed_back_from_a_session_stack_the_tabs_they_have_and_the_ones_o
     tabs = GeneratePane(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
-    first._preview._pixmap = QPixmap(400, 900)
+    first._viewport._pixmap = QPixmap(400, 900)
     first.refresh_media_layout()
 
     tabs.become_standalone()
     later = tabs._add_subtab()
-    later._preview._pixmap = QPixmap(400, 900)
+    later._viewport._pixmap = QPixmap(400, 900)
     later.refresh_media_layout()
 
     assert first._media_split.orientation() == Qt.Orientation.Vertical
@@ -1578,7 +1578,7 @@ def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
 
     view.become_hosted(_session())
 
@@ -1589,7 +1589,7 @@ def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
     view.become_hosted(_session())
 
     view.become_standalone()
@@ -1601,7 +1601,7 @@ def test_standalone_never_stands_them_side_by_side(qtbot):
     tab = GenerateTab(None, FakeDB([]))
     qtbot.addWidget(tab)
 
-    tab._preview._pixmap = QPixmap(400, 900)
+    tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
 
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
@@ -1611,13 +1611,13 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
     tabs = GeneratePane(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
     portrait_tab = tabs.currentWidget()
-    portrait_tab._preview._pixmap = QPixmap(400, 900)
+    portrait_tab._viewport._pixmap = QPixmap(400, 900)
     portrait_tab.refresh_media_layout()
     assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal
 
     tabs._add_subtab()
     landscape_tab = tabs.currentWidget()
-    landscape_tab._preview._pixmap = QPixmap(1200, 700)
+    landscape_tab._viewport._pixmap = QPixmap(1200, 700)
     tabs.setCurrentWidget(portrait_tab)
     tabs.setCurrentWidget(landscape_tab)
 

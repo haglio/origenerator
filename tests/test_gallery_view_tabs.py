@@ -19,7 +19,7 @@ from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.animations import _VideoTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_tab import GenerateTab
-from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.viewport import Viewport
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     _SDXL,
@@ -27,10 +27,10 @@ from tests.gallery_view_support import (
     _image,
     _image_workflow,
     _png_bytes,
-    _preview_of,
     _row,
     _shape,
     _video_workflow,
+    _viewport_of,
 )
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -66,7 +66,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
 
     view._on_thumbnail_clicked("vid1")
     assert _animations(view).isHidden()
@@ -80,33 +80,33 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _preview_of(view).show_media = MagicMock()
+    _viewport_of(view).show_media = MagicMock()
     resolved = (Path("C:/out/sdxl_t2i_i1.png"), "image")
     monkeypatch.setattr(generate_tab_module, "resolve_preview", MagicMock(return_value=resolved))
 
     view._on_thumbnail_clicked("i1")
 
-    assert _preview_of(view).show_media.call_args.args == (resolved[0], "image", "i1")
+    assert _viewport_of(view).show_media.call_args.args == (resolved[0], "image", "i1")
 
 
 def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _preview_of(view).clear = MagicMock()
-    _preview_of(view).show_media = MagicMock()
+    _viewport_of(view).clear = MagicMock()
+    _viewport_of(view).show_media = MagicMock()
     monkeypatch.setattr(generate_tab_module, "resolve_preview", MagicMock(return_value=None))
 
     view._on_thumbnail_clicked("i1")
 
-    assert _preview_of(view).clear.called
-    _preview_of(view).show_media.assert_not_called()
+    assert _viewport_of(view).clear.called
+    _viewport_of(view).show_media.assert_not_called()
 
 
-def test_gallery_creates_a_preview_widget(qtbot):
+def test_gallery_creates_a_viewport(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    assert isinstance(_preview_of(view), PreviewWidget)
+    assert isinstance(_viewport_of(view), Viewport)
 
 
 def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
@@ -124,7 +124,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert view._arrangement.left_column.widget(1) is view._queue
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
-    assert view._arrangement.panes.widget(1).isAncestorOf(_preview_of(view))
+    assert view._arrangement.panes.widget(1).isAncestorOf(_viewport_of(view))
     assert not view._arrangement.panes.widget(1).isAncestorOf(view._queue)
 
 
@@ -143,7 +143,7 @@ def test_the_generate_pane_is_a_tab_widget_of_editable_generate_tabs(qtbot):
     assert isinstance(view._generate_pane, QTabWidget)
     assert view._arrangement.panes.widget(1).isAncestorOf(view._generate_pane)
     assert isinstance(view._generate_pane.widget(0), GenerateTab)
-    assert view._generate_pane.widget(0).isAncestorOf(_preview_of(view))
+    assert view._generate_pane.widget(0).isAncestorOf(_viewport_of(view))
 
 
 def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
@@ -164,7 +164,7 @@ def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     editing = view._generate_pane._add_subtab()
-    editing._preview.show_media = MagicMock()
+    editing._viewport.show_media = MagicMock()
     count = view._generate_pane.count()
 
     view._reselect_generation("i1")
@@ -173,7 +173,7 @@ def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
     assert view._generate_pane.currentWidget() is editing
     assert view._generate_pane.count() == count
     assert editing._displayed_row is None
-    editing._preview.show_media.assert_not_called()
+    editing._viewport.show_media.assert_not_called()
 
 
 def _current_form(view):
@@ -255,7 +255,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
 
     view = GalleryView(db)
     qtbot.addWidget(view)
-    _preview_of(view).show_media = MagicMock()
+    _viewport_of(view).show_media = MagicMock()
     view.select_folder(folder_key)
     view.select_generation("i2")
     view.refresh()
@@ -263,7 +263,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     assert view.selected_generation() == "i2"
     tab = view._generate_pane.current_generate_tab()
     assert tab.is_blank()
-    tab._preview.show_media.assert_not_called()
+    tab._viewport.show_media.assert_not_called()
 
 
 def _make_db(tmp_path):
@@ -368,7 +368,7 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
 
     view._on_thumbnail_clicked("v1")
     estimate = view._generate_pane.current_generate_tab()._estimate_label
@@ -464,9 +464,9 @@ def test_a_rebuild_takes_an_item_that_has_gone_off_the_tab_showing_it(qtbot, tmp
     tab = view._generate_pane.current_generate_tab()
     gone = tmp_path / "gone.png"
     gone.write_bytes(_png_bytes())
-    tab._preview.show_image(gone)
+    tab._viewport.show_image(gone)
 
     db.delete_generation("i2")
     view.refresh()
 
-    assert not tab._preview.is_showing_any([gone])
+    assert not tab._viewport.is_showing_any([gone])

@@ -276,7 +276,7 @@ def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
 
     tab = view._generate_pane.current_generate_tab()
     assert tab._folder_modify.folder_key == key
-    assert tab._preview._stack.currentWidget() is tab._preview._sheet
+    assert tab._viewport._stack.currentWidget() is tab._viewport._sheet
     client.submit_job.assert_not_called()
 
 
@@ -561,7 +561,7 @@ def test_a_tab_watching_auto_generate_follows_it_onto_the_next_seed(qtbot, tmp_p
     client.preview_image.emit(view._live_jobs[key].prompt_id, _png_bytes())
 
     assert tab.watched_key() == key
-    assert _frame_shown(tab._preview, _png_bytes())
+    assert _frame_shown(tab._viewport, _png_bytes())
 
 
 def test_only_the_auto_toggle_ends_auto_generate_not_a_string_of_cancels(qtbot, tmp_path):
@@ -692,16 +692,16 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     key = _select_first_leaf(view)
     tab = _folder_tab(view, db)
     showing = tab._displayed_row
-    tab._preview.show_frame = MagicMock()
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_frame = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     view._toggle_auto(True)
     job = view._live_jobs[key]
     client.preview_image.emit(job.prompt_id, b"a frame")
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    tab._preview.show_frame.assert_not_called()
-    tab._preview.show_media.assert_not_called()
+    tab._viewport.show_frame.assert_not_called()
+    tab._viewport.show_media.assert_not_called()
     assert tab._displayed_row is showing
     assert view._selected_reroll_key is None
 
@@ -716,13 +716,13 @@ def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtb
     view._toggle_auto(True)
     _generating_tile(view).selected.emit()
     tab = view._generate_pane.current_generate_tab()
-    tab._preview.show_frame = MagicMock()
+    tab._viewport.show_frame = MagicMock()
 
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
     client.preview_image.emit(view._live_jobs[key].prompt_id, b"the next one")
 
     assert view._selected_reroll_key == key
-    tab._preview.show_frame.assert_called_with(b"the next one")
+    tab._viewport.show_frame.assert_called_with(b"the next one")
 
 
 def test_auto_generate_ending_lets_the_pane_go(qtbot, tmp_path):
@@ -935,7 +935,7 @@ def test_generate_from_a_tab_back_on_its_videos_own_seeds_draws_a_fresh_one(qtbo
     qtbot.addWidget(view)
     view.refresh()
     tab = _front_panel(view)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     tab.show_saved_generation(db.get_generation("vid"), [])
     tab._param_form.set_seed_random(False)
 

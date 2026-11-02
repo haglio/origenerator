@@ -181,7 +181,7 @@ def test_the_tab_menu_leaves_out_what_would_close_nothing(tabs):
 def _loaded_tab(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),
                         "sdxl_g1.png")
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(row, [row])
     return tabs.current_generate_tab()
 
@@ -213,7 +213,7 @@ def test_copy_name_on_a_tab_copies_the_name_of_the_item_it_shows(qtbot, tmp_path
     names.take([row], [], {})
     tabs = GeneratePane(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
     qtbot.addWidget(tabs)
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(row, [row])
     QApplication.clipboard().clear()
 
@@ -230,7 +230,7 @@ def test_a_name_given_to_an_item_after_its_tab_showed_it_reaches_the_tab_and_nam
     names = ItemNames(db)
     tabs = GeneratePane(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
     qtbot.addWidget(tabs)
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(row, [row])
     names.take([row], [], {})
 
@@ -355,7 +355,7 @@ def test_tab_text_and_mark_follow_the_item_a_click_shows(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4),
                         "sdxl_g1.png")
     tabs._names.take([row], [], {})
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
 
     tabs.load_selection(row, [row])
 
@@ -372,7 +372,7 @@ def test_the_resting_tab_is_named_for_what_it_is_and_wears_no_mark(tabs):
 def test_load_selection_reuses_the_blank_current_tab(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),
                         "sdxl_g1.png")
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     before = tabs.count()
 
     tabs.load_selection(row, [row])
@@ -387,7 +387,7 @@ def test_load_selection_reuses_the_tab_for_the_same_folder(tabs):
     params = _sdxl_full(positive_prompt="a wizard", seed=1)
     a = _complete_gen(tabs._db, "a", params, "sdxl_a.png")
     b = _complete_gen(tabs._db, "b", dict(params, seed=2), "sdxl_b.png")
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(a, [a, b])
     count = tabs.count()
 
@@ -400,14 +400,14 @@ def test_load_selection_reuses_the_tab_for_the_same_folder(tabs):
 def test_load_selection_reuses_the_tab_for_a_run_made_before_the_workflow_changed(tabs):
     row = _complete_gen(tabs._db, "old", _sdxl_full(positive_prompt="a wizard", seed=1),
                         "sdxl_old.png", workflow_version="v001")
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(row, [row])
     tabs.pin_current_tab()
     count = tabs.count()
 
     for _ in range(2):
         for tab in tabs.generate_tabs():
-            tab._preview.show_media = MagicMock()
+            tab._viewport.show_media = MagicMock()
         tabs.load_selection(row, [row])
         tabs.pin_current_tab()
 
@@ -417,7 +417,7 @@ def test_load_selection_reuses_the_tab_for_a_run_made_before_the_workflow_change
 def test_load_selection_replaces_the_preview_tab_rather_than_forking(tabs):
     cat = _complete_gen(tabs._db, "cat", _sdxl_full(positive_prompt="cat", seed=1), "cat.png")
     dog = _complete_gen(tabs._db, "dog", _sdxl_full(positive_prompt="dog", seed=1), "dog.png")
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(cat, [cat, dog])
     count = tabs.count()
 
@@ -431,7 +431,7 @@ def test_a_click_reads_the_table_no_more_than_the_tab_it_lands_in(tabs):
     params = _sdxl_full(positive_prompt="a wizard", seed=1)
     a = _complete_gen(tabs._db, "a", params, "sdxl_a.png")
     b = _complete_gen(tabs._db, "b", dict(params, seed=2), "sdxl_b.png")
-    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.currentWidget()._viewport.show_media = MagicMock()
     tabs.load_selection(a, [a, b])
     tab = tabs.current_generate_tab()
 
@@ -448,7 +448,7 @@ def _two_generations(tabs):
     cat = _complete_gen(tabs._db, "cat", _sdxl_full(positive_prompt="cat", seed=1), "cat.png")
     dog = _complete_gen(tabs._db, "dog", _sdxl_full(positive_prompt="dog", seed=1), "dog.png")
     for tab in tabs.generate_tabs():
-        tab._preview.show_media = MagicMock()
+        tab._viewport.show_media = MagicMock()
     return cat, dog
 
 
@@ -598,74 +598,74 @@ def test_current_generate_tab_is_the_front_tab(tabs):
 
 def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
     tab = tabs.currentWidget()
-    tab._preview.show_message = MagicMock()
+    tab._viewport.show_message = MagicMock()
     tab.watch_folder("image/sdxl_t2i/abc", None)
-    tab._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
+    tab._viewport.show_message.assert_called_once_with("Waiting for preview…", live=True)
     assert tab.watched_key() == "image/sdxl_t2i/abc"
     assert tab.is_awaiting_frame()
 
 
 def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
     tab = tabs.currentWidget()
-    tab._preview.show_combination = MagicMock()
-    tab._preview.show_message = MagicMock()
+    tab._viewport.show_combination = MagicMock()
+    tab._viewport.show_message = MagicMock()
 
     tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
 
-    tab._preview.show_combination.assert_called_once_with(
+    tab._viewport.show_combination.assert_called_once_with(
         Combination("frame.png", "clip.webp"))
-    tab._preview.show_message.assert_not_called()
+    tab._viewport.show_message.assert_not_called()
     assert not tab.is_awaiting_frame()
 
 
 def test_the_pair_is_repainted_only_when_it_changes(tabs):
     tab = tabs.currentWidget()
-    tab._preview.show_combination = MagicMock()
+    tab._viewport.show_combination = MagicMock()
 
     tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
     tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
 
-    assert tab._preview.show_combination.call_count == 1
+    assert tab._viewport.show_combination.call_count == 1
 
 
 @pytest.mark.parametrize("made_from", [Combination(), Combination(prompt_edited=True)])
 def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
     tab = tabs.currentWidget()
-    tab._preview.show_message = MagicMock()
+    tab._viewport.show_message = MagicMock()
 
     tab.watch_folder("k", None, None, made_from)
 
-    tab._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
+    tab._viewport.show_message.assert_called_once_with("Waiting for preview…", live=True)
 
 
 def test_watching_prefers_a_given_wait_note(tabs):
     tab = tabs.currentWidget()
-    tab._preview.show_message = MagicMock()
+    tab._viewport.show_message = MagicMock()
     tab.watch_folder("k", None, "Waiting on 3 jobs from another app")
-    assert tab._preview.show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
+    assert tab._viewport.show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
 
 
 def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
     tab = tabs.currentWidget()
-    tab._preview.show_message = MagicMock()
-    tab._preview.show_frame = MagicMock()
+    tab._viewport.show_message = MagicMock()
+    tab._viewport.show_frame = MagicMock()
     tab.watch_folder("k", None, "Waiting on 3 jobs from another app")
     tab.show_live_wait("Waiting on 3 jobs from another app")
-    assert tab._preview.show_message.call_count == 1
+    assert tab._viewport.show_message.call_count == 1
     tab.show_live_wait("Waiting on 1 job from another app")
-    assert tab._preview.show_message.call_count == 2
+    assert tab._viewport.show_message.call_count == 2
 
     tab.show_live_frame(b"frame")
 
-    tab._preview.show_frame.assert_called_once_with(b"frame")
+    tab._viewport.show_frame.assert_called_once_with(b"frame")
     assert not tab.is_awaiting_frame()
 
 
 def test_watching_with_a_frame_puts_it_up_at_once(tabs):
     tab = tabs.currentWidget()
-    tab._preview.show_frame = MagicMock()
+    tab._viewport.show_frame = MagicMock()
     tab.watch_folder("k", b"frame")
-    tab._preview.show_frame.assert_called_once_with(b"frame")
+    tab._viewport.show_frame.assert_called_once_with(b"frame")
 
 
 def test_watchers_of_lists_only_the_tabs_following_that_folder(tabs):
@@ -687,23 +687,23 @@ def test_stop_watching_puts_the_displayed_generation_back(tabs, monkeypatch):
     cat, dog = _two_generations(tabs)
     tabs.load_selection(cat, [cat, dog])
     tab = tabs.current_generate_tab()
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     tab.watch_folder("k", b"frame")
 
     tab.stop_watching()
 
     assert tab.watched_key() is None
-    tab._preview.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
+    tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
 def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
     tab = tabs.currentWidget()
-    tab._preview.clear = MagicMock()
+    tab._viewport.clear = MagicMock()
     tab.watch_folder("k", b"frame")
 
     tab.stop_watching()
 
-    tab._preview.clear.assert_called_once()
+    tab._viewport.clear.assert_called_once()
     assert tab.is_blank()
 
 
@@ -713,11 +713,11 @@ def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monke
     tab = tabs.currentWidget()
     tab.prefill("sdxl_t2i", json.loads(cat["params_json"]))
     tab.watch_folder("k", b"frame")
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     tab.stop_watching()
 
-    tab._preview.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
+    tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
 def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
@@ -735,14 +735,14 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
     running = dict(cat, prompt_id="live", status="running", output_files="[]",
                    thumbnail_path=None)
     tab = tabs.currentWidget()
-    tab._preview.clear = MagicMock()
+    tab._viewport.clear = MagicMock()
 
     tab.show_running_generation(running)
 
     assert tab._param_form.get_values()["positive_prompt"] == "cat"
     assert tab.displayed_row() is None
     assert tab._basic_section.isHidden()
-    tab._preview.clear.assert_called()
+    tab._viewport.clear.assert_called()
     assert not tab.is_blank()
 
 
@@ -750,20 +750,20 @@ def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
     cat, _dog = _two_generations(tabs)
     tab = tabs.currentWidget()
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     tab.watch_folder("k", None)
 
     tab.show_finished_media(cat)
 
     assert not tab.is_awaiting_frame()
-    tab._preview.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
+    tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
 def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a cat", seed=1),
                         "sdxl_g1.png")
     tab = _pick_workflow(tabs.current_generate_tab())
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     tab.note_launched("g1")
     tab._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
@@ -1071,13 +1071,13 @@ def test_release_media_reaches_a_tab_that_is_not_in_front(tabs, tmp_path):
     kept = tmp_path / "kept.png"
     kept.write_bytes(b"x")
     covered, front = tabs.current_generate_tab(), tabs._add_subtab()
-    covered._preview.show_image(doomed)
-    front._preview.show_image(kept)
+    covered._viewport.show_image(doomed)
+    front._viewport.show_image(kept)
 
     tabs.release_media([doomed])
 
-    assert not covered._preview.is_showing_any([doomed])
-    assert front._preview.is_showing_any([kept])
+    assert not covered._viewport.is_showing_any([doomed])
+    assert front._viewport.is_showing_any([kept])
 
 
 def test_a_deleted_generation_leaves_every_tab_showing_it_empty(tabs, tmp_path):
@@ -1086,14 +1086,14 @@ def test_a_deleted_generation_leaves_every_tab_showing_it_empty(tabs, tmp_path):
     kept.write_bytes(b"x")
     doomed, other = tabs.current_generate_tab(), tabs._add_subtab()
     doomed.show_saved_generation({"prompt_id": "g1", "workflow_name": "sdxl_t2i"}, [])
-    doomed._preview.show_image(gone)
+    doomed._viewport.show_image(gone)
     other.show_saved_generation({"prompt_id": "g2", "workflow_name": "sdxl_t2i"}, [])
-    other._preview.show_image(kept)
+    other._viewport.show_image(kept)
 
     tabs.reconcile_previews({"g2"})
 
-    assert not doomed._preview.is_showing_any([gone])
-    assert other._preview.is_showing_any([kept])
+    assert not doomed._viewport.is_showing_any([gone])
+    assert other._viewport.is_showing_any([kept])
 
 
 def test_capture_restore_round_trips_config(tabs, qtbot):

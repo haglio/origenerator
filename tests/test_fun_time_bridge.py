@@ -33,11 +33,11 @@ from tests.gallery_view_support import (
     _generating_tile,
     _image,
     _png_bytes,
-    _preview_of,
     _reroll_client,
     _row,
     _running_reroll,
     _seeded_db,
+    _viewport_of,
     _will_move_on,
 )
 from tests.slideshow_hud_support import funestra_of, open_both_shapes
@@ -784,7 +784,7 @@ def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_f
     view.refresh()
     _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
-    _preview_of(view).open_fullscreen()
+    _viewport_of(view).open_fullscreen()
     return client, job
 
 

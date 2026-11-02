@@ -49,7 +49,6 @@ from tests.gallery_view_support import (
     _press_ctrl_f,
     _press_enter,
     _press_escape,
-    _preview_of,
     _reroll_client,
     _resolve_by_id,
     _seeded_db,
@@ -58,6 +57,7 @@ from tests.gallery_view_support import (
     _shown_view_with_one_image,
     _SignalMotion,
     _tab_with_prompts,
+    _viewport_of,
 )
 from tests.lit_switches import lit_in
 from tests.osr2_fakes import FakeBroker
@@ -389,7 +389,7 @@ def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_i
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)
 
-    slideshow = _preview_of(view).open_fullscreen()
+    slideshow = _viewport_of(view).open_fullscreen()
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
@@ -475,9 +475,9 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     _resolve_by_id(monkeypatch)
     view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     tab = view._generate_pane.current_generate_tab()
-    tab._preview.show_frame(_png_bytes())
+    tab._viewport.show_frame(_png_bytes())
 
-    win = tab._preview.open_fullscreen()
+    win = tab._viewport.open_fullscreen()
 
     qtbot.addWidget(win.shown)
     assert win is not None

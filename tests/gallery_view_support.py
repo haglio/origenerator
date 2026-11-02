@@ -418,9 +418,9 @@ def _children_by_prompt(item):
             for child in _subs(item)}
 
 
-def _preview_of(view):
+def _viewport_of(view):
     tab = view._generate_pane.current_generate_tab()
-    return tab._preview if tab is not None else None
+    return tab._viewport if tab is not None else None
 
 
 def _frame_shown(preview, frame: bytes) -> bool:

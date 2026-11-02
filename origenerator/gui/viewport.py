@@ -54,7 +54,7 @@ def _path_key(path) -> str:
     return os.path.normcase(os.path.abspath(str(path)))
 
 
-class PreviewWidget(QWidget):
+class Viewport(QWidget):
     media_resized = pyqtSignal()
     action_triggered = pyqtSignal(str, str)
     context_requested = pyqtSignal(str, QPoint)

@@ -88,9 +88,9 @@ from origenerator.gui.message import set_marked_text
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
-from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.viewport import Viewport
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneItems
 from origenerator.image_states import state_names
@@ -263,7 +263,7 @@ class GenerateTab(DropZones):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
-        self._build_preview()
+        self._build_viewport()
         body = self._build_body_scroll()
         header = LabelForm()
         self._build_saved_generation_block(body, header)
@@ -278,17 +278,17 @@ class GenerateTab(DropZones):
         self._media_border: list[int] | None = None
         self._on_workflow_changed()
 
-    def _build_preview(self) -> PreviewWidget:
-        self._preview = PreviewWidget(show_scrubber=True)
-        self._preview.action_triggered.connect(self.item_action_requested)
-        self._preview.context_requested.connect(self.context_menu_requested)
+    def _build_viewport(self) -> Viewport:
+        self._viewport = Viewport(show_scrubber=True)
+        self._viewport.action_triggered.connect(self.item_action_requested)
+        self._viewport.context_requested.connect(self.context_menu_requested)
         self._media_split = PaneSplitter(Qt.Orientation.Vertical)
-        self._preview_pane, preview_column = pane()
-        preview_column.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
-        preview_column.addWidget(self._preview)
-        self._media_split.addWidget(self._preview_pane)
-        self._preview.media_resized.connect(self._reflow_for_the_media)
-        return self._preview
+        self._viewport_pane, viewport_column = pane()
+        viewport_column.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        viewport_column.addWidget(self._viewport)
+        self._media_split.addWidget(self._viewport_pane)
+        self._viewport.media_resized.connect(self._reflow_for_the_media)
+        return self._viewport
 
     def _build_body_scroll(self) -> QVBoxLayout:
         self._scroll = QScrollArea()
@@ -762,13 +762,13 @@ class GenerateTab(DropZones):
 
     def _mark_prompt_edits(self) -> None:
         if self._live_source is None:
-            self._preview.mark_prompt_edited(self._prompts_differ_from_source())
+            self._viewport.mark_prompt_edited(self._prompts_differ_from_source())
 
     def show_combination(self, combination: Combination) -> None:
         if self._live_source is None:
             combination = combination._replace(
                 prompt_edited=self._prompts_differ_from_source())
-        self._preview.show_combination(combination)
+        self._viewport.show_combination(combination)
         self._reflow_for_the_media()
 
     def launched_runs(self) -> list[str]:
@@ -888,14 +888,14 @@ class GenerateTab(DropZones):
             self._media_split.insertWidget(0, self._settings_pane)
         else:
             self._media_split.setOrientation(Qt.Orientation.Vertical)
-            self._media_split.insertWidget(0, self._preview_pane)
+            self._media_split.insertWidget(0, self._viewport_pane)
         self._media_split.setStretchFactor(0, 3 if beside else 0)
         self._media_split.setStretchFactor(1, 4 if beside else 0)
         if sum(sizes) > 0:
             self._media_split.setSizes(sorted(sizes, reverse=True))
 
     def _media_is_portrait(self) -> bool:
-        size = self._preview.media_size()
+        size = self._viewport.media_size()
         return bool(size) and shape_of_size(*size) == PORTRAIT
 
     def show_recent_preview(self):
@@ -905,7 +905,7 @@ class GenerateTab(DropZones):
         if row is not None and resolve_preview(row, OUTPUT_PLACES) is not None:
             self._display_result(row, self._image_rows())
             return
-        self._preview.clear()
+        self._viewport.clear()
         self._set_displayed_row(None)
         self._hide_footer()
         self._arm_preview_actions()
@@ -1037,7 +1037,7 @@ class GenerateTab(DropZones):
         self._hide_footer()
         self._set_displayed_row(None)
         self._displayed_config = None
-        self._preview.show_folder(thumbnails)
+        self._viewport.show_folder(thumbnails)
         self._reflow_for_the_media()
         self._mark_prompts()
         self._apply_generate_caption()
@@ -1058,7 +1058,7 @@ class GenerateTab(DropZones):
         self._point_elsewhere(row)
         self._hide_footer()
         self._related.show_requests_and_modifications(row["prompt_id"])
-        self._preview.clear()
+        self._viewport.clear()
         self._note_displayed_config(being_made=row)
         self._emit_title()
 
@@ -1096,7 +1096,7 @@ class GenerateTab(DropZones):
         if preview is None:
             return
         self._live_note = None
-        self._preview.show_media(*preview, row["prompt_id"])
+        self._viewport.show_media(*preview, row["prompt_id"])
         self._arm_preview_actions(row["prompt_id"])
 
     def watched_key(self) -> str | None:
@@ -1122,7 +1122,7 @@ class GenerateTab(DropZones):
     def show_live_frame(self, frame: bytes):
         self._live_note = None
         self._live_source = None
-        self._preview.show_frame(frame)
+        self._viewport.show_frame(frame)
 
     def show_live_wait(self, note: str | None):
         text = note or _WAITING_NOTE
@@ -1130,7 +1130,7 @@ class GenerateTab(DropZones):
             return
         self._live_note = text
         self._live_source = None
-        self._preview.show_message(text, live=True)
+        self._viewport.show_message(text, live=True)
 
     def is_awaiting_frame(self) -> bool:
         return self._watched_key is not None and self._live_note is not None
@@ -1144,7 +1144,7 @@ class GenerateTab(DropZones):
         elif self._workflow_dropdown.currentData() is not None:
             self.show_recent_preview()
         else:
-            self._preview.clear()
+            self._viewport.clear()
 
     def _forget_watch(self):
         self._watched_key = None
@@ -1158,9 +1158,9 @@ class GenerateTab(DropZones):
         self._set_displayed_row(row)
         preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is not None:
-            self._preview.show_media(*preview, row["prompt_id"])
+            self._viewport.show_media(*preview, row["prompt_id"])
         else:
-            self._preview.clear()
+            self._viewport.clear()
         self._show_footer(row, image_rows, preview)
         self._arm_preview_actions()
         if arriving:
@@ -1176,9 +1176,9 @@ class GenerateTab(DropZones):
             prompt_id = self._displayed_row["prompt_id"]
         row = self._db.get_generation(prompt_id) if prompt_id is not None else None
         if row is None:
-            self._preview.set_actions(None)
+            self._viewport.set_actions(None)
             return
-        self._preview.set_actions(
+        self._viewport.set_actions(
             row["prompt_id"], favorite=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
         )
@@ -1186,11 +1186,11 @@ class GenerateTab(DropZones):
     def reconcile_preview(self, live_ids):
         shown = self._displayed_row
         if shown is not None and shown.get("prompt_id") not in live_ids:
-            self._preview.clear()
+            self._viewport.clear()
         self._reread_corners()
 
     def _reread_corners(self):
-        armed = self._preview.actions_id()
+        armed = self._viewport.actions_id()
         if armed is not None:
             self._arm_preview_actions(armed)
 
@@ -1299,7 +1299,7 @@ class GenerateTab(DropZones):
     def refresh_modified_message(self):
         modified = (self._displayed_config is not None
                     and not self._would_remake_what_it_shows())
-        self._preview.set_message(_MODIFIED_MESSAGE if modified else None)
+        self._viewport.set_message(_MODIFIED_MESSAGE if modified else None)
 
     def _would_remake_what_it_shows(self) -> bool:
         return (self._displayed_config is not None
@@ -1333,7 +1333,7 @@ class GenerateTab(DropZones):
         if pending is not None:
             frame = pending.frame
             if frame:
-                self._preview.show_frame(frame, enhancing=True)
+                self._viewport.show_frame(frame, enhancing=True)
         elif was_running:
             self._restore_preview()
         if self._versions.update_pending(pending):
@@ -1344,14 +1344,14 @@ class GenerateTab(DropZones):
         row = self._displayed_row
         preview = resolve_preview(row, OUTPUT_PLACES) if row else None
         if preview is None:
-            self._preview.clear()
+            self._viewport.clear()
             return
-        self._preview.show_media(*preview, row["prompt_id"])
+        self._viewport.show_media(*preview, row["prompt_id"])
         self._arm_preview_actions()
         self.refresh_modified_message()
 
     def set_fullscreen_factory(self, make):
-        self._preview.set_fullscreen_factory(make)
+        self._viewport.set_fullscreen_factory(make)
 
     def set_enhance_settings(self, settings: EnhanceSettings):
         if settings == self._enhance_settings:
@@ -1431,7 +1431,7 @@ class GenerateTab(DropZones):
             return
         path = self._version_path(self._listed_versions[position])
         if path.exists():
-            self._preview.show_media(path, media_type_of_row(self._displayed_row),
+            self._viewport.show_media(path, media_type_of_row(self._displayed_row),
                                      self._displayed_row["prompt_id"])
             self._arm_preview_actions()
             self.refresh_modified_message()
@@ -1466,7 +1466,7 @@ class GenerateTab(DropZones):
                       inbox=self._inbox, places=OUTPUT_PLACES)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
-            QMessageBox.warning(self._preview, lane.failure_title,
+            QMessageBox.warning(self._viewport, lane.failure_title,
                                 lane.failure_body(e))
             return
         self._redraw_lane_button()
@@ -1492,10 +1492,10 @@ class GenerateTab(DropZones):
         return preview[0]
 
     def release_media(self, paths) -> None:
-        self._preview.release_media(paths)
+        self._viewport.release_media(paths)
 
     def osr2_drive_target(self):
-        return drive_target_for(self._displayed_video_path(), self._preview.player())
+        return drive_target_for(self._displayed_video_path(), self._viewport.player())
 
     def video_on_screen(self) -> str | None:
-        return self._preview.video_on_screen()
+        return self._viewport.video_on_screen()

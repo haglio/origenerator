@@ -133,7 +133,7 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
         top = widget.mapTo(tab, QPoint(0, 0)).y()
         return top, top + widget.height()
 
-    _, preview_foot = span(tab._preview)
+    _, preview_foot = span(tab._viewport)
     line_top, line_foot = span(tab._media_split.handle(1))
     generate_top, generate_foot = span(tab._generate_btn.parentWidget())
     settings_top, _ = span(tab._scroll)
@@ -341,7 +341,7 @@ def test_the_pane_keeps_a_margin_round_its_contents(tab):
     tab.show()
     tab.resize(700, 800)
 
-    top_left = tab._preview.mapTo(tab, tab._preview.rect().topLeft())
+    top_left = tab._viewport.mapTo(tab, tab._viewport.rect().topLeft())
     assert top_left.x() == 8
     assert top_left.y() == 8
     form = tab._form_host
@@ -675,7 +675,7 @@ def test_a_made_from_pair_already_on_show_is_not_painted_again(tab):
 
 def test_a_wait_text_already_on_show_is_not_painted_again(tab):
     painted = []
-    tab._preview.show_message = lambda text, **_kwargs: painted.append(text)
+    tab._viewport.show_message = lambda text, **_kwargs: painted.append(text)
 
     tab.show_live_wait("Loading the model")
     tab.show_live_wait("Loading the model")
@@ -1124,7 +1124,7 @@ def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypa
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     shown = []
-    monkeypatch.setattr(tab._preview, "show_media",
+    monkeypatch.setattr(tab._viewport, "show_media",
                         lambda path, mt, generation: shown.append((path, mt, generation)))
 
     tab.prefill("sdxl_t2i", _wiz_params())
@@ -1136,8 +1136,8 @@ def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
     qtbot.addWidget(tab)
     tab.show_recent_preview()
-    assert tab._preview._media is None
-    assert tab._preview._generation is None
+    assert tab._viewport._media is None
+    assert tab._viewport._generation is None
 
 
 def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
@@ -1151,7 +1151,7 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
     qtbot.addWidget(tab)
     tab.prefill("sdxl_t2i", _wiz_params())
 
-    assert tab._preview._generation == "g1"
+    assert tab._viewport._generation == "g1"
 
 
 def test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
@@ -1374,7 +1374,7 @@ def _named(tab, row) -> str:
 def test_a_displayed_item_names_the_tab_by_its_name_not_its_file(tab):
     row = _image_row(tab._db, filename="sdxl_img1.png")
     name = _named(tab, row)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     tab.show_saved_generation(row, [row])
 
@@ -1384,7 +1384,7 @@ def test_a_displayed_item_names_the_tab_by_its_name_not_its_file(tab):
 def test_title_changed_when_the_shown_item_changes(tab):
     row = _image_row(tab._db, filename="sdxl_img1.png")
     name = _named(tab, row)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     titles = []
     tab.title_changed.connect(titles.append)
 
@@ -1400,7 +1400,7 @@ def test_the_mark_is_the_shown_items_own_thumbnail(tab, tmp_path):
     thumb = tmp_path / "thumb.png"
     pixmap.save(str(thumb))
     row = dict(_image_row(tab._db), thumbnail_path=str(thumb))
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     tab.show_saved_generation(row, [row])
 
@@ -1533,7 +1533,7 @@ def saved_panel(qtbot, tmp_path, installed_models):
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "sdxl_t2i"))
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     return tab, db
 
 
@@ -1549,7 +1549,7 @@ def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
     names.take([image], [], {})
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db, names=names)
     qtbot.addWidget(tab)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     tab.show_saved_generation(image, [image])
 
@@ -1662,11 +1662,11 @@ def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkey
     tab, db = saved_panel
     video, upscale = _evolver_upscaled_video(db, monkeypatch, tmp_path)
     tab.show_saved_generation(video, [])
-    tab._preview.show_media.reset_mock()
+    tab._viewport.show_media.reset_mock()
 
     tab._show_version(0)
 
-    tab._preview.show_media.assert_called_once_with(upscale, "video", "vid1")
+    tab._viewport.show_media.assert_called_once_with(upscale, "video", "vid1")
 
 
 def test_an_upscaled_videos_versions_have_no_trash_can(saved_panel, monkeypatch, tmp_path):
@@ -1753,14 +1753,14 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
 
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
-    tab._preview.show_frame = MagicMock()
-    tab._preview.show_media.reset_mock()
+    tab._viewport.show_frame = MagicMock()
+    tab._viewport.show_media.reset_mock()
 
     tab.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", "2x"))
-    tab._preview.show_frame.assert_called_once_with(b"\x89PNG-ish", enhancing=True)
+    tab._viewport.show_frame.assert_called_once_with(b"\x89PNG-ish", enhancing=True)
 
     tab.set_pending_enhancement(None)
-    tab._preview.show_media.assert_called_once_with(
+    tab._viewport.show_media.assert_called_once_with(
         output_dir / "image" / "sdxl_img1.png", "image", "img1"
     )
 
@@ -1789,11 +1789,11 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
 
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
-    tab._preview.show_media.reset_mock()
+    tab._viewport.show_media.reset_mock()
 
     tab._show_version(1)
 
-    tab._preview.show_media.assert_called_once_with(
+    tab._viewport.show_media.assert_called_once_with(
         output_dir / "image" / "sdxl_img1.png", "image", "img1"
     )
     assert tab._displayed_row["prompt_id"] == "img1"
@@ -1811,11 +1811,11 @@ def test_an_arrow_after_a_level_is_clicked_puts_the_next_level_in_the_preview(
     tab.show_saved_generation(image, [image])
     newest = _version_rows(tab)[0]
     qtbot.mouseClick(newest, Qt.MouseButton.LeftButton)
-    tab._preview.show_media.reset_mock()
+    tab._viewport.show_media.reset_mock()
 
     qtbot.keyClick(newest, Qt.Key.Key_Down)
 
-    tab._preview.show_media.assert_called_once_with(
+    tab._viewport.show_media.assert_called_once_with(
         output_dir / "image" / "sdxl_img1.png", "image", "img1"
     )
 
@@ -1842,7 +1842,7 @@ def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
 
     tab.show_saved_generation(image, [image])
 
-    assert tab._preview._actions_id == "img1"
+    assert tab._viewport._actions_id == "img1"
 
 
 def test_a_preview_corner_relays_the_act_with_the_id_it_is_about(saved_panel):
@@ -1850,7 +1850,7 @@ def test_a_preview_corner_relays_the_act_with_the_id_it_is_about(saved_panel):
     got = []
     tab.item_action_requested.connect(lambda pid, action: got.append((pid, action)))
 
-    tab._preview.action_triggered.emit("img1", corner_buttons.STAR)
+    tab._viewport.action_triggered.emit("img1", corner_buttons.STAR)
 
     assert got == [("img1", corner_buttons.STAR)]
 
@@ -1863,7 +1863,7 @@ def test_a_favorite_preview_stays_favorite_through_an_enhance_setting_change(sav
 
     tab.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert tab._preview._controls.buttons()[0].toolTip() == "Unfavorite this item"
+    assert tab._viewport._controls.buttons()[0].toolTip() == "Unfavorite this item"
 
 
 def test_right_clicking_the_preview_asks_for_the_generations_menu(saved_panel):
@@ -1871,7 +1871,7 @@ def test_right_clicking_the_preview_asks_for_the_generations_menu(saved_panel):
     got = []
     tab.context_menu_requested.connect(lambda pid, pos: got.append(pid))
 
-    tab._preview.context_requested.emit("img1", QPoint(4, 4))
+    tab._viewport.context_requested.emit("img1", QPoint(4, 4))
 
     assert got == ["img1"]
 
@@ -1899,7 +1899,7 @@ def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, monkeypat
 
     tab.show_saved_generation(image, [image])
 
-    assert tab._preview.show_media.call_args.args == ("img1.png", "image", "img1")
+    assert tab._viewport.show_media.call_args.args == ("img1.png", "image", "img1")
 
 
 def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, monkeypatch):
@@ -1909,7 +1909,7 @@ def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, m
 
     tab.show_saved_generation(image, [image])
 
-    assert tab._preview._generation is None
+    assert tab._viewport._generation is None
 
 
 def test_the_tab_watches_no_run_of_its_own(tab):
@@ -1961,7 +1961,7 @@ def _wizard_panel(qtbot, tmp_path, monkeypatch):
         [{"filename": "sdxl_g1.png", "subfolder": "image"}]))
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     return tab, db
 
 
@@ -2101,7 +2101,7 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
     tab.show_saved_generation(video, [])
 
-    assert tab.osr2_drive_target() == (vpath, tab._preview.player(), actions)
+    assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
 
 
 def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
@@ -2115,7 +2115,7 @@ def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tm
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
     tab.show_saved_generation(video, [])
 
-    assert tab.osr2_drive_target() == (vpath, tab._preview.player(), actions)
+    assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
 
 
 def test_osr2_drive_target_is_none_for_a_video_without_a_funscript(saved_panel, monkeypatch, tmp_path):
@@ -2151,7 +2151,7 @@ def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
 
     tab.show_recent_preview()
 
-    assert tab.osr2_drive_target() == (vpath, tab._preview.player(), actions)
+    assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
 
 
 def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, tmp_path):
@@ -2229,7 +2229,7 @@ def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_pa
 
     tab.show_saved_generation(video, [])
 
-    assert tab._preview.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video",
+    assert tab._viewport.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video",
                                                          "vid1")
 
 
@@ -2239,7 +2239,7 @@ def test_a_click_puts_up_only_the_image_it_was_on(qtbot, tmp_path, monkeypatch):
 
     tab.show_saved_generation(row, [row])
 
-    assert tab._preview.show_media.call_count == 1
+    assert tab._viewport.show_media.call_count == 1
 
 
 def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
@@ -2332,7 +2332,7 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
 
 
 def _message(tab):
-    return "" if tab._preview._message.isHidden() else tab._preview._message.text()
+    return "" if tab._viewport._message.isHidden() else tab._viewport._message.text()
 
 
 def _set_prompt(tab, text):
@@ -2927,7 +2927,7 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
     tab.show_saved_generation(image, [image])
     _set_prompt(tab, "a dog")
 
-    tab._preview.show_message("Waiting for preview…", live=True)
+    tab._viewport.show_message("Waiting for preview…", live=True)
 
     assert _message(tab) == ""
 
@@ -3366,7 +3366,7 @@ def test_a_modify_cannot_be_edited_after_the_tab_opens_on_it():
 
 
 def test_a_modify_tab_shows_the_whole_folder_in_its_preview(modifying):
-    preview = modifying._preview
+    preview = modifying._viewport
     assert preview._stack.currentWidget() is preview._sheet
     assert preview._sheet.count() == 3
 
@@ -3393,22 +3393,22 @@ def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
     monkeypatch.setattr(generate_tab_module, "resolve_preview",
                         lambda row, out: (Path("C:/out/img1.png"), "image"))
     tab.show_saved_generation(image, [image])
-    assert tab._preview._actions_id == "img1"
+    assert tab._viewport._actions_id == "img1"
     fired = []
     tab.item_action_requested.connect(lambda pid, action: fired.append(pid))
 
     tab.open_folder_modify(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
                               _folder_params(), _images(tmp_path, 3))
 
-    assert tab._preview._actions_id is None
-    tab._preview._on_control("trash")
+    assert tab._viewport._actions_id is None
+    tab._viewport._on_control("trash")
     assert fired == []
 
 
 def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(modifying):
     modifying.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert modifying._preview._actions_id is None
+    assert modifying._viewport._actions_id is None
 
 
 def test_a_settings_push_does_not_arm_corners_over_a_followed_runs_frames(
@@ -3420,7 +3420,7 @@ def test_a_settings_push_does_not_arm_corners_over_a_followed_runs_frames(
 
     tab.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert tab._preview.actions_id() is None
+    assert tab._viewport.actions_id() is None
 
 
 def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
@@ -3431,7 +3431,7 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
 
     tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
 
-    assert tab._preview.actions_id() == "img1"
+    assert tab._viewport.actions_id() == "img1"
 
 
 def test_a_modify_tab_holds_no_generation_of_its_own(modifying):
@@ -3529,7 +3529,7 @@ def test_a_landed_run_does_not_take_the_wall_of_images_away(modifying):
     modifying.show_completed_result(row, [])
 
     assert modifying.displayed_row() is None
-    assert modifying._preview._stack.currentWidget() is modifying._preview._sheet
+    assert modifying._viewport._stack.currentWidget() is modifying._viewport._sheet
 
 
 
@@ -3681,7 +3681,7 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db,
                                 inbox=evolver_export.EvolverInbox(inbox))
     qtbot.addWidget(tab)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     video = tmp_path / "vid1.mp4"
     video.write_bytes(b"pixels")
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (video, "video"))
@@ -3706,7 +3706,7 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db,
                                 inbox=evolver_export.EvolverInbox(inbox))
     qtbot.addWidget(tab)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     tab.show_saved_generation(_video_row(db, "vid1"), [])
     _press(tab, export_lane_module.KINO.send_caption)

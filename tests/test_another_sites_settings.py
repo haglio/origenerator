@@ -46,7 +46,7 @@ def library(qtbot, tmp_path):
         video=Made(_VIDEO), image=Made(_IMAGE), action="Wave"))
     tab =GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
     return tab, db, video, image
 
 
@@ -75,7 +75,7 @@ def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site
         kind=VideoKind.IMAGE_TO_VIDEO)
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
-    tab._preview.show_media = MagicMock()
+    tab._viewport.show_media = MagicMock()
 
     tab.show_saved_generation(video, [image])
 

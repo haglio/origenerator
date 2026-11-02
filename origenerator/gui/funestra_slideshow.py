@@ -481,7 +481,7 @@ class FunestraSlideshow(QObject):
             self._lock(False)
 
     def slideshow_cull(self) -> None:
-        """The Funestras' "weird": a favorite loses its star and the Funestra moves
+        """The Funestras' "trash": a favorite loses its star and the Funestra moves
         on; anything else is taken away and the Funestra moves on.
 
         The Funestra is told to drop a condemned item before the generation is:

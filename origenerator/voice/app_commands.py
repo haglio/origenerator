@@ -1,6 +1,6 @@
 """What a bare spoken word asks of the app — a collection, a button, the image.
 
-Fun Time's Funestras answer single words: "weird" condemns the video, "lock" holds
+Fun Time's Funestras answer single words: "trash" condemns the clip, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
 the Gallery pane buttons do and the names of the collections that lead the tree — so
 "experiments" stands you in the Experiments collection exactly as clicking its row
@@ -43,7 +43,6 @@ class AppCommand(Enum):
     LATEST = "recents"
     FAVORITES = "favorites"
     EXPERIMENTS = "experiments"
-    TRASH = "trash"
 
     # The transport, aimed at whichever surface has the floor: a slide either
     # way over a slideshow, a step through the history in the gallery.
@@ -51,7 +50,7 @@ class AppCommand(Enum):
     FORWARD = "forward"
 
     # What you do to what is in front of you.
-    CULL = "cull"        # Fun Time's "weird": take this one away
+    CULL = "cull"        # Fun Time's "trash": take this one away
     LOCK = "lock"        # lock the slide (which favorites it and asks for the better version)
     UNLOCK = "unlock"    # let it go again
     FAVORITE = "favorite"
@@ -154,7 +153,6 @@ _COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.LATEST: ("recents", "recent"),
     AppCommand.FAVORITES: ("favorites",),
     AppCommand.EXPERIMENTS: ("experiments", "experiment"),
-    AppCommand.TRASH: ("trash",),
 }
 _COLLECTION_VERBS = ("go to", "open", "show")
 # Said on its own, this one already plays the collection, or narrows a slideshow to it
@@ -170,10 +168,9 @@ for _collection, _names in _COLLECTION_NAMES.items():
 _say(AppCommand.BACK, "back", "go back", "previous", "previous slide")
 _say(AppCommand.FORWARD, "forward", "go forward", "next", "next slide", "skip")
 
-# What you do to what is in front of you. "weird" is Fun Time's word for a video
-# that has to go, and it means the same here; "delete" says it plainly for
-# anyone who never learned the other one.
-_say(AppCommand.CULL, "weird", "delete", "delete it")
+# What you do to what is in front of you. "trash" is Fun Time's word for what
+# has to go, and it means the same here.
+_say(AppCommand.CULL, "trash", "delete", "delete it")
 _say(AppCommand.LOCK, "lock", "hold")
 _say(AppCommand.UNLOCK, "unlock", "release")
 _say(AppCommand.FAVORITE, "favorite", "favorite it", "favorite this")

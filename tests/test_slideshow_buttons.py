@@ -3,7 +3,7 @@ face, its tooltip and the state it draws."""
 from __future__ import annotations
 
 import pytest
-from funestra.hud_controls import AN_IMAGE
+from funestra.hud_controls import AN_IMAGE, TRASH_TOOLTIP, lock_tooltip
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.slideshow_buttons import HUD_FACTS, answer, slideshow_rows
@@ -95,11 +95,11 @@ class TestTheWords:
         assert band["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
         assert band["cycle_version"].tooltip == "Another version of this slide"
 
-    def test_the_lock_the_trash_and_reset_say_what_they_do_here(self):
+    def test_the_lock_and_the_trash_read_as_kinos_and_reset_says_what_it_does_here(self):
         band = _by_name()
 
-        assert "favoriting" in band["lock"].tooltip
-        assert band["trash"].tooltip == "Delete this one and move on"
+        assert band["lock"].tooltip == lock_tooltip(False, "slide")
+        assert band["trash"].tooltip == TRASH_TOOLTIP
         assert band["reset"].tooltip.startswith("Reset — ")
 
 

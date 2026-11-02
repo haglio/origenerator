@@ -1678,7 +1678,7 @@ class SlideshowDirector:
         """A word about the slide filling the screen: step off it either way,
         take it away, lock it, or favorite it.
 
-        The words are Fun Time's, and so is what they do — "weird" condemns what
+        The words are Fun Time's, and so is what they do — "trash" condemns what
         was on screen when it was said, a lock holds it — because the two rooms are
         one room to whoever is speaking, and a word that means one thing there and
         another here is a word nobody can use.

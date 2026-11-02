@@ -593,7 +593,7 @@ class SlideshowSet:
 
     def unfavorite_current(self, unfavorite) -> bool:
         """Take the star off the item on screen, through *unfavorite* — the
-        Funestras' "weird" on a favorite, which demotes it rather than condemning
+        Funestras' "trash" on a favorite, which demotes it rather than condemning
         it.  ``False`` when it wears no star, or nothing was wired to take one
         off: then the press means the other thing."""
         prompt_id = self.current_prompt_id()

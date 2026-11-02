@@ -22,8 +22,7 @@ from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 @pytest.mark.parametrize("said, wanted", [
     ("experiments", AppCommand.EXPERIMENTS),
-    ("recents", AppCommand.LATEST),
-    ("trash", AppCommand.TRASH),
+    ("recents", AppCommand.RECENTS),
 ])
 def test_a_collection_answers_to_its_own_bare_name(said, wanted):
     assert match_app_command(said) is wanted
@@ -38,7 +37,7 @@ def test_a_collection_also_answers_to_a_sentence_shaped_ask(said):
 # --- Fun Time's own words over a slideshow ----------------------------------
 
 def test_the_words_fun_times_funestras_answer_to_mean_the_same_here():
-    assert match_app_command("weird") is AppCommand.CULL
+    assert match_app_command("trash") is AppCommand.CULL
     assert match_app_command("lock") is AppCommand.LOCK
     assert match_app_command("unlock") is AppCommand.UNLOCK
     assert match_app_command("next") is AppCommand.FORWARD
@@ -192,7 +191,7 @@ def test_favorites_on_its_own_is_left_to_the_order_that_plays_the_collection():
 # --- what must NOT match: a sentence that holds a command word --------------
 
 def test_whispers_punctuation_and_case_are_ignored():
-    assert match_app_command("Weird!") is AppCommand.CULL
+    assert match_app_command("Trash!") is AppCommand.CULL
     assert match_app_command("  Lock. ") is AppCommand.LOCK
 
 
@@ -219,7 +218,7 @@ def test_an_empty_utterance_asks_for_nothing():
 
 def test_the_recognizer_is_asked_to_hear_every_way_a_command_is_said_in_words():
     heard = spoken_phrases()
-    for phrase in ("experiments", "go to trash", "weird", "favorite it", "go to favorites",
+    for phrase in ("experiments", "go to experiments", "trash", "favorite it", "go to favorites",
                    "auto generate on",
                    "mic off", "o s r two off", "clear filter", "slow down",
                    "human inspired off", "amp fifty", "center one hundred", "max speed"):
@@ -230,7 +229,7 @@ def test_taking_an_item_away_and_shutting_the_mic_are_heard_only_when_said_outri
     # A near miss is never repaired into either: one has no spoken way back, and the
     # other is not something to do to an item on a guess.
     assert phrases_heard_only_outright() == {
-        "mic off", "voice off", "weird", "delete", "delete it"}
+        "mic off", "voice off", "trash", "delete", "delete it"}
 
 
 def test_a_number_in_digits_is_how_whisper_writes_it_not_something_to_listen_for():

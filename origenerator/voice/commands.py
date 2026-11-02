@@ -32,10 +32,8 @@ from origenerator.gallery.collection import (
     EXPERIMENTS_LABEL,
     FAVORITES_KEY,
     FAVORITES_LABEL,
-    LATEST_KEY,
-    LATEST_LABEL,
-    TRASH_KEY,
-    TRASH_LABEL,
+    RECENTS_KEY,
+    RECENTS_LABEL,
 )
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command
@@ -57,7 +55,6 @@ COLLECTION_KEYS: dict[str, str] = {
     LATEST_LABEL.lower(): LATEST_KEY,
     FAVORITES_LABEL.lower(): FAVORITES_KEY,
     EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
-    TRASH_LABEL.lower(): TRASH_KEY,
 }
 
 # A collection command is its name, at most led by a shape: three words is already

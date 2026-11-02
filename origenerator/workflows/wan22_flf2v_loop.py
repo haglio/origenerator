@@ -29,16 +29,8 @@ from origenerator.workflows.wan_experts import (
 class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     """WAN 2.2 first-last-frame loop: a single image drives both endpoints.
 
-    The output resolution is derived in-graph from the input image (see
-    :meth:`build_api_payload`): it keeps the image's aspect ratio at a fixed
-    pixel budget rather than a hardcoded resolution. The decoded frames are
-    interpolated up to the chosen playback rate before they are written
-    (:meth:`~WorkflowTemplate.interpolation_nodes`), which leaves the loop's two
-    matched endpoints exactly where the model put them. They also
-    drive a HunyuanVideo-Foley pass (:meth:`~WorkflowTemplate.foley_audio_nodes`),
-    whose synced audio ``VHS_VideoCombine`` muxes into the file — though a
-    player restarting the loop restarts the track with it; only the frames
-    loop seamlessly.
+    The audio loops with the file only as far as a player lets it: a player restarting
+    the loop restarts the track with it, and only the frames loop seamlessly.
     """
 
     name = "wan22_flf2v_loop"
@@ -116,17 +108,10 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     def build_api_payload(self, params: dict) -> dict:
         loras_high = self.lora_chain("5", ["3", 0], picked_loras(params, FIRST_PASS_LORA_KEYS))
         loras_low = self.lora_chain("6", ["4", 0], picked_loras(params, SECOND_PASS_LORA_KEYS))
-        # Size the loop off the input image: derived in-graph by default, or scaled
-        # to the user's explicit WxH when the derived size was unlocked. Both
-        # endpoints read the same scaled image.
         sized = self.image_size_nodes(["11", 0], params)
         size_nodes, frame_ref = sized.nodes, sized.image
         width_ref, height_ref = sized.width, sized.height
 
-        # Each segment reads its own scene of the prompt and of the negative (a
-        # --- line starts the next of each, which is how the scenes editor stores
-        # them); nodes 9 and 10 below encode the first scene's, and any later
-        # scene gets its own.
         scenes = scene_prompts(params["positive_prompt"])
         negatives = scene_prompts(params["negative_prompt"])
 
@@ -138,9 +123,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["9", 0])
             negative_nodes, negative_ref = self.scene_prompt_nodes(
                 index, scene, negatives, ["1", 0], ["10", 0], role="negative")
-            # Only the segment that ends the loop is told to end on its start
-            # frame; an earlier one told so would close the loop and then have
-            # to leave it again.
             endpoints = {"start_image": start, **({"end_image": frame_ref} if last else {})}
             nodes = {
                 **prompt_nodes,
@@ -201,15 +183,9 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             }
             return nodes, [decode_id, 0]
 
-        # A loop longer than one segment is chained from each segment's last
-        # frame (WorkflowTemplate.chain_segments); its frames come back joined.
         segments, decoded_ref, total_frames = self.chain_segments(params, frame_ref, segment)
-        # Scored for the frames the scenes really add up to, which is what the
-        # stored video length says whenever the form wrote it.
         foley, audio_ref = self.foley_audio_nodes(
             "19", "20", "21", decoded_ref, {**params, "frame_count": total_frames})
-        # Foley scores the decoded frames; VHS_VideoCombine writes the
-        # interpolated ones. At the native rate they are the same frames.
         interpolate, frames_ref = self.interpolation_nodes("22", decoded_ref, params)
         return {
             **foley,

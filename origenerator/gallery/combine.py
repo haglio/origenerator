@@ -1,13 +1,3 @@
-"""Combine a gallery image with a video's settings into new i2v params.
-
-The gallery already holds both halves of an I2V: a video row carries its
-full settings (workflow, params and seed), and any image row's output file can seed
-an i2v. This readies them to re-run on a *different* image — the one input a
-user picks — without touching a Generate tab. The settings are either a past video's
-(:func:`combined_params`) or ones written down as a workflow and its params
-(:func:`written_params`), and either one runs with fresh seeds. Qt-free so it
-stays unit-testable.
-"""
 from __future__ import annotations
 
 from origenerator.content import load_content
@@ -17,46 +7,16 @@ from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 
 _CONTENT = load_content()
 
-# How long a Genau flick is generated for, in frames at the native rate. Genau
-# steers a video as ONE cycle — see :func:`cycle_shaped` — so the ideal is the
-# shortest video that holds exactly one, and 13 frames is where the arithmetic
-# lands (a cycle at the app's own cadence is 0.83 s, and 13/16 is 0.81).
-#
-# It is 29 because the model cannot close a loop that short. First-last-frame
-# conditions both ends on the same image, but the model needs room to come
-# BACK to it, and measured over one video's settings at a fixed seed the last frame lands
-# this far from the first: 13 frames -2.02%, 17 +1.34%, 21 +0.99%, 29 +0.23%,
-# 41 -0.19%, 81 +0.05%. Under 29 the lighting visibly pops on every repeat; at
-# 29 it stops. So the length is set by the loop closing, and the ONE cycle is
-# asked for in words instead (:data:`_CYCLE_WORDS`).
+# The model cannot close a shorter loop: the last frame lands further from the first (13 frames
+# -2.02%, 29 frames +0.23%, measured at a fixed seed), and the lighting pops on every repeat.
 CYCLE_FRAMES = 29
 
-# The words that ask a 29-frame loop for ONE cycle, and for a deep one, PER
-# ACTION: ``{action: {"positive": ..., "negative": ...}}`` with a ``""`` entry standing
-# in for an action that has none of its own.
-#
-# Per action because a cycle is not one motion. What made the difference on the action
-# it was tuned on was naming the cycle in stages -- out to one end, in to the
-# other, back -- and the stages are different parts of the body from one action to
-# the next; the wording that doubled the travel on one would be describing
-# something that is not happening in another. The default carries whichever action's
-# wording generalizes furthest, and an action sets its own when that is not close
-# enough.
-#
-# In the overlay rather than here for the reason every other phrase the library
-# speaks in is: this file is public, and the sanitize guard bans that vocabulary
-# from the tracked tree. An overlay with none of this leaves every prompt exactly
-# as its settings wrote it.
+# {action: {"positive": ..., "negative": ...}}, a "" entry standing in for an action with none of
+# its own. In the overlay because the sanitize guard bans this vocabulary from the tracked tree.
 _CYCLE_WORDS: dict = _CONTENT.get("genau_flick_prompts") or {}
 
 
 def combined_params(video_row: dict, input_image: str | None, workflow) -> dict | None:
-    """The video's settings readied to run on ``input_image`` -- what the graph
-    loads the new image by -- with fresh seeds. ``None`` with no image.
-
-    A size-deriving workflow's stored ``width``/``height`` sized its OWN frame,
-    so they are dropped: left in, they would stretch the new image to them.
-    """
     params = _run_on(input_image, filled_params(video_row, workflow), workflow)
     return None if params is None else without_an_explicit_size(params, workflow)
 
@@ -78,8 +38,6 @@ def _words(prompt):
 
 
 def written_params(settings: dict, input_image: str | None, workflow) -> dict | None:
-    """Written-down settings over their workflow's defaults, readied to run on
-    ``input_image`` with fresh seeds; ``None`` with no image."""
     params = {**workflow.default_params(), **(settings.get("params") or {})}
     return _run_on(input_image, params, workflow)
 
@@ -91,42 +49,12 @@ def _run_on(input_image: str | None, params: dict, workflow) -> dict | None:
 
 
 def cycle_words(category: str = "") -> tuple[str, str]:
-    """The ``(positive, negative)`` a Genau flick of ``category`` asks for, or the
-    default pair when that action has none of its own -- see :data:`_CYCLE_WORDS`.
-
-    Empty strings when the overlay carries nothing at all, which is what leaves
-    a run's prompt untouched rather than appending a stray space.
-    """
     words = _CYCLE_WORDS.get(category) or _CYCLE_WORDS.get("") or {}
     return ((words.get("positive") or "").strip(),
             (words.get("negative") or "").strip())
 
 
 def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
-    """``params`` re-cut so the loop portrays ONE deep cycle, and plays smoothly.
-
-    The Genau lane's whole problem: Genau does not play a video, it scrubs it
-    against the device's phase — so it steers whatever it is given as a single
-    cycle running out to one extreme and back. A video that holds two stumbles;
-    a video that holds four looks like a machine.
-
-    Three settings answer that, and each was arrived at by measuring:
-
-    * :data:`CYCLE_FRAMES` seconds of motion, because that is the shortest loop
-      the model closes cleanly (see the note there).
-    * The words, chosen by the action (:func:`cycle_words`). At 29 frames the model
-      fits about two cycles on its own, so the prompt asks for one outright —
-      naming the cycle in stages rather than saying "one cycle", which does
-      nothing. The same wording doubled the travel, so the video reads as a
-      deliberate cycle rather than a wiggle. It rides the content overlay rather
-      than this file, like every other phrase the library speaks in.
-    * The top playback rate, because 29 frames of one cycle is too coarse to
-      scrub slowly and the interpolator fills the rest in
-      (:mod:`origenerator.workflows.frame_rate`).
-
-    A workflow with no length or no rate to set is handed back unchanged: this
-    shapes settings, it does not invent them.
-    """
     defaults = workflow.default_params()
     if "frame_count" not in defaults or "frame_rate" not in defaults:
         return params

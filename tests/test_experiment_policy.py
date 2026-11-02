@@ -241,6 +241,21 @@ def test_video_experiments_keep_their_start_frame():
         assert "input_image" not in proposal.mutated_keys
 
 
+def test_a_verdict_on_a_number_counts_for_the_numbers_near_it_and_not_for_one_far_off():
+    steps = FakeWorkflow().param_definitions()[3]
+    bucket = ExperimentPolicy._bucket
+
+    assert bucket(20, steps) == bucket(21.4, steps)
+    assert bucket(20, steps) != bucket(45, steps)
+
+
+def test_a_verdict_on_a_dropdown_value_counts_for_exactly_that_value():
+    sampler = FakeWorkflow().param_definitions()[5]
+
+    assert ExperimentPolicy._bucket("uni_pc", sampler) == "uni_pc"
+    assert ExperimentPolicy._bucket("euler", sampler) != ExperimentPolicy._bucket("uni_pc", sampler)
+
+
 def test_proposal_mutates_declared_dims_and_rerolls_the_seed():
     base = make_row("base-1", params={"seed": 777})
     base_params = json.loads(base["params_json"])

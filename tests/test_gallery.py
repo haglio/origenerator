@@ -303,6 +303,21 @@ def test_a_start_frames_signature_follows_the_index_it_is_given():
     assert settings_signature("wan22_i2v", params, lantern) !=         settings_signature("wan22_i2v", params, {})
 
 
+def test_an_image_answers_as_itself_under_each_of_the_files_it_lists():
+    enhanced = _row(
+        prompt_id="lantern", workflow_name="sdxl_t2i",
+        params_json=json.dumps({"positive_prompt": "a lantern", "steps": 30, "seed": 1}),
+        output_files=json.dumps([{"filename": "Lantern_enhanced.png"}, {"filename": "lantern_first.png"}]),
+    )
+    no_file = _row(prompt_id="nothing-made", workflow_name="sdxl_t2i", output_files=json.dumps([]))
+
+    index = build_image_config_index([enhanced, no_file])
+
+    assert set(index) == {"lantern_enhanced.png", "lantern_first.png"}
+    assert index["lantern_enhanced.png"] == index["lantern_first.png"]
+    assert index["lantern_first.png"].prompt_id == "lantern"
+
+
 def test_settings_signature_ignores_seeds_but_keeps_other_params():
     a = json.dumps({"steps": 50, "cfg": 7.5, "seed": 1, "noise_seed": 99})
     b = json.dumps({"cfg": 7.5, "steps": 50, "seed": 2, "noise_seed": 7})

@@ -735,3 +735,43 @@ def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
+
+
+def test_a_tab_turned_to_an_image_being_enhanced_shows_that_run(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tab = view._generate_pane.current_generate_tab()
+    tab.show_saved_generation(db.get_generation("g1"), view._image_rows)
+    view.enhance_items(["g0"])
+    assert not tab._versions._host.findChildren(_PendingRow)
+
+    tab.show_saved_generation(db.get_generation("g0"), view._image_rows)
+
+    assert tab._versions._host.findChildren(_PendingRow)
+
+
+def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbot, tmp_path,
+                                                                            monkeypatch):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
+    db = _enhanceable_db(tmp_path, count=1)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+    slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    (job,) = view._jobs.all_jobs
+    assert slideshow.hud_item_note == "Enhancement queued"
+
+    client.executing_prompts = lambda: [job.prompt_id]
+    view._poll()
+
+    assert slideshow.hud_item_note == "Enhancing…"
+    slideshow.close()

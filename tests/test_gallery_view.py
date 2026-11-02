@@ -42,7 +42,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY,
 )
 from origenerator.gallery.labels import workflow_label
-from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS, TOGETHER
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
@@ -2673,3 +2673,39 @@ def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
 
     assert leaf.toolTip(0).startswith(leaf.text(0))
     assert "a cat" not in leaf.toolTip(0)
+
+
+def test_the_experiments_switch_is_up_only_in_the_experiments_collection(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
+    assert not view._experiments_bar.isHidden()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    assert view._experiments_bar.isHidden()
+
+
+def test_back_returns_to_where_the_gallery_first_landed(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    landed = view._tree.currentItem()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._navigation.go_back()
+
+    assert view._tree.currentItem() is landed
+
+
+def test_the_shapes_chosen_before_the_first_draw_read_nothing(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    read = []
+    db.list_generations = lambda: read.append("read") or []
+
+    view.set_toc_sides(list(TOGETHER))
+
+    assert read == []

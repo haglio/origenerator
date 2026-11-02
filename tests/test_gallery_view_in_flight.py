@@ -36,7 +36,7 @@ from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.combine import CombineRequest
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.hud_queue import queue_section
-from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.inflight import InFlightItem, RunReading, cancel_tooltip
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash

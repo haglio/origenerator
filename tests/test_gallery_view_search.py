@@ -46,6 +46,7 @@ from tests.gallery_view_support import (
     _press_ctrl_f,
     _row,
     _search_for,
+    _shape,
     _shown_view_with_one_image,
     _subs,
     _tab_with_prompts,
@@ -836,3 +837,42 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
 
     assert _find_count(view) == "2 of 2"
     assert _press_ctrl_f(view, monkeypatch) is True
+
+
+def test_a_search_asks_its_question_once_through_a_rebuild(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    asked = []
+    run = view._search.run
+    view._search.run = lambda: asked.append("run") or run()
+
+    view.refresh()
+
+    assert asked == ["run"]
+
+
+def test_with_no_row_selected_a_search_covers_the_gallerys_own_rows_and_not_the_trash(qtbot):
+    view = GalleryView(_trash_db(rows=[_image("i1", "a cat", 50, 1)],
+                                 held=[("d1", _image("d1", "a cat", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _shape(view._tree).setCurrentItem(None)
+
+    assert view.search_scope().ids == {"i1"}
+
+
+def test_an_open_find_counts_again_as_a_prompt_is_typed_in(qtbot, tmp_path):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    tab = _tab_with_prompts(view)
+    positive, _negative = tab.prompt_fields()
+    positive.setPlainText("a cat")
+    view._open_find()
+    _find_query(view).setText("cat")
+    assert _find_count(view) == "1 of 1"
+
+    positive.setPlainText("a cat and a cat")
+
+    assert _find_count(view) == "1 of 2"

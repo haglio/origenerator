@@ -1,5 +1,3 @@
-"""The style a drop zone wears while a drag it would take is under way: edged in
-blue and lit, and one step lighter still while the drag is over it."""
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QRectF, Qt
@@ -41,8 +39,6 @@ def light(widget: QWidget, state: str, on: bool) -> None:
 
 
 class DropEdge(QWidget):
-    """The style's edge, drawn over everything ``zone`` holds, which would hide it."""
-
     def __init__(self, zone: QWidget):
         super().__init__(zone)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)

@@ -1,14 +1,10 @@
 # ruff: noqa: PLC0415 -- inside the functions, so naming this module costs nothing
-"""Open the window for settling what each animation runs, on its own
-(:mod:`origenerator.own_window`) like the sorting one."""
 from __future__ import annotations
 
 import json
 
 
 def _launcher(db, client, enhance_settings):
-    """Queue one video of a sample's own image with the prompts as edited: the
-    same settings, their seeds re-rolled so it cannot reproduce the sample."""
     from origenerator import gallery
     from origenerator.generation_config import randomize_seeds
     from origenerator.gui.enhance_controller import launch_enhancements
@@ -80,7 +76,6 @@ def the_animation_window():
               if gallery.media_type_of_row(row) == MediaType.IMAGE]
 
     def look(sample: dict):
-        """The image this video was made from, and the video's own loop."""
         source = gallery.find_source_image_id(sample, images)
         row = db.get_generation(source) if source else None
         still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None

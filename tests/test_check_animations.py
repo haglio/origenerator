@@ -1,7 +1,3 @@
-"""The trial videos the animation window asks for, made the way every video is.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -57,3 +53,22 @@ def test_a_trial_from_an_image_never_enhanced_is_made_from_its_enhancement(qtbot
                       if row["workflow_name"] == _I2V.name and row["prompt_id"] != "sample"]
     assert gallery.parse_params(trial_video["params_json"])["input_image"] \
         == "image/image_enhance_00001_.png [output]"
+
+
+def test_a_trial_carries_the_prompts_as_edited_under_seeds_the_sample_did_not_use(qtbot, tmp_path):
+    db = _library(tmp_path)
+    client = _client()
+    trial = check_animations._launcher(db, client, gallery.EnhanceSettings())
+
+    trial(db.get_generation("sample"), "alpha", "beta")
+    (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "image"]
+    client.job_completed.emit(enhance["prompt_id"],
+                              {"outputs": {"12": {"images": [_ENHANCED]}}})
+
+    (video,) = [row for row in db.list_generations()
+                if row["workflow_name"] == _I2V.name and row["prompt_id"] != "sample"]
+    made = gallery.parse_params(video["params_json"])
+    sample = gallery.parse_params(db.get_generation("sample")["params_json"])
+    assert (made["positive_prompt"], made["negative_prompt"]) == ("alpha", "beta")
+    assert all(made[key] != sample[key] for key in _I2V.seed_keys())
+

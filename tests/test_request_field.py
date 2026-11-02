@@ -1,4 +1,3 @@
-"""The words a tab is asked to change its image by, typed or as they were heard."""
 from __future__ import annotations
 
 from origenerator.gui.request_field import RequestField
@@ -16,7 +15,7 @@ def test_a_pause_in_the_typing_asks_for_the_words(qtbot):
     field.asked.connect(asked.append)
 
     qtbot.keyClicks(field._words, "two women")
-    assert asked == []  # not per letter
+    assert asked == []
 
     qtbot.waitUntil(lambda: asked == ["two women"], timeout=5000)
 

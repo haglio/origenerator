@@ -11,7 +11,7 @@ from shared_ui.testing import ground
 
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
-from origenerator.gui.drop_zone import DropZone
+from origenerator.gui.drop_zone import DropZone, ZoneLookups
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.stylesheet import build_stylesheet
@@ -22,9 +22,9 @@ def _zone(qtbot, kind="image", lent_by=lambda pid: pid,
           preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False,
           named=lambda name: None, name_of=lambda held: "", browse=None,
           leads_to=lambda held: held):
-    zone = DropZone(kind=kind, lent_by=lent_by, preview=preview, placeholder=placeholder,
-                    grayscale=grayscale, named=named, name_of=name_of, browse=browse,
-                    leads_to=leads_to)
+    lookups = ZoneLookups(lent_by=lent_by, preview=preview, named=named, name_of=name_of,
+                          browse=browse, leads_to=leads_to)
+    zone = DropZone(kind=kind, lookups=lookups, placeholder=placeholder, grayscale=grayscale)
     qtbot.addWidget(zone)
     return zone
 

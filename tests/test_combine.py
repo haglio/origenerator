@@ -10,7 +10,7 @@ from shared_ui.testing import ground
 
 from origenerator import action_settings, animation_paths
 from origenerator.gui.action_dropdown import ACTION_LABEL
-from origenerator.gui.combine import Combine, CombineRequest, _text_inset
+from origenerator.gui.combine import Combine, CombineRequest, ZoneLookups, _text_inset
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.recent_videos import RecentVideo
@@ -35,11 +35,13 @@ class _Uses:
 def _panel(qtbot, start_images=None, *, fitting=None, preview=None, uses=None):
     start_images = start_images or {}
     uses = uses if uses is not None else _Uses()
+    seen = preview or (lambda pid: (None, None))
     combine = Combine(
-        image_lent_by=lambda pid: pid if pid.startswith("img") else start_images.get(pid),
-        video_lent_by=lambda pid: pid if pid.startswith("vid") and (
-            fitting is None or pid in fitting) else None,
-        preview=preview or (lambda pid: (None, None)),
+        image_lookups=ZoneLookups(
+            lambda pid: pid if pid.startswith("img") else start_images.get(pid), seen),
+        video_lookups=ZoneLookups(
+            lambda pid: pid if pid.startswith("vid") and (
+                fitting is None or pid in fitting) else None, seen),
         history=uses.history,
     )
     combine.video_used.connect(uses.record)
@@ -875,11 +877,13 @@ def test_the_two_radios_are_further_apart_than_a_circle_is_from_its_own_word(qtb
 
 def test_both_zones_paste_a_name_and_only_the_image_zone_browses(qtbot):
     browsed = []
+    shared = {"named": {"AB12CD34 001": "img1"}.get, "name_of": {"img1": "AB12CD34 001"}.get}
     combine = Combine(
-        image_lent_by=lambda pid: pid, video_lent_by=lambda pid: pid,
-        preview=lambda pid: (None, None), history=lambda intent: [],
-        named={"AB12CD34 001": "img1"}.get, name_of={"img1": "AB12CD34 001"}.get,
-        browse_image=lambda: browsed.append("asked"))
+        image_lookups=ZoneLookups(
+            lambda pid: pid, lambda pid: (None, None),
+            browse=lambda: browsed.append("asked"), **shared),
+        video_lookups=ZoneLookups(lambda pid: pid, lambda pid: (None, None), **shared),
+        history=lambda intent: [])
     qtbot.addWidget(combine)
     image_actions = {action.text(): action for action in combine.image_zone.menu().actions()}
     assert list(image_actions) == ["Paste Origenerator name", "Browse..."]

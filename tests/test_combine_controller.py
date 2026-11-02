@@ -16,7 +16,7 @@ from origenerator.gui import combine_controller as module
 from origenerator.gui import file_pick
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine import CombineRequest
-from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
+from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController, CombineParts
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
@@ -46,16 +46,10 @@ class FakePanel:
             self.item = prompt_id
             self.changed.emit()
 
-    def __init__(self, image_lent_by, video_lent_by, preview, history, *,
-                 named=None, name_of=None, browse_image=None, leads_to=None):
-        self.image_lent_by = image_lent_by
-        self.video_lent_by = video_lent_by
-        self.preview = preview
+    def __init__(self, image_lookups, video_lookups, history):
         self.history = history
-        self.named = named
-        self.name_of = name_of
-        self.browse_image = browse_image
-        self.leads_to = leads_to
+        self.name_of = image_lookups.name_of
+        self.browse_image = image_lookups.browse
         self.image_zone = self._Slot()
         self.video_zone = self._Slot()
         self.intent = action_settings.VIDEO
@@ -289,10 +283,10 @@ def combine(qtbot, monkeypatch, starting):
         host = host or FakeHost()
         parent = QWidget()
         qtbot.addWidget(parent)
-        controller = CombineController(
-            host, parent=parent, db=db or FakeDB(), jobs=jobs or FakeReroll(),
-            client=client, info_tabs_of=lambda: tabs or FakeTabs(),
+        parts = CombineParts(
+            jobs=jobs or FakeReroll(), client=client, info_tabs_of=lambda: tabs or FakeTabs(),
             slideshows=slideshows or FakeSlideshows(), starting=starting, inbox=inbox)
+        controller = CombineController(host, parts, parent=parent, db=db or FakeDB())
         controller._after_painting = lambda work: work()
         built.append((parent, controller))
         return controller, host
@@ -1133,10 +1127,10 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
     monkeypatch.setattr(module, "the_animation_window", lambda: made)
     parent = QWidget()
     qtbot.addWidget(parent)
-    controller = CombineController(
-        FakeHost(), parent=parent, db=FakeDB(), jobs=FakeReroll(), client=object(),
-        info_tabs_of=FakeTabs, slideshows=FakeSlideshows(),
-        starting=StartingRows())
+    parts = CombineParts(
+        jobs=FakeReroll(), client=object(), info_tabs_of=FakeTabs,
+        slideshows=FakeSlideshows(), starting=StartingRows())
+    controller = CombineController(FakeHost(), parts, parent=parent, db=FakeDB())
 
     controller.widget._defaults_btn.click()
 

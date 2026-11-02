@@ -22,7 +22,13 @@ from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.content import genau_flick_word
 from origenerator.gui.action_dropdown import ACTION_LABEL
-from origenerator.gui.drop_zone import DROP_A_VIDEO, DROP_AN_IMAGE, DropZone, DropZones
+from origenerator.gui.drop_zone import (
+    DROP_A_VIDEO,
+    DROP_AN_IMAGE,
+    DropZone,
+    DropZones,
+    ZoneLookups,
+)
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.generate_button import (
     DEFAULT_CAPTION,
@@ -72,26 +78,17 @@ class Combine(QWidget):
 
     def __init__(
         self,
-        image_lent_by: Callable[[str], str | None],
-        video_lent_by: Callable[[str], str | None],
-        preview: Callable[[str], tuple[str | None, str | None]],
+        image_lookups: ZoneLookups,
+        video_lookups: ZoneLookups,
         history: Callable[[str], list[str]],
         parent=None,
-        *,
-        named: Callable[[str], str | None] = lambda name: None,
-        name_of: Callable[[str], str] = lambda held: "",
-        browse_image: Callable[[], None] | None = None,
-        leads_to: Callable[[str], str | None] = lambda held: held,
     ):
         super().__init__(parent)
-        self._preview = preview
+        self._preview = video_lookups.preview
         self._history = history
-        self.image_zone = DropZone(MediaType.IMAGE, image_lent_by, preview, DROP_AN_IMAGE,
-                                   named=named, name_of=name_of, browse=browse_image,
-                                   leads_to=leads_to)
-        self.video_zone = DropZone(MediaType.VIDEO, video_lent_by, preview, DROP_A_VIDEO,
-                                   grayscale=True, named=named, name_of=name_of,
-                                   leads_to=leads_to)
+        self.image_zone = DropZone(MediaType.IMAGE, image_lookups, DROP_AN_IMAGE)
+        self.video_zone = DropZone(MediaType.VIDEO, video_lookups, DROP_A_VIDEO,
+                                   grayscale=True)
         _keep_its_room_when_hidden(self.video_zone)
         self._between = DropZones((self.image_zone, self.video_zone))
         self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)

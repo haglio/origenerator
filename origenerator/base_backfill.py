@@ -1,31 +1,3 @@
-"""Re-deriving the base render an inline enhance threw away, while the app is shut.
-
-Before enhancement became a layer, a workflow with ``enhance`` on saved only the
-finished image: the base render was made on the way through and discarded, so
-those rows carry one file and no "before" to compare it against.
-
-They are recoverable, because they are reproducible. Diffusion is deterministic
-given the same seed, model, sampler, scheduler, steps and cfg, and the enhance
-tail hangs off the base pass without altering it — so re-running the recorded
-settings with the tail switched off produces exactly the pixels that pass produced
-the first time.
-
-It is GPU nobody asked for, though — one full render per row, and the library
-here has well over a hundred — so doing it while the app is open would put every
-one of them in front of the user's own work. It rides the same absence the
-background experimenter does: queued while the app is closed, cleared when it opens.
-ComfyUI outlives the app and works through the batch alone; the next launch
-folds whatever finished into the images it belongs to and drops whatever hadn't
-started. How much goes is a time budget rather than a row count
-(:data:`BATCH_MINUTES`), because a repair costs exactly one render and that is
-seconds for an image and minutes for a video.
-
-The rows it makes are repairs, not generations: tagged ``source="base_render"``,
-kept out of the tree so a half-finished one never shows as a duplicate image,
-and folded into their target the way a standalone enhance folds into the image
-it upgraded.
-"""
-
 from __future__ import annotations
 
 import json
@@ -46,41 +18,18 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-# What an absence is allowed to spend on repairs, in minutes of GPU. Sized in
-# time rather than rows because the cost of one repair is the cost of one
-# render, and that is not a fixed thing: the first version of this handed out
-# six per absence on the reasoning that a render is a night's work, when the
-# rows needing repair are images this library finishes in a median of eight
-# seconds — which would have drained a 147-row backlog over twenty-five
-# evenings. The budget is read against what each workflow has actually taken
-# here (:func:`typical_seconds`), so a backlog of slow renders still queues few.
 BATCH_MINUTES = 45.0
 
-# What one repair is assumed to cost where the library has never timed that
-# workflow. Deliberately pessimistic: guessing high queues too few, which costs
-# another absence, where guessing low queues a batch ComfyUI cannot finish and
-# the next launch throws the remainder away.
 UNTIMED_SECONDS = 60.0
 
-# The params key carrying which row a re-render is repairing. Nothing in the
-# graph reads it, and the gallery's grouping only ever asks a workflow for the
-# keys it declares — so an extra key here can't split a folder or reach a node.
 TARGET_KEY = "_base_render_of"
 
 
 def rows_missing_their_base(rows: list[dict]) -> list[dict]:
-    """Enhanced images that kept no original and whose settings can be rebuilt.
-
-    The yellow plus says an enhancement happened; the absence of an original says the
-    tail baked it in. Those two together are exactly the rows this can help. A
-    row whose workflow isn't registered (an import) is passed over: there are no
-    settings to re-run, and guessing them would produce a "base" that is not this
-    image's base at all.
-    """
     out = []
     for row in rows:
         if row.get("source") == GenerationSource.BASE_RENDER:
-            continue  # a repair in flight is not itself something to repair
+            continue
         if gallery.media_type_of_row(row) != MediaType.IMAGE:
             continue
         if not gallery.is_enhanced_row(row) or gallery.original_files_of(row):
@@ -95,12 +44,6 @@ def rows_missing_their_base(rows: list[dict]) -> list[dict]:
 
 
 def base_params_for(row: dict, workflow) -> dict:
-    """The row's own settings with the enhance tail switched off.
-
-    Every other param — the seed above all — is reproduced exactly, because that
-    is the whole basis for expecting the same pixels back. The target's id rides
-    along under :data:`TARGET_KEY` so the finished render knows what it repairs.
-    """
     params = dict(workflow.default_params())
     params.update(gallery.parse_params(row.get("params_json")))
     params["enhance"] = False
@@ -109,8 +52,6 @@ def base_params_for(row: dict, workflow) -> dict:
 
 
 def already_queued(rows: list[dict]) -> set[str]:
-    """The ids of rows a re-render is already in flight for, so a second absence
-    doesn't queue the same repair twice."""
     return {
         gallery.parse_params(r.get("params_json")).get(TARGET_KEY)
         for r in rows if r.get("source") == GenerationSource.BASE_RENDER and is_in_progress(r)
@@ -118,12 +59,6 @@ def already_queued(rows: list[dict]) -> set[str]:
 
 
 def typical_seconds(rows: list[dict], workflow_name: str) -> float:
-    """How long one run of ``workflow_name`` has actually taken in this library.
-
-    The median of what it has recorded, so a handful of very slow runs (a model
-    loaded from cold, a machine busy with something else) doesn't decide the
-    budget for the rest. :data:`UNTIMED_SECONDS` where it has never been timed.
-    """
     timed = [
         row["duration_seconds"] for row in rows
         if row.get("workflow_name") == workflow_name
@@ -135,17 +70,6 @@ def typical_seconds(rows: list[dict], workflow_name: str) -> float:
 
 def queue_base_renders(rows: list[dict], launch, limit: int | None = None,
                        budget_minutes: float = BATCH_MINUTES) -> int:
-    """Hand ComfyUI a batch of base re-renders to run while the app is closed.
-
-    ``launch(workflow, params)`` submits one and returns its prompt_id, or
-    ``None`` when the launch didn't take. Returns how many were queued.
-
-    The batch is as much as fits in ``budget_minutes`` of estimated GPU, priced
-    per row from what its workflow has actually taken here — so a backlog of
-    quick images goes in one absence and a backlog of slow ones does not get
-    queued only for the next launch to discard it. ``limit`` caps the count on
-    top of that, for a caller that wants a fixed number.
-    """
     pending = already_queued(rows)
 
     def launch_one(row: dict) -> bool:
@@ -174,46 +98,19 @@ def queue_within_budget(rows: list[dict], candidates: list[dict], launch_one, *,
         if name not in cost:
             cost[name] = typical_seconds(rows, name)
         if queued and spent + cost[name] > budget:
-            break  # always at least one, however slow: the backlog has to move
+            break
         if launch_one(row):
             queued += 1
             spent += cost[name]
     return queued, spent
 
 
-# How often the run-it-now path asks ComfyUI whether a repair has landed, and how
-# long it waits before giving up on one. A repair is a single still, so the
-# timeout is generous for any model rather than tuned to one.
 RENDER_POLL_SECONDS = 2.0
 RENDER_TIMEOUT_SECONDS = 900
 
 
 def render_base_now(client, workflow, params: dict, *,
                     now=time.monotonic, sleep=time.sleep) -> list[dict]:
-    """Run one repair to completion and return its output files; ``[]`` if it
-    never lands.
-
-    *client* is only ever asked for HTTP -- a
-    :class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt, and which a
-    ``ComfyUIClient`` forwards every call of. The polling below is why this one
-    is not on the app's own Qt loop.
-
-    The absence path does not block: it hands ComfyUI a batch through the app's
-    own :class:`~origenerator.gui.generation_job.GenerationJob`, which follows
-    each run over the websocket, and the next launch folds whatever finished.
-    That needs a Qt loop and a running app, and ``tools/backfill_base_renders``
-    has neither -- it is the same repair done in one sitting, with the app shut
-    -- so it submits and polls ``/history`` itself.
-
-    It lives here rather than in the tool because everything either path decides
-    about a repair is decided in this module: which rows need one
-    (:func:`rows_missing_their_base`), what settings reproduce it
-    (:func:`base_params_for`), and how the result is attached
-    (:func:`attach_base`). A submit loop kept alone in ``tools/`` is the one
-    piece nothing here would catch going out of step.
-
-    ``now`` and ``sleep`` are injected so the wait can be tested without one.
-    """
     prompt_id = str(uuid.uuid4())
     client.submit_job(
         saving_into_its_run_folder(workflow.payload_for_comfyui(params), OUTPUT_PLACES, prompt_id),
@@ -221,8 +118,6 @@ def render_base_now(client, workflow, params: dict, *,
     deadline = now() + RENDER_TIMEOUT_SECONDS
     while now() < deadline:
         sleep(RENDER_POLL_SECONDS)
-        # ComfyUI answers with nothing at all until the prompt finishes, so an
-        # empty history is "not yet", never "produced nothing".
         history = client.fetch_history(prompt_id)
         if not history:
             continue
@@ -237,14 +132,6 @@ def render_base_now(client, workflow, params: dict, *,
 
 
 def attach_base(db, target_id: str, files: list[dict]) -> bool:
-    """Record ``files`` as the pre-enhance version of the image ``target_id``.
-
-    The enhanced file keeps its place at the head of the target's
-    ``output_files`` — it is still what the row shows — and the base joins it
-    there as the version the Generate pane offers as ``Original``. ``False`` when there
-    is nothing to attach it to: the target was deleted meanwhile, or something
-    else repaired it first.
-    """
     target = db.get_generation(target_id) if target_id else None
     if not files or target is None or gallery.original_files_of(target):
         return False
@@ -259,12 +146,6 @@ def attach_base(db, target_id: str, files: list[dict]) -> bool:
 
 
 def fold_base_render(db, render_row: dict) -> str | None:
-    """Attach a finished re-render to the image it repairs, and drop its own row.
-
-    Returns the target's prompt_id, or ``None`` when there was nothing to fold
-    onto — the row is then left alone rather than half-migrated, so it can be
-    found and cleared by hand.
-    """
     target_id = gallery.parse_params(render_row.get("params_json")).get(TARGET_KEY)
     if not attach_base(db, target_id, gallery.row_output_files(render_row)):
         return None
@@ -273,12 +154,6 @@ def fold_base_render(db, render_row: dict) -> str | None:
 
 
 def fold_completed_base_renders(db) -> int:
-    """Fold every re-render that finished while the app was closed.
-
-    The startup sweep, run before the tree is built so a repaired image is
-    already showing both its versions by the time it is drawn. Returns how many
-    were folded.
-    """
     folded = 0
     for row in db.list_generations():
         if (row.get("source") != GenerationSource.BASE_RENDER
@@ -292,14 +167,4 @@ def fold_completed_base_renders(db) -> int:
 
 
 def cancel_base_renders(db, client) -> int:
-    """Clear ComfyUI of the re-renders the last absence queued but didn't reach.
-
-    *client* is asked for HTTP only, as in :func:`render_base_now`.
-
-    The app is open now, so the GPU is the user's. The experimenter's own
-    cancel, for repairs (:func:`origenerator.inflight.drop_in_flight`): every
-    one still queued is dropped and its abandoned row deleted, and one caught
-    mid-render is stopped as well. Returns how many were dropped; a finished one
-    is untouched, since it is a repair waiting to fold.
-    """
     return drop_in_flight(db, client, GenerationSource.BASE_RENDER, "base re-render")

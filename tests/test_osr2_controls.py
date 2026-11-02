@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import QApplication
 from origenerator import motion_engine
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.osr2_controls_state import (
+    Osr2Situation,
     drive_hud,
     osr2_controls_hud,
     osr2_controls_room,
@@ -100,7 +101,7 @@ def test_cores_osr2_controls_are_the_consoles_osr2_section_alone(qtbot):
 def test_the_osr2_controls_declare_the_buttons_this_app_answers(qtbot):
     _panel, motion = _controls(qtbot)
 
-    hud = osr2_controls_hud(motion, control=OSR2_DRIVING)
+    hud = osr2_controls_hud(motion, Osr2Situation(control=OSR2_DRIVING))
 
     assert hud.main_hud_model.rows == ()
     assert [[b.command for b in row if b.command] for row in hud.main_hud_model.osr2_rows] == [
@@ -136,7 +137,7 @@ def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot)
     _panel, motion = _controls(qtbot)
     motion.parked_by_the_pause = True
 
-    assert osr2_controls_hud(motion, control=OSR2_DRIVING).main_hud_model.paused
+    assert osr2_controls_hud(motion, Osr2Situation(control=OSR2_DRIVING)).main_hud_model.paused
 
 
 def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_is_paused(qtbot):
@@ -145,7 +146,7 @@ def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_i
     motion.state.state.amplitude = 60
     motion.parked_by_the_pause = True
     painter = MainHudPainter()
-    painter.rgba(osr2_controls_hud(motion, control=OSR2_DRIVING))
+    painter.rgba(osr2_controls_hud(motion, Osr2Situation(control=OSR2_DRIVING)))
     left, top = hud_xy()
 
     taken = [button.command for (x, y, w, h), button in painter.buttons
@@ -162,7 +163,7 @@ def test_every_button_the_osr2_controls_declare_does_something_here(qtbot, monke
     controls, motion = _controls(qtbot, control=control)
     motion.active = True
     controls.drawing()
-    main_hud = osr2_controls_hud(motion, control=control.state()).main_hud_model
+    main_hud = osr2_controls_hud(motion, Osr2Situation(control=control.state())).main_hud_model
     declared = [b.command for row in (*main_hud.rows, *main_hud.osr2_rows, main_hud.osr2_controls)
                 for b in row if b.command]
 
@@ -243,7 +244,7 @@ def test_the_readout_under_a_funscript_carries_the_max_intensity_too(qtbot):
     _panel, motion = _controls(qtbot, control=control)
     motion.set_max_intensity(40)
 
-    drive = osr2_controls_hud(motion, control=control.state(), script=script).drive
+    drive = osr2_controls_hud(motion, Osr2Situation(control=control.state(), script=script)).drive
 
     assert (drive.driven, drive.max_intensity) == ("funscript", 40)
 
@@ -297,7 +298,7 @@ def test_the_group_lights_the_state_the_switch_is_in(qtbot):
     control = FakeControl(OSR2_PARKED)
     controls, motion = _controls(qtbot, control=control)
 
-    hud = osr2_controls_hud(motion, control=control.state())
+    hud = osr2_controls_hud(motion, Osr2Situation(control=control.state()))
 
     assert hud.main_hud_model.osr2_control == OSR2_PARKED
     assert controls.drawing()[0]
@@ -328,7 +329,7 @@ def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
     control = FakeControl(script=script)
     _panel, motion = _controls(qtbot, control=control)
 
-    hud = osr2_controls_hud(motion, control=control.state(), script=script)
+    hud = osr2_controls_hud(motion, Osr2Situation(control=control.state(), script=script))
 
     assert hud.drive.driven == "funscript"
     assert hud.drive.waveform == script.trace(80, 12.0)
@@ -340,7 +341,7 @@ def test_the_dot_sits_where_the_script_has_the_device_now(qtbot):
     control = FakeControl(script=script)
     _panel, motion = _controls(qtbot, control=control)
 
-    hud = osr2_controls_hud(motion, control=control.state(), script=script)
+    hud = osr2_controls_hud(motion, Osr2Situation(control=control.state(), script=script))
 
     assert hud.drive.position == round(0.25 * POSITION_MAX)
 
@@ -351,7 +352,7 @@ def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
     _panel, motion = _controls(qtbot, control=control)
     motion.active = True
 
-    hud = osr2_controls_hud(motion, control=control.state(), script=script)
+    hud = osr2_controls_hud(motion, Osr2Situation(control=control.state(), script=script))
 
     assert hud.drive.driven == "robot_hand"
     assert hud.main_hud_model.osr2 is Osr2State.ROBOT_HAND
@@ -359,7 +360,7 @@ def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
 
 def test_with_their_switch_off_the_osr2_controls_say_parked_over_a_device_that_is_on(qtbot):
     painter = MainHudPainter()
-    hud = osr2_controls_hud(FakeMotion(), device=Osr2Mode.CONTROLLED, control=OSR2_PARKED)
+    hud = osr2_controls_hud(FakeMotion(), Osr2Situation(device=Osr2Mode.CONTROLLED, control=OSR2_PARKED))
     painter.rgba(hud)
 
     assert painter._osr2_state(hud.main_hud_model) == OSR2_PARKED
@@ -370,8 +371,8 @@ def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
     control = FakeControl(script=script)
     _panel, motion = _controls(qtbot, control=control)
 
-    hud = osr2_controls_hud(motion, device=Osr2Mode.OFF, control=control.state(),
-                      script=script)
+    hud = osr2_controls_hud(motion, Osr2Situation(device=Osr2Mode.OFF, control=control.state(),
+                      script=script))
 
     assert hud.main_hud_model.osr2 is Osr2State.OFF
 
@@ -412,7 +413,7 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     motion = FakeMotion()
     motion.active = True
 
-    hud = osr2_controls_hud(motion, device=Osr2Mode.OFF)
+    hud = osr2_controls_hud(motion, Osr2Situation(device=Osr2Mode.OFF))
 
     assert hud.main_hud_model.osr2 is Osr2State.OFF
     assert hud.drive.driven == DRIVEN_BY_NOTHING
@@ -425,7 +426,7 @@ def test_an_osr2_the_broker_cannot_hear_says_why_and_drives_nothing(qtbot, troub
     motion = FakeMotion()
     motion.active = True
 
-    hud = osr2_controls_hud(motion, device=Osr2Mode.OFF, trouble=trouble)
+    hud = osr2_controls_hud(motion, Osr2Situation(device=Osr2Mode.OFF, trouble=trouble))
 
     assert hud.main_hud_model.osr2 is said
     assert hud.drive.driven == DRIVEN_BY_NOTHING
@@ -569,7 +570,7 @@ def test_no_state_draws_the_osr2_controls_outside_the_room_kept_for_them():
             (None, FakeScript())):
         motion.active = active
         _raw, (width, height) = MainHudPainter(device_only=True).rgba(
-            osr2_controls_hud(motion, device=device, control=control, script=script))
+            osr2_controls_hud(motion, Osr2Situation(device=device, control=control, script=script)))
 
         fit = (control, active, device)
         assert width <= room_width, fit
@@ -615,7 +616,7 @@ def test_with_the_osr2_running_its_own_auto_mode_the_line_says_auto(qtbot):
     motion = FakeMotion()
     motion.active = True
 
-    assert osr2_controls_hud(motion, device=Osr2Mode.AUTO).main_hud_model.osr2 is Osr2State.AUTO
+    assert osr2_controls_hud(motion, Osr2Situation(device=Osr2Mode.AUTO)).main_hud_model.osr2 is Osr2State.AUTO
 
 
 def test_the_panel_redraws_once_the_osr2_goes_into_its_own_auto_mode(qtbot):

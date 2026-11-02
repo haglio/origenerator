@@ -464,7 +464,7 @@ class WorkflowTemplate(ABC):
             own = prompts[fix.part.name]
             fixed = WorkflowTemplate.lora_chain(
                 f"fix{index}_lora", refs.model,
-                [(own["lora"], own["strength"])] if own["lora"] else [], clip_ref=refs.clip)
+                [(own["lora"], own["strength"])] if own["lora"] else [], clip_ref=refs.clip_ref)
             nodes.update(fixed.nodes)
             model, fixed_clip_ref = fixed.model, fixed.clip_ref
             positive, negative = refs.positive, refs.negative

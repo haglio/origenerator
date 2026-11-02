@@ -20,4 +20,4 @@ class NodeRefs:
     positive: list
     negative: list
     vae: list
-    clip: list | None = None
+    clip_ref: list | None = None

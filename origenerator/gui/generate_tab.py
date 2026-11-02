@@ -265,7 +265,7 @@ class GenerateTab(DropZones):
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._making_one = None
-        self._launched_runs: list[str] = []            # the runs this tab's Generate started (see launched_runs)
+        self._launched_runs: dict[str, dict | None] = {}  # the runs this tab holds, each with what its press made it of
         # The settings folder whose live run this tab's preview follows — its
         # own Generate's, or the run it was pointed at by a click on that
         # folder's live tile (see watch_folder). None while the preview is the
@@ -953,7 +953,6 @@ class GenerateTab(DropZones):
         if not self._can_generate() or refused_over_prompts(self._generate_btn, self.prompt_fields()):
             return
         key = self._workflow_dropdown.currentData()
-        params = self._param_form.get_values()
         if self._folder_modify is not None:
             # A request that asked for nothing would re-run every seed in the
             # folder to re-create the folder, so the press says what it still
@@ -961,19 +960,13 @@ class GenerateTab(DropZones):
             if self._folder_modify.is_unchanged(self.current_config()):
                 self._generate_btn.flash_guard(_MODIFY_GUARD)
                 return
-            self._mark_against_what_the_press_makes()
-            self.modify_requested.emit(self._folder_modify.folder_key, key, params)
+            self.modify_requested.emit(self._folder_modify.folder_key, key,
+                                       self._param_form.get_values())
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
-        if self.asked() is None:  # a request's runs stay marked against what it was asked of
-            self._mark_against_what_the_press_makes()
         self.generate_requested.emit(key, self._batch_of(self._how_many.how_many()))
         self._param_form.roll_random_seeds()
-
-    def _mark_against_what_the_press_makes(self) -> None:
-        with self._loading():  # marking the fields is no edit of them
-            self._param_form.track_prompt_rewrites()
 
     def _batch_of(self, how_many: int) -> list[dict]:
         batch = [self._param_form.get_values()]
@@ -1043,17 +1036,19 @@ class GenerateTab(DropZones):
         """
         return list(self._launched_runs)
 
-    def note_launched(self, origin: str):
+    def note_launched(self, origin: str, made_of: dict | None = None):
         """Claim a run this tab's Generate just started, at the back of its own."""
-        self._launched_runs.append(origin)
+        self._launched_runs[origin] = made_of
+        if made_of is not None:
+            self._mark_prompts()
 
     def forget_launched(self, origins=None):
         """Let go of runs this tab claimed — all of them, or the named ones (those
         that have finished, failed or been cancelled)."""
-        if origins is None:
-            self._launched_runs = []
-        else:
-            self._launched_runs = [r for r in self._launched_runs if r not in origins]
+        ended = [self._launched_runs.pop(origin) for origin in self.launched_runs()
+                 if origins is None or origin in origins]
+        if any(made_of is not None for made_of in ended):
+            self._mark_prompts()
 
     def set_generating(self, generating: bool, *, auto_generating: bool = False):
         """Reflect whether a run of this config's folder is in flight.
@@ -1413,8 +1408,7 @@ class GenerateTab(DropZones):
         self._displayed_config = None  # ...so no settings for a message to deviate from
         self._preview.show_folder(thumbnails)
         self._reflow_for_the_media()
-        if self._param_form is not None:
-            self._param_form.track_prompt_rewrites()
+        self._mark_prompts()
         self._apply_generate_caption()
         self._emit_title()
 
@@ -1428,8 +1422,7 @@ class GenerateTab(DropZones):
         if self._folder_modify is None:
             return
         self._folder_modify = None
-        if self._param_form is not None:
-            self._param_form.clear_prompt_rewrites()
+        self._mark_prompts()
         self._apply_generate_caption()
 
     # --- displaying a saved generation (the browsed selection) ----------------
@@ -1693,23 +1686,31 @@ class GenerateTab(DropZones):
         )
         if self._param_form is not None:
             self._aim_the_request(self._displayed_row or being_made)
-            marked_against = self._marked_against()
-            with self._loading():  # marking the fields is no edit of them
-                if marked_against is None:
-                    self._param_form.clear_prompt_rewrites()
-                else:
-                    self._param_form.track_prompt_rewrites(marked_against)
+            self._mark_prompts()
         self.refresh_modified_message()
 
+    def _mark_prompts(self) -> None:
+        if self._param_form is None:
+            return
+        marked_against = self._marked_against()
+        with self._loading():  # marking the fields is no edit of them
+            if marked_against is None:
+                self._param_form.clear_prompt_rewrites()
+            else:
+                self._param_form.track_prompt_rewrites(marked_against)
+
     def _marked_against(self) -> dict | None:
+        if pressed := [made_of for made_of in self._launched_runs.values() if made_of is not None]:
+            return pressed[-1]
+        if self._folder_modify is not None:
+            return self._folder_modify.opened_on.params
         aim = self._request_aim
         requested = aim is not None and bool(aim.words)
         if self._displayed_config is None and not requested:
             return None
-        params = self._settings_shown().params
         if not requested:
-            return params
-        return {**params, "positive_prompt": aim.asked_of[0],
+            return self._settings_shown().params
+        return {**self._settings_shown().params, "positive_prompt": aim.asked_of[0],
                 "negative_prompt": aim.asked_of[1]}
 
     def _settings_shown(self) -> ConfigSnapshot:

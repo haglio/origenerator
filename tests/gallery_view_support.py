@@ -17,6 +17,7 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import (
     QImage,
     QKeyEvent,
+    QTextCursor,
 )
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
@@ -907,6 +908,20 @@ def _combine_db(tmp_path, *, enhanced=True):
                          output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
     db.set_settings_source("vid", category="dancing")
     return db
+
+
+def _struck_and_lit(field) -> tuple[str, str]:
+    cursor = QTextCursor(field.document())
+    struck = lit = ""
+    for position in range(len(field.toPlainText())):
+        cursor.setPosition(position)
+        cursor.setPosition(position + 1, QTextCursor.MoveMode.KeepAnchor)
+        fmt = cursor.charFormat()
+        if fmt.fontStrikeOut():
+            struck += cursor.selectedText()
+        elif fmt.background().style() != Qt.BrushStyle.NoBrush:
+            lit += cursor.selectedText()
+    return struck.strip(), lit.strip()
 
 
 def _front_panel(view):

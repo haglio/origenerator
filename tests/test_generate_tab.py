@@ -74,6 +74,7 @@ from origenerator.workflows.model_arch import KREA2, WAN
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.gallery_view_support import _struck_and_lit
 from tests.text_readers import clap_reader, clip_reader, word_reader
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
 
@@ -2850,21 +2851,6 @@ def test_a_video_made_with_two_models_that_are_not_installed_names_both(installe
                             "installed ones are picked in their place.")
 
 
-def _struck_and_lit(field) -> tuple[str, str]:
-    """What a prompt field shows struck through, and what it shows lit."""
-    cursor = QTextCursor(field.document())
-    struck = lit = ""
-    for position in range(len(field.toPlainText())):
-        cursor.setPosition(position)
-        cursor.setPosition(position + 1, QTextCursor.MoveMode.KeepAnchor)
-        fmt = cursor.charFormat()
-        if fmt.fontStrikeOut():
-            struck += cursor.selectedText()
-        elif fmt.background().style() != Qt.BrushStyle.NoBrush:
-            lit += cursor.selectedText()
-    return struck.strip(), lit.strip()
-
-
 def test_editing_a_shown_image_s_prompt_marks_how_it_now_differs(saved_panel, qtbot):
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat on a couch")
@@ -2904,8 +2890,17 @@ def test_showing_the_image_a_tab_already_shows_still_marks_what_is_typed(saved_p
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
 
 
+def _each_press_launches_a_run(tab):
+    def launch(*_press):
+        tab.note_launched(f"run {len(tab.launched_runs())}",
+                          made_of=tab._param_form.get_values())
+    tab.generate_requested.connect(launch)
+    tab.modify_requested.connect(launch)
+
+
 def test_generate_takes_the_red_and_green_off_its_prompts(saved_panel, qtbot):
     tab, db = saved_panel
+    _each_press_launches_a_run(tab)
     image = _image_row(db, "img1", prompt="a cat on a couch")
     tab.show_saved_generation(image, [image])
     field = _positive_field(tab)
@@ -2918,8 +2913,53 @@ def test_generate_takes_the_red_and_green_off_its_prompts(saved_panel, qtbot):
     assert field.toPlainText() == "a dog on a couch"
 
 
+def test_a_press_that_starts_no_run_leaves_the_red_and_green(saved_panel, qtbot):
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    tab.show_saved_generation(image, [image])
+    field = _positive_field(tab)
+    field.setPlainText("a dog on a couch")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+
+    tab._on_generate()
+
+    assert _struck_and_lit(field) == ("cat", "dog")
+
+
+def test_the_red_and_green_come_back_only_when_the_last_press_has_ended(saved_panel, qtbot):
+    tab, db = saved_panel
+    _each_press_launches_a_run(tab)
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    tab.show_saved_generation(image, [image])
+    field = _positive_field(tab)
+    field.setPlainText("a dog on a couch")
+    tab._on_generate()
+    field.setPlainText("a dog on a rug")
+    tab._on_generate()
+
+    tab.forget_launched({"run 1"})
+    assert _struck_and_lit(field) == ("couch", "rug")
+
+    tab.forget_launched({"run 0"})
+    assert "cat" in _struck_and_lit(field)[0]
+
+
+def test_a_run_the_tab_only_took_up_leaves_the_red_and_green(saved_panel, qtbot):
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    tab.show_saved_generation(image, [image])
+    field = _positive_field(tab)
+    field.setPlainText("a dog on a couch")
+    qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
+
+    tab.note_launched("a run of auto-generate")
+
+    assert _struck_and_lit(field) == ("cat", "dog")
+
+
 def test_what_is_typed_after_generate_is_marked_against_what_it_made(saved_panel, qtbot):
     tab, db = saved_panel
+    _each_press_launches_a_run(tab)
     image = _image_row(db, "img1", prompt="a cat on a couch")
     tab.show_saved_generation(image, [image])
     field = _positive_field(tab)
@@ -2933,6 +2973,7 @@ def test_what_is_typed_after_generate_is_marked_against_what_it_made(saved_panel
 
 def test_undo_after_generate_takes_back_what_was_typed_before_it(saved_panel, qtbot):
     tab, db = saved_panel
+    _each_press_launches_a_run(tab)
     image = _image_row(db, "img1", prompt="a cat on a couch")
     tab.show_saved_generation(image, [image])
     field = _positive_field(tab)
@@ -3690,6 +3731,7 @@ def test_generate_asks_for_the_folder_rather_than_these_settings(modifying, qtbo
 
 
 def test_modify_takes_the_red_and_green_off_its_prompts(modifying, qtbot):
+    _each_press_launches_a_run(modifying)
     field = _positive_field(modifying)
     field.setPlainText("a dog on a couch")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
@@ -3698,6 +3740,17 @@ def test_modify_takes_the_red_and_green_off_its_prompts(modifying, qtbot):
 
     assert _struck_and_lit(field) == ("", "")
     assert field.toPlainText() == "a dog on a couch"
+
+
+def test_a_canceled_modify_marks_its_prompts_against_the_folder_again(modifying, qtbot):
+    _each_press_launches_a_run(modifying)
+    field = _positive_field(modifying)
+    field.setPlainText("a dog on a couch")
+    modifying._generate_btn.click()
+
+    modifying.forget_launched()
+
+    assert _struck_and_lit(field) == ("cat", "dog")
 
 
 def test_a_modify_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(

@@ -1,4 +1,3 @@
-"""diff_text — what a prompt field is worth while it shows a change."""
 from __future__ import annotations
 
 from PyQt6.QtWidgets import QPlainTextEdit

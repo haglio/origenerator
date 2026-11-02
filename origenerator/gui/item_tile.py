@@ -28,24 +28,13 @@ from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 from origenerator.trash_collection import why_it_cannot_be_restored
 
-_IMAGE_SIZE = tile_shape.thumbnail_size()  # the thumbnail area, inside the family tile
+_IMAGE_SIZE = tile_shape.thumbnail_size()
 _BORDER_PX = 2
-# Hover-revealed corner buttons (an i2v tile's per-seed re-rolls, a review
-# collection's keep/reject): the same translucent ground the corner buttons sit on, blue
-# on hover, laid along the tile's top-left edge — the one edge the three corner
-# controls leave alone.
 _CORNER_BUTTON_CSS = (
     GROUND_CSS + f"QPushButton:hover {{ background: {as_rgba(BLUE, 0.9)}; }}"
 )
 
-# A selected thumbnail fills its whole tile — under both the image and the
-# caption — the way a file manager highlights a picked item. Two things make
-# the fill actually show:
-#   * WA_StyledBackground, or a plain QWidget subclass paints no stylesheet
-#     background at all; and
-#   * transparent child labels, or the app's global `QWidget { background-color }`
-#     paints them opaque and the fill only peeks through the 4px margin as a
-#     frame (which is what an earlier attempt did).
+# A plain QWidget subclass paints no stylesheet background without WA_StyledBackground, and the app's global QWidget background paints child labels opaque unless they are transparent.
 _SELECTED_TILE_CSS = (
     f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}")
 _BORDER_UNSELECTED = f"2px solid {palette.TILE_BORDER}"
@@ -53,9 +42,6 @@ _BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
 class CornerButton(NamedTuple):
-    """One hover control on a tile's corner: what it asks for, the icon it wears,
-    and what it says on hover."""
-
     action_id: str
     icon: QIcon
     tooltip: str
@@ -70,12 +56,12 @@ def restore_offer_of(item: dict) -> RestoreOffer:
 
 
 class ItemTile(QWidget):
-    pressed = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the press
-    clicked = pyqtSignal(str)  # prompt_id, let go of without being dragged
-    double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
-    context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
-    corner_button_triggered = pyqtSignal(str, str)  # prompt_id, action_id
-    control_triggered = pyqtSignal(str, str)  # prompt_id, corner_buttons.STAR/TRASH/ENHANCE
+    pressed = pyqtSignal(str, Qt.KeyboardModifier)
+    clicked = pyqtSignal(str)
+    double_clicked = pyqtSignal(str)
+    context_requested = pyqtSignal(str, QPoint)
+    corner_button_triggered = pyqtSignal(str, str)
+    control_triggered = pyqtSignal(str, str)
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
@@ -91,17 +77,14 @@ class ItemTile(QWidget):
                                  corner_buttons=corner_buttons, restore=restore)
         self._selected = False
         self._favorite = favorite
-        self._enhance = enhance       # what the enhance corner has to say, if anything
-        self._enhancing = enhancing   # the run being made of this image, if any
-        # The tile's own thumbnail, held aside while a running enhancement streams
-        # its frames over the top, so the end of the run restores it.
+        self._enhance = enhance
+        self._enhancing = enhancing
         self._resting_pixmap: QPixmap | None = None
         self._corner_buttons: list[QPushButton] = []
         self.drag_out = DragOut()
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Right-click anywhere on the tile asks the gallery for a context menu.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self.prompt_id, self.mapToGlobal(pos))
@@ -116,8 +99,6 @@ class ItemTile(QWidget):
         self._image_label.setFixedSize(_IMAGE_SIZE)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # A video tile loops its short WebP preview; an image (or a video whose
-        # WebP couldn't be built) shows its static frame.
         if movie_path and Path(movie_path).exists():
             play_in(self._image_label, movie_path, _IMAGE_SIZE)
         elif thumb_path and Path(thumb_path).exists():
@@ -133,11 +114,9 @@ class ItemTile(QWidget):
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.setWordWrap(True)
         tile_shape.style_caption(self._text_label)
-        # Transparent so the tile's fill shows through under the caption.
         self._text_label.setStyleSheet("background-color: transparent;")
 
-        # Let mouse events (clicks, hover) fall through to the tile, so enter/leave
-        # track the whole tile instead of flickering as the cursor crosses a child.
+        # Without it enter/leave flicker as the cursor crosses a child.
         self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._text_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
@@ -145,16 +124,9 @@ class ItemTile(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
-        # In a mixed listing (the Latest collection) an item type icon names the kind;
-        # inside a single-type folder the caller leaves it off as redundant. Which
-        # corner it takes is ItemTypeIcon's own business, and it says so.
         if media_type:
             ItemTypeIcon(media_type, self)
 
-        # Star, trash and plus in the tile's other three corners: what the item is
-        # (favorited, enhanced) and what can be done to it, as one mark each, all
-        # of them up whenever there is an item under them. On a Trash-collection
-        # tile restore stands where the star goes.
         layout.activate()  # so the thumbnail has a rectangle for the controls to sit in
         self._controls = CornerButtons(self, restore=restore)
         self._controls.place(self._image_label.geometry())
@@ -164,27 +136,17 @@ class ItemTile(QWidget):
             button.installEventFilter(self)  # an off-tile exit from a control
         self._sync_controls()
 
-        # While an enhancement of this image is in flight, the tile wears the same
-        # two overlays an in-flight tile does, so work in progress reads the same
-        # whichever kind of work it is: a tile status scrim naming the stage, and a bar along
-        # the thumbnail's foot saying how far along the run is. The scrim dims the
-        # thumbnail rather than replacing it — the base render is out and worth
-        # looking at, which is the point of generating it first.
         self._status_scrim = TileStatusScrim(self)
         self._enhancing_bar = ProgressBar(self)
         self._enhancing_bar.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._enhancing_bar.hide()
-        # Its own clock rather than the gallery's poll, so the countdown advances
-        # a second at a time whether or not a refresh has landed.
         self._enhancing_tick = QTimer(self)
         self._enhancing_tick.setInterval(TICK_MS)
         self._enhancing_tick.timeout.connect(self._render_enhancing_timing)
         self._place_enhancing_bar()
         self._show_enhancing_run()
 
-        # An i2v folder's tiles carry top-left hover controls to re-roll one seed
-        # on its own; other tiles pass none and grow no buttons.
         self._build_corner_buttons(corner_buttons or [])
 
     @staticmethod
@@ -197,20 +159,15 @@ class ItemTile(QWidget):
                 tuple(action.action_id for action in corner_buttons or ()))
 
     def set_selected(self, selected: bool):
-        """Lighten the whole tile when selected; restore the resting look when not."""
         if selected == self._selected:
-            return  # idempotent: skip restyling thumbnails a click didn't move
+            return
         self._selected = selected
         self._apply_styles()
 
     def enhance_state(self) -> str | None:
-        """What this tile's enhance corner is saying, or ``None`` where it has no
-        plus at all (:mod:`origenerator.gui.corner_buttons`)."""
         return self._enhance
 
     def set_enhance(self, enhance: str | None):
-        """Re-read the enhance corner without rebuilding the tile — what a turn of
-        the Enhance pane's settings does to every item on screen at once."""
         if enhance == self._enhance:
             return
         self._enhance = enhance
@@ -227,18 +184,6 @@ class ItemTile(QWidget):
         self._controls.show_for(favorite=self._favorite, enhance=self._enhance)
 
     def set_enhancing(self, run: RunReading | None):
-        """Show the enhancement being made of this image, or clear it away.
-
-        Fed on every reconcile, so a fresh frame and another step of progress
-        arrive the same way: the thumbnail takes the run's latest frame, the scrim
-        names the stage over it, and the bar at its foot carries how far along
-        the run is and how much longer it has.
-
-        A run that ends puts the tile's own thumbnail back: the streamed frames
-        are a partial render of a file that doesn't exist yet, so once the run
-        is over they are no longer of anything. (A landed enhancement folds onto
-        the row and the rebuild redraws the tile from the new file; a cancelled
-        one leaves the base render, which is what was there before.)"""
         self._enhancing = run
         if run is None and self._resting_pixmap is not None:
             self._image_label.setPixmap(self._resting_pixmap)
@@ -248,11 +193,6 @@ class ItemTile(QWidget):
         self._show_enhancing_run()
 
     def _paint_enhancing_frame(self, frame: bytes):
-        """Paint the latest frame of the enhancement being made of this image.
-
-        The tile is where the user is looking while a folder enhances itself, so
-        the run streams here as well as in the Generate pane — the overlays stay over
-        the top, because what is on the tile is still not the finished file."""
         pixmap = QPixmap()
         if not pixmap.loadFromData(frame) or pixmap.isNull():
             return
@@ -264,11 +204,6 @@ class ItemTile(QWidget):
         )
 
     def _show_enhancing_run(self):
-        """Put the scrim and the bar up over the thumbnail, or take them away.
-
-        The scrim's place is re-read each time: the streamed frames leave the
-        thumbnail where it was, but a tile built before its layout ran has none yet.
-        """
         run = self._enhancing
         self._status_scrim.cover(
             self._image_label, "Enhancing…" if run is not None else None,
@@ -278,18 +213,14 @@ class ItemTile(QWidget):
         if run is None:
             self._enhancing_tick.stop()
             return
-        self._enhancing_bar.raise_()  # over the scrim just raised, and the item type icon
+        self._enhancing_bar.raise_()
         self._render_enhancing_timing()
-        # Only a run ComfyUI has actually started has a clock to advance; ticking
-        # a queued one would redraw a line that cannot change.
         if run.started_at is None:
             self._enhancing_tick.stop()
         else:
             self._enhancing_tick.start()
 
     def _render_enhancing_timing(self):
-        """Write the run's reading across the bar at the thumbnail's foot — the
-        compact one, since a tile is a third of the Job Queue's width."""
         run = self._enhancing
         if run is None:
             return
@@ -316,22 +247,11 @@ class ItemTile(QWidget):
         else:
             self.setStyleSheet("")
             border = _BORDER_UNSELECTED
-        # Transparent background so the tile fill shows under any letterboxing.
         self._image_label.setStyleSheet(
             f"background-color: transparent; border: {border}; border-radius: {BUTTON_RADIUS}px;"
         )
 
-    # --- corner buttons (hover-revealed per-seed re-rolls) -----------
-
     def _build_corner_buttons(self, actions: list[CornerButton]):
-        """Lay out one hidden button per :class:`CornerButton` along the tile's
-        top-left edge.
-
-        Each fires :attr:`corner_button_triggered` with this tile's prompt_id and
-        its action_id. Hidden until the tile is hovered (see :meth:`enterEvent`);
-        an event filter keeps them up while the cursor sits on a button rather than
-        the tile itself, so they don't flicker out from under the pointer.
-        """
         for i, action in enumerate(actions):
             button = QPushButton(self)
             button.setIcon(action.icon)
@@ -343,7 +263,7 @@ class ItemTile(QWidget):
             button.move(self._image_label.x() + CORNER_INSET + i * (CORNER_SIZE + CORNER_GAP),
                         self._image_label.y() + CORNER_INSET)
             button.setVisible(False)
-            button.installEventFilter(self)  # keep the set up while hovering a button
+            button.installEventFilter(self)
             button.clicked.connect(
                 lambda _=False, a=action.action_id:
                 self.corner_button_triggered.emit(self.prompt_id, a))
@@ -354,8 +274,6 @@ class ItemTile(QWidget):
             button.setVisible(visible)
 
     def _cursor_over_tile(self) -> bool:
-        """Whether the pointer is still anywhere within the tile — including over a
-        corner button — so leaving for a button doesn't read as leaving the tile."""
         return self.rect().contains(self.mapFromGlobal(QCursor.pos()))
 
     def _hover_buttons(self) -> list:
@@ -364,8 +282,6 @@ class ItemTile(QWidget):
         return self._corner_buttons + self._controls.buttons()
 
     def eventFilter(self, obj, event):
-        # A button is a child, so the cursor leaving it (back onto the tile, or off
-        # the tile entirely) is where an off-tile exit from a button surfaces.
         if event.type() == QEvent.Type.Leave and obj in self._hover_buttons():
             if not self._cursor_over_tile():
                 self._set_corner_buttons_visible(False)
@@ -376,13 +292,11 @@ class ItemTile(QWidget):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        if not self._cursor_over_tile():  # moving onto a button isn't leaving the tile
+        if not self._cursor_over_tile():
             self._set_corner_buttons_visible(False)
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
-        # Only a left click (re)selects. A right click opens the context menu via
-        # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_out.note_press(event)
             self.pressed.emit(self.prompt_id, event.modifiers())
@@ -393,17 +307,11 @@ class ItemTile(QWidget):
             self.clicked.emit(self.prompt_id)
 
     def mouseMoveEvent(self, event):
-        # Drag the generation out to wherever it is dropped, but only once the press
-        # has travelled far enough to read as a drag rather than a click.
         if not self.drag_out.should_start(event):
             return
-        # The tile's thumbnail trails the cursor — the frame a video tile's looping
-        # WebP is on, as much as a still image's pixmap.
         self.drag_out.start(generation_mime(self.prompt_id), label_thumbnail(self._image_label))
 
     def mouseDoubleClickEvent(self, event):
-        # A left double-click is an "open" gesture; the first click's press has
-        # already selected the tile, so the handler acts on the current selection.
         if event.button() == Qt.MouseButton.LeftButton:
             self.double_clicked.emit(self.prompt_id)
 

@@ -286,15 +286,15 @@ RECOMMENDED: dict[str, str] = {
         "8 is the usual start, 5 for a looping clip."
     ),
     "enhance_detail_fixes": (
-        "Good range: 0.3–0.5 for each part."
+        "Good range: 0.3\u20130.5 for each part."
     ),
     "width": (
-        "Good sizes: about one megapixel in all for SDXL, such as 832×1216, 1024×1024 "
-        "or 1216×832; up to about two for Flux and WAN 2.2 T2I."
+        "Good sizes: about one megapixel in all for SDXL, such as 832\u00d71216, 1024\u00d71024 "
+        "or 1216\u00d7832; up to about two for Flux and WAN 2.2 T2I."
     ),
     "height": (
-        "Good sizes: about one megapixel in all for SDXL, such as 832×1216, 1024×1024 "
-        "or 1216×832; up to about two for Flux and WAN 2.2 T2I."
+        "Good sizes: about one megapixel in all for SDXL, such as 832\u00d71216, 1024\u00d71024 "
+        "or 1216\u00d7832; up to about two for Flux and WAN 2.2 T2I."
     ),
     "frame_count": (
         "A longer clip is made in pieces, each starting on the last frame of the one "

@@ -1119,7 +1119,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
-        f"{SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
+        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  Latest")
 
 
 def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
@@ -1131,7 +1131,7 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
     view._tree.setCurrentItem(workflow.child(0))
 
     assert view.slideshow_subject() == (
-        f"{SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
+        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  Latest")
 
 
 def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
@@ -1664,7 +1664,7 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
     assert list(_path_links(view)) == ["All"]
     assert icon_then_text("star", "Favorites", color=TEXT_PRIMARY,
                           size=path.fontMetrics().height()) in path.text()
-    assert view._folder_path.display_text() == f"{SHAPE_LABELS[LANDSCAPE]}  ›  All  ›  Favorites"
+    assert view._folder_path.display_text() == f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Favorites"
 
 
 def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):

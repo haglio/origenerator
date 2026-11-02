@@ -33,7 +33,7 @@ from tests.slideshow_hud_support import button_on_screen, hud_targets
 def _inflight(key="j1", status="queued", cancel=None, **kw):
     reading = {name: kw.pop(name) for name in list(kw)
                if name in ("frame", "progress", "started_at", "typical_seconds")}
-    return InFlightItem(key=key, caption="Alpha Workflow › a paper kite",
+    return InFlightItem(key=key, caption="Alpha Workflow \u203a a paper kite",
                         reading=RunReading(status=status, **reading),
                         reveal=kw.pop("reveal", lambda: None), cancel=cancel, **kw)
 

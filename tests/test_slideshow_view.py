@@ -1038,7 +1038,7 @@ def test_the_message_wears_the_color_of_what_it_says(qtbot):
 
 def _inflight(**kw):
     kw.setdefault("key", "j1")
-    kw.setdefault("caption", "Alpha Workflow › a paper kite")
+    kw.setdefault("caption", "Alpha Workflow \u203a a paper kite")
     kw.setdefault("status", "queued")
     kw.setdefault("reveal", lambda: None)
     reading = {k: kw.pop(k) for k in list(kw) if k in ("status", "frame", "progress", "pass_progress", "stage", "started_at", "typical_seconds")}

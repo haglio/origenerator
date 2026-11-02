@@ -154,7 +154,7 @@ def test_a_mark_is_drawn_just_after_the_title_and_level_with_it(qtbot):
     assert abs(title_middle - mark_middle) <= 2
 
 
-_WARNING = "Steps: Example Model's page recommends 20–40 steps. Click to use 40."
+_WARNING = "Steps: Example Model's page recommends 20\u201340 steps. Click to use 40."
 
 
 def test_a_warning_appears_left_of_the_title_without_moving_it(qtbot):

@@ -116,7 +116,7 @@ def test_a_numbers_good_range_is_one_the_app_holds_it_to_not_a_sentence(workflow
     numbers = (ParamType.INT, ParamType.FLOAT)
     said = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
                   if pd.type in numbers and pd.good is None
-                  and re.search(r"\d–\d", RECOMMENDED.get(pd.key, "")))
+                  and re.search(r"\d\u2013\d", RECOMMENDED.get(pd.key, "")))
     assert said == []
 
 
@@ -153,7 +153,7 @@ def test_the_sampler_step_spacing_and_fixes_recommend_what_to_set_them_to():
 def test_a_tooltip_ends_with_what_to_set_it_to():
     steps = next(pd for pd in WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()
                  if pd.key == "steps")
-    assert definition_help(steps) == f"{PARAM_HELP['steps']} Good range: 25–50."
+    assert definition_help(steps) == f"{PARAM_HELP['steps']} Good range: 25\u201350."
 
 
 def test_one_value_is_recommended_as_advice_rather_than_as_a_range():
@@ -162,7 +162,7 @@ def test_one_value_is_recommended_as_advice_rather_than_as_a_range():
 
 def test_every_span_of_numbers_is_called_a_good_range():
     unnamed = sorted(key for key, text in RECOMMENDED.items()
-                     if re.search(r"\d–\d", text) and "good range" not in text.lower())
+                     if re.search(r"\d\u2013\d", text) and "good range" not in text.lower())
     assert unnamed == []
 
 
@@ -185,10 +185,10 @@ def test_how_to_compare_two_step_spacings_stays_whatever_is_recommended():
 
 def test_a_definitions_good_range_is_said_in_its_tooltip():
     pd = ParamDef("mystery_number", "Mystery", ParamType.INT, 30, good=(20, 40))
-    assert definition_help(pd) == "Good range: 20–40."
+    assert definition_help(pd) == "Good range: 20\u201340."
 
 
 def test_a_durations_good_range_is_said_in_seconds():
     pd = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161, step=4,
                   unit="s", rate=16, good=(81, 161))
-    assert " Good range: 5–10 s. " in definition_help(pd)
+    assert " Good range: 5\u201310 s. " in definition_help(pd)

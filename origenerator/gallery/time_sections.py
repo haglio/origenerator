@@ -40,10 +40,10 @@ def new_work_opens_a_section(rows, *, now: datetime | None = None) -> bool:
 def _heading(*, oldest: datetime, newest: datetime, today: date) -> str:
     begun = f"{_day(oldest, today)}, {_clock(oldest)}"
     if newest.date() != oldest.date():
-        return f"{begun} – {_day(newest, today)}, {_clock(newest)}"
+        return f"{begun} \u2013 {_day(newest, today)}, {_clock(newest)}"
     if _clock(newest) == _clock(oldest):
         return begun
-    return f"{begun} – {_clock(newest)}"
+    return f"{begun} \u2013 {_clock(newest)}"
 
 
 def _day(moment: datetime, today: date) -> str:

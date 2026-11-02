@@ -2260,7 +2260,7 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
 
 
 def _cancelable(key, cancelled):
-    return InFlightItem(key=key, caption="Alpha Workflow › a paper kite",
+    return InFlightItem(key=key, caption="Alpha Workflow \u203a a paper kite",
                         reading=RunReading(status="queued"), reveal=lambda: None,
                         cancel=lambda: cancelled.append(key))
 
@@ -2301,7 +2301,7 @@ def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
         lambda _parent, title, text, *_a, **_kw: asked.append((title, text))
         or QMessageBox.StandardButton.No))
     for held in ([_cancelable("a", []), _cancelable("b", []),
-                  InFlightItem(key="c", caption="Alpha Workflow › a paper kite",
+                  InFlightItem(key="c", caption="Alpha Workflow \u203a a paper kite",
                                reading=RunReading(status="queued"), reveal=lambda: None)],
                  [_cancelable("a", [])]):
         _view_holding(qtbot, monkeypatch, held)._queue._cancel_all.click()

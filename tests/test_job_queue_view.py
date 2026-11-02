@@ -47,7 +47,7 @@ def dressed(qtbot):
 _EITHER_WAY = object()
 
 
-def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
+def _item(key="j1", caption="Alpha Workflow \u203a a kite", status="running", frame=None,
           progress=None, reveal=None, cancel=None, foreign_ahead=None, starts_at=None,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
@@ -1172,10 +1172,10 @@ def test_an_unregistered_workflow_leads_with_the_price_alone(queue):
 
 
 def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
-    queue.set_items([_item(caption="Alpha Workflow › a kite", typical_seconds=None,
+    queue.set_items([_item(caption="Alpha Workflow \u203a a kite", typical_seconds=None,
                            job_kind="Video", requested=True)])
     tip = queue.rows()[0]._lead.toolTip()
-    assert tip.startswith("Alpha Workflow › a kite")
+    assert tip.startswith("Alpha Workflow \u203a a kite")
     assert "No timing data" in tip
     assert "start image" in tip
     assert "Queued by a request" in tip

@@ -26,7 +26,7 @@ from origenerator.gui.hud_queue import (
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
 
 
-def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", **kw):
+def _item(key="j1", caption="Alpha Workflow \u203a a paper kite", status="queued", **kw):
     reading = {name: kw.pop(name) for name in list(kw)
                if name in ("frame", "progress", "pass_progress", "stage",
                            "started_at", "typical_seconds")}
@@ -62,7 +62,7 @@ def test_the_job_queue_keeps_one_size_whatever_is_in_flight():
 
 
 def test_the_job_queue_fits_the_width_the_hud_already_has():
-    long_line = [_item("j1", caption="Alpha Workflow › " + "a paper kite " * 40,
+    long_line = [_item("j1", caption="Alpha Workflow \u203a " + "a paper kite " * 40,
                        typical_seconds=30)]
 
     assert queue_section(long_line, 0).size()[0] == 0

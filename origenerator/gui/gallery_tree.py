@@ -37,7 +37,7 @@ _COLLECTION_TIPS = {
 }
 
 
-PATH_SEPARATOR = "  ›  "
+PATH_SEPARATOR = "  \u203a  "
 
 
 class PathStep(NamedTuple):

@@ -46,6 +46,15 @@ def _places(given: OutputPlaces | None) -> OutputPlaces:
     return config.OUTPUT_PLACES if given is None else given
 
 
+@dataclass(frozen=True)
+class Dating:
+    created_fallback: str = ""
+    held_days: int | None = None
+
+
+UNDATED = Dating()
+
+
 def file_item(file: dict, label: str = "File", *,
               held_days: int | None = None, places: OutputPlaces | None = None) -> BasicItem:
     filename = file.get("filename") or ""

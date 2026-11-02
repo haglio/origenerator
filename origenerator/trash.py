@@ -22,19 +22,16 @@ from app_support.file_channel import retried_while_held
 
 from origenerator.file_numbers import NUMBERED, next_number, numbered
 
-_MOVE_ATTEMPTS = 12     # a freshly-closed media file can stay locked for a beat
+_MOVE_ATTEMPTS = 12
 _MOVE_RETRY_DELAY = 0.15
 
 
 @dataclass
 class TrashedBatch:
-    """One deletion's files parked in the trash, with how to put them back."""
-
-    moves: list[tuple[Path, Path]]  # (original_path, trashed_path)
-    subdir: Path | None  # the batch's holding folder, or None when empty
+    moves: list[tuple[Path, Path]]
+    subdir: Path | None
 
     def restore(self) -> dict[str, str]:
-        """Put every file back, under the next free number where its name is taken."""
         renamed = self._renamed_where_taken()
         for original, trashed in self.moves:
             back = renamed.get(original, original)
@@ -59,7 +56,6 @@ class TrashedBatch:
         return renamed
 
     def purge(self) -> None:
-        """Delete the held files for good — the opposite of ``restore``."""
         if self.subdir is not None:
             shutil.rmtree(self.subdir, ignore_errors=True)
 
@@ -72,12 +68,6 @@ class TrashedBatch:
         return next((trashed for was, trashed in self.moves if was == Path(original)), None)
 
     def record(self) -> dict:
-        """This batch as plain data, so it can be stored and re-made later.
-
-        What the Trash keeps in the database beside the deleted row: the
-        moves are how to put the files back, the subdir is what to remove when
-        the item is ended instead.
-        """
         return {
             "moves": [[str(original), str(trashed)] for original, trashed in self.moves],
             "subdir": str(self.subdir) if self.subdir is not None else None,
@@ -85,8 +75,6 @@ class TrashedBatch:
 
     @classmethod
     def from_record(cls, record: dict) -> TrashedBatch:
-        """Re-make a batch from what :meth:`record` stored — the handle a session
-        that never performed the delete needs in order to undo or end it."""
         subdir = (record or {}).get("subdir")
         return cls(
             moves=[(Path(original), Path(trashed))
@@ -104,7 +92,6 @@ class Trash:
         self.root = Path(root)
 
     def store(self, paths) -> TrashedBatch:
-        """Move ``paths`` into a fresh batch folder and return its undo handle."""
         paths = [Path(p) for p in paths]
         if not paths:
             return TrashedBatch(moves=[], subdir=None)
@@ -118,23 +105,12 @@ class Trash:
         return TrashedBatch(moves=moves, subdir=subdir)
 
     def held_names(self) -> set[str]:
-        """The names its files had, whichever folder each was deleted from."""
         if not self.root.is_dir():
             return set()
         return {_name_before(held.name) for batch in self.root.iterdir() if batch.is_dir()
                 for held in batch.iterdir()}
 
     def purge_orphans(self, keep) -> int:
-        """Delete every batch folder not named in ``keep``, and say how many went.
-
-        The Trash holds a batch indefinitely, so clearing the trash
-        wholesale (what a launch used to do) would destroy exactly what is now
-        recoverable. What is left over once the Trash's own folders are spared is
-        genuinely unreachable: a rejected experiment's batch that fell off the
-        undo stack, a batch from before the Trash existed, or a folder left over
-        by a crash between the move and the record. Without this the trash only
-        ever grows.
-        """
         if not self.root.exists():
             return 0
         held = {Path(path).resolve() for path in keep if path}
@@ -148,7 +124,6 @@ class Trash:
 
 
 def _held_as(index: int, name: str) -> str:
-    # The index keeps same-named files from distinct folders apart.
     return f"{index}_{name}"
 
 
@@ -157,15 +132,6 @@ def _name_before(held: str) -> str:
 
 
 def _move(src: Path, dest: Path) -> None:
-    """Move a file into the trash, retrying briefly past a transient lock.
-
-    A video the preview only just let go of can stay open for a moment — the
-    media backend closes its source on its own thread, a beat after being told
-    to — and AV scanners or the indexer can grab any file, so a one-shot move
-    would fail where a second or two of retries succeeds. What retrying can't
-    outlast is a pane still *showing* the file: that handle never goes away on
-    its own, which is why the release runs first (see
-    ``GalleryEdits._trash_files``).
-    """
+    # Retry briefly: the media backend closes a source on its own thread a beat after release, and AV scanners or the indexer can lock any file
     retried_while_held(lambda: shutil.move(str(src), str(dest)),
                        attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)

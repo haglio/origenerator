@@ -64,8 +64,6 @@ def _has_image(tile):
 
 
 def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
-    # The stage is read on the scrim over the thumbnail, the way an in-flight tile
-    # and an enhancing thumbnail say theirs.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
     assert tile._status_scrim.text() == "Waiting…"
@@ -74,8 +72,6 @@ def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
 
 
 def test_an_auto_generating_folders_tile_says_cancel_and_hovers_the_next_seed(qtbot):
-    # Pressing it there discards the seed and Auto-Generate starts another, which
-    # the hover says.
     tile = GeneratingTile(FakeJob(state="running"), auto_generating=True)
     qtbot.addWidget(tile)
     assert tile._cancel.text() == "Cancel"
@@ -92,7 +88,6 @@ def test_the_cancel_button_emits_cancel_requested(qtbot):
 
 
 def test_a_click_on_the_tile_selects_it(qtbot):
-    # So the Generate pane can mirror its preview.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     picks = []
@@ -108,7 +103,7 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
 
     tile.set_selected(True)
     assert tile._selected
-    assert "solid" in tile.styleSheet()  # a solid selection border, not the dashed resting one
+    assert "solid" in tile.styleSheet()
 
     tile.set_selected(False)
     assert not tile._selected
@@ -116,8 +111,6 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
 
 
 def _picked_tile_drawn(qtbot):
-    """A picked tile, and the pixels of the tile it sits in, drawn under the app
-    stylesheet."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -159,8 +152,6 @@ def test_started_signal_switches_the_scrim_to_generating(qtbot):
 
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
-    # The same line the Job Queue writes for the same job, so a run
-    # reads identically wherever it is being watched.
     job = FakeJob(state="running", last_progress=(10, 20),
                   started_at=time.time() - 90.5)
     tile = GeneratingTile(job, typical_seconds=725.0)
@@ -170,10 +161,6 @@ def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
 
 
 def test_the_bar_says_which_pass_is_being_taken(qtbot):
-    # A video run is three passes, and the substep progress bar along the foot restarts
-    # once per pass. Named, the caption says which of them is being done — the
-    # one thing a twelve-minute run can report while the countdown is still too
-    # early to mean anything.
     job = FakeJob(state="running", last_progress=(405, 818),
                   last_pass_progress=(1, 10), last_stage="Second pass",
                   started_at=time.time() - 90.5)
@@ -183,10 +170,6 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
 
 
 def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
-    # It stood a blurred copy of the frame, where the Job Queue's corner stood a
-    # sharp pair and the Generate tab stood a blank — three surfaces, three ideas
-    # of one wait. All three stand the sum now.
-
     frame = tmp_path / "frame.png"
     Image.new("RGB", (60, 40), (0, 0, 255)).save(frame)
     video = tmp_path / "clip.png"
@@ -198,7 +181,7 @@ def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     thumbnail = tile._image.pixmap()
     assert thumbnail is not None
     assert not thumbnail.isNull()
-    assert thumbnail.width() > thumbnail.height()   # the pair, not one thumbnail alone
+    assert thumbnail.width() > thumbnail.height()
 
 
 def test_a_tile_with_nothing_behind_it_keeps_its_plain_plate(qtbot):
@@ -220,23 +203,19 @@ def test_progress_signal_advances_the_bar(qtbot):
 
 
 def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
-    # Its wait is the Job Queue to explain; a zero counting up over a bar that
-    # has not moved says the run is going nowhere.
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
     assert tile._bar.caption() == ""
-    assert tile._bar.maximum() == 0  # indeterminate: sweeping, not stuck at 0%
+    assert tile._bar.maximum() == 0
 
 
 def test_the_clock_advances_between_polls(qtbot):
-    # The gallery re-renders on its own schedule, which would make a seconds count
-    # skip; the tile re-reads the clock itself so it moves a second at a time.
     job = FakeJob(state="running", started_at=time.time() - 5.5)
     tile = GeneratingTile(job, typical_seconds=100.0)
     qtbot.addWidget(tile)
     assert tile._bar.caption() == "~1:34 left"
 
-    job._started_at -= 3  # as if three seconds had gone by
+    job._started_at -= 3
     tile._tick.timeout.emit()
     assert tile._bar.caption() == "~1:31 left"
 
@@ -251,8 +230,6 @@ def test_preview_signal_renders_image(qtbot):
 
 
 def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
-    # Overlaid rather than laid out beneath, so the thumbnail keeps the full
-    # height every tile in the grid gives it.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
@@ -264,7 +241,6 @@ def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
 
 
 def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
-    # A tile rebuilt mid-run (navigation/poll) must show the job's current state.
     job = FakeJob(state="running", last_progress=(5, 10), last_preview=_png_bytes(),
                   started_at=time.time() - 20.5)
     tile = GeneratingTile(job)
@@ -275,9 +251,6 @@ def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
 
 
 def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
-    # The tile is a tile in the grid like any other, and every other one answers
-    # a right-click. It hands the gesture up for the gallery to answer with the
-    # run's own menu.
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     asked = []

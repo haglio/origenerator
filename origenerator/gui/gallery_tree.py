@@ -1,23 +1,3 @@
-"""Builds and queries the gallery's folder list — the left pane.
-
-The pane draws one tree per shape, each under a standing label and each scrolling
-on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`), and
-each carries the whole tree of contents over the rows that shape holds. Standing
-anywhere is standing on one shape, so a slideshow started there knows what to
-play (see :mod:`origenerator.item_shape`).
-
-A row's key in the tree is therefore its folder's own key with the shape
-appended, and the two maps kept here — key→item and prompt-id→item — are keyed
-that way; a folder drawn again under a collection of your own adds the folders it is
-drawn inside. The folder's own key is what a star, a name and a place in a custom
-folder hang off, and it is untouched: ``keys_by_folder`` maps one back to
-the rows drawing it, its own place first, which is how a navigation that knows
-only a folder key (a re-roll, a combine, a folder tile) finds a row to select.
-
-Pure rendering and lookups over the pane the GalleryView owns and lays out; it
-has no database or refresh concerns — folder star/delete live in the view,
-which rebuilds every shape through :meth:`populate`.
-"""
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -45,14 +25,7 @@ from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE,
 from origenerator.item_shape import key_holds, shape_of, shaped_key, split_key
 from origenerator.media import MediaType
 
-# A search does not narrow this tree: a narrowed list of folder names is a poor
-# answer to "where is the one with the two of them on the couch", because a
-# folder's name is a short code and the thing you would actually recognize is
-# the thumbnail. The search fills the Gallery pane with matching thumbnails
-# instead (see GalleryPane.show_search_results), and the tree is left alone — so the folder
-# you were standing in is still there when the search clears.
-
-GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
+GROUP_ROLE = Qt.ItemDataRole.UserRole
 
 _COLLECTION_TIPS = {
     LATEST_KEY: "Recently generated",
@@ -108,46 +81,24 @@ def _shown_collections(shape, folder_key: str) -> list[str]:
 
 @dataclass
 class ShapeModel:
-    """One shape of the list: everything that side's section draws."""
-
     shape: str
-    tree_model: list                       # the media roots this shape holds
+    tree_model: list
     custom_collections: list = field(default_factory=list)
-    show_latest: bool = False             # anything at all to list yet
+    show_latest: bool = False
     collection_counts: dict[str, int] = field(default_factory=dict)
 
 
 class GalleryTree:
-    """The folder tree: builds it from the gallery model and answers the lookups
-    (key→item, prompt→item, folder path, the selected folder's key) the view
-    navigates by. The pane holding the two trees is owned by the view."""
-
     def __init__(self, tree):
         self._tree = tree
-        self.item_by_key: dict[str, QTreeWidgetItem] = {}  # tree key -> its row
-        self.leaf_by_id: dict[str, QTreeWidgetItem] = {}   # prompt_id -> its settings row
-        # plain key -> the tree keys drawing it, in shape order. Each shape draws
-        # its own copy of every collection, and of every folder holding rows of its
-        # shape — so a caller holding a key with no shape (a re-roll's folder, a
-        # saved session's, a spoken collection name) can still find a row.
+        self.item_by_key: dict[str, QTreeWidgetItem] = {}
+        self.leaf_by_id: dict[str, QTreeWidgetItem] = {}
         self.keys_by_folder: dict[str, list[str]] = {}
-        self._recently_worked: set[str] = set()  # tree keys wearing the mark
+        self._recently_worked: set[str] = set()
         self._drawn_shapes: frozenset[str] | None = None
         self._folders_left_open: set[str] = set()
 
     def populate(self, shapes, *, folder_meta=None, recently_worked=()):
-        """Rebuild the list from ``shapes``, with the folders left open opened again.
-
-        ``shapes`` are the :class:`ShapeModel`s of the sections the pane is
-        drawing. ``folder_meta`` is the same label/star overlay the tree models
-        were built with, so the All row each shape wraps around its model wears
-        its name and star like any folder under it.
-
-        ``recently_worked`` are the ``(shape, folder key)`` pairs of the folders
-        worked in lately (:func:`~origenerator.gallery.recently_worked_folders`),
-        whose rows wear a mark. A folder stays where the row that made it put
-        it, so the mark is the whole of what says where the work has been.
-        """
         self._recently_worked = {shaped_key(key, shape)
                                  for shape, key in recently_worked}
         self._folders_left_open = self.folders_left_open()
@@ -158,7 +109,6 @@ class GalleryTree:
         self.keys_by_folder = {}
         for shape in shapes:
             self._add_side(self._tree.root_for(shape.shape), shape, folder_meta)
-        # Folders default to collapsed; only restore folders the user had open.
         for key in self._folders_left_open:
             item = self.item_by_key.get(key)
             if item is not None:
@@ -168,13 +118,6 @@ class GalleryTree:
         self._drawn_shapes = frozenset(shape.shape for shape in shapes)
 
     def _add_side(self, root, shape, folder_meta) -> None:
-        """One side's whole tree of contents, filling that side's section.
-
-        Drawn even for a shape with nothing in it yet: the split is what tells a
-        slideshow which screen it is for, so the shape you have not generated
-        for is still somewhere you can stand and somewhere its first generation
-        can appear.
-        """
         customs = [(custom, self._add_custom_collection(custom, root, shape))
                    for custom in shape.custom_collections]
         all_row = self._add_node(gallery.all_group(shape.tree_model, folder_meta), root, shape)
@@ -196,16 +139,6 @@ class GalleryTree:
 
     def _register(self, item, key: str, parent_item,
                   folder_key: str | None = None) -> QTreeWidgetItem:
-        """Hang ``item`` under ``parent_item`` as ``key``, and index it.
-
-        The key rides the row itself so the selected row can name its own place
-        without anything having to work out which shape it is on;
-        ``keys_by_folder`` is the way back for a caller holding a key with no
-        shape on it (``folder_key`` — only a side's own root has none).
-
-        A row of a folder lately worked in is marked here rather than at each
-        tier, so every kind of row answers to the one rule; the tooltip says
-        what the mark means, since a dot nothing explains is a riddle."""
         item.setData(0, TREE_KEY_ROLE, key)
         if shaped_key(*split_key(key)) in self._recently_worked:
             item.setData(0, RECENT_ROLE, True)
@@ -217,23 +150,12 @@ class GalleryTree:
         return item
 
     def _open_all(self) -> None:
-        """Open every side's All row on a gallery's first build.
-
-        Every other folder defaults shut, but All shut is a shape with nothing in
-        it — Images and Videos are where the gallery starts. Only on the first
-        build: after that its state is the user's, saved and restored with every
-        other folder's, so collapsing it sticks.
-        """
         if self.built or self._folders_left_open:
             return
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
 
     def _add_custom_collection(self, group, parent_item, shape, inside=()) -> QTreeWidgetItem:
-        """Add a row for one of the user's own folders: a collection-shaped row carrying
-        its group (so the view's folder machinery — folder path, tiles, slideshow —
-        treats it like any other folder), and collecting the folders dropped onto
-        it."""
         count = len(gallery.rows_under(group))
         item = QTreeWidgetItem([group.label])
         item.setIcon(0, icons.custom_collection_icon())
@@ -241,7 +163,7 @@ class GalleryTree:
                            "in a folder you made; drop folders or items here to add them")
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, count)
-        item.setData(0, DROP_KEY_ROLE, group.key)  # the folder gathers, not the shape
+        item.setData(0, DROP_KEY_ROLE, group.key)
         return self._register(item, shaped_key(group.key, shape.shape, inside), parent_item,
                               folder_key=group.key)
 
@@ -279,8 +201,6 @@ class GalleryTree:
                 if child.data(0, GROUP_ROLE) is None]
 
     def keys_for_folder(self, folder_key: str) -> list[str]:
-        """The tree keys drawing ``folder_key`` — a folder's own key or a collection's
-        — in shape order, empty for one no shape is holding right now."""
         return list(self.keys_by_folder.get(folder_key, ()))
 
     def mark_favorite(self, folder_key: str, favorite: bool) -> None:
@@ -290,7 +210,6 @@ class GalleryTree:
             item.emitDataChanged()
 
     def collection_item(self, collection_key: str, shape: str) -> QTreeWidgetItem | None:
-        """One side's copy of a collection row."""
         return self.item_by_key.get(shaped_key(collection_key, shape))
 
     def set_collection_counts(self, shape: str, counts: dict[str, int]) -> None:
@@ -327,20 +246,10 @@ class GalleryTree:
         self._folders_left_open = set(keys)
 
     def selected_folder_key(self) -> str | None:
-        """The tree key of the selected row — its folder's key with the shape it is
-        being looked at from appended, or a collection's own shaped key."""
         item = self._tree.currentItem()
         return item.data(0, TREE_KEY_ROLE) if item is not None else None
 
     def path_steps(self, item) -> list[PathStep]:
-        """The path down to ``item``, led by its shape.
-
-        The shape comes from the row's own key rather than from a row above it —
-        each half is a tree of its own — and it leads the path because a
-        folder's label alone would not say which of the two copies of it you
-        are standing in. The header over the Gallery pane is a long way from
-        the label over the half you clicked.
-        """
         steps = []
         node = item
         while node is not None:

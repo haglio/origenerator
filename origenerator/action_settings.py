@@ -1,12 +1,3 @@
-"""Pick the settings for a dropdown action, mined from the gallery.
-
-An action's videos are the ones launched as that action, grouped by their settings, and the
-chosen one supplies its full params to re-run on a dropped image.
-:func:`most_used_video` is the action's most-used; :func:`pinned_settings` sits above it,
-for an action the overlay pins; :func:`available_categories` says which actions either
-could answer; :func:`starting_settings` is the lane's own workflow as it starts.
-Each is asked for one lane, its *intent*: :data:`VIDEO` or :data:`GENAU`.
-"""
 from __future__ import annotations
 
 import json
@@ -16,20 +7,11 @@ from origenerator.content import genau_flick_word, load_content
 
 _CONTENT = load_content()
 
-# Library vocabulary, so the overlay's (content.example.json documents the shape).
 CATEGORIES: tuple[str, ...] = tuple(_CONTENT["actions"])
 
-# What the settings are chosen for. A long-form video for the Satellite Funestras,
-# or a Genau flick — one complete cycle, looping end to end, scrubbed against the
-# device's phase rather than played. Both are "an action on this image", so they share
-# every tier here; what differs is which overlay table is consulted and, for GENAU,
-# that only a looping workflow's videos can be mined.
 VIDEO = "video"
 GENAU = "genau"
 
-# An action named here runs its pinned workflow+params instead of whatever mining
-# would pick, which is the way out for an action whose past videos all share a
-# weakness. One table per intent, because the key is the action alone.
 _CURATED_BY_INTENT: dict[str, dict] = {
     VIDEO: _CONTENT.get("pinned_kino_settings") or {},
     GENAU: _CONTENT.get("pinned_genau_settings") or {},
@@ -37,9 +19,6 @@ _CURATED_BY_INTENT: dict[str, dict] = {
 
 
 def pinned_settings(category: str, intent: str = VIDEO) -> dict | None:
-    """The overlay's hand-tuned ``intent`` settings for ``category``, else ``None``
-    -- including for a malformed entry, so the caller falls back to mining rather
-    than failing the action."""
     spec = _CURATED_BY_INTENT.get(intent, {}).get(category)
     if not isinstance(spec, dict) or not spec.get("workflow"):
         return None
@@ -58,9 +37,7 @@ def in_its_lane(settings: dict, intent: str) -> dict:
 
 
 def loops(row) -> bool:
-    """Whether a looping workflow made ``row`` — its last frame meeting its first,
-    which only such a video can supply Genau settings from. The registry import is
-    deferred: it pulls in the whole workflow package."""
+    # Deferred: the workflow registry import pulls in the whole workflow package
     from origenerator.workflows import WORKFLOW_REGISTRY  # noqa: PLC0415 — keeps this module light
 
     workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
@@ -70,10 +47,6 @@ def loops(row) -> bool:
 def lane_of(row) -> str:
     return GENAU if loops(row) else VIDEO
 
-# Params that are no part of the settings: the prompt, the start frame, the seeds, the
-# bookkeeping, and the values derived rather than chosen (the output size, the video
-# length, the dual-sampler split points). Excluding them keeps the signature on the
-# real levers, so one setup on different frames groups as one.
 _SETTINGS_EXCLUDE = frozenset((
     "positive_prompt", "negative_prompt", "input_image",
     "seed", "noise_seed", "filename_prefix", "batch_size",
@@ -83,16 +56,12 @@ _SETTINGS_EXCLUDE = frozenset((
 
 
 def _hashable(value):
-    """A stable, hashable stand-in for a param value (lists/dicts → sorted JSON)."""
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return json.dumps(value, sort_keys=True)
 
 
 def _settings_signature(row: dict):
-    """A hashable key for a row's model+params settings, ignoring the free-text prompt,
-    the input image and the seeds — so the same setup on different frames counts as
-    one."""
     try:
         params = json.loads(row.get("params_json") or "{}")
     except (json.JSONDecodeError, TypeError):
@@ -106,13 +75,10 @@ def _settings_signature(row: dict):
 
 
 def _created(row) -> str:
-    """A row's creation timestamp for recency ordering (missing sorts oldest)."""
     return row.get("created_at") or ""
 
 
 def _action_settings_groups(category: str, video_rows, *, loop_only: bool = False) -> dict:
-    """The action's videos grouped by settings signature; ``loop_only`` keeps just the
-    ones a looping workflow made (see :func:`loops`)."""
     groups = defaultdict(list)
     for row in video_rows:
         if action_of(row) != category:
@@ -124,9 +90,6 @@ def _action_settings_groups(category: str, video_rows, *, loop_only: bool = Fals
 
 
 def action_of(row: dict) -> str:
-    """The action ``row`` shows, because somebody said so: a video's is the action it was
-    launched as, an image's the action it was sorted as, and "" means nobody has
-    said. Never read off the prompt."""
     return row.get("action") or row.get("image_state") or ""
 
 
@@ -140,15 +103,6 @@ def as_sentence(said: str) -> str:
 
 
 def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
-    """The actions a picked dropdown entry can actually answer: those ``video_rows``
-    holds at least one usable video of (settings can be mined), plus those the
-    overlay pins ``intent`` settings for (nothing to mine — the settings are
-    pinned). Combine greys out the rest, so an action that could only ever answer
-    "no past video yet" is never offered.
-
-    Under ``GENAU`` only a looping workflow's videos count toward the mined half:
-    a long-form video of the action is real, but its settings cannot make a Genau flick.
-    """
     loop_only = intent == GENAU
     return {c for c in CATEGORIES
             if pinned_settings(c, intent) is not None
@@ -157,9 +111,6 @@ def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
 
 
 def most_used_video(category: str, video_rows, intent: str = VIDEO) -> str | None:
-    """The prompt_id of the exemplar for ``category``'s most-used settings, or
-    ``None`` when the gallery holds no video of the action. Most used is the settings under the most
-    of the user's videos of it, ties to the more recent, shown by its newest."""
     groups = _action_settings_groups(category, video_rows, loop_only=intent == GENAU)
     if not groups:
         return None

@@ -1,4 +1,3 @@
-"""The rows of the tree of contents: where each one wears its mark."""
 from __future__ import annotations
 
 import json
@@ -61,8 +60,6 @@ def _gallery_tree(qtbot, rows, collections_of_your_own=(), folder_meta=None):
 
 
 def _gathered_tree(qtbot, rows, collections_of_your_own, folder_meta=None, recently_worked=()):
-    """The list built from ``rows``, with the collections of your own that
-    ``collections_of_your_own`` makes out of the Landscape side's folders."""
     model = gallery.build_gallery_tree(rows, folder_meta)
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
@@ -76,7 +73,6 @@ def _gathered_tree(qtbot, rows, collections_of_your_own, folder_meta=None, recen
 
 
 def _table_of_contents(qtbot, rows, collections_of_your_own=(), folder_meta=None):
-    """The Landscape half, built from ``rows`` and opened all the way down."""
     pane, _tree = _gallery_tree(qtbot, rows, collections_of_your_own, folder_meta)
     pane.resize(500, 1600)
     with qtbot.waitExposed(pane):

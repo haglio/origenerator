@@ -1,13 +1,3 @@
-"""A settings folder's generating tile: the run in front of its line, beside the
-folder's ``+`` rather than in its place.
-
-It shows the run the way every other in-flight surface does: ComfyUI's preview —
-or, until there is one, what the run is made from
-(:func:`~origenerator.gui.combination_view.combination_pixmap`) — under a tile status scrim
-naming the stage, a bar along the thumbnail's foot reading
-:func:`origenerator.timing.progress_status_label`, and a Cancel that throws the
-run away.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
@@ -33,15 +23,11 @@ _MADE_FROM_NOTHING = Combination()
 
 class GeneratingTile(QFrame):
     cancel_requested = pyqtSignal()
-    selected = pyqtSignal()  # clicked, to drive the Generate pane
-    context_requested = pyqtSignal(QPoint)  # global position
+    selected = pyqtSignal()
+    context_requested = pyqtSignal(QPoint)
 
     def __init__(self, job, parent=None, *, auto_generating=False,
                  typical_seconds=None, made_from=_MADE_FROM_NOTHING):
-        """``typical_seconds`` is what this folder's workflow usually takes, so the
-        bar can say how much of the run is left; ``None`` where there is no
-        history to say it from. ``made_from`` stands in the plate until the run
-        streams a frame of its own."""
         super().__init__(parent)
         self._job = job
         self._selected = False
@@ -70,15 +56,11 @@ class GeneratingTile(QFrame):
         self._cancel.clicked.connect(lambda: self.cancel_requested.emit())
         layout.addWidget(self._cancel)
 
-        # Both ride over the thumbnail rather than taking a row of their own, so the
-        # tile is the same size and shape as every tile beside it.
         self._status_scrim = TileStatusScrim(self)
         self._bar = ProgressBar(self)
         self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._place_bar()
 
-        # Its own clock rather than the gallery's poll, so the count advances a
-        # second at a time whether or not a refresh has landed.
         self._tick = QTimer(self)
         self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_timing)
@@ -96,7 +78,6 @@ class GeneratingTile(QFrame):
         self._tick.start()
 
     def set_selected(self, selected: bool):
-        """Fill the tile with the selected blue when it drives the Generate pane."""
         self._selected = selected
         self.setStyleSheet(_SELECTED_FRAME_CSS if selected else _RESTING_FRAME_CSS)
 
@@ -110,27 +91,19 @@ class GeneratingTile(QFrame):
         )
 
     def _render_state(self, *_):
-        # The numbers are read back off the job rather than taken from a signal:
-        # the tile's own clock re-renders on a tick that carries none, and both
-        # paths must draw the same line.
         self._status_scrim.cover(
             self._image,
             "Generating…" if self._reading().rendering else "Waiting…",
         )
-        self._bar.raise_()  # the scrim it sits on was just raised over everything
+        self._bar.raise_()  # the scrim was just raised over everything, and the bar sits on it
         self._render_timing()
 
     def _render_timing(self):
-        """A job ComfyUI hasn't started has no elapsed time and no steps to
-        report, so the bar stays indeterminate with nothing written on it: its
-        wait is the Job Queue to explain."""
         self._bar.show_progress(self._reading().caption(compact=True),
                                 *self._reading().bars())
 
     def _place_bar(self):
-        """The thumbnail is only positioned once the tile's layout has run, so that
-        is forced here — a bar placed before it sits in the tile's top-left
-        corner."""
+        # Qt: the thumbnail is positioned only once the layout has run, so force it; a bar placed before sits in the top-left corner
         self.layout().activate()
         frame = self._image.geometry()
         self._bar.setGeometry(QRect(

@@ -18,12 +18,21 @@ from unittest.mock import DEFAULT, MagicMock, patch
 import pytest
 from app_support import loading_screen as launchers_screen
 from app_support import origenerator_handoff as handoff
+from app_support.testing import (
+    app_id_claimed,
+    exception_hooks_left_alone,
+    logging_left_alone,
+    no_taskbar_description,
+    pinned_shortcuts_stamped,
+    window_dressed,
+)
 from app_support.win32 import TaskbarApp
 from PIL import Image
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
+from shared_ui.testing import brought_to_front
 
 from origenerator import app_link, config, content, evolver_agreement, gallery, trash_collection
 from origenerator.app import (
@@ -76,12 +85,11 @@ def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_p
     # fail-fast abort, so what Qt says on its way down reaches the app's own
     # log or nothing: twenty crashes in four days left only Windows' record.
     installed = []
-    monkeypatch.setattr("app_support.logging_utils.configure_logging",
-                        lambda *a, **k: None)
     monkeypatch.setattr("origenerator.qt_messages.install_qt_message_logging",
                         lambda: installed.append(True))
 
-    _configure_logging(tmp_path)
+    with logging_left_alone():
+        _configure_logging(tmp_path)
 
     assert installed == [True]
 
@@ -199,11 +207,11 @@ def _no_crash_log_in_the_checkout(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _a_boot_leaves_the_suites_own_error_hooks_in_place(monkeypatch):
+def _a_boot_leaves_the_suites_own_error_hooks_in_place():
     """pytest sets its thread hook once per run, so a boot that put the app's in
     its place would hide every later test's thread errors in a log."""
-    monkeypatch.setattr("app_support.logging_utils.install_exception_logging",
-                        lambda logger: None)
+    with exception_hooks_left_alone():
+        yield
 
 
 def _the_copies(monkeypatch, claim, *, closing=False):
@@ -289,8 +297,8 @@ def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
     # The pin by its whole name: a pin that merely mentions the app, a branch
     # preview's, must not be relabelled as the live one.
     with patch("origenerator.app.sys.platform", "win32"), \
-         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("app_support.win32.stamp_pinned_shortcuts", return_value={}) as mock_stamp:
+         app_id_claimed() as mock_set_id, \
+         pinned_shortcuts_stamped(return_value={}) as mock_stamp:
         _init_windows_taskbar_identity(None, None)
 
     mock_set_id.assert_called_once_with("Origenerator")
@@ -300,8 +308,8 @@ def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
 def test_a_pin_windows_will_not_stamp_is_logged_and_the_launch_goes_on(caplog):
     refused = {Path("C:/pins/Origenerator.lnk"): OSError("IPersistFile::Save failed")}
     with patch("origenerator.app.sys.platform", "win32"), \
-         patch("app_support.win32.set_app_user_model_id"), \
-         patch("app_support.win32.stamp_pinned_shortcuts", return_value=refused), \
+         app_id_claimed(), \
+         pinned_shortcuts_stamped(return_value=refused), \
          caplog.at_level(logging.WARNING):
         _init_windows_taskbar_identity(None, None)
 
@@ -310,8 +318,8 @@ def test_a_pin_windows_will_not_stamp_is_logged_and_the_launch_goes_on(caplog):
 
 def test_a_preview_claims_a_taskbar_button_of_its_own_and_leaves_the_pin_to_the_live_app():
     with patch("origenerator.app.sys.platform", "win32"), \
-         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("app_support.win32.stamp_pinned_shortcuts", return_value={}) as mock_stamp:
+         app_id_claimed() as mock_set_id, \
+         pinned_shortcuts_stamped(return_value={}) as mock_stamp:
         _init_windows_taskbar_identity(None, Preview(feature=None))
 
     mock_set_id.assert_called_once_with("Origenerator.Preview")
@@ -320,8 +328,8 @@ def test_a_preview_claims_a_taskbar_button_of_its_own_and_leaves_the_pin_to_the_
 
 def test_init_windows_taskbar_identity_noop_off_windows():
     with patch("origenerator.app.sys.platform", "linux"), \
-         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("app_support.win32.stamp_pinned_shortcuts") as mock_stamp:
+         app_id_claimed() as mock_set_id, \
+         pinned_shortcuts_stamped() as mock_stamp:
         _init_windows_taskbar_identity(None, None)
 
     mock_set_id.assert_not_called()
@@ -673,8 +681,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
          patch("origenerator.gui.core.Core", return_value=window), \
-         patch("shared_ui.foreground.bring_to_front",
-               side_effect=lambda w: events.append(
+         brought_to_front(side_effect=lambda w: events.append(
                    "front:window" if w is window else "front:something else")), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -794,8 +801,8 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
     # the pinned Origenerator shortcut keeps the standalone identity, so it is
     # left unstamped.
     with patch("origenerator.app.sys.platform", "win32"), \
-         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("app_support.win32.stamp_pinned_shortcuts") as mock_stamp:
+         app_id_claimed() as mock_set_id, \
+         pinned_shortcuts_stamped() as mock_stamp:
         _init_windows_taskbar_identity("FunTime.App", None)
 
     mock_set_id.assert_called_once_with("FunTime.App")
@@ -815,28 +822,26 @@ def test_the_live_app_leaves_its_button_to_its_pinned_shortcut(tmp_path):
     assert _the_preview_on_the_taskbar(None, tmp_path) is None
 
 
-def test_a_hosted_boot_shows_every_window_under_the_sessions_taskbar_button(qapp, monkeypatch):
+def test_a_hosted_boot_shows_every_window_under_the_sessions_taskbar_button(qapp):
     worn = []
-    monkeypatch.setattr("app_support.win32.dress_window",
-                        lambda hwnd, app_id, app: worn.append(app_id))
-    monkeypatch.setattr("app_support.win32.described_taskbar_app", lambda app_id: None)
     built = MagicMock()
 
-    with _a_faked_boot([], **{
-        "origenerator.app._taskbar_identity": _taskbar_identity,
-        "origenerator.gui.core.Core": built,
-    }):
-        assert main(hosted_launch(**{"--taskbar-identity": "FunTime.App.Preview"})) == 0
+    with window_dressed(side_effect=lambda hwnd, app_id, app: worn.append(app_id)), no_taskbar_description():
+        with _a_faked_boot([], **{
+            "origenerator.app._taskbar_identity": _taskbar_identity,
+            "origenerator.gui.core.Core": built,
+        }):
+            assert main(hosted_launch(**{"--taskbar-identity": "FunTime.App.Preview"})) == 0
 
-    taskbar = built.call_args.kwargs["taskbar"]
-    window = QWidget()
-    try:
-        window.show()
+        taskbar = built.call_args.kwargs["taskbar"]
+        window = QWidget()
+        try:
+            window.show()
 
-        assert worn == ["FunTime.App.Preview"]
-    finally:
-        window.close()
-        qapp.removeEventFilter(taskbar)
+            assert worn == ["FunTime.App.Preview"]
+        finally:
+            window.close()
+            qapp.removeEventFilter(taskbar)
 
 
 

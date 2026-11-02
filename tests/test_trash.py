@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from app_support.testing import no_wait_for_a_held_file
+
 import origenerator.trash as trash_mod
 from origenerator.trash import Trash, TrashedBatch
 
@@ -129,9 +131,9 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
         return real_move(s, d)
 
     monkeypatch.setattr(trash_mod.shutil, "move", flaky_move)
-    monkeypatch.setattr("app_support.file_channel.time.sleep", lambda _s: None)
 
-    batch = trash.store([src])
+    with no_wait_for_a_held_file():
+        batch = trash.store([src])
 
     assert attempts["n"] == 2  # retried once, then succeeded
     assert not src.exists()

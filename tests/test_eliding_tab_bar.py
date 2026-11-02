@@ -17,7 +17,6 @@ from origenerator.gui.stylesheet import build_stylesheet
 
 
 def _tabs_with(qtbot, n, width=600):
-    """A shown, laid-out tab widget holding ``n`` long-titled tabs at a fixed width."""
     tabs = QTabWidget()
     tabs.setTabBar(ElidingTabBar())
     qtbot.addWidget(tabs)
@@ -34,7 +33,6 @@ def _widest_name(bar) -> str:
 
 
 def test_a_long_title_gets_only_the_room_the_widest_item_name_needs(qtbot):
-    # A very long tab label must not stretch its tab past the cap — it elides.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     bar.addTab("SDXL T2I › " + "an extremely long prompt " * 8)
@@ -43,7 +41,6 @@ def test_a_long_title_gets_only_the_room_the_widest_item_name_needs(qtbot):
 
 
 def test_short_title_keeps_its_natural_width(qtbot):
-    # The cap is a ceiling, not a fixed size — a short label stays compact.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     bar.addTab("A")
@@ -67,23 +64,18 @@ def test_the_widest_name_an_item_can_wear_fits_its_tab_whole(qtbot, point_size):
 
 
 def test_labels_elide_with_an_ellipsis(qtbot):
-    # A capped tab shows its label truncated with "…" rather than hard-clipped.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     assert bar.elideMode() == Qt.TextElideMode.ElideRight
 
 
 def test_never_shows_scroll_buttons(qtbot):
-    # Overflow collapses the tabs instead of hiding them under scroll arrows,
-    # so every tab stays on screen.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     assert bar.usesScrollButtons() is False
 
 
 def test_all_tabs_stay_within_the_bar_when_crowded(qtbot):
-    # Twenty tabs in a 600px bar: they collapse to fit rather than overflow, so
-    # none is pushed off the edge and out of reach.
     tabs = _tabs_with(qtbot, n=20, width=600)
     bar = tabs.tabBar()
     right_edge = max(bar.tabRect(i).right() for i in range(bar.count()))
@@ -91,26 +83,18 @@ def test_all_tabs_stay_within_the_bar_when_crowded(qtbot):
 
 
 def test_a_crowded_row_never_asks_for_more_width_than_it_has(qtbot):
-    # The row packs its tabs into whatever width it is given, so a floor read off
-    # the width it has right now rises every time the pane grows to meet it — and
-    # that is what walked the Generate tab sideways into the gallery on launch, a
-    # few pixels a pass, for as long as the app was busy enough to draw each one.
     tabs = _tabs_with(qtbot, n=20, width=600)
 
     assert tabs.minimumSizeHint().width() <= tabs.width()
 
 
 def test_tabs_collapse_further_as_more_open(qtbot):
-    # The more tabs share the row, the narrower each one gets.
     roomy = _tabs_with(qtbot, n=8, width=600)
     crowded = _tabs_with(qtbot, n=20, width=600)
     assert crowded.tabBar().tabRect(0).width() < roomy.tabBar().tabRect(0).width()
 
 
 def test_the_row_keeps_its_height_when_the_last_tab_closes(qtbot):
-    # A stock empty bar is zero pixels tall, so a bar that momentarily empties —
-    # a pane rebuilding its tabs from a saved session — would collapse the row it
-    # stands in and everything laid out beside it. The row holds the height it had.
     tabs = _tabs_with(qtbot, n=2)
     full = tabs.tabBar().sizeHint().height()
     assert full > 0
@@ -121,13 +105,10 @@ def test_the_row_keeps_its_height_when_the_last_tab_closes(qtbot):
 
 
 def test_a_bar_that_never_held_a_tab_asks_for_no_row(qtbot):
-    # Nothing to reserve a row for until a tab has shown what one measures.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     assert bar.sizeHint().height() == 0
 
-
-# --- each tab's own close button ---------------------------------------------
 
 def _closable_bar(qtbot, count=2):
     bar = ElidingTabBar()
@@ -143,8 +124,6 @@ def _close_button(bar, index):
 
 
 def test_every_tab_wears_the_bars_own_close_button(qtbot):
-    # The stock one is painted red by the platform style on the tab in front, and
-    # pushed flush against the tab's right edge.
     bar = _closable_bar(qtbot)
     assert [_close_button(bar, i).objectName() for i in range(2)] == [
         "tabCloseButton", "tabCloseButton",
@@ -156,7 +135,7 @@ def test_the_close_mark_is_padded_off_the_tabs_edge(qtbot):
     button = _close_button(bar, 0)
     mark = bar.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
     assert button.iconSize().width() == mark
-    assert button.width() > mark  # room either side of the mark
+    assert button.width() > mark
 
 
 def test_the_same_mark_whichever_tab_is_in_front(qtbot):
@@ -179,7 +158,6 @@ def test_clicking_a_close_button_asks_for_that_tab(qtbot):
 
 
 def test_a_close_button_follows_its_tab_as_neighbors_close(qtbot):
-    # Its index is looked up at click time, because tabs shift under it.
     bar = _closable_bar(qtbot, count=3)
     last = _close_button(bar, 2)
     asked = []
@@ -188,12 +166,10 @@ def test_a_close_button_follows_its_tab_as_neighbors_close(qtbot):
 
     last.click()
 
-    assert asked == [1]  # it is the second tab now, and says so
+    assert asked == [1]
 
 
 def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
-    # A tab dragged along the row takes its ✕ with it, and the ✕ must still close
-    # the tab it rides on rather than whatever has taken its old slot.
     bar = _closable_bar(qtbot, count=3)
     first = _close_button(bar, 0)
     asked = []
@@ -204,8 +180,6 @@ def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
 
     assert asked == [2]
 
-
-# --- a middle click closes the tab under it ----------------------------------
 
 def _middle_press(qtbot, widget, pos):
     qtbot.mousePress(widget, Qt.MouseButton.MiddleButton, pos=pos)
@@ -222,9 +196,6 @@ def test_a_middle_click_asks_for_the_tab_under_it_on_the_press(qtbot):
 
 
 def test_the_release_ending_a_middle_click_asks_for_nothing_more(qtbot):
-    # Qt 6.11 closes a tab on the middle button's RELEASE of its own accord, and
-    # that would take a second tab: the row has shifted under the cursor by then,
-    # the press having closed the first.
     bar = _closable_bar(qtbot, count=3)
     asked = []
     bar.tabCloseRequested.connect(asked.append)
@@ -237,8 +208,6 @@ def test_the_release_ending_a_middle_click_asks_for_nothing_more(qtbot):
 
 
 def test_a_middle_click_on_the_close_mark_closes_that_tab_too(qtbot):
-    # The ✕ rides on the tab and answers the left button alone, so a middle click
-    # landing on it has to fall through to the bar rather than stop at the button.
     bar = _closable_bar(qtbot, count=3)
     bar.resize(bar.sizeHint())
     mark = _close_button(bar, 1)
@@ -252,7 +221,7 @@ def test_a_middle_click_on_the_close_mark_closes_that_tab_too(qtbot):
 
 def test_a_middle_click_beside_the_tabs_closes_nothing(qtbot):
     bar = _closable_bar(qtbot, count=2)
-    bar.setExpanding(False)  # so the row is wider than the tabs standing on it
+    bar.setExpanding(False)
     bar.resize(600, bar.sizeHint().height())
     beside = QPoint(bar.tabRect(1).right() + 40, bar.tabRect(1).center().y())
     assert bar.tabAt(beside) == -1
@@ -265,7 +234,6 @@ def test_a_middle_click_beside_the_tabs_closes_nothing(qtbot):
 
 
 def test_a_middle_click_closes_nothing_in_a_row_that_offers_no_close(qtbot):
-    # A tab with no ✕ on it is a tab this bar doesn't close, whichever button asks.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     bar.addTab("tab 0")
@@ -277,8 +245,6 @@ def test_a_middle_click_closes_nothing_in_a_row_that_offers_no_close(qtbot):
 
     assert asked == []
 
-
-# --- the preview tab, drawn in italic ----------------------------------------
 
 def _painted_label_font(bar, index):
     """The font the bar's style would paint tab ``index``'s label with.
@@ -304,16 +270,12 @@ def test_no_tab_is_the_preview_tab_to_begin_with(qtbot):
 
 
 def test_the_preview_tabs_label_is_painted_italic(qtbot):
-    # Qt has no per-tab font, so the slant is applied where the label is finally
-    # painted — this is the whole mechanism, and it is worth pinning down.
     bar = _closable_bar(qtbot, count=3)
     bar.set_preview_index(1)
     assert _painted_label_font(bar, 1).italic() is True
 
 
 def test_the_other_tabs_stay_upright(qtbot):
-    # The painter carries its font from one label to the next, so an italic left
-    # in place would spread down the row.
     bar = _closable_bar(qtbot, count=3)
     bar.set_preview_index(1)
     assert _painted_label_font(bar, 0).italic() is False
@@ -328,8 +290,6 @@ def test_clearing_the_preview_tab_puts_its_label_back_upright(qtbot):
 
 
 def test_an_index_past_the_last_tab_marks_nothing(qtbot):
-    # A stale index — the preview tab closed, its index not yet re-synced —
-    # must not slant whichever tab has since taken that slot.
     bar = _closable_bar(qtbot, count=2)
     bar.set_preview_index(5)
     assert _painted_label_font(bar, 0).italic() is False
@@ -337,10 +297,6 @@ def test_an_index_past_the_last_tab_marks_nothing(qtbot):
 
 
 def test_the_bars_style_is_owned_by_the_bar(qtbot):
-    # QProxyStyle takes ownership of a base style that has no parent, and setting
-    # an app stylesheet re-wraps every widget's own style in a QStyleSheetStyle —
-    # so an unparented proxy is deleted out from under Python the first time the
-    # app is themed, and the next thing to touch it faults the process.
     bar = _closable_bar(qtbot)
     assert bar._preview_style.parent() is bar
 
@@ -358,8 +314,6 @@ def test_the_italic_mark_survives_the_app_being_themed(qtbot):
     assert _painted_label_font(bar, 0).italic() is True
 
 
-# --- the mark a tab wears, and the space around it ---------------------------
-
 def _icon(width, height, color=Qt.GlobalColor.red) -> QIcon:
     pixmap = QPixmap(width, height)
     pixmap.fill(color)
@@ -368,19 +322,15 @@ def _icon(width, height, color=Qt.GlobalColor.red) -> QIcon:
 
 @pytest.mark.parametrize("shape", [(256, 144), (144, 256), (200, 200)])
 def test_a_mark_is_the_same_width_whatever_shape_the_thumbnail_is(shape):
-    # The row's spacing is built on the mark's width, so a portrait thumbnail
-    # must not push the label further out than a landscape one does.
     mark = tab_mark(_icon(*shape))
     assert mark.actualSize(MARK_CANVAS) == MARK_CANVAS
 
 
 def test_a_mark_trails_the_gap_its_label_needs(qtbot):
-    # Qt's own tab layout puts the text a fixed 4px after whatever the icon
-    # measures, so the rest of the gap rides on the canvas as transparency.
     canvas = tab_mark(_icon(256, 144)).pixmap(MARK_CANVAS).toImage()
     assert canvas.width() == MARK + EDGE - 4
-    assert canvas.pixelColor(MARK - 1, MARK // 2).alpha() == 255   # thumbnail
-    assert canvas.pixelColor(MARK, MARK // 2).alpha() == 0         # its gap
+    assert canvas.pixelColor(MARK - 1, MARK // 2).alpha() == 255
+    assert canvas.pixelColor(MARK, MARK // 2).alpha() == 0
 
 
 def test_a_tab_with_nothing_to_show_wears_nothing(qtbot):
@@ -388,14 +338,10 @@ def test_a_tab_with_nothing_to_show_wears_nothing(qtbot):
 
 
 def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
-    # The whole point of the arithmetic above: painted under the real stylesheet,
-    # a tab's mark starts EDGE in from the tab's left edge — the same inset the ✕
-    # keeps at the other end.
-
     app = QApplication.instance()
     prior = app.styleSheet()
     try:
-        app.setStyleSheet(build_stylesheet())  # before the widget: it styles on build
+        app.setStyleSheet(build_stylesheet())
         tabs = QTabWidget()
         tabs.setTabBar(ElidingTabBar())
         qtbot.addWidget(tabs)

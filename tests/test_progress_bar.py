@@ -30,7 +30,7 @@ def styled_bar(qtbot):
     host.resize(240, 60)
     with qtbot.waitExposed(host):
         host.show()
-    yield b
+    return b
 
 
 def test_a_caption_reads_on_the_bar_rather_than_beside_it(bar):

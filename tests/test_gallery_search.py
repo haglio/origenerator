@@ -83,7 +83,7 @@ def controller(qtbot):
         built.append((parent, found))
         return found
 
-    yield build
+    return build
 
 
 def _type(found, text):

@@ -298,7 +298,7 @@ def router(qtbot, monkeypatch, starting):
         )
         return router, host, slideshows
 
-    yield build
+    return build
 
 
 def _row(prompt_id="g1", *, workflow_name="sdxl_t2i"):

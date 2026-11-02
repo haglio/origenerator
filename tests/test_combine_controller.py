@@ -296,7 +296,7 @@ def combine(qtbot, monkeypatch, starting):
         controller._after_painting = lambda work: work()
         built.append((parent, controller))
         return controller, host
-    yield build
+    return build
 
 
 

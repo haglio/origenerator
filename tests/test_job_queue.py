@@ -1,4 +1,3 @@
-"""JobQueue — launching re-roll jobs: whole-folder, per-seed, and combine."""
 from __future__ import annotations
 
 import json
@@ -34,8 +33,6 @@ def _client():
     client.submit_job = MagicMock(return_value="comfy-X")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
-    # Every send asks after an earlier run of its id first; answered here,
-    # never by a server on the machine.
     client.fetch_history = MagicMock(return_value={})
     client.forget_history = MagicMock()
     client.executing_prompts = MagicMock(return_value=set())
@@ -49,7 +46,6 @@ def _params(**over):
 
 
 def _image_row(prompt_id="img-1", filename="frame_001.png", seed=100):
-    """A completed image generation whose output file an i2v can seed from."""
     image_wf = WORKFLOW_REGISTRY[_IMAGE_WF]
     return {
         "prompt_id": prompt_id,
@@ -64,7 +60,6 @@ def _image_row(prompt_id="img-1", filename="frame_001.png", seed=100):
 
 
 def _video_row(prompt_id="vid-1", input_image="frame_001.png [output]", noise_seed=11, seed=22):
-    """A completed i2v whose start frame is ``_image_row``'s output."""
     return {
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
@@ -75,7 +70,6 @@ def _video_row(prompt_id="vid-1", input_image="frame_001.png [output]", noise_se
 
 
 def _launched_params(db, workflow_name):
-    """The params_json (as a dict) of the launched row for ``workflow_name``."""
     row = next(r for r in db.list_generations() if r["workflow_name"] == workflow_name)
     return json.loads(row["params_json"])
 
@@ -87,23 +81,16 @@ def test_start_prepared_launches_and_tracks_the_job(qtbot, tmp_path):
 
     started = queue.start_prepared("video/wf/deadbeef", _I2V, _params(seed=3, noise_seed=9))
 
-    # The launched run names itself, so a caller can act on the row it just made.
     assert started == queue.jobs["video/wf/deadbeef"].prompt_id
     assert "video/wf/deadbeef" in queue.jobs
     client.submit_job.assert_called_once()
     rows = db.list_generations()
     assert len(rows) == 1
     assert rows[0]["status"] == "running"
-    # The seed is reused verbatim — start_prepared does not randomize it.
     assert json.loads(rows[0]["params_json"])["seed"] == 3
 
 
 def test_an_interrupted_job_lands_as_an_error_not_a_completion(qtbot, tmp_path):
-    # A cancel from outside this job (ComfyUI's own UI, a second app instance)
-    # ends the prompt the way a success ends it, with a history carrying no
-    # outputs. The row must record the failure: a 'completed' row with no file is
-    # invisible in the gallery yet still refuses a re-run of those settings as a
-    # duplicate — the state the user hits as "it says it exists already".
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -119,9 +106,6 @@ def test_an_interrupted_job_lands_as_an_error_not_a_completion(qtbot, tmp_path):
 
 
 def test_finished_names_the_folder_and_the_generation(qtbot, tmp_path):
-    # The signal carries the prompt_id alongside the folder key so the view can
-    # tell whose completion this is — a user re-roll to load into the front tab,
-    # or a background experiment to leave the tabs alone for.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -146,8 +130,6 @@ def test_start_prepared_records_the_callers_source(qtbot, tmp_path):
 
 
 def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
-    # Two images of one folder's settings, both wanted: the second queues with the first
-    # rather than being refused, which is what stopped them being made together.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     queue.start_prepared("k", _I2V, _params(seed=3))
@@ -156,16 +138,10 @@ def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
 
     assert again
     assert len(queue.all_jobs) == 2
-    # Both are queued; only the first has been handed to ComfyUI, which holds one
-    # prompt of ours at a time -- a video asked for is "later".
     client.submit_job.assert_called_once()
 
 
 def test_the_folders_live_tile_follows_the_folders_job_nearest_the_front(qtbot, tmp_path):
-    # Things keyed by folder — the one live re-roll tile, the selection that
-    # follows it — show the job being made or next to be, not whichever was
-    # asked for first: an image asked for second takes the machine from the
-    # first, and the tile has to follow it there.
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     first = _launch_image(queue, "k", seed=3)
     assert queue.job_for("k") is first
@@ -178,8 +154,6 @@ def test_the_folders_live_tile_follows_the_folders_job_nearest_the_front(qtbot, 
 
 
 def test_an_experiment_never_stacks_onto_a_busy_folder(qtbot, tmp_path):
-    # Only work the user asked for may queue up; the background experimenter still
-    # takes an idle folder or none at all.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     queue.start_prepared("k", _I2V, _params(seed=3))
@@ -196,8 +170,6 @@ def test_a_generation_asked_for_with_no_server_never_starts(qtbot, tmp_path):
     assert queue.start_prepared("k", _I2V, _params()) is None
 
 
-# --- per-item seed re-rolls: keep one seed, re-roll the other ----------------
-
 def test_reroll_video_seed_keeps_the_frame_and_rerolls_only_the_video_seed(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
@@ -205,14 +177,13 @@ def test_reroll_video_seed_keeps_the_frame_and_rerolls_only_the_video_seed(qtbot
 
     queue.reroll_video_seed("k", _video_row(noise_seed=11, seed=22))
 
-    # One job — the video itself — with no image re-roll first.
     client.submit_job.assert_called_once()
     rows = db.list_generations()
     assert len(rows) == 1
     assert rows[0]["workflow_name"] == "wan22_i2v"
     params = _launched_params(db, "wan22_i2v")
-    assert params["input_image"] == "frame_001.png [output]"        # same start frame
-    assert params["noise_seed"] != 11                                # video seed re-rolled
+    assert params["input_image"] == "frame_001.png [output]"
+    assert params["noise_seed"] != 11
 
 
 def test_reroll_image_seed_regenerates_the_frame_then_keeps_the_video_seed(qtbot, tmp_path):
@@ -220,29 +191,25 @@ def test_reroll_image_seed_regenerates_the_frame_then_keeps_the_video_seed(qtbot
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     image = _image_row(seed=100)
-    db.restore_generation(image)  # _reroll_source_image reads the full row from the DB
+    db.restore_generation(image)
 
     queue.reroll_image_seed("k", _video_row(noise_seed=11, seed=22), [image])
 
-    # The first launched job is the IMAGE workflow, its seed re-rolled.
     client.submit_job.assert_called_once()
     assert _launched_params(db, _IMAGE_WF)["seed"] != 100
 
-    # Completing the image runs the video next — on the new frame, video seed kept.
     image_job = queue.job_for("k")
     image_job.finished.emit(
         [{"filename": "newframe.png", "subfolder": "", "type": "output"}], None, 1.0
     )
     assert client.submit_job.call_count == 2
     video_params = _launched_params(db, "wan22_i2v")
-    assert video_params["input_image"] == "newframe.png [output]"     # fresh start frame
+    assert video_params["input_image"] == "newframe.png [output]"
     assert video_params["noise_seed"] == 11
     assert video_params["seed"] == 22
 
 
 def test_reroll_image_seed_is_a_noop_when_the_frame_is_not_rebuildable(qtbot, tmp_path):
-    # A hand-picked (un-rebuildable) frame can't be re-rolled; keeping the video
-    # seed too would just duplicate the item, so nothing is launched.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
 
@@ -257,12 +224,11 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     image = _image_row(seed=100)
-    db.restore_generation(image)  # _reroll_source_image reads the full row from the DB
+    db.restore_generation(image)
     group = gallery.SettingsGroup("k", "settings", [_video_row(noise_seed=11, seed=22)])
 
     queue.start_reroll("k", group, [image])
 
-    # A folder re-roll leads with the image (a new frame), its seed re-rolled.
     client.submit_job.assert_called_once()
     assert _launched_params(db, _IMAGE_WF)["seed"] != 100
     image_job = queue.job_for("k")
@@ -270,8 +236,8 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
         [{"filename": "newframe.png", "subfolder": "", "type": "output"}], None, 1.0
     )
     video_params = _launched_params(db, "wan22_i2v")
-    assert video_params["input_image"] == "newframe.png [output]"     # fresh frame
-    assert video_params["noise_seed"] != 11                             # video seed re-rolled too
+    assert video_params["input_image"] == "newframe.png [output]"
+    assert video_params["noise_seed"] != 11
 
 
 def test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_image(qtbot, tmp_path):
@@ -285,7 +251,6 @@ def test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_image(q
 
 
 def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
-    # A chained image→video re-roll stacks like any other user launch now.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -297,34 +262,27 @@ def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
     queue.start_reroll("k", group, [image])
 
     assert len(queue.all_jobs) == 2
-    client.submit_job.assert_called_once()  # the second waits its turn in the line
+    client.submit_job.assert_called_once()
 
-
-# --- user work preempts background experiments --------------------------------
 
 def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
-    # A video experiment can hold the GPU for many minutes; a user's Generate must
-    # kick it off rather than silently queue after it with a dead progress bar.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     queue.start_prepared("exp-key", _I2V, _params(), source="experiment")
     experiment = queue.job_for("exp-key")
-    client.progress.emit(experiment.prompt_id, "s", 1, 10)  # ComfyUI began executing it
+    client.progress.emit(experiment.prompt_id, "s", 1, 10)
 
     started = queue.start_prepared("user-key", _I2V, _params(seed=7))
 
     assert started
-    client.interrupt.assert_called_once()              # the running experiment was stopped
+    client.interrupt.assert_called_once()
     assert not queue.has("exp-key")
-    assert db.get_generation(experiment.prompt_id) is None  # its abandoned row is dropped
+    assert db.get_generation(experiment.prompt_id) is None
     assert queue.has("user-key")
 
 
 def test_user_launch_dequeues_a_still_queued_experiment_by_name(qtbot, tmp_path):
-    # An experiment ComfyUI hasn't started yet is removed from its queue, and
-    # stopped by name in case it has started meanwhile -- by name, so whatever
-    # else is executing is untouched.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -338,8 +296,6 @@ def test_user_launch_dequeues_a_still_queued_experiment_by_name(qtbot, tmp_path)
 
 
 def test_per_seed_rerolls_preempt_experiments_too(qtbot, tmp_path):
-    # Every user path funnels through the same launch choke point, so a per-item
-    # seed re-roll clears the experimenter exactly as the Generate button does.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -352,7 +308,6 @@ def test_per_seed_rerolls_preempt_experiments_too(qtbot, tmp_path):
 
 
 def test_an_experiment_launch_never_preempts(qtbot, tmp_path):
-    # Only user work owns the GPU; a background experiment never bumps anything.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -381,8 +336,6 @@ def test_other_work_nobody_asked_for_never_preempts_an_experiment_either(qtbot, 
 
 
 def test_user_launch_claims_the_experiments_own_folder(qtbot, tmp_path):
-    # Even when the user's settings land in the very folder the experiment runs
-    # in, their Generate preempts it and takes the slot — not a silent no-op.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -396,9 +349,6 @@ def test_user_launch_claims_the_experiments_own_folder(qtbot, tmp_path):
 
 
 def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
-    # Opening the app drops the batch the last absence queued, but one ComfyUI
-    # refused to dequeue survives that sweep and is adopted as a live job. It
-    # reconnects with its row's source, so the first user launch still clears it.
     client = _client()
     client.executing_prompts.return_value = {"exp-rr"}
     db = Database(tmp_path / "test.db")
@@ -413,13 +363,11 @@ def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
 
     queue.start_prepared("user-key", _I2V, _params(seed=7))
 
-    client.interrupt.assert_called_once()  # stopped on the server, started or not
+    client.interrupt.assert_called_once()
     assert db.get_generation("exp-rr") is None
 
 
 def test_progress_tick_persists_the_jobs_progress_to_its_row(qtbot, tmp_path):
-    # A running job's live progress is written to its row, so a restart can resume
-    # the bar where it was instead of spinning until ComfyUI's next per-step push.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -427,17 +375,13 @@ def test_progress_tick_persists_the_jobs_progress_to_its_row(qtbot, tmp_path):
     queue.start_prepared(key, _I2V, _params(steps=20, seed=3, noise_seed=9))
     job = queue.jobs[key]
 
-    client.progress.emit(job.prompt_id, "s", 5, 10)  # a live sampler step
+    client.progress.emit(job.prompt_id, "s", 5, 10)
 
     state = json.loads(db.get_generation(job.prompt_id)["progress_json"])
     assert state["last_progress"] == list(job.last_progress)
 
 
 def test_progress_persistence_is_throttled(qtbot, tmp_path, monkeypatch):
-    # Ticks fire per step (sub-second for images); only the first of a burst is
-    # written, so the disk isn't hammered — the value stays recent enough to resume.
-    # The interval is set here rather than waited out: a machine that stalls a
-    # second between two emits would otherwise write the second one and fail.
     monkeypatch.setattr(job_queue_module, "_PROGRESS_PERSIST_INTERVAL_S", 3600)
     client = _client()
     db = Database(tmp_path / "test.db")
@@ -446,18 +390,17 @@ def test_progress_persistence_is_throttled(qtbot, tmp_path, monkeypatch):
     queue.start_prepared(key, _I2V, _params(steps=20))
     pid = queue.jobs[key].prompt_id
 
-    client.progress.emit(pid, "s", 5, 10)                       # first tick -> written
+    client.progress.emit(pid, "s", 5, 10)
     first = db.get_generation(pid)["progress_json"]
-    client.progress.emit(pid, "s", 6, 10)                       # inside the interval -> throttled
+    client.progress.emit(pid, "s", 6, 10)
     assert db.get_generation(pid)["progress_json"] == first
 
     monkeypatch.setattr(job_queue_module, "_PROGRESS_PERSIST_INTERVAL_S", 0)
-    client.progress.emit(pid, "s", 7, 10)                       # past it -> written again
+    client.progress.emit(pid, "s", 7, 10)
     assert db.get_generation(pid)["progress_json"] != first
 
 
 def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
-    # On restart the reconnected job comes back already showing its last position.
     client = _client()
     client.executing_prompts.return_value = {"rr"}
     db = Database(tmp_path / "test.db")
@@ -477,8 +420,6 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     assert job.last_progress == (30, 50)
 
 
-# --- the line: what runs next, and what waits --------------------------------
-
 def _image_params(**over):
     params = dict(WORKFLOW_REGISTRY[_IMAGE_WF].default_params())
     params.update(over)
@@ -486,7 +427,6 @@ def _image_params(**over):
 
 
 def _launch_image(queue, key, **over):
-    """Launch an image job — the kind that jumps the line — and return it."""
     queue.start_prepared(key, WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(**over))
     return queue.newest_job_for(key)
 
@@ -502,8 +442,6 @@ def test_queue_order_starts_out_empty(qtbot, tmp_path):
 
 
 def test_comfyui_is_handed_one_job_at_a_time(qtbot, tmp_path):
-    # The line is kept on this side of the wire precisely so it can still be
-    # re-ordered: a prompt already on the server can only be interrupted.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -586,15 +524,13 @@ def test_an_experiment_stopped_for_the_person_keeps_no_seeds(qtbot, tmp_path):
 
 
 def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
-    # A queue stalled on a job ComfyUI won't take would strand everything after
-    # it; the refused job fails and the line carries on.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     client.submit_job = MagicMock(side_effect=[RuntimeError("bad prompt"), "ok"])
 
-    _launch_video(queue, "k1", seed=1)           # refused, and dropped
-    second = _launch_video(queue, "k2", seed=2)  # takes its place
+    _launch_video(queue, "k1", seed=1)
+    second = _launch_video(queue, "k2", seed=2)
 
     statuses = {row["prompt_id"]: row["status"] for row in db.list_generations()}
     assert statuses.pop(second.prompt_id) == "running"
@@ -622,8 +558,6 @@ def _comfyui_down():
 
 
 class _ComfyUIComingUp:
-    """Bringing ComfyUI up, held until the test lets it finish."""
-
     def __init__(self, comes_up=True):
         self.comes_up = comes_up
         self.times = 0
@@ -739,9 +673,6 @@ def test_with_nothing_to_start_comfyui_a_story_it_never_heard_fails_like_any_ref
 
 def test_a_storys_row_says_running_only_once_its_voice_is_done_and_comfyui_has_it(
         qtbot, tmp_path, monkeypatch):
-    # A running row is one the next launch looks for on ComfyUI and clears when
-    # ComfyUI never heard of it, which is how a story still speaking as the app
-    # closed was lost.
     voices = voices_asked_for(monkeypatch)
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())
@@ -754,10 +685,6 @@ def test_a_storys_row_says_running_only_once_its_voice_is_done_and_comfyui_has_i
 
 def test_a_story_flushed_while_comfyui_makes_a_run_of_the_queues_waits_in_the_line(
         qtbot, tmp_path, monkeypatch):
-    # Nobody is left to answer a voice once the line is flushed: the closing copy,
-    # or the command that hands ComfyUI the backfill while the app is closed, ends
-    # as the flush returns. A story whose voice was started there read as sent, and
-    # never reached ComfyUI (2026-10-29, at every closing after that until found).
     voices = voices_asked_for(monkeypatch)
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())
@@ -837,15 +764,12 @@ def test_a_run_that_cannot_even_be_built_is_reported_as_failed(qtbot, tmp_path):
 
 
 def test_a_folder_rerolls_start_frame_queues_behind_the_images_waiting(qtbot, tmp_path):
-    # A chained i2v draws its start frame first, but a video is what was asked
-    # for: placed as the image that prompt makes, it would take the front of the
-    # line and put minutes of GPU ahead of every image already queued.
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())
     image = _image_row(seed=100)
-    db.restore_generation(image)  # _reroll_source_image reads the full row from the DB
+    db.restore_generation(image)
     first = _launch_image(queue, "i0")
-    second = _launch_image(queue, "i1")  # takes the machine; the first waits
+    second = _launch_image(queue, "i1")
 
     queue.start_reroll("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
 
@@ -854,18 +778,14 @@ def test_a_folder_rerolls_start_frame_queues_behind_the_images_waiting(qtbot, tm
 
 
 def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, tmp_path):
-    # There can be a great many of them, and putting one in front of the user's
-    # own work would be the whole cost of the feature.
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
-    _launch_video(queue, "v1", seed=1)   # on the server
+    _launch_video(queue, "v1", seed=1)
     user_video = _launch_video(queue, "v2", seed=2)
     queue.start_prepared("e1", WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(),
                               source="experiment")
 
     assert queue.queue_order[1] == user_video.prompt_id
 
-
-# --- handing the line over as the app closes ---------------------------------
 
 class _Training(QObject):
     ended = pyqtSignal(object)
@@ -932,8 +852,6 @@ def test_a_canceled_training_says_nothing_of_what_it_came_to(qtbot, tmp_path):
 
 
 def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
-    # There is about to be nobody watching, so every reason to keep the line on
-    # this side is gone and the server can work through the rest alone.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -949,8 +867,6 @@ def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
 
 
 def test_closing_while_a_training_runs_leaves_the_line_for_the_next_launch(qtbot, tmp_path):
-    # A training outlives the app, and anything ComfyUI is handed now would
-    # fight it for the graphics card until one of the two ran out of memory.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1033,10 +949,7 @@ def test_flush_with_nothing_waiting_is_harmless(qtbot, tmp_path):
     client.submit_job.assert_not_called()
 
 
-# --- taking a held queue back after a restart --------------------------------
-
 def _pending_row(db, prompt_id, workflow_name="wan22_i2v", params=None):
-    """A row the queue was still holding when the app closed."""
     workflow = WORKFLOW_REGISTRY.get(workflow_name)
     if params is None:
         params = dict(workflow.default_params()) if workflow is not None else {}
@@ -1046,8 +959,6 @@ def _pending_row(db, prompt_id, workflow_name="wan22_i2v", params=None):
 
 
 def test_a_queue_held_when_the_app_closed_comes_back_as_a_queue(qtbot, tmp_path):
-    # A pending row was never submitted, so there is nothing on the server to
-    # rebind to — it rejoins the line under its own prompt id and waits its turn.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1057,7 +968,7 @@ def test_a_queue_held_when_the_app_closed_comes_back_as_a_queue(qtbot, tmp_path)
     queue.reconnect_running()
 
     assert [call.args[1] for call in client.submit_job.call_args_list] == ["held-1"]
-    assert queue.queue_order == ["held-1", "held-2"]  # oldest first, as asked
+    assert queue.queue_order == ["held-1", "held-2"]
 
 
 def test_a_re_adopted_queue_starts_moving_again_at_once(qtbot, tmp_path):
@@ -1073,7 +984,6 @@ def test_a_re_adopted_queue_starts_moving_again_at_once(qtbot, tmp_path):
 
 
 def test_a_held_row_whose_workflow_is_gone_is_dropped(qtbot, tmp_path):
-    # It could never be sent, and left in flight it would sit in the queue forever.
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())
     _pending_row(db, "orphan", workflow_name="a_workflow_that_left", params={})
@@ -1084,11 +994,7 @@ def test_a_held_row_whose_workflow_is_gone_is_dropped(qtbot, tmp_path):
     assert queue.queue_order == []
 
 
-# --- moving a job by hand -----------------------------------------------------
-
 def test_a_job_moved_in_the_waiting_line_costs_nothing(qtbot, tmp_path):
-    # A waiting job has never been sent, so its place is ours to change: no
-    # dequeue, no re-submit, nothing the server has to agree to.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     head = _launch_video(queue, "k0", seed=0)
@@ -1104,8 +1010,6 @@ def test_a_job_moved_in_the_waiting_line_costs_nothing(qtbot, tmp_path):
 
 
 def test_a_job_moved_to_the_top_takes_the_machine_from_the_one_being_made(qtbot, tmp_path):
-    # The user's own words for a move to the top: it deposes the job being
-    # rendered, which goes back in the line right behind it and starts over.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1152,8 +1056,6 @@ def test_a_shielded_job_being_made_cannot_be_moved_down(qtbot, tmp_path):
 
 def test_a_video_moved_to_the_top_starts_at_once_however_lately_an_image_was_asked_for(
         qtbot, tmp_path):
-    # Its minute's wait is for a video nobody moved: one moved to the top took the
-    # machine to be made now, and waiting would leave the machine idle.
     client = _client()
     now = [1000.0]
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
@@ -1179,8 +1081,6 @@ def test_a_move_cannot_put_anything_ahead_of_a_job_put_first(qtbot, tmp_path):
 
 
 def test_a_job_let_go_over_one_the_line_does_not_hold_goes_to_its_end(qtbot, tmp_path):
-    # Another app's prompts share the server, and a row can outlive its job by a
-    # poll; neither is a place in this line.
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     head = _launch_video(queue, "k0", seed=0)
     second = _launch_video(queue, "k1", seed=1)
@@ -1203,13 +1103,11 @@ def test_moving_a_job_the_line_does_not_hold_changes_nothing(qtbot, tmp_path):
 
 def test_a_move_without_a_client_is_harmless(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), None)
-    queue.move("anything", before=None)  # nothing to move, nothing to raise
+    queue.move("anything", before=None)
 
 
 def test_a_move_says_the_line_was_reordered_and_one_that_changes_nothing_says_nothing(
         qtbot, tmp_path):
-    # The Job Queue redraws on that word, rather than a poll later: a row that
-    # sits still after its button was pressed reads as a press that missed.
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     head = _launch_video(queue, "k0", seed=0)
     second = _launch_video(queue, "k1", seed=1)
@@ -1234,8 +1132,6 @@ def test_up_moves_a_job_ahead_of_the_one_above_it(qtbot, tmp_path):
 
 
 def test_up_on_a_video_just_behind_its_images_enhancement_takes_both_up(qtbot, tmp_path):
-    # It cannot pass the enhancement it is made from, so the press is spent on
-    # the job above that, and the enhancement goes up with it.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     rendering = _launch_video(queue, "r", seed=1)
@@ -1325,16 +1221,11 @@ def test_parse_progress_state_tolerates_absent_or_corrupt():
     assert _parse_progress_state(None) is None
     assert _parse_progress_state("") is None
     assert _parse_progress_state("not json") is None
-    assert _parse_progress_state("[1, 2]") is None          # valid JSON, but not a dict
+    assert _parse_progress_state("[1, 2]") is None
     assert _parse_progress_state('{"total": 20}') == {"total": 20}
 
 
-# --- a submit the server is slow to answer -----------------------------------------
-
 def _gated_client():
-    """A client whose submit waits until the test lets it go: ComfyUI taking its
-    time to answer, as it can for a minute. The wait is capped so a hand-over
-    that never pumps the gate's opener fails instead of hanging the suite."""
     client = _client()
     gate = threading.Event()
     client.submit_job = MagicMock(side_effect=lambda payload, pid: gate.wait(5) and "comfy-X")
@@ -1342,12 +1233,6 @@ def _gated_client():
 
 
 def test_the_window_stays_alive_while_comfyui_takes_its_time_to_answer(qtbot, tmp_path):
-    # ComfyUI can take a minute to accept a prompt (fifty seconds, 2026-09-05),
-    # and the submit used to wait for it on the GUI thread: the window froze
-    # solid, which reads as a crash, and the row the launch had just written
-    # could not even be painted. The wait is off that thread now and the window
-    # is kept alive meanwhile -- so a timer fires during it, and finds the
-    # launch already in the line, on a row already written and announced.
     client, gate = _gated_client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1369,9 +1254,6 @@ def test_the_window_stays_alive_while_comfyui_takes_its_time_to_answer(qtbot, tm
 
 
 def test_a_launch_canceled_while_its_submit_is_out_is_dequeued_when_it_lands(qtbot, tmp_path):
-    # The window being alive, its Cancel can be pressed while the server has not
-    # answered. The job is forgotten at once; when the server does take it, it is
-    # told to let it go, since nobody wants it any more.
     client, gate = _gated_client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1392,8 +1274,6 @@ def test_a_launch_canceled_while_its_submit_is_out_is_dequeued_when_it_lands(qtb
 
 
 def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_path):
-    # One hand-over at a time, still: a second launch during the wait joins the
-    # line rather than racing the first to the server.
     client, gate = _gated_client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1411,13 +1291,10 @@ def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_pat
     second = queue.jobs["video/wf/second"].prompt_id
     assert seen["submits"] == 1
     assert queue.queue_order == [first, second]
-    assert client.submit_job.call_count == 1  # the second waits for the first to finish
+    assert client.submit_job.call_count == 1
 
 
 def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
-    # What the window's own surfaces can't carry: the run is over, so there is no
-    # tile left to write on, and whoever tells the user needs the whole of it in
-    # one record (see origenerator.run_toast).
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1435,9 +1312,6 @@ def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
 
 
 def test_an_enhance_reports_the_image_it_improved_rather_than_itself(qtbot, tmp_path):
-    # An enhance is an upgrade of an image already in the gallery: its own row is
-    # folded into that image and deleted the moment it lands, so a toast
-    # pointing at the run's own id would point at nothing by the time it is read.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1453,9 +1327,6 @@ def test_an_enhance_reports_the_image_it_improved_rather_than_itself(qtbot, tmp_
 
 
 def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
-    # A prompt that died wrote no execution_success for ComfyUI to measure to, so
-    # the only measure left is the one the bar was counting up: how long since the
-    # run began. Stamped here rather than waited out.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1472,8 +1343,6 @@ def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
 
 
 def test_a_background_experiment_reports_itself_as_one(qtbot, tmp_path):
-    # Whoever tells the user has to be able to leave the app's own idle work out:
-    # a night of experiments is a night of interruptions otherwise.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1486,17 +1355,11 @@ def test_a_background_experiment_reports_itself_as_one(qtbot, tmp_path):
     assert ended[0].source == GenerationSource.EXPERIMENT
 
 
-# --- the user's image work takes the machine from a video being rendered -----
-
 def _rendering(client, job):
-    """ComfyUI has begun rendering ``job``."""
     client.progress.emit(job.prompt_id, "s", 1, 10)
 
 
 def test_an_image_takes_the_machine_from_a_video_being_rendered(qtbot, tmp_path):
-    # Minutes of GPU, most of it spent, against seconds the user is waiting for:
-    # the video is stopped, the image goes at once, and the video starts over
-    # after it -- ahead of the video queued after it, which it was in front of.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1528,7 +1391,7 @@ def test_the_video_set_aside_starts_over_a_minute_after_the_image_was_asked_for(
     assert client.submit_job.call_args_list[-1].args[1] == image.prompt_id
 
     now[0] = 1060.0
-    queue._videos_wait.timeout.emit()  # the minute is up, delivered the way the timer does
+    queue._videos_wait.timeout.emit()
 
     assert [c.args[1] for c in client.submit_job.call_args_list] == [
         video.prompt_id, image.prompt_id, video.prompt_id
@@ -1537,8 +1400,6 @@ def test_the_video_set_aside_starts_over_a_minute_after_the_image_was_asked_for(
 
 
 def _a_video_waiting_on_an_image(tmp_path, now):
-    """A video set aside for an image asked for at ``now``, the image done
-    ten seconds later: the video is waiting out the rest of the minute."""
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
     video = _launch_video(queue, "v", seed=1)
@@ -1582,8 +1443,6 @@ def test_the_video_waiting_out_the_minute_says_when_it_starts(qtbot, tmp_path):
 
 
 def test_a_video_set_aside_says_no_start_while_the_image_is_being_made(qtbot, tmp_path):
-    # Until the image is done it is the image the video waits on, which
-    # has its own bar; a start time would be a promise the image could break.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: 1000.0)
     video = _launch_video(queue, "v", seed=1)
@@ -1627,9 +1486,6 @@ def test_a_video_waiting_out_the_minute_goes_to_comfyui_as_the_app_closes(qtbot,
 
 
 def test_a_video_set_aside_shows_as_one_that_has_not_started(qtbot, tmp_path):
-    # Its row goes back to pending -- a restart re-adopts it into the line rather
-    # than looking for it on a server that no longer has it -- and the progress
-    # persisted for the stopped run goes with it.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1648,7 +1504,6 @@ def test_a_video_set_aside_shows_as_one_that_has_not_started(qtbot, tmp_path):
 
 
 def test_a_video_asked_for_leaves_a_video_being_rendered_alone(qtbot, tmp_path):
-    # Asking for a video is asking for "later".
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     rendering = _launch_video(queue, "v1", seed=1)
@@ -1661,8 +1516,6 @@ def test_a_video_asked_for_leaves_a_video_being_rendered_alone(qtbot, tmp_path):
 
 
 def test_a_videos_start_frame_being_drawn_is_set_aside_with_the_videos(qtbot, tmp_path):
-    # The prompt on the GPU is a still, but the run it opens is a video, and it
-    # rejoins the line as one: after the image, ahead of the videos waiting.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -1680,13 +1533,10 @@ def test_a_videos_start_frame_being_drawn_is_set_aside_with_the_videos(qtbot, tm
 
 
 def test_an_image_being_rendered_is_set_aside_right_after_the_newer_one(qtbot, tmp_path):
-    # Anything on the GPU yields to the user's image work, an image included:
-    # it was the front until the newer one took it, so it goes right after it,
-    # ahead of the images asked for before it.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     oldest = _launch_image(queue, "i1", seed=1)
-    middle = _launch_image(queue, "i2", seed=2)   # takes the machine from oldest
+    middle = _launch_image(queue, "i2", seed=2)
     _rendering(client, middle)
 
     newest = _launch_image(queue, "i3", seed=3)
@@ -1750,8 +1600,6 @@ def test_a_batch_names_none_where_an_entry_did_not_go(qtbot, tmp_path):
 
 
 def test_a_repair_being_rendered_is_set_aside_to_the_back(qtbot, tmp_path):
-    # A base re-render adopted from the last absence is work nobody asked for:
-    # it yields like anything else, and goes back to where it joined.
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     queue.start_prepared("r", WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(),
@@ -1780,9 +1628,6 @@ def test_work_nobody_asked_for_takes_the_machine_from_nothing(qtbot, tmp_path):
 
 
 def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_path):
-    # After a restart the server can hold several of ours -- one rendering, the
-    # rest queued after it there, where the image would wait on all of them.
-    # They come back in the order they were in, ahead of any video waiting here.
     client = _client()
     client.executing_prompts.return_value = {"v-old"}
     db = Database(tmp_path / "test.db")
@@ -1821,8 +1666,6 @@ def test_a_restart_takes_back_every_job_comfyui_holds_but_is_not_making(qtbot, t
 
 
 def test_the_run_comfyui_is_making_is_the_front_of_the_line(qtbot, tmp_path):
-    # Taken back after a restart, the runs the server holds come back oldest
-    # first, which need not be the order it makes them in.
     client = _client()
     client.executing_prompts.return_value = {"v-new"}
     db = Database(tmp_path / "test.db")
@@ -1841,8 +1684,6 @@ def test_the_run_comfyui_is_making_is_the_front_of_the_line(qtbot, tmp_path):
 
 def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_again(
         qtbot, tmp_path):
-    # The stop can reach the server after the video's last node has saved. Then
-    # the file exists, and its turn coming round again is when that is found.
     client = _client()
     db = Database(tmp_path / "test.db")
     now = [1000.0]
@@ -1859,16 +1700,13 @@ def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_
     now[0] = 1060.0
     queue._videos_wait.timeout.emit()
 
-    assert client.submit_job.call_count == 2  # the video's first send, and the image
+    assert client.submit_job.call_count == 2
     assert db.get_generation(video.prompt_id)["status"] == "completed"
     assert queue.queue_order == []
 
 
 def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_when_it_lands(
         qtbot, tmp_path):
-    # The server can take a minute to accept a prompt. An image asked for in
-    # that minute cannot take the machine from a video that is not on it yet,
-    # so it takes it the moment the video lands, as one asked for later would.
     client, gate = _gated_client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     seen = {}
@@ -1886,8 +1724,6 @@ def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_wh
     ]
     assert queue.queue_order == [seen["image"].prompt_id, video.prompt_id]
 
-
-# --- what a slideshow is locked on is made first --------------------------------
 
 def test_a_job_put_first_leads_the_line_and_takes_the_machine(qtbot, tmp_path):
     client = _client()
@@ -1930,11 +1766,11 @@ def test_an_image_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
 
 def test_a_job_not_made_yet_is_placed_where_the_line_would_take_it(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
-    _launch_video(queue, "v1", seed=1)  # on the machine
+    _launch_video(queue, "v1", seed=1)
     waiting = _launch_video(queue, "v2", seed=2)
 
     assert queue.joins_before(MediaType.IMAGE) == waiting.prompt_id
-    assert queue.joins_before(MediaType.VIDEO) is None  # the back
+    assert queue.joins_before(MediaType.VIDEO) is None
 
 
 def test_a_job_not_made_yet_is_placed_behind_every_job_put_first(qtbot, tmp_path):
@@ -1997,8 +1833,6 @@ def test_a_job_put_first_while_a_hand_over_is_out_takes_the_machine_when_it_land
     assert client.submit_job.call_args_list[-1].args[1] == locked.prompt_id
     assert queue.queue_order == [locked.prompt_id, handed_over_next.prompt_id]
 
-
-# --- a shielded run keeps the machine until it is done ---------------------------
 
 def test_an_image_asked_for_waits_behind_a_shielded_video_being_rendered(qtbot, tmp_path):
     client = _client()
@@ -2133,8 +1967,6 @@ def test_taking_the_shield_off_with_only_videos_waiting_leaves_the_run_going(qtb
     assert queue.queue_order == [video.prompt_id, later.prompt_id]
 
 
-# --- a video waits for the enhancement of the image it starts from ----------
-
 _ENHANCE = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
 _IMAGE = "image/image_00001_.png [output]"
 _ENHANCED = {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}
@@ -2147,8 +1979,6 @@ def _launch_enhance(queue, key, image=_IMAGE):
 
 
 def _a_minute_later(queue, now):
-    """The minute a video waits after the last image asked for, here an
-    enhancement, gone by, and the timer's call delivered."""
     now[0] += 60
     queue._videos_wait.timeout.emit()
 
@@ -2180,7 +2010,7 @@ def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_an
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
     enhance = _launch_enhance(queue, "e")
     video = _launch_video(queue, "v", input_image=_IMAGE)
-    now[0] += 120  # the enhancement asked for long ago: no minute left to wait
+    now[0] += 120
     sent_by_the_announcement = []
     queue.finished.connect(
         lambda *_: sent_by_the_announcement.append(client.submit_job.call_count))
@@ -2244,7 +2074,6 @@ _PLAIN = {"filename": "image_00001_.png", "subfolder": "image", "type": "output"
 
 
 def _image(db, *, enhanced=False):
-    """The image a video starts from, enhanced or still plain."""
     db.insert_generation(prompt_id="image", workflow_name=_IMAGE_WF, workflow_version="v",
                          params_json="{}", workflow_json="{}")
     db.update_generation(

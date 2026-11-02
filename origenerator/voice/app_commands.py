@@ -50,7 +50,7 @@ class AppCommand(Enum):
     FORWARD = "forward"
 
     # What you do to what is in front of you.
-    CULL = "cull"        # Fun Time's "trash": take this one away
+    CULL = "trash"      # take this one away
     LOCK = "lock"        # lock the slide (which favorites it and asks for the better version)
     UNLOCK = "unlock"    # let it go again
     FAVORITE = "favorite"

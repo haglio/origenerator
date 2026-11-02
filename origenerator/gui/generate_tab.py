@@ -86,7 +86,7 @@ from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.message import set_marked_text
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
-from origenerator.gui.param_form import ParamForm
+from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowTraits
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.viewport import Viewport
@@ -507,14 +507,16 @@ class GenerateTab(DropZones):
             self._offer_workflows(makes=wf.output_type, holding=key)
             edited = self._edited_form_values()
             deriver = wf.derived_display_size if wf.derives_size_from_input else None
-            self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
-                                         size_source=wf.derived_size_source,
-                                         hidden_keys=wf.enhance_keys(),
-                                         pins_reused_seed=wf.pins_reused_seed(),
-                                         heights=self._heights,
-                                         seed_history=SeedHistory(
-                                             self._seed_uses, self._looping_preview),
-                                         items=self._zone_items(), lora_keys=wf.lora_keys))
+            self._install_form(ParamForm(
+                wf.param_definitions(),
+                WorkflowTraits(size_deriver=deriver,
+                               size_source=wf.derived_size_source,
+                               hidden_keys=wf.enhance_keys(),
+                               pins_reused_seed=wf.pins_reused_seed(),
+                               lora_keys=wf.lora_keys),
+                FormHelpers(heights=self._heights,
+                            seed_history=SeedHistory(self._seed_uses, self._looping_preview),
+                            items=self._zone_items())))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried_over = {

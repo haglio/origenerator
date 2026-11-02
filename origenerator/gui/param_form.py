@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QSize, Qt, pyqtSignal
@@ -107,6 +108,26 @@ _DIMENSION_MAX = 8192
 _DIMENSION_STEP = 16
 _PADLOCK = {False: "lock", True: "unlock"}
 
+@dataclass(frozen=True)
+class WorkflowTraits:
+    size_deriver: Callable[[dict], tuple[int, int] | None] | None = None
+    size_source: str = "input_image"
+    hidden_keys: tuple[str, ...] = ()
+    pins_reused_seed: bool = True
+    lora_keys: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FormHelpers:
+    heights: object = None
+    seed_history: SeedHistory | None = None
+    items: object = None
+
+
+NO_TRAITS = WorkflowTraits()
+NO_HELPERS = FormHelpers()
+
+
 class ParamForm(QWidget):
     changed = pyqtSignal()
     train_requested = pyqtSignal(str)
@@ -117,32 +138,26 @@ class ParamForm(QWidget):
     def __init__(
         self,
         param_defs: list[ParamDef],
+        traits: WorkflowTraits = NO_TRAITS,
+        helpers: FormHelpers = NO_HELPERS,
         parent=None,
-        *,
-        size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
-        size_source: str = "input_image",
-        hidden_keys: tuple[str, ...] = (),
-        pins_reused_seed: bool = True,
-        heights=None,
-        seed_history: SeedHistory | None = None,
-        items=None,
-        lora_keys: tuple[str, ...] = (),
     ):
         super().__init__(parent)
-        self._lora_keys = tuple(lora_keys)
+        self._lora_keys = tuple(traits.lora_keys)
         self._training_controls: dict[str, TrainingControls] = {}
-        self._heights = heights
-        self._seed_history = seed_history
-        self._items = items or FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
+        self._heights = helpers.heights
+        self._seed_history = helpers.seed_history
+        self._items = helpers.items or FilesOnly(
+            places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
         self._item_seeds: dict[str, int] = {}
         self._item_thumbnail: str | None = None
-        self._pins_reused_seed = pins_reused_seed
-        self._hidden_keys = frozenset(hidden_keys)
+        self._pins_reused_seed = traits.pins_reused_seed
+        self._hidden_keys = frozenset(traits.hidden_keys)
         self._hidden = {
             pd.key: pd.default for pd in param_defs if pd.key in self._hidden_keys
         }
-        self._size_deriver = size_deriver
-        self._size_source_key = size_source
+        self._size_deriver = traits.size_deriver
+        self._size_source_key = traits.size_source
         self._unlock_btn: QToolButton | None = None
         self._dimensions_hint: QLabel | None = None
         self._dim_value_labels: dict[str, QLabel] = {}

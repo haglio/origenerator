@@ -2,6 +2,7 @@
 # Imports below are late on purpose: QT_SCALE_FACTOR must be set before Qt's platform plugin starts, and the voice runtimes load before Qt.
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 import uuid
@@ -72,10 +73,8 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
     from app_support.win32 import set_app_user_model_id, stamp_pinned_shortcuts
 
     from origenerator.win32 import APP_USER_MODEL_ID
-    try:
+    with contextlib.suppress(OSError):
         set_app_user_model_id(identity or taskbar_identity(APP_USER_MODEL_ID, preview))
-    except OSError:
-        pass
     if identity is None:
         import logging
 
@@ -90,10 +89,8 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
 def _warm_voice_runtimes() -> None:
     """ctranslate2 and onnxruntime fail with an access violation or DLL init error when imported after PyQt6; a broken install raises OSError."""
     for module in ("onnxruntime", "ctranslate2"):
-        try:
+        with contextlib.suppress(Exception):
             __import__(module)
-        except Exception:
-            pass
 
 
 @dataclass(frozen=True)

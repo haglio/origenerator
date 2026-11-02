@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import logging
 from dataclasses import replace
 
@@ -146,10 +147,8 @@ class Core(QMainWindow):
         blob = self._app_state.get(GEOMETRY_KEY)
         if not isinstance(blob, str):
             return
-        try:
+        with contextlib.suppress(ValueError):
             self.restoreGeometry(QByteArray(base64.b64decode(blob)))
-        except ValueError:
-            pass
 
     def showEvent(self, event):
         super().showEvent(event)

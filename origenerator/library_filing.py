@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -91,10 +92,8 @@ def _file_everything_under(top: Path, places: OutputPlaces, held: set[str]) -> i
 
 def _remove_what_is_left_empty(folder: Path) -> None:
     for dirpath, _dirnames, _filenames in os.walk(folder, topdown=False):
-        try:
+        with contextlib.suppress(OSError):
             os.rmdir(dirpath)
-        except OSError:
-            pass
 
 
 def _run_subfolder(places: OutputPlaces, prompt_id: str) -> str:

@@ -136,6 +136,11 @@ class ItemTile(QWidget):
             button.installEventFilter(self)  # Qt reports a cursor leaving through a control only to the control
         self._sync_controls()
 
+        self._build_the_enhancing_bar()
+
+        self._build_corner_buttons(corner_buttons or [])
+
+    def _build_the_enhancing_bar(self) -> None:
         self._status_scrim = TileStatusScrim(self)
         self._enhancing_bar = ProgressBar(self)
         self._enhancing_bar.setAttribute(
@@ -146,8 +151,6 @@ class ItemTile(QWidget):
         self._enhancing_tick.timeout.connect(self._render_enhancing_timing)
         self._place_enhancing_bar()
         self._show_enhancing_run()
-
-        self._build_corner_buttons(corner_buttons or [])
 
     @staticmethod
     def look_of(prompt_id: str, thumb_path: str | None, label_text: str, *,

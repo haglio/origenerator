@@ -54,6 +54,11 @@ def _path_key(path) -> str:
     return os.path.normcase(os.path.abspath(str(path)))
 
 
+def _lets_the_mouse_through(widget):
+    widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+    return widget
+
+
 class Viewport(QWidget):
     media_resized = pyqtSignal()
     action_triggered = pyqtSignal(str, str)
@@ -67,12 +72,10 @@ class Viewport(QWidget):
         self._movie_native = None
         self._media: tuple | None = None
         self._live = False
-        self._fullscreen = None
-        self._open_fullscreen_view = None
-        self._generation: str | None = None
+        self._fullscreen = self._open_fullscreen_view = None
+        self._generation = self._actions_id = None
         self.drag_out = DragOut()
 
-        self._actions_id: str | None = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
@@ -82,44 +85,35 @@ class Viewport(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        media_host = QWidget()
-        self._media_host = media_host
+        self._media_host = media_host = QWidget()
         outer.addWidget(media_host, 1)
         self._stack = QStackedLayout(media_host)
         self._stack.setContentsMargins(0, 0, 0, 0)
 
-        self._image_label = QLabel(_PLACEHOLDER)
+        self._image_label = _lets_the_mouse_through(QLabel(_PLACEHOLDER))
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image_label.setMinimumHeight(240)
         # Qt: a word-wrapped label's width sets a wide minimum on the pane unless it can wrap
         self._image_label.setWordWrap(True)
         self._image_label.installEventFilter(self)
         media_host.installEventFilter(self)
-        self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._stack.addWidget(self._image_label)
 
-        self._video = VideoSurface()
-        self._video.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._video = _lets_the_mouse_through(VideoSurface())
         self._player.setVideoOutput(self._video.video_sink())
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
         self._player.metaDataChanged.connect(self._place_controls)
-        self._stack.addWidget(self._video)
 
-        self._combination = CombinationView()
-        self._combination.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._stack.addWidget(self._combination)
-
-        self._sheet = ContactSheet()
-        self._sheet.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._stack.addWidget(self._sheet)
+        self._combination = _lets_the_mouse_through(CombinationView())
+        self._sheet = _lets_the_mouse_through(ContactSheet())
+        for page in (self._image_label, self._video, self._combination, self._sheet):
+            self._stack.addWidget(page)
 
         self._stack.setCurrentWidget(self._image_label)
 
-        self._message = QLabel(media_host)
+        self._message = _lets_the_mouse_through(QLabel(media_host))
         self._message.setStyleSheet(_MESSAGE_PLATE)
         self._message.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._message.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._message.hide()
 
         self._controls = CornerButtons(self)

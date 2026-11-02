@@ -46,7 +46,7 @@ from origenerator.gallery import (
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_versions import params_from_mime
-from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.flow_layout import FieldGrid, FlowLayout
 from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,
     NoWheelDropdown,
@@ -151,87 +151,6 @@ def _enhancer_param_defs() -> dict:
     }
 
 
-def _narrowest(widget: QWidget) -> int:
-    return widget.minimumWidth() or widget.minimumSizeHint().width()
-
-
-class _FieldGrid(QGridLayout):
-    """Fields beside one column of captions, its warning marks in a column left of it.
-
-    A layout, because Qt asks a widget's layout for its height at a width, never the widget."""
-
-    def __init__(self, dropdowns: list[tuple[QLabel, QWidget]],
-                 numbers: list[tuple[QLabel, QWidget]], marks: dict[QLabel, WarningMark]):
-        super().__init__()
-        self._dropdowns = dropdowns
-        self._numbers = numbers
-        self._marks = marks
-        self.setContentsMargins(0, 0, 0, 0)
-        self.setSpacing(GAP_SMALL)
-        self._stacked: bool | None = None
-        self._arrange(stacked=False)
-
-    def hasHeightForWidth(self) -> bool:
-        return True
-
-    def heightForWidth(self, width: int) -> int:
-        lines = [[pair] for pair in self._dropdowns]
-        if width < self._one_line_width():
-            lines += [[pair] for pair in self._numbers]
-        else:
-            lines.append(self._numbers)
-        heights = [max(max(label.sizeHint().height(), field.sizeHint().height())
-                       for label, field in line) for line in lines]
-        return sum(heights) + (len(heights) - 1) * self.verticalSpacing()
-
-    def sizeHint(self) -> QSize:
-        width = self._one_line_width()
-        return QSize(width, self.heightForWidth(width))
-
-    def minimumSize(self) -> QSize:
-        pairs = self._dropdowns + self._numbers
-        narrowest = (self._mark_column()
-                     + max(label.sizeHint().width() for label, _field in pairs)
-                     + self.horizontalSpacing()
-                     + max(_narrowest(field) for _label, field in pairs))
-        return QSize(narrowest, self.heightForWidth(self._one_line_width()))
-
-    def setGeometry(self, rect: QRect) -> None:
-        self._arrange(stacked=rect.width() < self._one_line_width())
-        super().setGeometry(rect)
-
-    def _mark_column(self) -> int:
-        return (max(mark.sizeHint().width() for mark in self._marks.values())
-                + self.horizontalSpacing())
-
-    def _one_line_width(self) -> int:
-        captions = max(label.sizeHint().width()
-                       for label, _field in self._dropdowns + self._numbers[:1])
-        return (self._mark_column() + captions
-                + sum(label.sizeHint().width() for label, _field in self._numbers[1:])
-                + sum(_narrowest(field) for _label, field in self._numbers)
-                + self.horizontalSpacing() * (2 * len(self._numbers) - 1))
-
-    def _arrange(self, stacked: bool) -> None:
-        if stacked == self._stacked:
-            return
-        for column in range(self.columnCount()):
-            self.setColumnStretch(column, 0)
-        span = 1 if stacked else 2 * len(self._numbers) - 1
-        for row, (label, field) in enumerate(self._dropdowns):
-            if label in self._marks:
-                self.addWidget(self._marks[label], row, 0)
-            self.addWidget(label, row, 1)
-            self.addWidget(field, row, 2, 1, span)
-        below = len(self._dropdowns)
-        for index, (label, field) in enumerate(self._numbers):
-            row, column = (below + index, 1) if stacked else (below, 1 + 2 * index)
-            self.addWidget(label, row, column)
-            self.addWidget(field, row, column + 1)
-            self.setColumnStretch(column + 1, 1)
-        self._stacked = stacked
-
-
 def _settings_dragged(mime, _source) -> tuple[dict] | None:
     params = params_from_mime(mime)
     return None if params is None else (params,)
@@ -299,6 +218,29 @@ class EnhancePane(QWidget):
         title_row.addWidget(self._auto)
         column.addLayout(title_row)
 
+        column.addWidget(self._build_the_settings(), 1)
+
+        self._enhance_button = QPushButton("Enhance")
+        self._enhance_button.setObjectName("enhanceButton")
+        self._enhance_button.clicked.connect(self.enhance_requested)
+        self._presets: list[Preset] = []
+        self._preset_dropdown = NoWheelDropdown()
+        self._preset_dropdown.floor_chars = 2
+        self._preset_dropdown.setPlaceholderText("(custom)")
+        self._preset_dropdown.setToolTip("Pick a preset to use its settings")
+        self._preset_dropdown.activated.connect(
+            lambda index: self._take_settings(self._presets[index].params))
+        self._preset_button = QPushButton("Save…")
+        self._preset_button.clicked.connect(self._name_the_settings)
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 0)
+        action_row.addWidget(self._preset_dropdown, 1)
+        action_row.addWidget(self._preset_button)
+        action_row.addWidget(self._enhance_button)
+        column.addLayout(action_row)
+        DropTarget(self, _settings_dragged, self._take_settings)
+
+    def _build_the_settings(self) -> QWidget:
         settings = QWidget()
         settings_column = QVBoxLayout(settings)
         settings_column.setContentsMargins(0, 0, 0, 0)
@@ -325,7 +267,7 @@ class EnhancePane(QWidget):
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
         model_caption = self._labeled("Model", self._model)
-        settings_column.addLayout(_FieldGrid(
+        settings_column.addLayout(FieldGrid(
             dropdowns=[(model_caption, self._model),
                      (self._labeled("Upscaler", self._upscaler), self._upscaler)],
             numbers=[(self._labeled(label, widget), widget)
@@ -339,27 +281,7 @@ class EnhancePane(QWidget):
         settings_column.addWidget(fix_heading)
         settings_column.addWidget(self._fix_row())
         settings_column.addStretch(1)
-        column.addWidget(_SettingsScroll(settings), 1)
-
-        self._enhance_button = QPushButton("Enhance")
-        self._enhance_button.setObjectName("enhanceButton")
-        self._enhance_button.clicked.connect(self.enhance_requested)
-        self._presets: list[Preset] = []
-        self._preset_dropdown = NoWheelDropdown()
-        self._preset_dropdown.floor_chars = 2
-        self._preset_dropdown.setPlaceholderText("(custom)")
-        self._preset_dropdown.setToolTip("Pick a preset to use its settings")
-        self._preset_dropdown.activated.connect(
-            lambda index: self._take_settings(self._presets[index].params))
-        self._preset_button = QPushButton("Save…")
-        self._preset_button.clicked.connect(self._name_the_settings)
-        action_row = QHBoxLayout()
-        action_row.setContentsMargins(0, 0, 0, 0)
-        action_row.addWidget(self._preset_dropdown, 1)
-        action_row.addWidget(self._preset_button)
-        action_row.addWidget(self._enhance_button)
-        column.addLayout(action_row)
-        DropTarget(self, _settings_dragged, self._take_settings)
+        return _SettingsScroll(settings)
 
     def _fix_row(self) -> QWidget:
         host = QWidget()

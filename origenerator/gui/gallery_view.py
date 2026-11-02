@@ -1032,8 +1032,7 @@ class GalleryView(QWidget):
             multi_keys = []
         selected_gen = self.selected_generation()
         reroll_key = self._selected_reroll_key
-        self._pending_key = None
-        self._pending_selection = None
+        self._pending_key = self._pending_selection = None
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._combine.offer_the_actions(rows)
@@ -1042,14 +1041,12 @@ class GalleryView(QWidget):
         self._held_rows = trash_collection.trash_items(self._db.list_trashed())
         start_frames, trees = self._lists_for(rows, meta, self._tree.shapes)
         self._image_index = start_frames
-        unreviewed = self._review_queue(rows)
-        held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_collections_by_shape = _custom_collections_by_shape(
             trees, self._db.list_custom_collections())
         self._custom_collections = [folder for folders in self._custom_collections_by_shape.values()
                                 for folder in folders]
-        self._search.index.update(rows + held, gallery.folder_names_by_row(
+        self._search.index.update(rows + self._held_rows, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()
@@ -1058,8 +1055,8 @@ class GalleryView(QWidget):
             gallery.recent_generations(rows, bumped=bumped),
             trees,
             rows,
-            unreviewed,
-            held,
+            self._review_queue(rows),
+            self._held_rows,
             image_index=start_frames,
         )
         self._tree_view.populate(
@@ -1081,7 +1078,6 @@ class GalleryView(QWidget):
                 self._folder_path.set_display("")
                 self._avg_label.setText("")
                 self._gallery_pane.show_empty()
-                self._selected_row = None
             self._restore_multi_selection(multi_keys)
             self._restore_reroll_selection(reroll_key)
         self._navigation.seed()

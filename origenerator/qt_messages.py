@@ -12,9 +12,8 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QLoggingCategory, QtMsgType, qInstallMessageHandler
-
-_FFMPEG_FORMAT_DUMP_CATEGORY = "qt.multimedia.ffmpeg.mediadataholder"
+from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
+from shared_ui.qt_messages import silence_the_ffmpeg_format_dump
 
 _LEVELS = {
     QtMsgType.QtDebugMsg: logging.DEBUG,
@@ -69,13 +68,10 @@ class RepeatCollapser:
 
 
 def install_qt_message_logging():
+    silence_the_ffmpeg_format_dump()
     collapse = RepeatCollapser(lambda level, message: logger.log(level, "%s", message))
 
     def log_qt_message(kind, _context, message: str) -> None:
         collapse(_LEVELS.get(kind, logging.WARNING), message)
 
     return qInstallMessageHandler(log_qt_message)
-
-
-def silence_the_ffmpeg_format_dump() -> None:
-    QLoggingCategory.setFilterRules(f"{_FFMPEG_FORMAT_DUMP_CATEGORY}.info=false")

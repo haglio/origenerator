@@ -1,7 +1,3 @@
-"""What Combine's Recent dropdown lists: every video of the selected kind.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 from origenerator.action_settings import GENAU, VIDEO

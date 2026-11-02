@@ -75,8 +75,7 @@ def _unlit(option):
 
 
 class _LitOverWhatItIsHanded(QProxyStyle):
-    """Lights an item under the mouse over the whole rect its drawing is handed,
-    in a wash that darkens where it is laid twice, as Windows 11's own style does."""
+    """Windows 11's own style lights the row over the whole rect it is handed, darkening where laid twice."""
 
     def drawPrimitive(self, element, option, painter, widget=None):
         if element == QStyle.PrimitiveElement.PE_PanelItemViewItem:

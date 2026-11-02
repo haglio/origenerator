@@ -1,4 +1,3 @@
-"""The one way the app asks the local model for an answer."""
 from __future__ import annotations
 
 import json

@@ -1,5 +1,3 @@
-"""The one way this app asks the local model for an answer: one POST to the
-OpenAI-compatible chat endpoint on this machine, over stdlib ``urllib``."""
 from __future__ import annotations
 
 import json

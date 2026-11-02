@@ -250,7 +250,7 @@ class JobQueue(QObject):
             self._launch(
                 key, image_workflow, prepared_params(source_row, image_workflow),
                 lambda k, job, files, thumb, dur: self._on_image_finished(
-                    k, job, files, thumb, dur, workflow, video_params
+                    k, job, (files, thumb, dur), workflow, video_params
                 ),
                 run_media_type=workflow.output_type,
             )
@@ -707,10 +707,10 @@ class JobQueue(QObject):
             self._db.delete_generation(stopped.prompt_id)
         self._pump()
 
-    def _on_image_finished(self, key, image_job, files, thumb_path, duration,
-                           video_workflow, video_params):
+    def _on_image_finished(self, key, image_job, landed, video_workflow, video_params):
+        files, _thumb_path, _duration = landed
         self._drop(key, image_job)
-        mark_generation_completed(self._db, image_job.prompt_id, files, thumb_path, duration)
+        mark_generation_completed(self._db, image_job.prompt_id, *landed)
         input_ref = gallery.output_file_reference(files)
         if input_ref is not None:
             video_params = {**video_params, "input_image": input_ref}

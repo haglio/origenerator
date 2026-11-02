@@ -445,11 +445,11 @@ class VoiceRouter(QObject):
     def _on_revised(self, context, revision) -> None:
         row, workflow, params, spoken, shape, standing = context
         try:
-            self._answer_the_revision(row, workflow, params, spoken, shape, revision)
+            self._answer_the_revision((row, workflow, params), spoken, shape, revision)
         finally:
             self._starting.drop(standing)
 
-    def _answer_the_revision(self, row, workflow, params, spoken, shape, revision) -> None:
+    def _answer_the_revision(self, asked: tuple, spoken, shape, revision) -> None:
         slideshow = self._slideshows.surface_for(shape)
         if revision is None:
             self._answer_request(
@@ -461,5 +461,5 @@ class VoiceRouter(QObject):
                 slideshow, f"“{revision.term}” is already how you asked for it", spoken,
                 kind=WARNING)
             return
-        message, kind = self._host.queue_request(row, workflow, params, spoken, revision)
+        message, kind = self._host.queue_request(*asked, spoken, revision)
         self._answer_request(slideshow, message, spoken, kind=kind)

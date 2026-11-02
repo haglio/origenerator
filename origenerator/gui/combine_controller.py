@@ -295,15 +295,13 @@ class CombineController(QObject):
         if built is None:
             return
         workflow, params, video_row, _image_row = built
-        self._open_prepared(workflow, params, self._image_still(image_id), video_row,
-                            "", video_id, intent)
+        self._open_prepared(workflow, params, self._image_still(image_id), video_row, ("", video_id, intent))
 
-    def _open_prepared(self, workflow, params, still: str | None, video_row,
-                       category: str, video_id: str | None, intent: str) -> None:
+    def _open_prepared(self, workflow, params, still: str | None, video_row, settings_source: tuple) -> None:
         Combine = self._generate_pane_of().open_config(workflow.name, params)
         if Combine is None:
             return
-        Combine.set_settings_source(category, video_id, intent)
+        Combine.set_settings_source(*settings_source)
         Combine.show_combination(Combination(
             still, self._host.animated_preview(video_row) if video_row is not None else None))
 
@@ -431,8 +429,7 @@ class CombineController(QObject):
                  or self._readied(action_settings.starting_settings(intent), reference))
         if built is not None:
             workflow, params = built
-            self._open_prepared(workflow, params, self._image_still(image_id), None,
-                                category, None, intent)
+            self._open_prepared(workflow, params, self._image_still(image_id), None, (category, None, intent))
 
     def send_to_genau_if_requested(self, row: dict | None) -> None:
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):

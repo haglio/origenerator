@@ -73,8 +73,8 @@ class Scrubber(QWidget):
             painter.fillRect(x0 + column, y0, 1, y1 - y0, QColor(red, green, blue))
 
     def _paint_frame(self, painter, x0, x1, y0, y1) -> None:
-        _ring(painter, x0, x1, y0, y1, 1, _EDGE)
-        _ring(painter, x0 + 1, x1 - 1, y0 + 1, y1 - 1, BORDER_W - 1, _BORDER)
+        _ring(painter, (x0, x1, y0, y1), 1, _EDGE)
+        _ring(painter, (x0 + 1, x1 - 1, y0 + 1, y1 - 1), BORDER_W - 1, _BORDER)
 
     def _paint_cursor(self, painter, x0, x1, y0, y1) -> None:
         if self._position is None or self._duration <= 0:
@@ -88,7 +88,8 @@ def _too_narrow_for_a_track(width, height) -> bool:
     return width < 2 * BORDER_W or height < 2 * BORDER_W
 
 
-def _ring(painter, x0, x1, y0, y1, thickness, color) -> None:
+def _ring(painter, box: tuple[int, int, int, int], thickness, color) -> None:
+    x0, x1, y0, y1 = box
     painter.fillRect(x0, y0, x1 - x0, thickness, color)
     painter.fillRect(x0, y1 - thickness, x1 - x0, thickness, color)
     painter.fillRect(x0, y0, thickness, y1 - y0, color)

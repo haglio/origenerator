@@ -180,7 +180,7 @@ def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VID
     images = _bring_up_to_records(db, places, rows, keep_going, kinds)
     wanted = itertools.takewhile(lambda _new: keep_going(), new)
     brought = (made for video, record in wanted
-               if (made := _brought_in(video, record, places, images, grab, kinds)))
+               if (made := _brought_in(video, record, places, images, (grab, kinds))))
     brought_in = 0
     for batch in itertools.batched(brought, videos_per_write):
         db.insert_rows([row for made in batch for row in made])
@@ -191,8 +191,8 @@ def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VID
 _THE_IMAGE_AND_THE_VIDEO = 2
 
 
-def _brought_in(video: OutsideVideo, record: Record, places: Places, images: dict, grab,
-                kinds: dict[str, set[VideoKind]]) -> list[dict]:
+def _brought_in(video: OutsideVideo, record: Record, places: Places, images: dict, grab_and_kinds: tuple) -> list[dict]:
+    grab, kinds = grab_and_kinds
     image = _image_of(video.source, record)
     made = rows_bringing_in(video, record, frames_dir=places.frames_dir,
                             thumb_dir=places.thumb_dir, grab=grab, image=images.get(image),
@@ -417,7 +417,7 @@ def _frame_fields(record: Record, filed: datetime, site: str) -> dict:
         GenerationSource.OUTSIDE if image else GenerationSource.STARTING_FRAME,
         outside_workflow(site, MediaType.IMAGE),
         (image or record.video).params,
-        _made_at(image or record.video, filed), filed, action=None)
+        (_made_at(image or record.video, filed), filed), action=None)
 
 
 def _video_fields(record: Record, filed: datetime, frame_file: str | None, site: str,
@@ -425,11 +425,12 @@ def _video_fields(record: Record, filed: datetime, frame_file: str | None, site:
     return _recorded_fields(
         GenerationSource.OUTSIDE, outside_workflow(site, MediaType.VIDEO, kind),
         {**record.video.params, "input_image": frame_file},
-        _made_at(record.video, filed), filed, action=record.action)
+        (_made_at(record.video, filed), filed), action=record.action)
 
 
-def _recorded_fields(source: str, workflow_name: str, params: dict, made: datetime,
-                     filed: datetime, *, action: str | None) -> dict:
+def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[datetime, datetime], *,
+                     action: str | None) -> dict:
+    made, filed = when
     return {
         "source": source,
         "workflow_name": workflow_name,

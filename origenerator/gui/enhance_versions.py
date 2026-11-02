@@ -192,7 +192,7 @@ class _VersionRow(_Row):
     context_requested = pyqtSignal(int, QPoint)
     delete_pressed = pyqtSignal(int)
 
-    def __init__(self, version, position: int, image_path, dating=UNDATED,
+    def __init__(self, version, position: int, image_path, dating: Dating = UNDATED,
                  deletable: bool = False):
         super().__init__(version.label)
         self._position = position
@@ -349,7 +349,7 @@ class EnhanceVersions(QWidget):
         self._section.set_collapsed(collapsed)
 
     def show_versions(self, items: list[tuple], pending: RunningEnhancement | None = None,
-                    add: EnhanceOffer | None = None, dating=UNDATED, deletable: bool = True):
+                    add: EnhanceOffer | None = None, dating: Dating = UNDATED, deletable: bool = True):
         form = self._section.content_form()
         form.removeRow(self._host)
         self._host = QWidget()

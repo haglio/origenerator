@@ -39,14 +39,14 @@ def _client():
     return client
 
 
-def _params():
+def _params_with_the_two_sampler_enhance_tail():
     return dict(SDXL.default_params(), enhance=True)
 
 
 def _started_job(tmp_path):
     client = _client()
     job = GenerationJob(
-        client, SDXL, _params(),
+        client, SDXL, _params_with_the_two_sampler_enhance_tail(),
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A",
     )
     job.start()
@@ -71,7 +71,7 @@ def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):
 
 def test_a_launched_row_records_which_version_of_its_workflow_ran(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
-    job = GenerationJob(_client(), SDXL, _params(),
+    job = GenerationJob(_client(), SDXL, _params_with_the_two_sampler_enhance_tail(),
                         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
 
     insert_generation_row(db, job)
@@ -195,7 +195,7 @@ def test_completion_generates_thumbnail_when_output_exists(qtbot, tmp_path):
     out.mkdir()
     Image.new("RGB", (10, 10), (200, 50, 50)).save(out / "a.png")
     client = _client()
-    job = GenerationJob(client, SDXL, _params(), places=OutputPlaces.in_one_folder(out), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
+    job = GenerationJob(client, SDXL, _params_with_the_two_sampler_enhance_tail(), places=OutputPlaces.in_one_folder(out), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     job.start()
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append((files, thumb, dur)))
@@ -387,7 +387,7 @@ def test_cancel_detaches_from_client(qtbot, tmp_path):
 def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
     client = _client()
     job = GenerationJob.reconnect(
-        client, SDXL, _params(), "running-id",
+        client, SDXL, _params_with_the_two_sampler_enhance_tail(), "running-id",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     client.submit_job.assert_not_called()
@@ -401,7 +401,7 @@ def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
 
 def test_a_job_taken_back_with_no_start_recorded_waits_on_the_server(qtbot, tmp_path):
     job = GenerationJob.reconnect(
-        _client(), SDXL, _params(), "pid",
+        _client(), SDXL, _params_with_the_two_sampler_enhance_tail(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
 
@@ -410,7 +410,7 @@ def test_a_job_taken_back_with_no_start_recorded_waits_on_the_server(qtbot, tmp_
 
 def test_a_job_taken_back_that_had_started_is_still_being_made(qtbot, tmp_path):
     job = GenerationJob.reconnect(
-        _client(), SDXL, _params(), "pid",
+        _client(), SDXL, _params_with_the_two_sampler_enhance_tail(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
         progress_state={"last_progress": [30, 70], "started_at": time.time() - 60},
     )
@@ -454,7 +454,7 @@ def test_progress_state_carries_the_start_time(qtbot, tmp_path):
 def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path):
     began = time.time() - 600
     job = GenerationJob.reconnect(
-        _client(), SDXL, _params(), "pid",
+        _client(), SDXL, _params_with_the_two_sampler_enhance_tail(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
         progress_state={"last_progress": [30, 70], "started_at": began},
     )
@@ -463,7 +463,7 @@ def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path
 
 def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot, tmp_path):
     client = _client()
-    job = GenerationJob(client, SDXL, _params(),
+    job = GenerationJob(client, SDXL, _params_with_the_two_sampler_enhance_tail(),
                         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
     heard_at = []
     client.submit_job.side_effect = lambda payload, prompt_id: (
@@ -477,7 +477,7 @@ def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot
 
 def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_path):
     job = GenerationJob.reconnect(
-        _client(), SDXL, _params(), "pid",
+        _client(), SDXL, _params_with_the_two_sampler_enhance_tail(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     assert job.started_at is None
@@ -504,7 +504,7 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
 
 def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):
     job = GenerationJob.reconnect(
-        _client(), SDXL, _params(), "pid",
+        _client(), SDXL, _params_with_the_two_sampler_enhance_tail(), "pid",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     assert job.last_progress == (0, 0)
@@ -554,7 +554,7 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
 
 
 def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
-    image = GenerationJob(_client(), SDXL, _params())
+    image = GenerationJob(_client(), SDXL, _params_with_the_two_sampler_enhance_tail())
     video = GenerationJob(_client(), WORKFLOW_REGISTRY["wan22_i2v"],
                           WORKFLOW_REGISTRY["wan22_i2v"].default_params())
 
@@ -564,7 +564,7 @@ def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
 def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
     client = _client()
 
-    job = GenerationJob(client, SDXL, _params())
+    job = GenerationJob(client, SDXL, _params_with_the_two_sampler_enhance_tail())
 
     client.submit_job.assert_not_called()
     assert job.state == "idle"
@@ -574,7 +574,7 @@ def test_a_job_taken_back_lands_the_run_the_last_copy_had_already_sent(qtbot, tm
     client = _client()
     client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
     job = GenerationJob(
-        client, SDXL, _params(), prompt_id="held-1",
+        client, SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="held-1",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     finished = []
@@ -590,7 +590,7 @@ def test_a_job_taken_back_lands_the_run_the_last_copy_had_already_sent(qtbot, tm
 def test_a_job_taken_back_reports_the_run_it_is_finally_given(qtbot, tmp_path):
     client = _client()
     job = GenerationJob(
-        client, SDXL, _params(), prompt_id="held-1",
+        client, SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="held-1",
         places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs",
     )
     job.start()
@@ -641,7 +641,7 @@ def test_defer_detaches_so_the_stopped_runs_end_is_not_taken_as_this_jobs(qtbot,
 
 def test_a_job_the_server_does_not_hold_cannot_be_deferred(qtbot, tmp_path):
     client = _client()
-    job = GenerationJob(client, SDXL, _params())
+    job = GenerationJob(client, SDXL, _params_with_the_two_sampler_enhance_tail())
 
     assert job.defer() is False
 
@@ -665,7 +665,7 @@ def test_a_deferred_job_sent_again_first_forgets_its_false_start(qtbot, tmp_path
 
 def test_a_job_taken_over_from_another_copy_forgets_its_false_start_when_sent_again(qtbot, tmp_path):
     client = _client()
-    job = GenerationJob.reconnect(client, SDXL, _params(), "comfy-A",
+    job = GenerationJob.reconnect(client, SDXL, _params_with_the_two_sampler_enhance_tail(), "comfy-A",
                                   places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
     client.fetch_history = MagicMock(return_value={"outputs": {}})
     job.defer()
@@ -694,7 +694,7 @@ def test_a_deferred_job_whose_run_finished_after_all_lands_instead_of_running_ag
 
 def test_a_first_send_forgets_nothing_on_a_server_with_no_record_of_it(qtbot, tmp_path):
     client = _client()
-    job = GenerationJob(client, SDXL, _params())
+    job = GenerationJob(client, SDXL, _params_with_the_two_sampler_enhance_tail())
 
     job.start()
 

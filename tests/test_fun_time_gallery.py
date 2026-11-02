@@ -108,7 +108,7 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     assert view.eventFilter(view, event) is False
 
 
-def test_fun_time_gallery_carries_the_standalone_osr2_state_through(qtbot):
+def test_fun_time_gallery_does_not_put_the_standalone_osr2_state_on_but_hands_it_back_untouched(qtbot):
     view = _fun_time_view(qtbot)
 
     view.restore_osr2_state(OSR2_RETRACTED)

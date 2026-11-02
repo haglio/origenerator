@@ -52,6 +52,21 @@ def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
     assert tops[1] - tops[0] == 20 + 20
 
 
+def test_a_hidden_widget_takes_no_place_and_leaves_no_gap_where_it_was(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    flow = FlowLayout(host, spacing=4)
+    buttons = [QPushButton(str(n)) for n in range(3)]
+    for button in buttons:
+        button.setFixedSize(40, 20)
+        flow.addWidget(button)
+    buttons[1].hide()
+    host.resize(300, 100)
+    flow.setGeometry(host.rect())
+
+    assert flow.itemAt(2).geometry().left() == flow.itemAt(0).geometry().right() + 1 + 4
+
+
 def test_the_row_gap_defaults_to_the_one_between_buttons(qtbot):
     host = QWidget()
     qtbot.addWidget(host)

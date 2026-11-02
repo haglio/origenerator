@@ -1,25 +1,3 @@
-"""The two halves of a combination, shown as the sum they are: image + source video.
-
-Two renderings of one look. :class:`CombinationView` is the live one, for a pane
-with room to loop the video; :func:`combination_pixmap` is the same arithmetic as
-a still, for the surfaces that hold a pixmap rather than a widget — the Job Queue's corner and a folder's generating tile. They are together here because what
-they have to agree on is the look: a run in flight shows the same pair in all
-three places until ComfyUI streams a frame of the run itself, and three
-surfaces each drawing their own idea of it is what left one blurred, one blank
-and one missing its plus.
-
-What "Edit individual…" hands a tab is not a generation — it is an image and a
-past video's settings, and nothing has been made from them yet. The form below
-holds the settings, but the pane above it had nothing to show and said so, with
-the same "select a generation to preview" a tab that had been pointed at nothing
-says. So it shows the arithmetic instead: the frame that will be animated on the
-left, a plus sign, and on the right the video whose settings the run will follow,
-looping in gray (:mod:`origenerator.gui.grayscale`) because it lends the settings and
-not the result.
-
-Both halves are square-fit into whatever height the pane has, side by side, so
-the pair reads as one line of arithmetic at any size the pane is dragged to.
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -44,26 +22,11 @@ from origenerator.gui.grayscale import play_grayscale
 from origenerator.gui.looping_preview import fit_size, looping_movie
 from origenerator.gui.queue_thumbs import fitted_cell
 
-# How much of the pane's height a half takes, leaving room for the plus sign
-# to breathe between them and the pane's own margins around them.
 _HEIGHT_SHARE = 0.8
 _MARGIN = MARGIN_STANDARD
 
 
 def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
-    """The pair as one still, fitted into ``size`` — or ``None`` for a
-    run made from nothing, which is a plate the caller leaves alone.
-
-    The same arithmetic :class:`CombinationView` lays out live: the frame, the
-    plus, and the video whose settings go with it, drained of color because it is
-    not what is being made. Either half alone still draws, and the plus shows
-    only with both, since a lone image is not a sum.
-
-    A still rather than the widget because the surfaces that want it are a
-    thumbnail-sized label apiece, redrawn on every poll — and the halves come
-    from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a cell the
-    Job Queue has already scaled this second is not scaled again for the tile.
-    """
     both = bool(combination.image and combination.source_video)
     enclosed = bool(combination.source_video) and combination.prompt_edited
     side = pair_side(size, both, enclosed)
@@ -91,8 +54,6 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
 
 
 def _readable(path) -> QPixmap | None:
-    """The pixmap at ``path``, or ``None`` when there is none to load — a frame
-    the library has since moved is an ordinary case, not an error."""
     if not path or not Path(path).is_file():
         return None
     pixmap = QPixmap(str(path))
@@ -100,8 +61,6 @@ def _readable(path) -> QPixmap | None:
 
 
 class CombinationView(QWidget):
-    """An image, a plus, and the gray video whose settings go with it."""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._image_path: str | None = None
@@ -122,11 +81,9 @@ class CombinationView(QWidget):
         self.close_paren_label = QLabel(")")
         self._parens = (self.open_paren_label, self.close_paren_label)
         for operator in (self.plus_label, *self._parens):
-            operator.setObjectName("estimateLabel")  # muted, like the pane's own text
+            operator.setObjectName("estimateLabel")
         for paren in self._parens:
             paren.hide()
-        # Clicks fall through to the pane, which owns the double-click that opens
-        # a slideshow — there is nothing here to open, so nothing here should eat one.
         for label in (self.image_label, self.plus_label, self.open_paren_label,
                       self.video_label, self.close_paren_label):
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -135,12 +92,6 @@ class CombinationView(QWidget):
         layout.addStretch(1)
 
     def show_pair(self, combination: Combination) -> None:
-        """Show the image beside its source video, looping in gray.
-
-        Either may be missing — a curated action is pinned in the overlay and has no
-        past video under it, and a frame can have moved — and the plus shows only
-        when both halves are there, since a lone image is not a sum.
-        """
         self._stop_movie()
         self._image_path = str(combination.image) if combination.image else None
         self._video_path = str(combination.source_video) if combination.source_video else None
@@ -150,7 +101,7 @@ class CombinationView(QWidget):
         self.image_label.setVisible(self._pixmap is not None)
         self._has_video = bool(self._video_path and Path(self._video_path).is_file())
         if not self._has_video:
-            self.video_label.clear()  # no stale last frame under the next pair
+            self.video_label.clear()
         self.video_label.setVisible(self._has_video)
         self.plus_label.setVisible(self._pixmap is not None and self._has_video)
         self._show_parentheses(combination.prompt_edited)
@@ -170,7 +121,6 @@ class CombinationView(QWidget):
             paren.setVisible(self._enclosed)
 
     def clear(self) -> None:
-        """Drop both halves — the pane is showing something else now."""
         self._stop_movie()
         self._image_path = self._video_path = None
         self._pixmap = None
@@ -178,12 +128,7 @@ class CombinationView(QWidget):
         self.image_label.clear()
         self.video_label.clear()
 
-    # --- fitting ----------------------------------------------------------
-
     def _side(self) -> int:
-        """The square each half is fitted into: a share of the pane's height,
-        and no wider than lets the pair, its plus and any parentheses fit across
-        between the margins — the arithmetic :func:`combination_pixmap` draws by."""
         room = QSize(self.width() - 2 * _MARGIN, int(self.height() * _HEIGHT_SHARE))
         return pair_side(room, self._pixmap is not None and self._has_video, self._enclosed)
 
@@ -201,8 +146,6 @@ class CombinationView(QWidget):
         if self._movie is not None and self._video_path:
             target = fit_size(self._video_path, QSize(side, side))
             if target is not None:
-                # Re-fit in place rather than rebuilding: a new movie would restart
-                # the loop from frame one on every pixel of a resize drag.
                 self._movie.setScaledSize(target)
         for label in (self.image_label, self.video_label):
             label.setFixedWidth(side)

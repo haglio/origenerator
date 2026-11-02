@@ -1,19 +1,3 @@
-"""A folder's thumbnails, all of them, tiled edge to edge.
-
-What the preview shows when the tab is about a whole folder rather than one
-generation: the folder itself. A rewrite lands on every item in it, so the
-pane above the prompt has to be every item — showing the newest one alone
-would say the edit was about that item.
-
-The wall fills the pane. The grid is whichever column count leaves the cells
-squarest for the space there is (:func:`rows_for`), the last rows share out the
-remainder so no row ends ragged (:func:`row_counts`), and each thumbnail is scaled
-to cover its cell and cropped to it. Nothing is letterboxed and nothing is
-lettered: this shows a folder, not a sheet to read filenames off.
-
-Both grid functions are pure, so how the wall lays out is testable without a
-screen.
-"""
 from __future__ import annotations
 
 import math
@@ -25,18 +9,6 @@ from PyQt6.QtWidgets import QWidget
 
 
 def rows_for(count: int, width: int, height: int) -> int:
-    """How many rows ``count`` cells take filling a ``width``×``height`` rect.
-
-    Chosen by trying every row count and keeping the one whose cells come out
-    least oblong — which is what makes a wall of thumbnails read as a wall rather
-    than as a row of slivers or a stack of rows. A rect with no area, or nothing
-    to put in it, is ``0``.
-
-    The rows are the whole answer: how many cells each one holds is
-    :func:`row_counts`, which shares the remainder out row by row, and the widest
-    row is what a candidate's cell width is measured at. Searching columns
-    instead would score a cell shape no row ends up drawn at.
-    """
     if count <= 0 or width <= 0 or height <= 0:
         return 0
     best = None
@@ -49,11 +21,6 @@ def rows_for(count: int, width: int, height: int) -> int:
 
 
 def row_counts(count: int, rows: int) -> list[int]:
-    """How many cells each row holds, sharing out the remainder from the top.
-
-    Nine thumbnails over four rows is 3/2/2/2, not 3/3/3/0 — the wall fills, and no
-    row ends in a gap where the grid simply ran out of thumbnails.
-    """
     if rows <= 0 or count <= 0:
         return []
     base, extra = divmod(count, rows)
@@ -61,8 +28,6 @@ def row_counts(count: int, rows: int) -> list[int]:
 
 
 def _readable(path) -> QPixmap | None:
-    """The thumbnail at ``path``, or ``None`` when there is none to load — a file
-    the library has since moved is an ordinary case here, not an error."""
     if not path or not Path(path).is_file():
         return None
     thumbnail = QPixmap(str(path))
@@ -70,8 +35,6 @@ def _readable(path) -> QPixmap | None:
 
 
 def _cover(thumbnail: QPixmap, cell: QRect) -> QPixmap:
-    """``thumbnail`` filling ``cell`` exactly: scaled up until it covers, then
-    cropped about its middle."""
     scaled = thumbnail.scaled(cell.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                               Qt.TransformationMode.SmoothTransformation)
     return scaled.copy(
@@ -81,16 +44,11 @@ def _cover(thumbnail: QPixmap, cell: QRect) -> QPixmap:
 
 
 class ContactSheet(QWidget):
-    """Every thumbnail handed to it, tiled to fill the widget."""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._thumbnails: list[QPixmap] = []
 
     def show_thumbnails(self, paths) -> None:
-        """Tile these files. Ones that can't be read are left out rather than
-        drawn as gaps — the wall says how big the folder is, and a missing file
-        is not a thumbnail in it."""
         self._thumbnails = [p for path in paths if (p := _readable(path)) is not None]
         self.update()
 
@@ -99,12 +57,9 @@ class ContactSheet(QWidget):
         self.update()
 
     def count(self) -> int:
-        """How many thumbnails are actually on the wall."""
         return len(self._thumbnails)
 
     def cells(self) -> list[QRect]:
-        """Where each thumbnail goes, in drawing order — the layout on its own, so
-        it can be read without painting."""
         if not self._thumbnails:
             return []
         rows = rows_for(len(self._thumbnails), self.width(), self.height())

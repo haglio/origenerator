@@ -71,7 +71,12 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
 from origenerator.gui.eliding import ElidingLabel
-from origenerator.gui.enhance_versions import Dating, EnhanceOffer, EnhanceVersions, RunningEnhancement
+from origenerator.gui.enhance_versions import (
+    Dating,
+    EnhanceOffer,
+    EnhanceVersions,
+    RunningEnhancement,
+)
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_modify import FolderModify
 from origenerator.gui.generate_button import (

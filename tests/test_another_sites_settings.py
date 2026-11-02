@@ -14,7 +14,14 @@ from origenerator.gui.generate_pane import parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
 from origenerator.media import MediaType
-from origenerator.outside_videos import FrameFolders, Lent, Made, OutsideVideo, Record, rows_bringing_in
+from origenerator.outside_videos import (
+    FrameFolders,
+    Lent,
+    Made,
+    OutsideVideo,
+    Record,
+    rows_bringing_in,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.outside import VideoKind, outside_workflow
 from tests.comfyui_folders import SUITE_FOLDERS

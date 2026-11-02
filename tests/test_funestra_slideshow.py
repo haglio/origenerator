@@ -2041,3 +2041,11 @@ def test_a_press_on_the_job_queue_on_a_sessions_funestra_reaches_its_foot(qtbot,
     slideshow.shown.press_the_queue("a press", "1|2")
 
     assert pressed == [("a press", "1|2")]
+
+
+def test_a_slideshow_culled_empty_is_over(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, items=[("one.png", "image", "id-1")])
+
+    slideshow.slideshow_cull()
+
+    assert slideshow.is_showing() is False

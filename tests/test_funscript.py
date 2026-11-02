@@ -7,7 +7,6 @@ from app_support.funscript import read_actions
 from funestra.funscript import Funscript
 from funestra.heatmap import build_heatmap
 from funestra.robot_hand import RobotHandState, bpm_for_speed
-
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
     funscript_of,
@@ -86,8 +85,6 @@ def test_a_videos_own_script_is_found_before_those_older_versions_filed(tmp_path
 
 
 def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
-    """Hundreds sit beside their videos. A reader that knew only the new place
-    would drop the motion from every one of them, silently."""
     video = tmp_path / "video" / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"v")
@@ -190,13 +187,10 @@ def test_a_video_with_no_script_anywhere_has_none(tmp_path):
 
 
 def test_read_actions_passes_a_missing_script_through():
-    """``funscript_of`` answers ``None`` for a video with no script, and that goes
-    straight to ``read_actions`` at every call site."""
     assert read_actions(None) == []
 
 
 def test_synthesize_actions_alternates_extremes_at_half_period():
-    # 1 Hz over 2 s → a half-cycle every 500 ms, starting at the floor.
     actions = synthesize_actions(2.0, hz=1.0)
     assert [a["pos"] for a in actions] == [0, 100, 0, 100, 0]
     assert [a["at"] for a in actions] == [0, 500, 1000, 1500, 2000]
@@ -219,7 +213,7 @@ def test_a_scripted_video_moves_at_the_pace_the_robot_hands_speed_bar_rests_at()
 
 
 def test_every_script_is_back_where_it_began_exactly_as_its_video_ends():
-    duration = 49 / 16  # three and a half cycles at 1.2 Hz, were they not fitted
+    duration = 49 / 16
     actions = synthesize_actions(duration, hz=1.2)
     assert actions[0]["pos"] == actions[-1]["pos"]
     assert actions[-1]["at"] == round(duration * 1000)
@@ -245,8 +239,6 @@ def test_write_then_read_round_trips_actions(tmp_path):
 
 
 def test_a_script_that_is_missing_or_will_not_read_holds_no_actions(tmp_path):
-    """One answer across the family, where this app answered None, a sibling
-    answered an empty list and a third raised."""
     assert read_actions(tmp_path / "nope.funscript") == []
     bad = tmp_path / "bad.funscript"
     bad.write_text("not json", encoding="utf-8")
@@ -328,8 +320,6 @@ def test_a_script_whose_video_will_not_say_how_long_it_is_keeps_the_pace_it_has(
     assert script.read_bytes() == before
 
 
-# --- heatmap: funscript actions -> one color per time bucket ----------------
-
 def test_heatmap_colors_empty_without_actions_or_buckets():
     assert heatmap_colors([], 10) == []
     assert heatmap_colors(synthesize_actions(2.0, hz=1.0), 0) == []
@@ -351,9 +341,7 @@ def test_the_heatmap_is_the_one_the_funestras_scrubber_paints():
 
 
 def test_heatmap_colors_run_hotter_with_travel_speed():
-    # A whole motion crammed into 100 ms reads "fast" (red-dominant); the same
-    # motion spread over a second reads "slow" (blue-dominant). One bucket each.
     fast = heatmap_colors([{"at": 0, "pos": 0}, {"at": 100, "pos": 100}], 1)[0]
     slow = heatmap_colors([{"at": 0, "pos": 0}, {"at": 1000, "pos": 100}], 1)[0]
-    assert fast[0] > fast[2]  # red > blue
-    assert slow[2] > slow[0]  # blue > red
+    assert fast[0] > fast[2]
+    assert slow[2] > slow[0]

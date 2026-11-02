@@ -1,11 +1,3 @@
-"""Linking an image-conditioned video to the image generation that seeded it.
-
-An i2v row references its start frame by filename; these helpers match that back
-to the image generation that produced the file, index every image by the
-configuration that made it (so a video can find its frame's settings signature and
-folder name in O(1)), and invert the relation to list the videos an image was
-animated into. The bridge between a video's folders and its start frame's.
-"""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -29,22 +21,12 @@ from origenerator.media import MediaType
 
 @dataclass
 class _ImageConfig:
-    """How the gallery keys and names an image used as an i2v's start frame."""
-
-    prompt_id: str  # which image it is — what the source-image tier groups on
-    signature: str  # the image's settings signature — what names it below
+    prompt_id: str
+    signature: str
     rebuildable: bool
 
 
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
-    """The prompt_id of the image generation an ``input_image`` value names.
-
-    I2V rows reference their start frame by filename; match it to an
-    image generation by basename (through any ``[output]`` annotation). ``None``
-    when the value is empty or none of ``image_rows`` produced a file with that
-    name. Takes the bare value so the Generate tab — which has the field, not a
-    stored row — can resolve it the same way :func:`find_source_image_id` does.
-    """
     image = _image_named(input_image, image_rows)
     return image["prompt_id"] if image is not None else None
 
@@ -62,8 +44,6 @@ def source_image_of(row: dict, image_rows: list[dict]) -> dict | None:
 
 
 def start_images_among(image_rows: list[dict]) -> Callable[[dict], dict | None]:
-    """:func:`source_image_of` for many rows over one pool, each start frame
-    looked for once however many rows share it."""
     named = cache(partial(_image_named, image_rows=image_rows))
     return lambda row: named(_start_frame_of(row))
 
@@ -78,21 +58,11 @@ def _rebuildable(image: dict) -> bool:
 
 
 def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
-    """Return the prompt_id of the image used as this row's ``input_image``.
-
-    I2V rows reference their start frame by filename; match it to an
-    image generation by basename. Returns ``None`` when the row has no input
-    image or none of ``image_rows`` produced a file with that name.
-    """
     image = source_image_of(row, image_rows)
     return image["prompt_id"] if image is not None else None
 
 
 def source_image_id_in(row: dict, image_index: dict) -> str | None:
-    """The prompt_id of the image ``row``'s start frame is, read off
-    ``image_index`` (see :func:`build_image_config_index`) rather than searched
-    for: what a walk of the whole library asks of every video in it. ``None``
-    for a row with no input image, or one no indexed generation produced."""
     return source_image_id_of(_start_frame_of(row), image_index)
 
 
@@ -134,17 +104,6 @@ def image_config_index_of(rows: list[dict]) -> dict:
 
 
 def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
-    """Map each image's output filename to the generation that produced it.
-
-    Keyed by output basename (lowercased, matching how an ``input_image`` value
-    resolves), so an i2v row can look up which image its start frame is, plus
-    that image's settings signature and folder name, in O(1). Built once per
-    tree. Images that produced no file contribute nothing.
-
-    Every file an image row lists points at the same entry, so an image answers
-    as itself under any of its names — which is what keeps a video made from an
-    enhanced frame with one made from the frame before it was enhanced.
-    """
     index: dict[str, _ImageConfig] = {}
     for image in image_rows:
         workflow_name = image.get("workflow_name") or "unknown"
@@ -158,8 +117,6 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
 
 
 def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[dict]:
-    """The video rows that started from one of this image's files: every video
-    whose link back could name it."""
     image_id = image_row.get("prompt_id")
     if image_id is None:
         return []

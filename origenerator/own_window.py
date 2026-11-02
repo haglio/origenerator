@@ -1,6 +1,4 @@
 # ruff: noqa: PLC0415 -- inside the function, so naming this module costs nothing
-"""Opening one of the windows this app has no button for: both of them took
-these steps in two copies until one aged and both died on the same line."""
 from __future__ import annotations
 
 import logging
@@ -10,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def taskbar_identity(title: str, preview) -> str:
-    """What the window *title* names calls itself to Windows -- a preview under
-    a group of its own, so its button is never the production app's."""
     from shared_ui.preview import taskbar_identity as named_for
 
     from origenerator.win32 import APP_USER_MODEL_ID
@@ -21,8 +17,6 @@ def taskbar_identity(title: str, preview) -> str:
 
 
 def taskbar_app(title: str, launcher: str, preview):
-    """Its name, the icon this copy wears -- yellow for a preview, as the app's
-    own window is -- and the launcher that opens it again."""
     from app_support.win32 import TaskbarApp
     from shared_ui.preview_icon_pil import icon_file
 
@@ -59,8 +53,7 @@ def open_on_its_own(title: str, build, *, launcher: str) -> int:
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
 
-    # Before config, which is the first module a missing key stops from
-    # importing, and so before anything that reads where this copy runs from.
+    # Imported before config, which a missing overlay key stops from importing.
     from origenerator.content import missing_overlay_keys
     missing = missing_overlay_keys()
     if missing:
@@ -77,8 +70,7 @@ def open_on_its_own(title: str, build, *, launcher: str) -> int:
     from origenerator.gui.stylesheet import dress_application
     dress_application(app, preview)
 
-    # Named, so the window outlives this line: handed straight to show_or_say it
-    # was collected the moment that call returned, before anything could run.
+    # Held in a local: handed straight to show_or_say the window was collected before anything could run.
     built = build()
     return 0 if show_or_say(title, built) else app.exec()
 

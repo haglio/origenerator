@@ -6,9 +6,6 @@ never imported by the app, each step under the Python that can run it:
 
 ``run`` is the whole training, and crops by starting ``crop`` under ComfyUI's
 Python, so the training is one program that goes on if the app closes.
-
-Only the plain functions are imported by the app's tests; everything heavy is
-imported inside the step that needs it, so this file loads anywhere.
 """
 
 from __future__ import annotations
@@ -23,9 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools import card_claim  # noqa: E402
 
-# How many times the training sees a photo in all, spread over however many
-# photos there are, so a small set is not under-trained.
-_SIGHTINGS = 150
+_TOTAL_PHOTO_SIGHTINGS = 150
 
 
 def training_environment(base: dict) -> dict:
@@ -33,7 +28,7 @@ def training_environment(base: dict) -> dict:
 
 
 def dataset_folder(work: str, part: str, count: int) -> str:
-    return f"{work}/{max(1, math.ceil(_SIGHTINGS / count))}_{part}"
+    return f"{work}/{max(1, math.ceil(_TOTAL_PHOTO_SIGHTINGS / count))}_{part}"
 
 
 def train_command(job: dict, dataset: str, python: str = sys.executable) -> list[str]:

@@ -1,30 +1,3 @@
-"""The gallery's icons: shared glyphs, composed the way this app needs them.
-
-The marks themselves live in :mod:`shared_ui.icons` now.  They used to be drawn
-here, and Fun Time drew its own copies of the ones it shares -- which is how the
-two apps ended up with microphones of different shapes on one screen.  What
-stays here is what is genuinely this app's: which button wears which mark, what
-color it wears it in, and the grounds the TOC initials and item type icons sit on.
-
-The Gallery pane buttons' icons each return a QIcon carrying a normal and a muted
-"disabled" rendering (Qt swaps to the latter when a button is disabled).  The
-TOC initials (:func:`toc_initial_icon`) mark which
-of workflow/model/LoRA a folder is; the item type icons
-(:func:`item_type_icon`) mark a Latest tile as an image or a video.
-
-:func:`recent_mark_icon` is the dot at the start of the row of a folder lately
-worked in, drawn here because it is a color saying one thing, not a mark anyone
-reads.
-
-The corner buttons (:func:`corner_star_icon`, :func:`corner_trash_icon`,
-:func:`corner_enhance_icon`) are the marks an item wears in its
-own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
-with the cursor on it -- because each is a sign and a button at once: the mark
-says which state the item is in, and pressing it is what changes that state.
-
-:func:`tab_close_icon` is the family's cross, so a button that closes tabs wears
-the very mark the tabs themselves do.
-"""
 from __future__ import annotations
 
 from functools import cache
@@ -62,12 +35,8 @@ from origenerator.gallery.output import media_type_of_row
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
 
-_SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
+_SIZE = int(CANVAS)
 
-# TOC initials. Every gallery folder above a settings leaf sits at one
-# of these levels, and a small TOC initial in the level's own color names
-# which, so a tree row or a Gallery pane tile is self-describing without the reader
-# counting indentation.
 LEVEL_LABELS = {
     "workflow": "Workflow", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
@@ -77,32 +46,17 @@ _TOC_INITIALS = {
     "source_image": ("I", GREEN),
 }
 
-# The Latest collection mixes images and videos in one flow, so each tile wears a
-# small item type icon naming its kind. A white glyph on a translucent dark ground,
-# so it reads over a thumbnail of any color.
 _ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
 _ITEM_TYPE_ICON_INK = WHITE
-_ITEM_TYPE_ICON_SIZE = 22  # the icon's on-screen size, in px
+_ITEM_TYPE_ICON_SIZE = 22
 _TOC_INITIAL_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 
-# Every ground carries its mark at one size, whichever mark it is. A corner star and
-# an item type icon can sit on the same tile, and the two only read as one system if
-# they are drawn to one scale — which they were not while each glyph was sized
-# for itself.
 _GLYPH_ON_GROUND = 44
 _GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
 
-# A favorited item's star, in the green Fun Time paints its favorite ★ with: one
-# color means "favorited" across both apps, so a star learned in one reads in
-# the other. Worn by every star that says something IS favorited — the tile's
-# corner button and a favorited folder's row alike. The plus marking an enhanced
-# tile is yellow (YELLOW, this palette's yellow): green is spoken for and the two
-# corner buttons can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
 _REROLL_GLYPH = WHITE
 
-# The re-roll glyph is a composite: the media mark up and to the left, leaving
-# the lower-right corner free for the small regenerate arrow that modifies it.
 _REROLL_MEDIA = 34
 _REROLL_MEDIA_AT = 1
 
@@ -116,14 +70,10 @@ def forward_icon() -> QIcon:
 
 
 def undo_icon() -> QIcon:
-    """A circular arrow curling back, its head to the left — undo."""
     return qt_icon("undo_arrow", size=_SIZE)
 
 
 def redo_icon() -> QIcon:
-    """Undo's mirror image, head to the right — redo. The pair is a mirror on
-    purpose: side by side among the Gallery pane buttons, two arrowheads pointing opposite ways say
-    which is which faster than any difference in the arc could."""
     return qt_icon("redo_arrow", size=_SIZE)
 
 
@@ -144,32 +94,18 @@ def move_down_icon() -> QIcon:
 
 
 def slideshow_icon() -> QIcon:
-    """A play triangle in a frame — play this folder as a fullscreen slideshow."""
     return qt_icon("slideshow", size=_SIZE)
 
 
 def enhance_icon() -> QIcon:
-    """A bold plus — enhance (upscale + re-sample) images.
-
-    Yellow, the very plus an item wears in its enhance corner once it holds one
-    (:func:`corner_enhance_icon`), so the button and the mark it leaves are
-    one symbol in one color — and so it can't be read as a star, which is what
-    green means across this family (:data:`_STAR_GLYPH`)."""
     return qt_icon("plus", color=YELLOW, size=_SIZE)
 
 
 def mic_icon() -> QIcon:
-    """A microphone — say a command or a request.
-
-    The family's one microphone: Fun Time's dashboard paints this same drawing
-    into its voice controls, so the two apps side by side show one control rather
-    than two marks that merely mean the same thing."""
     return qt_icon("mic", size=_SIZE)
 
 
 def radio_icon(*, lit_ink=None) -> QIcon:
-    """A speaker sounding off — Origenerator Radio's on/off switch, drawn in
-    *lit_ink* while it is on when the ground it is lit on wants another ink."""
     icon = qt_icon("speaker", size=_SIZE)
     if lit_ink is not None:
         icon.addPixmap(icon_pixmap("speaker", _SIZE, lit_ink), QIcon.Mode.Normal, QIcon.State.On)
@@ -177,27 +113,14 @@ def radio_icon(*, lit_ink=None) -> QIcon:
 
 
 def trash_icon(*, color=None) -> QIcon:
-    """A trash can — the Trash collection's mark, and the Delete button that fills
-    it. One glyph for both ends of a deletion, so the collection reads as where that
-    button's items go."""
     return qt_icon("trash", color=color, size=_SIZE)
 
 
 def delete_icon() -> QIcon:
-    """The Gallery pane buttons' trash can, in red — the one control among them that
-    takes something away, and the only one worth stopping on before clicking."""
     return trash_icon(color=RED)
 
 
 def star_icon(*, filled: bool) -> QIcon:
-    """A five-pointed star — solid when the folder is favorited, an outline when
-    not, so the hover control shows the state it will toggle.
-
-    A favorited one is green (:data:`_STAR_GLYPH`), the color the corner button and
-    Fun Time's favorite ★ both wear; the outline stays the chrome's own gray,
-    because it is an offer to favorite rather than a thing that is favorited. The
-    Gallery pane buttons' Favorite wears the filled one, so the control and the mark it
-    leaves on a tile are one symbol in one color."""
     if filled:
         icon = qt_icon("star", color=_STAR_GLYPH, size=_SIZE)
         icon.addPixmap(_painted(_ringed_star), QIcon.Mode.Selected)
@@ -247,23 +170,12 @@ def all_icon() -> QIcon:
 
 
 def custom_collection_icon() -> QIcon:
-    """A folder — the mark on a folder the user composed, and the Gallery pane button
-    that composes one out of the picked folders."""
     return qt_icon("folder", size=_SIZE)
 
 
 
 @cache
 def recent_mark_icon() -> QIcon:
-    """A filled dot — worn at the start of the row of a folder lately worked in.
-
-    A dot rather than a glyph, in the family's one accent color: it says a
-    folder is one of the few you were last in and nothing else, and a mark that
-    says one thing should not look like something you can read. Drawn at the
-    shared canvas and scaled down where it is painted, so it stays a smooth disc
-    at whatever size the row gives it; inset a little so that scaling has the
-    room its soft edge needs.
-    """
     icon = QIcon(_painted(_disc(BLUE)))
     icon.addPixmap(_painted(_disc(TEXT_PRIMARY)), QIcon.Mode.Selected)
     return icon
@@ -278,41 +190,22 @@ def _disc(color):
 
 @cache
 def experiment_verdict_icon(verdict: str) -> QIcon:
-    """An experiment tile's review hover-buttons: a check ("up" — keep it, it
-    joins the gallery) or a cross ("down" — reject it and teach the experimenter
-    what to avoid). White line art on the buttons' own translucent ground, like the
-    per-seed re-roll controls."""
     return QIcon(icon_pixmap("check" if verdict == "up" else "cross",
                              _SIZE, _REROLL_GLYPH))
 
 
 @cache
 def item_type_icon(media_type: str) -> QPixmap:
-    """A small item type icon marking a Latest tile as an image or a video.
-
-    A white glyph — a play triangle for a video, a framed photo for an image — on
-    a translucent dark ground, so it reads over a thumbnail of any color. Cached and
-    pre-scaled to its on-screen size; the same two icons decorate every tile.
-    """
     glyph = "play" if media_type == MediaType.VIDEO else "photo"
     return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, glyph, _ITEM_TYPE_ICON_INK))
 
 
 @cache
 def media_type_icon(media_type: str) -> QIcon:
-    """The same play/photo mark as :func:`item_type_icon`, bare.
-
-    The item type icon sits over a thumbnail, so it needs its dark ground to read against
-    any thumbnail; this one sits in a row of text — a Generate tab's label, where it
-    stands in for the thumbnail a tab has no result to show yet, or the row of a
-    folder of images or videos — so the ground would be a black square among words.
-    """
     return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
-# --- the shape a shape of the tree of contents holds ------------------------
-
-MARK_BESIDE_A_WORD = 15  # on-screen size, for a mark that sits level with a word
+MARK_BESIDE_A_WORD = 15
 _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}
 
 
@@ -326,26 +219,13 @@ def separate_mark(size: int) -> QPixmap:
     return icon_pixmap("portrait_beside_landscape", size, TEXT_PRIMARY)
 
 
-# --- the controls an item wears in its corners --------------------------
+ENHANCE_OPEN = "open"
+ENHANCE_HELD = "held"
+ENHANCE_MORE = "more"
 
-# What the plus in an item's lower-right corner is saying. The three are the
-# whole of what the enhancer can be up to about one image; an item it cannot
-# take at all (a video, or a run with no file) shows no plus.
-ENHANCE_OPEN = "open"   # nothing made of it yet: the offer of a first one
-ENHANCE_HELD = "held"   # it already holds the very version these settings make
-ENHANCE_MORE = "more"   # it holds one, and these settings would make another
-
-# A corner button at rest is there without shouting; under the cursor it goes
-# the light gray that says "this is a button" — whatever it is filled with, so
-# the arming and the state it reports stay two separate readings of one mark.
 _CORNER_REST = TEXT_MUTED
 _CORNER_ARMED = TEXT_SECONDARY
 _RESTORE_UNAVAILABLE_OPACITY = 0.4
-# The mark is drawn a little inside its cell rather than filling it, which is what
-# leaves the enhance corner room to shift a second copy of itself down and right
-# without running off the canvas. _ENHANCE_SHADOW is that shift: far enough to
-# show as a shadow at the size a corner is drawn at, and no further, since past
-# the margin it stops being under the mark and starts being beside it.
 _CORNER_MARK = 40.0
 _CORNER_MARK_AT = 4.0
 _ENHANCE_SHADOW = 5.0
@@ -353,26 +233,12 @@ _ENHANCE_SHADOW = 5.0
 
 @cache
 def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
-    """The star in an item's top-left corner: favorite it, or take the
-    favorite away.
-
-    Filled and green once it is favorited — the green Fun Time paints its
-    favorite ★ with, so one color means one thing across both apps — and a
-    hollow outline while it is not. The mark is therefore the state and the
-    button at once, which is why a favorited item keeps it up with nothing
-    hovering: there is no separate sign left to disagree with it.
-    """
     return _corner_icon("star" if favorite else "star_outline",
                         _STAR_GLYPH if favorite else _CORNER_REST, armed)
 
 
 @cache
 def corner_trash_icon(*, armed: bool) -> QIcon:
-    """The trash can in an item's lower-left corner: delete this item.
-
-    Red under the cursor rather than the other two's light gray — it is the one
-    corner whose press takes something away, and it wears the very can, in the very
-    red, that the Gallery pane buttons' Delete does."""
     return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
 
 
@@ -391,22 +257,6 @@ def corner_restore_icon(*, can_restore: bool, armed: bool) -> QIcon:
 
 @cache
 def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
-    """The plus in an item's lower-right corner, reading ``state``.
-
-    :data:`ENHANCE_OPEN` is a hollow plus — nothing has been made of this image
-    and pressing would make the first. :data:`ENHANCE_HELD` is the solid yellow
-    one: it already holds exactly the version the Enhance settings describe, so
-    there is nothing here to press and the mark is a sign alone.
-
-    :data:`ENHANCE_MORE` is both at once, which is the state that needs saying:
-    the image holds an enhancement AND the settings on the Enhance pane would make a
-    different one. So the solid yellow plus goes down first, shifted a little,
-    and is then cleared back out under the hollow one — leaving the enhancement
-    it has as a yellow shadow under the offer of another. The clear is safe here
-    in the one way it is anywhere: this pixmap is ours and the only thing under
-    the mark is the shadow just drawn, so what shows through the hollow is the
-    ground the button paints under it.
-    """
     if state == ENHANCE_HELD:
         return _corner_icon("plus", YELLOW, armed=False)
     ink = _CORNER_ARMED if armed else _CORNER_REST
@@ -416,7 +266,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
         if state == ENHANCE_MORE:
             draw_icon(painter, "plus", YELLOW, size=_CORNER_MARK, x=shifted, y=shifted)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-            _mark(painter, "plus", YELLOW)  # the color is spent: a clear ignores it
+            _mark(painter, "plus", YELLOW)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         _mark(painter, "plus_outline", ink)
 
@@ -424,21 +274,16 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
 
 
 def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
-    """One corner button's mark, at rest or armed — bare line art, since the
-    button paints the translucent ground under it that the corner buttons draw into
-    themselves."""
     color = (arm_color or _CORNER_ARMED) if armed else ink
     return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
 
 
 def _mark(painter: QPainter, glyph: str, ink):
-    """Paint one corner button's glyph where every corner button's glyph goes."""
     draw_icon(painter, glyph, ink, size=_CORNER_MARK,
               x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
 
 
 def _painted(draw, size: int = _SIZE) -> QPixmap:
-    """A transparent canvas with ``draw`` painting into it."""
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -449,14 +294,7 @@ def _painted(draw, size: int = _SIZE) -> QPixmap:
 
 
 def _same_when_dead(pixmap: QPixmap) -> QIcon:
-    """``pixmap`` as an icon that keeps its own look when the button is disabled.
-
-    Qt fades a disabled button's icon by default, which is right for a control
-    that is temporarily out of reach and wrong for the enhance corner's solid
-    yellow plus: that one is disabled precisely because it is a finished
-    statement — this image already holds the version you would be asking for — so
-    a faded rendering of it would read as a fault rather than as an answer.
-    """
+    """``pixmap`` as an icon that keeps its own look when the button is disabled (Qt fades it by default)."""
     icon = QIcon()
     icon.addPixmap(pixmap, QIcon.Mode.Normal)
     icon.addPixmap(pixmap, QIcon.Mode.Disabled)
@@ -464,7 +302,6 @@ def _same_when_dead(pixmap: QPixmap) -> QIcon:
 
 
 def _display_size(pixmap: QPixmap, size: int = _ITEM_TYPE_ICON_SIZE) -> QPixmap:
-    """A rendered ground scaled down to the size a tile shows it at."""
     return pixmap.scaled(
         size, size,
         Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
@@ -473,18 +310,10 @@ def _display_size(pixmap: QPixmap, size: int = _ITEM_TYPE_ICON_SIZE) -> QPixmap:
 
 @cache
 def reroll_seed_icon(media_type: str) -> QIcon:
-    """A thumbnail hover-button glyph: a regenerate ring around a small play/photo
-    mark — "re-roll this video" (its motion) or "this image" (its start frame).
-
-    White line art; the button paints its own translucent ground under it, so the
-    glyph reads over a thumbnail of any color. The two differ by their inner mark,
-    so a video seed control is never mistaken for an image seed one.
-    """
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    # The media identity, drawn large so video vs image reads at a glance...
     draw_icon(painter, "play" if media_type == MediaType.VIDEO else "photo", _REROLL_GLYPH,
               size=_REROLL_MEDIA, x=_REROLL_MEDIA_AT, y=_REROLL_MEDIA_AT)
     draw_icon(painter, "regenerate_corner", _REROLL_GLYPH, size=_SIZE)
@@ -493,8 +322,6 @@ def reroll_seed_icon(media_type: str) -> QIcon:
 
 
 def tab_close_icon() -> QIcon:
-    """The family's cross, so every control that closes a tab wears one mark --
-    the tabs' own, and the config pane's "All" beside them."""
     return qt_icon("cross", size=_SIZE)
 
 
@@ -510,13 +337,6 @@ def folder_kind_icon(group) -> tuple[QIcon, str] | None:
 
 @cache
 def toc_initial_icon(level: str) -> QIcon:
-    """The TOC initial marking a folder's place in the hierarchy (see LEVEL_LABELS).
-
-    Its level's letter, in that level's own color.
-
-    Cached: the same few TOC initials decorate many tree rows and tiles, so they're
-    rendered once and shared rather than re-drawn per folder.
-    """
     icon = QIcon()
     letter, color = _TOC_INITIALS[level]
     icon.addPixmap(_render_toc_initial(letter, color))
@@ -524,13 +344,11 @@ def toc_initial_icon(level: str) -> QIcon:
 
 
 def _render_on_ground(ground, glyph: str, ink) -> QPixmap:
-    """A rounded ground filled with *ground*, carrying *glyph* in *ink*."""
     return _ground_pixmap(ground, lambda painter: draw_icon(
         painter, glyph, ink, size=_GLYPH_ON_GROUND, x=_GROUND_INSET, y=_GROUND_INSET))
 
 
 def _ground_pixmap(color, draw) -> QPixmap:
-    """A rounded ground filled with ``color``, with ``draw`` painting its mark."""
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -544,8 +362,6 @@ def _ground_pixmap(color, draw) -> QPixmap:
 
 
 def _render_toc_initial(letter: str, color) -> QPixmap:
-    """A ground with ``letter`` centered in readable contrast — dark on a light
-    ground, light on a saturated one."""
     def draw(painter: QPainter):
         font = QFont(FONT_UI)
         font.setBold(True)
@@ -562,6 +378,5 @@ _READS_AS_LIGHT = 150
 
 
 def _readable_on(color):
-    """Near-black or the primary text color, whichever reads on ``color``."""
     luminance = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
     return BG_PRIMARY if luminance > _READS_AS_LIGHT else TEXT_PRIMARY

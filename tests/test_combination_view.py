@@ -1,47 +1,38 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QSize
+from PyQt6.QtCore import QSize, Qt
 
 from origenerator.gui.combination import Combination
-from origenerator.gui.combination_view import combination_pixmap
+from origenerator.gui.combination_view import CombinationView, combination_pixmap
 
 
 def _image(path, size=(60, 40), color=(0, 0, 255)):
-    """A file standing in for a start frame or a source video's thumbnail."""
     Image.new("RGB", size, color).save(path)
     return str(path)
 
 
 def test_the_pair_is_two_halves_with_the_operator_between_them(qtbot, tmp_path):
-    # The look every surface showing a waiting run stands: what is being
-    # animated, plus the video whose settings came with it.
     pair = combination_pixmap(Combination(_image(tmp_path / "frame.png"),
                                           _image(tmp_path / "clip.png", color=(255, 0, 0))),
                               QSize(172, 160))
 
-    assert pair.width() > pair.height()   # two of them across, not one
-    assert pair.width() <= 172            # …and inside the plate it was given
+    assert pair.width() > pair.height()
+    assert pair.width() <= 172
 
 
 def test_a_lone_image_is_not_a_sum(qtbot, tmp_path):
-    # Nothing came with it, so there is nothing to add it to and no operator to
-    # draw: the frame takes the plate on its own.
     alone = combination_pixmap(Combination(_image(tmp_path / "frame.png")), QSize(172, 160))
 
     assert alone.width() == alone.height()
 
 
 def test_a_run_made_from_nothing_draws_nothing(qtbot, tmp_path):
-    # A T2V has no thumbnail to its name yet, and a stand-in would be a
-    # thumbnail of something with nothing to do with it.
     assert combination_pixmap(Combination(), QSize(172, 160)) is None
     assert combination_pixmap(Combination(str(tmp_path / "gone.png")), QSize(172, 160)) is None
 
 
 def test_the_clip_beside_the_frame_is_drained_of_color(qtbot, tmp_path):
-    # Gray because it is not what is being made: in full color beside the frame
-    # it reads as a second subject.
     frame = _image(tmp_path / "frame.png", size=(80, 80), color=(0, 0, 255))
     video = _image(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
     image = combination_pixmap(Combination(frame, video), QSize(172, 160)).toImage()
@@ -49,8 +40,8 @@ def test_the_clip_beside_the_frame_is_drained_of_color(qtbot, tmp_path):
     side = image.height()
     left = image.pixelColor(side // 2, side // 2)
     right = image.pixelColor(image.width() - side // 2, side // 2)
-    assert left.blue() > left.red()                      # the frame keeps its color
-    assert right.red() == right.green() == right.blue()  # the video has lost its
+    assert left.blue() > left.red()
+    assert right.red() == right.green() == right.blue()
 
 
 def _columns_of(image, color):
@@ -76,3 +67,59 @@ def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses(qtbot, tmp
     assert video_edited[0] > video_as_made[0]
     assert _painted(edited, video_as_made[0], video_edited[0])
     assert _painted(edited, video_edited[-1] + 1, edited.width())
+
+
+def _view(qtbot, combination):
+    view = CombinationView()
+    qtbot.addWidget(view)
+    view.resize(500, 200)
+    view.show()
+    view.show_pair(combination)
+    return view
+
+
+def test_a_click_on_the_pair_falls_through_to_the_pane(qtbot, tmp_path):
+    view = _view(qtbot, Combination(_image(tmp_path / "frame.png")))
+
+    for label in (view.image_label, view.plus_label, view.video_label):
+        assert label.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+
+def test_the_plus_shows_only_with_both_halves(qtbot, tmp_path):
+    frame, clip = _image(tmp_path / "frame.png"), _image(tmp_path / "clip.png")
+
+    both = _view(qtbot, Combination(frame, clip))
+    alone = _view(qtbot, Combination(frame))
+
+    assert not both.plus_label.isHidden()
+    assert alone.plus_label.isHidden()
+
+
+def test_the_parentheses_show_only_around_a_source_video_whose_prompt_was_edited(qtbot, tmp_path):
+    frame, clip = _image(tmp_path / "frame.png"), _image(tmp_path / "clip.png")
+
+    edited = _view(qtbot, Combination(frame, clip, prompt_edited=True))
+    no_video = _view(qtbot, Combination(frame, prompt_edited=True))
+    as_made = _view(qtbot, Combination(frame, clip))
+
+    assert not edited.open_paren_label.isHidden()
+    assert no_video.open_paren_label.isHidden()
+    assert as_made.open_paren_label.isHidden()
+
+
+def test_dragging_the_pane_bigger_keeps_the_looping_video_going(qtbot, tmp_path):
+    view = _view(qtbot, Combination(_image(tmp_path / "frame.png"), _image(tmp_path / "clip.png")))
+    playing = view._movie
+
+    view.resize(800, 300)
+
+    assert view._movie is playing
+
+
+def test_showing_a_pair_with_no_video_leaves_no_last_frame_of_the_one_before(qtbot, tmp_path):
+    frame, clip = _image(tmp_path / "frame.png"), _image(tmp_path / "clip.png")
+    view = _view(qtbot, Combination(frame, clip))
+
+    view.show_pair(Combination(frame))
+
+    assert view.video_label.pixmap().isNull()

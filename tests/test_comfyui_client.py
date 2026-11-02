@@ -1,11 +1,3 @@
-"""The websocket event pump, and what it emits.
-
-The REST half's tests are tests/test_comfyui_api.py; what is left here is the
-part that needs Qt -- the thread, the signals, and the message handlers that
-turn a ComfyUI websocket frame into one.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -18,20 +10,7 @@ from tests.comfyui_folders import SUITE_FOLDERS
 
 
 def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
-    """stop() must interrupt the reconnect backoff, not wait it out.
-
-    The websocket loop parks in ``await asyncio.sleep(3)`` between reconnect
-    attempts. If stop() only flips a flag, the thread (and the whole process)
-    lingers for the rest of that sleep after the window has already closed, so
-    a quick relaunch is swallowed by Windows while the dying instance still
-    owns the taskbar identity. stop() must cancel the sleep so the thread ends
-    at once.
-    """
-    client = ComfyUIClient(host="127.0.0.1", port=59999, folders=SUITE_FOLDERS)  # nothing listening
-    # Wait for the refused connect to drop the loop into its 3s reconnect sleep.
-    # The refusal fires ``disconnected`` almost at once; the generous timeout is a
-    # safety net for a cold QThread + asyncio + websockets spin-up under heavy load
-    # (a full GUI suite plus sibling agents), not an expected wait.
+    client = ComfyUIClient(host="127.0.0.1", port=59999, folders=SUITE_FOLDERS)
     with qtbot.waitSignal(client.disconnected, timeout=15000):
         client.start()
     client.stop()
@@ -55,8 +34,6 @@ def test_parse_ws_executing_none_signals_completion():
     assert messages == [("exec", "p1", "5"), ("finished", "p1")]
 
 def test_executing_message_tracks_then_clears_current_prompt():
-    # Preview frames arrive without a prompt_id, so the client tags them with
-    # whichever prompt is currently executing.
     client = ComfyUIClient.__new__(ComfyUIClient)
     client._executing_prompt_id = None
     client._on_job_finished = lambda pid: None
@@ -73,13 +50,8 @@ def test_executing_message_tracks_then_clears_current_prompt():
     assert client._executing_prompt_id is None
 
 def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
-    # After a reconnect, ComfyUI's replayed "executing" carries no prompt_id, so the
-    # client can't learn the running job from it. A progress event does name the
-    # prompt; the client adopts it as the executing prompt, so the live preview
-    # frames that follow (which carry no id of their own) attribute to that job
-    # instead of being dropped. Without this, a reconnected run shows no live frame.
     client = ComfyUIClient(folders=SUITE_FOLDERS)
-    client._executing_prompt_id = ""  # the empty tag the reconnect replay left over
+    client._executing_prompt_id = ""
 
     client._handle_ws_message(json.dumps({
         "type": "progress", "data": {"prompt_id": "job1", "value": 3, "max": 10},
@@ -88,11 +60,6 @@ def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
     assert client._executing_prompt_id == "job1"
 
 def test_progress_carries_the_node_that_took_the_step(qtbot):
-    # Which sampler a step belongs to is what says what it cost: a foley step and
-    # a WAN video step arrive as the same event and are two orders of magnitude
-    # apart in the bar (see origenerator.progress). The node is read off the
-    # progress event itself rather than off the "executing" frame before it,
-    # because a reconnect mid-pass never sees that frame.
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     seen = []
     client.progress.connect(lambda *args: seen.append(args))
@@ -105,8 +72,6 @@ def test_progress_carries_the_node_that_took_the_step(qtbot):
         "type": "progress", "data": {"prompt_id": "job1", "value": 4, "max": 50},
     }))
 
-    # An event with no node named still reports; the tracker treats an empty name
-    # as "same pass as before", which is what it was before ids were carried.
     assert seen == [("job1", "24", 3, 50), ("job1", "", 4, 50)]
 
 def test_a_failed_run_arrives_saying_what_threw_and_nothing_its_node_was_given(qtbot):
@@ -129,17 +94,12 @@ def test_a_failed_run_arrives_saying_what_threw_and_nothing_its_node_was_given(q
     })]
 
 def test_reuses_a_supplied_client_id(qtbot):
-    # Persisting and reusing this id across launches is how a restart reconnects to a
-    # job still running in ComfyUI, which targets that job's live websocket messages
-    # at the id that submitted it. The id also rides the /ws query so ComfyUI routes
-    # the running prompt's messages to this reconnecting socket.
     client = ComfyUIClient(client_id="stable-id", folders=SUITE_FOLDERS)
 
     assert client.client_id == "stable-id"
     assert "clientId=stable-id" in client.ws_url
 
 def test_mints_a_distinct_client_id_when_none_supplied(qtbot):
-    # A read-only gallery or a test needs no persisted id; each gets its own.
     assert ComfyUIClient(folders=SUITE_FOLDERS).client_id
     assert ComfyUIClient(folders=SUITE_FOLDERS).client_id != ComfyUIClient(folders=SUITE_FOLDERS).client_id
 
@@ -149,7 +109,6 @@ def test_binary_preview_emits_image_tagged_with_current_prompt(qtbot):
     received = []
     client.preview_image.connect(lambda pid, data: received.append((pid, data)))
 
-    # ComfyUI frames: 4-byte event type (1 = preview), 4-byte image format, image.
     msg = struct.pack(">I", 1) + struct.pack(">I", 2) + b"PNG-BYTES"
     client._handle_ws_binary(msg)
 
@@ -162,6 +121,17 @@ def test_binary_non_preview_event_is_ignored(qtbot):
     client.preview_image.connect(lambda pid, data: received.append((pid, data)))
 
     client._handle_ws_binary(struct.pack(">I", 3) + b"not-an-image")
+
+    assert received == []
+
+
+def test_a_binary_frame_too_short_to_hold_a_preview_is_ignored(qtbot):
+    client = ComfyUIClient(folders=SUITE_FOLDERS)
+    client._executing_prompt_id = "p1"
+    received = []
+    client.preview_image.connect(lambda pid, data: received.append((pid, data)))
+
+    client._handle_ws_binary(struct.pack(">I", 1) + b"abc")
 
     assert received == []
 

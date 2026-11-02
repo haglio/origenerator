@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from origenerator.gui import omnipause
+from PIL import Image
 from PyQt6.QtCore import QObject
+from PyQt6.QtGui import QMovie
 
 
 class _Pane(QObject):
@@ -41,3 +43,19 @@ def test_the_freeze_lets_go_of_what_has_gone(qtbot):
     pane.setParent(None)
     del pane
     omnipause.freeze(True)
+
+
+def test_a_looping_picture_held_by_the_room_is_paused_with_it(tmp_path):
+    two_frames = tmp_path / "loop.gif"
+    first, second = Image.new("RGB", (4, 4), "red"), Image.new("RGB", (4, 4), "blue")
+    first.save(two_frames, save_all=True, append_images=[second], duration=50, loop=0)
+    movie = QMovie(str(two_frames))
+    movie.start()
+    omnipause.holds(movie)
+
+    omnipause.freeze(True)
+    paused = movie.state()
+    omnipause.freeze(False)
+
+    assert paused == QMovie.MovieState.Paused
+    assert movie.state() == QMovie.MovieState.Running

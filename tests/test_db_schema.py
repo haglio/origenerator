@@ -219,7 +219,7 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
         column for column, *_ in SCHEMA["generations"]) == GENERATION_COLUMNS
 
 
-FIRST_SHIPPED = {
+COLUMNS_AS_FIRST_SHIPPED_AND_NEVER_EDITED = {
     "combine_video_uses": {
         "id", "intent", "video_prompt_id", "generation_prompt_id", "created_at"},
     "custom_folder_generations": {"folder_id", "prompt_id", "position"},
@@ -247,7 +247,7 @@ FIRST_SHIPPED = {
 @pytest.mark.parametrize("table", sorted(SCHEMA))
 def test_every_column_either_shipped_with_the_table_or_the_migration_adds_it(table):
     assert {column for column, *_ in SCHEMA[table]} == (
-        FIRST_SHIPPED[table] | set(ADDED_COLUMNS.get(table, ())))
+        COLUMNS_AS_FIRST_SHIPPED_AND_NEVER_EDITED[table] | set(ADDED_COLUMNS.get(table, ())))
 
 
 
@@ -279,6 +279,21 @@ def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
     with sqlite3.connect(path) as conn:
         found = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
     assert found == {column for column, *_ in SCHEMA[table]}
+
+
+def test_opening_a_database_that_is_already_up_to_date_changes_nothing_in_it(tmp_path):
+    path = tmp_path / "older.db"
+    with sqlite3.connect(path) as conn:
+        for table in ADDED_COLUMNS:
+            _create_without(conn, table, set(ADDED_COLUMNS[table]))
+    Database(path)
+    with sqlite3.connect(path) as conn:
+        once = conn.execute("SELECT name, sql FROM sqlite_master ORDER BY name").fetchall()
+
+    Database(path)
+
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT name, sql FROM sqlite_master ORDER BY name").fetchall() == once
 
 
 @pytest.mark.parametrize("table", sorted(ADDED_COLUMNS))

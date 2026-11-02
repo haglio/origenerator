@@ -39,10 +39,15 @@ def test_the_connection_is_closed_even_when_the_block_raises(file):
         conn.execute("SELECT 1")
 
 
-def test_a_block_that_raises_writes_nothing(file):
-    with pytest.raises(ValueError, match="half a batch"), file.connect() as conn:
+def _write_half_a_batch(file):
+    with file.connect() as conn:
         conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene two",))
         raise ValueError("half a batch")
+
+
+def test_a_block_that_raises_writes_nothing(file):
+    with pytest.raises(ValueError, match="half a batch"):
+        _write_half_a_batch(file)
 
     with file.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0] == 0

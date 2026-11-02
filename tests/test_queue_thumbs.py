@@ -16,19 +16,15 @@ from origenerator.gui.queue_thumbs import (
     source_pixmap,
 )
 
-CELL = 28  # a queue row's height, less its margins
+CELL = 28
 
 
 def _thumbnail(path, color, size=(80, 40)):
-    """A flat rectangle standing in for a render — wider than tall, so a cell
-    that crops it can be told from a cell that squashed it."""
     Image.new("RGB", size, color).save(path)
     return str(path)
 
 
 def _color_at(pixmap, x, y):
-    # pixelColor, not pixel: an empty cell and a faint slot differ only in alpha,
-    # which pixel() throws away.
     return pixmap.toImage().pixelColor(x, y)
 
 
@@ -37,15 +33,13 @@ def _middle_of_cell(index):
 
 
 def test_a_cell_shows_the_whole_image_letterboxed(qapp, tmp_path):
-    # Fitted, not cover-cropped: a crop takes the edges off, and a thumbnail whose
-    # subject is not dead center comes out as a thumbnail of something else.
-    red = _thumbnail(tmp_path / "a.png", (255, 0, 0))  # wider than tall
+    red = _thumbnail(tmp_path / "a.png", (255, 0, 0))
 
     block = source_pixmap(Combination(red), CELL)
 
-    assert _color_at(block, CELL // 2, CELL // 2).red() > 200  # the thumbnail itself
-    assert _color_at(block, CELL // 2, 0).alpha() == 0         # letterbox above it
-    assert _color_at(block, CELL // 2, CELL - 1).alpha() == 0  # and below
+    assert _color_at(block, CELL // 2, CELL // 2).red() > 200
+    assert _color_at(block, CELL // 2, 0).alpha() == 0
+    assert _color_at(block, CELL // 2, CELL - 1).alpha() == 0
 
 
 def test_a_tall_thumbnail_is_pillarboxed_instead(qapp, tmp_path):
@@ -58,14 +52,11 @@ def test_a_tall_thumbnail_is_pillarboxed_instead(qapp, tmp_path):
 
 
 def test_a_missing_file_is_no_thumbnail_rather_than_a_blank_one(qapp, tmp_path):
-    # A start frame can be a library file that has moved, or one still rendering.
     assert source_pixmap(Combination(tmp_path / "gone.png"), CELL) is None
     assert source_pixmap(Combination(), CELL) is None
 
 
 def test_a_combine_draws_the_frame_then_its_source_video_in_gray(qapp, tmp_path):
-    # The frame leads because it is what gets animated; the source video follows in
-    # gray because it is the settings being reused, not a second thing being made.
     frame = _thumbnail(tmp_path / "frame.png", (255, 0, 0))
     video = _thumbnail(tmp_path / "source.png", (0, 0, 255))
 
@@ -75,7 +66,7 @@ def test_a_combine_draws_the_frame_then_its_source_video_in_gray(qapp, tmp_path)
     assert lead.red() > 200
     assert lead.blue() < 60
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
-    assert follow.red() == follow.green() == follow.blue()  # the source video, drained
+    assert follow.red() == follow.green() == follow.blue()
 
 
 def _source_video_columns(block, video):
@@ -94,9 +85,6 @@ def test_a_combine_row_puts_a_plus_between_the_frame_and_its_source_video(qapp, 
 
 
 def test_a_source_video_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
-    # A video queued after the image it animates has no frame on disk yet. The
-    # source video still says something about this run, and stays in its own cell so
-    # the two read as one column down the line.
     video = _thumbnail(tmp_path / "source.png", (0, 0, 255))
 
     block = source_pixmap(Combination(tmp_path / "not-yet.png", video), CELL)
@@ -131,8 +119,6 @@ def test_neither_half_on_disk_is_still_no_thumbnail(qapp, tmp_path):
 
 
 def test_the_thumbnails_lie_across_the_row_not_stacked(qapp, tmp_path):
-    # Stacked into a 2x2 the cells are half a row's height each, which is small
-    # enough that four of them read as one smudge.
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
     paths = [_thumbnail(tmp_path / f"{i}.png", c) for i, c in enumerate(colors)]
 
@@ -148,8 +134,6 @@ def test_the_thumbnails_lie_across_the_row_not_stacked(qapp, tmp_path):
 
 
 def test_a_folder_view_keeps_its_empty_slots(qapp, tmp_path):
-    # A folder holding one item should read as a folder with room in it, not as
-    # thumbnails that failed to arrive — so the cells nothing fills are drawn.
     one = _thumbnail(tmp_path / "only.png", (255, 0, 0))
 
     block = folder_pixmap([one], CELL)
@@ -159,8 +143,6 @@ def test_a_folder_view_keeps_its_empty_slots(qapp, tmp_path):
 
 
 def test_a_start_frame_leaves_the_rest_of_the_block_empty(qapp, tmp_path):
-    # It is not a folder: there is no second thumbnail missing from it, so drawing
-    # slots beside it would claim three that never existed.
     frame = _thumbnail(tmp_path / "frame.png", (255, 0, 0))
 
     block = source_pixmap(Combination(frame), CELL)
@@ -170,7 +152,6 @@ def test_a_start_frame_leaves_the_rest_of_the_block_empty(qapp, tmp_path):
 
 
 def test_one_thumbnail_takes_the_same_width_as_four(qapp, tmp_path):
-    # So the line of text beside the block starts at the same place on every row.
     frame = _thumbnail(tmp_path / "frame.png", (255, 0, 0))
     mates = [_thumbnail(tmp_path / f"m{i}.png", (0, 0, 255)) for i in range(4)]
 
@@ -178,8 +159,6 @@ def test_one_thumbnail_takes_the_same_width_as_four(qapp, tmp_path):
 
 
 def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
-    # Four is what fits across without the row's text starting halfway along the
-    # Job Queue; the fifth thumbnail of a busy folder has nowhere to go.
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255)]
     paths = [_thumbnail(tmp_path / f"{i}.png", c) for i, c in enumerate(colors)]
 
@@ -187,12 +166,10 @@ def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
 
     assert len(paths) > FOLDER_CELLS
     last = _color_at(block, _middle_of_cell(3), CELL // 2)
-    assert last.blue() < 60  # the fourth thumbnail, not the fifth
+    assert last.blue() < 60
 
 
 def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypatch):
-    # The Job Queue re-renders on every poll and a start frame is a full-size render;
-    # decoding one a second and a half apart is work nobody sees.
     thumbnail = _thumbnail(tmp_path / "a.png", (255, 0, 0))
     queue_thumbs._CELLS.clear()
     source_pixmap(Combination(thumbnail), CELL)
@@ -203,13 +180,11 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
     again = source_pixmap(Combination(thumbnail), CELL)
 
     assert reads == []
-    assert again is not None  # answered from the cache, not re-fitted to nothing
+    assert again is not None
 
 
 def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
         qapp, tmp_path, monkeypatch):
-    # The seed dropdown draws a cell for every seed it is scrolled past, which
-    # over a session can be the whole library.
     monkeypatch.setattr(queue_thumbs, "_MOST_CELLS", 2)
     queue_thumbs._CELLS.clear()
     a, b, c = (_thumbnail(tmp_path / f"{name}.png", (255, 0, 0)) for name in "abc")
@@ -222,13 +197,10 @@ def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
     for path in (a, c, b):
         fitted_cell(path, CELL)
 
-    assert len(reads) == 1  # only b, drawn longest ago, had to be read again
+    assert len(reads) == 1
 
 
 def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
-    # A start frame enhanced in place, or a thumbnail written again, is the
-    # same path with new pixels; the cache keyed by path alone kept drawing
-    # the old thumbnail until the app restarted (bug 27).
     thumbnail = _thumbnail(tmp_path / "a.png", (255, 0, 0))
     queue_thumbs._CELLS.clear()
     assert _color_at(source_pixmap(Combination(thumbnail), CELL), CELL // 2, CELL // 2).red() > 200
@@ -241,8 +213,6 @@ def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
 
 
 def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):
-    # Every row is handed a fresh view-model on every poll, and recomposing four
-    # scaled cells for a queue that hasn't moved is work nobody sees.
     thumbs = QueueThumbs(CELL)
     qtbot.addWidget(thumbs)
     folder = [_thumbnail(tmp_path / "f.png", (0, 0, 255))]
@@ -256,8 +226,6 @@ def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):
 
 def test_a_source_frame_that_is_not_on_disk_yet_leaves_the_block_to_the_folder(
         qtbot, tmp_path):
-    # A video queued after the image it animates: its start frame is named but
-    # not rendered, so the caller is told to fall back rather than draw a blank.
     thumbs = QueueThumbs(CELL)
     qtbot.addWidget(thumbs)
 
@@ -276,8 +244,6 @@ def test_a_block_with_nothing_to_show_leaves_the_row(qtbot, tmp_path):
 
 
 def test_the_block_never_eats_the_rows_click(qtbot):
-    # The row it sits in opens the folder on a click and reorders the line on a
-    # drag; a child widget under the cursor would swallow both.
     thumbs = QueueThumbs(CELL)
     qtbot.addWidget(thumbs)
 

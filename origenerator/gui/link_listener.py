@@ -1,12 +1,3 @@
-"""Where a click on one of this app's toasts reaches the running app.
-
-Windows answers a click by running the production checkout's handler
-(:mod:`origenerator.app_link`), which hands the generation over here or starts
-the app carrying it; both arrive at :meth:`LinkListener.answer_with`. Standing
-from the moment there is an event loop rather than from the moment there is a
-window, because a launch here is slow and a click during one would otherwise
-find nobody listening and start a second copy.
-"""
 from __future__ import annotations
 
 import logging
@@ -23,15 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class LinkListener(QObject):
-    """The channel a checkout's clicks arrive on, and what is waiting on it."""
-
     def __init__(self, *, checkout: Path, environ=None,
                  parent: QObject | None = None):
         super().__init__(parent)
         self._answer: Callable[[str], None] | None = None
         self._waiting: list[str] = []
-        # Taken out of the environment, not merely read: every child this app
-        # starts would otherwise inherit an instruction meant for this launch.
         self._asked_for(
             (os.environ if environ is None else environ).pop(app_link.CARRIED_IN, ""))
         self._server = running_copy.listen(
@@ -42,19 +29,12 @@ class LinkListener(QObject):
                            self._server.errorString())
 
     def answer_with(self, go_to: Callable[[str], None]) -> None:
-        """Take every click to *go_to*, starting with any that arrived already."""
         self._answer = go_to
         waiting, self._waiting = self._waiting, []
         for generation in waiting:
             go_to(generation)
 
     def _asked_for(self, generation: str) -> None:
-        """Answer a click, or hold it until there is a window to answer it in.
-
-        Whatever arrives is read as strictly as the link it came from
-        (:func:`origenerator.app_link.a_generation`): a link is open to anything
-        that can reach a shell.
-        """
         wanted = app_link.a_generation(generation)
         if wanted is None:
             if generation:

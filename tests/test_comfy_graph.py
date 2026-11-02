@@ -15,7 +15,7 @@ def test_follow_resolves_link_else_none():
     graph = {"2": {"class_type": "CLIPTextEncode", "inputs": {"text": "hi"}}}
     assert follow(graph, ["2", 0])["inputs"]["text"] == "hi"
     assert follow(graph, None) is None
-    assert follow(graph, "2") is None  # not a link
+    assert follow(graph, "2") is None
 
 
 def test_conditioning_node_finds_wan_node():
@@ -52,8 +52,6 @@ def test_clip_prompt_nodes_falls_back_to_titles():
 
 
 def test_dual_sampler_model_files_pairs_high_low_unet_and_lora():
-    # A WAN i2v model chain: each stage's sampler -> ModelSamplingSD3 -> LoRA
-    # loader -> UNET loader. High is the noise-adding stage, low the other.
     graph = {
         "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_high.safetensors"}},
         "5": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_low.safetensors"}},
@@ -77,7 +75,6 @@ def test_dual_sampler_model_files_pairs_high_low_unet_and_lora():
 
 
 def test_a_dual_sampler_offers_its_unets_and_no_lora():
-    # WAN t2i has the dual samplers but no LoRA loaders in the model chain.
     graph = {
         "3": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_high.safetensors"}},
         "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_low.safetensors"}},
@@ -95,7 +92,6 @@ def test_a_dual_sampler_offers_its_unets_and_no_lora():
 
 
 def test_dual_sampler_model_files_empty_without_advanced_samplers():
-    # A plain KSampler graph (SDXL) has no high/low split to read.
     graph = {"5": {"class_type": "KSampler", "inputs": {"model": ["1", 0]}}}
     assert dual_sampler_model_files(graph) == {}
 
@@ -107,8 +103,6 @@ def test_graph_model_params_reads_sdxl_checkpoint():
 
 
 def test_graph_model_params_reads_flux_gguf_unet():
-    # Flux loads its diffusion model via UnetLoaderGGUF; the gallery groups Flux
-    # runs by this "unet" value, so it must be pulled out of the graph.
     graph = {
         "1": {"class_type": "UnetLoaderGGUF",
               "inputs": {"unet_name": "ultrarealFineTune_v4_fp16.gguf"}},
@@ -118,9 +112,6 @@ def test_graph_model_params_reads_flux_gguf_unet():
 
 
 def test_graph_model_params_reads_a_lone_unet_loader_through_its_sampler():
-    # Krea 2 loads its diffusion model via UNETLoader, the loader WAN's expert
-    # pair also uses, so one that is no half of a pair is read off the
-    # KSampler's own model chain, LoRA and all.
     graph = {
         "1": {"class_type": "UNETLoader",
               "inputs": {"unet_name": "krea2_turbo_fp8_scaled.safetensors", "weight_dtype": "default"}},
@@ -154,8 +145,6 @@ def test_graph_model_params_empty_when_no_model_loaders():
 
 
 def test_input_image_name_reads_the_loadimage_filename():
-    # i2v/flf2v graphs start from a LoadImage; its filename is the source frame
-    # the gallery links back to.
     graph = {
         "1": {"class_type": "LoadImage", "inputs": {"image": "sdxl_t2i_00022_.png"}},
         "5": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"start_image": ["1", 0]}},
@@ -164,8 +153,6 @@ def test_input_image_name_reads_the_loadimage_filename():
 
 
 def test_input_image_name_none_without_a_string_source():
-    # No LoadImage, or one whose image is a wired link rather than a filename,
-    # names no source image.
     assert input_image_name({"5": {"class_type": "KSampler", "inputs": {}}}) is None
     linked = {"1": {"class_type": "LoadImage", "inputs": {"image": ["9", 0]}}}
     assert input_image_name(linked) is None

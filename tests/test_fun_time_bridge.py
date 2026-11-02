@@ -12,11 +12,7 @@ from funestra.hud_placement import HudCorner
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.radio import radio_file_for, read_radio
 from funestra.satellite_hud import parse_hud
-from PIL import Image
-
-from origenerator import fun_time_mode as contract
-from origenerator import gallery
-from origenerator.fun_time_bridge import FunTimeBridge
+from origenerator.fun_time_bridge import FunTimeBridge, ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
@@ -25,7 +21,11 @@ from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
 from origenerator.gui.slideshow_pace import DEFAULT_S
-from origenerator.slideshow_buttons import answer
+from origenerator.slideshow_buttons import ORIGENERATOR_MODE, answer
+from PIL import Image
+
+from origenerator import fun_time_mode as contract
+from origenerator import gallery
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeDB,
@@ -1069,8 +1069,6 @@ def test_an_app_closing_takes_its_funestras_radio_with_it(qtbot, tmp_path):
 
 
 def test_asking_the_room_for_the_mode_writes_it_on_the_dashboard_channel(tmp_path):
-    from origenerator.fun_time_bridge import ask_for_origenerator_mode
-    from origenerator.slideshow_buttons import ORIGENERATOR_MODE
     channel = tmp_path / "dashboard_cmd.txt"
 
     ask_for_origenerator_mode(channel)
@@ -1079,6 +1077,4 @@ def test_asking_the_room_for_the_mode_writes_it_on_the_dashboard_channel(tmp_pat
 
 
 def test_a_session_that_names_no_dashboard_channel_is_not_asked_for_the_mode():
-    from origenerator.fun_time_bridge import ask_for_origenerator_mode
-
     ask_for_origenerator_mode(None)

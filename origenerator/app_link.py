@@ -1,11 +1,3 @@
-"""The way into this app from outside it: the link a clicked toast follows.
-
-A toast outlives the app that raised it, so Windows answers one by
-following the link the toast carries (``activationType="protocol"``) and running
-whatever is registered for its scheme: the production checkout's handler
-(:data:`HANDLER`), whichever copy raised the toast. Qt-free, because this is
-what runs on a click.
-"""
 from __future__ import annotations
 
 import ctypes
@@ -29,8 +21,6 @@ SCHEME = "origenerator"
 _GO_TO = "go-to"
 _GENERATION = "generation"
 
-#: A generation's id as this app ever writes one. A link is open to whatever can
-#: reach a shell, so anything else is refused rather than passed on.
 _AN_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 CARRIED_IN = "ORIGENERATOR_GO_TO"
@@ -50,12 +40,10 @@ _LOOK_EVERY_S = 0.1
 
 
 def link_to(generation: str) -> str:
-    """The link that takes the user to *generation*."""
     return f"{SCHEME}:{_GO_TO}?{_GENERATION}={generation}"
 
 
 def generation_in(link: str) -> str | None:
-    """The generation *link* asks for, or ``None`` when it asks for anything else."""
     parts = urlsplit(link)
     if parts.scheme != SCHEME or parts.path != _GO_TO:
         return None
@@ -64,7 +52,6 @@ def generation_in(link: str) -> str | None:
 
 
 def a_generation(asked: str) -> str | None:
-    """*asked* if it could name a generation of this app's, else ``None``."""
     return asked if _AN_ID.fullmatch(asked or "") else None
 
 
@@ -73,15 +60,12 @@ def made_for_a_click() -> bool:
 
 
 def channel_for(checkout: Path) -> str:
-    """The name the app running out of *checkout* is handed a generation on."""
     home = os.path.normcase(os.path.abspath(checkout))
     return f"Origenerator-{hashlib.sha1(home.encode('utf-16-le')).hexdigest()[:12]}"
 
 
 def windowless_interpreter() -> Path:
-    """This interpreter's silent twin, beside it in every venv. Windows gives a
-    console interpreter with no console of its own a console window, over
-    whatever the user was doing."""
+    """Windows gives a console interpreter run with no console of its own a console window over whatever the user was doing."""
     silent = Path(sys.executable).with_name("pythonw.exe")
     return silent if silent.exists() else Path(sys.executable)
 
@@ -91,11 +75,6 @@ def handler_command(*, checkout: Path, interpreter: Path) -> str:
 
 
 def follow(argv, *, checkout: Path = CHECKOUT) -> int:
-    """Take the user to whatever the link in *argv* names. What Windows calls.
-
-    *argv* is the launcher to start the app with and the link itself, in the
-    order :func:`handler_command` writes them.
-    """
     try:
         launcher, link = argv
     except ValueError:
@@ -127,11 +106,6 @@ def wait_until_it_listens(channel: str) -> None:
 
 
 def hand_over(generation: str, *, channel: str) -> bool:
-    """Hand *generation* to the app listening on *channel*, or say nobody is.
-
-    A busy pipe is not nobody: starting a second copy of the app over a click is
-    worse than the click doing nothing, so that waits and then gives up.
-    """
     giving_up_at = time.monotonic() + _BUSY_PATIENCE_S
     while True:
         try:
@@ -160,11 +134,7 @@ def listening(channel: str) -> bool:
 
 
 def let_it_take_the_foreground(pipe: int) -> None:
-    """Pass the right to come forward to whoever is listening on *pipe*.
-
-    Windows hands that right to the process it starts for a click and to nobody
-    else (see :mod:`shared_ui.foreground`).
-    """
+    """Windows lets only the process it started for a click come to the foreground."""
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
     kernel32.GetNamedPipeServerProcessId.argtypes = [
         ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.wintypes.ULONG)]
@@ -175,12 +145,6 @@ def let_it_take_the_foreground(pipe: int) -> None:
 
 
 def start_the_app(checkout: Path, launcher: str, generation: str) -> None:
-    """Start the app out of *checkout*, carrying *generation* for it to open.
-
-    Through the checkout's own launcher, so a launch from a click is the launch a
-    double-click makes; the generation rides in the environment, which is what a
-    launcher passes on and arguments are not.
-    """
     system = os.environ.get("SYSTEMROOT", r"C:\Windows")
     subprocess.Popen(
         [str(Path(system) / "System32" / "wscript.exe"), str(checkout / launcher)],
@@ -191,10 +155,6 @@ def start_the_app(checkout: Path, launcher: str, generation: str) -> None:
 
 
 def _note(checkout: Path, what: str) -> None:
-    """Say in the launcher's own log that a click arrived, and what came of it.
-
-    The only record a click leaves: the handler has no console and no window.
-    """
     try:
         log = checkout / "state" / "origenerator_launcher.log"
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -202,4 +162,4 @@ def _note(checkout: Path, what: str) -> None:
             stamped = time.strftime("%Y-%m-%d %H:%M:%S")
             writing.write(f"===== {stamped} toast: {what}\n")
     except OSError:
-        pass  # a click is worth more than the note of it
+        pass

@@ -1,7 +1,3 @@
-"""The link a clicked toast follows, and what following one does.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import os
@@ -35,14 +31,10 @@ def test_a_link_names_the_generation_it_opens():
     "origenerator:go-to?generation=" + "a" * 129,
 ])
 def test_a_link_that_asks_for_anything_else_names_nothing(link):
-    # The scheme is open to whatever can reach a shell -- a page, another app --
-    # so a link is read as one thing only: a generation this gallery may hold.
     assert app_link.generation_in(link) is None
 
 
 def test_each_checkout_names_a_channel_of_its_own():
-    # A suite's copy listens on its own checkout's, never on the one production's
-    # clicks arrive on.
     live = app_link.channel_for(Path(r"C:\workspace\origenerator"))
     preview = app_link.channel_for(Path(r"C:\workspace\origenerator\.claude\worktrees\x"))
 
@@ -132,8 +124,6 @@ def test_a_link_to_anything_else_starts_nothing_and_hands_over_nothing(monkeypat
 
 
 def test_a_handler_called_with_anything_else_does_nothing(monkeypatch, tmp_path):
-    # The scheme is open to whatever can reach a shell, and so is the command
-    # registered for it.
     monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: pytest.fail("handed over"))
     runs = _started(monkeypatch)
 
@@ -144,9 +134,6 @@ def test_a_handler_called_with_anything_else_does_nothing(monkeypatch, tmp_path)
 
 
 def test_an_app_too_busy_to_take_a_click_is_not_started_a_second_time(monkeypatch, tmp_path):
-    # Every instance of the channel busy means the app is there and answering
-    # someone else. A second copy of it started over a click would be worse than
-    # the click doing nothing.
     monkeypatch.setattr(app_link, "_BUSY_PATIENCE_S", 0.05)
     monkeypatch.setattr(app_link.os, "open",
                         lambda *a, **k: (_ for _ in ()).throw(PermissionError("busy")))
@@ -159,10 +146,6 @@ def test_an_app_too_busy_to_take_a_click_is_not_started_a_second_time(monkeypatc
 
 
 def test_a_click_while_another_click_is_starting_the_app_starts_nothing(monkeypatch, tmp_path):
-    # Toasts clicked one after another faster than the app comes up: the copy
-    # the first click started is still on its loading screen, nobody is
-    # listening yet, and a second copy started over it could only say that
-    # another copy is running.
     monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: False)
     app_is_up = threading.Event()
     monkeypatch.setattr(app_link, "listening", lambda channel: app_is_up.is_set())
@@ -195,9 +178,6 @@ def test_a_click_whose_app_never_comes_up_leaves_the_next_click_free_to_start_it
 
 
 def test_a_click_leaves_a_line_in_the_log_the_launcher_writes(monkeypatch, tmp_path):
-    # The one record of a click there can be: nothing else about it is visible,
-    # and a click that did nothing is otherwise indistinguishable from one that
-    # never happened.
     monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: True)
 
     app_link.follow(["launch_origenerator.vbs", app_link.link_to("alpha-1")],
@@ -216,9 +196,6 @@ def test_a_log_that_cannot_be_written_costs_the_click_nothing(monkeypatch, tmp_p
 
 
 def test_the_handler_windows_runs_answers_out_of_its_own_checkout(tmp_path):
-    # Run by path from wherever Windows happens to be standing, so what decides
-    # what a click does has to be this checkout's copy rather than whichever one
-    # the venv has installed.
     handler = subprocess.run(
         [sys.executable, str(app_link.CHECKOUT / app_link.HANDLER),
          app_link.LIVE_LAUNCHER, "https://example.test/"],

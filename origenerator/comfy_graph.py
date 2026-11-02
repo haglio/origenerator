@@ -1,10 +1,3 @@
-"""Traversal helpers for ComfyUI API-format prompt graphs.
-
-A prompt graph is ``{node_id: {"class_type": str, "inputs": {...}}}`` where an
-input can be a link ``[source_node_id, slot]``. The importer uses these helpers
-to locate the prompt, conditioning, latent and model nodes when reading back the
-settings a graph was run with.
-"""
 from __future__ import annotations
 
 from typing import NamedTuple
@@ -21,14 +14,12 @@ class ModelChain(NamedTuple):
 
 
 def follow(graph: dict, ref) -> dict | None:
-    """Resolve an input link ``[node_id, slot]`` to its source node, or None."""
     if isinstance(ref, list) and ref:
         return graph.get(str(ref[0]))
     return None
 
 
 def conditioning_node(graph: dict) -> dict | None:
-    """The Wan video conditioning node (i2v/flf2v), if the graph has one."""
     return next(
         (n for n in graph.values() if n.get("class_type") in _COND_NODES),
         None,
@@ -48,11 +39,6 @@ def empty_latent(graph: dict) -> dict | None:
 
 
 def _model_chain(graph: dict, model_ref) -> ModelChain:
-    """Walk a ``model`` link back to its UNET and LoRA source files.
-
-    Follows each node's ``model`` input until it reaches a ``UNETLoader``,
-    capturing the first LoRA loader's name and model strength on the way.
-    """
     unet = lora = strength = None
     node = follow(graph, model_ref)
     seen: set[int] = set()
@@ -87,15 +73,6 @@ def _base_sampler_models(graph: dict) -> dict:
 
 
 def dual_sampler_model_files(graph: dict) -> dict:
-    """The high/low UNET and LoRA filenames a WAN dual-noise graph loaded.
-
-    WAN 2.2's two-stage sampling runs a high-noise ``KSamplerAdvanced``
-    (``add_noise`` enabled) then a low-noise one (disabled). Walking each
-    sampler's ``model`` input back to its UNET — and any LoRA in between — pairs
-    the files with the stage that used them by graph structure, not node-id
-    order. Returns whichever ``unet_``, ``lora_`` and ``lora_strength_`` keys, high
-    and low, it resolves; empty for a graph with no such samplers.
-    """
     result: dict = {}
     for suffix, add_noise in (("high", "enable"), ("low", "disable")):
         sampler = next(
@@ -117,19 +94,6 @@ def dual_sampler_model_files(graph: dict) -> dict:
 
 
 def graph_model_params(graph: dict) -> dict:
-    """The model-file params a graph loads, keyed as the workflows store them.
-
-    One place the importer (and its backfill) reads a graph's models from, so
-    every workflow's model nests into the gallery's folders the same way:
-
-    * ``checkpoint`` — SDXL's ``CheckpointLoaderSimple``.
-    * ``unet`` — Flux's ``UnetLoaderGGUF``, or the lone ``UNETLoader`` a
-      ``KSampler``'s model chain leads back to (Krea 2), with any LoRA on the way.
-    * ``unet_high``/``unet_low`` (and any ``lora_high``/``lora_low``) — WAN's
-      dual-noise samplers, paired to their stage by :func:`dual_sampler_model_files`.
-
-    Returns only the keys it resolves; empty for a graph with no model loaders.
-    """
     params: dict = {}
     for node in graph.values():
         inputs = node.get("inputs", {})
@@ -169,7 +133,6 @@ def sound_params(graph: dict) -> dict:
 
 
 def driving_video_params(graph: dict) -> dict:
-    """The video a graph performed and, at a forced rate, the second it started at."""
     for node in graph.values():
         inputs = node.get("inputs", {})
         video = inputs.get("video") if node.get("class_type") == "VHS_LoadVideoPath" else None
@@ -183,14 +146,6 @@ def driving_video_params(graph: dict) -> dict:
 
 
 def input_image_name(graph: dict) -> str | None:
-    """The image filename an I2V graph loads, or ``None``.
-
-    i2v and flf2v graphs start from a single ``LoadImage`` whose ``image`` input
-    names the source frame — the value the gallery links a video back to. Returns
-    the last such filename found (graphs here carry one), or ``None`` when no
-    ``LoadImage`` holds a plain filename (a graph without one, or one fed by a
-    wired link rather than a name).
-    """
     result = None
     for node in graph.values():
         if node.get("class_type") == "LoadImage":
@@ -201,9 +156,6 @@ def input_image_name(graph: dict) -> str | None:
 
 
 def clip_prompt_nodes(graph: dict):
-    """Return the (positive, negative) CLIPTextEncode nodes, traced back from
-    what the graph conditions on that side; by title only where nothing is
-    wired to trace."""
     titled_positive, titled_negative = _titled_prompt_nodes(graph)
     return (_encoder_feeding(graph, "positive") or titled_positive,
             _encoder_feeding(graph, "negative") or titled_negative)

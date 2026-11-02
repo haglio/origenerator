@@ -29,10 +29,9 @@ def _draw(path: Path, color: tuple, pointing_down: bool) -> None:
     image.save(path)
 
 
-def arrow_paths(color) -> tuple[str, str] | None:
+def arrow_paths(color, directory: Path = STATE_DIR / "ui") -> tuple[str, str] | None:
     rgb = (color.red(), color.green(), color.blue(), 255)
     stem = f"spin_arrow_{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
-    directory = STATE_DIR / "ui"
     up, down = directory / f"{stem}_up.png", directory / f"{stem}_down.png"
     try:
         if not up.exists():

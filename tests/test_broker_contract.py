@@ -10,7 +10,7 @@ from origenerator import config, osr2
 CONTRACT = Path("broker") / "broker_contract.json"
 
 
-def _promise() -> dict:
+def _broker_contract_found_by_walking_up_from_here() -> dict:
     for parent in Path(__file__).resolve().parents:
         published = parent / CONTRACT
         if published.is_file():
@@ -19,6 +19,6 @@ def _promise() -> dict:
 
 
 def test_the_stamp_is_read_from_the_directory_the_broker_writes_it_to():
-    named = _promise()["state_dir"]
+    named = _broker_contract_found_by_walking_up_from_here()["state_dir"]
 
     assert config.project_dir(named["checkout"]) / named["name"] == osr2.SHARED_STATE_DIR

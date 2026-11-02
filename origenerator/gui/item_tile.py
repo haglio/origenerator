@@ -360,7 +360,7 @@ class ItemTile(QWidget):
 
     def _hover_buttons(self) -> list:
         """Every child a cursor can be over while it is still "on the tile" — the
-        collection's own actions and the three corner controls alike."""
+        collection's own actions and the three corner buttons alike."""
         return self._corner_buttons + self._controls.buttons()
 
     def eventFilter(self, obj, event):

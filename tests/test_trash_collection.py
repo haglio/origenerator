@@ -509,10 +509,10 @@ def test_an_item_whose_files_are_all_gone_is_emptied_with_no_thumbnail(tmp_path)
     gone = _file(tmp_path / "out" / "p1.png")
     batch = Trash(tmp_path / "trash").store([gone])
     (batch.subdir / "0_p1.png").unlink()
-    db.record_deletion("p1", {"prompt_id": "p1", "output_files": json.dumps(
+    db.record_trashed("p1", {"prompt_id": "p1", "output_files": json.dumps(
         [{"filename": "p1.png", "subfolder": ""}])}, batch.record())
     _age(db, "p1", 2)
 
-    assert recovery.empty_what_has_waited_a_day(db, _places(tmp_path)) == 1
+    assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 1
 
-    assert recovery.bin_items(db.list_deletions())[0]["thumbnail_path"] is None
+    assert trash_collection.trash_items(db.list_trashed())[0]["thumbnail_path"] is None

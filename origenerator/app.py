@@ -221,6 +221,7 @@ def _put_the_backfill_in_place(library: Library):
 
 
 def _tend_the_trash(library: Library):
+    from origenerator import trash_collection
 
     return trash_collection.tend_the_trash(library.db, library.places)
 

@@ -1095,9 +1095,9 @@ class GalleryPane(QObject):
         deleted item hasn't got.
 
         What it doesn't get is the ordinary tile's right-click menu, its star or its
-        enhance — those all want a row in the gallery — and no drag to a combine slot,
+        enhance — those all want a row in the gallery — and no drag to a Combine drop zone,
         whose graphs read files out of ComfyUI's output folder, not ours. Its corners
-        and its menu offer the two acts that do apply: restore, where the star goes,
+        and its menu offer the two things that do apply: restore, where the star goes,
         or end it for good, where delete goes.
         """
         def wire(tile):

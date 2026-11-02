@@ -1,22 +1,3 @@
-"""A tooltip you can click into.
-
-Qt's own tooltip is a rendering of some text: its window is transparent to the
-mouse and vanishes the moment the pointer moves toward it, so a link inside one
-can be drawn but never followed. Where the useful thing to say about a control is
-"it is happening over there", that is exactly the wrong tooltip — naming the
-place is no help when the names are long and alike, and the answer the user wants
-is to be taken there.
-
-So this is a small popup that behaves like a tooltip and accepts a click: it
-appears under the widget it watches after the usual pause, stays while the
-pointer is over either of them, and emits :attr:`link_activated` with the href of
-whatever link was clicked. It closes on the way out of both, on a click of the
-watched widget, and whenever its text is taken away.
-
-One tip per watched widget, set with :meth:`set_html` — empty html turns it off,
-which is the state a control is in when it has nothing but ordinary text to say
-(that stays with Qt's tooltip, which handles the ordinary case perfectly well).
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, pyqtSignal
@@ -26,29 +7,15 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
 
 
 def link(href: str, text: str) -> str:
-    """One link for a tip's html, colored so it reads as one.
-
-    Qt's default anchor color is the desktop's, which against this app's dark
-    surfaces can come out all but unreadable — and a link nobody sees is the same
-    as no link.
-    """
     return f'<a href="{href}" style="color: {BLUE.name()};">{text}</a>'
 
-# The pause before it appears, near enough Qt's own that the two don't feel like
-# different mechanisms on neighboring buttons.
 _APPEAR_MS = 500
-# How long it survives the pointer leaving, so the pointer can cross the gap onto
-# the tip to click its link. Qt's tooltip needs no such grace, being unclickable.
 _LINGER_MS = 400
-# The gap under the watched widget, wide enough that the pointer travelling down
-# to the tip doesn't leave the widget before the tip is under it.
 _GAP = GAP_SMALL
 
 
 class LinkTip(QObject):
-    """Watches one widget and shows a clickable tip beneath it."""
-
-    link_activated = pyqtSignal(str)  # the href of the link that was clicked
+    link_activated = pyqtSignal(str)
 
     def __init__(self, widget, parent=None):
         super().__init__(parent or widget)
@@ -69,12 +36,6 @@ class LinkTip(QObject):
         widget.installEventFilter(self)
 
     def set_html(self, html: str):
-        """What the tip says, as rich text — ``""`` to have no tip at all.
-
-        Taking the text away closes an open one: the reason it was worth clicking
-        into (Auto-Generate running elsewhere, say) has ended, and a stale offer to go
-        somewhere is worse than none.
-        """
         self._html = html or ""
         if not self._html:
             self.hide()
@@ -97,8 +58,6 @@ class LinkTip(QObject):
                 self._appear.stop()
                 self._start_hide()
             elif event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.Hide):
-                # The click has done whatever the tip was offering to explain, and
-                # what it says next is decided by the click's own outcome.
                 self.hide()
         return False
 
@@ -124,15 +83,11 @@ class LinkTip(QObject):
 
 
 class _TipPopup(QFrame):
-    """The popup itself: a tooltip-shaped frame that reports its own hovering."""
-
     entered = pyqtSignal()
     left = pyqtSignal()
 
     def __init__(self):
-        # The ToolTip window type keeps it frameless and focus-free, but unlike
-        # QToolTip's own window it still receives the mouse — which is the whole
-        # point of the thing.
+        # Qt: the ToolTip window type is frameless and focus-free yet, unlike QToolTip's window, receives the mouse.
         super().__init__(None, Qt.WindowType.ToolTip)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setStyleSheet(
@@ -144,9 +99,8 @@ class _TipPopup(QFrame):
         layout.setContentsMargins(MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD, GAP_SMALL)
         self.label = QLabel()
         self.label.setTextFormat(Qt.TextFormat.RichText)
-        # Links only: selecting the text would swallow the click that follows one.
         self.label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
-        self.label.setOpenExternalLinks(False)  # the href is ours to act on
+        self.label.setOpenExternalLinks(False)
         layout.addWidget(self.label)
 
     def offset(self):

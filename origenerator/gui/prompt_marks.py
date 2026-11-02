@@ -7,7 +7,7 @@ from shared_ui.colors import BG_PRIMARY, TEXT_MUTED, YELLOW
 from origenerator.gui.tracked_prompt import prompt_ranges_from
 
 
-class _PastTheLimit(QSyntaxHighlighter):
+class _PromptMarks(QSyntaxHighlighter):
     starts_at: int | None = None
     unread = False
 
@@ -25,9 +25,9 @@ class _PastTheLimit(QSyntaxHighlighter):
 
 
 def mark_past_the_limit(field: QPlainTextEdit, starts_at: int | None, *, unread: bool) -> None:
-    marks = field.findChild(_PastTheLimit)
+    marks = field.findChild(_PromptMarks)
     if marks is None:
-        marks = _PastTheLimit(field)
+        marks = _PromptMarks(field)
         marks.setDocument(field.document())
     if (marks.starts_at, marks.unread) != (starts_at, unread):
         marks.starts_at, marks.unread = starts_at, unread

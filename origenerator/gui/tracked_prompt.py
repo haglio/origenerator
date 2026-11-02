@@ -39,7 +39,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtGui import QBrush, QKeySequence, QTextCharFormat, QTextCursor
+from PyQt6.QtGui import QBrush, QKeySequence, QTextCharFormat, QTextCursor, QTextDocument
 from PyQt6.QtWidgets import QPlainTextEdit
 
 from origenerator.gui import diff_text
@@ -51,9 +51,10 @@ from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 # rewrites the document once rather than once per letter.
 SETTLE_MS = 150
 
-_ARROW_STEPS = {Qt.Key.Key_Left: -1, Qt.Key.Key_Right: 1}
-_ARROW_MODES = {Qt.KeyboardModifier.NoModifier: QTextCursor.MoveMode.MoveAnchor,
-                Qt.KeyboardModifier.ShiftModifier: QTextCursor.MoveMode.KeepAnchor}
+_BACK = (QTextCursor.MoveOperation.PreviousCharacter, QTextCursor.MoveOperation.PreviousWord)
+_ON = (QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveOperation.NextWord)
+_MOVES = {Qt.Key.Key_Left: _BACK, Qt.Key.Key_Right: _ON}
+_ERASES = {Qt.Key.Key_Backspace: _BACK, Qt.Key.Key_Delete: _ON}
 
 
 def _plain_format() -> QTextCharFormat:
@@ -159,6 +160,7 @@ class _Tracker(QObject):
         if self._history is not None:
             self._history.watch(edit)
         edit.document().contentsChange.connect(self._on_contents_change)
+        edit.cursorPositionChanged.connect(self._keep_caret_off_struck_words)
 
     def detach(self) -> None:
         self._settle.stop()
@@ -167,6 +169,7 @@ class _Tracker(QObject):
         if self._history is not None:
             self._history.unwatch(self._edit)
         self._edit.document().contentsChange.disconnect(self._on_contents_change)
+        self._edit.cursorPositionChanged.disconnect(self._keep_caret_off_struck_words)
         self._edit.setUndoRedoEnabled(True)
         self.setParent(None)
         self.deleteLater()
@@ -335,22 +338,76 @@ class _Tracker(QObject):
         # Leaving the field ends the typing, whatever the clock still says.
         if event.type() == QEvent.Type.FocusOut:
             self.show_whole_change()
-        return event.type() == QEvent.Type.KeyPress and self._arrow_stepped(event)
+        return event.type() == QEvent.Type.KeyPress and self._key_kept_off_struck_words(event)
 
-    def _arrow_stepped(self, event) -> bool:
-        step = _ARROW_STEPS.get(event.key())
-        mode = _ARROW_MODES.get(event.modifiers())
-        cursor = self._edit.textCursor()
-        if (step is None or mode is None
-                or (mode == QTextCursor.MoveMode.MoveAnchor and cursor.hasSelection())
-                or not any(kind == REMOVED for kind, _piece in self._layout)):
+    def _key_kept_off_struck_words(self, event) -> bool:
+        if not any(kind == REMOVED for kind, _piece in self._layout):
             return False
+        shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+        mode = QTextCursor.MoveMode.KeepAnchor if shift else QTextCursor.MoveMode.MoveAnchor
+        selected = self._edit.textCursor().hasSelection()
+        if event.key() in _MOVES and (shift or ctrl or not selected):
+            self._move_through_prompt(_MOVES[event.key()][ctrl], mode)
+            return True
+        if event.key() in _ERASES and not shift and not selected:
+            self._erase_through_prompt(_ERASES[event.key()][ctrl])
+            return True
+        return event.key() == Qt.Key.Key_Down and not ctrl and self._down_past_struck_lines(mode)
+
+    def _along_prompt(self, offset: int, move: QTextCursor.MoveOperation) -> int:
+        prompt = QTextDocument(self._value)
+        cursor = QTextCursor(prompt)
+        cursor.setPosition(offset)
+        cursor.movePosition(move)
+        return cursor.position()
+
+    def _move_through_prompt(self, move: QTextCursor.MoveOperation,
+                             mode: QTextCursor.MoveMode) -> None:
+        cursor = self._edit.textCursor()
         here = self.prompt_offset(cursor.position())
-        there = min(max(here + step, 0), len(self._value))
+        there = self._along_prompt(here, move)
         if there != here:
             cursor.setPosition(self.document_offset(there), mode)
             self._edit.setTextCursor(cursor)
+
+    def _erase_through_prompt(self, move: QTextCursor.MoveOperation) -> None:
+        here = self.prompt_offset(self._edit.textCursor().position())
+        there = self._along_prompt(here, move)
+        if there != here:
+            cursor = QTextCursor(self._edit.document())
+            cursor.setPosition(self.document_offset(here))
+            cursor.setPosition(self.document_offset(there), QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+
+    def _down_past_struck_lines(self, mode: QTextCursor.MoveMode) -> bool:
+        cursor = self._edit.textCursor()
+        here = self.prompt_offset(cursor.position())
+        if (not cursor.movePosition(QTextCursor.MoveOperation.Down, mode)
+                or self.prompt_offset(cursor.position()) != here):
+            return False
+        while (self.prompt_offset(cursor.position()) == here
+               and cursor.movePosition(QTextCursor.MoveOperation.Down, mode)):
+            pass
+        if self.prompt_offset(cursor.position()) == here:
+            cursor.setPosition(self.document_offset(self._along_prompt(here, _ON[0])), mode)
+        self._edit.setTextCursor(cursor)
         return True
+
+    def _keep_caret_off_struck_words(self) -> None:
+        if self._writing:
+            return
+        cursor = self._edit.textCursor()
+        here = self.prompt_offset(cursor.position())
+        place = self.document_offset(here)
+        if cursor.hasSelection() and self.prompt_offset(cursor.anchor()) == here:
+            cursor.setPosition(place)
+        elif cursor.position() != place:
+            cursor.setPosition(place, QTextCursor.MoveMode.KeepAnchor if cursor.hasSelection()
+                               else QTextCursor.MoveMode.MoveAnchor)
+        else:
+            return
+        self._edit.setTextCursor(cursor)
 
 
 def _tracker_of(edit: QPlainTextEdit) -> _Tracker | None:

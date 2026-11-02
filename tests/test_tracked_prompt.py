@@ -478,10 +478,125 @@ def test_an_arrow_with_a_selection_and_no_shift_still_goes_to_the_selections_edg
     assert not pair.edit.textCursor().hasSelection()
 
 
-def test_ctrl_with_an_arrow_still_moves_by_the_word(pair, qtbot):
+def _click_at(qtbot, edit: QPlainTextEdit, position: int, click=None) -> None:
+    cursor = QTextCursor(edit.document())
+    cursor.setPosition(position)
+    (click or qtbot.mouseClick)(edit.viewport(), Qt.MouseButton.LeftButton,
+                                pos=edit.cursorRect(cursor).center())
+
+
+def test_a_click_on_struck_words_puts_the_caret_where_backspace_works(pair, qtbot):
     _struck_out_of_the_middle(pair)
+
+    _click_at(qtbot, pair.edit, pair.edit.toPlainText().index("cat") + 1)
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Backspace)
+
+    assert diff_text.live_text(pair.edit) != "a on a couch"
+    assert _marked(pair.edit, "struck") == "cat"
+
+
+def test_a_double_click_on_a_struck_word_selects_nothing(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+
+    _click_at(qtbot, pair.edit, pair.edit.toPlainText().index("cat") + 1, qtbot.mouseDClick)
+
+    assert not pair.edit.textCursor().hasSelection()
+
+
+def test_end_stops_before_struck_words_so_backspace_takes_the_last_letter(pair, qtbot):
+    pair.edit.setPlainText("a cat")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_End)
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Backspace)
+
+    assert diff_text.live_text(pair.edit) == "a ca"
+
+
+def test_home_stops_after_struck_words_that_open_the_prompt(pair, qtbot):
+    pair.edit.setPlainText("on a couch")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Home)
+
+    assert pair.edit.textCursor().position() == pair.edit.toPlainText().index("on a couch")
+
+
+def test_backspace_at_the_start_of_the_prompt_leaves_struck_words_that_open_it_whole(pair, qtbot):
+    pair.edit.setPlainText("on a couch")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
     tracked_prompt.put_caret_in_prompt(pair.edit, 0)
+    before = pair.edit.toPlainText()
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Backspace)
+
+    assert pair.edit.toPlainText() == before
+
+
+def test_delete_just_before_struck_words_takes_the_letter_after_them(pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a"))
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Delete)
+
+    assert diff_text.live_text(pair.edit) == "aon a couch"
+
+
+def test_delete_at_the_end_of_the_prompt_leaves_struck_words_after_it_whole(pair, qtbot):
+    pair.edit.setPlainText("a cat")
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a cat"))
+    before = pair.edit.toPlainText()
+
+    qtbot.keyClick(pair.edit, Qt.Key.Key_Delete)
+
+    assert pair.edit.toPlainText() == before
+
+
+def test_ctrl_with_the_right_arrow_goes_past_struck_words_to_the_next_word_of_the_prompt(
+        pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a "))
 
     qtbot.keyClick(pair.edit, Qt.Key.Key_Right, Qt.KeyboardModifier.ControlModifier)
 
-    assert pair.edit.textCursor().position() == len("a ")
+    assert tracked_prompt.caret_in_prompt(pair.edit) == len("a on ")
+
+
+def test_ctrl_with_the_left_arrow_goes_past_struck_words_to_the_last_word_of_the_prompt(
+        pair, qtbot):
+    _struck_out_of_the_middle(pair)
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("a on"))
+
+    for _word in ("on", "a"):
+        qtbot.keyClick(pair.edit, Qt.Key.Key_Left, Qt.KeyboardModifier.ControlModifier)
+
+    assert tracked_prompt.caret_in_prompt(pair.edit) == 0
+
+
+def test_the_down_arrow_gets_past_struck_lines(pair, qtbot):
+    pair.edit.setPlainText("one\nfour")
+    tracked_prompt.track(pair.edit, "one\ntwo\nthree\nfour")
+    pair.edit.setFocus()
+    tracked_prompt.put_caret_in_prompt(pair.edit, 0)
+
+    for _press in range(3):
+        qtbot.keyClick(pair.edit, Qt.Key.Key_Down)
+
+    assert pair.edit.textCursor().block().text() == "four"
+
+
+def test_the_up_arrow_gets_past_struck_lines(pair, qtbot):
+    pair.edit.setPlainText("one\nfour")
+    tracked_prompt.track(pair.edit, "one\ntwo\nthree\nfour")
+    pair.edit.setFocus()
+    tracked_prompt.put_caret_in_prompt(pair.edit, len("one\nfour"))
+
+    for _press in range(3):
+        qtbot.keyClick(pair.edit, Qt.Key.Key_Up)
+
+    assert pair.edit.textCursor().block().text() == "one"

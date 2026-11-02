@@ -186,11 +186,8 @@ class FolderTree(QTreeWidget):
         super().mousePressEvent(event)
 
     def selected_folder_keys(self) -> list[str]:
-        keys = []
-        for item in self.selectedItems():
-            if item.data(0, self._role) is not None:
-                keys.append(item.data(0, TREE_KEY_ROLE))
-        return keys
+        return [item.data(0, TREE_KEY_ROLE) for item in self.selectedItems()
+                if item.data(0, self._role) is not None]
 
     def startDrag(self, supported_actions):
         pressed = self.currentItem()

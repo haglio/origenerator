@@ -48,14 +48,11 @@ def _painted_strings(tree: ast.AST):
 
 def test_no_test_spells_out_a_family_color_by_hand():
     family = _family_hex()
-    offenders = []
-    for path in _sources():
-        for node in _painted_strings(ast.parse(path.read_text(encoding="utf-8"))):
-            for found in _HEX.findall(node.value):
-                if found.lower() in family:
-                    offenders.append(
-                        f"{path.name}:{node.lineno} {found} is "
-                        f"shared_ui.palette.{family[found.lower()]}")
+    offenders = [f"{path.name}:{node.lineno} {found} is shared_ui.palette.{family[found.lower()]}"
+                 for path in _sources()
+                 for node in _painted_strings(ast.parse(path.read_text(encoding="utf-8")))
+                 for found in _HEX.findall(node.value)
+                 if found.lower() in family]
     assert not offenders, (
         "a family color written out by hand instead of read from "
         "shared_ui.palette: " + ", ".join(offenders))

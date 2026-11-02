@@ -17,6 +17,7 @@ from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import (
     GenerationJob,
+    JobPlan,
     JobSpec,
     JobState,
     insert_generation_row,
@@ -208,7 +209,7 @@ class JobQueue(QObject):
                     source: str = GenerationSource.GENERATED) -> list[str | None]:
         if self._client is None or not self._launchable(key, source):
             return [None] * len(batch)
-        jobs = [self._new_job(key, workflow, params, self._on_finished, source=source)
+        jobs = [self._new_job(key, JobPlan(workflow, params, source=source), self._on_finished)
                 for params in batch]
         lined_up = [job for job in jobs if job is not None]
         if lined_up:
@@ -231,8 +232,9 @@ class JobQueue(QObject):
         self._reroll_variation(key, row, image_rows, new_image=True, new_video=False)
 
     def regenerate(self, key: str, row: dict) -> str | None:
-        return self._launch(key, (workflow := WORKFLOW_REGISTRY[row["workflow_name"]]),
-                            filled_params(row, workflow), self._on_finished)
+        workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
+        return self._launch(
+            key, JobPlan(workflow, filled_params(row, workflow)), self._on_finished)
 
     def _reroll_variation(self, key, row, image_rows, *, new_image, new_video):
         if self._client is None or not self._launchable(key):
@@ -245,15 +247,16 @@ class JobQueue(QObject):
         if source is None:
             if not new_video:
                 return
-            self._launch(key, workflow, video_params, self._on_finished)
+            self._launch(key, JobPlan(workflow, video_params), self._on_finished)
         else:
             source_row, image_workflow = source
             self._launch(
-                key, image_workflow, prepared_params(source_row, image_workflow),
+                key,
+                JobPlan(image_workflow, prepared_params(source_row, image_workflow),
+                        run_media_type=workflow.output_type),
                 lambda k, job, files, thumb, dur: self._on_image_finished(
                     k, job, (files, thumb, dur), workflow, video_params
                 ),
-                run_media_type=workflow.output_type,
             )
 
     def _reroll_source_image(self, row: dict, image_rows: list[dict]):
@@ -261,28 +264,25 @@ class JobQueue(QObject):
         source = self._db.get_generation(picked["prompt_id"]) if picked is not None else None
         return (source, WORKFLOW_REGISTRY[source["workflow_name"]]) if source is not None else None
 
-    def _launch(self, key, workflow, params, on_finished, *, origin=None, run_media_type=None,
-                shielded=False):
-        job = self._new_job(key, workflow, params, on_finished,
-                            origin=origin, run_media_type=run_media_type, shielded=shielded)
+    def _launch(self, key, plan: JobPlan, on_finished):
+        job = self._new_job(key, plan, on_finished)
         if job is not None:
             self._enqueue(job)
             self._admit(job)
         return job and job.prompt_id
 
-    def _new_job(self, key, workflow, params, on_finished, *,
-                 source=GenerationSource.GENERATED, origin=None, run_media_type=None,
-                 shielded=False):
+    def _new_job(self, key, plan: JobPlan, on_finished):
+        source = plan.source
         try:
-            job = GenerationJob(self._client, JobSpec(workflow, params, source))
+            job = GenerationJob(self._client, JobSpec(plan.workflow, plan.params, source))
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             if _the_users_own(source):
                 self.failed.emit(key, f"Origenerator could not put the run together: {e!r}")
             return None
-        job.origin = origin or job.prompt_id
-        job.run_media_type = run_media_type or job.media_type
-        job.shielded = shielded
+        job.origin = plan.origin or job.prompt_id
+        job.run_media_type = plan.run_media_type or job.media_type
+        job.shielded = plan.shielded
         start_image = self._enhanced_start_image_of(job)
         if start_image:
             job.start_from(start_image)
@@ -713,8 +713,11 @@ class JobQueue(QObject):
         input_ref = gallery.output_file_reference(landed[0])
         if input_ref is not None:
             video_params = {**video_params, "input_image": input_ref}
-        self._launch(key, video_workflow, video_params, self._on_finished,
-                     origin=image_job.origin, shielded=image_job.shielded)
+        self._launch(
+            key,
+            JobPlan(video_workflow, video_params, origin=image_job.origin,
+                    shielded=image_job.shielded),
+            self._on_finished)
         self._pump()
 
     def _on_finished(self, key, job, files, thumb_path, duration):

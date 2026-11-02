@@ -38,7 +38,7 @@ SCENE_BREAK = "---"
 FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
 
 RIFE_CHECKPOINT = "rife47.pth"
-# The node's own default: it clears the CUDA cache after this many frames.
+# ComfyUI's own default for the node: it clears the CUDA cache after this many frames.
 _RIFE_CACHE_FRAMES = 10
 
 UPSCALE_MODEL_FACTOR = 4.0

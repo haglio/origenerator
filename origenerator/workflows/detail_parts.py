@@ -29,7 +29,7 @@ class DetailPart:
     shared_photos: bool = True
 
 
-# Fragments follow ADetailer-style YOLO model names.
+# ComfyUI's detector models are named ADetailer-style, and these fragments follow.
 _BUILTIN_PARTS = (
     DetailPart("faces", ("face", "faces"), ("face",),
                prompt=("natural detailed face, natural proportions of the face, realistic skin "

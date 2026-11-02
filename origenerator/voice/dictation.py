@@ -23,7 +23,7 @@ COLLECTING = RequestState.COLLECTING
 COMPLETED = RequestState.COMPLETED
 ABANDONED = RequestState.ABANDONED
 
-# As whisper renders the lead word; a hurried "request:" comes back in the trailing forms.
+# As Whisper renders the lead word; a hurried "request:" comes back in the trailing forms.
 LEAD_WORDS = ("request", "requests", "requested")
 _END_WORDS = ("over",)
 
@@ -124,5 +124,5 @@ def words_of(record: dict | None) -> str:
 
 
 def request_bias() -> str:
-    # A short marker word off a quiet mic comes back as something else unless whisper is told to expect it.
+    # A short marker word off a quiet mic comes back as something else unless Whisper is told to expect it.
     return "Voice requests: request, over."

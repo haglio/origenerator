@@ -48,7 +48,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        # GGUF Flux models live under diffusion_models beside the WAN UNETs and others.
+        # ComfyUI keeps GGUF Flux models under diffusion_models beside the WAN UNETs and others.
         defaults = self.default_params()
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),

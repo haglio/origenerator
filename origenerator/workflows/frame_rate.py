@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# WAN 2.1 and 2.2 were trained at 16 fps: 81 frames is five seconds of motion
+# ComfyUI's WAN 2.1 and 2.2 were trained at 16 fps: 81 frames is five seconds of motion
 NATIVE_FPS = 16.0
 
 MAX_PLAYBACK_FPS = 112.0

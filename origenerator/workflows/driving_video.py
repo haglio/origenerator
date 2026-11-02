@@ -15,7 +15,7 @@ def frames_within(frame_count: int, *, video_seconds: float | None, start: int) 
     available = int(video_seconds * NATIVE_FPS) - start
     if available >= frame_count:
         return frame_count
-    # WAN takes frame counts of the form 4k+1.
+    # ComfyUI's WAN nodes take frame counts of the form 4k+1.
     return max(SHORTEST_VIDEO_FRAMES, (available - 1) // 4 * 4 + 1)
 
 

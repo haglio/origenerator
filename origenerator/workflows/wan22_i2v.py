@@ -30,7 +30,7 @@ from origenerator.workflows.wan_experts import (
     wan_expert_shift_param,
 )
 
-# WAN 2.2 speech-to-video runs under the lightning LoRA of Comfy's own S2V template: four steps, no guidance
+# ComfyUI's WAN 2.2 speech-to-video template runs under the lightning LoRA: four steps, no guidance
 _SPEECH_LORA = "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
 _SPEECH_STEPS = 4
 _SPEECH_CFG = 1.0
@@ -120,7 +120,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, defaults["cfg_low"], min_val=0.0, max_val=30.0, step=0.1, good=(3, 4)),
             wan_expert_shift_param(defaults),
             *wan_expert_model_params(defaults),
-            # Only the speech model fits here: an expert in this place would render deaf
             model_dropdown("unet_s2v", "Speaking Model", defaults["unet_s2v"], "diffusion_models",
                          accepts=(WAN_S2V,)),
             *wan_expert_lora_params(defaults),

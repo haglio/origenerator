@@ -26,42 +26,37 @@ _MAX_HEADER_BYTES = 32 * 1024 * 1024
 
 _MAX_TENSOR_NAMES = 400
 
-# Prefixes that wrap an otherwise-normal state dict. The same WAN model ships
-# both bare (``blocks.0.…``) and wrapped (``model.diffusion_model.blocks.0.…``),
-# and a ControlNet wraps the whole net in ``control_model.`` — so the wrapper is
-# stripped before anything is matched, or half the signatures below would miss.
+# Prefixes that wrap an otherwise-normal state dict as ComfyUI loads it. The same WAN model ships both bare
+# (``blocks.0.x``) and wrapped (``model.diffusion_model.blocks.0.x``), and a ControlNet wraps the whole net in
+# ``control_model.``, so the wrapper is stripped before anything is matched, or half the signatures below would miss.
 _WRAPPERS = (
     "model.diffusion_model.", "diffusion_model.", "control_model.",
     "model.", "transformer.",
 )
 
-# Tensor-name fragments only a LoRA has: the A/B pair of the diffusers form, the
-# down/up pair of the kohya form, and kohya's flattened module prefixes.
+# Tensor-name fragments only a LoRA has when ComfyUI loads it: the A/B pair of the diffusers form,
+# the down/up pair of the kohya form, and kohya's flattened module prefixes.
 _LORA_MARKERS = ("lora_A.", "lora_B.", "lora_down.", "lora_up.", "lora_unet_", "lora_te")
 
-# A sharded download (``…-00001-of-00006.safetensors``). Each part holds a slice
-# of the tensors and none loads on its own, so listing them offers six broken
-# picks in place of one model that isn't selectable at all.
+# A sharded download (``-00001-of-00006.safetensors``). Each part holds a slice of the tensors and ComfyUI loads
+# none on its own, so listing them offers six broken picks in place of one model that isn't selectable at all.
 _SHARD = re.compile(r"-\d+-of-\d+\.[^.]+$")
 
-# WAN 2.2 trains a high-noise and a low-noise expert, and which one a file is
-# lives only in its name. Anchored so a word merely *containing* the letters
-# can't match: "low" needs a non-letter before it (``-low-``, ``_low_``) or a
-# camel-case hump (``t2vLowV30``). Ordinary words swallow these letters —
-# "yellow", "slow", "flow" — and several installed LoRAs are named with them,
-# so an unanchored search would file each of those under low-noise.
+# WAN 2.2 trains a high-noise and a low-noise expert, and which one a ComfyUI file is lives only in its name.
+# Anchored so a word merely *containing* the letters can't match: "low" needs a non-letter before it
+# (``-low-``, ``_low_``) or a camel-case hump (``t2vLowV30``), since "yellow", "slow" and "flow" name installed LoRAs.
 _EXPERT_CAMEL = re.compile(r"(?<=[a-z0-9])(High|Low)")
 _EXPERT_BOUNDED = re.compile(r"(?:^|[^A-Za-z])(high|low)", re.IGNORECASE)
 _EXPERT_AFTER_PRECISION = re.compile(r"(?:fp|bf)\d+([HL])\.[^.]+$", re.IGNORECASE)
 _EXPERT_INITIALS = {"h": "high", "l": "low"}
 
-# What a Krea 2 block holds and a WAN block never does -- wq/wk/wv/wo and a gated
+# What a Krea 2 block holds and a WAN block never does as ComfyUI loads them -- wq/wk/wv/wo and a gated
 # MLP -- dotted, or flattened as lycoris spells it (`lycoris_blocks_0_attn_wq`).
 _KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|up|down))")
 
-# kohya's flattened SD UNet, which is how the enhance's fix training writes a
-# LoRA with no text encoder in it. SDXL stacks transformer blocks in an attention
-# where SD1.5 has one, so a second block tells the two apart without the encoders.
+# kohya's flattened SD UNet, which is how the enhance's fix training writes a LoRA with no text encoder
+# in it, as ComfyUI loads it. SDXL stacks transformer blocks in an attention where SD1.5 has one, so a
+# second block tells the two apart without the encoders.
 _SD_UNET_LORA = re.compile(r"^lora_unet_(?:input|output|middle)_block")
 _SDXL_STACKED_BLOCKS = re.compile(r"transformer_blocks_[1-9]")
 
@@ -186,46 +181,41 @@ def _arch_from(shapes: dict[str, list[int] | None]) -> str | None:
     def starts(*prefixes: str) -> bool:
         return any(c.startswith(p) for c in components for p in prefixes)
 
-    # SDXL first: its two text encoders show up as `conditioner.` in a
-    # checkpoint, as the extra size/pooled conditioning (`label_emb`,
-    # `add_embedding`) in a bare UNet or ControlNet, and as the paired
-    # `lora_te1_`/`lora_te2_` in a LoRA — where SD1.5's single `lora_te_` would
-    # otherwise claim it below.
+    # SDXL first: ComfyUI shows its two text encoders as `conditioner.` in a checkpoint, as the extra
+    # size/pooled conditioning (`label_emb`, `add_embedding`) in a bare UNet or ControlNet, and as the paired
+    # `lora_te1_`/`lora_te2_` in a LoRA, where SD1.5's single `lora_te_` would otherwise claim it below.
     if has("conditioner", "label_emb", "add_embedding") or starts("lora_te1_", "lora_te2_"):
         return SDXL
     if any(_SD_UNET_LORA.match(key) for key in keys):
         return SDXL if any(_SDXL_STACKED_BLOCKS.search(key) for key in keys) else SD15
-    # Flux before Qwen and LTX: its diffusers-form LoRAs carry plain
+    # Flux before Qwen and LTX: ComfyUI's diffusers-form Flux LoRAs carry plain
     # `transformer_blocks` too, and only the `single_` twin separates them.
     if (has("double_blocks", "single_blocks", "single_transformer_blocks", "guidance_in")
             or starts("lora_unet_double_blocks", "lora_unet_single_blocks")):
         return FLUX
-    # LTX before Qwen, same reason: it is a `transformer_blocks` model as well,
+    # LTX before Qwen, same reason: ComfyUI loads it as a `transformer_blocks` model as well,
     # and these three names are what is only ever LTX.
     if has("patchify_proj", "adaln_single", "caption_projection"):
         return LTX
     if has("transformer_blocks"):
         return QWEN
-    # Krea 2 before WAN: its single-stream `blocks.N` would read as WAN's. The
-    # text-fusion adapter beside them is what only it has, and a LoRA trained
-    # on the blocks alone shows what only its blocks hold.
+    # Krea 2 before WAN: its single-stream `blocks.N` would read as WAN's in ComfyUI. The text-fusion
+    # adapter beside them is what only it has, and a LoRA trained on the blocks alone shows what only its blocks hold.
     if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):
         return KREA2
-    # WAN S2V and WAN Animate before WAN: each is WAN's `blocks.N` with one
-    # thing beside them only it has -- the audio injector, the pose embedding.
+    # WAN S2V and WAN Animate before WAN: each is WAN's `blocks.N` with one thing beside them only it has
+    # in ComfyUI's loaders -- the audio injector, the pose embedding.
     if has("audio_injector"):
         return WAN_S2V
     if has("pose_patch_embedding", "face_adapter"):
         return WAN_ANIMATE
-    # WAN: bare `blocks.N` (never `input_blocks`/`double_blocks`, which is why
-    # this is safe after the families above), the patch/text/time embeddings
-    # around them, VACE's parallel stack, or a kohya LoRA's flattened form.
+    # WAN: bare `blocks.N` (never `input_blocks`/`double_blocks`, which is why this is safe after the
+    # families above), the patch/text/time embeddings around them, VACE's parallel stack, or a kohya LoRA's flattened form, all as ComfyUI loads them.
     if (has("blocks", "patch_embedding", "text_embedding", "time_projection", "vace_blocks")
             or starts("lora_unet_blocks_")):
         return _wan_kind(shapes)
-    # SD1.5 last, as the family defined by lacking SDXL's additions: its
-    # checkpoint marker, its single-text-encoder LoRA marker, and the original
-    # ControlNet shape, which is SD1.5's only because no SDXL marker fired.
+    # SD1.5 last, as the family defined by lacking SDXL's additions: its checkpoint marker, its
+    # single-text-encoder LoRA marker, and the original ControlNet shape (ComfyUI loads all three).
     if has("cond_stage_model", "zero_convs", "input_hint_block") or starts("lora_te_"):
         return SD15
     return None
@@ -239,7 +229,7 @@ def _tensor_shapes(path: Path) -> dict[str, list[int] | None] | None:
             names = _gguf_names(path)
             return None if names is None else dict.fromkeys(names)
     except (OSError, struct.error, UnicodeDecodeError, ValueError, KeyError):
-        return None   # KeyError: a GGUF metadata value of a type we don't know
+        return None
     return None
 
 
@@ -250,7 +240,7 @@ def _safetensors_header(path: Path) -> dict | None:
             return None
         header = handle.read(length)
     if len(header) < length:
-        return None   # truncated: never saw the index we would be judging
+        return None
     return json.loads(header)
 
 
@@ -271,9 +261,8 @@ def safetensors_metadata(path: Path) -> dict:
     return metadata if isinstance(metadata, dict) else {}
 
 
-# GGUF's metadata values are typed; every type but string and array is a fixed
-# width, so skipping the GGUF metadata to reach the tensor index is a matter of
-# stepping over the right number of bytes per value.
+# GGUF's metadata values are typed; every type but string and array is a fixed width, so skipping the metadata to reach the
+# tensor index (ComfyUI loads these files) is a matter of stepping over the right number of bytes per value.
 _GGUF_FIXED_WIDTHS = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 _GGUF_STRING = 8
 _GGUF_ARRAY = 9
@@ -283,7 +272,7 @@ def _gguf_names(path: Path) -> list[str] | None:
     with path.open("rb") as handle:
         if handle.read(4) != b"GGUF":
             return None
-        handle.read(4)   # format version — the layout below is stable across 2/3
+        handle.read(4)
         tensor_count, kv_count = struct.unpack("<QQ", handle.read(16))
         for _ in range(kv_count):
             (key_length,) = struct.unpack("<Q", handle.read(8))
@@ -295,7 +284,7 @@ def _gguf_names(path: Path) -> list[str] | None:
             (name_length,) = struct.unpack("<Q", handle.read(8))
             names.append(handle.read(name_length).decode("utf-8"))
             (dimensions,) = struct.unpack("<I", handle.read(4))
-            handle.read(8 * dimensions + 12)   # the dims, the ggml type, the offset
+            handle.read(8 * dimensions + 12)
     return names
 
 

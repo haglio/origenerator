@@ -22,9 +22,7 @@ _TARGET_MEGAPIXELS = 1.0
 class SdxlPoseTransferWorkflow(WorkflowTemplate):
     """SDXL T2I steered by the structure of an input image.
 
-    DWPose's person detector collapses on close-ups and overlapping bodies, which is why
-    depth is the default mode. SetUnionControlNetType is added only for union
-    ControlNets: a plain single-purpose one crashes on the extra argument.
+    ComfyUI's SetUnionControlNetType is added only for union ControlNets: a plain single-purpose one crashes on the extra argument.
     """
     name = "sdxl_pose_transfer"
     version = "v004"
@@ -119,7 +117,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                         "resolution": 1024,
                         "bbox_detector": params["pose_bbox_detector"],
                         "pose_estimator": params["pose_estimator"],
-                        # xinsir's SDXL ControlNets are trained on thicker skeleton sticks.
+                        # xinsir's SDXL ControlNets (ComfyUI loads them) are trained on thicker skeleton sticks.
                         "scale_stick_for_xinsr_cn": (
                             "enable" if "xinsir" in params["controlnet"].lower()
                             else "disable"

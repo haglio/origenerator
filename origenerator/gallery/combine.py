@@ -7,12 +7,10 @@ from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 
 _CONTENT = load_content()
 
-# The model cannot close a shorter loop: the last frame lands further from the first (13 frames
+# ComfyUI's model cannot close a shorter loop: the last frame lands further from the first (13 frames
 # -2.02%, 29 frames +0.23%, measured at a fixed seed), and the lighting pops on every repeat.
 CYCLE_FRAMES = 29
 
-# {action: {"positive": ..., "negative": ...}}, a "" entry standing in for an action with none of
-# its own. In the overlay because the sanitize guard bans this vocabulary from the tracked tree.
 _CYCLE_WORDS: dict = _CONTENT.get("genau_flick_prompts") or {}
 
 

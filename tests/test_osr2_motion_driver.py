@@ -494,3 +494,22 @@ def test_a_paused_room_lets_the_app_go_back_behind_background_work(qtbot, monkey
 
     driver.set_frozen(False)
     assert raised == ["ahead", "back", "ahead"]
+
+
+def test_where_the_wave_stands_in_its_bars_is_a_fraction_of_the_way_up_from_the_floor_to_the_ceiling():
+    motion = motion_engine.Motion()
+    motion_engine.set_dials(motion.state, speed=50, amplitude=60, center=50)
+
+    fractions = []
+    for phase in (0.0, 0.25, 0.5):
+        motion.phase = phase
+        fractions.append(motion_engine._envelope_fraction(motion))
+
+    assert fractions == pytest.approx([0.0, 0.5, 1.0])
+
+
+def test_a_wave_with_no_amplitude_stands_at_the_floor_of_its_bars():
+    motion = motion_engine.Motion()
+    motion_engine.set_dials(motion.state, speed=50, amplitude=0, center=50)
+
+    assert motion_engine._envelope_fraction(motion) == 0.0

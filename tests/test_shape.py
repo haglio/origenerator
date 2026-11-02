@@ -550,6 +550,43 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
     assert view._tree._trees["portrait"].selectedItems() == []
 
 
+def _view_with_a_row_on_each_side(qtbot, tmp_path):
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    view = GalleryView(FakeDB([tall, wide]))
+    qtbot.addWidget(view)
+    view.refresh()
+    return (view, view._item_by_key[shaped_key("__all__", "portrait")],
+            view._item_by_key[shaped_key("__all__", "landscape")])
+
+
+def test_the_half_that_lets_go_when_the_other_is_picked_reports_no_change_of_its_own(qtbot, tmp_path):
+    view, portrait_all, landscape_all = _view_with_a_row_on_each_side(qtbot, tmp_path)
+    view._tree.setCurrentItem(portrait_all)
+    reported = []
+    view._tree.currentItemChanged.connect(lambda current, _previous: reported.append(current))
+
+    view._tree.setCurrentItem(landscape_all)
+
+    assert reported
+    assert None not in reported
+
+
+def test_silencing_the_folder_list_silences_both_halves(qtbot, tmp_path):
+    view, portrait_all, landscape_all = _view_with_a_row_on_each_side(qtbot, tmp_path)
+    view._tree.setCurrentItem(portrait_all)
+    reported = []
+    view._tree._trees["landscape"].currentItemChanged.connect(
+        lambda current, _previous: reported.append(current))
+
+    view._tree.blockSignals(True)
+    view._tree.setCurrentItem(landscape_all)
+    view._tree.blockSignals(False)
+
+    assert reported == []
+    assert view._tree.is_current(landscape_all)
+
+
 def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)

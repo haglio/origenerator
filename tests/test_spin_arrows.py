@@ -19,8 +19,10 @@ def _alpha_rows(path: str) -> list[int]:
 def test_the_arrows_are_png_files_named_with_forward_slashes(tmp_path):
     up, down = arrow_paths(_GREEN, tmp_path)
 
-    assert "\\" not in up and "\\" not in down
-    assert Path(up).is_file() and Path(down).is_file()
+    assert "\\" not in up
+    assert "\\" not in down
+    assert Path(up).is_file()
+    assert Path(down).is_file()
 
 
 def test_the_up_arrow_narrows_toward_its_top_and_the_down_arrow_toward_its_bottom(tmp_path):

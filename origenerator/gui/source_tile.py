@@ -47,14 +47,13 @@ class SourceTile(QWidget):
 
         self.hide()
 
-    def show_source(self, prompt_id: str, thumbnail_path, name: str,
-                    heading: str | None = None, media_type: str | None = None,
-                    gray: bool = False):
-        self._prompt_id = prompt_id
+    def show_source(self, row: dict, name: str, heading: str | None = None,
+                    media_type: str | None = None, gray: bool = False):
+        self._prompt_id = row["prompt_id"]
         self._heading.setText(heading or _DEFAULT_HEADING)
         self._item_type_icon.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
         self._name.setText(name)
-        thumb = self._scaled_thumb(thumbnail_path)
+        thumb = self._scaled_thumb(row.get("thumbnail_path"))
         self._thumb.setPixmap(grayscale_pixmap(thumb) if gray else thumb)
         self.show()
 

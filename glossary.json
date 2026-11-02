@@ -699,7 +699,6 @@
         "console"
       ],
       "keep": [
-        "funestra.console",
         "console_hud",
         "ConsoleHud",
         "ConsolePainter",
@@ -865,7 +864,6 @@
         "timeline"
       ],
       "keep": [
-        "funestra.timeline",
         "TIMELINE_HEIGHT",
         "timeline_h"
       ]

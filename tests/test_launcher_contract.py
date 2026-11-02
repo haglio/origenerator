@@ -1,11 +1,3 @@
-"""What launch_origenerator.vbs runs, asked of the launcher under the real script host.
-
-The launcher is rendered from its spec in pyproject.toml by app_support.launcher,
-whose own tests hold what every launcher does: the venv's interpreter and never
-one off PATH, nothing on PYTHONPATH, Option Explicit, a dialog naming a missing
-venv.  What is Origenerator's is asked of this one; the branch preview's
-launcher is asked in tests/test_branch_session.py.
-"""
 from __future__ import annotations
 
 import sys
@@ -26,8 +18,7 @@ def test_the_launcher_is_where_the_pinned_shortcut_points():
 
 @on_windows
 def test_the_launcher_runs_the_package_from_this_checkout_on_its_venv():
-    """A python off PATH finds the repo directory as a namespace package instead
-    of the editable install, and dies while importing -- before any window."""
+    """A python off PATH finds the repo directory as a namespace package instead of the editable install."""
     report = dry_run(LAUNCHER)
 
     assert Path(report.value("interpreter")).parent == REPO_ROOT / ".venv" / "Scripts"
@@ -45,15 +36,6 @@ def test_a_launch_that_dies_importing_leaves_its_traceback_in_state():
 
 @on_windows
 def test_the_sorting_launcher_sorts_the_live_library_whichever_checkout_runs_it():
-    """Its own launcher, because sorting is a window of its own: it wants the
-    library and nothing else the app holds, and it is run beside the app or
-    instead of it.
-
-    The live library from any checkout, because what is being answered is the
-    real library -- a branch's own database is one nobody will ever animate from,
-    and a run of sorting spent on it is lost. So it borrows what the preview
-    launcher does: the primary's venv, and the flag that points the library at
-    the live install (config.LIBRARY_STATE_DIR). In the primary both are itself."""
     report = dry_run(REPO_ROOT / "sort_images.vbs")
 
     assert Path(report.value("directory")) == REPO_ROOT
@@ -66,12 +48,6 @@ def test_the_sorting_launcher_sorts_the_live_library_whichever_checkout_runs_it(
 @pytest.mark.skipif(".claude" not in REPO_ROOT.parts,
                     reason="only a worktree has the primary checkout above it")
 def test_both_of_those_windows_run_on_the_primary_checkouts_venv():
-    """A worktree has no virtual environment of its own, and these two windows
-    read and write the live install's library, so they borrow the primary's --
-    three folders up from a worktree. Asked only from a worktree, because that
-    is where three folders up IS the primary: the shared launcher spells that
-    climb the same way wherever the file sits, so from a plain checkout it
-    answers with a folder holding no virtual environment at all."""
     for name in ("sort_images.vbs", "check_animations.vbs"):
         report = dry_run(REPO_ROOT / name)
 
@@ -81,8 +57,6 @@ def test_both_of_those_windows_run_on_the_primary_checkouts_venv():
 
 @on_windows
 def test_the_animation_launcher_reads_the_live_library_too():
-    """The videos it judges and the settings it writes are the live install's,
-    for the reason the sorting launcher's are."""
     report = dry_run(REPO_ROOT / "check_animations.vbs")
 
     assert report.value("arguments") == "-m origenerator.check_animations"

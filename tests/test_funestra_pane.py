@@ -1,13 +1,9 @@
-"""The pane a Slideshow's Funestra draws into: the pass it is handed through its
-channel, the HUD it wears, the pointer it is handed, and the engine it opens on
-its window."""
 from __future__ import annotations
 
 import logging
 import time
 
 from funestra.console import ModeHud
-from funestra.funestra import User
 from funestra.funestra_verbs import RELOAD_PLAYLIST, play_file
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.playlist import PlaylistItem
@@ -15,20 +11,19 @@ from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.satellite_hud import HudModel
 from funestra.testing import FakeEngine, engine_will_not_open
 from funestra.volume import VolumeHud
+from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
 
+from funestra.funestra import User
 from origenerator import running_ahead
-from origenerator.gui.funestra_pane import FunestraPane, PaneChannel
 from tests import gestures
 from tests.running_ahead_support import record_the_app_running_ahead
 from tests.slideshow_hud_support import speaker_on_screen
 
 
 class _Running:
-    """What runs on the Funestra, as the Funestra sees it."""
-
     def __init__(self, playback) -> None:
         self.playback = playback
         self.commands: list[str] = []
@@ -36,8 +31,6 @@ class _Running:
         self.closed = False
 
     def apply_command(self, command: str) -> bool:
-        """A press on the HUD is this one's to answer; a verb handed to the
-        Funestra is the Funestra's own."""
         self.commands.append(command)
         return not command.split(" ", 1)[0].isupper()
 
@@ -79,8 +72,6 @@ def _items(tmp_path, *names):
 
 
 def _hand_over(pane, items, land=None):
-    """A pass handed over the way a slideshow hands its Funestra one: the list
-    written, the item to stand on played, then the list taken up."""
     pane.channel.write_playlist(items)
     landing = next((item for item in items if item.path == land), None)
     if landing is not None:
@@ -268,8 +259,6 @@ def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_pa
 
 
 def test_a_pane_with_no_window_to_draw_into_opens_no_engine(qtbot, tmp_path):
-    """The suite draws on a platform with no windows in it, and an engine
-    handed one of those has nothing to paint."""
     pane = FunestraPane(channel=PaneChannel(), user=lambda playback: _Running(playback), hud=lambda: None)
     qtbot.addWidget(pane)
 

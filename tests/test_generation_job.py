@@ -717,3 +717,27 @@ def test_a_job_waiting_here_or_on_the_server_is_called_queued_on_screen():
 def test_every_state_a_job_walks_through_is_named_once():
     assert {state.value for state in JobState} == {
         "idle", "speaking", "queued", "running", "finishing", "finished", "failed", "canceled"}
+
+
+def test_a_row_inserted_for_a_job_has_the_source_the_job_carries(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    job = GenerationJob(_client(), SDXL, _params_with_the_two_sampler_enhance_tail(), source="experiment",
+                        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs")
+
+    insert_generation_row(db, job)
+
+    assert job.source == "experiment"
+    assert db.get_generation(job.prompt_id)["source"] == "experiment"
+
+
+def test_a_server_that_cannot_be_asked_after_the_stopped_run_is_taken_to_hold_nothing(qtbot, tmp_path):
+    client = _client()
+    client.fetch_history.side_effect = OSError("ComfyUI is down")
+    job = GenerationJob(client, SDXL, _params_with_the_two_sampler_enhance_tail(), places=OutputPlaces.in_one_folder(tmp_path),
+                        thumb_dir=tmp_path / "thumbs", prompt_id="comfy-A")
+
+    job.start()
+
+    client.submit_job.assert_called_once_with(job.payload, "comfy-A")
+    client.forget_history.assert_not_called()
+    assert job.state == "queued"

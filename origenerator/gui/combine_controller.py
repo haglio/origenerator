@@ -42,27 +42,20 @@ NO_PAST_VIDEO = "No past video yet"
 
 
 class CombineHost(Protocol):
-    def image_config_index(self) -> dict:
-        pass
+    def image_config_index(self) -> dict: ...
 
-    def animated_preview(self, row: dict) -> str | None:
-        pass
+    def animated_preview(self, row: dict) -> str | None: ...
 
-    def folder_key_of(self, row: dict) -> str:
-        pass
+    def folder_key_of(self, row: dict) -> str: ...
 
     def folder_key_for(self, workflow_name: str, params: dict,
-                       workflow_version: str | None = None) -> str:
-        pass
+                       workflow_version: str | None = None) -> str: ...
 
-    def reveal_launch(self, key: str) -> None:
-        pass
+    def reveal_launch(self, key: str) -> None: ...
 
-    def follow_link(self, prompt_id: str) -> None:
-        pass
+    def follow_link(self, prompt_id: str) -> None: ...
 
-    def tell(self, title: str, message: str) -> None:
-        pass
+    def tell(self, title: str, message: str) -> None: ...
 
 
 class CombineController(QObject):

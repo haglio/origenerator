@@ -1,11 +1,3 @@
-"""The standalone enhance, driven with no gallery around it.
-
-What the button would run on and why an image is passed over, what a batch
-shares, and where a run in flight shows -- all of it used to be reachable only
-by building the app's central widget. Here the surfaces are recorders.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -43,8 +35,6 @@ class FakeSignal:
 
 
 class FakePanel:
-    """The Enhance pane reduced to what the controller drives."""
-
     def __init__(self, on_changed):
         self.on_changed = on_changed
         self.enhance_requested = FakeSignal()
@@ -211,8 +201,6 @@ class FakeTabs:
 
 
 class FakeGroup:
-    """A settings folder, as the controller reads one."""
-
     def __init__(self, rows):
         self.rows = list(rows)
 
@@ -271,7 +259,6 @@ def _video(prompt_id="v1"):
 
 @pytest.fixture
 def enhance(monkeypatch):
-    """A controller whose pane and surfaces are all recorders."""
     monkeypatch.setattr(module, "EnhancePane", FakePanel)
 
     def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None,
@@ -283,8 +270,6 @@ def enhance(monkeypatch):
             info_tabs_of=lambda: tabs or FakeTabs()), host
     return build
 
-
-# --- what the button would run on -------------------------------------------
 
 
 def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
@@ -303,7 +288,6 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
 
 def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
                                                                       monkeypatch):
-    # There is no video enhancer, and a picked video looks no different picked.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row",
                         lambda row: row["media_type"] == "image")
     monkeypatch.setattr(module.gallery, "media_type_of_row",
@@ -318,8 +302,6 @@ def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
 
 def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
                                                                         monkeypatch):
-    # Change any setting and the button comes back, which is what makes it read
-    # as "you have this one" rather than as "no".
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "image")
     monkeypatch.setattr(module.gallery, "version_matching_settings",
@@ -331,8 +313,6 @@ def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
 
 
 def test_a_folder_that_is_not_a_settings_folder_offers_nothing(enhance):
-    # The collections and the workflow folders above a settings one have no single
-    # set of settings to enhance at.
     controller, _host = enhance(FakeHost(group=FakeGroup([_image("i1")])))
 
     assert controller.offer() == (False, "Nothing here to enhance")
@@ -375,8 +355,6 @@ def test_a_folders_offer_reads_what_the_enhance_runs_made_never_the_whole_librar
         (True, "Enhance 1 not-yet-enhanced image in this folder (upscale + light redraw)"),
         read_while_building)
 
-
-# --- what a launch carries ---------------------------------------------------
 
 
 def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch):
@@ -471,8 +449,6 @@ def test_an_image_with_an_enhancement_at_these_settings_on_its_way_is_not_enhanc
 
 
 def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
-    # With it on the app turns out finished images rather than raw ones, without
-    # pressing Enhance All after every run.
     monkeypatch.setattr(module.gallery, "rows_awaiting_enhancement",
                         lambda rows, everything: list(rows))
     monkeypatch.setattr(module.gallery, "enhance_params_for",
@@ -517,12 +493,8 @@ def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
     assert jobs.prepared == []
 
 
-# --- the settings ------------------------------------------------------------
-
 
 def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
-    # The pane holds the settings and the tabs hold the images, so the tile can
-    # only know whether it would be a duplicate once the two meet.
     tab = FakeGenerateTab()
     gallery_pane = FakeGalleryPane()
     controller, host = enhance(gallery_pane=gallery_pane, tabs=FakeTabs([tab]))
@@ -577,7 +549,6 @@ def test_a_preset_renamed_on_the_panel_keeps_its_settings_under_the_new_name(enh
 
 
 def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatch):
-    # A video is the one place with no enhancement to configure at all.
     monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "video")
     rows = [_video("v1")]
     controller, _host = enhance(FakeHost(picked=["v1"], rows=rows),
@@ -627,13 +598,9 @@ def test_with_nothing_picked_the_panel_hears_the_folder_on_screen_is_in_front(en
     assert controller.pane.images_in_front == ([], folder)
 
 
-# --- a run in flight, and where it shows -------------------------------------
-
 
 def test_every_live_job_is_searched_not_each_folders_leading_one(enhance,
                                                                  monkeypatch):
-    # A batch of enhances goes out whole and its jobs share a settings key, so
-    # all but the first would read as not in flight off the folder-facing view.
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, input_image, row: target == row["prompt_id"])
     jobs = [FakeJob("run-a"), FakeJob("run-b")]
@@ -679,25 +646,31 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
     assert slideshows.frames == {"i1": b"frame"}
 
 
+def test_a_run_from_before_the_stamp_is_matched_by_the_file_it_reads(enhance):
+    read, other = _image("i1", files=("one.png",)), _image("i2", files=("two.png",))
+    db = FakeDB([read, other])
+    controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-old", input_image="one.png")]))
+
+    assert controller.run_of(read) is not None
+    assert controller.run_of(other) is None
+
+
 def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     db = FakeDB([_image("i1")])
     db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
     controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-a")]))
-    controller.run_of(_image("i1"))  # reads and keeps the stamp
+    controller.run_of(_image("i1"))
 
     controller.forget("run-a")
 
     assert "run-a" not in controller._targets
 
 
-# --- stopping one ------------------------------------------------------------
-
 
 def test_a_delete_takes_the_runs_being_made_of_what_it_deletes(enhance,
                                                                monkeypatch):
-    # A video-length wait can sit after an enhance nobody wants any more.
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: row["prompt_id"] == "i1")
     jobs = FakeReroll([FakeJob("run-a")])
@@ -719,7 +692,7 @@ def test_cancelling_from_a_tile_leaves_the_image_exactly_as_it_was(enhance,
     controller.cancel_for([_image("i1")])
 
     assert jobs.cancelled == ["run-a"]
-    assert gallery_pane.enhancing == {}  # the scrim comes off in the same breath
+    assert gallery_pane.enhancing == {}
 
 
 def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
@@ -731,12 +704,9 @@ def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
     assert gallery_pane.enhancing is None
 
 
-# --- said out loud -----------------------------------------------------------
-
 
 def test_a_spoken_enhance_refuses_an_image_that_already_has_one(enhance,
                                                                 monkeypatch):
-    # Re-enhancing stays a deliberate step made in front of the settings it uses.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
@@ -755,8 +725,6 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
 
 def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
                                                                monkeypatch):
-    # One part with nothing installed to find it is dropped rather than taking
-    # the rest of the command down with it.
     class Part:
         def __init__(self, name):
             self.name = name
@@ -830,8 +798,6 @@ def test_a_spoken_enhance_over_an_image_that_has_one_in_flight_is_refused(enhanc
 
 
 def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkeypatch):
-    # Nothing was refused: the run was wanted and its submit failed, so it reads
-    # red rather than the yellow of an image with nothing to do.
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
@@ -869,8 +835,6 @@ def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypa
 
 def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(enhance,
                                                                                 monkeypatch):
-    # The Auto switch enhancing an image a slideshow stayed locked on while it was
-    # made, or a batch that takes in the locked one.
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
@@ -884,8 +848,6 @@ def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(
 
     assert jobs.first == {"run-1"}
 
-
-# --- training a fix's LoRA -----------------------------------------------------
 
 
 _training_runs: list = []

@@ -1,22 +1,3 @@
-"""The standalone enhance: what it runs at, what it runs on, and where it shows.
-
-The sixth of the gallery's screen concerns to come out of the view that used to
-hold all of them. What lives here is an enhancement's whole life -- the settings
-pane and the app-wide settings it holds, which images the Enhance button would
-act on and why a particular one is passed over, the launch of a batch under the
-folder its settings shape, and the run's appearance on every surface that shows
-the image it improves: the tile's status scrim, the version list's live row, a tab's
-streaming preview, and an open slideshow's corner.
-
-The spoken words that ask for one are here too -- "enhance" over an image, and
-"fix <part>" for the same image with a detail pass aimed at what was named --
-because both are this job with a different gate in front of them, and what they
-answer with is what this side knows.
-
-What stays with the host is what an enhancement is *of*: which images are
-picked, which folder is on screen, and the Gallery pane button that offers the enhancement.
-:class:`EnhanceHost` names each of those.
-"""
 from __future__ import annotations
 
 import json
@@ -41,8 +22,6 @@ from origenerator.workflows.detail_parts import detector_folder, name_parts, par
 
 logger = logging.getLogger(__name__)
 
-# Said the same way by the button and by the Enhance pane it would run, because
-# both go dark together the moment what's in front of you is a video.
 NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
 ALREADY_AT_THESE_SETTINGS = (
     "Already enhanced at these settings — change one to make another"
@@ -74,9 +53,6 @@ def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.
         for (row, params), prompt_id in zip(entries, jobs.start_batch(key, workflow, batch,
                                                                       source=source), strict=True):
             if prompt_id:
-                # Which image the run is of, by id: the params name only the file
-                # it reads, and a file name can belong to more than one row.
-                # Stamped on the row for the fold and for a restart.
                 db.set_enhance_target(prompt_id, row.get("prompt_id"))
             launched.append((row, params, key, prompt_id))
     return launched
@@ -93,44 +69,34 @@ def _made_or_on_its_way(jobs, row: dict, params: dict) -> bool:
 
 
 class Offer(NamedTuple):
-    """What the Enhance button would do right now, and what it says it would do.
-
-    A record rather than the button itself: what the enhancement is aimed at is this
-    side's answer, and lighting a button is the Gallery pane buttons'.
-    """
-
     available: bool
     tip: str
 
 
 class EnhanceHost(Protocol):
-    """What an enhancement needs of the gallery around it, and nothing else."""
-
     def selected_prompt_ids(self) -> list[str]:
-        """The thumbnails picked in the middle column."""
+        pass
 
     def row_for(self, prompt_id: str) -> dict | None:
-        """The generation row ``prompt_id`` names, or ``None``."""
+        pass
 
     def image_rows(self) -> list[dict]:
-        """Every image row the gallery is holding."""
+        pass
 
     def image_config_index(self) -> dict:
-        """The settings-signature index a folder key is derived against."""
+        pass
 
     def current_group(self):
-        """The folder on screen, or ``None`` in a collection or a search."""
+        pass
 
     def typical_run_seconds(self, job) -> float | None:
-        """How long a run like this one usually takes, for the live bar."""
+        pass
 
     def enhance_offer_changed(self) -> None:
-        """Re-aim the Enhance button: what it would act on has changed."""
+        pass
 
 
 class EnhanceController:
-    """Every standalone enhance: its settings, its launches, and its live runs."""
-
     def __init__(self, host: EnhanceHost, *, db, jobs, gallery_pane, slideshows,
                  info_tabs_of):
         self._host = host
@@ -138,21 +104,9 @@ class EnhanceController:
         self._jobs = jobs
         self._gallery_pane = gallery_pane
         self._slideshows = slideshows
-        # The tabs are built by the window's own layout, after this: asked for
-        # rather than held, so a live run reaches whichever tabs exist by then.
         self._generate_pane_of = info_tabs_of
-        # What every enhance runs at, app-wide — the pane's value. Restored from
-        # the session by :meth:`restore_settings`.
         self._settings = gallery.EnhanceSettings()
-        # Which image each live enhance is of, by that image's prompt_id — the
-        # stamp its row carries (``enhance_of``), read once per job rather than
-        # on every streamed frame. ``None`` for a run from before the stamp was
-        # recorded, which is matched by the file it reads instead (see
-        # :meth:`_of_row`).
         self._targets: dict[str, str | None] = {}
-        # Which image each running enhance is improving, and the set of runs that
-        # answer was worked out from — recomputed only when that set changes, not
-        # on every frame they stream.
         self._by_prompt: dict[str, object] = {}
         self._signature: tuple = ()
         self.pane = EnhancePane(self._on_settings_changed)
@@ -165,8 +119,6 @@ class EnhanceController:
         self.pane.preset_renamed.connect(lambda index, name: self.pane.show_presets(
             enhance_presets.rename(index, name)))
         self._training: TrainingRun | None = None
-
-    # --- training a fix's LoRA --------------------------------------------------
 
     def _train_fix(self, name: str) -> None:
         if self._training is not None:
@@ -220,58 +172,29 @@ class EnhanceController:
             fix_training.note_duration(lora_training.time_taken(job, trainer))
         lora_training.mark_taken(job)
 
-    # --- what it runs at ------------------------------------------------------
-
     @property
     def settings(self):
-        """What the next enhance will run at — read by the tiles' own corners."""
         return self._settings
 
     def settings_json(self) -> str:
-        """The app-wide enhancement settings, for the session to persist."""
         return self._settings.to_json()
 
     def restore_settings(self, raw: str | None) -> None:
-        """Restore the enhancement settings a previous session left."""
         self._settings = gallery.EnhanceSettings.parse(raw)
         self.pane.show_settings(self._settings)
         self._push_settings()
 
     def _push_settings(self) -> None:
-        """Tell every Generate tab what the ``+ Enhance`` row would run at.
-
-        The pane holds the settings and the tabs hold the images, so the row
-        can only know whether it would be making a duplicate once the two meet —
-        here, on every edit and every rebuild."""
         for pane in self._generate_pane_of().generate_tabs():
             pane.set_enhance_settings(self._settings)
 
     def _on_settings_changed(self, settings) -> None:
-        """Take an edit made in the Enhance pane.
-
-        Held app-wide rather than per folder: enhancement is whatever you are
-        doing at the moment, not a property of where you happen to be standing,
-        so switching folders never changes what the next enhance will run at.
-        Written through on each edit rather than on an Apply, so an enhance
-        launched a moment later uses what is on screen."""
         self._settings = settings
         self._push_settings()
-        # Whether a picked image already holds this exact version is what the
-        # button is answering, so turning a setting is what brings it back.
         self._host.enhance_offer_changed()
-        # Every image on screen is answering it too, in its own corner.
         self._gallery_pane.refresh_corners()
 
     def sync_pane(self, offer: Offer) -> None:
-        """Gray the Enhance settings out where nothing they say could ever run,
-        and aim the pane's own Enhance button with the Gallery pane button's ``offer``.
-
-        The pane is app-wide and follows you rather than the folder, which is
-        why it shows in the collections as readily as on a settings folder — but a
-        video is the one place with no enhancement to configure at all, and live
-        settings there advertise an action that isn't on offer. A mixed folder
-        keeps them: the images in it are still enhanceable.
-        """
         picked = [row for pid in self._host.selected_prompt_ids()
                   if (row := self._host.row_for(pid)) is not None]
         folder = None if picked or self._gallery_pane.selected_ids else self._host.current_group()
@@ -280,17 +203,7 @@ class EnhanceController:
         self.pane.show_offer(offer.available, offer.tip)
         self.pane.show_images_in_front(picked, folder)
 
-    # --- what it would run on -------------------------------------------------
-
     def offer(self) -> Offer:
-        """What the Enhance button would do, aimed the way Delete is: the picked
-        thumbnails if any are picked, else every image in this folder still
-        waiting for one.
-
-        Picked items are enhanced whether or not they already have been (that is
-        what picking them says); a whole folder is only its not-yet-enhanced
-        images, so the button doesn't quietly re-run the ones that are done.
-        """
         if self._gallery_pane.selected_ids:
             ids = self.enhanceable_selection()
             if ids:
@@ -314,22 +227,6 @@ class EnhanceController:
             rows, self._db.rows_made_by(gallery.ENHANCE_WORKFLOW))
 
     def enhanceable_selection(self) -> list[str]:
-        """The picked thumbnails this button would actually run on.
-
-        Two things are dropped. Videos, because there is no video enhancer — the
-        workflow under all of this refines a still — and they are picked from
-        the same flow and look no different picked, so a picked video is nothing
-        to run rather than a run that fails.
-
-        And an image that already holds a version made at exactly the settings
-        on the pane: running it again would spend a generation arriving at the
-        image that is already there. Judged against what the run would *use*
-        (:func:`~origenerator.gallery.enhance.version_matching_settings`), so a
-        source-matched model resolves to this image's own checkpoint before the
-        comparison rather than the pane's raw value. Change any setting and the
-        button comes back, which is what makes it read as "you have this one"
-        rather than as "no".
-        """
         return [prompt_id for prompt_id in self._host.selected_prompt_ids()
                 if (row := self._db.get_generation(prompt_id)) is not None
                 and self.would_enhance(row)]
@@ -339,14 +236,10 @@ class EnhanceController:
                 and gallery.version_matching_settings(row, self._settings) is None)
 
     def _selection_is_all_video(self) -> bool:
-        """Whether every picked thumbnail is a video — which is why Enhance is
-        dark, as opposed to its images being enhanced at these settings already."""
         return _all_video(row for pid in self._host.selected_prompt_ids()
                           if (row := self._db.get_generation(pid)) is not None)
 
     def enhance_the_selection(self) -> None:
-        """The Gallery pane button's action: enhance the picked thumbnails, or every
-        image in this folder that isn't enhanced yet."""
         if self._gallery_pane.selected_ids:
             ids = self.enhanceable_selection()
             if ids:
@@ -356,9 +249,6 @@ class EnhanceController:
         self._enhance_all()
 
     def _enhance_all(self) -> None:
-        """The folder button's action: queue a standalone enhance for every
-        image in it that isn't enhanced yet, at the current settings, then
-        retire the button."""
         group = self._host.current_group()
         if not isinstance(group, gallery.SettingsGroup):
             return
@@ -366,24 +256,10 @@ class EnhanceController:
         self._host.enhance_offer_changed()
 
     def enhance_items(self, prompt_ids: list[str]) -> None:
-        """Queue a standalone enhance for each picked generation (the thumbnail
-        context menu's action) — a deliberate pick, so already-enhanced images
-        are re-enhanced rather than skipped, landing as a further version beside
-        the ones already there."""
         rows = [self._db.get_generation(pid) for pid in prompt_ids]
         self._enqueue([r for r in rows if r is not None])
 
     def _enqueue(self, rows: list[dict]) -> None:
-        """Launch a standalone enhance of each of ``rows``, at the current settings.
-
-        All of them go to the controller at once: ComfyUI runs one prompt at a
-        time and the Job Queue shows the line, so a batch of enhances is a
-        queue the user can watch — and cancel a row out of — rather than a
-        backlog held out of sight in here. (This view did hold one, because
-        enhances of a single folder's images share a settings key and the
-        controller took only one job per folder; it takes them all now, so the
-        buffer had nothing left to do but hide the work.)
-        """
         asks = []
         for row in rows:
             params = gallery.enhance_params_for(row, self._settings)
@@ -402,13 +278,7 @@ class EnhanceController:
         return bool(launched) and self._note_launch(*launched[0])
 
     def _note_launch(self, row: dict, params: dict, key: str, prompt_id: str | None) -> bool:
-        """Unlaunchable (no client, or the submit was refused) is logged rather
-        than dropped in silence: a request the user made and never saw run is
-        the one failure they cannot diagnose from the screen.
-        """
         if prompt_id:
-            # Kept for the tile, the version list and the slideshow while it runs:
-            # the launch's own reconcile read the row before the stamp.
             self._targets[prompt_id] = row.get("prompt_id")
             self.put_what_is_locked_first()
             self.reconcile()
@@ -421,35 +291,13 @@ class EnhanceController:
         return False
 
     def enhance_when_wanted(self, row: dict | None) -> None:
-        """Enhance a just-finished image while the Auto checkbox is on.
-
-        The Enhance pane's standing instruction, app-wide: with it checked the app
-        turns out finished images rather than raw ones, without pressing Enhance
-        All after every run. The gate is Enhance All's own —
-        :func:`~origenerator.gallery.enhance.rows_awaiting_enhancement` — so a
-        video, an already-enhanced image (inline or folded), and an image whose
-        enhance is still in flight are all passed over. That last part is what
-        stops the loop: the enhance this queues folds back onto the row it came
-        from and arrives here already enhanced."""
         if row is None or not self._settings.auto:
             return
         awaiting = self._awaiting([row])
         if awaiting:
             self._enqueue(awaiting)
 
-    # --- said out loud ---------------------------------------------------------
-
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
-        """Enhance the image on screen: the id it launched on (``None`` when it
-        didn't), the line the speaking surface should say, and its kind.
-
-        Only an image that has received no enhancement gets one, the same gate a
-        fullscreen lock's Down uses — spoken over a slideshow, this is a gesture made
-        with no view of the Enhance pane, and an image already carrying an
-        enhancement someone chose must not be re-derived at whatever the settings
-        happen to say now. Re-enhancing stays a deliberate step made in front of
-        the settings it will use (the thumbnail menu, the ``+ Enhance`` row).
-        """
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
             return None, "only a finished image can be enhanced", WARNING
@@ -461,18 +309,6 @@ class EnhanceController:
         return self._launch_spoken(row, params, "enhance", "enhancing…")
 
     def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
-        """Launch a targeted fix if the image wants one: the id it launched on
-        (``None`` when it didn't) and the line the surface should say about it.
-
-        The run is the image's latest enhancement done again with a detail pass
-        aimed at each part named (:func:`~origenerator.gallery.enhance.
-        fix_params_for`) — so the answer to a bad hand on an already-enhanced
-        image is the same image, same settings, hand redrawn.
-
-        Said back in the parts it is actually redrawing, which is not always the
-        parts asked for: one with nothing installed to find it is dropped rather
-        than taking the rest of the command down with it, and the caption is
-        where that shows. Refused outright only when none of them can run."""
         asked = name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
@@ -489,14 +325,6 @@ class EnhanceController:
 
     def _launch_spoken(self, row: dict, params: dict, what: str,
                        doing: str) -> tuple[str | None, str, str]:
-        """The tail both spoken enhancements share: refuse one already in flight,
-        else launch and say so.
-
-        A targeted fix and a plain "enhance" differ in what they refuse and in
-        what they run; from here on they are one job. ``what`` names the run in
-        a refusal ("teeth fix", "enhance"), ``doing`` is what the surface says
-        while it runs.
-        """
         if self.run_of(row) is not None:
             return None, "an enhance of this image is already running", WARNING
         logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
@@ -506,14 +334,6 @@ class EnhanceController:
         return row["prompt_id"], doing, INFO
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """Locking a slide asked for it to be enhanced, first. Returns whether a
-        run started — the slideshow shows its corner note only if one did.
-
-        The same ask as a spoken "enhance" over the same image, so the same
-        decision makes it (:meth:`enhance_it`); a lock has no corner line to
-        fill, so its answer is dropped. The decision is on this side rather than
-        in the slideshow because it is this side that holds the versions — and a
-        video has none to receive."""
         if self.enhance_it(prompt_id)[0] is not None:
             return True
         self.put_what_is_locked_first()
@@ -525,69 +345,31 @@ class EnhanceController:
                   if (row := self._host.row_for(prompt_id)) is not None]
         self._jobs.put_first(job.prompt_id for job in self.jobs_targeting(locked))
 
-    # --- the runs in flight, and where each one shows -------------------------
-
     def _enhances_in_flight(self) -> list:
-        """Every standalone enhance in flight, across every folder."""
         return [job for job in self._jobs.all_jobs
                 if job.workflow.name == gallery.ENHANCE_WORKFLOW]
 
     def _target_of(self, job) -> str | None:
-        """The prompt_id of the image a live enhance ``job`` is of — the stamp
-        its row carries (:meth:`Database.set_enhance_target`), read once and
-        kept — or ``None`` for a run from before the stamp was recorded."""
         if job.prompt_id not in self._targets:
             row = self._db.get_generation(job.prompt_id)
             self._targets[job.prompt_id] = (row or {}).get("enhance_of")
         return self._targets[job.prompt_id]
 
     def _of_row(self, job, row: dict) -> bool:
-        """Whether a live enhance ``job`` is an enhance of ``row`` — by the image's
-        id where the run recorded one, else by the file it reads. The one
-        question every surface showing a run on its image asks
-        (:func:`gallery.enhance_run_targets_row`)."""
         return gallery.enhance_run_targets_row(
             self._target_of(job), job.params.get("input_image"), row)
 
     def _job_for(self, row: dict, running=None):
-        """The standalone enhance being made of this row's image, or ``None``.
-
-        The one walk under every surface that shows a run on the image it
-        improves. There were three of it, each with its own copy of which job
-        counts and its own restatement of why a queued one has no frame; the two
-        answers they gave differ only in the shape the surface wants, which is
-        what :meth:`run_of` and :meth:`_pending_for` do with what this finds.
-
-        Every live job is searched, not each folder's leading one: a batch of
-        enhances goes out whole and its jobs share a settings key, so all but the
-        first would read as not in flight off the folder-facing view. ``running``
-        takes a listing the caller already holds -- the reconcile reads one per
-        pass -- and everything else asks for a fresh one, which is what a delete
-        cancelling the runs under it needs.
-        """
         for job in (self._enhances_in_flight() if running is None else running):
             if self._of_row(job, row):
                 return job
         return None
 
     def run_of(self, row: dict) -> RunReading | None:
-        """The standalone enhance being made of this image right now, as the
-        image's tile sees it, or ``None``.
-
-        The Gallery pane's tiles ask as they are built, so a folder generating
-        with the Auto switch on reads honestly: the base render is out, on
-        screen, and something better is on the way. Without it the folder looks
-        like it is turning out plain images and ignoring the switch."""
         job = self._job_for(row)
         return self._as_run(job) if job is not None else None
 
     def _as_run(self, job) -> RunReading:
-        """One enhance in flight, as every surface showing it reads it.
-
-        The frame is the job's own latest, which a run that hasn't started has
-        none of: a batch's queued jobs show as queued rather than borrowing the
-        frame of the one being rendered.
-        """
         return RunReading(
             status=display_status(job.state),
             frame=job.last_preview,
@@ -599,20 +381,6 @@ class EnhanceController:
         )
 
     def reconcile(self) -> None:
-        """Show the enhancement being made wherever the image it improves is.
-
-        The Generate pane's version list leads with a live row while one is in flight,
-        the tab's own preview streams the same frames, and the image's tile in
-        the middle column streams them under its "Enhancing…" scrim — the same
-        in-flight treatment work gets everywhere else in the app. The jobs are
-        the gallery's, so the match is made here: every running standalone
-        enhance against every tab's displayed row. Cheap enough to re-run on
-        each frame; the pane updates its row in place.
-
-        Every job of every folder, for the same reason :meth:`run_of` reads them
-        all: a batch of enhances shares one settings key, and a tab showing the
-        third image of it must find its own run rather than the first.
-        """
         running = self._enhances_in_flight()
         for pane in self._generate_pane_of().generate_tabs():
             row = pane.displayed_row()
@@ -623,20 +391,6 @@ class EnhanceController:
         self.tell_the_slideshows()
 
     def tell_the_slideshows(self) -> None:
-        """Tell an open slideshow how the enhancements in flight are going.
-
-        A slideshow is where a batch of them gets asked for — every locked slide is a
-        run — so it is the surface most likely to be looking at an image whose
-        turn has not come. The slideshow cannot tell on its own: a lock hears only
-        that a run started, not where in the line it landed. Told, its HUD
-        says whether the version is being made or waiting to be.
-
-        Keyed by the mapping the tiles are drawn from, which covers every image
-        in the library rather than the open folder's — a slideshow of a collection plays
-        items from anywhere. The status is read off the job rather than its row:
-        the row says "running" from the moment the job is handed to ComfyUI, and
-        the wait on ComfyUI's own queue is exactly the stretch this names.
-        """
         self._slideshows.note_enhancing(
             {prompt_id: "running" if job.state == "running" else "queued"
              for prompt_id, job in self._by_prompt.items()},
@@ -644,15 +398,6 @@ class EnhanceController:
              if job.state == "running" and job.last_preview})
 
     def _reconcile_tiles(self, running) -> None:
-        """Stream each running enhance onto the tile of the image it is enhancing.
-
-        Which image a job targets is worked out only when the set of running
-        enhances changes, not on every streamed frame: the match walks every
-        image row, and the frames arrive several times a second. The set is
-        told by the runs themselves and what each is of, so a run cancelled and
-        launched again on the same image is read afresh rather than off the
-        job that is gone.
-        """
         live = {job.prompt_id for job in running}
         self._targets = {pid: target for pid, target in self._targets.items()
                          if pid in live}
@@ -674,15 +419,6 @@ class EnhanceController:
         })
 
     def _pending_for(self, row: dict, running) -> RunningEnhancement | None:
-        """A standalone enhance running on
-        ``row``'s own image, or ``None`` — the version list's live row.
-
-        The settings ride along so the live row can name what is being made the
-        way a finished version names what made it: the pane may have moved on
-        since the run was launched, so the job's own params are the only honest
-        answer. Everything else about which job it is, and why a queued one shows
-        no frame, is :meth:`_job_for`'s and :meth:`_as_run`'s.
-        """
         job = self._job_for(row, running)
         if job is None:
             return None
@@ -691,54 +427,20 @@ class EnhanceController:
                                   gallery.describe_enhance_params(job.params))
 
     def forget(self, prompt_id: str) -> None:
-        """A run that is over is nobody's enhance any more."""
         self._targets.pop(prompt_id, None)
 
-    # --- stopping one ----------------------------------------------------------
-
     def jobs_targeting(self, rows) -> list:
-        """Every standalone enhance in flight whose image is one of ``rows``.
-
-        :meth:`run_of`'s question asked the other way round — over a set of
-        images rather than one — for the callers that act on a whole set: the
-        tile menu's Cancel, the delete about to take those images out from
-        under their runs, and the images the slideshows are locked on.
-        """
         running = self._enhances_in_flight()
         return [job for job in running
                 if any(self._job_for(row, [job]) is not None for row in rows if row)]
 
     def cancel_for_delete(self, rows) -> None:
-        """Stop every standalone enhance still being made of ``rows`` — the items
-        a delete is about to take.
-
-        Wired into :class:`GalleryEdits` beside the media release, so it runs
-        for every delete there is: a picked tile, a whole folder, a rejected
-        experiment, a slideshow's Up key.
-
-        Canceling frees the queue — a video-length wait can sit after an
-        enhance nobody wants any more — and takes the run's transient row with
-        it, so no enhanced file lands with no original to be a version of.
-        """
         for job in self.jobs_targeting(rows):
             logger.info("Canceling the enhance of %s: its image is being deleted",
                         job.params.get("input_image"))
             self._jobs.cancel_job(job.prompt_id)
 
     def cancel_for(self, rows) -> None:
-        """Throw away the enhancements being made of ``rows``, keeping the images.
-
-        The tile menu's Cancel. Everything the delete path's cancel does, minus
-        the delete: the runs stop, their transient rows go with them, and the
-        images they were being made of are left exactly as they were — the
-        image on screen is the one that was already there.
-
-        Not a re-roll's cancel, which is why it doesn't go through the gallery's
-        own: an auto-generating folder takes that as a discarded seed and
-        launches the next one, and nobody asking to stop an enhancement is
-        asking for a fresh variation. The redraw afterwards is what takes the
-        scrim off the tile and the pending row out of the Generate pane.
-        """
         jobs = self.jobs_targeting(rows)
         for job in jobs:
             logger.info("Canceling the enhance of %s: asked to, from its tile",
@@ -749,7 +451,5 @@ class EnhanceController:
 
 
 def _all_video(rows) -> bool:
-    """Whether ``rows`` is a non-empty set of videos — the one case with nothing
-    to enhance at all, as opposed to nothing picked."""
     rows = list(rows)
     return bool(rows) and all(gallery.media_type_of_row(row) == MediaType.VIDEO for row in rows)

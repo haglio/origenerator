@@ -12,11 +12,6 @@ LONG_RUN_SECONDS = 60
 
 @dataclass(frozen=True)
 class RunOutcome:
-    """What a run came to, for whoever reports on it rather than redraws for it.
-
-    ``seconds`` is the run itself, never the wait in the line before it.
-    """
-
     kind: str
     display_name: str
     seconds: float | None
@@ -51,7 +46,6 @@ def toast_for(outcome: RunOutcome) -> Toast | None:
 
 
 def outcome_of_row(row: dict, *, ok: bool, seconds: float | None) -> RunOutcome:
-    """What a run came to, read off its stored row rather than off a live job."""
     workflow_name = row.get("workflow_name") or ""
     workflow = WORKFLOW_REGISTRY.get(workflow_name)
     return RunOutcome(

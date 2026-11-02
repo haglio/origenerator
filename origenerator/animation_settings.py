@@ -1,6 +1,3 @@
-"""The settings each animation runs, once accepted: one set per lane, action and
-starting state, in a file beside the library that reads as empty if it will not
-parse."""
 from __future__ import annotations
 
 import json
@@ -37,7 +34,6 @@ def _write(held: dict, path: Path | None = None) -> None:
 
 def settings_for(lane: str, action: str, state: str, *, path: Path | None = None
                ) -> dict | None:
-    """One animation's accepted settings, shaped like the overlay's pinned settings."""
     held = _read(path).get(lane, {}).get(action, {}).get(state)
     if not isinstance(held, dict) or not (held.get("workflow") or held.get("params")):
         return None
@@ -69,8 +65,6 @@ def accepted(*, path: Path | None = None) -> set[tuple[str, str, str]]:
 
 
 class AcceptedSettings:
-    """The store the window writes through, handed in so a test can stand in."""
-
     def remember(self, lane: str, action: str, state: str, *, workflow: str,
                  params: dict) -> None:
         remember(lane, action, state, workflow=workflow, params=params)

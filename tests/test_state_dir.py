@@ -1,5 +1,3 @@
-"""Where the app keeps its state: the checkout's own, unless the process says otherwise."""
-
 from __future__ import annotations
 
 import _winapi
@@ -65,8 +63,6 @@ def test_another_checkout_started_without_the_preview_flag_keeps_its_trash_besid
 
 
 def test_a_process_told_where_its_state_is_keeps_every_path_there(tmp_path):
-    # The suite is that process: it points every run at a directory of its own,
-    # and every module that binds a path at import has to follow.
     state, db, thumbs, ui, _project, trash, _primary, _records, _production = _paths(
         str(tmp_path / "elsewhere"))
     assert state == tmp_path / "elsewhere"
@@ -77,11 +73,6 @@ def test_a_process_told_where_its_state_is_keeps_every_path_there(tmp_path):
 
 
 def test_a_branch_session_shares_the_live_installs_library_and_keeps_its_own_window_state():
-    # The library -- its database, and the thumbnails and trash kept beside the
-    # items -- is the production app's wherever the app runs from, so every
-    # instance shows every generation, made in a preview or not. What is about
-    # this window alone (its saved geometry and tabs, its logs) stays in the
-    # checkout that runs it.
     state, db, thumbs, ui, project, trash, primary, records, production = _paths(
         None, branch_session=True)
     library = primary / "state"

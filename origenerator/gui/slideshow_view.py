@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from dataclasses import replace
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 
 from funestra.file_channel import append_command
 from funestra.funestra_verbs import SPEED_DOWN, SPEED_UP
@@ -62,15 +63,52 @@ def _sent_to_the_dashboard(shape: str) -> tuple[str, ...]:
               for verb in ("prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash")))
 
 
+@dataclass(frozen=True)
+class ViewShow:
+    shape: str = ""
+    start: int | None = None
+    shuffle: object = None
+    actions: SlideshowActions | None = None
+    hud: object = None
+    versions: object = None
+    pace: object = None
+    frames: object = None
+
+
+@dataclass(frozen=True)
+class ViewWiring:
+    engine: object = None
+    motion: object = None
+    radio: object = None
+    volume: object = None
+    clock: Callable[[], float] = time.monotonic
+
+
+NOTHING_TO_SHOW = ViewShow()
+USUAL_WIRING = ViewWiring()
+
+
+@dataclass(frozen=True)
+class HudWear:
+    dashboard_cmd_file: object = None
+    label_for: object = None
+    corner: HudCorner = HudCorner.UPPER_LEFT
+    minimized: bool = False
+    collapse: object = None
+    open_in: object = None
+
+
+NO_WEAR = HudWear()
+
+
 class SlideshowView(QWidget):
-    def __init__(self, items, *, shape: str = "", start=None,
-                 shuffle=None, actions=None, hud=None, versions=None, engine=None, motion=None,
-                 pace=None, frames=None, radio=None, volume=None,
-                 clock=time.monotonic, parent=None):
+    def __init__(self, items, show: ViewShow = NOTHING_TO_SHOW,
+                 wiring: ViewWiring = USUAL_WIRING, parent=None):
         super().__init__(parent)
-        self._actions = actions if actions is not None else SlideshowActions()
-        self._motion = motion
-        self._clock = clock
+        shape = show.shape
+        self._actions = show.actions if show.actions is not None else SlideshowActions()
+        self._motion = wiring.motion
+        self._clock = wiring.clock
         self._hud_shape = shape
         self._dashboard_cmd_file = None
         self._label_for = None
@@ -102,31 +140,30 @@ class SlideshowView(QWidget):
 
         channel = PaneChannel()
         self.slideshow = FunestraSlideshow(
-            Playing(items, start=start, shuffle=shuffle, hud=hud, actions=self._actions,
-                    versions=versions),
-            Seat(shape, channel,
-                 frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")),
-            Hosting(pace=pace, shown=self),
+            Playing(items, start=show.start, shuffle=show.shuffle, hud=show.hud, actions=self._actions,
+                    versions=show.versions),
+            Seat(show.shape, channel,
+                 show.frames if show.frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")),
+            Hosting(pace=show.pace, shown=self),
             parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._pane = FunestraPane(
             channel=channel, user=lambda _playback: _TheWindowsPresses(self),
             hud=self._hud_model,
-            engine_for=None if engine is None else (lambda _window_id: engine),
-            sound=PaneSound(radio, volume, self._volume_moved))
+            engine_for=(None if wiring.engine is None
+                        else (lambda _window_id: wiring.engine)),
+            sound=PaneSound(wiring.radio, wiring.volume, self._volume_moved))
         layout.addWidget(self._pane, 1)
         self.slideshow.tick()
 
-    def wear_the_hud(self, shape: str, *, dashboard_cmd_file=None, label_for=None,
-                     corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
-                     collapse=None, open_in=None) -> None:
+    def wear_the_hud(self, shape: str, wear: HudWear = NO_WEAR) -> None:
         self._hud_shape = shape
-        self._dashboard_cmd_file = dashboard_cmd_file
-        self._label_for = label_for
-        self._corner, self._minimized = corner, minimized
-        self._collapse = collapse
-        self._open_in = open_in
+        self._dashboard_cmd_file = wear.dashboard_cmd_file
+        self._label_for = wear.label_for
+        self._corner, self._minimized = wear.corner, wear.minimized
+        self._collapse = wear.collapse
+        self._open_in = wear.open_in
         self.refresh_hud()
 
     @property

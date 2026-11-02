@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, fields, replace
+from dataclasses import fields, replace
 
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
@@ -16,7 +16,7 @@ from origenerator.gui.hud_nav_map import (
     build_nav_map,
     step_in_ring,
 )
-from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from origenerator.gui.slideshow_wiring import NO_DEAL, HudFacts, SetDeal, SlideshowActions
 from origenerator.media import MediaType
 from origenerator.slideshow import (
     LIVE,
@@ -35,26 +35,15 @@ _ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
 GENERATING = "Generating…"
 
 
-@dataclass(frozen=True)
-class SetDeal:
-    shuffle: object = None
-    start: int | None = None
-    opening: object = None
-
-
-NO_DEAL = SetDeal()
-
-
 class SlideshowSet:
     def __init__(self, items, *, actions: SlideshowActions, deal: SetDeal = NO_DEAL,
                  hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
-        start, opening = deal.start, deal.opening
         self._shuffle = deal.shuffle
         self._on_pass_change = on_pass_change
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen
-        self._known: dict[str, NavMapNeighbors] = {}
+        self._known: dict[str, NavMapNeighbors] = deal.neighbors_known()
         self._actions_of = actions.actions_of
         self._named: dict[str, str] = {}
         self._slides_of = actions.slides
@@ -66,10 +55,8 @@ class SlideshowSet:
         self._runs_offered: set[str] = set()
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
-        if opening is not None and opening.lead_neighbors is not None:
-            self._known[opening.items[opening.lead][2]] = opening.lead_neighbors
-        self.playlist = self._deal(items, start=opening.lead if opening is not None else start)
-        if start is None:
+        self.playlist = self._deal(items, start=deal.led_at)
+        if deal.start is None:
             self.lead_with_what_is_being_made()
         self._a_row_played_whole_is_its_loop()
 

@@ -6,7 +6,7 @@ from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
 
 from origenerator.gui import voice_router
 from origenerator.gui.message import ERROR, WARNING
-from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from tests.gallery_view_support import _requesting_view
 from tests.marked_words import words
 
@@ -20,7 +20,7 @@ _ASKED_AGAIN = object()
 
 
 def _view(qtbot):
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
     return view
 

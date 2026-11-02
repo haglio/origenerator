@@ -149,7 +149,11 @@ from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
-from origenerator.gui.slideshow_director import SlideshowDirector
+from origenerator.gui.slideshow_director import (
+    DirectorSources,
+    DirectorSurroundings,
+    SlideshowDirector,
+)
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.starting_rows import StartingRows
@@ -403,10 +407,12 @@ class GalleryView(QWidget):
         self._navigation = NavigationController(self, search=self._search)
         self._trail = (False, False)
         self._slideshows = SlideshowDirector(
-            self, db=db, gallery_pane=self._gallery_pane, jobs=self._jobs,
-            pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
-            names=self._item_names, radio=self._radio,
-            buttons_of=lambda: self._buttons)
+            self,
+            DirectorSources(db=db, gallery_pane=self._gallery_pane, jobs=self._jobs,
+                            names=self._item_names),
+            DirectorSurroundings(
+                pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
+                radio=self._radio, buttons_of=lambda: self._buttons))
         self._starting = StartingRows(self)
         self._starting.changed.connect(self._update_queue)
         self._combine = CombineController(

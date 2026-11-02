@@ -24,7 +24,12 @@ from origenerator.gallery.shapes import BOTH
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui.message import FAVORITE, INFO, WARNING
-from origenerator.gui.slideshow_director import SlideshowDirector
+from origenerator.gui.slideshow_director import (
+    Carrying,
+    DirectorSources,
+    DirectorSurroundings,
+    SlideshowDirector,
+)
 from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.item_names import ItemNames
@@ -554,8 +559,8 @@ def slideshows(monkeypatch):
         made.append(slideshow)
         return slideshow
 
-    def build_window(items, *, motion=None, **kwargs):
-        return FakeWindow(build_slideshow(items, **kwargs), motion=motion)
+    def build_window(items, show, wiring):
+        return FakeWindow(build_slideshow(items, **vars(show)), motion=wiring.motion)
 
     def build_funestra_slideshow(playing, seat, hosting):
         return build_slideshow(
@@ -575,9 +580,10 @@ def slideshows(monkeypatch):
         host = host or FakeHost()
         db = db or FakeDB()
         director = SlideshowDirector(
-            host, db=db, gallery_pane=gallery_pane or FakeGalleryPane(),
-            jobs=FakeJobQueue(), pace=SlideshowPace(), motion=None,
-            fun_time=fun_time, names=ItemNames(db))
+            host,
+            DirectorSources(db=db, gallery_pane=gallery_pane or FakeGalleryPane(),
+                            jobs=FakeJobQueue(), names=ItemNames(db)),
+            DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
             (f"{r['prompt_id']}.png", "image", r["prompt_id"], None) for r in rows]
@@ -924,7 +930,7 @@ def test_a_slideshow_of_both_shapes_coming_back_to_an_item_goes_to_that_items_mo
 
     director.open([(f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
                    for row in rows], rows=rows, shape=BOTH,
-                  resume=SlideshowState(order=("g0", "g1", "g2"), current="g2"))
+                  carrying=Carrying(resume=SlideshowState(order=("g0", "g1", "g2"), current="g2")))
 
     assert made[0].shown.geometry == LANDSCAPE_MONITOR.getRect()
 
@@ -1180,9 +1186,11 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 
 def _director():
     db = FakeDB()
-    return SlideshowDirector(FakeHost(), db=db, gallery_pane=FakeGalleryPane(),
-                             jobs=FakeJobQueue(), pace=SlideshowPace(), motion=None,
-                             fun_time=None, names=ItemNames(db))
+    return SlideshowDirector(
+        FakeHost(),
+        DirectorSources(db=db, gallery_pane=FakeGalleryPane(), jobs=FakeJobQueue(),
+                        names=ItemNames(db)),
+        DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=None))
 
 
 def test_a_video_evolver_upscaled_plays_as_the_upscale(tmp_path, monkeypatch):
@@ -2583,7 +2591,7 @@ def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_follow
         funestras={PORTRAIT: object(), LANDSCAPE: object()}))
     host.queue = ([_being_made("g-run")], 0)
 
-    director.open([], folder_items=[("a.png", "image", "g1", None)], start=0)
+    director.open([], carrying=Carrying(folder_items=[("a.png", "image", "g1", None)]), start=0)
 
     assert made[0].items == [("a.png", "image", "g1", None)]
     assert made[0].generating == [("g-run", b"frame")]

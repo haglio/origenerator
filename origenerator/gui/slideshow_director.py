@@ -57,10 +57,17 @@ from origenerator.gui.hud_places import (
 from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
+from origenerator.gui.slideshow_wiring import (
+    NOTHING_CARRIED,
+    Carrying,
+    DirectorSources,
+    DirectorSurroundings,
+    HudFacts,
+    Showing,
+    SlideshowActions,
+)
 from origenerator.gui.version_stepper import Version
-from origenerator.item_names import ItemNames
 from origenerator.item_shape import (
     filter_rows,
     row_shape,
@@ -245,20 +252,20 @@ def _shape_it_opens_on(shape: str, rows, items, opened_on: str | None) -> str:
 
 
 class SlideshowDirector:
-    def __init__(self, host: SlideshowHost, *, db, gallery_pane, jobs, pace, motion,
-                 fun_time, names: ItemNames, radio=None, buttons_of=None):
+    def __init__(self, host: SlideshowHost, sources: DirectorSources,
+                 surroundings: DirectorSurroundings):
         self._host = host
-        self._radio = radio
-        self._buttons_of = buttons_of
+        self._radio = surroundings.radio
+        self._buttons_of = surroundings.buttons_of
         self._volume_left_at: VolumeHud | None = None
-        self._db = db
-        self._names = names
-        self._gallery_pane = gallery_pane
-        self._jobs = jobs
-        self._pace = pace
+        self._db = sources.db
+        self._names = sources.names
+        gallery_pane = self._gallery_pane = sources.gallery_pane
+        self._jobs = sources.jobs
+        self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
-        self._motion = motion
-        self._fun_time = fun_time
+        self._motion = surroundings.motion
+        fun_time = self._fun_time = surroundings.fun_time
         self._slideshow = None
         self._standalone_shape: str | None = None
         self._standalone_window_shape: str | None = None
@@ -369,8 +376,9 @@ class SlideshowDirector:
         picked_elsewhere = (start is not None and resume is not None
                             and resume.current != one_picked)
         self.open(items, rows=rows, location=location, shape=shape, start=start,
-                  resume=None if picked_elsewhere else resume,
-                  filters=replace(self._filters, **{switch: True}) if switch else None,
+                  carrying=Carrying(
+                      resume=None if picked_elsewhere else resume,
+                      filters=replace(self._filters, **{switch: True}) if switch else None),
                   **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
@@ -394,7 +402,7 @@ class SlideshowDirector:
         hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
         if media is None:
             return self.open([], rows=listed, start=0, shuffle=in_order,
-                             folder_items=self.items_of(listed), hud=hud)
+                             carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
         rows = (listed if any(row["prompt_id"] == generation for row in listed)
                 else self.rows_at(self._location_of(self._host.row_for(generation))))
         opened_on = [row for row in rows if row["prompt_id"] == generation]
@@ -406,10 +414,19 @@ class SlideshowDirector:
         shape = majority_shape(map(row_shape, rows))
         slideshow = self.open(items, rows=opened_on, start=0, shape=shape, shuffle=in_order,
                               hud=hud)
+
+        def fill_in(folder) -> None:
+            if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
+                return
+            folder_items, versions = folder
+            start = _place_of(generation, folder_items)
+            if start is not None:
+                self.open(folder_items, rows=rows, start=start, shape=shape, shuffle=in_order,
+                          hud=hud, carrying=Carrying(versions=versions))
+
         if slideshow is not None and len(rows) > 1:
             self._host.off_thread(
-                lambda: (self.items_of(rows), self.versions_of(rows)),
-                partial(self._fill_in, slideshow, rows, generation, shape=shape, hud=hud))
+                lambda: (self.items_of(rows), self.versions_of(rows)), fill_in)
         return slideshow
 
     def _listed_rows(self) -> list[dict]:
@@ -419,15 +436,6 @@ class SlideshowDirector:
                 for prompt_id in self._host.listed_prompt_ids())
         return [row for row in rows if row is not None]
 
-    def _fill_in(self, slideshow, rows, generation, folder, *, shape, hud) -> None:
-        if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
-            return
-        items, versions = folder
-        start = _place_of(generation, items)
-        if start is not None:
-            self.open(items, rows=rows, start=start, shape=shape, shuffle=in_order, hud=hud,
-                      versions=versions)
-
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:
             return None
@@ -435,41 +443,39 @@ class SlideshowDirector:
         return shaped_key(key, row_shape(row))
 
     @looking_once
-    def open(self, items, *, rows=(), folder_items=None, location=None,
-             shape=None, resume=None, filters=None, versions=None, **kwargs):
+    def open(self, items, *, rows=(), location=None, shape=None,
+             carrying: Carrying = NOTHING_CARRIED, **kwargs):
         run = self._run_being_made_at(location) if not items else None
         where = shape or (row_shape(run) if run is not None
-                         else _shape_of_the_set(rows, items or folder_items or []))
+                         else _shape_of_the_set(rows, items or carrying.folder_items or []))
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
         follows_a_run = not items
-        if follows_a_run and not folder_items and run is None:
+        if follows_a_run and not carrying.folder_items and run is None:
             return None
         if (channel is not None and where not in self._regions_wanted
                 and self._session_channel is not None):
             self._asked_for[where] = partial(
-                self.open, items, rows=rows, folder_items=folder_items, location=location,
-                shape=where, resume=resume, filters=filters, **kwargs)
+                self.open, items, rows=rows, location=location, shape=where,
+                carrying=replace(carrying, versions=None), **kwargs)
             ask_for_the_funestra(self._session_channel, where)
             return None
         if follows_a_run:
-            items, kwargs["start"] = folder_items or [], None
+            items, kwargs["start"] = carrying.folder_items or [], None
         opening = kwargs.pop("opening", None)
         hud = replace(kwargs.pop("hud", HudFacts()),
                       enhanced_ids=(self._enhanced_ids_of(rows) if opening is None
                                     else opening.enhanced_ids),
                       enhancing=self._enhance_status)
-        versions = self.versions_of(rows) if versions is None else versions
-        actions = self._slideshow_actions(where)
+        versions = self.versions_of(rows) if carrying.versions is None else carrying.versions
+        showing = Showing(self._slideshow_actions(where), hud, versions, opening)
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
-            slideshow = self._hand_to_the_funestra(items, where, channel, actions=actions,
-                                            hud=hud, versions=versions, opening=opening, **kwargs)
+            slideshow = self._hand_to_the_funestra(items, where, channel, showing, **kwargs)
         else:
             shape = (_shape_it_opens_on(where, rows, items,
-                                        _item_opened_on(items, kwargs.get("start"), resume))
+                                        _item_opened_on(items, kwargs.get("start"), carrying.resume))
                      if self._fun_time is None else where)
-            slideshow = self._open_a_window(items, where, window_shape=shape, actions=actions,
-                                            hud=hud, versions=versions, **kwargs)
+            slideshow = self._open_a_window(items, where, showing, window_shape=shape, **kwargs)
             if self._fun_time is None:
                 self._standalone_showing = _one_shape_of_the_set(rows, items) or shape
         self._slideshow = slideshow
@@ -478,11 +484,12 @@ class SlideshowDirector:
         self._live_slideshows = [entry for entry in self._live_slideshows
                                  if entry[0] is not slideshow]
         self._live_slideshows.append((slideshow, location))
+        filters = carrying.filters
         if filters is None:
             filters = self._filters if self._fun_time is None else SlideshowFilters()
         slideshow.take_up(filters, keep_the_slide=keep_the_slide)
-        if resume is not None:
-            slideshow.resume(resume, opened_on_it=keep_the_slide)
+        if carrying.resume is not None:
+            slideshow.resume(carrying.resume, opened_on_it=keep_the_slide)
         if not keep_the_slide:
             self._offer_the_frames(slideshow, location, self._host.queue_now()[0])
             if follows_a_run:
@@ -567,15 +574,14 @@ class SlideshowDirector:
         if self._window_up() is not None:
             self.pause_or_play_the_room()
 
-    def _hand_to_the_funestra(self, items, shape: str, channel, *, actions, hud,
-                            versions, opening=None, **kwargs):
+    def _hand_to_the_funestra(self, items, shape: str, channel, showing: Showing, **kwargs):
         occupant = self.region_slideshow(shape)
         if occupant is not None:
-            occupant.play(Playing(items, hud=hud, versions=versions, **kwargs))
+            occupant.play(Playing(items, hud=showing.hud, versions=showing.versions, **kwargs))
             return occupant
         slideshow = FunestraSlideshow(
-            Playing(items, actions=actions, hud=hud, versions=versions, opening=opening,
-                    **kwargs),
+            Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions,
+                    opening=showing.opening, **kwargs),
             Seat(shape, channel, FrameFiles(FRAMES_BEING_MADE_DIR / shape)),
             Hosting(pace=self._pace_on(shape), say=self._host.say))
         self._region_slideshows[shape] = slideshow
@@ -584,7 +590,7 @@ class SlideshowDirector:
         slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
         return slideshow
 
-    def _open_a_window(self, items, shape: str, *, window_shape: str, actions, hud, versions,
+    def _open_a_window(self, items, shape: str, showing: Showing, *, window_shape: str,
                        **kwargs):
         up = self._window_up() if self._fun_time is None else None
         view = up.shown if up is not None else None
@@ -593,13 +599,14 @@ class SlideshowDirector:
             self._standalone_window_shape = window_shape
         built = view is None
         if built:
-            view = SlideshowView(items, shape=shape, actions=actions,
-                                 pace=self._pace_on(shape), motion=self._motion, hud=hud,
-                                 versions=versions, **self._the_sound_standing_on_its_own(),
-                                 **kwargs)
+            view = SlideshowView(
+                items,
+                ViewShow(shape=shape, actions=showing.actions, pace=self._pace_on(shape),
+                         hud=showing.hud, versions=showing.versions, **kwargs),
+                ViewWiring(motion=self._motion, **self._the_sound_standing_on_its_own()))
         else:
             view.slideshow.play(
-                Playing(items, actions=actions, hud=hud, versions=versions, **kwargs))
+                Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions, **kwargs))
         if built:
             self._present_surface(view, shape)
         else:
@@ -762,10 +769,11 @@ class SlideshowDirector:
 
     def _wear_the_hud(self, view, shape: str) -> None:
         corner, minimized = self.hud_place(shape)
-        view.wear_the_hud(shape, dashboard_cmd_file=self._session_channel,
-                          label_for=self._names.of, corner=corner, minimized=minimized,
-                          collapse=partial(self.collapse_the_hud, shape=shape),
-                          open_in=partial(self.open_the_hud_in, shape=shape))
+        view.wear_the_hud(shape, HudWear(
+            dashboard_cmd_file=self._session_channel, label_for=self._names.of,
+            corner=corner, minimized=minimized,
+            collapse=partial(self.collapse_the_hud, shape=shape),
+            open_in=partial(self.open_the_hud_in, shape=shape)))
 
     @property
     def _session_channel(self):
@@ -852,8 +860,8 @@ class SlideshowDirector:
 
     def put_back(self, held: HeldSlideshow):
         return self.open(list(held.items), rows=self._rows_of(held.items),
-                         location=held.state.location, shape=held.shape, resume=held.state,
-                         filters=held.filters,
+                         location=held.state.location, shape=held.shape,
+                         carrying=Carrying(resume=held.state, filters=held.filters),
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
                          hud=HudFacts(order_label=held.order_label,
                                       favorite_ids=self._favorite_prompt_ids()))
@@ -922,7 +930,7 @@ class SlideshowDirector:
             return False
         self.open(opening.items, rows=opening.rows, location=self.base_location(shape), shape=shape,
                   hud=HudFacts(favorite_ids=self._favorite_prompt_ids()),
-                  versions=opening.versions, opening=opening)
+                  carrying=Carrying(versions=opening.versions), opening=opening)
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
                     shape, len(opening.items), (time.perf_counter() - began) * 1000)

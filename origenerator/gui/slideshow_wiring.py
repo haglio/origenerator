@@ -44,3 +44,59 @@ class HudFacts:
     favorite_ids: Collection[str] = field(default_factory=frozenset)
     enhanced_ids: Collection[str] = field(default_factory=frozenset)
     enhancing: Mapping[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SetDeal:
+    shuffle: object = None
+    start: int | None = None
+    opening: object = None
+
+    @property
+    def led_at(self) -> int | None:
+        return self.opening.lead if self.opening is not None else self.start
+
+    def neighbors_known(self) -> dict:
+        opening = self.opening
+        if opening is None or opening.lead_neighbors is None:
+            return {}
+        return {opening.items[opening.lead][2]: opening.lead_neighbors}
+
+
+NO_DEAL = SetDeal()
+
+
+@dataclass(frozen=True)
+class DirectorSources:
+    db: object
+    gallery_pane: object
+    jobs: object
+    names: object
+
+
+@dataclass(frozen=True)
+class DirectorSurroundings:
+    pace: object
+    motion: object
+    fun_time: object
+    radio: object = None
+    buttons_of: Callable | None = None
+
+
+@dataclass(frozen=True)
+class Showing:
+    actions: SlideshowActions
+    hud: HudFacts
+    versions: dict
+    opening: object = None
+
+
+@dataclass(frozen=True)
+class Carrying:
+    folder_items: list | None = None
+    resume: object = None
+    filters: SlideshowFilters | None = None
+    versions: dict | None = None
+
+
+NOTHING_CARRIED = Carrying()

@@ -1,4 +1,3 @@
-"""The buttons Origenerator declares on a slideshow's HUD."""
 from __future__ import annotations
 
 import pytest
@@ -30,10 +29,6 @@ def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
-    """"portrait_next", "landscape_trash" — the same spelling a satellite's
-    button row posts, so the session routes a slideshow's press with no new verbs; and
-    every glyph on this HUD is cryptic on purpose, so each one names itself
-    on hover."""
     for shape in ("portrait", "landscape"):
         for button in slideshow_rows(shape)[-1]:
             assert button.command.startswith(f"{shape}_"), button.command
@@ -41,17 +36,11 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
 
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
-    """A run of evenly spaced squares reads as one undifferentiated strip; the
-    wider gap opens at the seams the Funestras' own row opens them at, and
-    Enhanced only keeps Reset in its group."""
     assert [name for name, button in zip(_names(_button_row()), _button_row(), strict=True) if button.group_break] == [
         "lock", "enhanced", "shuffle", "cycle_version"]
 
 
 def test_the_switches_light_and_the_things_done_never_do():
-    """The lock and the two filters are states the slideshow sits in — the lock and
-    F-mode in the favorites' green, the enhanced-only switch in an enhanced
-    image's own yellow; a step, the bin and reset are things done."""
     row = _by_name(locked=True, favorites_filter=True, enhanced=True)
 
     assert row["lock"].lit
@@ -141,9 +130,6 @@ def test_reset_is_faded_with_nothing_to_put_back():
 
 
 def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize():
-    """Hosted, this slideshow covers a Satellite Funestra and has no window of its own
-    to park, so the mode pair leads the HUD with this mode lit — and the
-    minimize a Funestra's button row ends with is not declared at all."""
     rows = slideshow_rows("portrait", hosted=True)
     mode_row = [button.command for button in rows[0]]
 
@@ -154,8 +140,6 @@ def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize(
 
 
 def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
-    """Standalone there is no Funestra under it and no mode to leave, so the pair
-    is not drawn — a lit button nothing answers would be a drawing of one."""
     rows = slideshow_rows("portrait")
 
     assert len(rows) == 1
@@ -163,9 +147,6 @@ def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
 
 
 def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
-    """The Funestra's window is the session's, so minimize is the session's; and
-    the mode pair is on the HUD the session draws around this button row, not in
-    it.  What is left is exactly what the slideshow itself answers."""
     rows = slideshow_rows("portrait", hosted=True, own_window=False)
 
     assert len(rows) == 1
@@ -173,8 +154,6 @@ def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_i
 
 
 class _Host:
-    """A slideshow reduced to the calls a press can make of one."""
-
     def __init__(self):
         self.calls = []
         self.transport = self
@@ -241,9 +220,6 @@ class _Host:
 
 
 def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
-    """A session's spoken "lock", "unlock", "f mode on" and "f mode off" name
-    the state wanted, and a flip would hand the other one to a speaker who
-    cannot see which way the switch stands."""
     host = _Host()
 
     for action in ("lock_on", "lock_off", "fmode_on", "fmode_off"):
@@ -254,8 +230,6 @@ def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
 
 
 def test_filter_said_of_a_side_narrows_to_the_action_on_screen():
-    """The Funestras' "filter" with no action named, as a satellite takes it: the
-    action read off what is showing."""
     host = _Host()
 
     assert answer(host, "lock_action")
@@ -264,15 +238,11 @@ def test_filter_said_of_a_side_narrows_to_the_action_on_screen():
 
 
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():
-    """An image nobody enhanced, a video Evolver never upscaled: there is
-    nothing to step to, so the button is drawn faded rather than offered."""
     assert _by_name()["cycle_version"].dim
     assert not _by_name(has_other_versions=True)["cycle_version"].dim
 
 
 def test_every_declared_button_is_answered_by_the_slideshow():
-    """A button this HUD declares and nothing answers would be drawn dead —
-    so every one of them, minimize aside, reaches the slideshow."""
     host = _Host()
     for button in slideshow_rows("portrait", hosted=True, own_window=False)[0]:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
@@ -306,11 +276,6 @@ def test_a_map_click_plays_that_item_and_a_double_click_locks_it():
 
 
 def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
-    """The two loop buttons, the loop key, the expand mark, the map's keys
-    and the button at the head of each row — each in the Funestras' spelling,
-    each meaning on a slideshow what it means on a Funestra.  Lifting the filter is
-    the one that means more: said to a slideshow, "no filter" is the way out of
-    every narrowing, so the press is too."""
     host = _Host()
 
     for action in ("seed_loop", "action_loop", "no_loop", "loop", "more_seeds",
@@ -327,8 +292,6 @@ def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
 
 
 def test_a_press_a_slideshow_has_no_answer_to_says_so():
-    """Minimize parks a window, which is not the slideshow's to answer; nor is the
-    strike under an act, which a slideshow has no acts for."""
     host = _Host()
 
     assert not answer(host, "minimize")
@@ -337,9 +300,6 @@ def test_a_press_a_slideshow_has_no_answer_to_says_so():
 
 
 def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
-    """Hosted it is the region's base state — that shape's whole library, the
-    way a Funestra's reset leaves it browsing its own; standalone there is no
-    such state and it is this set from the top."""
     hosted = next(b for b in _button_row(hosted=True) if b.command == "portrait_reset")
     alone = next(b for b in _button_row() if b.command == "portrait_reset")
 

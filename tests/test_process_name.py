@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app_support.launcher import launchers
 from app_support.process_identity import ProcessNamer
-from app_support.process_identity_check import assert_the_app_names_its_process
+from app_support.process_identity_check import ProcessName, assert_the_process_is_named
 
 from origenerator.app import _name_this_process
 
@@ -24,6 +24,5 @@ def test_the_launcher_runs_the_console_interpreter_its_log_needs():
 
 
 def test_the_app_prepares_that_copy_for_next_time(tmp_path: Path):
-    assert_the_app_names_its_process(
-        _name_this_process, tmp_path, app_name=APP_NAME, role=ROLE,
-        interpreter="python.exe", row=APP_NAME, icon=PROJECT_DIR / "icon.ico")
+    assert_the_process_is_named(_name_this_process, tmp_path, ProcessName(
+        app_name=APP_NAME, role=ROLE, interpreter="python.exe", row=APP_NAME, icon=PROJECT_DIR / "icon.ico"))

@@ -9,6 +9,8 @@ from pathlib import Path
 
 from funestra.hud import (
     SYMBOL_FONT,
+    ButtonGroundState,
+    ButtonLook,
     button_ground,
     draw_button,
     draw_icon,
@@ -375,7 +377,8 @@ def _shield_all_width() -> int:
 def _paint_shield_all(canvas, rect, *, dim: bool) -> None:
     image, draw = canvas.image, canvas.draw
     x, y, width, height = rect
-    ink = button_ground(draw, rect, BG_BUTTON, hovered=_on(rect, canvas.pointer), dim=dim)
+    ink = button_ground(
+        draw, rect, BG_BUTTON, ButtonGroundState(hovered=_on(rect, canvas.pointer), dim=dim))
     left = x + (width - _shield_all_width()) // 2 + _WORD_PAD
     draw_icon(image, "shield", (left - BUTTON_ICON_INSET, y, height, height), ink)
     draw.text((left + _SHIELD_MARK + _MARK_TO_WORD, y + height / 2), SHIELD_ALL_TEXT,
@@ -385,8 +388,8 @@ def _paint_shield_all(canvas, rect, *, dim: bool) -> None:
 
 
 def _paint_button(canvas, rect, button) -> None:
-    draw_button(canvas.image, canvas.draw, rect, button, hovered=_on(rect, canvas.pointer),
-                icon_font=_glyphs(), word_font=_tiny())
+    draw_button(canvas.image, canvas.draw, rect, button, ButtonLook(
+        hovered=_on(rect, canvas.pointer), icon_font=_glyphs(), word_font=_tiny()))
     canvas.targets.append((rect, button))
 
 

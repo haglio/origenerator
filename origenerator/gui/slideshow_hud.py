@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from funestra.hud_title import hud_title, looping_label
+from funestra.hud_title import HudTitleFacts, hud_title, looping_label
 from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
 
@@ -48,10 +48,11 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
     return HudModel(
         funestra=shape,
         locked=locked,
-        title=hud_title(playing_set=looping_label(shown.loop) if shown.loop else "",
-                        locked=locked, order=order_label,
-                        f_mode=favorites_filter, enhanced=enhanced,
-                        filters=(action_filter,)),
+        title=hud_title(HudTitleFacts(
+            playing_set=looping_label(shown.loop) if shown.loop else "",
+            locked=locked, order=order_label,
+            f_mode=favorites_filter, enhanced=enhanced,
+            filters=(action_filter,))),
         is_favorite=slideshow.hud_is_favorite,
         item_note=slideshow.hud_item_note,
         rows=slideshow_rows(shape, SlideshowFacts(

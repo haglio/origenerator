@@ -14,7 +14,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
-from shared_ui.notice_shape import NOTICE_TOP_MARGIN
+from shared_ui.message_shape import MESSAGE_TOP_MARGIN
 
 from origenerator.funscript import (
     synthesize_actions,
@@ -997,7 +997,7 @@ def test_a_spoken_answer_is_a_message_across_the_top(qtbot):
     view.slideshow.note_voice_command("next")
 
     note = view._note.geometry()
-    assert note.top() == NOTICE_TOP_MARGIN
+    assert note.top() == MESSAGE_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
 
 

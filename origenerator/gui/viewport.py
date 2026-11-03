@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.notice_shape import NOTICE_PAD_H, NOTICE_PAD_V, NOTICE_RADIUS, NOTICE_TOP_MARGIN
+from shared_ui.message_shape import MESSAGE_PAD_H, MESSAGE_PAD_V, MESSAGE_RADIUS, MESSAGE_TOP_MARGIN
 from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
 
 from origenerator.config import OUTPUT_PLACES
@@ -45,9 +45,9 @@ from origenerator.media import MediaType
 _PLACEHOLDER = "Select a generation to preview"
 
 _MESSAGE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
-                 f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px;"
-                 f" border-radius: {NOTICE_RADIUS}px;")
-_MESSAGE_MARGIN = NOTICE_TOP_MARGIN
+                 f" padding: {MESSAGE_PAD_V}px {MESSAGE_PAD_H}px;"
+                 f" border-radius: {MESSAGE_RADIUS}px;")
+_MESSAGE_MARGIN = MESSAGE_TOP_MARGIN
 
 
 def _path_key(path) -> str:

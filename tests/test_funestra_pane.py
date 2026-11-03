@@ -198,11 +198,11 @@ def test_the_pointer_reaches_the_funestra_in_the_windows_own_pixels(qtbot, tmp_p
     _hand_over(pane, _items(tmp_path, "one"))
     monkeypatch.setattr(type(pane._window), "devicePixelRatioF", lambda self: 2.0)
     reached = []
-    monkeypatch.setattr(pane._funestra, "press", lambda x, y, *, window: reached.append((x, y)))
+    monkeypatch.setattr(pane._funestra, "press", lambda x, y, *, viewport: reached.append((x, y)))
     monkeypatch.setattr(pane._funestra, "motion",
-                        lambda x, y, *, held, window: reached.append((x, y, held)))
+                        lambda x, y, *, held, viewport: reached.append((x, y, held)))
     monkeypatch.setattr(pane._funestra, "wheel",
-                        lambda x, y, steps, *, window: reached.append((x, y, steps)))
+                        lambda x, y, steps, *, viewport: reached.append((x, y, steps)))
 
     pane.press(QPointF(10, 20))
     pane.motion(QPointF(11, 21), held=True)

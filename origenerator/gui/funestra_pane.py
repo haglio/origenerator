@@ -164,7 +164,7 @@ class FunestraPane(QWidget):
 
     def tick(self) -> None:
         if self._funestra is not None:
-            self._funestra.tick(window=self._device_size())
+            self._funestra.tick(viewport=self._device_size())
 
     def _device_size(self) -> tuple[int, int]:
         scale = self._window.devicePixelRatioF()
@@ -206,7 +206,7 @@ class FunestraPane(QWidget):
 
     def press(self, position) -> None:
         if self._funestra is not None:
-            self._funestra.press(*self._device_point(position), window=self._device_size())
+            self._funestra.press(*self._device_point(position), viewport=self._device_size())
 
     def press_again(self, position) -> None:
         self._pressing_again = True
@@ -226,12 +226,12 @@ class FunestraPane(QWidget):
     def motion(self, position, *, held: bool) -> None:
         if self._funestra is not None:
             self._funestra.motion(*self._device_point(position), held=held,
-                                  window=self._device_size())
+                                  viewport=self._device_size())
 
     def wheel(self, position, steps: int) -> None:
         if self._funestra is not None:
             self._funestra.wheel(*self._device_point(position), steps,
-                                 window=self._device_size())
+                                 viewport=self._device_size())
 
     def pointer_left(self) -> None:
         if self._funestra is not None:

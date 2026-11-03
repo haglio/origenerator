@@ -496,3 +496,12 @@ def test_no_client_is_made_without_the_folders_comfyui_opens_files_from():
 ])
 def test_a_run_that_died_partway_is_reported_as_one_readable_line(message, said):
     assert format_execution_error(message) == said
+
+
+def test_with_no_clock_handed_in_it_keeps_real_time_and_can_wait():
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
+    before = client._clock()
+
+    client._sleep(0)
+
+    assert client._clock() >= before

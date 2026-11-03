@@ -5,12 +5,12 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from shared_ui.colors import BG_SECONDARY, GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.fonts import FONT_UI, make_font
 from shared_ui.icons import icon_then_text
-from shared_ui.notice_shape import (
-    NOTICE_PAD_H,
-    NOTICE_PAD_V,
-    NOTICE_RADIUS,
-    NOTICE_TOP_MARGIN,
-    NOTICE_TYPE_SIZE,
+from shared_ui.message_shape import (
+    MESSAGE_PAD_H,
+    MESSAGE_PAD_V,
+    MESSAGE_RADIUS,
+    MESSAGE_TOP_MARGIN,
+    MESSAGE_TYPE_SIZE,
 )
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
@@ -36,7 +36,7 @@ def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
 class Message(QLabel):
     def __init__(self, host: QWidget):
         super().__init__(host)
-        self.setFont(make_font(FONT_UI, NOTICE_TYPE_SIZE, bold=True))
+        self.setFont(make_font(FONT_UI, MESSAGE_TYPE_SIZE, bold=True))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         float_over_media(self)
         self.hide()
@@ -46,7 +46,7 @@ class Message(QLabel):
         self.setStyleSheet(
             f"background-color: {BG_SECONDARY.name()};"
             f" color: {ink}; border: 1px solid {ink};"
-            f" padding: {NOTICE_PAD_V}px {NOTICE_PAD_H}px; border-radius: {NOTICE_RADIUS}px;"
+            f" padding: {MESSAGE_PAD_V}px {MESSAGE_PAD_H}px; border-radius: {MESSAGE_RADIUS}px;"
         )
         set_marked_text(self, text, mark=mark, color=_INK[kind])
         self.show()
@@ -56,5 +56,5 @@ class Message(QLabel):
         host = self.parentWidget()
         self.adjustSize()
         x = (host.width() - self.width()) // 2
-        self.move(max(0, x), NOTICE_TOP_MARGIN)
+        self.move(max(0, x), MESSAGE_TOP_MARGIN)
         raise_over_media(self)

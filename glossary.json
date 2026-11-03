@@ -763,12 +763,6 @@
         "notice"
       ],
       "keep": [
-        "notice_shape",
-        "NOTICE_PAD_H",
-        "NOTICE_PAD_V",
-        "NOTICE_RADIUS",
-        "NOTICE_TOP_MARGIN",
-        "NOTICE_TYPE_SIZE",
         "notice_overlay"
       ]
     },

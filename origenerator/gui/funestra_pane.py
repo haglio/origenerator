@@ -7,6 +7,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 
 from funestra.funestra import Channels, Funestra
+from funestra.funestra_setup import FunestraSetup
 from funestra.funestra_verbs import RELOAD_PLAYLIST
 from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
@@ -131,11 +132,11 @@ class FunestraPane(QWidget):
         if engine is None:
             return
         self._engine = engine
-        self._funestra = Funestra(
-            engine, channels=Channels(), playlist=self.channel.items, audible=True,
+        self._funestra = Funestra(engine, FunestraSetup(
+            channels=Channels(), playlist=self.channel.items, audible=True,
             muted=self._muted, users={"slideshow": self._user}, hud=self._hud,
             radio=None if self._radio is None else self._radio.held_by_a_slideshow(),
-            on_volume_moved=self._on_volume_moved)
+            on_volume_moved=self._on_volume_moved))
         self._funestra.set_muted(self._muted)
         if self._volume is not None:
             self._funestra.set_volume(self._volume)

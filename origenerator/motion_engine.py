@@ -9,6 +9,8 @@ from funestra.robot_hand import (
     MAX_TICK_SECONDS,
     MIN_SPEED,
     RobotHandState,
+    TraceSpan,
+    Waveform,
     WaveformShape,
     adjust_amplitude,
     adjust_center,
@@ -138,8 +140,8 @@ def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[floa
         return learned_motion.trace_window(motion.learned, motion.state, samples, span_s)
     state = motion.state
     return wave_trace_window(
-        state.shape, state.amplitude, state.center, phase=motion.phase_total,
-        bpm=state.bpm, samples=samples, span_s=span_s)
+        Waveform(state.shape, state.amplitude, state.center),
+        TraceSpan(motion.phase_total, state.bpm, samples, span_s))
 
 
 def _at(motion: Motion, phase: float) -> float:

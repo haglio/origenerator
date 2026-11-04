@@ -3,15 +3,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import PurePosixPath
 
 from origenerator import config
 from origenerator.file_refs import reference_basename
-from origenerator.workflows.model_arch import safetensors_metadata
 
 MODEL_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
-_TRAINED_AT = ("ss_training_finished_at", "ss_training_started_at")
 FIX_LORA_FOLDER = "fixes"
 _FIX_LORA = re.compile(r"^(?P<part>.+) (?P<when>\d{4}-\d{2}-\d{2} \d{4})$")
 _VERSIONED = re.compile(r"^(?P<base>.+?) (?P<major>\d+)\.(?P<minor>\d+)$")
@@ -111,20 +108,3 @@ def write_kept(path, entries: dict) -> None:
 
 def write_title(stem: str, title: str) -> None:
     write_kept(config.MODEL_TITLES_PATH, {stem: title})
-
-
-def trained_when(path) -> datetime | None:
-    metadata = safetensors_metadata(path)
-    for key in _TRAINED_AT:
-        try:
-            return datetime.fromtimestamp(float(metadata[key])).astimezone()
-        except (KeyError, TypeError, ValueError, OverflowError, OSError):
-            continue
-    return None
-
-
-def trained_sentence(lora) -> str:
-    if versioned(model_title(lora)) is None:
-        return ""
-    when = trained_when(lora_folder() / str(lora))
-    return f"Trained {when:%Y-%m-%d %H:%M}." if when is not None else ""

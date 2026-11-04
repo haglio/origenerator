@@ -964,6 +964,10 @@
       "code_word": "trash",
       "status": "ruled",
       "ruled": "2026-10-30, his words on the glossary's list",
+      "keep": [
+        "Recycle Bin",
+        "recycle_bin"
+      ],
       "retired": [
         "recovery bin",
         "recovery",

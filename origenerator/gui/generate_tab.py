@@ -26,7 +26,6 @@ from origenerator import (
     action_settings,
     evolver_export,
     gallery,
-    look_training,
     outside_videos,
     request_settings,
 )
@@ -88,6 +87,7 @@ from origenerator.gui.generate_button import (
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyDropdown
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
 from origenerator.gui.label_cells import LabelCell, LabelForm
+from origenerator.gui.lora_offers import LoraOffers
 from origenerator.gui.message import set_marked_text
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
@@ -119,7 +119,6 @@ from origenerator.setting_advice import (
 )
 from origenerator.timing import estimate_label
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, workflow_named
-from origenerator.workflows.model_files import NO_LORA
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +196,7 @@ class GenerateTab(DropZones):
     enhance_requested = pyqtSignal(str)
     versions_delete_requested = pyqtSignal(str, list)
     train_requested = pyqtSignal(str)
+    trash_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database,
                  *, fun_time=None, inbox: evolver_export.EvolverInbox | None = None,
@@ -224,8 +224,10 @@ class GenerateTab(DropZones):
         self._folder_modify: FolderModify | None = None
         self._settings_source: tuple[str, str | None, str] = ("", None, "")
         self._source_video_row: dict | None = None
-        self._trainings_running: dict[str, str] = {}
-        self._offered_loras: dict[str, object] = {}
+        self.lora_offers = LoraOffers(lambda: self._param_form,
+                                      lambda: workflow_named(self._form_workflow_key),
+                                      train=self.train_requested.emit,
+                                      trash=self.trash_requested.emit)
         self._caption_timer = QTimer(self)
         self._caption_timer.setSingleShot(True)
         self._caption_timer.setInterval(_CAPTION_DELAY_MS)
@@ -533,7 +535,7 @@ class GenerateTab(DropZones):
                 self._rebase_on_the_model(None, checkpoint, keep=edited)
                 self._fresh_form = True
             self._form_checkpoint = checkpoint
-            self._offer_trainings()
+            self.lora_offers.offer()
         else:
             self._clear_form()
         self._show_advice()
@@ -594,7 +596,8 @@ class GenerateTab(DropZones):
         return {**not_offered_advice(values, definitions,
                                      (*workflow.model_keys, *workflow.lora_keys), defaults,
                                      workflow.display_name),
-                **not_installed_advice(self._models_not_installed(), definitions, defaults)}
+                **not_installed_advice(self._models_not_installed(), definitions, defaults,
+                                       in_scenes=self._param_form.tells_a_story())}
 
     def _resolve_every_warning(self):
         self._param_form.resolve_every_warning()
@@ -631,33 +634,10 @@ class GenerateTab(DropZones):
         self._param_form.item_activated.connect(self.link_clicked)
         if form.request_exchange() is not None:
             form.request_exchange().asked.connect(self._on_request_asked)
-        self._param_form.train_requested.connect(self.train_requested)
-        self._param_form.changed.connect(self._offer_trainings)
-        self._offered_loras = {}
+        self.lora_offers.form_replaced()
         self._form_host_column.addWidget(self._param_form)
         # Qt defers deleteLater, so the outgoing form is still alive here.
         self.prompt_fields_changed.emit()
-
-    def _offer_trainings(self, every_row: bool = False) -> None:
-        wf = workflow_named(self._form_workflow_key)
-        if self._param_form is None or wf is None:
-            return
-        values = self._param_form.get_values()
-        for key in wf.lora_keys:
-            if not every_row and self._offered_loras.get(key, NO_LORA) == values.get(key):
-                continue
-            self._offered_loras[key] = values.get(key)
-            base = look_training.trainable_base_of(values.get(key))
-            self._param_form.offer_training(
-                key, look_training.training_offer(base) if base else None,
-                self._trainings_running.get(base))
-
-    def show_training(self, base: str, text: str | None) -> None:
-        if text is None:
-            self._trainings_running.pop(base, None)
-        else:
-            self._trainings_running[base] = text
-        self._offer_trainings(every_row=True)
 
     def lora_value(self, key: str):
         return self._param_form.get_values().get(key) if self._param_form is not None else None

@@ -9,6 +9,7 @@ import pytest
 from origenerator import config, look_training, lora_training
 from origenerator.gui import look_training_controller as module
 from origenerator.gui.look_training_controller import LookTrainingController
+from origenerator.gui.lora_offers import trashed
 from origenerator.model_titles import model_title
 from origenerator.trigger_words import trigger_words_by_lora
 from tests.test_enhance_controller import FakeSignal
@@ -17,8 +18,10 @@ from tests.test_enhance_controller import FakeSignal
 class FakeGenerateTab:
     def __init__(self, lora="example_look.safetensors"):
         self.train_requested = FakeSignal()
+        self.trash_requested = FakeSignal()
         self.lora = lora
         self.shown: list = []
+        self.lora_offers = self
         self.picked: list = []
 
     def lora_value(self, key):
@@ -230,3 +233,30 @@ def test_a_version_finished_while_the_app_was_closed_gets_its_title_once(look, t
 
     assert model_title("Example Look 1.1.safetensors") == "Example Look 1.1"
     assert _runs == []
+
+
+def test_a_version_windows_will_not_recycle_says_why(monkeypatch):
+    def refuse(_lora):
+        raise OSError("Windows would not move it.")
+
+    told = _told(monkeypatch, "warning")
+
+    assert trashed("example_look.safetensors", None, trash=refuse) is False
+    assert told == ["Windows would not move it."]
+
+
+def test_a_version_windows_recycled_is_gone_without_a_word(monkeypatch):
+    told = _told(monkeypatch, "warning")
+
+    assert trashed("example_look.safetensors", None, trash=lambda _lora: None) is True
+    assert told == []
+
+
+def test_a_version_that_stays_leaves_the_tab_as_it_was(look):
+    tab = FakeGenerateTab()
+    LookTrainingController(None, info_tabs_of=lambda: _InfoTabs([tab], []), parent=None,
+                           trash=lambda _lora, _parent: False).wire(tab)
+
+    tab.trash_requested.emit("lora")
+
+    assert tab.picked == []

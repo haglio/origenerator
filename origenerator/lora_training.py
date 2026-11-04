@@ -42,12 +42,12 @@ class TrainingOffer:
     pictures: int
     folder: Path
     counted: str = "picture"
+    trash_tooltip: str | None = None
 
 
-def offer(state: TrainingState, *, tooltip: str, pictures: int, folder: Path,
-          counted: str = "picture") -> TrainingOffer:
+def offer(state: TrainingState, **shown) -> TrainingOffer:
     return TrainingOffer("Train" if state is TrainingState.UNTRAINED else "Retrain",
-                         state is not TrainingState.CURRENT, tooltip, pictures, folder, counted)
+                         state is not TrainingState.CURRENT, **shown)
 
 
 def picture_stamps(pictures: list[Path]) -> dict[str, list[int]]:

@@ -3,14 +3,11 @@ from __future__ import annotations
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
-    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLayout,
-    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QToolButton,
@@ -46,7 +43,17 @@ from origenerator.gallery import (
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_versions import params_from_mime
+from origenerator.gui.fix_prompts_parts import (
+    foot_row,
+    lora_dropdown,
+    ok_and_cancel,
+    prompt_boxes,
+    prompts_side_by_side,
+    strength_box,
+    window_column,
+)
 from origenerator.gui.flow_layout import FieldGrid, FlowLayout
+from origenerator.gui.lora_offers import trashed
 from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,
     NoWheelDropdown,
@@ -55,11 +62,13 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help, param_help, with_training_date
-from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
-from origenerator.prompt_tokens import prompt_reading
-from origenerator.setting_advice import fix_lora_model_advice, trigger_word_advice
+from origenerator.setting_advice import (
+    fix_lora_model_advice,
+    lost_lora_advice,
+    trigger_word_advice,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -72,7 +81,6 @@ from origenerator.workflows.detail_parts import (
     part_table,
 )
 from origenerator.workflows.image_enhance import ENHANCE_MODEL_FAMILIES
-from origenerator.workflows.lora_rows import lora_strength
 from origenerator.workflows.model_files import NO_LORA, list_lora_files
 
 _NOT_READ = object()
@@ -190,9 +198,10 @@ class EnhancePane(QWidget):
     preset_saved = pyqtSignal(str)
     preset_renamed = pyqtSignal(int, str)
 
-    def __init__(self, on_change, parent=None):
+    def __init__(self, on_change, parent=None, *, trash=trashed):
         super().__init__(parent)
         self._on_change = on_change
+        self._trash = trash
         self._fix_training: dict[str, str] = {}
         self._picked: list[dict] = []
         self._folder = None
@@ -347,9 +356,20 @@ class EnhancePane(QWidget):
         window.finished.connect(window.deleteLater)
         window.training.train_requested.connect(
             lambda: self.fix_training_requested.emit(part.name))
+        window.trash_requested.connect(lambda: self._trash_fix_lora(part, window))
         window.show_training(self._fix_training.get(part.name))
         self._fix_prompt_windows[part.name] = window
         window.show_over_parent()
+
+    def _trash_fix_lora(self, part, window) -> None:
+        lora = window.picked_lora()
+        if not self._trash(lora, window):
+            return
+        in_its_place = window.stop_offering(lora)
+        kept = fix_prompts_of(part, self._fix_prompts.get(part.name))
+        if kept["lora"] == lora:
+            self._keep_fix_prompts(part.name, dict(
+                kept, lora=in_its_place.fix, prompt=in_its_place.prompt_after(kept["prompt"])))
 
     def _keep_fix_prompts(self, name: str, prompts: dict) -> None:
         self._fix_prompts[name] = prompts
@@ -551,98 +571,79 @@ class EnhancePane(QWidget):
         self._emit()
 
 
-def _prompt_boxes(key: str, text: str) -> PromptBoxes:
-    boxes = PromptBoxes(QPlainTextEdit)
-    boxes.set_reading(prompt_reading(ENHANCE_WORKFLOW, {}, key))
-    boxes.set_value(text)
-    return boxes
-
-
-def _side_by_side(*widgets) -> QWidget:
-    host = QWidget()
-    row = QHBoxLayout(host)
-    row.setContentsMargins(0, 0, 0, 0)
-    row.setSpacing(GAP_SMALL)
-    for widget in widgets:
-        row.addWidget(widget)
-    return host
-
-
 class FixPromptsDialog(QDialog):
+    trash_requested = pyqtSignal()
+
     def __init__(self, parent, part, current: dict, loras: list[str]):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self._part = part
+        self._loras = loras
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setWindowTitle(f"{part.name.capitalize()} fix prompts")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(GAP_SMALL)
-        layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
-        heading = QLabel(self.windowTitle())
-        heading.setStyleSheet("font-weight: bold;")
-        layout.addWidget(heading)
-        self.positive = _prompt_boxes("positive_prompt", current["prompt"])
-        self.negative = _prompt_boxes("negative_prompt", current["avoid"])
+        layout = window_column(self)
+        positive = prompt_boxes("positive_prompt", current["prompt"])
+        self.positive = positive
+        self.negative = prompt_boxes("negative_prompt", current["avoid"])
         self.prompt_warning, self.lora_warning = WarningMark(), WarningMark()
-        side_by_side = QHBoxLayout()
-        for caption, field in (((self.prompt_warning, QLabel("Positive Prompt")), self.positive),
-                               ((QLabel("Negative Prompt"),), self.negative)):
-            column = QVBoxLayout()
-            column.addWidget(_side_by_side(*caption), 0, Qt.AlignmentFlag.AlignLeft)
-            column.addWidget(field, 1)
-            side_by_side.addLayout(column)
-        layout.addLayout(side_by_side, 1)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
-                                   | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        self.lora = NoWheelDropdown()
-        offer_options(self.lora, loras)
-        choose_option(self.lora, current["lora"] or NO_LORA)
-        self.lora.currentIndexChanged.connect(self._explain_lora)
+        layout.addLayout(prompts_side_by_side(self.prompt_warning, positive, self.negative), 1)
+        lora = lora_dropdown(loras, current["lora"])
+        self.lora = lora
+        lora.currentIndexChanged.connect(self._explain_lora)
         self._explain_lora()
-        strength = lora_strength("lora_strength", current["strength"])
-        self.strength = NoWheelDoubleSpinBox()
-        self.strength.setRange(strength.min_val, strength.max_val)
-        self.strength.setSingleStep(strength.step)
-        self.strength.setValue(strength.default)
-        self.strength.setToolTip(definition_help(strength))
-        self.training = TrainingControls()
+        self.strength = strength_box(current["strength"])
+        training = TrainingControls()
+        self.training = training
         self._running: str | None = None
         self._offer_training()
-        foot = FlowLayout(spacing=GAP_SMALL)
-        for together in ((self.lora_warning, QLabel("LoRA"), self.lora),
-                         (QLabel("LoRA Strength"), self.strength)):
-            foot.addWidget(_side_by_side(*together))
-        foot.addWidget(self.training)
-        foot.add_trailing(buttons)
-        layout.addLayout(foot)
-        self.positive.textChanged.connect(self._warn_of_a_missing_trigger_word)
-        self.lora.currentIndexChanged.connect(self._warn_of_a_missing_trigger_word)
+        lora.currentIndexChanged.connect(self._offer_training)
+        training.trash_requested.connect(self.trash_requested)
+        layout.addLayout(foot_row(self.lora_warning, lora, self.strength, training,
+                                  ok_and_cancel(self)))
+        positive.textChanged.connect(self._warn_about_the_lora)
+        lora.currentIndexChanged.connect(self._warn_about_the_lora)
         for mark in (self.prompt_warning, self.lora_warning):
-            mark.pressed.connect(self._add_the_missing_trigger_word)
-        self._warn_of_a_missing_trigger_word()
+            mark.pressed.connect(self._resolve_the_lora_warning)
+        self._warn_about_the_lora()
 
     def _missing_trigger_word(self):
         return trigger_word_advice({"positive_prompt": self.positive.value(),
-                                    "lora": self.lora.currentData()}, ("lora",)).get("lora")
+                                    "lora": self.picked_lora()}, ("lora",)).get("lora")
 
-    def _warn_of_a_missing_trigger_word(self) -> None:
-        missing = self._missing_trigger_word()
-        for mark in (self.prompt_warning, self.lora_warning):
-            mark.warn(missing.said if missing is not None else "")
+    def picked_lora(self):
+        return self.lora.currentData()
 
-    def _add_the_missing_trigger_word(self) -> None:
+    def _in_place_of_a_lost_lora(self):
+        return lost_lora_advice(self.picked_lora(), self._loras)
+
+    def _warn_about_the_lora(self) -> None:
+        found = self._in_place_of_a_lost_lora() or self._missing_trigger_word()
+        self.lora_warning.warn(found.said if found is not None else "")
         missing = self._missing_trigger_word()
-        if missing is not None:
+        self.prompt_warning.warn(missing.said if missing is not None else "")
+
+    def _resolve_the_lora_warning(self) -> None:
+        lost = self._in_place_of_a_lost_lora()
+        missing = self._missing_trigger_word()
+        if lost is not None:
+            self.choose_lora(lost.fix)
+            self.positive.rewrite(lost.prompt_after)
+        elif missing is not None:
             self.positive.rewrite(missing.fixed)
+
+    def stop_offering(self, lora: str):
+        self._loras = [option for option in self._loras if option != lora]
+        in_its_place = self._in_place_of_a_lost_lora()
+        self._resolve_the_lora_warning()
+        self.lora.removeItem(self.lora.findData(lora))
+        return in_its_place
 
     def show_training(self, text: str | None) -> None:
         self._running = text
         self._offer_training()
 
     def _offer_training(self) -> None:
-        self.training.show_offer(fix_training.training_offer(self._part), self._running)
+        self.training.show_offer(fix_training.training_offer(self._part, self.picked_lora()),
+                                 self._running)
 
     def event(self, event) -> bool:
         if event.type() == QEvent.Type.WindowActivate:
@@ -653,12 +654,12 @@ class FixPromptsDialog(QDialog):
         choose_option(self.lora, lora)
 
     def _explain_lora(self) -> None:
-        self.lora.setToolTip(with_training_date("", self.lora.currentData()))
+        self.lora.setToolTip(with_training_date("", self.picked_lora()))
 
     def prompts(self) -> dict:
         return fix_prompts_of(self._part, {
             "prompt": self.positive.value(), "avoid": self.negative.value(),
-            "lora": self.lora.currentData(), "strength": self.strength.value()})
+            "lora": self.picked_lora(), "strength": self.strength.value()})
 
     def show_over_parent(self) -> None:
         for watched in (self.parentWidget(), self.parentWidget().window()):

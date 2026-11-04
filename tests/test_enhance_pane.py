@@ -73,12 +73,12 @@ from tests.text_readers import clip_reader
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
 
-def _panel(qtbot, detectors=_FOUND_DETECTORS):
+def _panel(qtbot, detectors=_FOUND_DETECTORS, **seams):
     edits = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parts, "list_detector_files", lambda: list(detectors))
         mp.setattr(parts, "list_outline_detector_files", list)
-        pane = EnhancePane(edits.append)
+        pane = EnhancePane(edits.append, **seams)
     qtbot.addWidget(pane)
     return pane, edits
 
@@ -2258,3 +2258,72 @@ def test_a_fix_windows_lora_dropdown_says_when_its_picked_lora_was_trained(
 
     window.lora.setCurrentIndex(window.lora.findData(NO_LORA))
     assert window.lora.toolTip() == ""
+
+
+@pytest.fixture
+def fix_in_two_versions(monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
+    _fix_photos(monkeypatch, tmp_path, "one.jpg")
+    titled_models({})
+    worded_loras({"hands 1.0": ["zzold"], "hands 1.1": ["zznew"]})
+    gone = installed_models.add("loras", "fixes/hands 1.0.safetensors", arch="sdxl", lora=True)
+    installed_models.add("loras", "fixes/hands 1.1.safetensors", arch="sdxl", lora=True)
+    return gone
+
+
+_OLD_FIX_LORA, _NEW_FIX_LORA = r"fixes\hands 1.0.safetensors", r"fixes\hands 1.1.safetensors"
+
+
+def _fix_window_on_the_old_version(qtbot, **seams):
+    pane, _edits = _panel(qtbot, **seams)
+    pane._keep_fix_prompts("hands", {"prompt": "zzold, a part", "avoid": "", "lora": _OLD_FIX_LORA,
+                                     "strength": 1.0})
+    pane._fix_prompt_buttons["hands"].click()
+    return pane, pane._fix_prompt_windows["hands"]
+
+
+def test_a_fixs_old_version_offers_the_trash_where_its_newest_offers_retrain(
+        qtbot, fix_in_two_versions):
+    _pane, window = _fix_window_on_the_old_version(qtbot)
+
+    assert (window.training.train.isHidden(), window.training.trash.isHidden()) == (True, False)
+
+    window.choose_lora(_NEW_FIX_LORA)
+
+    assert (window.training.train.isHidden(), window.training.trash.isHidden()) == (False, True)
+
+
+def test_a_fixs_trash_moves_the_window_and_what_is_kept_to_the_newest_version_and_its_word(
+        qtbot, fix_in_two_versions):
+    pane, window = _fix_window_on_the_old_version(
+        qtbot, trash=lambda _lora, _parent: fix_in_two_versions.unlink() or True)
+
+    window.training.trash.click()
+
+    assert window.lora.currentData() == _NEW_FIX_LORA
+    assert window.lora.findData(_OLD_FIX_LORA) < 0
+    assert window.positive.value() == "zznew, a part"
+    assert (pane._fix_prompts["hands"]["lora"], pane._fix_prompts["hands"]["prompt"]) == (
+        _NEW_FIX_LORA, "zznew, a part")
+
+
+def test_a_fix_trash_windows_refuses_stays_on_that_version(qtbot, fix_in_two_versions):
+    _pane, window = _fix_window_on_the_old_version(qtbot, trash=lambda _lora, _parent: False)
+
+    window.training.trash.click()
+
+    assert window.lora.currentData() == _OLD_FIX_LORA
+
+
+def test_a_fixs_window_opened_on_a_version_since_trashed_offers_to_switch(
+        qtbot, fix_in_two_versions):
+    fix_in_two_versions.unlink()
+    _pane, window = _fix_window_on_the_old_version(qtbot)
+
+    assert window.lora_warning.toolTip() == (
+        "Not installed anymore, so nothing can be made with it. "
+        "Click to use Hands fix 1.1 and its trigger word, zznew.")
+
+    window.lora_warning.pressed.emit()
+
+    assert window.lora.currentData() == _NEW_FIX_LORA
+    assert window.positive.value() == "zznew, a part"

@@ -56,10 +56,9 @@ from origenerator.gui.request_exchange import RequestExchange
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
-from origenerator.gui.training_controls import TrainingControls
+from origenerator.gui.training_controls import TrainingRows
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly
-from origenerator.lora_training import TrainingOffer
 from origenerator.prompt_tokens import PromptReading
 from origenerator.setting_advice import Advice, MissingTriggerWords
 from origenerator.speech import CUSTOM_VOICE
@@ -117,7 +116,6 @@ _PADLOCK = {False: "lock", True: "unlock"}
 
 class ParamForm(QWidget):
     changed = pyqtSignal()
-    train_requested = pyqtSignal(str)
     text_fields_changed = pyqtSignal()
     seed_drawn = pyqtSignal(str, object)
     item_activated = pyqtSignal(str)
@@ -131,7 +129,7 @@ class ParamForm(QWidget):
     ):
         super().__init__(parent)
         self._lora_keys = tuple(traits.lora_keys)
-        self._training_controls: dict[str, TrainingControls] = {}
+        self.training = TrainingRows()
         self._heights = helpers.heights
         self._seed_history = helpers.seed_history
         self._items = helpers.items or FilesOnly(
@@ -207,9 +205,10 @@ class ParamForm(QWidget):
             if lora_key_of(row) in values:
                 self._set_row_visible(row, not strength_without_its_lora(row, values))
         for pd in self._param_defs:
-            if pd.beside_model in values:
+            if (pd.key in self._lora_keys and pd.options) or pd.beside_model in values:
                 offer_only(pd, self._widgets[pd.key],
-                           loras_offered_beside(values[pd.beside_model], pd.options))
+                           loras_offered_beside(values[pd.beside_model], pd.options)
+                           if pd.beside_model in values else pd.options)
         for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue
@@ -239,7 +238,7 @@ class ParamForm(QWidget):
             section = CollapsibleSection(title, collapsed=collapsed)
             section.toggled.connect(self._position_dimension_controls)
             section.warning.pressed.connect(
-                lambda title=title: self._resolve_warnings(self._present_keys[title]))
+                lambda title=title: self.resolve_warnings(self._present_keys[title]))
             self._sections[title] = section
             self._present_keys[title] = []
             outer.addWidget(section)
@@ -394,22 +393,16 @@ class ParamForm(QWidget):
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
         if pd.key in self._lora_keys:
-            controls = TrainingControls()
-            controls.train_requested.connect(lambda key=pd.key: self.train_requested.emit(key))
-            self._training_controls[pd.key] = controls
-            extras.append(controls)
+            extras.append(self.training.controls_for(pd.key))
         return extras
-
-    def offer_training(self, key: str, offer: TrainingOffer | None, running: str | None = None) -> None:
-        self._training_controls[key].show_offer(offer, running)
 
     def _label_cell(self, key: str, label: QWidget, column: LabelColumn) -> LabelCell:
         mark = WarningMark()
-        mark.pressed.connect(lambda: self._resolve_warnings([key]))
+        mark.pressed.connect(lambda: self.resolve_warnings([key]))
         self._warning_marks[key] = mark
         return LabelCell(mark, label, column)
 
-    def _resolve_warnings(self, rows: list[str]) -> None:
+    def resolve_warnings(self, rows: list[str]) -> None:
         for row in rows:
             for key, found in self._advised_at([row]):
                 self._take_advice(key, found)
@@ -419,12 +412,14 @@ class ParamForm(QWidget):
         widget = self._widgets.get(written)
         if isinstance(widget, PromptBoxes):
             widget.rewrite(found.fixed)
-            return
-        fixed = found.fixed(self._read_field(self._defs[written]))
-        if written == "frame_count" and self._scenes is not None:
-            self._scenes.set_total_frames(fixed)
         else:
-            self._write_field(self._defs[written], fixed)
+            fixed = found.fixed(self._read_field(self._defs[written]))
+            if written == "frame_count" and self._scenes is not None:
+                self._scenes.set_total_frames(fixed)
+            else:
+                self._write_field(self._defs[written], fixed)
+        if found.follow_up is not None:
+            self._take_advice(key, found.follow_up)
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():
@@ -463,7 +458,7 @@ class ParamForm(QWidget):
         return self._warnings_about(self._keys_in_order())
 
     def resolve_every_warning(self) -> None:
-        self._resolve_warnings(self._keys_in_order())
+        self.resolve_warnings(self._keys_in_order())
 
     def _keys_in_order(self) -> list[str]:
         return [key for keys in self._present_keys.values() for key in keys]

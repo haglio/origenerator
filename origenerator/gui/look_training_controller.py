@@ -5,6 +5,7 @@ from collections.abc import Callable
 from PyQt6.QtWidgets import QMessageBox
 
 from origenerator import config, look_training, lora_training
+from origenerator.gui.lora_offers import trashed
 from origenerator.gui.training_run import TrainingRun
 
 NO_PROGRAM = ("No training program is set up: content.local.json names no "
@@ -12,7 +13,8 @@ NO_PROGRAM = ("No training program is set up: content.local.json names no "
 
 
 class LookTrainingController:
-    def __init__(self, jobs, *, info_tabs_of: Callable[[], object], parent):
+    def __init__(self, jobs, *, info_tabs_of: Callable[[], object], parent, trash=trashed):
+        self._trash_version = trash
         self._jobs = jobs
         self._info_tabs_of = info_tabs_of
         self._parent = parent
@@ -20,6 +22,15 @@ class LookTrainingController:
 
     def wire(self, tab) -> None:
         tab.train_requested.connect(lambda key, tab=tab: self._train(tab, key))
+        tab.trash_requested.connect(lambda key, tab=tab: self._trash(tab, key))
+
+    def _trash(self, tab, key: str) -> None:
+        lora = tab.lora_value(key)
+        if not self._trash_version(lora, self._parent):
+            return
+        for each in self._info_tabs_of().generate_tabs():
+            each.lora_offers.stop_offering(lora)
+        tab.lora_offers.switch_from_trashed(key)
 
     def _train(self, tab, key: str) -> None:
         base = look_training.trainable_base_of(tab.lora_value(key))
@@ -56,7 +67,7 @@ class LookTrainingController:
 
     def _show(self, base: str, text: str | None) -> None:
         for tab in self._info_tabs_of().generate_tabs():
-            tab.show_training(base, text)
+            tab.lora_offers.show_training(base, text)
 
     def _ended(self, job: dict, lora: str | None, tab, key, why: str = "") -> None:
         self._training = None

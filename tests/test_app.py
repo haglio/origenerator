@@ -36,28 +36,26 @@ from shared_ui.testing import brought_to_front
 
 from origenerator import app_link, config, content, evolver_agreement, gallery, trash_collection
 from origenerator.app import (
-    MAINTENANCE,
-    Library,
     _arm_the_crash_log,
     _configure_logging,
-    _file_what_comfyui_left,
-    _fold_enhancements,
-    _hand_the_remakes_down_again,
-    _import_new_files,
     _init_windows_taskbar_identity,
-    _merge_soundless_copies,
     _open_the_loading,
-    _put_the_backfill_in_place,
-    _reconnect_to_running_generations,
     _say_where_the_window_comes_up,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
-    _tidy_video_previews,
     _warm_voice_runtimes,
     main,
     resolve_comfyui_client_id,
 )
 from origenerator.app_state import AppState
+from origenerator.boot_passes import (
+    MAINTENANCE,
+    Library,
+    _fold_enhancements,
+    _import_new_files,
+    _merge_soundless_copies,
+    _tidy_video_previews,
+)
 from origenerator.branch_session import ENV_FLAG, LAUNCHER
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
@@ -69,6 +67,12 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputPlaces
+from origenerator.passes_on_the_files import (
+    file_what_comfyui_left,
+    hand_the_remakes_down_again,
+    put_the_backfill_in_place,
+    reconnect_to_running_generations,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import run_python
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -1146,7 +1150,7 @@ _PASS_NAMES = [boot_pass.run.__name__ for boot_pass in MAINTENANCE]
 
 
 @pytest.mark.parametrize(("first", "then"), [
-    ("_follow_moved_files", "_import_new_files"),
+    ("follow_moved_files", "_import_new_files"),
     ("_import_new_files", "_fold_enhancements"),
     ("_fold_enhancements", "_disown_foreign_runs"),
 ])
@@ -1233,7 +1237,7 @@ def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old
                       thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs",
                       inbox=EvolverInbox(tmp_path / "0_inbox"))
 
-    assert _put_the_backfill_in_place(library) == 1
+    assert put_the_backfill_in_place(library) == 1
 
     assert db.get_generation("first")["starred"]
     assert db.get_generation("again") is None
@@ -1261,7 +1265,7 @@ def test_opening_the_app_hands_a_video_remade_in_place_to_kino_again(tmp_path):
                       thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs",
                       inbox=EvolverInbox(inbox))
 
-    assert _hand_the_remakes_down_again(library) == 1
+    assert hand_the_remakes_down_again(library) == 1
 
     assert (inbox / KINO.source / "first_00001.mp4").read_bytes() == b"made again"
 
@@ -1350,7 +1354,7 @@ def test_what_a_run_left_in_its_folder_never_becomes_an_item_of_its_own(tmp_path
     library = Library(db=db, client=None, places=places, thumb_dir=tmp_path / "thumbs",
                       log_dir=tmp_path / "logs", inbox=None)
 
-    _file_what_comfyui_left(library)
+    file_what_comfyui_left(library)
     _import_new_files(library)
 
     assert [row["prompt_id"] for row in db.list_generations()] == ["going"]
@@ -1384,8 +1388,8 @@ def test_a_run_comfyui_finished_and_then_forgot_is_written_down_on_its_own_row(t
     library = Library(db=db, client=_ComfyUIThatRestarted(), places=places,
                       thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs", inbox=None)
 
-    _reconnect_to_running_generations(library)
-    _file_what_comfyui_left(library)
+    reconnect_to_running_generations(library)
+    file_what_comfyui_left(library)
     _import_new_files(library)
 
     [row] = db.list_generations()

@@ -12,10 +12,12 @@ from origenerator.app import (
     BUILDING_THE_INTERFACE,
     CHECKOUT,
     CONNECTING,
-    MAINTENANCE,
     OPENING_THE_LIBRARY,
     STARTING_THE_SERVER,
     boot_steps,
+)
+from origenerator.boot_passes import (
+    MAINTENANCE,
 )
 from origenerator.gui.loading_screen import (
     CANCEL_HINT,

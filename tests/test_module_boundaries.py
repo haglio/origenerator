@@ -15,6 +15,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 QT_FREE = (
     "origenerator.app",
+    "origenerator.boot_passes",
+    "origenerator.passes_on_the_files",
     "origenerator.app_link",
     "origenerator.windows_toast",
     "origenerator.landed_while_away",

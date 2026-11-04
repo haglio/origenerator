@@ -27,6 +27,7 @@ class Setting:
     unit: str
     names: dict = field(default_factory=dict)
     notes: dict = field(default_factory=dict)
+    folder: str = ""
 
     def shown(self, value=None) -> str:
         value = self.value if value is None else value
@@ -117,7 +118,8 @@ def settings_to_tell(param_defs: list[ParamDef], params: dict) -> list[Setting]:
             options = _offered(pd, params)
             names = _named(pd, options)
             told.append(Setting(pd.key, pd.label, pd.type, params.get(pd.key, pd.default), options,
-                                pd.min_val, pd.max_val, pd.unit, names, _lora_notes(pd, names)))
+                                pd.min_val, pd.max_val, pd.unit, names, _lora_notes(pd, names),
+                                pd.folder))
     return told
 
 
@@ -150,14 +152,18 @@ def as_told(settings: list[Setting]) -> str:
     return "\n".join(lines)
 
 
+def setting_called(name, settings: list[Setting]) -> Setting | None:
+    called = str(name or "").strip().lower()
+    return next((setting for setting in settings
+                 if called in (setting.key.lower(), setting.label.lower())), None)
+
+
 def changes_asked(answer, settings: list[Setting]) -> dict:
     if not isinstance(answer, dict):
         return {}
-    by_name = {setting.key.lower(): setting for setting in settings}
-    by_name.update({setting.label.lower(): setting for setting in settings})
     changes = {}
     for name, raw in answer.items():
-        setting = by_name.get(str(name).strip().lower())
+        setting = setting_called(name, settings)
         if setting is None:
             continue
         value = setting.taken(raw)

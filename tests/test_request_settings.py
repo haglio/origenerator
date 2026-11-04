@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from origenerator import request_settings
 from origenerator.workflows.base import ParamDef, ParamType
 
@@ -69,3 +71,75 @@ def test_changes_are_described_by_label_before_and_after():
 
 def test_a_number_the_model_answered_in_words_is_dropped():
     assert request_settings.changes_asked({"width": "wider"}, _told()) == {}
+
+
+_LORA_ROW = ParamDef("lora", "LoRA 1", ParamType.DROPDOWN, "None",
+                     options=["None", "example_style.safetensors", "example_style_11.safetensors"],
+                     folder="loras")
+
+
+def test_a_model_file_is_told_and_taken_by_its_title(titled_models, worded_loras):
+    titled_models({"example_style": "Example Style 1.0", "example_style_11": "Other Look 2.0"})
+    worded_loras({})
+    (lora,) = request_settings.settings_to_tell([_LORA_ROW], {"lora": "example_style.safetensors"})
+
+    assert lora.told() == ("- LoRA 1 [lora]: Example Style 1.0, one of None, Example Style 1.0, "
+                           "Other Look 2.0")
+    assert lora.shown() == "Example Style 1.0"
+    assert request_settings.changes_asked({"lora": "other look 2.0"}, [lora]) == {
+        "lora": "example_style_11.safetensors"}
+
+
+def test_a_lora_is_told_with_its_trigger_words_and_the_newest_version_of_each_is_named(
+        titled_models, worded_loras):
+    titled_models({"example_style": "Example Style 1.0", "example_style_11": "Example Style 1.1"})
+    worded_loras({"example_style": ["exmplstyle"], "example_style_11": ["exmplnew", "newer"]})
+    (lora,) = request_settings.settings_to_tell([_LORA_ROW], {"lora": "example_style.safetensors"})
+
+    assert lora.told() == (
+        "- LoRA 1 [lora]: Example Style 1.0 (trigger word exmplstyle), one of None, "
+        "Example Style 1.0 (trigger word exmplstyle), "
+        "Example Style 1.1 (trigger words exmplnew and newer; the newest Example Style)")
+    assert lora.shown() == "Example Style 1.0"
+    assert request_settings.changes_asked({"lora": "Example Style 1.1"}, [lora]) == {
+        "lora": "example_style_11.safetensors"}
+
+
+def test_a_lora_row_beside_a_model_offers_only_the_loras_made_for_that_model(
+        titled_models, worded_loras, recorded_base_models):
+    titled_models({"example_style": "Example Style 1.0", "example_style_11": "Other Look 2.0"})
+    worded_loras({})
+    recorded_base_models({"krea": "Krea 2", "example_style": "Krea 2", "example_style_11": "SDXL 1.0"})
+    row = ParamDef("lora", "LoRA 1", ParamType.DROPDOWN, "None", options=_LORA_ROW.options,
+                   folder="loras", beside_model="unet")
+
+    (lora,) = request_settings.settings_to_tell([row], {"lora": "None", "unet": "krea.safetensors"})
+
+    assert lora.told() == "- LoRA 1 [lora]: None, one of None, Example Style 1.0"
+    assert request_settings.changes_asked({"lora": "Other Look 2.0"}, [lora]) == {}
+
+
+_SIZE = [ParamDef("width", "Width", ParamType.INT, 1024, min_val=512, max_val=2048, step=16),
+         ParamDef("height", "Height", ParamType.INT, 1024, min_val=512, max_val=2048, step=16)]
+
+
+@pytest.mark.parametrize(("width", "height", "shape"), [
+    (720, 1280, "portrait (taller than wide)"),
+    (1280, 720, "landscape (wider than tall)"),
+    (1024, 1024, "square"),
+])
+def test_width_and_height_are_told_together_as_the_shape_they_make(width, height, shape):
+    text = request_settings.as_told(
+        request_settings.settings_to_tell(_SIZE, {"width": width, "height": height}))
+
+    assert text.endswith(
+        f"Width {width} and Height {height} together make the image {shape}. Portrait, "
+        "landscape and square are a matter of Width and Height and never of the prompts: portrait "
+        "means Height greater than Width, landscape means Width greater than Height, square means "
+        "the two equal, so to make a landscape image portrait or the reverse, swap the two numbers.")
+
+
+def test_without_both_width_and_height_no_shape_is_told():
+    text = request_settings.as_told(request_settings.settings_to_tell(_SIZE[:1], {"width": 720}))
+
+    assert "portrait" not in text

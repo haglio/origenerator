@@ -8,9 +8,10 @@ from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery
 from origenerator.config import OUTPUT_PLACES
+from origenerator.gallery.collection import LATEST_KEY, folder_collection
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
 from origenerator.gallery.signatures import canonical_settings
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationStatus, made_here
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -38,6 +39,15 @@ def split_key(key: str | None) -> tuple[str | None, str | None]:
     base, _, placed = key.partition(_SEPARATOR)
     shape = placed.partition(_INSIDE)[0]
     return (base, shape) if shape in SHAPES_AND_BOTH else (key, None)
+
+
+def what_plays_at(key: str | None, rows: list[dict]) -> list[dict]:
+    base = base_of(key)
+    collection = folder_collection(base)
+    whole_library = base == gallery.ALL_KEY or (
+        collection is not None and collection.which == LATEST_KEY
+        and collection.folder == gallery.ALL_KEY)
+    return [row for row in rows if made_here(row)] if whole_library else rows
 
 
 def base_of(key: str | None) -> str | None:

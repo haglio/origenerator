@@ -62,6 +62,7 @@ from tests.gallery_view_support import (
     _row,
     _running_row,
     _scroll_bar,
+    _search_for,
     _seeded_db,
     _select_first_leaf,
     _set_enhance,
@@ -253,6 +254,84 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
                        sorted(playlist.items[index][2] for index in playlist.order)))
 
     assert played == [("Latest", ["i1"]), ("Shuffle", ["i1", "i2"])]
+    slideshow.close()
+
+
+def _a_gallery_with_another_sites_picture(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    theirs = {**_row("o1", "outside picture:a-site", {"positive_prompt": "a cat", "seed": 2},
+                     "a-site_o1.png"),
+              "source": "outside", "workflow_version": "outside"}
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), theirs]))
+    qtbot.addWidget(view)
+    view.refresh()
+    return view
+
+
+def _stand_on_the_folder_of(view, prompt_id) -> None:
+    folder = view.folder_key_of(view._db.get_generation(prompt_id))
+    view._tree.setCurrentItem(view._tree_item_for(shaped_key(folder, LANDSCAPE)))
+
+
+def _playing(slideshow) -> list[str]:
+    playlist = slideshow._set.playlist
+    return sorted(playlist.items[index][2] for index in playlist.order)
+
+
+def test_a_standalone_huds_order_pair_leaves_out_what_other_sites_made(qtbot, monkeypatch):
+    view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
+    _stand_on_the_folder_of(view, "i1")
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+    played = []
+
+    for order in ("latest", "shuffle"):
+        slideshow.shown.press(f"{slideshow.shown.hud_shape}_{order}")
+        played.append(_playing(slideshow))
+
+    assert played == [["i1"], ["i1"]]
+    slideshow.close()
+
+
+def test_a_slideshow_started_on_latest_leaves_out_what_other_sites_made(qtbot, monkeypatch):
+    view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
+    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+
+    assert _playing(slideshow) == ["i1"]
+    slideshow.close()
+
+
+def test_a_slideshow_of_a_searchs_hits_plays_what_it_found(qtbot, monkeypatch):
+    view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
+    view._tree.setCurrentItem(view._tree_item_for(shaped_key(gallery.ALL_KEY, LANDSCAPE)))
+    _search_for(view, "cat")
+
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+
+    assert _playing(slideshow) == ["i1", "o1"]
+    slideshow.close()
+
+
+def test_a_slideshow_started_on_a_sites_folder_plays_what_it_holds(qtbot, monkeypatch):
+    view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
+    _stand_on_the_folder_of(view, "o1")
+
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+
+    assert _playing(slideshow) == ["o1"]
     slideshow.close()
 
 

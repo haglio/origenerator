@@ -149,5 +149,5 @@ def stamp_unstamped(db, *, history=_source_history) -> int:
             block = _block_for(row, landings, launches)
             if block is not None:
                 blocks[row["prompt_id"]] = json.dumps(block)
-    db.set_provenance(blocks)
+    db.fill_in("provenance", blocks)
     return len(blocks)

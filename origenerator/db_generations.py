@@ -17,7 +17,7 @@ from origenerator.generation_state import (
 LIFECYCLE_COLUMNS = frozenset({
     "status", "output_files", "original_files", "enhance_history",
     "thumbnail_path", "error_message", "completed_at", "duration_seconds",
-    "progress_json",
+    "progress_json", "shape",
 })
 
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
@@ -155,11 +155,11 @@ class GenerationStore(Store):
                 (source_prompt_id or None, prompt_id),
             )
 
-    def set_provenance(self, blocks: dict[str, str]):
+    def fill_in(self, column: str, values: dict[str, str]):
         with self._connect() as conn:
             conn.executemany(
-                "UPDATE generations SET provenance = ? WHERE prompt_id = ?",
-                [(block, prompt_id) for prompt_id, block in blocks.items()],
+                f"UPDATE generations SET {column} = ? WHERE prompt_id = ?",
+                [(value, prompt_id) for prompt_id, value in values.items()],
             )
 
     def set_recorded_fields(self, rows: list[dict]):

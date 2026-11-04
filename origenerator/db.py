@@ -57,8 +57,8 @@ class Database:
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
         return self.generations.set_enhance_target(prompt_id, source_prompt_id)
 
-    def set_provenance(self, blocks: dict[str, str]):
-        return self.generations.set_provenance(blocks)
+    def fill_in(self, column, values):
+        self.generations.fill_in(column, values)
 
     def set_recorded_fields(self, rows: list[dict]):
         return self.generations.set_recorded_fields(rows)

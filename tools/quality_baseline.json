@@ -146,7 +146,6 @@
     "tests/test_recent_videos.py": 1,
     "tests/test_registered_widgets.py": 1,
     "tests/test_scratch.py": 3,
-    "tests/test_shape_cache.py": 1,
     "tests/test_slideshow_view.py": 3,
     "tests/test_stylesheet.py": 3,
     "tests/test_viewport.py": 2,
@@ -330,7 +329,6 @@
     "tests/test_seed_history.py": 1,
     "tests/test_setting_advice.py": 3,
     "tests/test_shape.py": 1,
-    "tests/test_shape_cache.py": 4,
     "tests/test_slideshow_director.py": 27,
     "tests/test_slideshow_hud.py": 6,
     "tests/test_slideshow_note.py": 1,
@@ -544,7 +542,6 @@
     "tests/test_lora_training.py": 2,
     "tests/test_queue_line.py": 4,
     "tests/test_shape.py": 2,
-    "tests/test_shape_cache.py": 1,
     "tests/test_slideshow_director.py": 5,
     "tests/test_speech.py": 3,
     "tests/test_training_run.py": 1

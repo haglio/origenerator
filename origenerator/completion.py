@@ -13,6 +13,7 @@ from origenerator.funscript import (
 )
 from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
+from origenerator.item_shape import shape_its_files_say
 from origenerator.library_filing import file_into_library
 from origenerator.media import MediaType
 from origenerator.output_places import OutputFolders, OutputPlaces
@@ -91,4 +92,5 @@ def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
     }
     if duration is not None:
         fields["duration_seconds"] = duration
+    fields["shape"] = shape_its_files_say({**(db.get_generation(prompt_id) or {}), **fields})
     db.update_generation(prompt_id, **fields)

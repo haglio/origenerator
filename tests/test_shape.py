@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import QApplication, QFrame, QLabel
 from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator import gallery
-from origenerator import item_shape as item_shape_module
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -285,17 +284,6 @@ def test_a_folder_composed_on_one_side_is_drawn_on_each_side_covering_it(
     _drawing(view, shape)
 
     assert ("Keepers" in _rows(view._tree, shape)) == shape_covers(shape, PORTRAIT)
-
-
-def test_a_rows_shape_is_worked_out_once_however_often_it_is_asked():
-    item_shape_module._asked_shape.cache_clear()
-    row = {"workflow_name": "sdxl_t2i",
-           "params_json": '{"width": 101, "height": 202}'}
-
-    assert row_shape(row) == "portrait"
-    assert row_shape(dict(row)) == "portrait"
-
-    assert item_shape_module._asked_shape.cache_info().misses == 1
 
 
 def _counting_builds(monkeypatch):

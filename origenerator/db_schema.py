@@ -122,7 +122,8 @@ CREATE TABLE IF NOT EXISTS generations (
     remade_at TEXT,
     -- On the old version the backfill sent to Trash, the video it was made
     -- again as, by its prompt_id: what Trash labels it an old version by.
-    old_version_of TEXT
+    old_version_of TEXT,
+    shape TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -266,6 +267,7 @@ ADDED_COLUMNS = {
         "fun_time_favorite_owed": "INTEGER NOT NULL DEFAULT 0",
         "remade_at": "TEXT",
         "old_version_of": "TEXT",
+        "shape": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -284,6 +286,14 @@ ADDED_COLUMNS = {
 
 RENAMED_TABLES = {"custom_collection_members": "custom_folder_items"}
 
+_NEW_FILES_FORGET_THE_RECORDED_SHAPE = """CREATE TRIGGER IF NOT EXISTS new_files_forget_the_recorded_shape
+AFTER UPDATE OF output_files, thumbnail_path, params_json, workflow_name ON generations
+WHEN NEW.shape IS OLD.shape AND NEW.shape IS NOT NULL
+BEGIN
+    UPDATE generations SET shape = NULL WHERE id = NEW.id;
+END;
+"""
+
 GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
@@ -293,7 +303,7 @@ GENERATION_COLUMNS = (
     "evolver_unsent_at", "genau_exported_at", "genau_unsent_at",
     "genau_requested_at", "recipe_category", "recipe_video_id",
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
-    "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of",
+    "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of", "shape",
 )
 
 
@@ -338,6 +348,7 @@ def migrate(conn) -> None:
             if column not in existing:
                 conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+    conn.execute(_NEW_FILES_FORGET_THE_RECORDED_SHAPE)
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     give_old_seed_uses_their_kind(conn)
     forget_the_seeds_tabs_picked_for_their_next_press(conn)

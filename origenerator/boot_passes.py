@@ -126,6 +126,12 @@ def _record_workflow_versions(library: Library):
     return stamp_unstamped(library.db)
 
 
+def _record_shapes(library: Library):
+    from origenerator.item_shape import record_shapes
+
+    return record_shapes(library.db)
+
+
 def _reconcile_favorites(library: Library):
     from origenerator.favorite_reconcile import reconcile_favorites
 
@@ -186,6 +192,9 @@ MAINTENANCE = (
     BootPass("Recording workflow versions...", _record_workflow_versions,
              counted="Recorded the workflow version of %d generation(s)",
              failure="Recording workflow versions failed: %s"),
+    BootPass(None, _record_shapes,
+             counted="Recorded the shape of %d item(s)",
+             failure="Recording shapes failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )

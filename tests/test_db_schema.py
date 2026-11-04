@@ -94,6 +94,7 @@ SCHEMA = {
         ("fun_time_favorite_owed", "INTEGER", 1, "0", 0),
         ("remade_at", "TEXT", 0, None, 0),
         ("old_version_of", "TEXT", 0, None, 0),
+        ("shape", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

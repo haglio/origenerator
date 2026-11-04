@@ -205,3 +205,24 @@ def test_an_answer_that_wraps_onto_several_lines_shows_whole_with_no_scroll_bar(
     qtbot.wait(20)
 
     assert exchange._scroll.verticalScrollBar().maximum() == 0
+
+
+def test_a_box_measured_too_short_grows_until_its_scroll_bar_goes(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange(EXCHANGE)
+    qtbot.wait(20)
+
+    exchange._scroll.setFixedHeight(10)
+
+    qtbot.waitUntil(lambda: exchange._scroll.height() > 10, timeout=2000)
+    qtbot.wait(20)
+    assert exchange._scroll.verticalScrollBar().maximum() == 0
+
+
+def test_his_words_and_the_answers_can_be_selected_with_the_mouse(qtbot):
+    exchange = _exchange(qtbot)
+    exchange.show_exchange(EXCHANGE)
+
+    (first, _second) = exchange._entries()
+    for label in (first.said, first.answered):
+        assert label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse

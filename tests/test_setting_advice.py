@@ -527,3 +527,72 @@ def test_no_model_advice_while_a_fixs_lora_has_its_model_or_that_model_is_not_in
                                  {"hands": "gone.safetensors"}, ["picked.safetensors"]) == {}
     assert fix_lora_model_advice("(match the source image)", None,
                                  {"hands": "gone.safetensors"}, ["picked.safetensors"]) == {}
+
+
+_LOOK_PICKER = [ParamDef("lora", "LoRA", ParamType.DROPDOWN, "None",
+                         options=["None", "look_two.safetensors", "other.safetensors"])]
+
+
+def _look_in_two_versions(installed_models, titled_models, worded_loras, *, old_word, new_word):
+    titled_models({"look_one": "Example Look 1.0", "look_two": "Example Look 1.1"})
+    worded_loras({"look_one": [old_word], "look_two": [new_word]})
+    installed_models.add("loras", "look_two.safetensors", arch="krea2", lora=True)
+
+
+def _gone_look(**kwargs):
+    return not_installed_advice({"lora": "look_one.safetensors"}, _LOOK_PICKER, {"lora": "None"},
+                                **kwargs)["lora"]
+
+
+def test_a_trashed_version_is_answered_with_the_newest_and_says_its_trigger_word(
+        installed_models, titled_models, worded_loras):
+    _look_in_two_versions(installed_models, titled_models, worded_loras,
+                          old_word="zzold", new_word="zznew")
+
+    found = _gone_look()
+
+    assert found.fix == "look_two.safetensors"
+    assert found.said == ("Not installed anymore, so nothing can be made with it. "
+                          "Click to use Example Look 1.1 and its trigger word, zznew.")
+
+
+def test_switching_to_the_newest_version_swaps_every_mention_of_the_old_trigger_word(
+        installed_models, titled_models, worded_loras):
+    _look_in_two_versions(installed_models, titled_models, worded_loras,
+                          old_word="zzold", new_word="zznew")
+
+    assert _gone_look().prompt_after("ZZold, a scene, zzold again") == "zznew, a scene, zznew again"
+
+
+def test_switching_adds_the_new_trigger_word_to_a_prompt_that_never_held_the_old_one(
+        installed_models, titled_models, worded_loras):
+    _look_in_two_versions(installed_models, titled_models, worded_loras,
+                          old_word="zzold", new_word="zznew")
+
+    assert _gone_look().prompt_after("a scene").startswith("zznew")
+
+
+def test_versions_sharing_a_trigger_word_leave_the_prompt_as_it_was(
+        installed_models, titled_models, worded_loras):
+    _look_in_two_versions(installed_models, titled_models, worded_loras,
+                          old_word="zzsame", new_word="zzsame")
+
+    found = _gone_look()
+
+    assert found.prompt_after("zzsame, a scene") == "zzsame, a scene"
+    assert found.said.endswith("Click to use Example Look 1.1.")
+
+
+def test_a_newest_version_with_no_recorded_word_leaves_the_prompt_as_it_was(
+        installed_models, titled_models, worded_loras):
+    _look_in_two_versions(installed_models, titled_models, worded_loras,
+                          old_word="zzold", new_word="")
+
+    assert _gone_look().prompt_after("zzold, a scene") == "zzold, a scene"
+
+
+def test_a_lost_lora_with_no_other_version_is_answered_as_before(
+        installed_models, titled_models, worded_loras):
+    titled_models({"look_one": "Example Look 1.0"})
+
+    assert _gone_look().fix == "None"

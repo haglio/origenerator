@@ -16,6 +16,7 @@
     "origenerator/animate_command.py": 1,
     "origenerator/app.py": 5,
     "origenerator/app_link.py": 2,
+    "origenerator/boot_passes.py": 2,
     "origenerator/check_animations.py": 1,
     "origenerator/comfyui_api.py": 5,
     "origenerator/comfyui_client.py": 4,
@@ -79,6 +80,7 @@
     "origenerator/importer.py": 2,
     "origenerator/osr2_motion_driver.py": 1,
     "origenerator/own_window.py": 2,
+    "origenerator/passes_on_the_files.py": 2,
     "origenerator/points_of_interest.py": 1,
     "origenerator/prompt_edit.py": 3,
     "origenerator/queue_line.py": 1,
@@ -156,7 +158,7 @@
     "tools/speech_worker.py": 4
   },
   "fan_out": {
-    "origenerator/app.py": 42,
+    "origenerator/app.py": 28,
     "origenerator/check_animations.py": 16,
     "origenerator/downtime.py": 23,
     "origenerator/enhanced_start_backfill.py": 16,
@@ -548,7 +550,7 @@
     "tests/test_training_run.py": 1
   },
   "statements": {
-    "origenerator/app.py": 429,
+    "origenerator/app.py": 330,
     "origenerator/gui/combine_controller.py": 341,
     "origenerator/gui/enhance_controller.py": 309,
     "origenerator/gui/enhance_pane.py": 475,

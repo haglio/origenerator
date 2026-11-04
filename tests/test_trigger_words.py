@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from origenerator.trigger_words import lacks_trigger_word, trigger_words, with_trigger_word
+import pytest
+
+from origenerator.trigger_words import (
+    lacks_trigger_word,
+    trigger_words,
+    with_trigger_word,
+    without_trigger_word,
+)
+from origenerator.workflows.base import story_of
 
 
 def test_a_lora_answers_to_the_words_written_down_for_it(worded_loras):
@@ -74,3 +82,21 @@ def test_a_word_goes_at_the_start_of_each_scene_of_a_story_missing_it():
 def test_a_word_goes_once_at_the_start_of_a_prompt_whose_dashes_tell_no_story():
     assert with_trigger_word("part one\n---\npart two", ["exmplstyle"]) == (
         "exmplstyle, part one\n---\npart two")
+
+
+@pytest.mark.parametrize(("prompt", "left"), [
+    ("exmplstyle, a portrait, soft light", "a portrait, soft light"),
+    ("a portrait, (Exmplstyle:1.2), soft light", "a portrait, soft light"),
+    ("a portrait, soft light, exmplstyle", "a portrait, soft light"),
+    ("a portrait in exmplstyle light", "a portrait in light"),
+    ("a portrait,  soft light", "a portrait,  soft light"),
+    ("exmplstyle", ""),
+])
+def test_a_loras_words_come_out_of_the_prompt_and_the_commas_close_over_them(prompt, left):
+    assert without_trigger_word(prompt, ["exmplstyle", "other"]) == left
+
+
+def test_a_loras_words_come_out_of_each_scene_of_a_story():
+    story = story_of(["exmplstyle, a dog", "a cat, (exmplstyle:1.1)"])
+
+    assert without_trigger_word(story, ["exmplstyle"], in_scenes=True) == story_of(["a dog", "a cat"])

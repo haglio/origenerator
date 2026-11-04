@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QPoint, Qt
+from PyQt6.QtGui import QHelpEvent, QTextCursor
+from PyQt6.QtWidgets import QApplication, QToolTip
 from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
 
@@ -60,9 +62,8 @@ def test_the_exchange_lists_each_turn_oldest_first_his_words_over_the_answer(qtb
     exchange.show_exchange(EXCHANGE)
 
     assert exchange.turns() == EXCHANGE
-    assert not exchange._scroll.isHidden()
-    first = exchange._entries()[0]
-    assert first.said.y() < first.answered.y()
+    assert not exchange._conversation.isHidden()
+    assert exchange._conversation.toPlainText().splitlines()[:2] == list(EXCHANGE[0])
 
 
 def test_his_words_wear_one_color_and_the_answer_sits_a_step_to_the_right_in_plain_text(qtbot):
@@ -70,22 +71,23 @@ def test_his_words_wear_one_color_and_the_answer_sits_a_step_to_the_right_in_pla
 
     exchange.show_exchange(EXCHANGE)
 
-    first = exchange._entries()[0]
-    assert BLUE_LIGHT.name() in first.said.styleSheet()
-    assert TEXT_PRIMARY.name() in first.answered.styleSheet()
-    assert first.answered.x() - first.said.x() == MARGIN_STANDARD
+    page = exchange._conversation.document()
+    words, answer = page.findBlockByNumber(0), page.findBlockByNumber(1)
+    assert words.begin().fragment().charFormat().foreground().color() == BLUE_LIGHT
+    assert answer.begin().fragment().charFormat().foreground().color() == TEXT_PRIMARY
+    assert (words.blockFormat().leftMargin(), answer.blockFormat().leftMargin()) == (0, MARGIN_STANDARD)
 
 
 def test_the_exchange_grows_with_the_conversation_until_twenty_lines(qtbot):
     exchange = _exchange(qtbot)
 
     exchange.show_exchange(EXCHANGE)
-    short = exchange._scroll.height()
+    short = exchange._conversation.height()
     exchange.show_exchange(EXCHANGE * 3)
-    taller = exchange._scroll.height()
+    taller = exchange._conversation.height()
 
     assert short < taller
-    assert exchange._scroll.verticalScrollBar().maximum() == 0
+    assert exchange._conversation.verticalScrollBar().maximum() == 0
     assert taller <= exchange.fontMetrics().lineSpacing() * 20
 
 
@@ -94,7 +96,7 @@ def test_with_no_exchange_only_the_line_shows(qtbot):
 
     exchange.show_exchange([])
 
-    assert exchange._scroll.isHidden()
+    assert exchange._conversation.isHidden()
     assert exchange.turns() == []
 
 
@@ -135,17 +137,17 @@ def test_a_failed_only_turn_leaves_the_line_alone_on_its_own(qtbot):
 
     exchange.failed()
 
-    assert exchange._scroll.isHidden()
+    assert exchange._conversation.isHidden()
 
 
 def test_a_long_exchange_scrolls_rather_than_growing_and_sits_at_its_end(qtbot):
     exchange = _exchange(qtbot)
 
     exchange.show_exchange([(f"request {n}", f"answer {n}") for n in range(30)])
-    qtbot.waitUntil(lambda: exchange._scroll.verticalScrollBar().maximum() > 0, timeout=2000)
+    qtbot.waitUntil(lambda: exchange._conversation.verticalScrollBar().maximum() > 0, timeout=2000)
 
-    bar = exchange._scroll.verticalScrollBar()
-    assert exchange._scroll.height() == exchange.fontMetrics().lineSpacing() * 20
+    bar = exchange._conversation.verticalScrollBar()
+    assert exchange._conversation.height() == exchange.fontMetrics().lineSpacing() * 20
     assert bar.value() == bar.maximum()
 
 
@@ -156,9 +158,9 @@ def test_hovering_a_turn_shows_the_change_it_made_to_the_prompts(qtbot):
                                  "a woman", "blurry, hat")])
 
     (entry,) = exchange._entries()
-    assert "a woman" in entry.toolTip()
-    assert "hat" in entry.toolTip()
-    assert exchange._entries()[0].toolTip() != ""
+    assert "a woman" in entry.tip
+    assert "hat" in entry.tip
+    assert exchange._entries()[0].tip != ""
 
 
 def test_a_turn_with_no_change_recorded_has_nothing_to_show_when_hovered(qtbot):
@@ -166,7 +168,7 @@ def test_a_turn_with_no_change_recorded_has_nothing_to_show_when_hovered(qtbot):
 
     exchange.show_exchange([("no hat", "Nothing to change.")])
 
-    assert exchange._entries()[0].toolTip() == ""
+    assert exchange._entries()[0].tip == ""
 
 
 def test_with_no_image_there_is_nothing_to_ask_of(qtbot):
@@ -193,7 +195,7 @@ def test_an_answer_coming_back_grows_the_box_so_no_scroll_bar_shows_on_two_lines
     exchange.answered(("a hat", "Gave her a hat."))
     qtbot.wait(20)
 
-    assert exchange._scroll.verticalScrollBar().maximum() == 0
+    assert exchange._conversation.verticalScrollBar().maximum() == 0
 
 
 def test_an_answer_that_wraps_onto_several_lines_shows_whole_with_no_scroll_bar(qtbot):
@@ -204,25 +206,60 @@ def test_an_answer_that_wraps_onto_several_lines_shows_whole_with_no_scroll_bar(
     exchange.answered(("a hat", "Gave her a wide straw hat with a ribbon around it. " * 3))
     qtbot.wait(20)
 
-    assert exchange._scroll.verticalScrollBar().maximum() == 0
+    assert exchange._conversation.verticalScrollBar().maximum() == 0
 
 
-def test_a_box_measured_too_short_grows_until_its_scroll_bar_goes(qtbot):
-    exchange = _shown_at(qtbot, 400)
+def test_the_whole_conversation_can_be_selected_at_once(qtbot):
+    exchange = _exchange(qtbot)
     exchange.show_exchange(EXCHANGE)
-    qtbot.wait(20)
+    conversation = exchange._conversation
+    conversation.setFocus()
 
-    exchange._scroll.setFixedHeight(10)
+    qtbot.keyClick(conversation, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
 
-    qtbot.waitUntil(lambda: exchange._scroll.height() > 10, timeout=2000)
-    qtbot.wait(20)
-    assert exchange._scroll.verticalScrollBar().maximum() == 0
+    selected = conversation.textCursor().selection().toPlainText()
+    assert selected.splitlines() == [line for turn in EXCHANGE for line in turn]
 
 
-def test_his_words_and_the_answers_can_be_selected_with_the_mouse(qtbot):
+def test_its_right_click_menu_takes_no_color_from_the_words(qtbot):
     exchange = _exchange(qtbot)
     exchange.show_exchange(EXCHANGE)
 
-    (first, _second) = exchange._entries()
-    for label in (first.said, first.answered):
-        assert label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+    assert "color" not in exchange._conversation.styleSheet()
+
+
+def test_hovering_his_words_or_the_answer_shows_that_turns_change(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange([Turn("no hat", "Took it off.", "a hat", "", "a", ""), ("hello", "Hi.")])
+    conversation = exchange._conversation
+
+    def tip_on(line):
+        block = conversation.document().findBlockByNumber(line)
+        return conversation.tip_at(conversation.cursorRect(QTextCursor(block)).center())
+
+    assert "hat" in tip_on(0)
+    assert "hat" in tip_on(1)
+    assert tip_on(2) == ""
+
+
+def test_resting_the_mouse_on_a_turn_opens_its_tooltip_and_on_one_with_no_change_closes_it(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange([Turn("no hat", "Took it off.", "a hat", "", "a", ""), ("hello", "Hi.")])
+    conversation = exchange._conversation
+
+    def rest_on(line):
+        block = conversation.document().findBlockByNumber(line)
+        place = conversation.cursorRect(QTextCursor(block)).center()
+        QApplication.sendEvent(conversation.viewport(), QHelpEvent(
+            QEvent.Type.ToolTip, place, conversation.viewport().mapToGlobal(place)))
+
+    rest_on(0)
+    assert "hat" in QToolTip.text()
+    rest_on(2)
+    qtbot.waitUntil(lambda: not QToolTip.isVisible(), timeout=2000)
+
+
+def test_a_place_with_no_turn_has_no_tooltip(qtbot):
+    exchange = _shown_at(qtbot, 400)
+
+    assert exchange._conversation.tip_at(QPoint(1, 1)) == ""

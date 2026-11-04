@@ -3059,7 +3059,7 @@ def test_an_image_a_request_is_still_making_shows_the_requests_change_on_its_ent
     tab.show_running_generation(running)
 
     (entry,) = tab._param_form.request_exchange()._entries()
-    struck, lit = _struck_and_lit_in(entry.toolTip())
+    struck, lit = _struck_and_lit_in(entry.tip)
     assert "a hat" in struck
     assert "hat" in lit
     assert _positive(tab) == "a cat"
@@ -3089,7 +3089,7 @@ def test_hovering_the_request_that_made_an_image_shows_the_whole_prompts_with_it
     tab.show_saved_generation(image, [image])
 
     (entry,) = tab._param_form.request_exchange()._entries()
-    tip = entry.toolTip()
+    tip = entry.tip
     struck, lit = _struck_and_lit_in(tip)
     assert ("a cat" in tip)
     assert ("blurry" in tip)
@@ -3118,12 +3118,12 @@ def test_generate_on_a_request_leaves_what_the_request_changed_marked(saved_pane
     _request_made(db, "img1")
     tab.show_saved_generation(image, [image])
     (entry,) = tab._param_form.request_exchange()._entries()
-    assert "a hat" in _struck_and_lit_in(entry.toolTip())[0]
+    assert "a hat" in _struck_and_lit_in(entry.tip)[0]
 
     tab._on_generate()
 
     (entry,) = tab._param_form.request_exchange()._entries()
-    assert "a hat" in _struck_and_lit_in(entry.toolTip())[0]
+    assert "a hat" in _struck_and_lit_in(entry.tip)[0]
     assert _struck_and_lit(_positive_field(tab)) == ("", "")
 
 
@@ -3139,7 +3139,7 @@ def test_the_requests_change_to_each_scene_of_a_video_shows_on_its_entry(saved_p
     tab.show_saved_generation(video, [])
 
     (entry,) = tab._param_form.request_exchange()._entries()
-    _struck, lit = _struck_and_lit_in(entry.toolTip())
+    _struck, lit = _struck_and_lit_in(entry.tip)
     assert lit.count("grass") == 2
 
 
@@ -3203,8 +3203,8 @@ def test_a_request_about_a_setting_changes_it_on_the_form_and_the_turn_shows_the
     qtbot.waitUntil(lambda: tab.current_config().params.get("steps") == 30, timeout=5000)
     assert _positive(tab) == "a woman on a couch"
     (entry,) = exchange._entries()
-    assert "Steps" in entry.toolTip()
-    assert "30" in entry.toolTip()
+    assert "Steps" in entry.tip
+    assert "30" in entry.tip
     assert tab.asked()["turns"][0].changes() == [("Steps", "50", "30")]
 
 

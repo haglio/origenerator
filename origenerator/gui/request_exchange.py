@@ -1,7 +1,18 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLayout, QWidget
+from math import ceil
+
+from PyQt6.QtCore import QEvent, QPoint, Qt, pyqtSignal
+from PyQt6.QtGui import QTextBlockFormat, QTextCharFormat, QTextCursor
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QTextEdit,
+    QToolTip,
+    QVBoxLayout,
+    QWidget,
+)
 from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
@@ -15,14 +26,6 @@ _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
 
 
-def _worded(color) -> QLabel:
-    label = QLabel()
-    label.setWordWrap(True)
-    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-    label.setStyleSheet(f"color: {color.name()}")
-    return label
-
-
 def _say(label: QLabel, words: str) -> None:
     label.setText(words)
     label.setVisible(bool(words))
@@ -34,50 +37,80 @@ def _column_without_margins(host: QWidget) -> QVBoxLayout:
     return column
 
 
-def _scrolling(box: QWidget) -> QScrollArea:
-    scroll = QScrollArea()
-    scroll.setWidgetResizable(True)
-    scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    scroll.setWidget(box)
-    scroll.hide()
-    return scroll
-
-
-def _fit_the_box(scroll: QScrollArea, turns: QVBoxLayout, width: int, tallest: int) -> None:
-    turns.invalidate()
-    scroll.setVisible(turns.count() > 0)
-    scroll.setFixedHeight(min(turns.totalHeightForWidth(width), tallest))
-
-
-def _grow_the_box(scroll: QScrollArea, overflow: int, tallest: int) -> None:
-    room = tallest - scroll.height()
-    if overflow > 0 and room > 0:
-        scroll.setFixedHeight(scroll.height() + min(overflow, room))
-
-
-class _Turn(QWidget):
-    def __init__(self, turn, parent=None):
-        super().__init__(parent)
-        column = _column_without_margins(self)
-        column.setSpacing(0)
-        self.said = _worded(BLUE_LIGHT)
-        self.said.setText(turn[0])
-        self.answered = _worded(TEXT_PRIMARY)
-        column.addWidget(self.said)
-        step = QHBoxLayout()
-        step.setContentsMargins(MARGIN_STANDARD, 0, 0, 0)
-        step.addWidget(self.answered)
-        column.addLayout(step)
+class _Entry:
+    def __init__(self, turn):
+        self.said = turn[0]
         self.take(turn)
 
     def take(self, turn) -> None:
-        _say(self.answered, turn[1])
+        self.answered = turn[1]
         turn = Turn(*turn)
         change = (turn.old_positive, turn.old_negative, turn.new_positive, turn.new_negative)
         settings = turn.changes()
-        self.setToolTip(request_change_html(*change, settings=settings)
-                        if any(change) or settings else "")
+        self.tip = (request_change_html(*change, settings=settings)
+                    if any(change) or settings else "")
+
+
+def _paragraph(cursor: QTextCursor, words: str, color, *, indent: int = 0, above: int = 0) -> None:
+    shape = QTextBlockFormat()
+    shape.setLeftMargin(indent)
+    shape.setTopMargin(above)
+    if cursor.document().isEmpty():
+        cursor.setBlockFormat(shape)
+    else:
+        cursor.insertBlock(shape)
+    ink = QTextCharFormat()
+    ink.setForeground(color)
+    cursor.insertText(words, ink)
+
+
+class _Conversation(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setFrameShape(QTextEdit.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
+                                     | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.setStyleSheet("QTextEdit { background: transparent; }")
+        page = self.document()
+        page.setDocumentMargin(0)
+        page.documentLayout().documentSizeChanged.connect(lambda _size: self._fit())
+        self._tips: list[str] = []
+        self.hide()
+
+    def show_entries(self, entries: list[_Entry]) -> None:
+        self.clear()
+        cursor = self.textCursor()
+        self._tips = []
+        for entry in entries:
+            _paragraph(cursor, entry.said, BLUE_LIGHT, above=GAP_SMALL if self._tips else 0)
+            self._tips.append(entry.tip)
+            if entry.answered:
+                _paragraph(cursor, entry.answered, TEXT_PRIMARY, indent=MARGIN_STANDARD)
+                self._tips.append(entry.tip)
+        self.setVisible(bool(entries))
+        self._fit()
+
+    def _fit(self) -> None:
+        tallest = self.fontMetrics().lineSpacing() * _LINES_AT_MOST
+        self.setFixedHeight(min(ceil(self.document().size().height()), tallest))
+        bar = self.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
+    def tip_at(self, place: QPoint) -> str:
+        block = self.cursorForPosition(place).blockNumber()
+        return self._tips[block] if block < len(self._tips) else ""
+
+    def viewportEvent(self, event) -> bool:
+        if event.type() != QEvent.Type.ToolTip:
+            return super().viewportEvent(event)
+        tip = self.tip_at(event.pos())
+        if tip:
+            QToolTip.showText(event.globalPos(), tip, self.viewport())
+        else:
+            QToolTip.hideText()
+        return True
 
 
 class RequestExchange(QWidget):
@@ -87,16 +120,9 @@ class RequestExchange(QWidget):
         super().__init__(parent)
         column = _column_without_margins(self)
         column.setSpacing(GAP_SMALL)
-        box = QWidget()
-        turns = _column_without_margins(box)
-        turns.setSpacing(GAP_SMALL)
-        turns.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self._turns = turns
-        scroll = _scrolling(box)
-        self._scroll = scroll
-        bar = scroll.verticalScrollBar()
-        bar.rangeChanged.connect(lambda _low, high: self._on_more_than_fits(bar, high))
-        column.addWidget(self._scroll)
+        self._conversation = _Conversation()
+        self._held: list[_Entry] = []
+        column.addWidget(self._conversation)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         line = QLineEdit()
@@ -116,62 +142,37 @@ class RequestExchange(QWidget):
             self._line.clear()
             self.asked.emit(words)
 
-    def _entries(self) -> list[_Turn]:
-        return [self._turns.itemAt(i).widget() for i in range(self._turns.count())]
+    def _entries(self) -> list[_Entry]:
+        return self._held
 
     def turns(self) -> list[tuple[str, str]]:
-        return [(entry.said.text(), entry.answered.text()) for entry in self._entries()]
+        return [(entry.said, entry.answered) for entry in self._held]
 
-    def _add(self, turn) -> None:
-        entry = _Turn(turn)
-        self._turns.addWidget(entry)
-        entry.show()
-        self._fit()
-
-    def _take_off(self, entry: _Turn) -> None:
-        self._turns.removeWidget(entry)
-        entry.deleteLater()
-        self._fit()
-
-    def _fit(self) -> None:
-        _fit_the_box(self._scroll, self._turns, self.width(), self._tallest())
-
-    def _tallest(self) -> int:
-        entries = self._entries()
-        metrics = (entries[0].said if entries else self).fontMetrics()
-        return metrics.lineSpacing() * _LINES_AT_MOST
-
-    def _on_more_than_fits(self, bar, high: int) -> None:
-        _grow_the_box(self._scroll, high, self._tallest())
-        bar.setValue(high)
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        if self._turns.count():
-            self._fit()
+    def _draw(self) -> None:
+        self._conversation.show_entries(self._held)
 
     def _settle(self, status: str = "", *, ready: bool = True) -> None:
         _say(self._status, status)
         self._line.setEnabled(self._available and ready)
 
     def show_exchange(self, turns) -> None:
-        for entry in self._entries():
-            self._take_off(entry)
-        for turn in turns:
-            self._add(turn)
+        self._held = [_Entry(turn) for turn in turns]
+        self._draw()
         self._settle()
 
     def add_turn(self, said: str) -> None:
-        self._add((said, ""))
+        self._held.append(_Entry((said, "")))
+        self._draw()
         self._settle(_UPDATING, ready=False)
 
     def answered(self, turn) -> None:
-        self._entries()[-1].take(turn)
-        self._fit()
+        self._held[-1].take(turn)
+        self._draw()
         self._settle()
 
     def failed(self) -> None:
-        self._take_off(self._entries()[-1])
+        self._held.pop()
+        self._draw()
         self._settle(_FAILED)
 
     def set_available(self, available: bool) -> None:

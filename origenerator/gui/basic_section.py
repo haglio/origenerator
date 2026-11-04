@@ -179,7 +179,7 @@ def _value_widget(item: BasicItem) -> QLabel:
     value = QLabel(wrappable(item.value))
     value.setTextInteractionFlags(_SELECTABLE)
     value.setWordWrap(True)
-    value.setStyleSheet(f"color: {_h(TEXT_SECONDARY)};")
+    value.setStyleSheet(f"QLabel {{ color: {_h(TEXT_SECONDARY)}; }}")
     return value
 
 

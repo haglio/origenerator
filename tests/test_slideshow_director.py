@@ -2136,6 +2136,44 @@ def test_a_video_sits_under_its_images_seed_with_the_image_down_its_column(slide
         "alpha", ("Source image", "beta"))
 
 
+def _a_sites(row):
+    return {**row, "source": GenerationSource.OUTSIDE}
+
+
+def test_what_another_site_made_stays_off_the_map(slideshows, tmp_path):
+    rows = [_fox("g1", seed=1), _a_sites(_fox("g2", seed=2)),
+            _fox("g3", seed=3),
+            _a_sites(_animation("o1", frame="g1.png", action="beta", tmp_path=tmp_path)),
+            _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("g1", shape="portrait")
+
+    mapped = [*around.seeds, *(row.slide for row in around.column), *around.group]
+    assert {slide.prompt_id for slide in mapped} == {"g3", "v1"}
+
+
+def test_videos_made_from_a_sites_picture_stay_together_on_the_map(slideshows, tmp_path):
+    rows = [_a_sites(_fox("g1", seed=1)),
+            _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("v1", shape="portrait")
+
+    assert [(row.label, row.slide.prompt_id) for row in around.column] == [("beta", "v2")]
+    assert [slide.prompt_id for slide in around.group] == ["v2"]
+
+
+def test_widening_the_map_takes_in_nothing_another_site_made(slideshows, tmp_path):
+    rows = [_fox("g1", seed=1), _a_sites(_image("o1", "a red fox", seed=2, steps=20)),
+            _image("g2", "a red fox", seed=3, steps=20)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    assert [slide.prompt_id
+            for slide in director.beyond_the_row_of("g1", shape="portrait")] == ["g2"]
+
+
 def test_a_hidden_starting_frame_stays_off_the_map_of_a_video_made_from_it(slideshows, tmp_path):
     frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
     rows = [frame, _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),

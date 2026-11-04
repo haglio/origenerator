@@ -173,6 +173,7 @@ from origenerator.item_shape import (
     requested_shape,
     row_shape,
     shaped_key,
+    what_plays_at,
 )
 from origenerator.item_shape import (
     shape_of as _shape_of,
@@ -1768,7 +1769,7 @@ class GalleryView(QWidget):
         if rows is None:
             group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
-        return rows
+        return rows if self._showing_search() else what_plays_at(self.slideshow_location(), rows)
 
     def slideshow_subject(self) -> str:
         if self._showing_search():

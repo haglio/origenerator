@@ -17,6 +17,7 @@ from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.shapes import SEPARATE, TOGETHER
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generate_tab import GenerateTab
@@ -986,6 +987,48 @@ def test_a_video_asked_for_in_origenerator_mode_is_made_while_both_regions_play(
     video = view._jobs.start_prepared("k", i2v, i2v.default_params())
 
     assert [call.args[1] for call in client.submit_job.call_args_list] == [video]
+
+
+def _mine_and_another_sites(tmp_path) -> list[dict]:
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    size = {"width": 720, "height": 1280}
+    return [
+        _row("mine", "sdxl_t2i", {"positive_prompt": "a", "seed": 1, **size},
+             "sdxl_t2i_mine.png", thumbnail_path=str(tall)),
+        _row("theirs", "outside picture:a-site", {"positive_prompt": "b", "seed": 2, **size},
+             "theirs.png", thumbnail_path=str(tall), source=GenerationSource.OUTSIDE,
+             workflow_version="outside"),
+    ]
+
+
+def test_a_regions_library_leaves_out_what_other_sites_made(qtbot, tmp_path):
+    view = _fun_time_view(qtbot, _mine_and_another_sites(tmp_path))
+    view.refresh()
+
+    played = view._slideshows.rows_at("__all__::portrait")
+
+    assert [row["prompt_id"] for row in played] == ["mine"]
+
+
+def test_a_regions_latest_leaves_out_what_other_sites_made(qtbot, tmp_path):
+    view = _fun_time_view(qtbot, _mine_and_another_sites(tmp_path))
+    view.refresh()
+
+    played = view._slideshows.rows_at(f"{LATEST_KEY}::portrait")
+
+    assert [row["prompt_id"] for row in played] == ["mine"]
+
+
+def test_the_gallery_goes_on_showing_what_other_sites_made(qtbot, tmp_path):
+    view = _fun_time_view(qtbot, _mine_and_another_sites(tmp_path))
+    view.refresh()
+
+    latest = view._gallery_pane.rows_for_collection(f"{LATEST_KEY}::portrait")
+    everything = gallery.rows_under(view.group_for_key("__all__::portrait"))
+
+    assert sorted(row["prompt_id"] for row in latest) == ["mine", "theirs"]
+    assert sorted(row["prompt_id"] for row in everything) == ["mine", "theirs"]
 
 
 def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):

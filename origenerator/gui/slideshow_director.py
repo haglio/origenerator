@@ -72,6 +72,7 @@ from origenerator.item_shape import (
     filter_rows,
     row_shape,
     shaped_key,
+    what_plays_at,
 )
 from origenerator.item_shape import (
     split_key as _split_collection_key,
@@ -697,10 +698,11 @@ class SlideshowDirector:
         if not location:
             return []
         rows = self._gallery_pane.rows_for_collection(location)
-        if rows is not None:
-            return self._one_per_run_where_the_order_is_newest_first(location, rows)
-        group = self._host.group_for_key(location)
-        return gallery.rows_under(group) if group is not None else []
+        if rows is None:
+            group = self._host.group_for_key(location)
+            rows = gallery.rows_under(group) if group is not None else []
+        return self._one_per_run_where_the_order_is_newest_first(
+            location, what_plays_at(location, rows))
 
     def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
         collection = folder_collection(_split_collection_key(location)[0])

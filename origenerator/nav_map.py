@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from origenerator import gallery
 from origenerator.action_settings import action_of
+from origenerator.generation_state import made_here
 from origenerator.media import MediaType
 from origenerator.search import content_stems
 
@@ -112,12 +113,12 @@ def surroundings(current: dict, rows, *, image_index) -> Surroundings:
                  if video["prompt_id"] != current["prompt_id"]
                  and animations.label_of(video) == own]
     group = [row for row in animations.group_of(current)
-             if row["prompt_id"] != current["prompt_id"]]
+             if row["prompt_id"] != current["prompt_id"] and made_here(row)]
     return Surroundings(
         label=own,
-        seeds=tuple(seeds),
-        configs=() if image is not None else tuple(
-            config_family(current, rows, image_index=image_index)[1:]),
+        seeds=tuple(filter(made_here, seeds)),
+        configs=() if image is not None else tuple(filter(made_here, config_family(
+            current, rows, image_index=image_index)[1:])),
         actions=_one_per_action(
             (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
             if label != own),
@@ -148,7 +149,7 @@ def beyond_the_row(current: dict, rows, *, image_index,
              -_likeness(subject, content_stems(animations.image_of(row) or row)),
              row["prompt_id"],
              row)
-            for row in candidates if row["prompt_id"] not in kept
+            for row in candidates if row["prompt_id"] not in kept and made_here(row)
         ),
         key=lambda scored: scored[:4],
     )

@@ -37,10 +37,10 @@ def with_trigger_words_swapped(prompt: str, old, new, *, in_scenes: bool = False
 
 
 def without_trigger_word(prompt: str, words, *, in_scenes: bool = False) -> str:
-    return story_of([_without_any(scene, words) for scene in _parts(prompt, in_scenes)])
+    return story_of([without_phrases(scene, words) for scene in _parts(prompt, in_scenes)])
 
 
-def _without_any(text: str, words) -> str:
+def without_phrases(text: str, words) -> str:
     if not _holds_one(text, words):
         return text
     for word in words:

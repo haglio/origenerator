@@ -18,6 +18,7 @@ _LINES_AT_MOST = 20
 def _worded(color) -> QLabel:
     label = QLabel()
     label.setWordWrap(True)
+    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     label.setStyleSheet(f"color: {color.name()}")
     return label
 
@@ -39,10 +40,20 @@ def _scrolling(box: QWidget) -> QScrollArea:
     scroll.setFrameShape(QScrollArea.Shape.NoFrame)
     scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     scroll.setWidget(box)
-    bar = scroll.verticalScrollBar()
-    bar.rangeChanged.connect(lambda _low, high: bar.setValue(high))
     scroll.hide()
     return scroll
+
+
+def _fit_the_box(scroll: QScrollArea, turns: QVBoxLayout, width: int, tallest: int) -> None:
+    turns.invalidate()
+    scroll.setVisible(turns.count() > 0)
+    scroll.setFixedHeight(min(turns.totalHeightForWidth(width), tallest))
+
+
+def _grow_the_box(scroll: QScrollArea, overflow: int, tallest: int) -> None:
+    room = tallest - scroll.height()
+    if overflow > 0 and room > 0:
+        scroll.setFixedHeight(scroll.height() + min(overflow, room))
 
 
 class _Turn(QWidget):
@@ -81,7 +92,10 @@ class RequestExchange(QWidget):
         turns.setSpacing(GAP_SMALL)
         turns.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._turns = turns
-        self._scroll = _scrolling(box)
+        scroll = _scrolling(box)
+        self._scroll = scroll
+        bar = scroll.verticalScrollBar()
+        bar.rangeChanged.connect(lambda _low, high: self._on_more_than_fits(bar, high))
         column.addWidget(self._scroll)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -120,10 +134,16 @@ class RequestExchange(QWidget):
         self._fit()
 
     def _fit(self) -> None:
-        self._turns.invalidate()
-        wanted = self._turns.totalHeightForWidth(self.width())
-        self._scroll.setVisible(self._turns.count() > 0)
-        self._scroll.setFixedHeight(min(wanted, self.fontMetrics().lineSpacing() * _LINES_AT_MOST))
+        _fit_the_box(self._scroll, self._turns, self.width(), self._tallest())
+
+    def _tallest(self) -> int:
+        entries = self._entries()
+        metrics = (entries[0].said if entries else self).fontMetrics()
+        return metrics.lineSpacing() * _LINES_AT_MOST
+
+    def _on_more_than_fits(self, bar, high: int) -> None:
+        _grow_the_box(self._scroll, high, self._tallest())
+        bar.setValue(high)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

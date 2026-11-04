@@ -478,7 +478,7 @@
     "origenerator/gui/region_openings.py": 7,
     "origenerator/gui/related_media.py": 21,
     "origenerator/gui/request_answering.py": 2,
-    "origenerator/gui/request_exchange.py": 18,
+    "origenerator/gui/request_exchange.py": 17,
     "origenerator/gui/scenes_editor.py": 30,
     "origenerator/gui/scope_search_edit.py": 7,
     "origenerator/gui/search_expander.py": 4,

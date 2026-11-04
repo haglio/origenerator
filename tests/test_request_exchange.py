@@ -17,6 +17,15 @@ def _exchange(qtbot):
     return exchange
 
 
+def _shown_at(qtbot, width):
+    exchange = RequestExchange()
+    qtbot.addWidget(exchange)
+    exchange.resize(width, 300)
+    with qtbot.waitExposed(exchange):
+        exchange.show()
+    return exchange
+
+
 def _asked(qtbot, exchange):
     asked = []
     exchange.asked.connect(asked.append)
@@ -174,3 +183,25 @@ def test_with_no_image_there_is_nothing_to_ask_of(qtbot):
 
     assert exchange._line.isEnabled()
     assert exchange._line.placeholderText() == "What to change, e.g. two women"
+
+
+def test_an_answer_coming_back_grows_the_box_so_no_scroll_bar_shows_on_two_lines(qtbot):
+    exchange = _shown_at(qtbot, 400)
+
+    exchange.add_turn("a hat")
+    qtbot.wait(20)
+    exchange.answered(("a hat", "Gave her a hat."))
+    qtbot.wait(20)
+
+    assert exchange._scroll.verticalScrollBar().maximum() == 0
+
+
+def test_an_answer_that_wraps_onto_several_lines_shows_whole_with_no_scroll_bar(qtbot):
+    exchange = _shown_at(qtbot, 300)
+
+    exchange.add_turn("a hat")
+    qtbot.wait(20)
+    exchange.answered(("a hat", "Gave her a wide straw hat with a ribbon around it. " * 3))
+    qtbot.wait(20)
+
+    assert exchange._scroll.verticalScrollBar().maximum() == 0

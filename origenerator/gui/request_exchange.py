@@ -121,7 +121,7 @@ class RequestExchange(QWidget):
 
     def _fit(self) -> None:
         self._turns.invalidate()
-        wanted = self._turns.totalHeightForWidth(self._scroll.viewport().width())
+        wanted = self._turns.totalHeightForWidth(self.width())
         self._scroll.setVisible(self._turns.count() > 0)
         self._scroll.setFixedHeight(min(wanted, self.fontMetrics().lineSpacing() * _LINES_AT_MOST))
 
@@ -147,6 +147,7 @@ class RequestExchange(QWidget):
 
     def answered(self, turn) -> None:
         self._entries()[-1].take(turn)
+        self._fit()
         self._settle()
 
     def failed(self) -> None:

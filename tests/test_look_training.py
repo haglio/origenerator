@@ -186,7 +186,7 @@ def test_what_a_trainable_lora_offers_beside_its_dropdown(
         (folder / name).write_bytes(b"")
     _installed(installed_models, titled_models, worded_loras, ("example_look", "Example Look 1.0"))
 
-    offer = look_training.training_offer("Example Look")
+    offer = look_training.training_offer("Example Look", "example_look.safetensors")
 
     assert (offer.label, offer.enabled, offer.pictures, offer.folder) == ("Retrain", True, 2, folder)
     assert "Example Look" in offer.tooltip

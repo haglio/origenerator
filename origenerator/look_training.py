@@ -5,7 +5,7 @@ from pathlib import Path, PureWindowsPath
 from origenerator import config, lora_training
 from origenerator.content import load_content
 from origenerator.lora_training import TrainingOffer, TrainingState
-from origenerator.lora_versions import newest_version, next_version
+from origenerator.lora_versions import newest_version, next_version, trash_tooltip
 from origenerator.model_titles import lora_folder, model_stem, model_title, versioned, write_title
 from origenerator.trigger_words import trigger_words_by_lora, write_trigger_words
 from origenerator.workflows.model_arch import describe
@@ -125,11 +125,12 @@ def take(job: dict) -> str:
     return job["lora"]
 
 
-def training_offer(base: str) -> TrainingOffer:
+def training_offer(base: str, lora) -> TrainingOffer:
     folder = pictures_folder(base)
     return lora_training.offer(
         training_state(base),
         tooltip=(f"Trains the next version of {base} from the pictures in {folder}. Your own "
                  "generations come first: the training pauses whenever ComfyUI has work and picks "
                  "up where it stopped."),
-        pictures=len(picture_files(folder)), folder=folder)
+        pictures=len(picture_files(folder)), folder=folder,
+        trash_tooltip=trash_tooltip(lora, model_family(base)))

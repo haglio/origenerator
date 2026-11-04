@@ -5,7 +5,7 @@ from pathlib import Path, PureWindowsPath
 from origenerator import comfyui_launcher, config, gallery, lora_training
 from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL
 from origenerator.lora_training import TrainingOffer, TrainingState
-from origenerator.lora_versions import next_version
+from origenerator.lora_versions import next_version, trash_tooltip
 from origenerator.model_titles import FIX_LORA_FOLDER, model_stem
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part, part_table
@@ -58,10 +58,11 @@ def train_tooltip(part) -> str:
             "fix's own detector. Nothing generates while it trains.")
 
 
-def training_offer(part) -> TrainingOffer:
+def training_offer(part, lora) -> TrainingOffer:
     folder = photos_folder(part)
     return lora_training.offer(training_state(part), tooltip=train_tooltip(part),
-                               pictures=len(photo_files(folder)), folder=folder, counted="photo")
+                               pictures=len(photo_files(folder)), folder=folder, counted="photo",
+                               trash_tooltip=trash_tooltip(lora))
 
 
 def fix_to_train():

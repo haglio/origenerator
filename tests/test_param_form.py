@@ -2522,14 +2522,14 @@ def _model_and_its_lora(qtbot, recorded_base_models, model):
 
 def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot, tmp_path, monkeypatch):
     form = _lora_form(qtbot, WorkflowTraits(lora_keys=("lora",)))
-    controls = form._training_controls["lora"]
+    controls = form.training.controls["lora"]
     assert controls.isHidden()
     opened = []
     monkeypatch.setattr(training_controls, "open_in_explorer", opened.append)
     asked = []
-    form.train_requested.connect(asked.append)
+    form.training.listen(train=asked.append, trash=None)
 
-    form.offer_training("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
+    form.training.offer("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
                                               pictures=87, folder=tmp_path))
 
     assert not controls.isHidden()
@@ -2542,19 +2542,19 @@ def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot
     controls.folder.click()
     assert opened == [tmp_path]
 
-    form.offer_training("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
+    form.training.offer("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
                                               pictures=1, folder=tmp_path), running="Training 10%")
     assert (controls.train.text(), controls.train.isEnabled()) == ("Training 10%", False)
     assert controls.pictures.text() == "1 picture"
 
-    form.offer_training("lora", None)
+    form.training.offer("lora", None)
     assert controls.isHidden()
 
 
 def test_a_form_told_no_lora_keys_offers_no_training(qtbot):
     form = _lora_form(qtbot)
 
-    assert form._training_controls == {}
+    assert form.training.controls == {}
 
 
 def test_a_lora_filed_apart_from_the_picked_model_is_not_offered(

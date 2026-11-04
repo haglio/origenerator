@@ -69,6 +69,7 @@ from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _Pend
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
+from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
@@ -4409,8 +4410,7 @@ def test_a_tabs_lora_dropdown_says_when_its_picked_lora_was_trained(
         f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}.")
 
 
-def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picked(
-        blank_panel, monkeypatch, tmp_path, installed_models, titled_models):
+def _trainable_look(monkeypatch, tmp_path):
     folder = tmp_path / "pictures"
     folder.mkdir()
     (folder / "one.jpg").write_bytes(b"")
@@ -4418,10 +4418,15 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
         "pictures": str(folder), "base_model": "example_raw.safetensors",
         "text_encoder": "example_te.safetensors", "vae": "example_vae.safetensors"}}})
     monkeypatch.setattr(config, "LOOK_TRAINING_DIR", tmp_path / "lora training")
+
+
+def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picked(
+        blank_panel, monkeypatch, tmp_path, installed_models, titled_models):
+    _trainable_look(monkeypatch, tmp_path)
     titled_models({"example_look": "Example Look 1.0"})
     installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True)
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
-    controls = blank_panel._param_form._training_controls["lora"]
+    controls = blank_panel._param_form.training.controls["lora"]
     assert controls.isHidden()
     asked = []
     blank_panel.train_requested.connect(asked.append)
@@ -4432,9 +4437,9 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     assert (controls.train.text(), controls.pictures.text()) == ("Retrain", "1 picture")
     controls.train.click()
     assert asked == ["lora"]
-    blank_panel.show_training("Example Look", "Training 10%")
+    blank_panel.lora_offers.show_training("Example Look", "Training 10%")
     assert (controls.train.text(), controls.train.isEnabled()) == ("Training 10%", False)
-    blank_panel.show_training("Example Look", None)
+    blank_panel.lora_offers.show_training("Example Look", None)
     assert (controls.train.text(), controls.train.isEnabled()) == ("Retrain", True)
     assert blank_panel.lora_value("lora") == "example_look.safetensors"
 
@@ -4458,3 +4463,95 @@ def test_a_sound_prompt_grays_the_words_past_where_its_reader_stops(
     assert [(span.start, span.format.foreground().color().name())
             for span in field.document().firstBlock().layout().formats()] == [
         (len(read) + 1, TEXT_MUTED.name())]
+
+
+class _OneTab:
+    def __init__(self, tab):
+        self._tab = tab
+
+    def generate_tabs(self):
+        return [self._tab]
+
+
+@pytest.fixture
+def look_in_two_versions(monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
+    _trainable_look(monkeypatch, tmp_path)
+    titled_models({"look_one": "Example Look 1.0", "look_two": "Example Look 1.1"})
+    worded_loras({"look_one": ["zzold"], "look_two": ["zznew"]})
+    gone = installed_models.add("loras", "look_one.safetensors", arch="krea2", lora=True)
+    installed_models.add("loras", "look_two.safetensors", arch="krea2", lora=True)
+    return gone
+
+
+def test_an_old_version_of_a_lora_offers_the_trash_where_the_newest_offers_retrain(
+        blank_panel, look_in_two_versions):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
+    form = blank_panel._param_form
+    controls = form.training.controls["lora"]
+
+    form.set_values({"lora": "look_one.safetensors"})
+    assert (controls.train.isHidden(), controls.trash.isHidden()) == (True, False)
+    assert controls.trash.toolTip() == (
+        "Moves Example Look 1.0 to the Recycle Bin. Example Look 1.1 stays.")
+    assert controls.pictures.text() == "1 picture"
+
+    form.set_values({"lora": "look_two.safetensors"})
+    assert (controls.train.isHidden(), controls.trash.isHidden()) == (False, True)
+    assert controls.train.text() == "Retrain"
+
+
+def test_a_training_under_way_shows_on_an_old_version_in_place_of_the_trash(
+        blank_panel, look_in_two_versions):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
+    form = blank_panel._param_form
+    controls = form.training.controls["lora"]
+    form.set_values({"lora": "look_one.safetensors"})
+
+    blank_panel.lora_offers.show_training("Example Look", "Training 10%")
+
+    assert (controls.train.isHidden(), controls.trash.isHidden()) == (False, True)
+    assert controls.train.text() == "Training 10%"
+
+
+def test_the_trash_moves_the_tab_to_the_newest_version_and_its_trigger_word(
+        blank_panel, look_in_two_versions):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
+    form = blank_panel._param_form
+    form.set_values({"lora": "look_one.safetensors", "positive_prompt": "zzold, scene one"})
+    LookTrainingController(None, info_tabs_of=lambda: _OneTab(blank_panel), parent=None,
+                           trash=lambda _lora, _parent: look_in_two_versions.unlink() or True
+                           ).wire(blank_panel)
+
+    form.training.controls["lora"].trash.click()
+
+    values = form.get_values()
+    assert values["lora"] == "look_two.safetensors"
+    assert values["positive_prompt"] == "zznew, scene one"
+    assert form._widgets["lora"].findData("look_one.safetensors") < 0
+
+
+def test_another_tab_holding_a_trashed_version_warns_and_its_click_switches_it(
+        blank_panel, look_in_two_versions):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "krea2_t2i"))
+    form = blank_panel._param_form
+    form.set_values({"lora": "look_one.safetensors", "positive_prompt": "zzold, scene one"})
+
+    look_in_two_versions.unlink()
+    blank_panel.lora_offers.stop_offering("look_one.safetensors")
+
+    mark = form._warning_marks["lora"]
+    assert mark.toolTip() == ("Not installed anymore, so nothing can be made with it. "
+                              "Click to use Example Look 1.1 and its trigger word, zznew.")
+    mark.pressed.emit()
+    assert form.get_values()["lora"] == "look_two.safetensors"
+    assert form.get_values()["positive_prompt"] == "zznew, scene one"
+
+
+def test_a_tab_with_no_form_has_nothing_to_stop_offering(qtbot, tmp_path):
+    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"))
+    qtbot.addWidget(tab)
+    tab._clear_form()
+
+    tab.lora_offers.stop_offering("look_one.safetensors")
+
+    assert tab.lora_value("lora") is None

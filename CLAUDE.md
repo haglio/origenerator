@@ -231,7 +231,11 @@ version (`model_titles.versioned`), and every LoRA trained here is named
 after the version that follows the highest its base already has
 (`lora_versions.next_version`: 1.0, then 1.1, and so on), in the folder of
 the version it follows, so no file is ever written over (his rule, 2026-10-25:
-gallery records name the file). The fix LoRAs from before versions, named by
+gallery records name the file). A version older than the newest shows the trash
+in place of Retrain, which sends its file to the Recycle Bin (his decision,
+2026-11-04); its title and trigger words stay written down, so an item naming it
+still reads as that version and its warning's click moves to the newest, trigger
+word included. The fix LoRAs from before versions, named by
 the minute they finished, keep their names and read as 1.0, 1.1 and so on in
 the order they were trained. When a picked LoRA's title carries a version, its
 dropdown's tooltip ends with the date its own header says it finished

@@ -5,12 +5,18 @@ from typing import NamedTuple
 
 from origenerator.base_models import filed_apart, loras_offered_beside
 from origenerator.content import load_content
+from origenerator.lora_versions import newest_offered_version
 from origenerator.model_titles import model_title
-from origenerator.trigger_words import lacks_trigger_word, trigger_words, with_trigger_word
-from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef
+from origenerator.trigger_words import (
+    lacks_trigger_word,
+    trigger_words,
+    with_trigger_word,
+    with_trigger_words_swapped,
+)
+from origenerator.workflows.base import SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, ParamType
 from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
-from origenerator.workflows.model_files import is_installed, is_no_lora
+from origenerator.workflows.model_files import NO_LORA, is_installed, is_no_lora
 from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
 GOOD_STEP_SPACING = {
@@ -39,10 +45,18 @@ _LORA_GROUPS = {
 STRENGTH_BELOW_ONE = ("Below 1 the Negative Prompt works backwards: what you get is pulled toward "
                       "what it names, and at 0 the Positive Prompt is ignored altogether.")
 _LONGEST_TRIGGER_WORD_IN_WORDS = 5
+NOT_INSTALLED = "Not installed anymore, so nothing can be made with it."
 
 
 def _shown(value) -> str:
     return f"{value:g}" if isinstance(value, (int, float)) else str(value)
+
+
+class _PromptRewrite(NamedTuple):
+    fixed: Callable[[str], str]
+
+    writes = "positive_prompt"
+    follow_up = None
 
 
 class Advice(NamedTuple):
@@ -50,6 +64,9 @@ class Advice(NamedTuple):
     value: object
     fix: object
     shown: Callable[[object], str] = _shown
+    old_words: tuple[str, ...] = ()
+    new_words: tuple[str, ...] = ()
+    in_scenes: bool = False
 
     writes = ""
 
@@ -63,10 +80,22 @@ class Advice(NamedTuple):
 
     @property
     def said(self) -> str:
-        return f"{self.text} Click to use {self.fix_shown}."
+        word = self.new_words[0] if self.new_words and self.new_words != self.old_words else ""
+        its_word = f" and its trigger word, {word}" if word else ""
+        return f"{self.text} Click to use {self.fix_shown}{its_word}."
 
     def fixed(self, _held) -> object:
         return self.fix
+
+    @property
+    def follow_up(self) -> _PromptRewrite | None:
+        return _PromptRewrite(self.prompt_after) if self.new_words else None
+
+    def prompt_after(self, prompt: str) -> str:
+        if not self.new_words:
+            return prompt
+        return with_trigger_words_swapped(prompt, self.old_words, self.new_words,
+                                          in_scenes=self.in_scenes)
 
 
 class MissingTriggerWords(NamedTuple):
@@ -75,6 +104,7 @@ class MissingTriggerWords(NamedTuple):
     in_scenes: bool = False
 
     writes = "positive_prompt"
+    follow_up = None
 
     @property
     def value_shown(self) -> str:
@@ -195,11 +225,25 @@ def not_installed(params: dict, definitions, keys) -> dict[str, str]:
             if not is_installed(pd.folder, params[pd.key])}
 
 
-def not_installed_advice(missing: dict[str, str], definitions, defaults: dict) -> dict[str, Advice]:
+def not_installed_advice(missing: dict[str, str], definitions, defaults: dict, *,
+                         in_scenes: bool = False) -> dict[str, Advice]:
     offered = {pd.key: pd.options for pd in definitions}
-    return {key: _in_place_of("Not installed anymore, so nothing can be made with it.", chosen,
-                              offered[key], defaults.get(key))
-            for key, chosen in missing.items()}
+    found = {}
+    for key, chosen in missing.items():
+        usual = _in_place_of(NOT_INSTALLED, chosen, offered[key], defaults.get(key))
+        newer = newest_offered_version(chosen, offered[key])
+        found[key] = usual if newer is None else usual._replace(
+            fix=newer, old_words=trigger_words(chosen), new_words=_warned_trigger_words(newer),
+            in_scenes=in_scenes)
+    return found
+
+
+def lost_lora_advice(chosen, offered) -> Advice | None:
+    if (is_no_lora(chosen) or is_installed("loras", chosen)
+            or newest_offered_version(chosen, offered) is None):
+        return None
+    dropdown = ParamDef("lora", "LoRA", ParamType.DROPDOWN, NO_LORA, options=offered)
+    return not_installed_advice({"lora": chosen}, [dropdown], {"lora": NO_LORA})["lora"]
 
 
 def not_offered_advice(params: dict, definitions, keys, defaults: dict,

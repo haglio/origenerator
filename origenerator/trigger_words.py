@@ -29,6 +29,13 @@ def with_trigger_word(prompt: str, words, *, in_scenes: bool = False) -> str:
                      for scene in _parts(prompt, in_scenes)])
 
 
+def with_trigger_words_swapped(prompt: str, old, new, *, in_scenes: bool = False) -> str:
+    for word in old:
+        if word not in new:
+            prompt = _pattern(word).sub(lambda _found: new[0], prompt)
+    return with_trigger_word(prompt, new, in_scenes=in_scenes)
+
+
 def _parts(prompt: str, in_scenes: bool) -> list[str]:
     return scene_prompts(prompt) if in_scenes else [prompt]
 
@@ -38,5 +45,9 @@ def _holds_one(text: str, words) -> bool:
 
 
 def _holds(text: str, word: str) -> bool:
+    return _pattern(word).search(text) is not None
+
+
+def _pattern(word: str) -> re.Pattern:
     spaced = r"\s+".join(re.escape(part) for part in word.split())
-    return re.search(rf"(?<!\w){spaced}(?!\w)", text, re.IGNORECASE) is not None
+    return re.compile(rf"(?<!\w){spaced}(?!\w)", re.IGNORECASE)

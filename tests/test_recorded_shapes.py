@@ -1,81 +1,128 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
+from PIL import Image
 
 from origenerator import item_shape
-from origenerator.gallery.shapes import PORTRAIT
+from origenerator.completion import mark_generation_completed
+from origenerator.db import Database, NewGeneration
+from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
+from origenerator.generation_state import GenerationStatus
 
 
-class _FakeImage:
-    def __init__(self, size):
-        self.size = size
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
+@pytest.fixture
+def tall_image(tmp_path):
+    path = tmp_path / "made-up tall.png"
+    Image.new("RGB", (9, 16)).save(path)
+    return str(path)
 
 
-@pytest.fixture(autouse=True)
-def _a_cache_of_this_files_own(monkeypatch):
-    monkeypatch.setattr(item_shape, "_measured", type(item_shape._measured)())
+@pytest.fixture
+def db(tmp_path):
+    return Database(tmp_path / "library.db")
 
 
-@pytest.fixture(autouse=True)
-def _every_path_reads_as_a_tall_image(monkeypatch):
-    monkeypatch.setattr(
-        item_shape, "Image", SimpleNamespace(open=lambda path: _FakeImage((90, 160))))
+def _added(db, prompt_id, *, params=None, thumbnail=None, status=GenerationStatus.COMPLETED):
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="made_up",
+                                       workflow_version="v001",
+                                       params_json=json.dumps(params or {}), workflow_json="{}"))
+    db.update_generation(prompt_id, status=status, thumbnail_path=thumbnail)
 
 
-def _measure(name: str) -> str:
-    return item_shape.row_shape({"thumbnail_path": f"/library/{name}.png"})
+def test_a_recorded_shape_answers_though_no_file_can_be_opened():
+    assert item_shape.row_shape({"shape": PORTRAIT, "thumbnail_path": "/made-up/gone.png"}) == PORTRAIT
 
 
-def test_the_remembered_shapes_stop_piling_up():
-    for n in range(item_shape._MEASURED_LIMIT + 100):
-        assert _measure(f"m{n}") == PORTRAIT
-
-    assert len(item_shape._measured) <= item_shape._MEASURED_LIMIT
+def test_a_row_with_no_recorded_shape_is_measured_from_its_thumbnail(tall_image):
+    assert item_shape.row_shape({"thumbnail_path": tall_image}) == PORTRAIT
 
 
-def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypatch):
-    row = {"thumbnail_path": "/library/known.png",
-           "output_files": '[{"filename": "known.png", "subfolder": ""}]'}
-    item_shape.row_shape(row)
-    looked_up = []
-    monkeypatch.setattr(item_shape.gallery, "resolve_preview",
-                        lambda *args: looked_up.append(args))
+def test_recording_writes_each_finished_items_shape(db, tall_image):
+    _added(db, "measured", thumbnail=tall_image)
+    _added(db, "asked", params={"width": 1280, "height": 720})
 
-    assert item_shape.row_shape(row) == PORTRAIT
-    assert looked_up == []
+    assert item_shape.record_shapes(db) == 2
+
+    assert db.get_generation("measured")["shape"] == PORTRAIT
+    assert db.get_generation("asked")["shape"] == LANDSCAPE
 
 
-def test_the_shape_a_row_asks_for_is_read_once_however_often_it_is_asked(monkeypatch):
-    reads = []
-    real = item_shape.canonical_settings
-    monkeypatch.setattr(item_shape, "canonical_settings",
-                        lambda workflow_name, params: reads.append(workflow_name)
-                        or real(workflow_name, params))
-    row = {"workflow_name": "sdxl_t2i", "params_json": json.dumps({"width": 720, "height": 1281})}
+def test_the_next_launch_needs_no_file_at_all(db, tall_image):
+    _added(db, "measured", thumbnail=tall_image)
+    item_shape.record_shapes(db)
+    Path(tall_image).unlink()
 
-    for _ in range(3):
-        assert item_shape.row_shape(dict(row)) == PORTRAIT
-
-    assert reads == ["sdxl_t2i"]
+    assert item_shape.record_shapes(db) == 0
+    assert item_shape.row_shape(db.get_generation("measured")) == PORTRAIT
 
 
-def test_the_one_it_drops_is_the_one_nothing_has_asked_for():
-    for n in range(item_shape._MEASURED_LIMIT):
-        _measure(f"m{n}")
-    _measure("m0")
+def test_a_run_still_being_made_is_left_for_its_finished_file_to_say(db, tall_image):
+    _added(db, "being made", thumbnail=tall_image, status=GenerationStatus.RUNNING)
 
-    _measure("late")
+    assert item_shape.record_shapes(db) == 0
+    assert db.get_generation("being made")["shape"] is None
 
-    # Windows spells the cache key's path with backslashes, so assert against the same normalization the cache stores.
-    assert str(Path("/library/m0.png")) in item_shape._measured
-    assert str(Path("/library/m1.png")) not in item_shape._measured
+
+def test_an_item_nothing_can_measure_is_left_unrecorded(db):
+    _added(db, "file gone", thumbnail="/made-up/gone.png")
+
+    assert item_shape.record_shapes(db) == 0
+    assert db.get_generation("file gone")["shape"] is None
+
+
+def test_a_finished_run_records_its_shape_as_it_finishes(db, tall_image):
+    _added(db, "just made", status=GenerationStatus.RUNNING)
+
+    mark_generation_completed(db, "just made", [], tall_image, None)
+
+    assert db.get_generation("just made")["shape"] == PORTRAIT
+
+
+@pytest.mark.parametrize("change", [
+    {"thumbnail_path": "/made-up/another.png"},
+    {"output_files": "[]"},
+])
+def test_new_files_forget_the_recorded_shape(db, tall_image, change):
+    _added(db, "remade", thumbnail=tall_image)
+    item_shape.record_shapes(db)
+
+    db.update_generation("remade", **change)
+
+    assert db.get_generation("remade")["shape"] is None
+
+
+def test_new_settings_forget_the_recorded_shape(db, tall_image):
+    _added(db, "resized", thumbnail=tall_image)
+    item_shape.record_shapes(db)
+
+    db.set_params_json("resized", json.dumps({"width": 1280, "height": 720}))
+
+    assert db.get_generation("resized")["shape"] is None
+
+
+def test_a_library_from_before_shapes_takes_the_column_and_forgets_on_new_files(tmp_path, tall_image):
+    path = tmp_path / "older"
+    Database(path)
+    with sqlite3.connect(path) as older:
+        older.execute("DROP TRIGGER new_files_forget_the_recorded_shape")
+        older.execute("ALTER TABLE generations DROP COLUMN shape")
+    db = Database(path)
+    _added(db, "old", thumbnail=tall_image)
+    item_shape.record_shapes(db)
+
+    db.update_generation("old", thumbnail_path="/made-up/another.png")
+
+    assert db.get_generation("old")["shape"] is None
+
+
+def test_a_favorite_keeps_the_recorded_shape(db, tall_image):
+    _added(db, "starred", thumbnail=tall_image)
+    item_shape.record_shapes(db)
+
+    db.set_generation_favorite("starred", True)
+
+    assert db.get_generation("starred")["shape"] == PORTRAIT

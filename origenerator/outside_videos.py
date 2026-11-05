@@ -179,22 +179,21 @@ def turn_at(db, *, wait_s: float = WAIT_S) -> Turn:
     return Turn(mutex_name("Global\\Origenerator.outside_videos", library), wait_s=wait_s)
 
 
-def scan_in_turn(db, places: Places, *, keep_going=lambda: True, wait_s: float = WAIT_S) -> int:
+def scan_in_turn(db, places: Places, *, wait_s: float = WAIT_S) -> int:
     with turn_at(db, wait_s=wait_s).taken() as ours:
-        return scan(db, places, keep_going=keep_going) if ours else 0
+        return scan(db, places) if ours else 0
 
 
-def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VIDEOS_PER_WRITE,
-         keep_going=lambda: True) -> int:
+def scan(db, places: Places, *, grab=first_frame_of,
+         videos_per_write: int = VIDEOS_PER_WRITE) -> int:
     rows = db.list_generations()
     new = [(video, record_of(video.path, places.records_folder))
            for video in outside_videos(places.upscaled_dir, skip_sources=places.skip_sources,
                                        rows=rows,
                                        held=db.library_paths() | db.trashed_library_paths())]
     kinds = _kinds_by_site(rows, new)
-    images = _bring_up_to_records(db, places, rows, keep_going, kinds)
-    wanted = itertools.takewhile(lambda _new: keep_going(), new)
-    brought = (made for video, record in wanted
+    images = _bring_up_to_records(db, places, rows, kinds)
+    brought = (made for video, record in new
                if (made := _brought_in(video, record, places, images, (grab, kinds))))
     brought_in = 0
     for batch in itertools.batched(brought, videos_per_write):
@@ -250,7 +249,7 @@ def _frames_by_file(rows: list[dict]) -> dict[str, dict]:
             for file in parse_file_list(row.get("output_files")) if file.get("path")}
 
 
-def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
+def _bring_up_to_records(db, places: Places, rows: list[dict],
                          kinds: dict[str, set[VideoKind]]) -> dict[tuple, dict]:
     said = said_in(places.journal)
     told_here, acted_here = favorites_in(said), actions_in(said)
@@ -259,8 +258,6 @@ def _bring_up_to_records(db, places: Places, rows: list[dict], keep_going,
     images: dict[tuple, dict] = {}
     rewritten: dict[str, dict] = {}
     for video_row in _outside_videos_oldest_first(rows):
-        if not keep_going():
-            break
         path = Path(min(library_paths_in(video_row.get("output_files"))))
         filed = _filed_at(path)
         if filed is None:

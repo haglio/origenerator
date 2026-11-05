@@ -8,7 +8,7 @@ from origenerator.base_models import loras_offered_beside
 from origenerator.model_titles import option_title, versioned
 from origenerator.setting_advice import spoken_list
 from origenerator.trigger_words import trigger_words
-from origenerator.workflows.base import ParamDef, ParamType
+from origenerator.workflows.base import ParamDef, ParamType, shown_with_what_is_held
 from origenerator.workflows.model_files import is_no_lora
 
 _TOLD = (ParamType.INT, ParamType.FLOAT, ParamType.DROPDOWN, ParamType.BOOL)
@@ -122,6 +122,8 @@ def _lora_notes(pd: ParamDef, names: dict) -> dict:
 
 def _choices(pd: ParamDef, params: dict) -> tuple[Choice, ...]:
     options = _offered(pd, params)
+    if pd.type is ParamType.DROPDOWN and pd.key in params:
+        options = tuple(shown_with_what_is_held(options, params[pd.key]))
     names = _named(pd, options)
     notes = _lora_notes(pd, names)
     return tuple(Choice(option, names.get(option) or str(option), notes.get(option, ""))

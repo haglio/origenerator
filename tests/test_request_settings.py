@@ -148,3 +148,19 @@ def test_a_switch_answered_with_a_bare_number_or_truth_value_is_read_as_on_or_of
 def test_a_setting_named_with_nothing_is_no_setting():
     assert request_settings.setting_called(None, _told()) is None
     assert request_settings.setting_called("", _told()) is None
+
+
+def test_a_picked_lora_the_row_no_longer_offers_is_still_told_by_its_title_and_words(
+        titled_models, worded_loras):
+    titled_models({"example_style": "Example Style 1.0", "example_style_11": "Example Style 1.1"})
+    worded_loras({"example_style": ["exmplstyle"], "example_style_11": ["exmplnew"]})
+    row = ParamDef("lora", "LoRA 1", ParamType.DROPDOWN, "None",
+                   options=["None", "example_style_11.safetensors"], folder="loras")
+
+    (lora,) = request_settings.settings_to_tell([row], {"lora": "example_style.safetensors"})
+
+    assert lora.told() == (
+        "- LoRA 1 [lora]: Example Style 1.0 (trigger word exmplstyle), one of None, "
+        "Example Style 1.1 (trigger word exmplnew; the newest Example Style), "
+        "Example Style 1.0 (trigger word exmplstyle)")
+    assert lora.shown() == "Example Style 1.0"

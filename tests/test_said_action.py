@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from origenerator import said_action
 from origenerator.generation_state import GenerationSource
@@ -63,6 +64,10 @@ def _a_recorded_video(places: Places, filed_under: str, **fields) -> tuple[dict,
     return row, Slide(video, "video", "o1"), record
 
 
+def _picked(places: Places) -> list[str]:
+    return [action for _when, action in actions_in(said_in(places.journal)).values()]
+
+
 def _recorded(record) -> dict:
     return json.loads(record.read_text(encoding="utf-8"))["video"]
 
@@ -92,8 +97,7 @@ class TestSayingAnAction:
 
         said_action.say(db, "o1", row, "beta", places_here=lambda: places)
 
-        assert [action for _when, action in actions_in(said_in(places.journal)).values()] == [
-            "beta"]
+        assert _picked(places) == ["beta"]
         assert db.said == [("action", "o1", "beta")]
 
 
@@ -117,7 +121,7 @@ class TestStrikingTheActionOnScreen:
         assert said_action.strike(db, Slide("gone.png", "image", "gone"), _nowhere) == ""
         assert db.said == []
 
-    def test_another_sites_video_loses_it_in_its_record_and_in_the_gallerys_next_entries(
+    def test_another_sites_video_keeps_the_rejection_in_its_record_as_kinos_does(
             self, tmp_path):
         places = _places(tmp_path)
         row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
@@ -127,7 +131,37 @@ class TestStrikingTheActionOnScreen:
         assert said_action.strike(db, slide, lambda: places) == "alpha"
 
         assert _recorded(record) == {"wrong_action": "alpha", "prompt": "a made-up prompt"}
-        assert [action for _when, action in actions_in(said_in(places.journal)).values()] == [""]
+        assert db.said == [("action", "o1", None)]
+        assert not places.journal.exists()
+
+    def test_a_pick_of_his_evolver_has_yet_to_write_down_is_cancelled_or_it_would_come_back(
+            self, tmp_path):
+        places = _places(tmp_path)
+        row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
+                                               source=GenerationSource.OUTSIDE)
+        os.utime(record, (1_000_000, 1_000_000))
+        db = _Gallery(row)
+        said_action.say(db, "o1", row, "alpha", places_here=lambda: places)
+
+        assert said_action.strike(db, slide, lambda: places) == "alpha"
+
+        assert _picked(places) == [""]
+
+    def test_a_pick_evolver_wrote_into_the_record_long_ago_is_not_journaled_again(
+            self, tmp_path):
+        places = _places(tmp_path)
+        row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
+                                               source=GenerationSource.OUTSIDE)
+        places.journal.parent.mkdir(parents=True)
+        places.journal.write_text(json.dumps({
+            "t": 1000, "event": "action", "action": "alpha",
+            "path": slide.path.relative_to(places.library_root).as_posix()}) + "\n",
+            encoding="utf-8")
+
+        assert said_action.strike(_Gallery(row), slide, lambda: places) == "alpha"
+
+        assert _picked(places) == ["alpha"]
+        assert _recorded(record)["wrong_action"] == "alpha"
 
     def test_a_video_made_here_loses_it_in_the_record_of_the_upscale_being_played(self, tmp_path):
         places = _places(tmp_path)

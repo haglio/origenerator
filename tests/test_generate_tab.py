@@ -3353,6 +3353,34 @@ def test_a_request_about_a_setting_changes_it_on_the_form_and_the_turn_shows_the
     assert tab.asked()["turns"][0].changes() == [("Steps", "50", "30")]
 
 
+@pytest.fixture
+def two_versions_of_a_style(installed_models, titled_models, worded_loras):
+    for name in ("example_style", "example_style_11"):
+        installed_models.add("loras", f"{name}.safetensors", arch="sdxl", lora=True)
+    titled_models({"example_style": "Example Style 1.0", "example_style_11": "Example Style 1.1"})
+    worded_loras({"example_style": ["exmplstyle"], "example_style_11": ["exmplnew"]})
+
+
+def test_a_request_for_the_newer_lora_picks_it_on_the_form_and_swaps_its_trigger_word_in_place(
+        two_versions_of_a_style, saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=_a_change(setting="lora", to="Example Style 1.1",
+                                             for_="newer version"))
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman, (exmplstyle:1.1), soft light",
+                       lora="example_style.safetensors")
+    tab.show_saved_generation(image, [image])
+
+    exchange = _ask(tab, qtbot, "use the newer version of the LoRA")
+
+    qtbot.waitUntil(lambda: bool(exchange.turns()) and bool(exchange.turns()[-1][1]), timeout=5000)
+    assert exchange.turns()[-1][1].endswith(
+        "to Example Style 1.1 (was Example Style 1.0), and swapped its trigger word exmplstyle "
+        "for exmplnew in the Positive Prompt.")
+    assert tab.current_config().params["lora"] == "example_style_11.safetensors"
+    assert _positive(tab) == "a woman, (exmplnew:1.1), soft light"
+
+
+
 def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
         saved_panel, qtbot, monkeypatch):
     calls = _rewriting(monkeypatch, answer=[

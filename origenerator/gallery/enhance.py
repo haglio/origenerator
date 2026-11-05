@@ -126,13 +126,20 @@ def is_enhanced_row(row: dict) -> bool:
     return workflow in _ALWAYS_ENHANCED and "enhance_denoise" in params
 
 
+def file_at(path: Path) -> dict:
+    return {"filename": path.name, "path": str(path)}
+
+
+def upscale_and_original(upscale: dict, original: dict) -> list[EnhanceVersion]:
+    return [EnhanceVersion(1, "Evolved", upscale), EnhanceVersion(0, "Original", original)]
+
+
 def displayed_versions(row: dict, upscale: Path | None = None) -> list[EnhanceVersion]:
     files = row_output_files(row)
     if media_type_of_row(row) != MediaType.IMAGE:
         if upscale is None or not files:
             return []
-        return [EnhanceVersion(1, "Evolved", {"filename": upscale.name, "path": str(upscale)}),
-                EnhanceVersion(0, "Original", files[0])]
+        return upscale_and_original(file_at(upscale), files[0])
     versions = enhancement_versions(row)
     if versions:
         return versions

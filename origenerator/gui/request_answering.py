@@ -47,7 +47,8 @@ class RequestAnswerer(QObject):
             if (self._client is not None
                     and not self._wait_for_the_graphics_card(self._client, HOLDER,
                                                     deadline_s=GRAPHICS_CARD_DEADLINE_S)):
-                return prompt_edit.request_applier(told.get("in_scenes", False))(*pair, words)
+                return prompt_edit.request_applier(told.get("in_scenes", False))(
+                    *pair, words, weights=told.get("weights", True))
             examples = prompt_edit.prompts_touching(
                 words, reversed(_his_prompts(self._db)))
             return self._work_out(*pair, words, exchange=exchange,

@@ -591,4 +591,35 @@ def test_a_request_may_change_a_setting_and_the_prompts_in_one_turn():
 
     assert revision.settings == (("steps", 30),)
     assert revision.negative == "blurry, hat"
-    assert revision.answer == 'Set Steps to 30 (was 50). Added "hat" to the Negative Prompt.'
+    assert revision.answer == ('Set Steps to 30 (was 50). Couldn\'t find "hat" in the Positive '
+                               'Prompt. Added "hat" to the Negative Prompt.')
+
+
+def test_the_model_is_told_when_the_prompts_take_no_weights():
+    said = build_request_messages("a woman", "", "more freckles", WhatIsKnown(weights=False),
+                                  "S")[1]["content"]
+    plain = build_request_messages("a woman", "", "more freckles", WhatIsKnown(), "S")[1]["content"]
+
+    assert "THESE PROMPTS TAKE NO WEIGHTS" in said
+    assert "WEIGHTS" not in plain
+
+
+def test_a_weight_the_model_writes_is_left_out_where_the_prompts_take_none():
+    model = _Model(_answer({"prompt": "positive", "replace": "freckles", "with": "(freckles:1.3)",
+                            "for": "more freckles"},
+                           {"prompt": "positive", "add": "(a red scarf:1.2)", "for": "a red scarf"}))
+
+    revision = work_out("a woman, freckles", "", "more freckles and a red scarf", weights=False,
+                        ask=model)
+
+    assert revision.positive == "a woman, freckles, a red scarf"
+
+
+def test_the_rules_own_edit_writes_no_weight_where_the_prompts_take_none():
+    def no_model(*_asked):
+        raise RuntimeError("no model here")
+
+    assert apply_request("a woman, freckles", "", "more freckles").positive == "a woman, (freckles:1.1)"
+    assert not apply_request("a woman, freckles", "", "more freckles", weights=False).changed
+    assert not apply_request("a woman", "hat", "no hat", weights=False).changed
+    assert not work_out("a woman, freckles", "", "more freckles", weights=False, ask=no_model).changed

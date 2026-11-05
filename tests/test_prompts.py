@@ -98,7 +98,10 @@ def test_portrait_and_landscape_are_taught_as_width_and_height_never_as_prompt_w
     prompt = _request_prompt()
     rule = prompt[prompt.index("Portrait, landscape"):].split("\n")[0]
 
-    assert "Width and Height settings, never words in a prompt" in rule
+    assert "are the Width and Height settings" in rule
+    assert "never write the shape into a prompt" in rule
+    assert "the word itself" in rule
+    assert "leave Width and Height alone" in rule
     assert '"setting": "width"' in prompt
 
 

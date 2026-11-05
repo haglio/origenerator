@@ -208,6 +208,7 @@ class WorkflowTemplate(ABC):
     model_keys: tuple[str, ...] = ()
     lora_keys: tuple[str, ...] = ()
     text_reader: str | None = None
+    prompts_take_weights: bool = True
     loras_keyed_only_when_named: tuple[str, ...] = ()
     extra_enhance_keys: tuple[str, ...] = ()
     redraw_model_key: str = ""

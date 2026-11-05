@@ -100,6 +100,19 @@ def test_what_was_asked_since_the_item_was_shown_follows_its_saved_exchange(qtbo
         ("a hat", "Gave her a hat."), ("a scarf", "Gave her a scarf.")]
 
 
+def test_the_rules_edit_made_without_the_card_writes_no_weight_where_the_prompts_take_none(
+        qtbot, tmp_path):
+    answerer, _db, _jobs, parent = _answerer(
+        qtbot, tmp_path, work_out=None, wait=lambda comfyui, holder, **settings: False)
+    answers = []
+
+    answerer.ask(None, ("a woman, freckles", ""), "more freckles", weights=False, owner=parent,
+                 then=answers.append)
+
+    qtbot.waitUntil(lambda: len(answers) == 1, timeout=5000)
+    assert not answers[0].changed
+
+
 def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):
     seen = {}
 

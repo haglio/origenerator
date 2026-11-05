@@ -2296,3 +2296,8 @@ def test_a_part_the_enhance_fixes_runs_a_real_denoise_so_the_floor_of_the_range_
                  if pd.key == "enhance_detail_fixes")
 
     assert fixes.min_val > 0
+
+
+def test_only_krea_2_says_its_prompts_take_no_weights():
+    assert [name for name, workflow in WORKFLOW_REGISTRY.items()
+            if not workflow.prompts_take_weights] == ["krea2_t2i"]

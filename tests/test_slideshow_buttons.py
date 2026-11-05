@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from funestra.hud_controls import AN_IMAGE, TRASH_TOOLTIP, lock_tooltip
+from funestra.hud_controls import (
+    AN_IMAGE,
+    RESET_PUTS_BACK_THE_SPEED,
+    TRASH_TOOLTIP,
+    lock_tooltip,
+)
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.slideshow_buttons import HUD_FACTS, SlideshowFacts, answer, slideshow_rows
@@ -310,3 +315,11 @@ def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
 
     assert "library" in hosted.tooltip
     assert "library" not in alone.tooltip
+
+
+def test_reset_says_the_speed_goes_back_in_the_words_kinos_reset_uses():
+    hosted = next(b for b in _button_row(hosted=True) if b.command == "portrait_reset")
+    alone = next(b for b in _button_row() if b.command == "portrait_reset")
+
+    assert RESET_PUTS_BACK_THE_SPEED in hosted.tooltip
+    assert RESET_PUTS_BACK_THE_SPEED in alone.tooltip

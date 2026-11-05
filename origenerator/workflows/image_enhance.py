@@ -84,6 +84,21 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
+            **(self._redrawing_model_nodes(params) if (params["enhance_denoise"] or detail) else {}),
+            **enhanced.nodes,
+            **detail,
+            "12": {
+                "class_type": "SaveImage",
+                "inputs": {
+                    "images": saved_ref,
+                    "filename_prefix": params["filename_prefix"],
+                },
+            },
+        }
+
+    @staticmethod
+    def _redrawing_model_nodes(params: dict) -> dict:
+        return {
             "2": {
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": params["checkpoint"]},
@@ -93,14 +108,5 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "5": {
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
-            },
-            **enhanced.nodes,
-            **detail,
-            "12": {
-                "class_type": "SaveImage",
-                "inputs": {
-                    "images": saved_ref,
-                    "filename_prefix": params["filename_prefix"],
-                },
             },
         }

@@ -322,6 +322,26 @@ def test_a_slideshow_of_a_searchs_hits_plays_what_it_found(qtbot, monkeypatch):
     slideshow.close()
 
 
+def test_a_slideshow_started_on_favorites_plays_what_other_sites_made_that_you_starred(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    theirs = {**_row("o1", "outside picture:a-site", {"positive_prompt": "a", "seed": 2},
+                     "a-site_o1.png"),
+              "source": "outside", "workflow_version": "outside", "starred": 1}
+    view = GalleryView(FakeDB([{**_image("i1", "a cat", 50, 1), "starred": 1}, theirs]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
+
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+
+    assert _playing(slideshow) == ["i1", "o1"]
+    slideshow.close()
+
+
 def test_a_slideshow_started_on_a_sites_folder_plays_what_it_holds(qtbot, monkeypatch):
     view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
     _stand_on_the_folder_of(view, "o1")

@@ -72,6 +72,7 @@ from origenerator.item_shape import (
     filter_rows,
     row_shape,
     shaped_key,
+    together,
     what_plays_at,
 )
 from origenerator.item_shape import (
@@ -362,7 +363,7 @@ class SlideshowDirector:
         if switch is not None:
             shape = shape or self._host.shape_in_view()
             location = shaped_key(collection.folder, shape)
-            rows = self.rows_at(location)
+            rows = together(self.rows_at(location), self.rows_at(shaped_key(collection.key, shape)))
         else:
             rows = self._one_per_run_where_the_order_is_newest_first(
                 location, self._host.rows_to_play())

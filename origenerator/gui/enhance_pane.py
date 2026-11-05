@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QRect, QSignalBlocker, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
@@ -90,6 +90,11 @@ _AUTO_TOOLTIP = (
     "against it or redone."
 )
 
+_ALL_FIXES_TOOLTIP = (
+    "The tick turns every fix on or off together. A number typed here sets every "
+    "fix to it, including the ones that are off. The number is empty while the "
+    "fixes differ."
+)
 
 _NO_DETECTOR_TOOLTIP = (
     "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
@@ -162,6 +167,17 @@ def _enhancer_param_defs() -> dict:
 def _settings_dragged(mime, _source) -> tuple[dict] | None:
     params = params_from_mime(mime)
     return None if params is None else (params,)
+
+
+def _set_of_tick_and_number(tick, label, number) -> QFrame:
+    column = QFrame()
+    grid = QGridLayout(column)
+    border_as_a_set(column, grid)
+    grid.setSpacing(GAP_SMALL)
+    grid.addWidget(tick, 0, 1, Qt.AlignmentFlag.AlignCenter)
+    grid.addWidget(label, 1, 0)
+    grid.addWidget(number, 1, 1)
+    return column
 
 
 class _SettingsScroll(QScrollArea):
@@ -304,14 +320,64 @@ class EnhancePane(QWidget):
         self._fix_prompt_buttons = {}
         self._fix_prompts = {}
         self._fix_prompt_windows = {}
+        self._fixes_that_can_run = [part.name for part in part_table()
+                                    if detector_for_part(part) is not None]
+        flow.addWidget(self._all_fixes_field())
         for part in part_table():
             flow.addWidget(self._fix_field(part))
+        self._show_all_fixes()
         return host
+
+    def _all_fixes_field(self) -> QWidget:
+        tick = TickControl("")
+        tick.setToolTip(_ALL_FIXES_TOOLTIP)
+        tick.clicked.connect(self._tick_every_fix)
+        number = self._fix_number()
+        number.setToolTip(_ALL_FIXES_TOOLTIP)
+        number.setKeyboardTracking(False)
+        number.setMinimum(number.minimum() - number.singleStep())
+        number.setSpecialValueText(" ")
+        number.valueChanged.connect(self._number_every_fix)
+        label = self._labeled("All", number)
+        self._all_fixes_tick, self._all_fixes_number = tick, number
+        if not self._fixes_that_can_run:
+            for one in (tick, number, label):
+                one.setEnabled(False)
+
+        return _set_of_tick_and_number(tick, label, number)
+
+    def _tick_every_fix(self, on: bool) -> None:
+        self._change_every_fix(lambda name: self._fix_checks[name].setChecked(on))
+
+    def _number_every_fix(self, value: float) -> None:
+        if value == self._all_fixes_number.minimum():
+            self._show_all_fixes()
+        else:
+            self._change_every_fix(lambda name: self._fixes[name].setValue(value))
+
+    def _change_every_fix(self, change) -> None:
+        self._loading = True
+        try:
+            for name in self._fixes_that_can_run:
+                change(name)
+        finally:
+            self._loading = False
+        self._emit()
+
+    def _show_all_fixes(self) -> None:
+        names = self._fixes_that_can_run
+        self._all_fixes_tick.setChecked(
+            bool(names) and all(self._fix_checks[name].isChecked() for name in names))
+        numbers = {self._fixes[name].value() for name in names}
+        number = self._all_fixes_number
+        with QSignalBlocker(number):
+            number.setValue(numbers.pop() if len(numbers) == 1 else number.minimum())
 
     def _fix_field(self, part) -> QWidget:
         check = TickControl("")
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
+        widget.valueChanged.connect(self._emit)
         label = self._labeled(part.name.capitalize(), widget)
         prompts_button = fill_square_with_icon(QToolButton(), size=BUTTON_SIZE_HUD)
         prompts_button.setIcon(qt_icon("pencil"))
@@ -326,14 +392,8 @@ class EnhancePane(QWidget):
                 one.setToolTip(reason)
         check.toggled.connect(lambda _on, name=part.name: self._fix_toggled(name))
 
-        column = QFrame()
-        grid = QGridLayout(column)
-        border_as_a_set(column, grid)
-        grid.setSpacing(GAP_SMALL)
-        grid.addWidget(prompts_button, 0, 0, Qt.AlignmentFlag.AlignCenter)
-        grid.addWidget(check, 0, 1, Qt.AlignmentFlag.AlignCenter)
-        grid.addWidget(label, 1, 0)
-        grid.addWidget(widget, 1, 1)
+        column = _set_of_tick_and_number(check, label, widget)
+        column.layout().addWidget(prompts_button, 0, 0, Qt.AlignmentFlag.AlignCenter)
 
         self._fixes[part.name] = widget
         self._fix_checks[part.name] = check
@@ -419,7 +479,6 @@ class EnhancePane(QWidget):
         widget.setFixedWidth(widget.fontMetrics().horizontalAdvance("0.00")
                              + _FIX_FIELD_CHROME)
         widget.setToolTip(param_help("enhance_detail_fixes"))
-        widget.valueChanged.connect(self._emit)
         return widget
 
     def show_presets(self, presets: list[Preset]) -> None:
@@ -513,6 +572,7 @@ class EnhancePane(QWidget):
                 self._show_fix_on(name)
         finally:
             self._loading = False
+        self._show_all_fixes()
         self._show_the_preset_held()
         self._warn_of_a_fixs_lora_trained_on_another_model()
 
@@ -557,6 +617,7 @@ class EnhancePane(QWidget):
 
     def _emit(self, *_args):
         if not self._loading:
+            self._show_all_fixes()
             self._show_the_preset_held()
             self._warn_of_a_fixs_lora_trained_on_another_model()
             self._on_change(self.settings())

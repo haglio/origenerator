@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from itertools import zip_longest
 from typing import ClassVar
 
 from origenerator.request_settings import Setting, setting_called
@@ -17,13 +16,15 @@ from origenerator.trigger_words import (
 from origenerator.workflows.model_files import is_no_lora
 
 _WORD = re.compile(r"[A-Za-z0-9']{2,}")
-_NOT_ASKED_FOR = "you didn't ask for that"
+_ALIKE_ENOUGH_TO_BE_ONE_PART = 0.5
 PROMPTS = {"positive": "Positive Prompt", "negative": "Negative Prompt"}
 _NOTHING_CHANGED = "Nothing changed."
 _SAYING_NOTHING = frozenset({
     "the", "and", "in", "on", "of", "with", "to", "it", "at", "an", "is", "for", "or", "no", "not",
     "her", "his", "him", "she", "he", "you", "me", "my", "please", "make", "have", "only", "more",
     "less", "use", "but", "that", "this", "did", "didn't", "don't", "do", "be", "as", "by",
+    "should", "shouldn't", "would", "could", "can", "are", "was", "has", "they", "them", "their",
+    "its", "there", "from", "into", "than", "then", "also", "just", "some", "any", "all",
 })
 _UNREADABLE = "Couldn't read one of the model's changes."
 
@@ -49,8 +50,7 @@ def _naming(text) -> set[str]:
 
 
 def answers_him(reason, asked: list[str]) -> bool:
-    words = _words_of(reason)
-    return bool(words) and any(words <= _words_of(request) for request in asked)
+    return bool(_naming(reason) & set().union(*(_naming(request) for request in asked)))
 
 
 def _spaced(words: str) -> str:
@@ -85,13 +85,46 @@ def _parts(text: str) -> list[str]:
     return parts
 
 
+def _alike(old: str, new: str) -> float:
+    return SequenceMatcher(None, old.lower(), new.lower(), autojunk=False).ratio()
+
+
+def _each_new_part_with_the_old_one_it_rewrites(old: list[str], new: list[str]) -> dict[int, int]:
+    rewrites: dict[int, int] = {}
+    for place, part in enumerate(new):
+        free = [index for index in range(len(old)) if index not in rewrites.values()]
+        likest = max(free, key=lambda index: _alike(old[index], part), default=None)
+        if likest is not None and _alike(old[likest], part) >= _ALIKE_ENOUGH_TO_BE_ONE_PART:
+            rewrites[place] = likest
+    return rewrites
+
+
+def _rewritten(old: list[str], new: list[str]) -> list[tuple[str, str]]:
+    if len(old) == len(new):
+        return list(zip(old, new, strict=True))
+    rewrites = _each_new_part_with_the_old_one_it_rewrites(old, new)
+    added_after: dict[int | None, list[str]] = {}
+    follows = None
+    for place, part in enumerate(new):
+        if place in rewrites:
+            follows = rewrites[place]
+        else:
+            added_after.setdefault(follows, []).append(part)
+    by_old = {index: new[place] for place, index in rewrites.items()}
+    pairs = [("", part) for part in added_after.get(None, ())]
+    for index, part in enumerate(old):
+        pairs.append((part, by_old.get(index, "")))
+        pairs += [("", added) for added in added_after.get(index, ())]
+    return pairs
+
+
 def _paired(old: list[str], new: list[str]) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for tag, i1, i2, j1, j2 in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
         if tag == "equal":
             pairs += [(part, part) for part in old[i1:i2]]
         else:
-            pairs += list(zip_longest(old[i1:i2], new[j1:j2], fillvalue=""))
+            pairs += _rewritten(old[i1:i2], new[j1:j2])
     return pairs
 
 
@@ -109,14 +142,6 @@ def _joined(before: str, words: str, after: str) -> str:
     return ", ".join(part for part in (before, words, after) if part)
 
 
-_DESCRIBED = {
-    "replace": lambda change, prompt: (f"replace {_quoted(change['replace'])} with "
-                                       f"{_quoted(change.get('with') or '')} in the {prompt}"),
-    "add": lambda change, prompt: f"add {_quoted(change['add'])} to the {prompt}",
-    "remove": lambda change, prompt: f"remove {_quoted(change['remove'])} from the {prompt}",
-}
-
-
 def _said_done(before: str, after: str, prompt: str) -> str:
     if not before:
         return f"Added {_quoted(after)} to the {prompt}."
@@ -124,14 +149,6 @@ def _said_done(before: str, after: str, prompt: str) -> str:
         return f"Removed {_quoted(before)} from the {prompt}."
     before, after = _only_the_words_that_differ(before, after)
     return f"Replaced {_quoted(before)} with {_quoted(after)} in the {prompt}."
-
-
-def _said_undone(before: str, after: str, prompt: str) -> str:
-    if not before:
-        return _DESCRIBED["add"]({"add": after}, prompt)
-    if not after:
-        return _DESCRIBED["remove"]({"remove": before}, prompt)
-    return _DESCRIBED["replace"]({"replace": before, "with": after}, prompt)
 
 
 def _trigger_words_of(lora) -> tuple[str, ...]:
@@ -162,10 +179,7 @@ class _Applying:
             self._say(f"{setting.label} can't be {_quoted(change.get('to'))}.")
         elif value == setting.value:
             self._say(f"{setting.label} is already {setting.shown()}.")
-        elif not answers_him(change.get("for"), self.asked):
-            self._say(f"Didn't set {setting.label} to {setting.shown(value)}: "
-                             f"{_NOT_ASKED_FOR}.")
-        else:
+        elif answers_him(change.get("for"), self.asked):
             self.changes[setting.key] = value
             swapped = self._trigger_words_swapped(setting, value) if setting.folder == "loras" else ""
             self._say(
@@ -197,12 +211,10 @@ class _Applying:
 
     def prompt(self, change: dict) -> None:
         which = str(change.get("prompt") or "").strip().lower()
-        edit = next((edit for edit in _DESCRIBED if edit in change), None)
+        edit = next((edit for edit in self._EDITS if edit in change), None)
         if which not in PROMPTS or edit is None:
             self._say(_UNREADABLE)
-        elif not answers_him(change.get("for"), self.asked):
-            self._say(f"Didn't {_DESCRIBED[edit](change, PROMPTS[which])}: {_NOT_ASKED_FOR}.")
-        else:
+        elif answers_him(change.get("for"), self.asked):
             self._say(self._EDITS[edit](self, which, change))
 
     def _replace(self, which: str, change: dict) -> str:
@@ -222,7 +234,7 @@ class _Applying:
         asked_for = [pair for pair in changed if _naming(" ".join(pair)) & his]
         if len(changed) <= 1 or not asked_for:
             return new, []
-        kept, done, left = [], [], []
+        kept, done = [], []
         for before, after in pairs:
             if before == after or (before, after) in asked_for:
                 kept.append(after)
@@ -230,8 +242,7 @@ class _Applying:
                     done.append(_said_done(before, after, prompt))
             else:
                 kept.append(before)
-                left.append(f"Didn't {_said_undone(before, after, prompt)}: {_NOT_ASKED_FOR}.")
-        return ", ".join(part for part in kept if part), done + left
+        return ", ".join(part for part in kept if part), done
 
     def _add(self, which: str, change: dict) -> str:
         words, text = str(change["add"]), getattr(self, which)

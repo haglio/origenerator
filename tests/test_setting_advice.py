@@ -493,12 +493,26 @@ def test_a_setting_advices_click_uses_its_fix_whatever_the_setting_holds():
         "", 40, "Example Model's page recommends 20\N{EN DASH}40 steps. Click to use 40.")
 
 
-def test_a_ticked_fixs_lora_trained_on_another_installed_model_says_so(titled_models):
+_LORA_ON_ANOTHER_MODEL = (
+    "A LoRA works best on the model it was trained on. On another model it can do little or make "
+    "the fix look wrong.\nTo fix this, either turn off the Hands fix or change Model to "
+    "Trained On v1.")
+
+
+@pytest.mark.parametrize(("runs_on", "matching", "differs"), [
+    ({"picked.safetensors"}, False, "but Model is set to picked"),
+    ({"picked.safetensors"}, True, "but the source image was made with picked"),
+    ({"picked.safetensors", "trained_on.safetensors"}, True,
+     "but some of the source images were made with picked"),
+])
+def test_a_fixs_lora_on_another_model_says_which_why_it_matters_and_the_two_ways_out(
+        titled_models, runs_on, matching, differs):
     titled_models({"trained_on": "Trained On v1"})
 
-    assert fix_lora_model_warning({"picked.safetensors"}, {"hands": "trained_on.safetensors"},
-                                  ["picked.safetensors", "trained_on.safetensors"]
-                                  ) == "The Hands fix's LoRA was trained on Trained On v1."
+    assert fix_lora_model_warning(runs_on, {"hands": "trained_on.safetensors"},
+                                  ["picked.safetensors", "trained_on.safetensors"],
+                                  matching_the_source=matching) == (
+        f"The Hands fix's LoRA was trained on Trained On v1, {differs}.\n" + _LORA_ON_ANOTHER_MODEL)
 
 
 def test_a_fixs_lora_held_against_models_nobody_can_know_says_there_is_no_guarantee(
@@ -506,18 +520,19 @@ def test_a_fixs_lora_held_against_models_nobody_can_know_says_there_is_no_guaran
     titled_models({"trained_on": "Trained On v1"})
 
     assert fix_lora_model_warning(None, {"hands": "trained_on.safetensors"},
-                                  ["trained_on.safetensors"]) == (
-        "There's no guarantee the images here were made by Trained On v1, which the Hands fix's "
-        "LoRA was trained on.")
+                                  ["trained_on.safetensors"], matching_the_source=True) == (
+        "The Hands fix's LoRA was trained on Trained On v1, and there's no guarantee the source "
+        "images here were made with it.\n" + _LORA_ON_ANOTHER_MODEL)
 
 
 def test_no_model_advice_while_a_fixs_lora_has_its_model_or_that_model_is_not_installed():
     assert not fix_lora_model_warning({"trained_on.safetensors"},
                                       {"hands": "trained_on.safetensors"},
-                                      ["trained_on.safetensors"])
+                                      ["trained_on.safetensors"], matching_the_source=False)
     assert not fix_lora_model_warning({"picked.safetensors"}, {"hands": "gone.safetensors"},
-                                      ["picked.safetensors"])
-    assert not fix_lora_model_warning(None, {"hands": "gone.safetensors"}, ["picked.safetensors"])
+                                      ["picked.safetensors"], matching_the_source=False)
+    assert not fix_lora_model_warning(None, {"hands": "gone.safetensors"}, ["picked.safetensors"],
+                                      matching_the_source=True)
 
 
 _LOOK_PICKER = [ParamDef("lora", "LoRA", ParamType.DROPDOWN, "None",

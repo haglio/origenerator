@@ -21,7 +21,7 @@ requires-python = ">=3.14"
 # other half had not landed turned all of them red at once. Moving to a newer
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
-    "app-support @ git+https://github.com/haglio/app_support@v0.1.429",
+    "app-support @ git+https://github.com/haglio/app_support@v0.1.434",
     "funestra @ git+https://github.com/haglio/funestra@v0.1.784",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.341",
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.129",
@@ -97,6 +97,7 @@ unread-test-helpers = ["end_outright", "let_go_over", "double_click", "click", "
 # shipped, and waits out an update of it already under way, before it starts
 # Origenerator (app_support.production_update).
 [tool.haglio.production]
+tests-run-from-its-venv = true
 
 # What Origenerator will not open without (origenerator.content.missing_overlay_keys):
 # every key content.example.json documents, in content.local.json. The production

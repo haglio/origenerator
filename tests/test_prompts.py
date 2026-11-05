@@ -64,6 +64,28 @@ def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_make_it_st
     assert '"remove": "animals"' in answer
 
 
+def test_a_complaint_that_something_unwanted_is_still_there_is_taught_as_keep_it_out_harder():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("A complaint that something he does not want"):].split("\n")[0]
+
+    assert "never remove it from there" in rule
+    assert "weigh more" in rule
+    example = prompt[prompt.index('- "they still have hats"'):].split("\n")[0]
+    assert '"remove": "straw hats"' in example
+    assert '"prompt": "negative", "add": "hats"' in example
+
+
+def test_something_unwanted_the_positive_prompt_never_named_is_taught_as_the_negative_prompts_alone():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("Positive prompts cannot negate"):].split("\n")[0]
+
+    assert "change nothing in the positive prompt" in rule
+    for asked in ('- "no scarf please"', '- "she shouldn\'t have gloves"'):
+        answer = prompt[prompt.index(asked):].split("\n")[0].split("->")[1]
+        assert '"prompt": "negative"' in answer
+        assert '"prompt": "positive"' not in answer
+
+
 def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_asks():
     rule = _request_prompt()[_request_prompt().index("PROMPTS OF HIS"):].split("\n")[0]
 

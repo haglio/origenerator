@@ -13,7 +13,11 @@ from origenerator.gallery.enhance import (
     version_matching_params,
 )
 from origenerator.gallery.enhance_fold import fold_enhancement
-from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL, EnhanceSettings
+from origenerator.gallery.enhance_settings import (
+    MATCH_SOURCE_MODEL,
+    EnhanceSettings,
+    default_enhance_params,
+)
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.image_enhance import FORMS_THAT_REDRAW
@@ -180,3 +184,8 @@ def test_an_upscaler_saved_as_a_pth_file_is_offered(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
 
     assert list_model_files("upscale_models", [], accepts=ANY) == ["made_up_upscaler.pth"]
+
+
+def test_a_krea_enhancement_starts_on_the_upscaler_that_keeps_its_texture_best():
+    assert default_enhance_params()["upscale_model"] == "4xFaceUpDAT.pth"
+    assert WORKFLOW_REGISTRY["krea2_t2i"].default_params()["upscale_model"] == "4xFaceUpDAT.pth"

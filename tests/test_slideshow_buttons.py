@@ -168,6 +168,9 @@ class _Host:
     def funscript_jump(self):
         self.calls.append("funscript jump")
 
+    def back_to_normal_speed(self):
+        self.calls.append("normal speed")
+
     def slideshow_toggle_lock(self):
         self.calls.append("lock")
 
@@ -249,7 +252,8 @@ def test_every_declared_button_is_answered_by_the_slideshow():
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),
-                          "funscript jump", "lock", "cull", "fmode", "enhanced", "reset",
+                          "funscript jump", "lock", "cull", "fmode", "enhanced",
+                          "normal speed", "reset",
                           ("order", False), ("order", True), ("version", -1)]
 
 

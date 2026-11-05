@@ -119,3 +119,4 @@ VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time lis
 VOICE_DEVICE_NAME = "Brio"
 LOCAL_LLM_BASE_URL = "http://localhost:11434"
 LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"
+REQUEST_LLM_MODEL = "huihui_ai/Qwen3.8-abliterated:27b-q3_K"

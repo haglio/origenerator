@@ -316,9 +316,13 @@ answers again.
 
 ## A Request is the one path to the local model, and the model's notes are his
 
-The local model (`config.LOCAL_LLM_MODEL`, served by Ollama on this machine at
-`config.LOCAL_LLM_BASE_URL`) is asked through `local_llm.ask`, Ollama's own chat
-door, and nothing else; a Request, spoken or typed, is worked out by
+The local models (served by Ollama on this machine at `config.LOCAL_LLM_BASE_URL`)
+are asked through `local_llm.ask`, Ollama's own chat door, and nothing else. A
+Request is answered by `config.REQUEST_LLM_MODEL`, the larger of the two, which
+takes ten seconds to a minute and a half to load and so is asked only where he
+waits on purpose; the notes on the collection and a search's widening, which
+waits fifteen seconds at most, are `config.LOCAL_LLM_MODEL`'s. A machine that
+runs this app has both pulled (`ollama pull`). A Request, spoken or typed, is worked out by
 `prompt_edit.work_out` through `gui/request_answering.RequestAnswerer`, which
 is the one place a Request is asked. Never a second path beside Request: two
 paths to the model would answer the same words two ways, and one of them would

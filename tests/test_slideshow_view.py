@@ -737,7 +737,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_action_without_redrawing_wh
     view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     shown = _put_up(view)
 
-    view.slideshow.slideshow_filter("source_image,_alpha")
+    view.slideshow.action_presses.filter("source_image,_alpha")
     _settle(view)
 
     assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
@@ -749,7 +749,7 @@ def test_a_filter_past_the_slide_on_screen_puts_up_what_is_left(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     shown = _put_up(view)
 
-    view.slideshow.slideshow_filter("beta")
+    view.slideshow.action_presses.filter("beta")
     _settle(view)
 
     assert shown == ["id-b"]
@@ -759,7 +759,7 @@ def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     shown = _put_up(view)
 
-    view.slideshow.slideshow_filter("gamma")
+    view.slideshow.action_presses.filter("gamma")
     _settle(view)
 
     assert (shown, view.slideshow.hud_action_filter) == ([], "")
@@ -769,7 +769,7 @@ def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot):
 def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
 
-    view.slideshow.slideshow_filter_to_the_action_on_screen()
+    view.slideshow.action_presses.filter_to_the_one_on_screen()
     _settle(view)
 
     assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("source image, alpha", 1)
@@ -779,7 +779,7 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
 def test_filter_said_over_an_item_named_for_no_action_says_so(qtbot):
     view = _view(qtbot, _KEYED)
 
-    view.slideshow.slideshow_filter_to_the_action_on_screen()
+    view.slideshow.action_presses.filter_to_the_one_on_screen()
     _settle(view)
 
     assert (view.slideshow.hud_action_filter, words(view._note)) == ("", "No action for this one")
@@ -787,7 +787,7 @@ def test_filter_said_over_an_item_named_for_no_action_says_so(qtbot):
 
 def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
-    view.slideshow.slideshow_filter("beta")
+    view.slideshow.action_presses.filter("beta")
     _settle(view)
 
     assert view.slideshow.clear_modes() is True
@@ -2374,7 +2374,7 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=around, actions_of=_actions_of))
     shown = _put_up(view)
 
-    view.slideshow.slideshow_filter("e629425b")
+    view.slideshow.action_presses.filter("e629425b")
     _settle(view)
 
     assert shown == ["id-c"]

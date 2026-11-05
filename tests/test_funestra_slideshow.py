@@ -1292,7 +1292,7 @@ def test_a_rows_button_narrows_the_slideshow_to_that_action_and_hands_the_funest
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
     _sent(slideshow)
 
-    slideshow.slideshow_filter("alpha")
+    slideshow.action_presses.filter("alpha")
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["one.png", "three.png"]
@@ -1305,7 +1305,7 @@ def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
 
-    slideshow.slideshow_filter_to_the_action_on_screen()
+    slideshow.action_presses.filter_to_the_one_on_screen()
 
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert (played, said) == (["one.png"], ["Filter: 'source image, alpha' (1)"])
@@ -1315,16 +1315,35 @@ def test_filter_said_over_an_item_named_for_no_action_says_so(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
-    slideshow.slideshow_filter_to_the_action_on_screen()
+    slideshow.action_presses.filter_to_the_one_on_screen()
 
     assert said == ["No action for this one"]
+
+
+def _a_slideshow_whose_actions_can_be_struck(qtbot, tmp_path, said: list) -> FunestraSlideshow:
+    named = {"id-1": "alpha"}
+    return _slideshow(qtbot, tmp_path, say=_into(said), actions=SlideshowActions(
+        actions_of=lambda prompt_ids: {prompt_id: named.get(prompt_id, "")
+                                       for prompt_id in prompt_ids},
+        strike_action=lambda slide: named.pop(slide.prompt_id, "")))
+
+
+def test_wrong_action_takes_the_action_off_the_slide_on_screen_and_says_which(qtbot, tmp_path):
+    said = []
+    slideshow = _a_slideshow_whose_actions_can_be_struck(qtbot, tmp_path, said)
+    slideshow.action_presses.filter_to_the_one_on_screen()
+
+    assert answer(slideshow, "wrong_action")
+    slideshow.action_presses.filter_to_the_one_on_screen()
+
+    assert said == ["Filter: 'alpha' (1)", "Action removed: alpha", "No action for this one"]
 
 
 def test_a_row_naming_two_actions_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
 
-    slideshow.slideshow_filter("source_image,_alpha")
+    slideshow.action_presses.filter("source_image,_alpha")
 
     assert said == ["Filter: 'source image, alpha' (1)"]
     assert parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8")).filter_query == (
@@ -1342,7 +1361,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
                            say=_into(said))
     _sent(slideshow)
 
-    slideshow.slideshow_filter("e629425b")
+    slideshow.action_presses.filter("e629425b")
 
     assert slideshow.hud_prompt_id == "id-1x"
     assert slideshow.hud_action_filter == ""
@@ -1353,7 +1372,7 @@ def test_a_filter_past_the_item_on_screen_sends_the_funestra_to_what_is_left(qtb
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of))
     _sent(slideshow)
 
-    slideshow.slideshow_filter("beta")
+    slideshow.action_presses.filter("beta")
 
     assert _plays(slideshow) == ["PLAY_FILE two.png"]
 
@@ -1363,14 +1382,14 @@ def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path)
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of), say=_into(said))
     _sent(slideshow)
 
-    slideshow.slideshow_filter("gamma")
+    slideshow.action_presses.filter("gamma")
 
     assert (_sent(slideshow), said) == ([], ["Filter: no matches for 'gamma'"])
 
 
 def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of))
-    slideshow.slideshow_filter("beta")
+    slideshow.action_presses.filter("beta")
 
     assert slideshow.clear_modes() is True
 

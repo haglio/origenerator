@@ -133,7 +133,8 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "loop": lambda host: host.slideshow_loop_cycle(),
     "more_seeds": lambda host: host.slideshow_more_seeds(),
     "no_filter": lambda host: host.clear_modes(),
-    "lock_action": lambda host: host.slideshow_filter_to_the_action_on_screen(),
+    "lock_action": lambda host: host.action_presses.filter_to_the_one_on_screen(),
+    "wrong_action": lambda host: host.action_presses.strike_the_one_on_screen(),
     "nav_left": lambda host: host.slideshow_nav("left"),
     "nav_right": lambda host: host.slideshow_nav("right"),
     "nav_up": lambda host: host.slideshow_nav("up"),
@@ -155,7 +156,8 @@ HAS_THE_OSR2 = "osr2"
 HUD_FACTS: dict[str, str] = {HUD_CORNER: "{corner}", HUD_MINIMIZED: "{on}", HAS_THE_OSR2: "{has}"}
 
 PRESSES = tuple(_PRESSES)
-PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "seed_loop", "action_loop", "loop",
+PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "wrong_action", "seed_loop",
+                                     "action_loop", "loop",
                                      "cycle_seed", "cycle_action"})
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEASE: "{x}|{y}",
@@ -170,7 +172,7 @@ def answer(host, action: str, argument: str = "") -> bool:
     elif action in PRESSES_ON_THE_QUEUE:
         host.press_the_queue(action, argument)
     elif action == FILTER:
-        host.slideshow_filter(argument)
+        host.action_presses.filter(argument)
     else:
         return False
     return True

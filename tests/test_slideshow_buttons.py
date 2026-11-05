@@ -163,6 +163,7 @@ class _Host:
     def __init__(self):
         self.calls = []
         self.transport = self
+        self.action_presses = self
 
     def slideshow_step(self, delta, *, verb=None):
         self.calls.append(("step", delta) if verb is None else ("step", delta, verb))
@@ -215,10 +216,10 @@ class _Host:
     def slideshow_nav(self, direction):
         self.calls.append(("nav", direction))
 
-    def slideshow_filter(self, query):
+    def filter(self, query):
         self.calls.append(("filter", query))
 
-    def slideshow_filter_to_the_action_on_screen(self):
+    def filter_to_the_one_on_screen(self):
         self.calls.append("filter to the action on screen")
 
     def slideshow_step_version(self, delta):
@@ -305,7 +306,7 @@ def test_a_press_a_slideshow_has_no_answer_to_says_so():
     host = _Host()
 
     assert not answer(host, "minimize")
-    assert not answer(host, "wrong_action")
+    assert not answer(host, "made_up_press")
     assert host.calls == []
 
 

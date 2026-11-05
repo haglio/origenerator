@@ -22,12 +22,13 @@ from funestra.funestra_verbs import (
     step_version,
 )
 from funestra.hud_title import SHUFFLE_LABEL
-from funestra.loop_cycle import LOCK, SEED
+from funestra.loop_cycle import LOCK
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from origenerator.gui.action_presses import ActionPresses
 from origenerator.gui.funestra_transport import FunestraTransport
 from origenerator.gui.message import HEARD_MARK, INFO, WARNING
 from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
@@ -40,8 +41,6 @@ from origenerator.gui.slideshow_set import (
     SlideshowSet,
     item_note,
     looping_note,
-    narrow_to_actions,
-    narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.library_views import Version
@@ -96,6 +95,9 @@ class FunestraSlideshow(QObject):
 
         self.transport = FunestraTransport(send=self._send, publish=self._publish,
                                            at_defaults=at_defaults)
+        self.action_presses = ActionPresses(lambda: self._set, lambda: self._actions,
+                                            flash=self._flash, jump_to=self._jump_to,
+                                            loop=self.slideshow_loop)
         self._funestra_locked = False
         self._locked = playing.locked
         self._keep_told: bool | None = None
@@ -528,20 +530,6 @@ class FunestraSlideshow(QObject):
             self._flash("More seeds")
         else:
             self._flash("Widening net failed", kind=WARNING)
-
-    def slideshow_filter(self, query: str) -> None:
-        row = self._set.configuration_row(query)
-        if row is not None:
-            if row is not self._set.playlist.current():
-                self._jump_to(row)
-            self.slideshow_loop(SEED)
-            return
-        said, narrowed = narrow_to_actions(self._set, query)
-        self._flash(said, kind=INFO if narrowed else WARNING)
-
-    def slideshow_filter_to_the_action_on_screen(self) -> None:
-        said, narrowed = narrow_to_the_action_on_screen(self._set)
-        self._flash(said, kind=INFO if narrowed else WARNING)
 
     def slideshow_nav(self, direction: str) -> None:
         target = self._set.nav_target(direction)

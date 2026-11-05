@@ -1267,6 +1267,18 @@
       "ruled": "Fun Time's HUD words, shared with its Satellites; ruled in Fun Time's glossary"
     },
     {
+      "id": "scene",
+      "thing": "a part of a spoken story",
+      "screen": null,
+      "his_word": "scene (2026-11-05: 'scene is fine for both')",
+      "code_today": [
+        "scene"
+      ],
+      "code_word": "scene",
+      "status": "ruled",
+      "ruled": "2026-11-05, his words"
+    },
+    {
       "id": "lane",
       "thing": "where a finished video is sent: down the Kino lane to the Satellites, or the Genau lane",
       "screen": [

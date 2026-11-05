@@ -65,12 +65,12 @@ def _close_once_its_loop_runs(window) -> None:
 
 def open_and_close(built) -> int:
     say_where_it_hangs()
+    config.COMFYUI_PORT = _a_port_nothing_answers_on()
     for keep_off in (suite.keep_the_microphone_shut, suite.refuse_the_comfyui_on_this_machine,
                      suite.start_no_comfyui_on_this_machine,
                      suite.keep_off_the_device, suite.keep_out_of_windows, suite.keep_silent,
                      suite.refuse_the_dialogs_nobody_can_answer, _leave_no_watcher_behind):
         keep_off(setattr)
-    config.COMFYUI_PORT = _a_port_nothing_answers_on()
     build = app._build_window
 
     def build_then_close(*args, **kwargs):

@@ -119,3 +119,13 @@ def without_nothing_weighted(prompt: str) -> str:
 def plus(prompt: str, term: str) -> str:
     kept = tidy(prompt)
     return f"{kept}, {term}" if kept else term
+
+
+_WEIGHTED = re.compile(r"\(([^()]*?)\s*:\s*[0-9]*\.?[0-9]+\s*\)")
+
+
+def without_weights(prompt: str) -> str:
+    bare = None
+    while bare != prompt:
+        bare, prompt = prompt, _WEIGHTED.sub(r"\1", prompt)
+    return ", ".join(unwrapped(segment)[0] for segment in segments_of(prompt))

@@ -278,18 +278,6 @@ def test_a_scan_writes_what_it_brings_in_a_few_videos_at_a_time(tmp_path):
     assert writes == [4, 2]
 
 
-def test_a_scan_stops_at_the_next_video_once_it_is_told_to(tmp_path):
-    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
-    for name in ("c1_topaz.mp4", "c2_topaz.mp4", "c3_topaz.mp4"):
-        _filed(places.upscaled_dir, "portrait", "a-site", name)
-    asked = []
-
-    brought_in = scan(db, places, grab=_still,
-                      keep_going=lambda: asked.append(True) or len(asked) < 2)
-
-    assert brought_in == 1 == len(_videos(db))
-
-
 def _deleted(db, row: dict) -> None:
     db.delete_generation(row["prompt_id"])
     db.record_trashed(row["prompt_id"], row, {"moves": [], "subdir": None})

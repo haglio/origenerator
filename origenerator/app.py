@@ -220,15 +220,6 @@ def _watch_for_fun_time(window, state_dir, library_state_dir):
     return watch
 
 
-def _look_for_other_sources_videos(db, app) -> None:
-    from origenerator.gui.outside_video_watch import OutsideVideoWatch
-    from origenerator.outside_videos import places_here
-
-    watch = OutsideVideoWatch(db, places_here, parent=app)
-    app.aboutToQuit.connect(watch.stop)
-    watch.start()
-
-
 def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     from origenerator.content import EXAMPLE_CONTENT, LOCAL_CONTENT
 
@@ -492,7 +483,6 @@ def _boot_and_run(app, app_args, preview) -> int:
         return boot.cancel(window, client)
 
     boot.show(window)
-    _look_for_other_sources_videos(db, app)
     exit_code = boot.run()
     boot.close(window, client)
     from origenerator.landed_while_away import hand_over_what_is_in_flight

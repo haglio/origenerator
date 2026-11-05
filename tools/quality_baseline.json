@@ -157,7 +157,7 @@
     "tools/speech_worker.py": 4
   },
   "fan_out": {
-    "origenerator/app.py": 28,
+    "origenerator/app.py": 26,
     "origenerator/check_animations.py": 16,
     "origenerator/downtime.py": 23,
     "origenerator/enhanced_start_backfill.py": 16,
@@ -464,7 +464,6 @@
     "origenerator/gui/off_thread.py": 1,
     "origenerator/gui/osr2_control.py": 11,
     "origenerator/gui/osr2_controls.py": 13,
-    "origenerator/gui/outside_video_watch.py": 7,
     "origenerator/gui/pane_arrangement.py": 38,
     "origenerator/gui/panes.py": 4,
     "origenerator/gui/param_fields.py": 7,
@@ -545,7 +544,7 @@
     "tests/test_training_run.py": 1
   },
   "statements": {
-    "origenerator/app.py": 330,
+    "origenerator/app.py": 323,
     "origenerator/gui/combine_controller.py": 341,
     "origenerator/gui/enhance_controller.py": 309,
     "origenerator/gui/enhance_pane.py": 466,
@@ -640,7 +639,6 @@
     "origenerator/gui/looping_preview.py": 1,
     "origenerator/gui/omnipause.py": 1,
     "origenerator/gui/osr2_controls_state.py": 3,
-    "origenerator/gui/outside_video_watch.py": 1,
     "origenerator/gui/param_fields.py": 2,
     "origenerator/gui/param_form.py": 1,
     "origenerator/gui/progress_bar.py": 5,

@@ -75,7 +75,7 @@ class Offer(NamedTuple):
 
 
 NOTHING_LEFT_TO_ENHANCE = ("No items without this enhancement selected, and no remaining items "
-                           "in this folder without this enhancement")
+                           "in this folder with no enhancement")
 
 
 class EnhanceHost(Protocol):

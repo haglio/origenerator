@@ -148,23 +148,26 @@ class _Applying:
         self.changes: dict = {}
         self.said: list[str] = []
 
+    def _say(self, line: str) -> None:
+        self.said += [line]
+
     def setting(self, change: dict) -> None:
         setting = setting_called(change.get("setting"), self.settings)
         if setting is None:
-            self.said.append(f"There is no setting called {_quoted(change.get('setting'))}.")
+            self._say(f"There is no setting called {_quoted(change.get('setting'))}.")
             return
         value = setting.taken(change.get("to"))
         if value is None:
-            self.said.append(f"{setting.label} can't be {_quoted(change.get('to'))}.")
+            self._say(f"{setting.label} can't be {_quoted(change.get('to'))}.")
         elif value == setting.value:
-            self.said.append(f"{setting.label} is already {setting.shown()}.")
+            self._say(f"{setting.label} is already {setting.shown()}.")
         elif not answers_him(change.get("for"), self.asked):
-            self.said.append(f"Didn't set {setting.label} to {setting.shown(value)}: "
+            self._say(f"Didn't set {setting.label} to {setting.shown(value)}: "
                              f"{_NOT_ASKED_FOR}.")
         else:
             self.changes[setting.key] = value
             swapped = self._trigger_words_swapped(setting, value) if setting.folder == "loras" else ""
-            self.said.append(
+            self._say(
                 f"Set {setting.label} to {setting.shown(value)} (was {setting.shown()}){swapped}.")
 
     def _trigger_words_swapped(self, setting: Setting, lora) -> str:
@@ -185,7 +188,7 @@ class _Applying:
 
     def change(self, change) -> None:
         if not isinstance(change, dict):
-            self.said.append(_UNREADABLE)
+            self._say(_UNREADABLE)
         elif "setting" in change:
             self.setting(change)
         else:
@@ -195,11 +198,11 @@ class _Applying:
         which = str(change.get("prompt") or "").strip().lower()
         edit = next((edit for edit in _DESCRIBED if edit in change), None)
         if which not in PROMPTS or edit is None:
-            self.said.append(_UNREADABLE)
+            self._say(_UNREADABLE)
         elif not answers_him(change.get("for"), self.asked):
-            self.said.append(f"Didn't {_DESCRIBED[edit](change, PROMPTS[which])}: {_NOT_ASKED_FOR}.")
+            self._say(f"Didn't {_DESCRIBED[edit](change, PROMPTS[which])}: {_NOT_ASKED_FOR}.")
         else:
-            self.said.append(self._EDITS[edit](self, which, change))
+            self._say(self._EDITS[edit](self, which, change))
 
     def _replace(self, which: str, change: dict) -> str:
         old, new = str(change["replace"]), str(change.get("with") or "")

@@ -611,22 +611,36 @@ def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monke
     assert words(view._slideshows.showing.shown._note) == "Request submitted"
 
 
-def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
+def test_a_request_the_model_answered_says_only_that_it_was_submitted_and_keeps_what_changed(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
         positive, negative, words,
-        ask=lambda p, n, r, known: (
-            "a woman, soft light", n, "Took the hat off her."))
+        ask=lambda p, n, r, known: {"changes": [
+            {"prompt": "positive", "remove": "a hat", "for": "no hat"}]})
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Took the hat off her."
+    assert words(view._slideshows.showing.shown._note) == "Request submitted"
     (job,) = view._live_jobs.values()
     assert job.params["positive_prompt"] == "a woman, soft light"
     (turn,) = view._db.requests.exchange_of(job.prompt_id)
-    assert (turn.said, turn.answered) == ("no hat", "Took the hat off her.")
+    assert (turn.said, turn.answered) == (
+        "no hat", 'Removed "a hat" from the Positive Prompt.')
     assert (turn.old_positive, turn.new_positive) == ("a woman, a hat, soft light", "a woman, soft light")
+
+
+def test_a_spoken_request_the_model_changes_nothing_for_says_so_and_makes_nothing(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words,
+        ask=lambda p, n, r, known: {"changes": [], "note": "There is a hat already."})
+
+    _speak_request(view, qtbot, "Request, a hat, over.")
+
+    assert words(view._slideshows.showing.shown._note) == "Nothing changed. There is a hat already."
+    assert not view._live_jobs
 
 
 def test_a_spoken_request_about_a_setting_remakes_the_image_with_that_setting(
@@ -634,12 +648,12 @@ def test_a_spoken_request_about_a_setting_remakes_the_image_with_that_setting(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.requests._work_out = lambda positive, negative, words, **given: work_out(
         positive, negative, words, settings=given["settings"],
-        ask=lambda p, n, r, known: (
-            p, n, "Fewer steps.", {"steps": 30}))
+        ask=lambda p, n, r, known: {"changes": [
+            {"setting": "steps", "to": 30, "for": "fewer steps"}]})
 
     _speak_request(view, qtbot, "Request, fewer steps, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Fewer steps."
+    assert words(view._slideshows.showing.shown._note) == "Request submitted"
     (job,) = view._live_jobs.values()
     assert job.params["steps"] == 30
     assert job.params["positive_prompt"] == "a woman, a hat, soft light"

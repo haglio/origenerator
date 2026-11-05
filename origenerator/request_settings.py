@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from origenerator.workflows.base import ParamDef, ParamType  # isort: skip
+from origenerator.workflows.base import ParamDef, ParamType, shown_with_what_is_held  # isort: skip
 from origenerator.workflows.model_files import is_no_lora  # isort: skip
 from origenerator.base_models import loras_offered_beside
 from origenerator.model_titles import option_title, versioned
@@ -122,6 +122,8 @@ def _lora_notes(pd: ParamDef, names: dict) -> dict:
 
 def _choices(pd: ParamDef, params: dict) -> tuple[Choice, ...]:
     options = _offered(pd, params)
+    if pd.type is ParamType.DROPDOWN and pd.key in params:
+        options = tuple(shown_with_what_is_held(options, params[pd.key]))
     names = _named(pd, options)
     notes = _lora_notes(pd, names)
     return tuple(Choice(option, names.get(option) or str(option), notes.get(option, ""))

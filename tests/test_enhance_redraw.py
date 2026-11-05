@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from origenerator import importer
+from origenerator import config, importer
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.enhance import (
     enhance_params_for,
@@ -17,6 +17,7 @@ from origenerator.gallery.enhance_settings import MATCH_SOURCE_MODEL, EnhanceSet
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.image_enhance import FORMS_THAT_REDRAW
+from origenerator.workflows.model_files import ANY, list_model_files
 
 
 def _classes(payload: dict) -> set[str]:
@@ -170,3 +171,12 @@ def test_every_form_making_images_with_no_checkpoint_can_redraw():
                and workflow.generates_here}
 
     assert without == set(FORMS_THAT_REDRAW)
+
+
+def test_an_upscaler_saved_as_a_pth_file_is_offered(tmp_path, monkeypatch):
+    folder = tmp_path / "models" / "upscale_models"
+    folder.mkdir(parents=True)
+    (folder / "made_up_upscaler.pth").write_bytes(b"made up")
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+
+    assert list_model_files("upscale_models", [], accepts=ANY) == ["made_up_upscaler.pth"]

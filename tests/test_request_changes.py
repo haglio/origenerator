@@ -448,3 +448,20 @@ def test_a_change_to_something_he_named_answers_him_whatever_reason_it_gives():
 
     assert outcome.positive == "a woman on a velvet couch"
     assert outcome.settings == {"height": 1280}
+
+
+def test_words_to_add_that_come_wrapped_in_commas_go_in_without_them():
+    outcome = _applied([{"prompt": "positive", "add": ", freckles, soft light, ", "for": "freckles"}],
+                       asked=("freckles",))
+
+    assert outcome.positive == "a woman on a couch, freckles, soft light"
+    assert outcome.line == 'Added "freckles, soft light" to the Positive Prompt.'
+
+
+def test_words_quoted_with_a_space_missing_or_added_are_still_found_where_they_stand():
+    outcome = _applied([{"prompt": "positive", "replace": "on acouch", "with": "on a couch, freckles",
+                         "for": "freckles"},
+                        {"prompt": "negative", "remove": "blur ry", "for": "blurry is fine"}],
+                       asked=("freckles, and blurry is fine",))
+
+    assert (outcome.positive, outcome.negative) == ("a woman on a couch, freckles", "")

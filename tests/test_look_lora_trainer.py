@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -306,7 +307,7 @@ def _popen_the_fake(job):
     """The real trainer runs below normal priority on Windows; a fake child at that priority can wait longer than a test may on a machine with full cores."""
     def popen(command, **options):
         options["creationflags"] = options.get("creationflags", 0) & ~_BELOW_NORMAL
-        return subprocess.Popen([sys.executable, job["trainer_program"], *command], **options)
+        return subprocess.Popen([sys._base_executable, job["trainer_program"], *command], **options)
     return popen
 
 
@@ -346,14 +347,31 @@ def test_a_training_runs_its_steps_under_accelerate_and_says_how_far_it_has_got(
     assert _status(job) == {"state": "training", "done": 25, "total": 50}
 
 
+class _AComfyUIJobComesOnceAStateIsSaved(_Machine):
+    def __init__(self, state: Path):
+        super().__init__(waiting=[0], memory=[100])
+        self._state, self._came = state, False
+
+    def jobs_waiting(self):
+        if self._came or not self._state.is_dir():
+            return 0
+        self._came = True
+        return 2
+
+    def sleep(self, seconds):
+        super().sleep(seconds)
+        time.sleep(0.005)
+
+
 def test_a_training_stopped_for_a_comfyui_job_resumes_from_its_newest_state_for_the_steps_left(
-        tmp_path):
+        tmp_path, capsys):
     job = _training_job(tmp_path, _SAVES_A_STATE + '''
 if "--resume" not in args:
-    time.sleep(30)
+    time.sleep(120)
 open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')
 ''')
-    machine = _Machine(waiting=[*([0] * 6), 2, *([0] * 20)], memory=[100])
+    state = Path(job["work"], "output", "Example Look 1.1-step00000025-state")
+    machine = _AComfyUIJobComesOnceAStateIsSaved(state)
     killed = []
 
     def kill(process):
@@ -363,6 +381,7 @@ open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')
     look_lora_trainer.train(job, machine, popen=_popen_the_fake(job), kill=kill)
 
     assert len(killed) == 1
+    assert f"resumed from {state}" in capsys.readouterr().out
     assert (machine.claimed, machine.released) == (2, 1)
     assert Path(job["work"], "steps_done.txt").read_text() == "50"
 

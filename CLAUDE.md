@@ -75,6 +75,14 @@ for one thing cost four. So:
   the clipboard, and Fun Time's Clip seconds. Genau's own videos are flicks
   in the code, and on screen they take the word the settings all of Haglio
   share give them, genau_flick_words.
+- **A source image and a starting frame are two things.** A video's starting
+  frame is the frame it starts on; its source image is an image that was
+  animated into it, so that image is the video's starting frame, while a T2V
+  video has a starting frame and no source image. So a video animated from a
+  T2V video's frame reads "From starting frame of" and that T2V video reads
+  "Starting frame animated in", where one animated from an image reads "From
+  source image" (his ruling, 2026-11-05, after both headings were changed to
+  say source image and read as false).
 - **An item is an image or a video, and neither is a picture or a record.**
   This code said "picture" all through it where it meant an image, and still
   says "record" where it means an item or the row behind one. Neither is the

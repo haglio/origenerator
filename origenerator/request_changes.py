@@ -11,6 +11,7 @@ from origenerator.prompt_terms import (
     index_of,
     reweighted,
     segments_of,
+    tidy,
     unwrapped,
 )
 from origenerator.request_settings import Setting, setting_called
@@ -75,6 +76,14 @@ def _spaced(words: str) -> str:
 def _found(text: str, words: str) -> re.Match | None:
     spaced = _spaced(words)
     return re.search(spaced, text, re.IGNORECASE) if spaced else None
+
+
+def _as_written(text: str, words: str) -> str:
+    if _found(text, words):
+        return words
+    letters = r"\s*".join(re.escape(letter) for letter in words if not letter.isspace())
+    there = re.search(rf"(?<!\w){letters}(?!\w)", text, re.IGNORECASE) if letters else None
+    return there.group(0) if there else words
 
 
 def _whole(text: str, words: str) -> bool:
@@ -236,7 +245,8 @@ class _Applying:
             self.said += [line for line in self._EDITS[edit](self, which, change) if line]
 
     def _replace(self, which: str, change: dict) -> list[str]:
-        old, new = str(change["replace"]), self._as_these_prompts_take(str(change.get("with") or ""))
+        old = _as_written(getattr(self, which), str(change["replace"]))
+        new = self._as_these_prompts_take(str(change.get("with") or ""))
         if not new.strip():
             return self._remove(which, {"remove": old})
         found = _found(getattr(self, which), old)
@@ -296,7 +306,7 @@ class _Applying:
 
     def _add(self, which: str, change: dict) -> list[str]:
         words, left_out = self._without_what_it_leaves_out(
-            which, "", self._as_these_prompts_take(str(change["add"])))
+            which, "", tidy(self._as_these_prompts_take(str(change["add"]))))
         if left_out:
             said = [line for unwanted in left_out for line in self._add("negative", {"add": unwanted})]
             return said + (self._add(which, {**change, "add": words}) if words else [])
@@ -320,7 +330,8 @@ class _Applying:
         return [*kept_out, f"Replaced {_quoted(before)} with {_quoted(after)} in the {PROMPTS[which]}."]
 
     def _remove(self, which: str, change: dict) -> list[str]:
-        text, asked = getattr(self, which), _parts(str(change["remove"]))
+        text = getattr(self, which)
+        asked = [_as_written(text, part) for part in _parts(str(change["remove"]))]
         parts = [part for part in asked if _whole(text, part)]
         if len(parts) > 1:
             parts = [part for part in parts if self._names_what_he_asked(part)]

@@ -792,3 +792,20 @@ def test_a_landed_enhancement_retires_the_enhance_button_and_the_tabs_live_row(q
 
     assert not view._buttons.enhance.isEnabled()
     assert tab._pending_enhancement is None
+
+
+def test_pressing_enhance_leaves_the_image_picked_and_new_settings_offer_another(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    pane = view._gallery_pane
+    pane.apply_selection("g0", Qt.KeyboardModifier.NoModifier)
+
+    view._enhance.enhance_the_selection()
+
+    assert pane.selected_prompt_ids() == ["g0"]
+    enhance_pane = view._enhance.pane
+    enhance_pane._denoise.setValue(enhance_pane._denoise.value() + 0.1)
+    assert enhance_pane._enhance_button.isEnabled()

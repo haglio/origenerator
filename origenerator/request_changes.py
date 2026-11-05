@@ -8,8 +8,9 @@ from typing import ClassVar
 
 from origenerator.request_settings import Setting, setting_called
 from origenerator.trigger_words import (
+    lacks_trigger_word,
     trigger_words,
-    with_trigger_word,
+    with_trigger_words_swapped,
     without_phrases,
     without_trigger_word,
 )
@@ -172,19 +173,19 @@ class _Applying:
 
     def _trigger_words_swapped(self, setting: Setting, lora) -> str:
         old, new = _trigger_words_of(setting.value), _trigger_words_of(lora)
-        without = (without_trigger_word(self.positive, old, in_scenes=self.in_scenes) if old
-                   else self.positive)
-        taken_out = without != self.positive
-        self.positive = (with_trigger_word(without, new, in_scenes=self.in_scenes) if new
-                         else without)
-        put_in = self.positive != without
-        if taken_out and put_in:
-            return f", and swapped its trigger word {old[0]} for {new[0]} in the Positive Prompt"
-        if taken_out:
+        before = self.positive
+        held = bool(old) and not lacks_trigger_word(before, old, in_scenes=self.in_scenes)
+        if new:
+            self.positive = with_trigger_words_swapped(before, old, new, in_scenes=self.in_scenes)
+        elif old:
+            self.positive = without_trigger_word(before, old, in_scenes=self.in_scenes)
+        if self.positive == before:
+            return ""
+        if not new:
             return f", and took its trigger word {old[0]} out of the Positive Prompt"
-        if put_in:
-            return f", and put its trigger word {new[0]} in the Positive Prompt"
-        return ""
+        if held:
+            return f", and swapped its trigger word {old[0]} for {new[0]} in the Positive Prompt"
+        return f", and put its trigger word {new[0]} in the Positive Prompt"
 
     def change(self, change) -> None:
         if not isinstance(change, dict):

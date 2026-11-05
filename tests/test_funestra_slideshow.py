@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 from funestra.file_channel import consume_command_file
-from funestra.funestra_verbs import play_file
+from funestra.funestra_verbs import play_file, set_speed
 from funestra.hud_title import LATEST_LABEL
+from funestra.playback_rate import NORMAL_RATE
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
@@ -631,6 +632,31 @@ def test_reset_is_faded_while_the_slideshow_is_at_its_defaults(qtbot, tmp_path):
     slideshow.set_locked(True)
 
     assert not _band_button(slideshow, "reset").dim
+
+
+def test_reset_is_offered_while_the_funestra_plays_off_the_normal_speed(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.mp4")
+    assert _band_button(slideshow, "reset").dim
+
+    _says(slideshow, video="one.mp4", speed=1.5)
+    slideshow.tick()
+
+    assert not _band_button(slideshow, "reset").dim
+
+
+@pytest.mark.parametrize("actions", [
+    pytest.param(SlideshowActions(), id="standalone"),
+    pytest.param(SlideshowActions(reset=lambda slideshow: None), id="in a session"),
+])
+def test_a_reset_puts_the_funestras_speed_back_to_normal(qtbot, tmp_path, actions):
+    slideshow = _slideshow(qtbot, tmp_path, actions=actions)
+    _says(slideshow, video="one.mp4", speed=1.5)
+    slideshow.tick()
+    _sent(slideshow)
+
+    assert answer(slideshow, "reset")
+
+    assert set_speed(NORMAL_RATE) in _sent(slideshow)
 
 
 def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before_its_list(

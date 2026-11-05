@@ -101,6 +101,12 @@ def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
 
 _NEWER, _OLDER = -1, 1
 
+
+def _reset(host) -> None:
+    host.transport.back_to_normal_speed()
+    host.slideshow_reset()
+
+
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda host: host.slideshow_step(-1),
     "next": lambda host: host.slideshow_step(1),
@@ -112,7 +118,7 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "lock_on": lambda host: host.set_locked(True),
     "lock_off": lambda host: host.set_locked(False),
     "trash": lambda host: host.slideshow_cull(),
-    "reset": lambda host: host.slideshow_reset(),
+    "reset": _reset,
     "shuffle": lambda host: host.slideshow_order(latest=False),
     "latest": lambda host: host.slideshow_order(latest=True),
     "fmode": lambda host: host.toggle_favorites_filter(),

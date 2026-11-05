@@ -58,8 +58,10 @@ def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_make_it_st
 
     assert "never remove" in rule.lower()
     assert "weight" in rule.lower()
-    example = prompt[prompt.rindex("didn't appear"):]
-    assert ":1." in example.split("->")[1].split("negative")[0]
+    example = prompt[prompt.index("- \"the dog didn't appear\""):].split("\n")[0]
+    answer = example.split("->")[1]
+    assert ":1." in answer
+    assert '"remove": "animals"' in answer
 
 
 def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_asks():
@@ -70,11 +72,34 @@ def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_as
     assert "end" in rule.lower()
 
 
-def test_a_request_about_a_setting_is_taught_to_change_the_setting_and_leave_the_prompts():
+def test_portrait_and_landscape_are_taught_as_width_and_height_never_as_prompt_words():
     prompt = _request_prompt()
-    rule = prompt[prompt.index("SETTINGS HE MAY ALSO CHANGE"):].split("\n")[0].lower()
+    rule = prompt[prompt.index("Portrait, landscape"):].split("\n")[0]
 
-    assert '"settings"' in rule
-    assert "leave" in rule
-    assert "prompts" in rule
-    assert '"settings": {}' in prompt
+    assert "Width and Height settings, never words in a prompt" in rule
+    assert '"setting": "width"' in prompt
+
+
+def test_a_lora_is_taught_by_title_with_the_newest_version_marked_and_trigger_words_the_apps():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("A LoRA is picked"):].split("\n")[0]
+
+    assert "title" in rule
+    assert "newest" in rule
+    assert "never edit trigger words" in rule
+
+
+def test_a_correction_is_taught_as_reversing_the_change_and_then_doing_what_was_asked():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("A correction"):].split("\n")[0]
+
+    assert "reverse the change" in rule
+    assert "nothing more" in rule
+    assert "never about him in the third person" in prompt
+
+
+def test_the_model_is_taught_to_change_only_what_was_asked():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("Change only what"):].split("\n")[0]
+
+    assert "Never add, remove or reword anything he did not ask about" in rule

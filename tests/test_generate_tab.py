@@ -3118,7 +3118,19 @@ def _struck_and_lit_in(html: str) -> tuple[str, str]:
     return struck.strip(), lit.strip()
 
 
-def _rewriting(monkeypatch, answer=("two women on a couch", "blurry"), changes=None):
+def _a_change(**change):
+    return {"changes": [change]}
+
+
+def _replacing(old, new, *, for_):
+    return _a_change(prompt="positive", replace=old, with_=new, for_=for_)
+
+
+_TWO_WOMEN = _replacing("a woman", "two women", for_="two women")
+_TWO_WOMEN_SAID = 'Replaced "a woman" with "two women" in the Positive Prompt.'
+
+
+def _rewriting(monkeypatch, answer=_TWO_WOMEN):
     calls = []
     answers = list(answer) if isinstance(answer, list) else []
 
@@ -3127,7 +3139,8 @@ def _rewriting(monkeypatch, answer=("two women on a couch", "blurry"), changes=N
         current = answers.pop(0) if answers else answer
         if isinstance(current, Exception):
             raise current
-        return (*current, "Done.", changes)
+        return {"changes": [{key.rstrip("_"): value for key, value in change.items()}
+                            for change in current["changes"]]}
 
     monkeypatch.setattr(prompt_edit, "ask_the_model", ask_the_model)
     return calls
@@ -3343,7 +3356,7 @@ def test_a_tab_showing_nothing_has_nothing_to_ask_a_change_of(tab):
     assert not tab._param_form.request_exchange()._line.isEnabled()
 
 
-def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_the_models_sentence(
+def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_what_changed(
         saved_panel, qtbot, monkeypatch):
     calls = _rewriting(monkeypatch)
     tab, db = saved_panel
@@ -3355,7 +3368,7 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_the_model
     qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
     assert [(positive, words) for positive, _negative, words in calls] == [
         ("a woman on a couch", "two women")]
-    assert exchange.turns() == [("two women", "Done.")]
+    assert exchange.turns() == [("two women", _TWO_WOMEN_SAID)]
     assert exchange._status.isHidden()
     assert exchange._line.text() == ""
     assert _message(tab) == "(not yet generated with modifications)"
@@ -3366,7 +3379,7 @@ def test_a_requests_rewrite_of_the_image_on_display_lands_in_boxes_of_whole_word
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
     clip_reader(tmp_path / "ComfyUI")
     cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
-    _rewriting(monkeypatch, answer=(cats[0], "blurry"))
+    _rewriting(monkeypatch, answer=_replacing("a woman on a couch", cats[0], for_="eighty cats"))
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
@@ -3378,7 +3391,7 @@ def test_a_requests_rewrite_of_the_image_on_display_lands_in_boxes_of_whole_word
 
 def test_a_request_about_a_setting_changes_it_on_the_form_and_the_turn_shows_the_change(
         saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch, answer=("a woman on a couch", "blurry"), changes={"steps": "30"})
+    _rewriting(monkeypatch, answer=_a_change(setting="steps", to="30", for_="fewer steps"))
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
@@ -3395,8 +3408,8 @@ def test_a_request_about_a_setting_changes_it_on_the_form_and_the_turn_shows_the
 
 def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
         saved_panel, qtbot, monkeypatch):
-    calls = _rewriting(monkeypatch, answer=[("two women on a couch", "blurry"),
-                                            ("two women on a beach", "blurry")])
+    calls = _rewriting(monkeypatch, answer=[
+        _TWO_WOMEN, _replacing("on a couch", "on a beach", for_="on a beach")])
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
@@ -3410,7 +3423,8 @@ def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
         ("a woman on a couch", "two women"), ("two women on a couch", "on a beach")]
     asked = tab.asked()
     assert [(turn.said, turn.answered) for turn in asked["turns"]] == [
-        ("two women", "Done."), ("on a beach", "Done.")]
+        ("two women", _TWO_WOMEN_SAID),
+        ("on a beach", 'Replaced "on a couch" with "on a beach" in the Positive Prompt.')]
     assert asked["turns"][1].old_positive == "two women on a couch"
     assert (asked["asked"], asked["source_prompt_id"], asked["old_positive"]) == (
         "on a beach", "img1", "a woman on a couch")

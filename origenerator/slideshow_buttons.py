@@ -7,6 +7,7 @@ from typing import Any
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
 from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_controls import (
+    RESET_PUTS_BACK_THE_SPEED,
     browse_order_buttons,
     favorites_only_tooltip,
     fmode_button,
@@ -42,8 +43,9 @@ ENHANCED_ICON = shared_icon("enhance_filter")
 
 ENHANCED_TOOLTIP = "Enhanced only — play just the images that have been enhanced"
 RESET_TOOLTIPS = {
-    True: "Reset — this shape's whole library back, with both filters off",
-    False: "Reset — both filters off, and this set from the top",
+    True: ("Reset — this shape's whole library back, with both filters off, "
+           f"{RESET_PUTS_BACK_THE_SPEED}"),
+    False: f"Reset — both filters off, {RESET_PUTS_BACK_THE_SPEED}, and this set from the top",
 }
 
 

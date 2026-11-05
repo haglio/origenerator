@@ -19,7 +19,7 @@ LOOK_EVERY_MS = 10 * 60 * 1000
 @dataclass(frozen=True)
 class WatchWork:
     run: Callable = run_off_thread
-    scan: Callable = outside_videos.scan
+    scan: Callable = outside_videos.scan_in_turn
     every_ms: int = LOOK_EVERY_MS
 
 

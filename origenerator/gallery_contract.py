@@ -43,6 +43,9 @@ SILENT_COPY_ROLE = "silent"
 
 DOWNTIME_COMMAND = (".venv/Scripts/python.exe", "-m", "origenerator.downtime")
 
+OUTSIDE_VIDEO_ENTRIES_COMMAND = (".venv/Scripts/python.exe", "-m",
+                                 "origenerator.outside_video_entries")
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -60,6 +63,7 @@ def declaration() -> dict:
         "silent_copy_role": SILENT_COPY_ROLE,
         "generated_fps": NATIVE_FPS,
         "downtime_command": list(DOWNTIME_COMMAND),
+        "outside_video_entries_command": list(OUTSIDE_VIDEO_ENTRIES_COMMAND),
     }
 
 

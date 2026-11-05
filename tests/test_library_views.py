@@ -6,6 +6,7 @@ from origenerator import gallery
 from origenerator.db import Database, NewGeneration
 from origenerator.library_views import LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.children import run_python
 
 
 def _image(db, prompt_id, seed):
@@ -35,6 +36,19 @@ def test_a_change_to_the_library_is_read_at_once(tmp_path):
     _image(Database(tmp_path / "test.db"), "pic-2", 2)
 
     assert [row["prompt_id"] for row in views.now().image_rows] == ["pic-2", "pic-1"]
+
+
+def test_a_change_another_program_makes_to_the_library_is_read_at_once(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _image(db, "pic-1", 1)
+    views = LibraryViews(db)
+    assert not views.now().image_rows[0]["starred"]
+
+    star_it = ("import sys; from origenerator.db import Database;"
+               " Database(sys.argv[1]).set_generation_favorite('pic-1', True)")
+    run_python(["-c", star_it, str(db.path)], check=True)
+
+    assert views.now().image_rows[0]["starred"]
 
 
 def test_a_reading_holds_what_the_trash_holds(tmp_path):

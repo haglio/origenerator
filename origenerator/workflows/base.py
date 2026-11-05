@@ -416,7 +416,7 @@ class WorkflowTemplate(ABC):
                     "crop": "disabled",
                 },
             }
-        nodes = {
+        upscaled = {
             _ENH_LOADER: {
                 "class_type": "UpscaleModelLoader",
                 "inputs": {"model_name": params["upscale_model"]},
@@ -426,6 +426,11 @@ class WorkflowTemplate(ABC):
                 "inputs": {"upscale_model": [_ENH_LOADER, 0], "image": refs.image},
             },
             _ENH_RESCALE: rescale,
+        }
+        if not params["enhance_denoise"]:
+            return EnhanceTail(upscaled, [_ENH_RESCALE, 0], [_ENH_UPSCALE, 0])
+        nodes = {
+            **upscaled,
             _ENH_ENCODE: {
                 "class_type": "VAEEncode",
                 "inputs": {"pixels": [_ENH_RESCALE, 0], "vae": refs.vae},

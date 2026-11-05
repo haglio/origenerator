@@ -136,3 +136,15 @@ def test_without_both_width_and_height_no_shape_is_told():
     text = request_settings.as_told(request_settings.settings_to_tell(_SIZE[:1], {"width": 720}))
 
     assert "portrait" not in text
+
+
+def test_a_switch_answered_with_a_bare_number_or_truth_value_is_read_as_on_or_off():
+    assert _taken("human", 0) is False
+    assert _taken("human", 1) is True
+    assert _taken("human", False) is False
+    assert _taken("human", True) is True
+
+
+def test_a_setting_named_with_nothing_is_no_setting():
+    assert request_settings.setting_called(None, _told()) is None
+    assert request_settings.setting_called("", _told()) is None

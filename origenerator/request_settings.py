@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import NamedTuple
 
 from origenerator.base_models import loras_offered_beside
 from origenerator.model_titles import option_title, versioned
@@ -15,29 +16,48 @@ _ON = ("on", "true", "yes", "1")
 _OFF = ("off", "false", "no", "0")
 
 
+def _as_named(text) -> str:
+    return "" if text is None else str(text).strip().lower()
+
+
+class Choice(NamedTuple):
+    value: object
+    title: str
+    note: str = ""
+
+    @property
+    def told(self) -> str:
+        return f"{self.title} ({self.note})" if self.note else self.title
+
+    def is_called(self, name: str) -> bool:
+        return name in (_as_named(self.value), _as_named(self.title))
+
+
 @dataclass(frozen=True)
 class Setting:
     key: str
     label: str
     type: ParamType
     value: object
-    options: tuple
+    choices: tuple[Choice, ...]
     low: float | None
     high: float | None
     unit: str
-    names: dict = field(default_factory=dict)
-    notes: dict = field(default_factory=dict)
     folder: str = ""
+
+    def _choice_of(self, value) -> Choice | None:
+        return next((choice for choice in self.choices if choice.value == value), None)
 
     def shown(self, value=None) -> str:
         value = self.value if value is None else value
         if self.type is ParamType.BOOL:
             return "on" if value else "off"
-        return self.names.get(value) or f"{value}{self.unit}"
+        choice = self._choice_of(value)
+        return choice.title if choice else f"{value}{self.unit}"
 
     def told(self) -> str:
         if self.type is ParamType.DROPDOWN:
-            kind = "one of " + ", ".join(self._option_told(option) for option in self.options)
+            kind = "one of " + ", ".join(choice.told for choice in self.choices)
         elif self.type is ParamType.BOOL:
             kind = "on or off"
         else:
@@ -45,19 +65,16 @@ class Setting:
             if self.low is not None and self.high is not None:
                 kind += f" from {self.low:g}" if self.type is ParamType.INT else f" from {self.low}"
                 kind += f" to {self.high:g}" if self.type is ParamType.INT else f" to {self.high}"
-        return f"- {self.label} [{self.key}]: {self._option_told(self.value)}, {kind}"
-
-    def _option_told(self, option) -> str:
-        note = self.notes.get(option)
-        return f"{self.shown(option)} ({note})" if note else self.shown(option)
+        picked = self._choice_of(self.value)
+        return f"- {self.label} [{self.key}]: {picked.told if picked else self.shown()}, {kind}"
 
     def taken(self, raw):
         try:
             if self.type is ParamType.BOOL:
-                word = str(raw).strip().lower()
+                word = _as_named(raw)
                 return True if word in _ON else False if word in _OFF else None
             if self.type is ParamType.DROPDOWN:
-                return self._option_called(str(raw).strip().lower())
+                return self._option_called(_as_named(raw))
             number = float(raw)
         except (TypeError, ValueError):
             return None
@@ -68,8 +85,7 @@ class Setting:
         return round(number) if self.type is ParamType.INT else number
 
     def _option_called(self, name: str):
-        return next((option for option in self.options
-                     if name in (str(option).lower(), self.shown(option).lower())), None)
+        return next((choice.value for choice in self.choices if choice.is_called(name)), None)
 
 
 def _named(pd: ParamDef, options: tuple) -> dict:
@@ -104,6 +120,14 @@ def _lora_notes(pd: ParamDef, names: dict) -> dict:
     return notes
 
 
+def _choices(pd: ParamDef, params: dict) -> tuple[Choice, ...]:
+    options = _offered(pd, params)
+    names = _named(pd, options)
+    notes = _lora_notes(pd, names)
+    return tuple(Choice(option, names.get(option) or str(option), notes.get(option, ""))
+                 for option in options)
+
+
 def _offered(pd: ParamDef, params: dict) -> tuple:
     options = pd.options or ()
     if pd.beside_model:
@@ -112,15 +136,9 @@ def _offered(pd: ParamDef, params: dict) -> tuple:
 
 
 def settings_to_tell(param_defs: list[ParamDef], params: dict) -> list[Setting]:
-    told = []
-    for pd in param_defs:
-        if pd.type in _TOLD:
-            options = _offered(pd, params)
-            names = _named(pd, options)
-            told.append(Setting(pd.key, pd.label, pd.type, params.get(pd.key, pd.default), options,
-                                pd.min_val, pd.max_val, pd.unit, names, _lora_notes(pd, names),
-                                pd.folder))
-    return told
+    return [Setting(pd.key, pd.label, pd.type, params.get(pd.key, pd.default),
+                    _choices(pd, params), pd.min_val, pd.max_val, pd.unit, pd.folder)
+            for pd in param_defs if pd.type in _TOLD]
 
 
 _SIZE_KEYS = ("width", "height")
@@ -153,9 +171,9 @@ def as_told(settings: list[Setting]) -> str:
 
 
 def setting_called(name, settings: list[Setting]) -> Setting | None:
-    called = str(name or "").strip().lower()
+    called = _as_named(name)
     return next((setting for setting in settings
-                 if called in (setting.key.lower(), setting.label.lower())), None)
+                 if called in (_as_named(setting.key), _as_named(setting.label))), None)
 
 
 def described(changes: dict, settings: list[Setting]) -> list[tuple[str, str, str]]:

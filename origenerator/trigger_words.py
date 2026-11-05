@@ -44,8 +44,8 @@ def without_phrases(text: str, words) -> str:
     if not _holds_one(text, words):
         return text
     for word in words:
-        spaced = r"\s+".join(re.escape(part) for part in word.split())
-        text = re.sub(rf"\(\s*{spaced}\s*(?::\s*[0-9.]+)?\s*\)|(?<!\w){spaced}(?!\w)", "", text,
+        whole = _pattern(word).pattern
+        text = re.sub(rf"\(\s*{whole}\s*(?::\s*[0-9.]+)?\s*\)|{whole}", "", text,
                       flags=re.IGNORECASE)
     text = re.sub(r"(?:\s*,\s*){2,}", ", ", text)
     text = re.sub(r"^[\s,]+|[\s,]+$", "", text)

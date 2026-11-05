@@ -158,20 +158,6 @@ def setting_called(name, settings: list[Setting]) -> Setting | None:
                  if called in (setting.key.lower(), setting.label.lower())), None)
 
 
-def changes_asked(answer, settings: list[Setting]) -> dict:
-    if not isinstance(answer, dict):
-        return {}
-    changes = {}
-    for name, raw in answer.items():
-        setting = setting_called(name, settings)
-        if setting is None:
-            continue
-        value = setting.taken(raw)
-        if value is not None and value != setting.value:
-            changes[setting.key] = value
-    return changes
-
-
 def described(changes: dict, settings: list[Setting]) -> list[tuple[str, str, str]]:
     return [(setting.label, setting.shown(), setting.shown(changes[setting.key]))
             for setting in settings if setting.key in changes]

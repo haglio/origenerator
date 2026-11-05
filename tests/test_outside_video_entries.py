@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 
-from origenerator import gallery_contract, outside_video_entries
+from origenerator import config, gallery_contract, outside_video_entries
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
 from origenerator.outside_videos import Places
@@ -18,9 +18,10 @@ def _places(tmp_path) -> Places:
                   skip_sources=frozenset({"this-app"}), library_root=tmp_path, journal=None)
 
 
-def _the_command(tmp_path, places: Places | None) -> int:
+def _the_command(tmp_path, places: Places | None, logged_to: list | None = None) -> int:
+    logged_to = [] if logged_to is None else logged_to
     return outside_video_entries.main(tmp_path / "origenerator.db", places=lambda: places,
-                                      start_logging=lambda: None)
+                                      log_to=lambda *where: logged_to.append(where))
 
 
 def _outside_videos(tmp_path) -> list[dict]:
@@ -57,6 +58,14 @@ def test_with_no_evolver_beside_this_app_the_command_writes_nothing(tmp_path, ca
 
     assert json.loads(capsys.readouterr().out) == {"brought_in": 0}
     assert Database(tmp_path / "origenerator.db").list_generations() == []
+
+
+def test_the_command_writes_its_log_where_the_app_writes_its_own(tmp_path):
+    logged_to = []
+
+    _the_command(tmp_path, None, logged_to)
+
+    assert logged_to == [("", config.STATE_DIR / "origenerator.log")]
 
 
 def test_the_command_the_document_names_answers_in_its_last_line_when_evolver_runs_it(tmp_path):

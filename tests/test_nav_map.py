@@ -6,6 +6,7 @@ from origenerator import gallery
 from origenerator.nav_map import (
     action_labels,
     beyond_the_row,
+    group_keys,
     one_per_stretch,
     seed_family,
     surroundings,
@@ -317,3 +318,43 @@ def test_a_video_has_no_configurations_of_its_own_because_its_seed_is_its_images
                           image_index=index)
 
     assert around.configs == ()
+
+
+def _a_library_of_two_images_and_their_videos():
+    one = _image("i1", "a fox", seed=1)
+    two = _image("i2", "a fox", seed=2)
+    other = _image("i3", "a hare", seed=3, steps=30)
+    index = gallery.build_image_config_index([one, two, other])
+    videos = [
+        _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha"),
+        _video("v2", "the fox runs", noise_seed=6, frame="i1.png", action="alpha"),
+        _video("v3", "the fox sleeps", noise_seed=7, frame="i1.png", action="beta"),
+        _video("v4", "the fox runs", noise_seed=8, frame="i2.png", action="alpha"),
+        _video("v5", "the hare runs", noise_seed=9, frame="i3.png", action="alpha"),
+        _video("v6", "the fox runs", noise_seed=1, frame="gone.png", action="alpha"),
+    ]
+    return [one, two, other, *videos], index
+
+
+def _sharing_a_key(keys: dict, prompt_id: str) -> set[str]:
+    return {other for other, key in keys.items() if key == keys[prompt_id]}
+
+
+def test_a_group_is_what_an_action_loop_plays_an_image_with_the_videos_made_from_it():
+    library, index = _a_library_of_two_images_and_their_videos()
+
+    keys = group_keys(library, image_index=index)
+
+    for row in library:
+        around = surroundings(row, library, image_index=index)
+        assert _sharing_a_key(keys, row["prompt_id"]) == {row["prompt_id"], *_ids(around.group)}
+
+
+def test_under_an_action_filter_a_group_is_what_a_seed_loop_plays():
+    library, index = _a_library_of_two_images_and_their_videos()
+
+    keys = group_keys(library, image_index=index, by_seed_family=True)
+
+    for row in library:
+        around = surroundings(row, library, image_index=index)
+        assert _sharing_a_key(keys, row["prompt_id"]) == {row["prompt_id"], *_ids(around.seeds)}

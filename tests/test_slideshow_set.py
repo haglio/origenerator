@@ -857,3 +857,155 @@ def test_a_set_picked_back_up_never_lands_on_a_slide_its_filters_leave_out():
     assert not slideshow_set.resume(SlideshowState(order=("id-1",), current="id-1"))
 
     assert _in_the_pass(slideshow_set) == ["id-2", "id-3"]
+
+
+_A_GROUP_AND_TWO_ALONE = [("fox.png", "image", "id-fox"), ("fox-runs.mp4", "video", "id-runs"),
+                          ("fox-sleeps.mp4", "video", "id-sleeps"),
+                          ("hare.png", "image", "id-hare"), ("owl.mp4", "video", "id-owl")]
+_OF_THE_FOX = {"id-fox": "fox", "id-runs": "fox", "id-sleeps": "fox"}
+_BY_SEED_FAMILY = {"id-runs": "running", "id-owl": "running"}
+_THE_FOX = set(_OF_THE_FOX)
+
+
+def _grouping(groups=_OF_THE_FOX, by_seed_family=_BY_SEED_FAMILY):
+    def group_of(slide, seed_family):
+        return (by_seed_family if seed_family else groups).get(slide.prompt_id)
+    return group_of
+
+
+def _grouped_set(items=_A_GROUP_AND_TWO_ALONE, *, shuffle=None, weights=None,
+                 on_pass_change=None, **asked):
+    weighing = {"weight_of": lambda path: weights.get(str(path), 1.0)} if weights else {}
+    return SlideshowSet(items, deal=SetDeal(shuffle=shuffle), on_pass_change=on_pass_change,
+                        actions=SlideshowActions(group_of=_grouping(), **weighing, **asked))
+
+
+def _dealt_ids(slideshow_set) -> set:
+    return {slide.prompt_id for slide in slideshow_set.playlist.items}
+
+
+def test_a_shuffled_set_deals_one_of_each_group_and_each_of_them_in_turn():
+    picked = set()
+    for _ in range(40):
+        dealt = _dealt_ids(_grouped_set())
+        assert len(dealt & _THE_FOX) == 1
+        assert {"id-hare", "id-owl"} <= dealt
+        picked |= dealt & _THE_FOX
+
+    assert picked == _THE_FOX
+
+
+def test_a_set_picked_back_up_keeps_its_remembered_order_and_still_one_of_each_group():
+    slideshow_set = _grouped_set()
+    remembered = ("id-owl", "id-sleeps", "id-runs", "id-hare")
+
+    assert slideshow_set.resume(SlideshowState(order=remembered, current="id-runs"))
+
+    assert slideshow_set.current_prompt_id() == "id-runs"
+    assert slideshow_set.playlist.order_ids() == ["id-owl", "id-runs", "id-hare"]
+
+
+def test_under_an_action_filter_a_set_deals_one_of_each_seed_family_instead():
+    named = {"id-fox": "alpha", "id-runs": "alpha", "id-sleeps": "alpha", "id-hare": "alpha",
+             "id-owl": "alpha"}
+    for _ in range(20):
+        slideshow_set = _grouped_set(actions_of=lambda ids: {pid: named[pid] for pid in ids})
+        slideshow_set.set_action_filter("alpha")
+
+        dealt = _dealt_ids(slideshow_set)
+
+        assert len(dealt & {"id-runs", "id-owl"}) == 1
+        assert {"id-fox", "id-sleeps", "id-hare"} <= dealt
+
+
+def test_under_latest_a_set_keeps_the_newest_of_each_group_newest_first_whatever_he_skips():
+    skipped = dict.fromkeys((path for path, _kind, _pid in _A_GROUP_AND_TWO_ALONE), 0.0)
+
+    slideshow_set = _grouped_set(shuffle=in_order, weights=skipped)
+
+    assert slideshow_set.playlist.order_ids() == ["id-fox", "id-hare", "id-owl"]
+
+
+def _come_to_the_last_slide(slideshow_set) -> str:
+    last = slideshow_set.playlist.order[-1]
+    slideshow_set.come_to(last)
+    return slideshow_set.current_prompt_id()
+
+
+def test_on_the_last_slide_a_shuffled_set_deals_its_next_pass_to_follow_the_slide_on_screen():
+    told = []
+    slideshow_set = _grouped_set(on_pass_change=told.append)
+    picked = set()
+    for _ in range(40):
+        on_screen = _come_to_the_last_slide(slideshow_set)
+        following = slideshow_set.playlist.order_ids()
+        assert following[0] == slideshow_set.current_prompt_id() == on_screen
+        assert len(set(following[1:]) & _THE_FOX) <= 1
+        assert {"id-hare", "id-owl"} <= set(following)
+        assert set(following) & _THE_FOX
+        picked |= set(following[1:]) & _THE_FOX
+
+    assert picked == _THE_FOX
+    assert told == [True] * 40
+
+
+def test_a_slide_short_of_the_last_deals_nothing_new():
+    slideshow_set = _grouped_set()
+    before = slideshow_set.playlist.order_ids()
+
+    slideshow_set.come_to(slideshow_set.playlist.order[1])
+
+    assert slideshow_set.playlist.order_ids() == before
+
+
+def test_latest_and_a_loop_deal_no_next_pass():
+    latest = _grouped_set(shuffle=in_order)
+    looping = _grouped_set(neighbors=lambda pid: NavMapNeighbors(
+        seeds=tuple(Slide.of(item) for item in _A_GROUP_AND_TWO_ALONE if item[2] != pid)))
+    looping.start_loop(SEED)
+    before = latest.playlist.order_ids(), looping.playlist.order_ids()
+
+    _come_to_the_last_slide(latest)
+    _come_to_the_last_slide(looping)
+
+    assert (latest.playlist.order_ids(), looping.playlist.order_ids()) == before
+
+
+def test_stepping_to_one_of_a_group_the_list_left_out_plays_it_next():
+    slideshow_set = _grouped_set()
+    left_out = next(Slide.of(item) for item in _A_GROUP_AND_TWO_ALONE
+                    if item[2] in _THE_FOX and item[2] not in _dealt_ids(slideshow_set))
+
+    assert slideshow_set.jump_to(left_out)
+
+    assert slideshow_set.current_prompt_id() == left_out.prompt_id
+
+
+def test_a_step_on_the_map_to_one_of_its_group_the_list_left_out_lands_on_it():
+    items = [("one.png", "image", "id-1"), ("one-x.png", "image", "id-1x")]
+    slideshow_set, _dealt = _set(items, neighbors=_neighbors,
+                                 group_of=lambda slide, _seed_family: "one image")
+    assert _ids(slideshow_set.playlist.items) == ["id-1"]
+
+    assert slideshow_set.jump_to(slideshow_set.nav_target("down"))
+
+    assert slideshow_set.current_prompt_id() == "id-1x"
+
+
+def test_a_set_of_one_group_deals_one_slide_and_a_set_of_one_item_deals_it():
+    one_group = _grouped_set(_A_GROUP_AND_TWO_ALONE[:3])
+    one_item = _grouped_set(_A_GROUP_AND_TWO_ALONE[3:4], weights={"hare.png": 0.0})
+
+    assert len(_dealt_ids(one_group)) == 1
+    assert _dealt_ids(one_item) == {"id-hare"}
+
+
+def test_a_set_that_is_one_row_loops_all_of_it_though_its_group_would_deal_one():
+    row = [("one.mp4", "video", "id-1"), ("one-b.mp4", "video", "id-1b")]
+    slideshow_set = SlideshowSet(row, deal=SetDeal(), actions=SlideshowActions(
+        neighbors=lambda pid: NavMapNeighbors(
+            seeds=tuple(Slide.of(item) for item in row if item[2] != pid)),
+        group_of=lambda slide, by_seed_family: "one image"))
+
+    assert sorted(slide.prompt_id for slide in slideshow_set.loop.pool) == ["id-1", "id-1b"]
+    assert _dealt_ids(slideshow_set) == {"id-1", "id-1b"}

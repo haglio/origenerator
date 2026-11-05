@@ -729,7 +729,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     slideshow.shown.press("portrait_no_loop")
 
     assert slideshow.shown.isVisible()
-    assert slideshow.pass_size() == 5
+    assert slideshow.pass_size() == 4, "one of g1 and the video made from it, and the other three"
     assert slideshow._set.playlist.current()[2] == "g1"
     dropped = slideshow_hud_model("portrait", slideshow)
     assert dropped.active_loop == ""

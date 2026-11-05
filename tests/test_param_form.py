@@ -46,7 +46,11 @@ from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
-from origenerator.gui.prompt_marks import RESOLVE_UNPAIRED_PARENTHESES, problem_to_resolve
+from origenerator.gui.prompt_marks import (
+    RESOLVE_IN_BOTH_PROMPTS,
+    RESOLVE_UNPAIRED_PARENTHESES,
+    problem_to_resolve,
+)
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tooltip_shape import shaped
@@ -2293,6 +2297,17 @@ def test_the_scenes_warn_about_their_length_and_a_missing_trigger_word_on_two_li
 
     assert form._warning_marks["scene_frames"].toolTip() == (
         f"Good range: 5\N{EN DASH}10 s. Click to use 10 s.\n{_TRIGGER_WORD_SAID}")
+
+
+def test_the_audio_prompts_oppose_each_other_as_the_other_two_do(qtbot):
+    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
+                      ParamDef("audio_negative_prompt", "Negative Prompt", "str", "",
+                               multiline=True)])
+    qtbot.addWidget(form)
+
+    form.set_values({"audio_prompt": "rain, thunder", "audio_negative_prompt": "thunder"})
+
+    assert problem_to_resolve(form.text_fields()) == RESOLVE_IN_BOTH_PROMPTS
 
 
 def test_a_warning_mark_sits_left_of_its_label(qtbot):

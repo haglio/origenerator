@@ -20,6 +20,7 @@ from origenerator.gui.prompt_field import PromptField, PromptHeights
 from origenerator.gui.prompt_marks import (
     RESOLVE_BAD_WEIGHTS,
     RESOLVE_DUPLICATES,
+    RESOLVE_IN_BOTH_PROMPTS,
     RESOLVE_UNPAIRED_PARENTHESES,
     RESOLVE_UNREAD_EMPHASIS,
     problem_to_resolve,
@@ -693,6 +694,63 @@ def test_a_prompt_not_in_use_highlights_no_duplicate(prompt):
 
     (box,) = prompt.boxes()
     assert _yellow_in(box) == []
+
+
+@pytest.fixture
+def opposing(qtbot):
+    positive, negative = _prompt_fields("positive_prompt"), _prompt_fields("negative_prompt")
+    qtbot.addWidget(positive)
+    qtbot.addWidget(negative)
+    positive.opposes(negative)
+    return positive, negative
+
+
+def test_a_thing_in_both_prompts_is_highlighted_in_each_and_refused(opposing):
+    positive, negative = opposing
+
+    positive.set_value("red cat, a dog")
+    negative.set_value("red cat")
+
+    assert _yellow_in(positive.boxes()[0]) == ["red cat"]
+    assert _yellow_in(negative.boxes()[0]) == ["red cat"]
+    assert problem_to_resolve(negative.boxes()) == RESOLVE_IN_BOTH_PROMPTS
+
+
+def test_taking_a_thing_out_of_one_prompt_clears_the_highlight_in_the_other(opposing):
+    positive, negative = opposing
+    positive.set_value("red cat, a dog")
+    negative.set_value("red cat")
+
+    negative.boxes()[0].setPlainText("blurry")
+
+    assert _yellow_in(positive.boxes()[0]) == []
+    assert problem_to_resolve(positive.boxes()) is None
+
+
+def test_a_thing_in_both_prompts_is_found_in_whichever_box_of_a_prompt_holds_it(opposing):
+    positive, negative = opposing
+
+    positive.set_value(f"a dog,{BOX_BREAK}red cat")
+    negative.set_value("red cat")
+
+    first, second = positive.boxes()
+    assert _yellow_in(first) == []
+    assert _yellow_in(second) == ["red cat"]
+
+
+def test_a_negative_prompt_nothing_reads_opposes_nothing_until_it_is_read_again(opposing):
+    positive, negative = opposing
+    positive.set_value("red cat")
+    negative.set_value("red cat")
+
+    negative.set_in_use(False, "Nothing reads this")
+
+    assert _yellow_in(positive.boxes()[0]) == []
+    assert problem_to_resolve([*positive.boxes(), *negative.boxes()]) is None
+
+    negative.set_in_use(True, "")
+
+    assert _yellow_in(positive.boxes()[0]) == ["red cat"]
 
 
 def _leave(box, reason=Qt.FocusReason.MouseFocusReason) -> None:

@@ -121,7 +121,14 @@ class _Scene(QFrame):
     def _count_down(self, key: str) -> None:
         count_down(self._countdowns[key], self.fields[key], self._reading_of(key),
                    in_use=self._in_use(key))
-        mark_problems_in([self.fields[key]], self._reading_of(key), in_use=self._in_use(key))
+        for each in SPOKEN_OVER:
+            self._mark_problems(each)
+
+    def _mark_problems(self, key: str) -> None:
+        opposite = next(each for each in SPOKEN_OVER if each != key)
+        opposing = diff_text.live_text(self.fields[opposite]) if self._in_use(opposite) else ""
+        mark_problems_in([self.fields[key]], self._reading_of(key), in_use=self._in_use(key),
+                         opposing=opposing)
 
     def _reading_of(self, key: str) -> PromptReading | None:
         return self._readings.get(key)

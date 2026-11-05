@@ -914,6 +914,53 @@ def test_removing_emphasis_leaves_alone_a_prompt_whose_model_reads_it(tab, promp
     assert (values["positive_prompt"], values["negative_prompt"]) == ("a", "(b:1.2)")
 
 
+def _yellow_words(field) -> list[str]:
+    text = field.toPlainText()
+    block = field.document().firstBlock()
+    found = []
+    while block.isValid():
+        found += [text[block.position() + span.start:block.position() + span.start + span.length]
+                  for span in block.layout().formats()
+                  if span.format.background().color() == YELLOW]
+        block = block.next()
+    return found
+
+
+def _prompt_box(tab, key):
+    (box,) = tab._param_form._widgets[key].boxes()
+    return box
+
+
+@pytest.mark.parametrize(("positive", "negative"), [
+    ("red cat, a dog", "blurry, red cat"),
+    ("(Red Cat:1.2), a dog", "blurry, red cat"),
+])
+def test_generate_refuses_a_term_in_both_prompts_and_highlights_it_in_each(
+        tab, positive, negative):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+
+    tab._param_form.set_values({"positive_prompt": positive, "negative_prompt": negative})
+    tab._generate_btn.click()
+
+    assert requested == []
+    assert tab._generate_btn.text() == "Resolve prompt conflicts first"
+    assert len(_yellow_words(_prompt_box(tab, "positive_prompt"))) == 1
+    assert _yellow_words(_prompt_box(tab, "negative_prompt")) == ["red cat"]
+
+
+def test_generate_goes_ahead_once_a_term_has_left_one_of_the_two_prompts(tab):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    tab._param_form.set_values({"positive_prompt": "red cat", "negative_prompt": "red cat"})
+
+    _prompt_box(tab, "negative_prompt").setPlainText("blurry")
+    tab._generate_btn.click()
+
+    assert len(requested) == 1
+    assert _yellow_words(_prompt_box(tab, "positive_prompt")) == []
+
+
 def _generate_color(tab):
     button = tab._generate_btn
     return button.grab().toImage().pixelColor(4, button.height() // 2)

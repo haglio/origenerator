@@ -63,6 +63,7 @@ from origenerator.gui.enhance_versions import (
     enhance_version_mime,
     params_from_mime,
 )
+from origenerator.gui.prompt_marks import RESOLVE_IN_BOTH_PROMPTS, problem_to_resolve
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from origenerator.workflows.model_files import NO_LORA
@@ -1717,6 +1718,17 @@ def test_a_fixs_prompts_fit_an_enhance_pane_dragged_as_short_as_it_goes(qtbot):
     assert window.geometry() == QRect(pane.mapToGlobal(QPoint(0, 0)), pane.size())
     for field in (*window.positive.boxes(), *window.negative.boxes()):
         assert field.height() >= 2 * field.fontMetrics().lineSpacing()
+
+
+def test_a_fixs_prompts_window_highlights_a_thing_in_both_of_its_prompts(qtbot):
+    pane, _edits = _panel(qtbot)
+    pane._fix_prompt_buttons["hands"].click()
+    window = pane._fix_prompt_windows["hands"]
+
+    window.positive.boxes()[0].setPlainText("red cat")
+    window.negative.boxes()[0].setPlainText("red cat")
+
+    assert problem_to_resolve(window.positive.boxes()) == RESOLVE_IN_BOTH_PROMPTS
 
 
 def test_each_fixs_edit_button_is_the_square_the_buttons_above_the_gallery_are(qtbot):

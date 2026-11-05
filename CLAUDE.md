@@ -193,6 +193,10 @@ every commit, never a few nearby files in its place.
   `Windows fatal exception: code 0xe0000001` dumps in a green run's output are
   `tests/test_windows_toast.py` having Windows refuse a notification on
   purpose, never a crash.
+- `-n` is pytest-xdist's, which the `dev` extra names. A venv without it
+  answers `unrecognized arguments: -n`; it goes in with
+  `pip install "pytest-xdist>=3.8,<4"` at a moment none of his apps is running
+  out of that venv, and nothing else in the venv changes.
 - GitHub still runs the suite shuffled, in four parts on four machines.
 
 ## A model picker offers only what its graph can run

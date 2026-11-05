@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from origenerator import request_settings
+from origenerator import config, request_settings
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.collection_notes import CollectionNotes
 from origenerator.prompt_edit import (
@@ -530,6 +530,7 @@ def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_
                                      "for": "no tan lines"}]}
     assert "a woman, tan" in sent["messages"][-1]["content"]
     assert sent["settings"]["json_answer"] is True
+    assert sent["settings"]["model"] == config.REQUEST_LLM_MODEL != config.LOCAL_LLM_MODEL
     assert sent["settings"]["reads_tokens"] > 16000
     assert sent["settings"]["stays_loaded"] == "0"
     assert "thinks" not in sent["settings"]

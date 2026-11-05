@@ -90,6 +90,8 @@ def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_as
     rule = _request_prompt()[_request_prompt().index("PROMPTS OF HIS"):].split("\n")[0]
 
     assert "the way those prompts" in rule.lower() or "the way they" in rule.lower()
+    assert "one person" in rule
+    assert "singular" in rule
     assert "never" in rule.lower()
     assert "end" in rule.lower()
 

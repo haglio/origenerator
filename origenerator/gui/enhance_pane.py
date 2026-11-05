@@ -584,6 +584,7 @@ class FixPromptsDialog(QDialog):
         positive = prompt_boxes("positive_prompt", current["prompt"])
         self.positive = positive
         self.negative = prompt_boxes("negative_prompt", current["avoid"])
+        positive.opposes(self.negative)
         self.prompt_warning, self.lora_warning = WarningMark(), WarningMark()
         layout.addLayout(prompts_side_by_side(self.prompt_warning, positive, self.negative), 1)
         lora = lora_dropdown(loras, current["lora"])

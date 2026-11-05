@@ -6,6 +6,7 @@ from origenerator.box_breaks import BOX_BREAK
 from origenerator.prompt_checks import (
     bad_weights,
     duplicate_things,
+    things_in_both,
     tidied,
     unpaired_parentheses,
     unread_emphasis,
@@ -72,6 +73,21 @@ def test_duplicates_ignore_capitals_and_the_spaces_around_and_within_a_thing():
 
 def test_words_shared_by_different_things_are_no_duplicate():
     assert duplicate_things("red cat, red dog, ,") == ()
+
+
+@pytest.mark.parametrize(("text", "other", "held"), [
+    ("red cat, a dog", "blurry, red cat", ["red cat"]),
+    ("Red  Cat, a dog", "red cat", ["Red  Cat"]),
+    ("(red cat:1.2), a dog", "red cat", ["(red cat:1.2)"]),
+    ("((red cat)), a dog", "(red cat:0.8)", ["((red cat))"]),
+    ("red cat, red dog", "red", []),
+    ("red cat", "red cat sitting", []),
+    ("a, , b", ", c", []),
+    ("red cat", "", []),
+])
+def test_a_thing_in_both_is_found_without_its_weight_and_without_regard_to_capitals(
+        text, other, held):
+    assert _spanned(text, things_in_both(text, other)) == held
 
 
 @pytest.mark.parametrize(("messy", "clean"), [

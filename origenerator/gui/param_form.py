@@ -67,6 +67,8 @@ from origenerator.workflows.derived_size import override_size
 from origenerator.workflows.lora_rows import lora_key_of, strength_without_its_lora
 
 _SEED_MAX = (1 << 63) - 1
+_OPPOSING_PROMPTS = (("positive_prompt", "negative_prompt"),
+                     ("audio_prompt", "audio_negative_prompt"))
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines",
                "frame_count")
 
@@ -262,6 +264,7 @@ class ParamForm(QWidget):
         self._build_swap_button()
         self._build_derived_dimensions()
         self._announce_every_edit()
+        self._oppose_the_prompts()
         self._refresh_section_visibility()
 
     def _build_request_section(self) -> CollapsibleSection:
@@ -286,6 +289,12 @@ class ParamForm(QWidget):
                 widget.edit(said)
             else:
                 self._write_field(pd, said)
+
+    def _oppose_the_prompts(self):
+        for positive, negative in _OPPOSING_PROMPTS:
+            boxes = self._widgets.get(positive), self._widgets.get(negative)
+            if all(isinstance(each, PromptBoxes) for each in boxes):
+                boxes[0].opposes(boxes[1])
 
     def _announce_every_edit(self):
         for pd in self._param_defs:

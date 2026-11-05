@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from origenerator.box_breaks import BOX_BREAK, parenthesis_at
+from origenerator.prompt_edit import terms_with_places
 
 _NUMBER = re.compile(r"\d+(\.\d+)?|\.\d+")
 _ENDS_A_GROUP = re.compile(r":([^:()]*)(?<!\\)\)")
@@ -64,15 +65,25 @@ def without_emphasis(text: str) -> str:
     return "".join(pieces) + text[last:]
 
 
+def _the_thing_itself(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
 def duplicate_things(text: str) -> tuple[tuple[int, int], ...]:
     places: dict[str, list[tuple[int, int]]] = {}
     for match in _A_THING.finditer(text):
-        words = match[0].split()
-        if words:
+        thing = _the_thing_itself(match[0])
+        if thing:
             start = match.start() + len(match[0]) - len(match[0].lstrip())
             end = match.end() - len(match[0]) + len(match[0].rstrip())
-            places.setdefault(" ".join(words).casefold(), []).append((start, end))
+            places.setdefault(thing, []).append((start, end))
     return tuple(sorted(span for spans in places.values() if len(spans) > 1 for span in spans))
+
+
+def things_in_both(text: str, other: str) -> tuple[tuple[int, int], ...]:
+    theirs = {_the_thing_itself(term) for term, _start, _end in terms_with_places(other)} - {""}
+    return tuple((start, end) for term, start, end in terms_with_places(text)
+                 if _the_thing_itself(term) in theirs)
 
 
 def _as_a_number(match: re.Match) -> str:

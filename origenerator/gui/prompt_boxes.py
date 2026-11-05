@@ -26,6 +26,7 @@ from origenerator.gui.prompt_marks import (
 from origenerator.prompt_checks import (
     bad_weights,
     duplicate_things,
+    things_in_both,
     tidied,
     unpaired_parentheses,
     unread_emphasis,
@@ -62,14 +63,20 @@ def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReadi
                         unread=reading is not None and reading.past_it == CUT_OFF)
 
 
+def _in_this_box(spans, start: int, end: int) -> tuple[tuple[int, int], ...]:
+    return tuple((max(first, start) - start, min(last, end) - start)
+                 for first, last in spans if first < end and last > start)
+
+
 def mark_problems_in(fields: list[QPlainTextEdit], reading: PromptReading | None,
-                     *, in_use: bool) -> None:
+                     *, in_use: bool, opposing: str = "") -> None:
     if not in_use:
         for field in fields:
             mark_problems(field, PromptProblems())
         return
     texts = [diff_text.live_text(field) for field in fields]
-    duplicates = duplicate_things(" ".join(texts))
+    whole = " ".join(texts)
+    duplicates, in_both_prompts = duplicate_things(whole), things_in_both(whole, opposing)
     start = 0
     for field, text in zip(fields, texts, strict=True):
         end = start + len(text)
@@ -77,8 +84,8 @@ def mark_problems_in(fields: list[QPlainTextEdit], reading: PromptReading | None
             tuple((at, at + 1) for at in unpaired_parentheses(text)),
             bad_weights(text),
             () if reading is None or reading.weighted else unread_emphasis(text),
-            tuple((max(first, start) - start, min(last, end) - start)
-                  for first, last in duplicates if first < end and last > start)))
+            _in_this_box(duplicates, start, end),
+            _in_this_box(in_both_prompts, start, end)))
         start = end + 1
 
 
@@ -118,6 +125,7 @@ class PromptBoxes(QWidget):
         self._baseline: str | None = None
         self._shares: list[str | None] = []
         self._in_use = True
+        self._opposite: PromptBoxes | None = None
         self._tip = ""
         self._writing = False
         self._flow_from: int | None = None
@@ -203,6 +211,22 @@ class PromptBoxes(QWidget):
         self.setToolTip(tip)
         self._mark_boxes_in_use()
         self._count_down()
+        if self._opposite is not None:
+            self._opposite.mark_problems()
+
+    def opposes(self, other: PromptBoxes) -> None:
+        self._opposite, other._opposite = other, self
+        self.textChanged.connect(other.mark_problems)
+        other.textChanged.connect(self.mark_problems)
+        self.mark_problems()
+        other.mark_problems()
+
+    def words_it_reads(self) -> str:
+        return " ".join(diff_text.live_text(box) for box in self._boxes) if self._in_use else ""
+
+    def mark_problems(self) -> None:
+        opposing = self._opposite.words_it_reads() if self._opposite is not None else ""
+        mark_problems_in(self._boxes, self._reading, in_use=self._in_use, opposing=opposing)
 
     def _mark_boxes_in_use(self) -> None:
         tip = self._tip
@@ -347,7 +371,7 @@ class PromptBoxes(QWidget):
             self.edit(tidy)
 
     def _count_down(self) -> None:
-        mark_problems_in(self._boxes, self._reading, in_use=self._in_use)
+        self.mark_problems()
         if self._cut_from is not None:
             for countdown, (_start, tokens) in zip(self._countdowns,
                                                    self._reading.pieces(self._cut_from), strict=True):

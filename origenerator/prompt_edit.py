@@ -155,6 +155,15 @@ def bare_terms(prompt: str) -> list[str]:
     return [_unwrap(segment)[0] for segment in _segments(prompt)]
 
 
+def terms_with_places(prompt: str) -> list[tuple[str, int, int]]:
+    places, at = [], 0
+    for segment in _segments(prompt):
+        start = at + len(segment) - len(segment.lstrip())
+        places.append((_unwrap(segment)[0], start, start + len(segment.strip())))
+        at += len(segment) + 1
+    return places
+
+
 def literal_match(terms: list[str], term: str) -> int | None:
     for i, text in enumerate(terms):
         if _mentions(text, term):

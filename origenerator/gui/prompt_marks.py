@@ -13,9 +13,10 @@ RESOLVE_UNPAIRED_PARENTHESES = "Resolve parentheses first"
 RESOLVE_BAD_WEIGHTS = "Resolve bad numbers first"
 RESOLVE_UNREAD_EMPHASIS = "Resolve unread emphasis first"
 RESOLVE_DUPLICATES = "Resolve duplicates first"
+RESOLVE_IN_BOTH_PROMPTS = "Resolve prompt conflicts first"
 
 _SAYS = (RESOLVE_UNPAIRED_PARENTHESES, RESOLVE_BAD_WEIGHTS, RESOLVE_UNREAD_EMPHASIS,
-         RESOLVE_DUPLICATES)
+         RESOLVE_DUPLICATES, RESOLVE_IN_BOTH_PROMPTS)
 
 Spans = tuple[tuple[int, int], ...]
 
@@ -25,6 +26,7 @@ class PromptProblems(NamedTuple):
     bad_weights: Spans = ()
     unread_emphasis: Spans = ()
     duplicates: Spans = ()
+    in_both_prompts: Spans = ()
 
 
 class _PromptMarks(QSyntaxHighlighter):

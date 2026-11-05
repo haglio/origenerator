@@ -74,6 +74,10 @@ class Offer(NamedTuple):
     tip: str
 
 
+NOTHING_LEFT_TO_ENHANCE = ("No items without this enhancement selected, and no remaining items "
+                           "in this folder without this enhancement")
+
+
 class EnhanceHost(Protocol):
     def selected_prompt_ids(self) -> list[str]: ...
 
@@ -211,7 +215,7 @@ class EnhanceController:
             self._awaiting(group.rows) if isinstance(group, gallery.SettingsGroup) else []
         )
         if not awaiting:
-            return Offer(False, "Nothing here to enhance")
+            return Offer(False, NOTHING_LEFT_TO_ENHANCE)
         return Offer(True, f"Enhance {len(awaiting)} not-yet-enhanced image"
                            f"{'s' if len(awaiting) != 1 else ''} in this folder "
                            f"{_WHAT_AN_ENHANCE_DOES}")

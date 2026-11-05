@@ -37,6 +37,7 @@ from origenerator.gui import (
     voice_router,
 )
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.enhance_controller import NOTHING_LEFT_TO_ENHANCE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_pace import DEFAULT_S
@@ -1043,7 +1044,7 @@ def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert words(view._voice.status) == "Nothing here to enhance"
+    assert words(view._voice.status) == NOTHING_LEFT_TO_ENHANCE
     assert view._live_jobs == {}
 
 

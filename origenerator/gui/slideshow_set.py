@@ -24,6 +24,7 @@ from origenerator.slideshow import (
     SlideshowFilters,
     SlideshowPlaylist,
     SlideshowState,
+    dealt,
     in_order,
 )
 
@@ -40,6 +41,7 @@ class SlideshowSet:
                  hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
         self._shuffle = deal.shuffle
+        self._weight_of = actions.weight_of
         self._on_pass_change = on_pass_change
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen
@@ -61,13 +63,8 @@ class SlideshowSet:
         self._a_row_played_whole_is_its_loop()
 
     def _deal(self, items, *, start=None, shuffle=None) -> SlideshowPlaylist:
-        shuffle = self._shuffle if shuffle is None else shuffle
-        if shuffle is not None:
-            return SlideshowPlaylist(items, shuffle=shuffle, start=start)
-        shuffled = SlideshowPlaylist(items)
-        if start is not None and 0 <= start < len(shuffled):
-            shuffled.lead_with(start)
-        return shuffled
+        return dealt(items, shuffle=self._shuffle if shuffle is None else shuffle,
+                     start=start, weight_of=self._weight_of)
 
     def _a_row_played_whole_is_its_loop(self) -> None:
         current = self.playlist.current()
@@ -329,7 +326,7 @@ class SlideshowSet:
         pool = self._pool_left_looping(state)
         if pool:
             self.start_loop(state.loop, pool)
-        if not self.playlist.resume(state.order, state.current):
+        if not self.playlist.resume(state.order, state.current, sat_out=self.all_items):
             return False
         if lead and not state.locked:
             self.lead_with_what_is_being_made()

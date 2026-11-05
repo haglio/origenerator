@@ -592,7 +592,7 @@ def slideshows(monkeypatch):
                         lambda *args: None)
     monkeypatch.setattr(module, "_screens", list)
 
-    def build(host=None, *, db=None, gallery_pane=None, fun_time=None):
+    def build(host=None, *, db=None, gallery_pane=None, fun_time=None, weights=None):
         host = host or FakeHost()
         db = db or FakeDB()
         gallery_pane = gallery_pane or FakeGalleryPane()
@@ -603,7 +603,9 @@ def slideshows(monkeypatch):
         director = SlideshowDirector(
             host,
             DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
-                            library=lambda: gallery_pane.library, listing=host.listing),
+                            library=lambda: gallery_pane.library, listing=host.listing,
+                            **({"weight_of": weights.of, "learn_weights": weights.learn}
+                               if weights else {})),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
@@ -2746,6 +2748,43 @@ def _a_session_side_with_its_opening_ready(slideshows, qtbot, gallery_pane):
     director.make_the_openings_ready()
     qtbot.waitUntil(lambda: director._openings.of(PORTRAIT) is not None)
     return director, host, made
+
+
+class FakeWeights:
+    def __init__(self):
+        self.learned = []
+
+    def of(self, item):
+        return 4.0
+
+    def learn(self, items):
+        self.learned.extend(items)
+
+
+def test_a_slideshow_is_dealt_by_the_weights_the_app_keeps_and_by_none_where_it_keeps_none(
+        slideshows):
+    director, _host, made = slideshows(weights=FakeWeights())
+    director.open([("a.mp4", "video", "g1", None)], location="workflow/a")
+    unweighted, _host, made_unweighted = slideshows()
+    unweighted.open([("a.mp4", "video", "g1", None)], location="workflow/a")
+
+    assert made[0].actions.weight_of("a.mp4") == 4.0
+    assert made_unweighted[-1].actions.weight_of is None
+
+
+def test_a_sides_opening_learns_the_weights_of_its_videos_while_it_is_made_ready(
+        slideshows, qtbot):
+    weights = FakeWeights()
+    gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4"), _row("g5")]})
+    director, _host, _made = slideshows(gallery_pane=gallery_pane, weights=weights,
+                                        fun_time=FakeSession(funestras={PORTRAIT: object()}))
+    director.items_of = lambda rows: [("g4.png", "image", "g4", None),
+                                      ("g5.mp4", "video", "g5", None)]
+
+    director.make_the_openings_ready()
+    qtbot.waitUntil(lambda: director._openings.of(PORTRAIT) is not None)
+
+    assert weights.learned == ["g5.mp4"]
 
 
 def test_a_side_with_its_opening_ready_opens_without_walking_the_library(

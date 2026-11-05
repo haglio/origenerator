@@ -15,7 +15,7 @@ from origenerator.gui.slideshow_set import (
     narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
-from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
+from origenerator.slideshow import LIVE, Slide, SlideshowFilters, SlideshowState, in_order
 from tests.slideshow_support import slides_named
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
@@ -788,3 +788,33 @@ def test_the_frame_of_an_image_being_made_is_its_newest():
     assert slideshow_set.frame_being_made_of(waiting) is None
     assert slideshow_set.frame_being_made_of(plain) is None
     assert slideshow_set.frame_being_made_of(live) == b"run-frame"
+
+
+_TWO_VIDEOS = [("one.mp4", "video", "id-1"), ("two.mp4", "video", "id-2")]
+
+
+def _shuffled_set(weights: dict, **deal) -> SlideshowSet:
+    return SlideshowSet(_TWO_VIDEOS, actions=SlideshowActions(weight_of=weights.__getitem__),
+                        deal=SetDeal(**deal))
+
+
+def _in_the_pass(slideshow_set: SlideshowSet) -> list:
+    return sorted(slide.prompt_id for slide in slideshow_set.playlist.items)
+
+
+def test_a_new_pass_keeps_the_video_on_screen_though_he_always_skips_it():
+    slideshow_set = _shuffled_set({"one.mp4": 0.0, "two.mp4": 0.0}, start=1)
+    assert (slideshow_set.current_prompt_id(), _in_the_pass(slideshow_set)) == ("id-2", ["id-2"])
+
+    slideshow_set.replace_items(slideshow_set.all_items, keep_slide=True)
+
+    assert (slideshow_set.current_prompt_id(), _in_the_pass(slideshow_set)) == ("id-2", ["id-2"])
+
+
+def test_a_set_picked_back_up_lands_on_the_video_it_left_off_on_though_it_sat_this_pass_out():
+    slideshow_set = _shuffled_set({"one.mp4": 1.0, "two.mp4": 0.0})
+    assert _in_the_pass(slideshow_set) == ["id-1"]
+
+    assert slideshow_set.resume(SlideshowState(order=("id-1", "id-2"), current="id-2"))
+
+    assert slideshow_set.current_prompt_id() == "id-2"

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import random
 from dataclasses import asdict, dataclass
+from functools import partial
 from typing import NamedTuple
+
+from app_support.watch_weights import passes_inclusion, weighted_shuffle
 
 LIVE = "live"
 
@@ -96,10 +99,18 @@ def _without(indices: list, removed: int) -> list:
 def in_order(order: list) -> None: ...
 
 
+_DEALER = random.Random()
+
+
+def _by_weight(slides: list, weight_of, order: list) -> None:
+    order[:] = weighted_shuffle(order, lambda index: weight_of(slides[index].path), _DEALER)
+
+
 class SlideshowPlaylist:
-    def __init__(self, items, *, shuffle=random.shuffle, start=None):
+    def __init__(self, items, *, shuffle=random.shuffle, start=None, weight_of=None):
         self._items = [Slide.of(item) for item in items]
-        self._shuffle = shuffle
+        self._shuffle = (shuffle if weight_of is None
+                         else partial(_by_weight, self._items, weight_of))
         self._order = list(range(len(self._items)))
         self._shuffle(self._order)
         self._pos = (self._order.index(start)
@@ -170,7 +181,10 @@ class SlideshowPlaylist:
     def order_ids(self) -> list:
         return [self._items[index].prompt_id for index in self._order]
 
-    def resume(self, order_ids, current_id) -> bool:
+    def resume(self, order_ids, current_id, sat_out=()) -> bool:
+        for slide in sat_out:
+            if slide.prompt_id == current_id:
+                self.add(slide)
         places = {slide.prompt_id: index
                   for index, slide in enumerate(self._items)
                   if slide.prompt_id is not None}
@@ -263,3 +277,24 @@ class SlideshowPlaylist:
         for index in found:
             self._items[index] = self._items[index].upgraded(path, media_type, still)
         return bool(found)
+
+
+def dealt(items, *, shuffle, start, weight_of) -> SlideshowPlaylist:
+    if shuffle is not None:
+        return SlideshowPlaylist(items, shuffle=shuffle, start=start)
+    slides = [Slide.of(item) for item in items]
+    playing = _in_this_pass(slides, start, weight_of)
+    shuffled = SlideshowPlaylist([slides[index] for index in playing], weight_of=weight_of)
+    if start in playing:
+        shuffled.lead_with(playing.index(start))
+    return shuffled
+
+
+def _in_this_pass(slides: list, on_screen, weight_of) -> list[int]:
+    everything = list(range(len(slides)))
+    if weight_of is None:
+        return everything
+    playing = [index for index, slide in enumerate(slides)
+               if index == on_screen or slide.is_live
+               or passes_inclusion(weight_of(slide.path), _DEALER)]
+    return playing or everything

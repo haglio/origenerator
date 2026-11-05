@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from funestra.hud_title import SHUFFLE_LABEL
 from funestra.volume import VolumeHud
 
+from origenerator import watch_weights
 from origenerator.slideshow import Slide, SlideshowFilters
 
 
@@ -34,6 +35,7 @@ class SlideshowActions:
     widen: Callable[[str], tuple] | None = None
     actions_of: Callable[[list], dict] | None = None
     strike_action: Callable[[Slide], str] | None = None
+    weight_of: Callable[[object], float] | None = None
     slides: Callable[[tuple], tuple] | None = None
     filters_changed: Callable[[SlideshowFilters], None] | None = None
     volume_moved: Callable[[VolumeHud], None] | None = None
@@ -92,6 +94,12 @@ class DirectorSources:
     names: object
     library: Callable[[], object]
     listing: Callable[[], Listing]
+    weight_of: Callable[[object], float] | None = None
+    learn_weights: Callable[[list], None] = list
+
+    @classmethod
+    def of_this_library(cls, **sources) -> DirectorSources:
+        return cls(**sources, **watch_weights.of_this_library())
 
 
 @dataclass(frozen=True)

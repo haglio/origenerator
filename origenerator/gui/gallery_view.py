@@ -419,8 +419,8 @@ class GalleryView(QWidget):
         self._trail = (False, False)
         self._slideshows = SlideshowDirector(
             self,
-            DirectorSources(db=db, jobs=self._jobs, names=self._item_names,
-                            library=lambda: self._library, listing=self.listing),
+            DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
+                                            library=lambda: self._library, listing=self.listing),
             DirectorSurroundings(
                 pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons))

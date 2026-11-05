@@ -223,6 +223,8 @@ class SlideshowDirector:
         self._db = sources.db
         self._names = sources.names
         self._listing = sources.listing
+        self._weight_of = sources.weight_of
+        self._learn_weights = sources.learn_weights
         self._jobs = sources.jobs
         self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
@@ -512,6 +514,7 @@ class SlideshowDirector:
             widen=partial(self.beyond_the_row_of, shape=shape),
             actions_of=partial(self.actions_of, shape=shape),
             strike_action=striking(self._db, self._host),
+            weight_of=self._weight_of,
             slides=self.slides_for,
             move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,
@@ -889,11 +892,12 @@ class SlideshowDirector:
     @looking_once
     def _opening_of(self, rows: list[dict]) -> RegionOpening:
         items = self.items_of(rows)
+        videos = [path for path, media_type, *_rest in items if media_type == MediaType.VIDEO]
+        self._learn_weights(videos)
         return RegionOpening(
             rows=rows, items=items, versions=self.versions_of(rows),
             enhanced_ids=self._enhanced_ids_of(rows),
-            scripts={str(path): funscript_of(path, places=OUTPUT_PLACES)
-                     for path, media_type, *_rest in items if media_type == MediaType.VIDEO},
+            scripts={str(path): funscript_of(path, places=OUTPUT_PLACES) for path in videos},
             lead=randrange(len(items)) if items else 0)
 
     def _with_its_lead_on_the_map(self, opening: RegionOpening, shape: str) -> RegionOpening:

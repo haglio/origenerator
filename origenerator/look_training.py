@@ -129,7 +129,7 @@ def training_offer(base: str, lora) -> TrainingOffer:
     folder = pictures_folder(base)
     return lora_training.offer(
         training_state(base),
-        tooltip=(f"Trains the next version of {base} from the pictures in {folder}. Your own "
+        tooltip=(f"Trains the next version of {base} from the images in {folder}. Your own "
                  "generations come first: the training pauses whenever ComfyUI has work and picks "
                  "up where it stopped."),
         pictures=len(picture_files(folder)), folder=folder,

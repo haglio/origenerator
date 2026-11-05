@@ -117,8 +117,7 @@ def test_train_with_no_pictures_makes_the_folder_and_says_to_put_them_there(look
     tab.train_requested.emit("lora")
 
     assert look.is_dir()
-    assert str(look) in told[0]
-    assert "Example Look" in told[0]
+    assert told[0] == f"Put images of Example Look in {look}, then press Train again."
     assert _runs == []
 
 

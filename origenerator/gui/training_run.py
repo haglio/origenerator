@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 POLL_MS = 2000
 STAGES = {
     "cropping": ("Cropping", "Cropping photos"),
-    "preparing": ("Copying", "Copying pictures"),
-    "describing": ("Describing", "Describing pictures"),
+    "preparing": ("Copying", "Copying images"),
+    "describing": ("Describing", "Describing images"),
     "caching": ("Preparing", "Preparing"),
     "waiting": ("Waiting", "Waiting for the graphics card"),
     "training": ("Training", "Training"),

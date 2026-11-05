@@ -267,10 +267,10 @@ def test_a_training_that_yields_the_tile_itself_starts_at_once_whatever_comfyui_
     assert not run.holds_the_line
     assert len(started) == 1
     assert queue.freed == 0
-    assert run.reading().stage == "Copying pictures"
+    assert run.reading().stage == "Copying images"
     assert run.caption == "Example Look 1.1 LoRA"
     _say(tmp_path, state="describing", done=3, total=12)
-    qtbot.waitUntil(lambda: run.reading().stage == "Describing pictures")
+    qtbot.waitUntil(lambda: run.reading().stage == "Describing images")
     assert run.reading().pass_progress == (3, 12)
     _say(tmp_path, state="waiting")
     qtbot.waitUntil(lambda: run.reading().stage == "Waiting for the graphics card")

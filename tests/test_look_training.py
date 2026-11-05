@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from origenerator import config, look_training, lora_training
+from origenerator.gui import param_help, training_run
 from origenerator.lora_training import TrainingState
 from origenerator.model_titles import model_title
 from origenerator.trigger_words import trigger_words_by_lora
@@ -192,3 +193,17 @@ def test_what_a_trainable_lora_offers_beside_its_dropdown(
     assert "Example Look" in offer.tooltip
     assert str(folder) in offer.tooltip
     assert "generations come first" in offer.tooltip
+
+
+def test_a_looks_training_counts_and_names_images_never_pictures(
+        monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
+    folder = _trainable(monkeypatch, tmp_path)
+    _installed(installed_models, titled_models, worded_loras, ("example_look", "Example Look 1.0"))
+
+    offer = look_training.training_offer("Example Look", "example_look.safetensors")
+    said = [offer.tooltip.replace(str(folder), ""), *(words for stage in training_run.STAGES.values() for words in stage),
+            param_help.MORE_THAN_ONE_BOX]
+
+    assert offer.counted == "image"
+    assert "the images in" in offer.tooltip
+    assert [line for line in said if "picture" in line.lower()] == []

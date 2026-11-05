@@ -43,7 +43,7 @@ class LookTrainingController:
         folder.mkdir(parents=True, exist_ok=True)
         if not look_training.picture_files(folder):
             QMessageBox.information(self._parent, "Train",
-                                    f"Put pictures of {base} in {folder}, then press Train again.")
+                                    f"Put images of {base} in {folder}, then press Train again.")
             return
         self._watch(look_training.training_job(base), tab, key).begin()
 

@@ -1908,3 +1908,12 @@ def test_enhancing_an_old_image_marks_the_folder_it_sits_in():
     marked = recently_worked_folders({PORTRAIT: tree}, [old, newer], limit=1)
 
     assert marked == {(PORTRAIT, "s1")}
+
+
+def test_a_video_another_site_made_is_found_by_where_it_is_kept(tmp_path):
+    kept = tmp_path / "outbox" / "portrait" / "example_site" / "scene one_topaz.mp4"
+    theirs = {"prompt_id": "o1", "output_files": json.dumps(
+        [{"filename": kept.name, "library_path": str(kept)}])}
+    ours = {"prompt_id": "v1", "output_files": json.dumps([{"filename": "scene one.mp4"}])}
+
+    assert generation_of_file(str(kept), [ours, theirs]) == "o1"

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from origenerator.box_breaks import BOX_BREAK, parenthesis_at
-from origenerator.prompt_edit import terms_with_places
+from origenerator.prompt_terms import terms_with_places
 
 _NUMBER = re.compile(r"\d+(\.\d+)?|\.\d+")
 _ENDS_A_GROUP = re.compile(r":([^:()]*)(?<!\\)\)")

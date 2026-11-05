@@ -12,6 +12,7 @@ from origenerator.gui import enhance_controller as module
 from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
     NO_VIDEO_ENHANCER,
+    NOTHING_LEFT_TO_ENHANCE,
     EnhanceController,
     EnhanceParts,
     Offer,
@@ -319,13 +320,13 @@ def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
 def test_a_folder_that_is_not_a_settings_folder_offers_nothing(enhance):
     controller, _host = enhance(FakeHost(group=FakeGroup([_image("i1")])))
 
-    assert controller.offer() == (False, "Nothing here to enhance")
+    assert controller.offer() == (False, NOTHING_LEFT_TO_ENHANCE)
 
 
 def test_a_collection_offers_nothing_to_enhance(enhance):
     controller, _host = enhance(FakeHost(group=None))
 
-    assert controller.offer() == (False, "Nothing here to enhance")
+    assert controller.offer() == (False, NOTHING_LEFT_TO_ENHANCE)
 
 
 def test_a_whole_folder_offer_says_what_the_enhance_does_in_plain_words(enhance,
@@ -580,9 +581,9 @@ def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
 def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(enhance):
     controller, _host = enhance()
 
-    controller.sync_pane(Offer(False, "Nothing here to enhance"))
+    controller.sync_pane(Offer(False, NOTHING_LEFT_TO_ENHANCE))
 
-    assert controller.pane.offer == (False, "Nothing here to enhance")
+    assert controller.pane.offer == (False, NOTHING_LEFT_TO_ENHANCE)
 
 
 def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):

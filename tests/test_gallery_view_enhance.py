@@ -27,6 +27,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_tab as generate_tab_module
+from origenerator.gui.enhance_controller import NOTHING_LEFT_TO_ENHANCE
 from origenerator.gui.enhance_versions import _AddRow, _PendingRow, _VersionRow
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.output_places import OutputPlaces
@@ -76,7 +77,7 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view._tree.setCurrentItem(view._tree_item_for(key))
     assert not view._buttons.enhance.isHidden()
     assert not view._buttons.enhance.isEnabled()
-    assert view._buttons.enhance.toolTip() == "Nothing here to enhance"
+    assert view._buttons.enhance.toolTip() == NOTHING_LEFT_TO_ENHANCE
 
 
 def test_enhance_all_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_path):

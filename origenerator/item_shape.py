@@ -50,6 +50,10 @@ def what_plays_at(key: str | None, rows: list[dict]) -> list[dict]:
     return [row for row in rows if made_here(row)] if whole_library else rows
 
 
+def together(rows: list[dict], more: list[dict]) -> list[dict]:
+    return list({row["prompt_id"]: row for row in (*rows, *more)}.values())
+
+
 def base_of(key: str | None) -> str | None:
     return split_key(key)[0]
 

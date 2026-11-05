@@ -1242,13 +1242,12 @@ class GenerateTab(DropZones):
             words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             owner=self,
-            then=lambda revision, context=(self._asked, aim.prompt_id): self._on_rewritten(
-                context, revision))
+            then=lambda revision, context=(self._asked, aim): self._on_rewritten(context, revision))
 
     def _on_rewritten(self, context, revision) -> None:
-        asked, prompt_id = context
+        asked, asked_of = context
         aim = self._request_aim
-        if asked != self._asked or aim is None or aim.prompt_id != prompt_id:
+        if asked != self._asked or aim is None or aim.prompt_id != asked_of.prompt_id:
             return
         exchange = self._param_form.request_exchange()
         if revision is None:

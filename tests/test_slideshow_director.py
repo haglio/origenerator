@@ -2303,6 +2303,49 @@ def test_a_lock_on_a_hosted_slideshow_puts_the_generation_it_holds_in_front_of_h
     assert host.followed == []
 
 
+def _a_video_locked_in_a_session(slideshows, tmp_path, row):
+    session = FakeSession()
+    session.dashboard_cmd_file = tmp_path / "dashboard_cmd.txt"
+    director, host, made = slideshows(FakeHost(rows=[row]), db=FakeDB([row]), fun_time=session)
+    director.open(director.items_of([row]), location="a-folder", shape="portrait")
+
+    made[0].actions.lock(row["prompt_id"])
+
+    return host, session.dashboard_cmd_file.read_text(encoding="utf-8").splitlines()
+
+
+def test_a_lock_on_another_sites_video_is_left_to_the_session_which_knows_its_sites_page(
+        slideshows, tmp_path):
+    video = _a_sites(_animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path))
+
+    host, told = _a_video_locked_in_a_session(slideshows, tmp_path, video)
+
+    assert told == ["portrait_lock_held|v1.png"]
+    assert host.shown == []
+
+
+def test_a_lock_on_a_video_made_here_is_left_to_the_session_so_core_shows_it_only_once(
+        slideshows, tmp_path):
+    video = _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)
+
+    host, told = _a_video_locked_in_a_session(slideshows, tmp_path, video)
+
+    assert told == ["portrait_lock_held|v1.png"]
+    assert host.shown == []
+
+
+def test_a_lock_on_a_video_the_session_cannot_be_told_of_is_shown_in_core(
+        slideshows, tmp_path):
+    video = _a_sites(_animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path))
+    director, host, made = slideshows(FakeHost(rows=[video]), db=FakeDB([video]),
+                                      fun_time=FakeSession())
+    director.open(director.items_of([video]), location="a-folder", shape="portrait")
+
+    made[0].actions.lock("v1")
+
+    assert host.shown == ["v1"]
+
+
 def _a_sitting():
     return [_image("g5", "a red fox", seed=5), _image("g4", "a red fox", seed=4),
             _image("g3", "a blue car", seed=3),

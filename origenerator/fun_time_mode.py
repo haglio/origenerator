@@ -65,6 +65,7 @@ SAY = "say"
 SAID_AT = " @"
 REQUEST_OPEN = "request_open"
 REQUEST_CLOSED = "request_closed"
+LOCK_HELD = "lock_held"
 
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 
@@ -154,6 +155,7 @@ def declaration() -> dict:
         "said_at_suffix": f"{SAID_AT}{{said_at_epoch_seconds}}",
         "request_lines": [spelled_for(shape, line) for shape in SHAPES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
+        "lock_lines": [f"{spelled_for(shape, LOCK_HELD)}|{{file}}" for shape in SHAPES],
         "fix_phrases": list(published_fix_phrases()),
     }
 

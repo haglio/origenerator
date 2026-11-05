@@ -99,7 +99,12 @@ def generations_by_stem(rows: list[dict]) -> dict[str, str]:
 
 
 def generation_of_file(path, rows: list[dict]) -> str | None:
-    return generations_by_stem(rows).get(stem_as_made(path))
+    return _kept_at(Path(path), rows) or generations_by_stem(rows).get(stem_as_made(path))
+
+
+def _kept_at(path: Path, rows: list[dict]) -> str | None:
+    return next((row["prompt_id"] for row in rows for file in row_output_files(row)
+                 if (kept := place_of_its_own(file)) and Path(kept) == path), None)
 
 
 def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:

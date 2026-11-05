@@ -529,8 +529,10 @@ class EnhancePane(QWidget):
                    if (model := fix_training.trained_on(own["lora"]))}
         if not trained:
             return ""
-        return fix_lora_model_warning(self._models_it_runs(params.get("checkpoint")), trained,
-                                      self._options("checkpoint"))
+        held = params.get("checkpoint")
+        return fix_lora_model_warning(self._models_it_runs(held), trained,
+                                      self._options("checkpoint"),
+                                      matching_the_source=held == MATCH_SOURCE_MODEL)
 
     def _models_it_runs(self, held) -> frozenset[str] | None:
         if held != MATCH_SOURCE_MODEL:

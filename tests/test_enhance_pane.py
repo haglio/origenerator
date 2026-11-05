@@ -1801,7 +1801,15 @@ def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, instal
 
 
 _HANDS_LORA = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
-_TRAINED_ON_SAID = "The Hands fix's LoRA was trained on trained_on."
+_ITS_TWO_WAYS_OUT = (
+    "A LoRA works best on the model it was trained on. On another model it can do little or make "
+    "the fix look wrong.\nTo fix this, either turn off the Hands fix or change Model to trained_on.")
+_MODEL_SET_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on, but Model is set to "
+                             "picked.\n" + _ITS_TWO_WAYS_OUT)
+_SOME_MADE_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on, but some of the source "
+                             "images were made with picked.\n" + _ITS_TWO_WAYS_OUT)
+_SOURCE_MADE_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on, but the source image "
+                               "was made with picked.\n" + _ITS_TWO_WAYS_OUT)
 
 
 @pytest.fixture
@@ -1830,7 +1838,7 @@ def test_a_ticked_fixs_lora_trained_on_another_model_warns_beside_the_model(hand
     pane, _edits = hands_trained_on({"hands": 0.45})
 
     assert (pane._model_warning.isHidden(), pane._model_warning.toolTip()) == (
-        False, _TRAINED_ON_SAID)
+        False, _MODEL_SET_ELSEWHERE_SAID)
 
 
 def test_clicking_the_models_warning_leaves_the_choice_of_model_or_fix_to_the_user(
@@ -1876,7 +1884,7 @@ def test_matching_the_source_warns_while_a_picked_image_is_made_by_another_model
                                 _made_by("picked.safetensors", file="two.png")])
 
     assert (pane._model_warning.isHidden(), pane._model_warning.toolTip()) == (
-        False, _TRAINED_ON_SAID)
+        False, _SOME_MADE_ELSEWHERE_SAID)
 
 
 def _folder(*rows) -> SettingsGroup:
@@ -1894,11 +1902,11 @@ def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
     pane.show_images_in_front([], folder)
 
     assert pane._model_warning.isHidden() is hidden
-    assert hidden or pane._model_warning.toolTip() == _TRAINED_ON_SAID
+    assert hidden or pane._model_warning.toolTip() == _SOURCE_MADE_ELSEWHERE_SAID
 
 
-_NO_GUARANTEE_SAID = ("There's no guarantee the images here were made by trained_on, which the "
-                      "Hands fix's LoRA was trained on.")
+_NO_GUARANTEE_SAID = ("The Hands fix's LoRA was trained on trained_on, and there's no guarantee "
+                      "the source images here were made with it.\n" + _ITS_TWO_WAYS_OUT)
 
 
 @pytest.mark.parametrize("folder", [

@@ -122,16 +122,29 @@ class MissingTriggerWords(NamedTuple):
         return with_trigger_word(prompt, self.words, in_scenes=self.in_scenes)
 
 
+def _lora_trained_elsewhere(fix: str, trained: str) -> str:
+    return ("A LoRA works best on the model it was trained on. On another model it can do little "
+            "or make the fix look wrong.\n"
+            f"To fix this, either turn off the {fix.capitalize()} fix or change Model to "
+            f"{model_title(trained)}.")
+
+
 def fix_lora_model_warning(runs_on: frozenset[str] | None, trained_on: dict[str, str],
-                           offered) -> str:
+                           offered, *, matching_the_source: bool) -> str:
     for fix, trained in trained_on.items():
         if trained not in offered:
             continue
+        lora = f"The {fix.capitalize()} fix's LoRA was trained on {model_title(trained)}"
         if runs_on is None:
-            return (f"There's no guarantee the images here were made by {model_title(trained)}, "
-                    f"which the {fix.capitalize()} fix's LoRA was trained on.")
-        if runs_on - {trained}:
-            return f"The {fix.capitalize()} fix's LoRA was trained on {model_title(trained)}."
+            return (f"{lora}, and there's no guarantee the source images here were made with it.\n"
+                    + _lora_trained_elsewhere(fix, trained))
+        others = sorted(runs_on - {trained})
+        if others:
+            used = model_title(others[0])
+            differs = (f"but Model is set to {used}" if not matching_the_source
+                       else f"but the source image was made with {used}" if len(runs_on) == 1
+                       else f"but some of the source images were made with {used}")
+            return f"{lora}, {differs}.\n" + _lora_trained_elsewhere(fix, trained)
     return ""
 
 

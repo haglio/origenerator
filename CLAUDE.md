@@ -182,21 +182,17 @@ every commit, never a few nearby files in its place.
   that writes where two workers meet (a fixed name in the temp folder, a fixed
   port, a named Windows object) fails only in this run, so give it `tmp_path`
   or a free port.
-- The workers run below normal priority (`tests/side_by_side.py`), so what he
+- The workers run below normal priority (app_support sets it), so what he
   is using on the computer comes first, and the run takes longer while the
   computer is busy: 5:32 beside his Origenerator and three other suites.
-- `-x` ends the run only once each worker has finished the tests already
-  dealt to it, so a red run can take as long as a green one.
 - A run that names test files or narrows with `-k` goes in one process, as
-  before: under `-n` the coverage floor is not stood down for it.
+  before, since dealing it out takes longer than it saves.
 - A worker that dies natively is named with the test it was running. Three
   `Windows fatal exception: code 0xe0000001` dumps in a green run's output are
   `tests/test_windows_toast.py` having Windows refuse a toast on
   purpose, never a crash.
-- `-n` is pytest-xdist's, which the `dev` extra names. A venv without it
-  answers `unrecognized arguments: -n`; it goes in with
-  `pip install "pytest-xdist>=3.8,<4"` at a moment none of his apps is running
-  out of that venv, and nothing else in the venv changes.
+- `-n` is pytest-xdist's, which the `dev` extra names and the production updater
+  installs. A venv without it answers `unrecognized arguments: -n`.
 - GitHub still runs the suite shuffled, in four parts on four machines.
 
 ## A model dropdown offers only what its graph can run

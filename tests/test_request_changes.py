@@ -170,3 +170,29 @@ def test_a_storys_scenes_each_get_the_trigger_word_swapped(versioned_style):
                              story_of(["exmplstyle, a dog", "a cat"]), in_scenes=True)
 
     assert outcome.positive == story_of(["exmplnew, a dog", "exmplnew, a cat"])
+
+
+def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_and_said_so():
+    outcome = _applied(
+        [{"prompt": "positive", "replace": "exmplstyle, two women on a couch, soft light",
+          "with": "(exmplstyle:1.2), one woman on a couch, soft light, natural lighting",
+          "for": "have only one woman"}],
+        pair=("exmplstyle, two women on a couch, soft light", "blurry"),
+        asked=("please make it portrait and have only one woman",))
+
+    assert outcome.positive == "exmplstyle, one woman on a couch, soft light"
+    assert outcome.line == (
+        'Replaced "two women" with "one woman" in the Positive Prompt. Didn\'t replace '
+        '"exmplstyle" with "(exmplstyle:1.2)" in the Positive Prompt: you didn\'t ask for that. '
+        'Didn\'t add "natural lighting" to the Positive Prompt: you didn\'t ask for that.')
+
+
+def test_a_replacement_in_words_that_are_not_his_at_all_is_the_models_to_make_whole():
+    outcome = _applied([{"prompt": "positive", "replace": "silver ear studs, a necklace",
+                         "with": "bare ears, a bare neck", "for": "no jewelry"}],
+                       pair=("a woman, silver ear studs, a necklace", "blurry"),
+                       asked=("no jewelry",))
+
+    assert outcome.positive == "a woman, bare ears, a bare neck"
+    assert outcome.line == ('Replaced "silver ear studs, a necklace" with "bare ears, a bare neck" '
+                            "in the Positive Prompt.")

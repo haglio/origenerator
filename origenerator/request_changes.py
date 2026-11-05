@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from difflib import SequenceMatcher
+from itertools import zip_longest
 from typing import ClassVar
 
 from origenerator.request_settings import Setting, setting_called
@@ -17,6 +19,11 @@ _WORD = re.compile(r"[A-Za-z0-9']{2,}")
 _NOT_ASKED_FOR = "you didn't ask for that"
 PROMPTS = {"positive": "Positive Prompt", "negative": "Negative Prompt"}
 _NOTHING_CHANGED = "Nothing changed."
+_SAYING_NOTHING = frozenset({
+    "the", "and", "in", "on", "of", "with", "to", "it", "at", "an", "is", "for", "or", "no", "not",
+    "her", "his", "him", "she", "he", "you", "me", "my", "please", "make", "have", "only", "more",
+    "less", "use", "but", "that", "this", "did", "didn't", "don't", "do", "be", "as", "by",
+})
 _UNREADABLE = "Couldn't read one of the model's changes."
 
 
@@ -34,6 +41,10 @@ def _quoted(value) -> str:
 
 def _words_of(text) -> set[str]:
     return {word.lower() for word in _WORD.findall(str(text or ""))}
+
+
+def _naming(text) -> set[str]:
+    return {word.removesuffix("s") for word in _words_of(text) - _SAYING_NOTHING}
 
 
 def answers_him(reason, asked: list[str]) -> bool:
@@ -64,6 +75,34 @@ def _end_of_the_part(text: str, start: int) -> int:
     return len(text)
 
 
+def _parts(text: str) -> list[str]:
+    parts, start = [], 0
+    while start <= len(text):
+        end = _end_of_the_part(text, start)
+        parts.append(text[start:end].strip())
+        start = end + 1
+    return parts
+
+
+def _paired(old: list[str], new: list[str]) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        if tag == "equal":
+            pairs += [(part, part) for part in old[i1:i2]]
+        else:
+            pairs += list(zip_longest(old[i1:i2], new[j1:j2], fillvalue=""))
+    return pairs
+
+
+def _only_the_words_that_differ(old: str, new: str) -> tuple[str, str]:
+    before, after = old.split(), new.split()
+    while before and after and before[0] == after[0]:
+        before, after = before[1:], after[1:]
+    while before and after and before[-1] == after[-1]:
+        before, after = before[:-1], after[:-1]
+    return (" ".join(before), " ".join(after)) if before and after else (old, new)
+
+
 def _joined(before: str, words: str, after: str) -> str:
     before, after = before.rstrip(" ,"), after.lstrip(" ,")
     return ", ".join(part for part in (before, words, after) if part)
@@ -75,6 +114,23 @@ _DESCRIBED = {
     "add": lambda change, prompt: f"add {_quoted(change['add'])} to the {prompt}",
     "remove": lambda change, prompt: f"remove {_quoted(change['remove'])} from the {prompt}",
 }
+
+
+def _said_done(before: str, after: str, prompt: str) -> str:
+    if not before:
+        return f"Added {_quoted(after)} to the {prompt}."
+    if not after:
+        return f"Removed {_quoted(before)} from the {prompt}."
+    before, after = _only_the_words_that_differ(before, after)
+    return f"Replaced {_quoted(before)} with {_quoted(after)} in the {prompt}."
+
+
+def _said_undone(before: str, after: str, prompt: str) -> str:
+    if not before:
+        return _DESCRIBED["add"]({"add": after}, prompt)
+    if not after:
+        return _DESCRIBED["remove"]({"remove": before}, prompt)
+    return _DESCRIBED["replace"]({"replace": before, "with": after}, prompt)
 
 
 def _trigger_words_of(lora) -> tuple[str, ...]:
@@ -151,8 +207,27 @@ class _Applying:
         found = _found(text, old)
         if found is None:
             return f"Couldn't find {_quoted(old)} in the {PROMPTS[which]}."
-        setattr(self, which, text[:found.start()] + new + text[found.end():])
-        return f"Replaced {_quoted(old)} with {_quoted(new)} in the {PROMPTS[which]}."
+        kept, said = self._what_he_asked_of(found.group(0), new, PROMPTS[which])
+        setattr(self, which, text[:found.start()] + kept + text[found.end():])
+        return " ".join(said) or f"Replaced {_quoted(old)} with {_quoted(new)} in the {PROMPTS[which]}."
+
+    def _what_he_asked_of(self, old: str, new: str, prompt: str) -> tuple[str, list[str]]:
+        his = set().union(*(_naming(request) for request in self.asked))
+        pairs = _paired(_parts(old), _parts(new))
+        changed = [pair for pair in pairs if pair[0] != pair[1]]
+        asked_for = [pair for pair in changed if _naming(" ".join(pair)) & his]
+        if len(changed) <= 1 or not asked_for:
+            return new, []
+        kept, done, left = [], [], []
+        for before, after in pairs:
+            if before == after or (before, after) in asked_for:
+                kept.append(after)
+                if before != after:
+                    done.append(_said_done(before, after, prompt))
+            else:
+                kept.append(before)
+                left.append(f"Didn't {_said_undone(before, after, prompt)}: {_NOT_ASKED_FOR}.")
+        return ", ".join(part for part in kept if part), done + left
 
     def _add(self, which: str, change: dict) -> str:
         words, text = str(change["add"]), getattr(self, which)

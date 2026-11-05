@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests.children import run_python
-from tests.scratch import remove_scratch
+from tests.scratch import give_these_tests_a_state_dir, remove_scratch
 
 _A_SUITE_THAT_LOGS_INTO_ITS_STATE_DIR = """
 import logging, sys
@@ -65,3 +65,50 @@ def test_the_suite_state_dir_goes_at_exit_with_the_apps_log_still_open_in_it(tmp
     run_python(["-c", _A_SUITE_THAT_LOGS_INTO_ITS_STATE_DIR, str(state)], check=True)
 
     assert not state.exists()
+
+
+def test_a_program_a_worker_starts_keeps_the_state_dir_it_was_handed():
+    worker = {"PYTEST_XDIST_WORKER": "gw3"}
+    give_these_tests_a_state_dir(worker, make=lambda: "made for gw3")
+    handed_to_its_program = worker | {"ORIGENERATOR_STATE_DIR": "the one its test named"}
+
+    give_these_tests_a_state_dir(handed_to_its_program, make=lambda: "made again")
+
+    assert handed_to_its_program["ORIGENERATOR_STATE_DIR"] == "the one its test named"
+
+
+@pytest.mark.parametrize("started_as", [{}, {"PYTEST_XDIST_WORKER": "gw3"}], ids=["one run", "a worker"])
+def test_a_state_dir_named_from_outside_the_suite_is_the_one_its_tests_use(started_as):
+    told = started_as | {"ORIGENERATOR_STATE_DIR": "named by whoever started the run"}
+
+    give_these_tests_a_state_dir(told, make=lambda: "made over it")
+
+    assert told["ORIGENERATOR_STATE_DIR"] == "named by whoever started the run"
+
+
+_A_RUN_THAT_STARTS_A_WORKER = """
+import os, subprocess, sys
+sys.path.insert(0, "tests")
+from scratch import give_these_tests_a_state_dir
+give_these_tests_a_state_dir(os.environ, make=lambda: "made for the run")
+os.environ["PYTEST_XDIST_WORKER"] = "gw3"
+subprocess.run([sys.executable, "-c", sys.argv[1]], check=True)
+"""
+
+_A_WORKER = """
+import os, sys
+sys.path.insert(0, "tests")
+from scratch import give_these_tests_a_state_dir
+give_these_tests_a_state_dir(os.environ, make=lambda: "made for gw3")
+print(os.environ["ORIGENERATOR_STATE_DIR"])
+"""
+
+
+def test_a_worker_makes_a_state_dir_of_its_own_though_windows_hands_it_no_variable_the_run_set_to_nothing():
+    as_a_run_starts = {name: value for name, value in os.environ.items()
+                       if name not in ("ORIGENERATOR_STATE_DIR", "ORIGENERATOR_SUITE_STATE_DIR_MADE_FOR",
+                                       "PYTEST_XDIST_WORKER")}
+
+    ran = run_python(["-c", _A_RUN_THAT_STARTS_A_WORKER, _A_WORKER], env=as_a_run_starts, check=True)
+
+    assert ran.stdout.strip() == "made for gw3"

@@ -518,7 +518,7 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     assert "..." not in content.rsplit("\n\n", 1)[0]
 
 
-def test_asking_the_model_sends_one_question_that_reads_long_thinks_first_and_lets_the_model_go():
+def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_go():
     sent = {}
 
     def ask(messages, **settings):
@@ -534,8 +534,7 @@ def test_asking_the_model_sends_one_question_that_reads_long_thinks_first_and_le
     assert sent["settings"]["json_answer"] is True
     assert sent["settings"]["reads_tokens"] > 16000
     assert sent["settings"]["stays_loaded"] == "0"
-    assert sent["settings"]["thinks"] is True
-    assert sent["settings"]["timeout"] >= 300
+    assert "thinks" not in sent["settings"]
 
 
 def test_asking_the_model_shows_it_his_prompts_that_touch_the_request():

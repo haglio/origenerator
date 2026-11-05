@@ -315,16 +315,14 @@ def test_a_model_that_changes_nothing_says_so_with_its_note_and_there_is_nothing
     assert revision.answer == "Nothing changed. The freckles are already there."
 
 
-def test_a_change_answering_none_of_his_words_is_left_out_and_said_so():
+def test_a_change_answering_none_of_his_words_is_left_out_without_a_word():
     model = _Model(_answer(_replace("natural makeup", "heavy makeup", for_="glamour"),
                            _add("soft light", for_="more light")))
 
     revision = work_out("a woman, natural makeup, beach", "blurry", "more light", ask=model)
 
     assert revision.positive == "a woman, natural makeup, beach, soft light"
-    assert revision.answer == ('Didn\'t replace "natural makeup" with "heavy makeup" in the '
-                               "Positive Prompt: you didn't ask for that. Added \"soft light\" to "
-                               "the Positive Prompt.")
+    assert revision.answer == 'Added "soft light" to the Positive Prompt.'
 
 
 def test_his_earlier_requests_count_as_his_words_too():

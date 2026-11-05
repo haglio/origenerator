@@ -14,14 +14,10 @@ from origenerator.outside_videos import Places, places_here, scan_in_turn
 logger = logging.getLogger(__name__)
 
 
-def _log_where_the_app_does() -> None:
-    configure_logging("", config.STATE_DIR / "origenerator.log")
-    install_exception_logging(logger)
-
-
 def main(db_path: Path | None = None, *, places: Callable[[], Places | None] = places_here,
-         start_logging: Callable[[], None] = _log_where_the_app_does) -> int:
-    start_logging()
+         log_to: Callable[[str, Path], object] = configure_logging) -> int:
+    log_to("", config.STATE_DIR / "origenerator.log")
+    install_exception_logging(logger)
     where = places()
     library = Database(config.DB_PATH if db_path is None else db_path)
     brought_in = scan_in_turn(library, where) if where is not None else 0

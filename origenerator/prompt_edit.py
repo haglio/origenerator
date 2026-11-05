@@ -10,15 +10,19 @@ from origenerator.box_breaks import unboxed
 from origenerator.collection_notes import CollectionNotes
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.db_requests import Turn
+from origenerator.prompt_terms import (
+    WEIGHT_STEP,
+    index_of,
+    plus,
+    reweighted,
+    without,
+    without_nothing_weighted,
+)
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
 from origenerator.request_changes import apply_changes
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
-
-# ComfyUI (term:weight) form; unweighted is 1.0, each wrapping paren 1.1x
-WEIGHT_STEP = 0.1
-_PAREN_WEIGHT = 1.1
 
 ADD = "add"
 REMOVE = "remove"
@@ -103,112 +107,6 @@ def parse_request(request: str) -> tuple | None:
     term = request[tokens[index][1]:tokens[end - 1][2]].strip()
     return (polarity or ADD), term
 
-
-
-def _segments(prompt: str) -> list[str]:
-    parts, depth, start = [], 0, 0
-    for i, char in enumerate(prompt or ""):
-        if char in "([":
-            depth += 1
-        elif char in ")]":
-            depth = max(0, depth - 1)
-        elif char == "," and depth == 0:
-            parts.append((prompt or "")[start:i])
-            start = i + 1
-    parts.append((prompt or "")[start:])
-    return parts
-
-
-def _unwrap(segment: str) -> tuple:
-    # ComfyUI: (term:1.2) states its weight; each wrapping paren multiplies by 1.1
-    text = (segment or "").strip()
-    weight = 1.0
-    while len(text) > 1 and text[0] == "(" and _closes_at_end(text):
-        text = text[1:-1].strip()
-        weight *= _PAREN_WEIGHT
-    match = re.fullmatch(r"(.*?):\s*([0-9]*\.?[0-9]+)", text, re.DOTALL)
-    if match:
-        return match.group(1).strip(), float(match.group(2))
-    return text, round(weight, 3)
-
-
-def _closes_at_end(text: str) -> bool:
-    depth = 0
-    for i, char in enumerate(text):
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            depth -= 1
-            if depth == 0:
-                return i == len(text) - 1
-    return False
-
-
-def _mentions(text: str, term: str) -> bool:
-    words = term.split()
-    if not words:
-        return False
-    pattern = r"\s+".join(re.escape(word) for word in words)
-    return re.search(rf"(?<!\w){pattern}(?!\w)", text, re.IGNORECASE) is not None
-
-
-def bare_terms(prompt: str) -> list[str]:
-    return [_unwrap(segment)[0] for segment in _segments(prompt)]
-
-
-def terms_with_places(prompt: str) -> list[tuple[str, int, int]]:
-    places, at = [], 0
-    for segment in _segments(prompt):
-        start = at + len(segment) - len(segment.lstrip())
-        places.append((_unwrap(segment)[0], start, start + len(segment.strip())))
-        at += len(segment) + 1
-    return places
-
-
-def literal_match(terms: list[str], term: str) -> int | None:
-    for i, text in enumerate(terms):
-        if _mentions(text, term):
-            return i
-    return None
-
-
-def _index_of(prompt: str, term: str) -> int | None:
-    return literal_match(bare_terms(prompt), term)
-
-
-def _tidy(prompt: str) -> str:
-    return re.sub(r"^[\s,]+|[\s,]+$", "", prompt)
-
-
-def _without(prompt: str, index: int) -> str:
-    segments = _segments(prompt)
-    del segments[index]
-    return _tidy(",".join(segments))
-
-
-def _format_weight(weight: float) -> str:
-    return f"{round(weight, 2):g}"
-
-
-def _reweighted(prompt: str, index: int, delta: float) -> str:
-    segments = _segments(prompt)
-    segment = segments[index]
-    term, weight = _unwrap(segment)
-    weight = round(weight + delta, 2)
-    lead = segment[:len(segment) - len(segment.lstrip())]
-    segments[index] = f"{lead}({term}:{_format_weight(weight)})"
-    return _tidy(",".join(segments))
-
-
-def _without_nothing_weighted(prompt: str) -> str:
-    segments = _segments(prompt)
-    kept = [segment for segment in segments if _unwrap(segment)[1] > 0]
-    return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
-
-
-def _plus(prompt: str, term: str) -> str:
-    kept = _tidy(prompt)
-    return f"{kept}, {term}" if kept else term
 
 
 @dataclass(frozen=True)
@@ -304,20 +202,20 @@ def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
                               term, polarity, action, said)
 
     if polarity == REMOVE:
-        index = _index_of(positive, term)
+        index = index_of(positive, term)
         if index is not None:
-            return made(_without(positive, index), negative, DROPPED)
-        index = _index_of(negative, term)
+            return made(without(positive, index), negative, DROPPED)
+        index = index_of(negative, term)
         if index is not None:
-            return made(positive, _reweighted(negative, index, WEIGHT_STEP), PUSHED)
-        return made(positive, _plus(negative, term), EXCLUDED)
-    index = _index_of(negative, term)
+            return made(positive, reweighted(negative, index, WEIGHT_STEP), PUSHED)
+        return made(positive, plus(negative, term), EXCLUDED)
+    index = index_of(negative, term)
     if index is not None:
-        return made(positive, _without(negative, index), ALLOWED)
-    index = _index_of(positive, term)
+        return made(positive, without(negative, index), ALLOWED)
+    index = index_of(positive, term)
     if index is not None:
-        return made(_reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
-    return made(_plus(positive, term), negative, ADDED)
+        return made(reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
+    return made(plus(positive, term), negative, ADDED)
 
 
 @dataclass(frozen=True)
@@ -362,8 +260,8 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, settings,
     if not isinstance(answer, dict):
         return None
     outcome = apply_changes(answer, pair, asked=asked, settings=settings)
-    return PromptRevision(positive, negative, _without_nothing_weighted(outcome.positive),
-                          _without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
+    return PromptRevision(positive, negative, without_nothing_weighted(outcome.positive),
+                          without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
                           outcome.line, tuple(outcome.settings.items()),
                           tuple(request_settings.described(outcome.settings, settings)))
 

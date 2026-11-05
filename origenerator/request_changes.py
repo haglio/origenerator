@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import ClassVar
 
+from origenerator.prompt_terms import end_of_the_term, segments_of
 from origenerator.request_settings import Setting, setting_called
 from origenerator.trigger_words import (
     lacks_trigger_word,
@@ -67,22 +68,8 @@ def _whole(text: str, words: str) -> bool:
     return bool(spaced) and re.search(rf"(?<!\w){spaced}(?!\w)", text, re.IGNORECASE) is not None
 
 
-def _end_of_the_part(text: str, start: int) -> int:
-    depth = 0
-    for at in range(start, len(text)):
-        depth += {"(": 1, "[": 1, ")": -1, "]": -1}.get(text[at], 0)
-        if text[at] == "," and depth <= 0:
-            return at
-    return len(text)
-
-
 def _parts(text: str) -> list[str]:
-    parts, start = [], 0
-    while start <= len(text):
-        end = _end_of_the_part(text, start)
-        parts.append(text[start:end].strip())
-        start = end + 1
-    return parts
+    return [part.strip() for part in segments_of(text)]
 
 
 def _alike(old: str, new: str) -> float:
@@ -249,7 +236,7 @@ class _Applying:
         if _whole(text, words):
             return f"The {PROMPTS[which]} already has {_quoted(words)}."
         anchor = _found(text, change.get("after") or "")
-        at = _end_of_the_part(text, anchor.end()) if anchor else len(text)
+        at = end_of_the_term(text, anchor.end()) if anchor else len(text)
         setattr(self, which, _joined(text[:at], words, text[at:]))
         return f"Added {_quoted(words)} to the {PROMPTS[which]}."
 

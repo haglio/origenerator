@@ -1240,7 +1240,7 @@ class GenerateTab(DropZones):
         self._requests.ask(
             aim.prompt_id, (params.get("positive_prompt") or "", params.get("negative_prompt") or ""),
             words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
-            in_scenes=self._param_form.tells_a_story(),
+            in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             owner=self,
             then=lambda revision, context=(self._asked, aim.prompt_id): self._on_rewritten(
                 context, revision))

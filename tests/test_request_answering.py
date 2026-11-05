@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import collection_notes
 from origenerator.collection_notes import CollectionNotes
 from origenerator.db import Database, NewGeneration, NewRequest
+from origenerator.db_requests import Turn
 from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.workflows.base import story_of
 
@@ -77,6 +78,26 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
     assert seen["notes"].patterns == "the patterns"
     assert seen["thread"] is not threading.main_thread()
     assert jobs.let_go == 1
+
+
+def test_what_was_asked_since_the_item_was_shown_follows_its_saved_exchange(qtbot, tmp_path):
+    seen = {}
+
+    def work_out(positive, negative, words, **known):
+        seen.update(exchange=known["exchange"])
+        return "the revision"
+
+    answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
+    db.record_request(NewRequest(prompt_id="g1", source_prompt_id="src", heard="", asked="a hat"))
+    db.requests.record_turns("g1", [("a hat", "Gave her a hat.")])
+    answers = []
+
+    answerer.ask("g1", ("a woman, a hat, a scarf", "blurry"), "no scarf",
+                 since=[Turn("a scarf", "Gave her a scarf.")], owner=parent, then=answers.append)
+
+    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    assert [(turn.said, turn.answered) for turn in seen["exchange"]] == [
+        ("a hat", "Gave her a hat."), ("a scarf", "Gave her a scarf.")]
 
 
 def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):

@@ -26,8 +26,8 @@ from origenerator import (
     action_settings,
     evolver_export,
     gallery,
-    outside_videos,
     request_settings,
+    said_action,
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
@@ -59,7 +59,7 @@ from origenerator.generation_config import (
     merge_denormalized,
     would_reproduce_a_completed_run,
 )
-from origenerator.generation_state import GenerationSource, made_here, source_of
+from origenerator.generation_state import made_here
 from origenerator.gui import icons
 from origenerator.gui.action_dropdown import ActionDropdown
 from origenerator.gui.basic_section import BasicSection, wrappable
@@ -306,13 +306,7 @@ class GenerateTab(DropZones):
         self._action.chosen.connect(self._on_action_chosen)
 
     def _on_action_chosen(self, prompt_id: str, said: str) -> None:
-        row = self._displayed_row or {}
-        if media_type_of_row(row) != MediaType.VIDEO:
-            self._db.set_image_state(prompt_id, said or None)
-        elif source_of(row) == GenerationSource.OUTSIDE and (places := outside_videos.places_here()):
-            outside_videos.pick_action(self._db, places, row, said)
-        else:
-            self._db.set_action(prompt_id, said or None)
+        said_action.say(self._db, prompt_id, self._displayed_row or {}, said)
 
     def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
         self._form_workflow_key = None

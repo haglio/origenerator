@@ -158,7 +158,7 @@ class SlideshowSet:
                 keep_slide: bool = False) -> None:
         self._shuffle = in_order if latest else None
         self.loop = None
-        self._library_moved()
+        self.library_moved()
         self.all_items = [Slide.of(item) for item in items]
         self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
                            favorite_ids=self.favorite_ids, enhanced_ids=enhanced_ids,
@@ -194,7 +194,7 @@ class SlideshowSet:
                                 and kept.prompt_id == item.prompt_id)
 
     def remember(self, item) -> None:
-        self._library_moved()
+        self.library_moved()
         self._take_into_a_looping_row(item)
         for index, kept in enumerate(self.all_items):
             if self._same(kept, item):
@@ -218,7 +218,7 @@ class SlideshowSet:
         self._forget(lambda kept: kept.prompt_id == prompt_id)
 
     def _forget(self, is_gone) -> None:
-        self._library_moved()
+        self.library_moved()
         self.all_items = [kept for kept in self.all_items if not is_gone(kept)]
         if self.loop is not None:
             kept = tuple(slide for slide in self.loop.pool if not is_gone(slide))
@@ -247,7 +247,7 @@ class SlideshowSet:
                 return self.all_items[index]
         return None
 
-    def _library_moved(self) -> None:
+    def library_moved(self) -> None:
         self._known.clear()
         self._named.clear()
 

@@ -421,6 +421,12 @@ class FakeDB:
         self.gets += 1
         return self.rows.get(prompt_id)
 
+    def set_action(self, prompt_id, action):
+        self.rows[prompt_id]["action"] = action
+
+    def set_image_state(self, prompt_id, state):
+        self.rows[prompt_id]["image_state"] = state
+
     def folder_meta_map(self):
         return {}
 
@@ -449,6 +455,10 @@ class FakeHost:
         self.picked = []
         self.holding = None
         self.latest = False
+        self.reread = 0
+
+    def refresh(self):
+        self.reread += 1
 
     def listing(self):
         return Listing(location=self.location, rows=tuple(self.rows), shown=tuple(self.visible),
@@ -2256,6 +2266,28 @@ def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows
     actions.favorite("g1")
     actions.unfavorite("g1")
     assert host.favorited == []
+
+
+def test_wrong_action_on_a_slide_takes_the_action_off_its_row_and_the_gallery_rereads(slideshows):
+    rows = [{**_image("g1", "a red fox", seed=1), "image_state": "alpha"}]
+    db = FakeDB(rows)
+    director, host, made = slideshows(FakeHost(rows=rows), db=db)
+    director.open(director.items_of(rows), location="a-folder", shape="portrait")
+
+    assert made[0].actions.strike_action(Slide("g1.png", "image", "g1")) == "alpha"
+
+    assert db.rows["g1"]["image_state"] is None
+    assert host.reread == 1
+
+
+def test_wrong_action_on_a_slide_with_no_action_leaves_the_gallery_as_it_is(slideshows):
+    rows = [_image("g1", "a red fox", seed=1)]
+    director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows))
+    director.open(director.items_of(rows), location="a-folder", shape="portrait")
+
+    assert made[0].actions.strike_action(Slide("g1.png", "image", "g1")) == ""
+
+    assert host.reread == 0
 
 
 def test_a_lock_on_a_hosted_slideshow_puts_the_generation_it_holds_in_front_of_him(slideshows):

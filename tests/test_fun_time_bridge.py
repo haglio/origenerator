@@ -196,6 +196,7 @@ def test_a_spoken_phrase_goes_with_when_the_session_heard_it_said(qtbot, tmp_pat
 class _SaidOverShow:
     def __init__(self):
         self.done = []
+        self.action_presses = self
 
     def back_to_what_was_said_over(self, said_at):
         self.done.append(("back to", said_at))
@@ -203,21 +204,26 @@ class _SaidOverShow:
     def slideshow_cull(self):
         self.done.append(("trash",))
 
+    def strike_the_one_on_screen(self):
+        self.done.append(("wrong action",))
+
     def set_locked(self, locked):
         self.done.append(("locked", locked))
 
 
-def test_a_spoken_trash_goes_back_to_the_slide_it_was_said_over_first(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize(("said", "done"), [("trash", "trash"), ("wrong_action", "wrong action")])
+def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
+        qtbot, tmp_path, monkeypatch, said, done):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _SaidOverShow()
     monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
     five_seconds_ago = time.time() - 5.0
 
     (tmp_path / "origenerator_cmd.txt").write_text(
-        f"portrait_trash @{five_seconds_ago:.3f}\n", encoding="utf-8")
+        f"portrait_{said} @{five_seconds_ago:.3f}\n", encoding="utf-8")
     bridge._tick()
 
-    assert show.done == [("back to", pytest.approx(time.monotonic() - 5.0, abs=1.0)), ("trash",)]
+    assert show.done == [("back to", pytest.approx(time.monotonic() - 5.0, abs=1.0)), (done,)]
 
 
 def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, tmp_path,
@@ -594,9 +600,9 @@ def test_a_press_no_slideshow_answers_is_dropped_on_the_log(qtbot, tmp_path, mon
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    _press(bridge, tmp_path, "portrait_wrong_action")
+    _press(bridge, tmp_path, "portrait_made_up_press")
 
-    assert "portrait_wrong_action" in caplog.text
+    assert "portrait_made_up_press" in caplog.text
     assert not (tmp_path / "origenerator_cmd.txt").exists()
 
 
@@ -857,7 +863,7 @@ def test_a_rows_filter_press_is_spelled_the_other_way_round_and_still_reaches_th
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     asked = []
-    monkeypatch.setattr(slideshow, "slideshow_filter", asked.append)
+    monkeypatch.setattr(slideshow.action_presses, "filter", asked.append)
 
     _press(bridge, tmp_path, "filter_portrait_red_fox")
 

@@ -34,6 +34,7 @@ from origenerator.gallery.shapes import (
 )
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
 from origenerator.generation_state import GenerationSource, source_of
+from origenerator.gui.action_presses import striking
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
@@ -101,6 +102,8 @@ _SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
 
 
 class SlideshowHost(Protocol):
+    def refresh(self) -> None: ...
+
     def off_thread(self, work, done) -> None: ...
 
     def queue_now(self) -> tuple[list, int]: ...
@@ -502,6 +505,7 @@ class SlideshowDirector:
             neighbors=partial(self.neighbors_of, shape=shape),
             widen=partial(self.beyond_the_row_of, shape=shape),
             actions_of=partial(self.actions_of, shape=shape),
+            strike_action=striking(self._db, self._host),
             slides=self.slides_for,
             move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,

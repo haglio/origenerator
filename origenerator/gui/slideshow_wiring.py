@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from funestra.hud_title import SHUFFLE_LABEL
 from funestra.volume import VolumeHud
 
-from origenerator.slideshow import SlideshowFilters
+from origenerator.slideshow import Slide, SlideshowFilters
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,7 @@ class SlideshowActions:
     neighbors: Callable[[str], object] | None = None
     widen: Callable[[str], tuple] | None = None
     actions_of: Callable[[list], dict] | None = None
+    strike_action: Callable[[Slide], str] | None = None
     slides: Callable[[tuple], tuple] | None = None
     filters_changed: Callable[[SlideshowFilters], None] | None = None
     volume_moved: Callable[[VolumeHud], None] | None = None

@@ -2179,7 +2179,9 @@ class GalleryView(QWidget):
     def _rerender_current_leaf(self):
         group = self.current_group()
         if isinstance(group, gallery.SettingsGroup):
+            place = self._gallery_pane.place()
             self._gallery_pane.show_thumbnails(group)
+            self._gallery_pane.return_to(place)
 
     def listed_prompt_ids(self) -> list[str]:
         return self._gallery_pane.listed_prompt_ids()

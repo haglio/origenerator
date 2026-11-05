@@ -6,10 +6,8 @@ from pathlib import Path
 
 from origenerator import config
 from origenerator.base_models import made_for_text_to_video
-from origenerator.model_titles import fix_of, is_a_fixs_lora, model_title
+from origenerator.model_titles import MODEL_EXTENSIONS, fix_of, is_a_fixs_lora, model_title
 from origenerator.workflows import model_arch
-
-_MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 
 # The directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, where the enhance graph's detail pass
 # finds its face/hand detectors in ComfyUI.
@@ -24,7 +22,7 @@ ANY = "any"
 def _model_paths(directory: Path) -> list[Path]:
     if not directory.exists():
         return []
-    return [f for f in directory.rglob("*") if f.is_file() and f.suffix in _MODEL_SUFFIXES]
+    return [f for f in directory.rglob("*") if f.is_file() and f.suffix in MODEL_EXTENSIONS]
 
 
 _catalogued: dict[str, tuple[tuple, list[tuple[str, model_arch.ModelFile]]]] = {}

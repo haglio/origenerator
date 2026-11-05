@@ -43,5 +43,10 @@
     ".venv/Scripts/python.exe",
     "-m",
     "origenerator.downtime"
+  ],
+  "outside_video_entries_command": [
+    ".venv/Scripts/python.exe",
+    "-m",
+    "origenerator.outside_video_entries"
   ]
 }

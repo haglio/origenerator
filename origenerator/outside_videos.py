@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import json
 import math
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ from typing import NamedTuple
 
 from app_support import favorites, haglio_settings
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
+from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_key
 from PIL import Image
 
@@ -25,6 +27,7 @@ from origenerator.gallery.source_image import videos_from_source_image
 from origenerator.gallery.tree import settings_folder_key, start_frame_index
 from origenerator.generation_state import GenerationSource, GenerationStatus, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
+from origenerator.one_at_a_time import WAIT_S, Turn
 from origenerator.outside_journal import actions_in, favorites_in, said_in
 from origenerator.thumbnail import (
     first_frame_of,
@@ -169,6 +172,16 @@ def _journal(places: Places, rows: list[dict], said: dict, now) -> None:
              for video in videos]
     with places.journal.open("a", encoding="utf-8", newline="\n") as journal:
         journal.write("".join(f"{line}\n" for line in lines))
+
+
+def turn_at(db, *, wait_s: float = WAIT_S) -> Turn:
+    library = os.path.normcase(os.path.realpath(db.path))
+    return Turn(mutex_name("Global\\Origenerator.outside_videos", library), wait_s=wait_s)
+
+
+def scan_in_turn(db, places: Places, *, keep_going=lambda: True, wait_s: float = WAIT_S) -> int:
+    with turn_at(db, wait_s=wait_s).taken() as ours:
+        return scan(db, places, keep_going=keep_going) if ours else 0
 
 
 def scan(db, places: Places, *, grab=first_frame_of, videos_per_write: int = VIDEOS_PER_WRITE,

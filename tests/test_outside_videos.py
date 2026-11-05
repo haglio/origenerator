@@ -46,6 +46,8 @@ from origenerator.outside_videos import (
     record_of,
     rows_bringing_in,
     scan,
+    scan_in_turn,
+    turn_at,
 )
 from origenerator.provenance import stamp_unstamped
 from origenerator.relocate import relocate_moved_outputs
@@ -250,6 +252,18 @@ def test_a_scan_brings_each_new_video_in_once(tmp_path):
 
     assert (scan(db, places, grab=_still), scan(db, places, grab=_still)) == (2, 0)
     assert len(_videos(db)) == 2
+
+
+def test_a_scan_stands_back_while_another_program_is_bringing_videos_in(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    write_mp4(places.upscaled_dir / "portrait" / "a-site" / "c1_topaz.mp4")
+
+    with turn_at(db).taken():
+        during = scan_in_turn(db, places, wait_s=0)
+    after = scan_in_turn(db, places)
+
+    assert (during, after) == (0, 1)
+    assert len(_videos(db)) == 1
 
 
 def test_a_scan_writes_what_it_brings_in_a_few_videos_at_a_time(tmp_path):

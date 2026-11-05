@@ -23,11 +23,11 @@ from origenerator.slideshow import (
     LIVE,
     Slide,
     SlideshowFilters,
-    SlideshowPlaylist,
     SlideshowState,
-    dealt,
     in_order,
+    same_slide,
 )
+from origenerator.slideshow_deal import Dealing, as_its_loop, dealt, followed_to, taken_up
 
 NO_ACTION_ON_SCREEN = "No action for this one"
 ENHANCEMENT_RUNNING = "running"
@@ -42,8 +42,9 @@ class SlideshowSet:
                  hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None) -> None:
         self._shuffle = deal.shuffle
-        self._weight_of = actions.weight_of
-        self._on_pass_change = on_pass_change
+        self._dealing = Dealing(weight_of=actions.weight_of, group_of=actions.group_of,
+                                filters_of=lambda: self.filters, stays=self.being_made)
+        self._on_pass_change = on_pass_change or (lambda _kept: None)
         self._neighbors_of = actions.neighbors
         self._widen = actions.widen
         self._known: dict[str, NavMapNeighbors] = deal.neighbors_known()
@@ -58,14 +59,11 @@ class SlideshowSet:
         self._runs_offered: set[str] = set()
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
-        self.playlist = self._deal(items, start=deal.led_at)
+        self.playlist = dealt(items, order=self._shuffle, start=deal.led_at,
+                              dealing=self._dealing)
         if deal.start is None:
             self.lead_with_what_is_being_made()
         self._a_row_played_whole_is_its_loop()
-
-    def _deal(self, items, *, start=None, shuffle=None) -> SlideshowPlaylist:
-        return dealt(items, shuffle=self._shuffle if shuffle is None else shuffle,
-                     start=start, weight_of=self._weight_of)
 
     def _a_row_played_whole_is_its_loop(self) -> None:
         current = self.playlist.current()
@@ -92,13 +90,13 @@ class SlideshowSet:
         keep_id = current.prompt_id if keep_slide and current is not None else None
         start = next((index for index, item in enumerate(items)
                       if keep_id is not None and item.prompt_id == keep_id), None)
-        self.playlist = self._deal(items, start=start, shuffle=shuffle)
+        self.playlist = dealt(items, order=self._shuffle if shuffle is None else shuffle,
+                              start=start, dealing=self._dealing)
         if new_set:
             self.lead_with_what_is_being_made()
             self._a_row_played_whole_is_its_loop()
         kept = start is not None
-        if self._on_pass_change is not None:
-            self._on_pass_change(kept)
+        self._on_pass_change(kept)
         return kept
 
     def _browse(self) -> list[Slide]:
@@ -189,16 +187,11 @@ class SlideshowSet:
             self._named = {**dict.fromkeys(asked, ""), **self._actions_of(asked)}
         return self._named[prompt_id]
 
-    @staticmethod
-    def _same(kept: Slide, item: Slide) -> bool:
-        return kept is item or (kept.prompt_id is not None
-                                and kept.prompt_id == item.prompt_id)
-
     def remember(self, item) -> None:
         self.library_moved()
         self._take_into_a_looping_row(item)
         for index, kept in enumerate(self.all_items):
-            if self._same(kept, item):
+            if same_slide(kept, item):
                 self.all_items[index] = item
                 return
         self.all_items.append(item)
@@ -209,11 +202,11 @@ class SlideshowSet:
                 or loop.position_of(item) is not None):
             return
         row = self.neighbors(loop.pool[0].prompt_id).seeds
-        if any(self._same(seed, item) for seed in row):
+        if any(same_slide(seed, item) for seed in row):
             self.loop = Loop(loop.axis, (*loop.pool, item))
 
     def forget(self, item) -> None:
-        self._forget(lambda kept: self._same(kept, item))
+        self._forget(lambda kept: same_slide(kept, item))
 
     def forget_id(self, prompt_id) -> None:
         self._forget(lambda kept: kept.prompt_id == prompt_id)
@@ -283,7 +276,7 @@ class SlideshowSet:
         if len(pool) <= 1:
             return False
         self.loop = Loop(axis, tuple(pool))
-        self.replace_items(pool, keep_slide=True, shuffle=in_order)
+        self.replace_items(pool, keep_slide=True, shuffle=as_its_loop)
         return True
 
     def end_loop(self, fall_back: Callable[[], bool] | None = None) -> bool:
@@ -295,10 +288,17 @@ class SlideshowSet:
             return True
         browse = self._browse()
         current = self.playlist.current()
-        if current is not None and not any(self._same(item, current) for item in browse):
+        if current is not None and not any(same_slide(item, current) for item in browse):
             browse = [current, *browse]
         self.replace_items(browse, keep_slide=True)
         return True
+
+    def come_to(self, item_index: int) -> None:
+        if (followed := followed_to(
+                self.playlist, item_index, passing=self._browse,
+                dealing=None if self.loop or self._shuffle else self._dealing)) is not self.playlist:
+            self.playlist = followed
+            self._on_pass_change(True)
 
     def step_loop(self, locked: bool, fall_back: Callable[[], bool] | None = None) -> str:
         running = self.loop.axis if self.loop is not None else OFF
@@ -327,10 +327,12 @@ class SlideshowSet:
                               loop_pool=tuple(slide.prompt_id for slide in loop.pool))
 
     def resume(self, state: SlideshowState, *, lead: bool = True) -> bool:
-        pool = self._pool_left_looping(state)
-        if pool:
+        if pool := self._pool_left_looping(state):
             self.start_loop(state.loop, pool)
-        if not self.playlist.resume(state.order, state.current, sat_out=self._browse()):
+        else:
+            self.playlist = taken_up(state.order, state.current, passing=self._browse(),
+                                     dealt_pass=self.playlist, dealing=self._dealing)
+        if not self.playlist.resume(state.order, state.current):
             return False
         if lead and not state.locked:
             self.lead_with_what_is_being_made()
@@ -358,10 +360,10 @@ class SlideshowSet:
 
     def jump_to(self, slide: Slide) -> bool:
         current = self.playlist.current()
-        if current is not None and self._same(current, slide):
+        if current is not None and same_slide(current, slide):
             return False
         index = next((index for index, item in enumerate(self.playlist.items)
-                      if self._same(item, slide)), None)
+                      if same_slide(item, slide)), None)
         if index is not None:
             self.playlist.jump_to(index)
             return True

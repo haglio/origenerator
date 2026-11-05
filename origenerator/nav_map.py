@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 
 from origenerator import gallery
@@ -126,6 +127,23 @@ def surroundings(current: dict, rows, *, image_index) -> Surroundings:
     )
 
 
+def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, Hashable]:
+    animations = _Animations(rows, image_index)
+
+    def by_its_image(row: dict) -> Hashable:
+        return (animations.image_of(row) or row)["prompt_id"]
+
+    def by_its_seed_family(row: dict) -> Hashable:
+        image = animations.image_of(row)
+        if image is None:
+            return (row.get("workflow_name"), gallery.settings_folder_key(row, image_index))
+        return (image.get("workflow_name"), gallery.settings_folder_key(image, image_index),
+                animations.label_of(row))
+
+    key_of = by_its_seed_family if by_seed_family else by_its_image
+    return {row["prompt_id"]: key_of(row) for row in rows if made_here(row)}
+
+
 def beyond_the_row(current: dict, rows, *, image_index,
                    additions: int = WIDEN_ADDITIONS) -> list[dict]:
     animations = _Animations(rows, image_index)
@@ -167,3 +185,34 @@ def one_per_stretch(rows, *, image_index) -> list[dict]:
             folder_of_the_stretch = folder
     kept = set(stands_for_the_stretch)
     return [row for row in rows if row["prompt_id"] in kept]
+
+
+_MADE_HERE, _FILED, _GROUPS = "made here", "filed", "groups"
+
+
+class SlideGroups:
+    def __init__(self, *, library: Callable[[], object], sources) -> None:
+        self._library = library
+        self._record_group_of = sources.record_group_of
+        self.learn = sources.learn_weights
+        self._read = None
+        self._found: dict = {}
+
+    def _kept(self, key, work_out):
+        reading = self._library()
+        if reading is not self._read:
+            self._read, self._found = reading, {}
+        if key not in self._found:
+            self._found[key] = work_out()
+        return self._found[key]
+
+    def __call__(self, slide, by_seed_family: bool, *, shape: str) -> Hashable | None:
+        library = self._library()
+        made_here = self._kept((_GROUPS, shape, by_seed_family), lambda: group_keys(
+            library.on_the_map(shape), image_index=library.image_index,
+            by_seed_family=by_seed_family))
+        if slide.prompt_id in made_here:
+            return (_MADE_HERE, made_here[slide.prompt_id])
+        filed = (self._record_group_of(slide.path, by_seed_family)
+                 if self._record_group_of is not None else None)
+        return (_FILED, filed) if filed is not None else None

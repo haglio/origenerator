@@ -2169,3 +2169,50 @@ def test_a_slideshow_culled_empty_is_over(qtbot, tmp_path):
     slideshow.slideshow_cull()
 
     assert slideshow.is_showing() is False
+
+
+_TWO_GROUPS = [("fox.png", "image", "id-fox"), ("fox-runs.mp4", "video", "id-runs"),
+               ("hare.png", "image", "id-hare"), ("hare-runs.mp4", "video", "id-hare-runs")]
+_BY_ANIMAL = {"id-fox": "fox", "id-runs": "fox", "id-hare": "hare", "id-hare-runs": "hare"}
+_ID_OF = {path: prompt_id for path, _kind, prompt_id in _TWO_GROUPS}
+
+
+def _shuffled_by_animal(qtbot, tmp_path, *, shuffle=None) -> FunestraSlideshow:
+    slideshow = FunestraSlideshow(
+        Playing(_TWO_GROUPS, shuffle=shuffle,
+                actions=SlideshowActions(group_of=lambda slide, _seed: _BY_ANIMAL[slide.prompt_id])),
+        _seat(tmp_path), _NO_HOSTING)
+    slideshow._timer.stop()
+    return slideshow
+
+
+def _on_the_last_slide(slideshow) -> list[str]:
+    last = _handed_to_the_funestra(slideshow)[-1]
+    _says(slideshow, video=last)
+    slideshow.tick()
+    return _handed_to_the_funestra(slideshow)
+
+
+def test_a_shuffled_slideshow_on_its_last_slide_hands_the_funestra_its_next_pass_to_follow(
+        qtbot, tmp_path):
+    slideshow = _shuffled_by_animal(qtbot, tmp_path)
+    handed = set()
+    for _ in range(30):
+        last = _handed_to_the_funestra(slideshow)[-1]
+        following = _on_the_last_slide(slideshow)
+        assert following[0] == last
+        assert sorted(_BY_ANIMAL[_ID_OF[video]] for video in following[1:]) in (
+            ["fox", "hare"], ["fox"], ["hare"])
+        handed |= set(following)
+
+    assert len(handed) == 4
+
+
+def test_a_slideshow_of_the_latest_on_its_last_slide_hands_the_funestra_nothing_new(
+        qtbot, tmp_path):
+    slideshow = _shuffled_by_animal(qtbot, tmp_path, shuffle=in_order)
+    before = _handed_to_the_funestra(slideshow)
+    _sent(slideshow)
+
+    assert _on_the_last_slide(slideshow) == before
+    assert "RELOAD_PLAYLIST" not in _sent(slideshow)

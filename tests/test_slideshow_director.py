@@ -592,7 +592,7 @@ def slideshows(monkeypatch):
                         lambda *args: None)
     monkeypatch.setattr(module, "_screens", list)
 
-    def build(host=None, *, db=None, gallery_pane=None, fun_time=None, weights=None):
+    def build(host=None, *, db=None, gallery_pane=None, fun_time=None, records=None):
         host = host or FakeHost()
         db = db or FakeDB()
         gallery_pane = gallery_pane or FakeGalleryPane()
@@ -604,8 +604,9 @@ def slideshows(monkeypatch):
             host,
             DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
                             library=lambda: gallery_pane.library, listing=host.listing,
-                            **({"weight_of": weights.of, "learn_weights": weights.learn}
-                               if weights else {})),
+                            **({"weight_of": records.of, "learn_weights": records.learn,
+                                "record_group_of": records.group_of}
+                               if records else {})),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
@@ -2750,9 +2751,10 @@ def _a_session_side_with_its_opening_ready(slideshows, qtbot, gallery_pane):
     return director, host, made
 
 
-class FakeWeights:
-    def __init__(self):
+class FakeRecords:
+    def __init__(self, filed=None):
         self.learned = []
+        self.filed = filed or {}
 
     def of(self, item):
         return 4.0
@@ -2760,10 +2762,13 @@ class FakeWeights:
     def learn(self, items):
         self.learned.extend(items)
 
+    def group_of(self, item, by_seed_family):
+        return self.filed.get(str(item))
+
 
 def test_a_slideshow_is_dealt_by_the_weights_the_app_keeps_and_by_none_where_it_keeps_none(
         slideshows):
-    director, _host, made = slideshows(weights=FakeWeights())
+    director, _host, made = slideshows(records=FakeRecords())
     director.open([("a.mp4", "video", "g1", None)], location="workflow/a")
     unweighted, _host, made_unweighted = slideshows()
     unweighted.open([("a.mp4", "video", "g1", None)], location="workflow/a")
@@ -2774,9 +2779,9 @@ def test_a_slideshow_is_dealt_by_the_weights_the_app_keeps_and_by_none_where_it_
 
 def test_a_sides_opening_learns_the_weights_of_its_videos_while_it_is_made_ready(
         slideshows, qtbot):
-    weights = FakeWeights()
+    weights = FakeRecords()
     gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4"), _row("g5")]})
-    director, _host, _made = slideshows(gallery_pane=gallery_pane, weights=weights,
+    director, _host, _made = slideshows(gallery_pane=gallery_pane, records=weights,
                                         fun_time=FakeSession(funestras={PORTRAIT: object()}))
     director.items_of = lambda rows: [("g4.png", "image", "g4", None),
                                       ("g5.mp4", "video", "g5", None)]
@@ -2839,3 +2844,40 @@ def test_nothing_is_made_ready_for_a_side_with_a_slideshow_up_or_no_funestra(
     director.make_the_openings_ready()
 
     assert asked == []
+
+
+def _group_of_on_the_portrait_side(director, made):
+    director.open([("a.mp4", "video", "g1", None)], location="workflow/a", shape="portrait")
+    return made[-1].actions.group_of
+
+
+def _groups_of(group_of) -> dict:
+    return {prompt_id: group_of(Slide(f"{prompt_id}.mp4", "video", prompt_id), False)
+            for prompt_id in ("g1", "v1", "v2", "v3", "o1", "o2")}
+
+
+def test_a_slideshow_groups_what_it_made_by_its_image_and_another_sites_videos_by_their_records(
+        slideshows, tmp_path):
+    rows = [_fox("g1", seed=1), _fox("g2", seed=2),
+            _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="g2.png", action="alpha", tmp_path=tmp_path),
+            _animation("v3", frame="g1.png", action="beta", tmp_path=tmp_path),
+            _a_sites(_animation("o1", frame="g1.png", action="beta", tmp_path=tmp_path)),
+            _a_sites(_animation("o2", frame="g2.png", action="beta", tmp_path=tmp_path))]
+    filed = {"o1.mp4": "img|one image", "o2.mp4": "img|one image"}
+    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords(filed))
+
+    groups = _groups_of(_group_of_on_the_portrait_side(director, made))
+
+    assert groups["g1"] == groups["v1"] == groups["v3"]
+    assert groups["v2"] != groups["v1"]
+    assert groups["o1"] == groups["o2"] != groups["g1"]
+
+
+def test_a_video_with_no_group_on_its_record_is_a_group_of_its_own(slideshows, tmp_path):
+    rows = [_a_sites(_animation("o1", frame="g1.png", action="beta", tmp_path=tmp_path))]
+    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords())
+
+    group_of = _group_of_on_the_portrait_side(director, made)
+
+    assert group_of(Slide("o1.mp4", "video", "o1"), False) is None

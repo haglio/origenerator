@@ -79,6 +79,7 @@ from origenerator.item_shape import (
 )
 from origenerator.media import MediaType
 from origenerator.nav_map import (
+    SlideGroups,
     action_labels,
     beyond_the_row,
     one_per_stretch,
@@ -224,7 +225,6 @@ class SlideshowDirector:
         self._names = sources.names
         self._listing = sources.listing
         self._weight_of = sources.weight_of
-        self._learn_weights = sources.learn_weights
         self._jobs = sources.jobs
         self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
@@ -252,6 +252,7 @@ class SlideshowDirector:
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
         self._library = sources.library
+        self._groups = SlideGroups(library=self._library, sources=sources)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
@@ -515,6 +516,7 @@ class SlideshowDirector:
             actions_of=partial(self.actions_of, shape=shape),
             strike_action=striking(self._db, self._host),
             weight_of=self._weight_of,
+            group_of=partial(self._groups, shape=shape),
             slides=self.slides_for,
             move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,
@@ -893,7 +895,7 @@ class SlideshowDirector:
     def _opening_of(self, rows: list[dict]) -> RegionOpening:
         items = self.items_of(rows)
         videos = [path for path, media_type, *_rest in items if media_type == MediaType.VIDEO]
-        self._learn_weights(videos)
+        self._groups.learn(videos)
         return RegionOpening(
             rows=rows, items=items, versions=self.versions_of(rows),
             enhanced_ids=self._enhanced_ids_of(rows),

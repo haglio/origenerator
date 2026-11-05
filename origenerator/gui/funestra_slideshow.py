@@ -336,7 +336,7 @@ class FunestraSlideshow(QObject):
         if item is not self._set.playlist.current() and self._comparing:
             self._comparing = False
             self._send(FORGET_VERSIONS)
-        self._set.playlist.jump_to(index)
+        self._set.come_to(index)
         self.media_changed.emit()
 
     def _item_showing(self, video: str):

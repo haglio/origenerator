@@ -40,3 +40,7 @@ def made_here(row: dict) -> bool:
 
 def in_sight(row: dict) -> bool:
     return source_of(row) not in OUT_OF_SIGHT
+
+
+def on_the_map(row: dict) -> bool:
+    return in_sight(row) or source_of(row) == GenerationSource.STARTING_FRAME

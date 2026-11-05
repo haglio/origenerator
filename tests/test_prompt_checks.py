@@ -9,6 +9,7 @@ from origenerator.prompt_checks import (
     tidied,
     unpaired_parentheses,
     unread_emphasis,
+    without_emphasis,
 )
 
 
@@ -130,3 +131,18 @@ def test_emphasis_a_model_reads_as_plain_text_is_found_whole(text, unread):
 @pytest.mark.parametrize("text", ["a, b", r"\(a\)", "16:9", "a) (b"])
 def test_what_is_no_pair_of_parentheses_is_not_unread_emphasis(text):
     assert unread_emphasis(text) == ()
+
+
+@pytest.mark.parametrize(("text", "plain"), [
+    ("(a:1.2), ((b)), c", "a, b, c"),
+    ("((a:1.2) b)", "a b"),
+    ("( a :.5 ), b", "a, b"),
+    ("(a, b:1.2), c", "a, b, c"),
+    ("x (a) y", "x a y"),
+    (r"\(a\), (b)", r"\(a\), b"),
+    ("16:9, (a)", "16:9, a"),
+    (f"(a){BOX_BREAK}((b))", f"a{BOX_BREAK}b"),
+    ("a, b", "a, b"),
+])
+def test_taking_out_emphasis_leaves_the_words_it_wrapped(text, plain):
+    assert without_emphasis(text) == plain

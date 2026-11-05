@@ -10,6 +10,7 @@ _OUTSIDE_ITS_PARENTHESES = re.compile(r"\)[ \t]*:[ \t]*[\d.]+")
 _NO_PARENTHESES = re.compile(r"(?<=[^\W\d_]):[\d.]+(?=[ \t]*(?:,|$))", re.MULTILINE)
 _A_THING = re.compile(r"[^,]+")
 _STACK = re.compile(r"(?<!\\)(\({2,})([^()]*)(\)+)")
+_WEIGHT_CLOSING_A_GROUP = re.compile(r"[ \t]*:[ \t]*[\d.]+[ \t]*(?=\))")
 _ONE_PARENTHESIS_ADDS = 1.1
 _ENDS = " ,\n" + BOX_BREAK
 
@@ -50,6 +51,17 @@ def unread_emphasis(text: str) -> tuple[tuple[int, int], ...]:
             outermost = [span for span in outermost if span[0] < start]
             outermost.append((start, index + 1))
     return tuple(outermost)
+
+
+def without_emphasis(text: str) -> str:
+    pieces, last = [], 0
+    for start, end in unread_emphasis(text):
+        group = _WEIGHT_CLOSING_A_GROUP.sub("", text[start:end])
+        words = "".join(character for index, character in enumerate(group)
+                        if not parenthesis_at(group, index))
+        pieces += [text[last:start], words.strip()]
+        last = end
+    return "".join(pieces) + text[last:]
 
 
 def duplicate_things(text: str) -> tuple[tuple[int, int], ...]:

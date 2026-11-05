@@ -818,3 +818,42 @@ def test_a_set_picked_back_up_lands_on_the_video_it_left_off_on_though_it_sat_th
     assert slideshow_set.resume(SlideshowState(order=("id-1", "id-2"), current="id-2"))
 
     assert slideshow_set.current_prompt_id() == "id-2"
+
+
+_A_ROW_OF_VIDEOS = [("one.mp4", "video", "id-1"), ("one-b.mp4", "video", "id-1b")]
+_FROM_ANOTHER_ROW = ("two.mp4", "video", "id-2")
+
+
+def _mates_in_the_row_of_videos(prompt_id):
+    in_the_row = any(item[2] == prompt_id for item in _A_ROW_OF_VIDEOS)
+    return NavMapNeighbors(seeds=tuple(Slide.of(item) for item in _A_ROW_OF_VIDEOS
+                                       if in_the_row and item[2] != prompt_id), label="fox")
+
+
+def _shuffled_rows(items, always_skipped: str) -> SlideshowSet:
+    return SlideshowSet(items, deal=SetDeal(), actions=SlideshowActions(
+        neighbors=_mates_in_the_row_of_videos,
+        weight_of=lambda path: 0.0 if path == always_skipped else 1.0))
+
+
+def test_a_set_of_two_rows_is_no_loop_while_the_video_from_one_of_them_sits_the_pass_out():
+    slideshow_set = _shuffled_rows([*_A_ROW_OF_VIDEOS, _FROM_ANOTHER_ROW], "two.mp4")
+    assert _in_the_pass(slideshow_set) == ["id-1", "id-1b"]
+
+    assert slideshow_set.loop is None
+
+
+def test_a_set_that_is_one_row_loops_all_of_it_though_he_always_skips_one_of_its_videos():
+    slideshow_set = _shuffled_rows(_A_ROW_OF_VIDEOS, "one-b.mp4")
+
+    assert sorted(slide.prompt_id for slide in slideshow_set.loop.pool) == ["id-1", "id-1b"]
+    assert _in_the_pass(slideshow_set) == ["id-1", "id-1b"]
+
+
+def test_a_set_picked_back_up_never_lands_on_a_slide_its_filters_leave_out():
+    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
+    slideshow_set.set_filters(SlideshowFilters(favorites=True))
+
+    assert not slideshow_set.resume(SlideshowState(order=("id-1",), current="id-1"))
+
+    assert _in_the_pass(slideshow_set) == ["id-2", "id-3"]

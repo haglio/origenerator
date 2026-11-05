@@ -16,6 +16,7 @@ from origenerator.gui.hud_nav_map import (
     build_nav_map,
     step_in_ring,
 )
+from origenerator.gui.slideshow_pass import rotated_onto
 from origenerator.gui.slideshow_wiring import NO_DEAL, HudFacts, SetDeal, SlideshowActions
 from origenerator.media import MediaType
 from origenerator.slideshow import (
@@ -68,12 +69,15 @@ class SlideshowSet:
 
     def _a_row_played_whole_is_its_loop(self) -> None:
         current = self.playlist.current()
-        if current is None or current.prompt_id is None or len(self.playlist) <= 1:
+        whole = self._browse()
+        if current is None or current.prompt_id is None or len(whole) <= 1:
             return
-        played = self.playlist.in_play_order()
-        if self._is_one_row([current, *played]):
-            at = self.playlist.index
-            self.loop = Loop(SEED, (*played[at:], *played[:at]))
+        if self._is_one_row([current, *whole]):
+            played = self.playlist.in_play_order()
+            sat_out = [slide for slide in whole if slide not in played]
+            for slide in sat_out:
+                self.playlist.add(slide)
+            self.loop = Loop(SEED, tuple(rotated_onto([*played, *sat_out], current)))
 
     def _is_one_row(self, slides) -> bool:
         if not slides:
@@ -326,7 +330,7 @@ class SlideshowSet:
         pool = self._pool_left_looping(state)
         if pool:
             self.start_loop(state.loop, pool)
-        if not self.playlist.resume(state.order, state.current, sat_out=self.all_items):
+        if not self.playlist.resume(state.order, state.current, sat_out=self._browse()):
             return False
         if lead and not state.locked:
             self.lead_with_what_is_being_made()

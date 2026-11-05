@@ -59,10 +59,8 @@ def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
 
 
 def tell_of_a_lock(dashboard_cmd_file, shape: str, file) -> bool:
-    if dashboard_cmd_file is None:
-        return False
-    append_command(dashboard_cmd_file, f"{spelled_for(shape, LOCK_HELD)}|{file}")
-    return True
+    return dashboard_cmd_file is not None and append_command(
+        dashboard_cmd_file, f"{spelled_for(shape, LOCK_HELD)}|{file}")
 
 
 def _split_argument(line: str) -> tuple[str, str, str]:

@@ -16,7 +16,11 @@ from PIL import Image
 
 from origenerator import fun_time_mode as contract
 from origenerator import gallery
-from origenerator.fun_time_bridge import FunTimeBridge, ask_for_origenerator_mode
+from origenerator.fun_time_bridge import (
+    FunTimeBridge,
+    ask_for_origenerator_mode,
+    tell_of_a_lock,
+)
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
@@ -1081,3 +1085,12 @@ def test_asking_the_room_for_the_mode_writes_it_on_the_dashboard_channel(tmp_pat
 
 def test_a_session_that_names_no_dashboard_channel_is_not_asked_for_the_mode():
     ask_for_origenerator_mode(None)
+
+
+def test_a_lock_the_session_could_not_be_told_of_is_said_to_be_untold(tmp_path):
+    in_the_way = tmp_path / "a file where the folder would be"
+    in_the_way.write_text("x", encoding="utf-8")
+
+    assert tell_of_a_lock(tmp_path / "dashboard_cmd.txt", "portrait", "scene one.mp4") is True
+    assert tell_of_a_lock(in_the_way / "dashboard_cmd.txt", "portrait", "scene one.mp4") is False
+    assert tell_of_a_lock(None, "portrait", "scene one.mp4") is False

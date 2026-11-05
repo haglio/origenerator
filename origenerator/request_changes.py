@@ -39,6 +39,12 @@ _LEFT_OUT = re.compile(r"(?:no|without)\s+(?:(?:a|an|any|the)\s+)?(\S.*)", re.IG
 
 
 @dataclass(frozen=True)
+class Prompts:
+    in_scenes: bool = False
+    take_weights: bool = True
+
+
+@dataclass(frozen=True)
 class Outcome:
     positive: str
     negative: str
@@ -159,16 +165,24 @@ def _trigger_words_of(lora) -> tuple[str, ...]:
     return () if is_no_lora(lora) else trigger_words(lora)
 
 
+_AS_WRITTEN = Prompts()
+_KEPT_OUT = "kept out: "
+_WORDS_OF_AN_EDIT = ("replace", "with", "add", "remove")
+
+
 class _Applying:
-    def __init__(self, positive: str, negative: str, asked: list[str], settings: list[Setting],
-                 in_scenes: bool):
-        self.positive = positive
-        self.negative = negative
+    def __init__(self, pair: tuple[str, str], asked: list[str], settings: list[Setting],
+                 prompts: Prompts):
+        self.shown_positive, self.negative = pair
+        self.positive = self.shown_positive
         self.asked = asked
         self.settings = settings
-        self.in_scenes = in_scenes
+        self.in_scenes = prompts.in_scenes
+        self.take_weights = prompts.take_weights
         self.changes: dict = {}
         self.said: list[str] = []
+        self.already_so: list[str] = []
+        self.took_out = False
 
     def _say(self, line: str) -> None:
         self.said += [line]
@@ -182,8 +196,8 @@ class _Applying:
         if value is None:
             self._say(f"{setting.label} can't be {_quoted(change.get('to'))}.")
         elif value == setting.value:
-            self._say(f"{setting.label} is already {setting.shown()}.")
-        elif answers_him(change.get("for"), self.asked):
+            self.already_so += [f"{setting.label} is already {setting.shown()}."]
+        elif self._answers_him(change, f"{setting.label} {change.get('to')}"):
             self.changes[setting.key] = value
             swapped = self._trigger_words_swapped(setting, value) if setting.folder == "loras" else ""
             self._say(
@@ -218,11 +232,13 @@ class _Applying:
         edit = next((edit for edit in self._EDITS if edit in change), None)
         if which not in PROMPTS or edit is None:
             self._say(_UNREADABLE)
-        elif answers_him(change.get("for"), self.asked):
+        elif self._answers_him(change, " ".join(str(change.get(key) or "") for key in _WORDS_OF_AN_EDIT)):
             self.said += [line for line in self._EDITS[edit](self, which, change) if line]
 
     def _replace(self, which: str, change: dict) -> list[str]:
-        old, new = str(change["replace"]), str(change.get("with") or "")
+        old, new = str(change["replace"]), self._as_these_prompts_take(str(change.get("with") or ""))
+        if not new.strip():
+            return self._remove(which, {"remove": old})
         found = _found(getattr(self, which), old)
         if found is None:
             return [f"Couldn't find {_quoted(old)} in the {PROMPTS[which]}."]
@@ -232,6 +248,8 @@ class _Applying:
         if _same_parts(kept, there):
             said = []
         else:
+            self.took_out = self.took_out or (which == "positive"
+                                              and len(_parts(kept)) < len(_parts(there)))
             text = getattr(self, which)
             setattr(self, which, text[:found.start()] + kept + text[found.end():])
             said = said or [f"Replaced {_quoted(old)} with {_quoted(new)} in the {PROMPTS[which]}."]
@@ -247,6 +265,14 @@ class _Applying:
             return new, []
         return (", ".join(part for part in _parts(new) if not left_out.get(part)),
                 [words for words in left_out.values() if words])
+
+    def _as_these_prompts_take(self, words: str) -> str:
+        if self.take_weights:
+            return words
+        return ", ".join(unwrapped(part)[0] for part in _parts(words))
+
+    def _answers_him(self, change: dict, changed: str) -> bool:
+        return answers_him(change.get("for"), self.asked) or self._names_what_he_asked(changed)
 
     def _names_what_he_asked(self, words: str) -> bool:
         return bool(_naming(words) & set().union(*(_naming(request) for request in self.asked)))
@@ -269,45 +295,63 @@ class _Applying:
         return ", ".join(part for part in kept if part), done
 
     def _add(self, which: str, change: dict) -> list[str]:
-        words, left_out = self._without_what_it_leaves_out(which, "", str(change["add"]))
+        words, left_out = self._without_what_it_leaves_out(
+            which, "", self._as_these_prompts_take(str(change["add"])))
         if left_out:
             said = [line for unwanted in left_out for line in self._add("negative", {"add": unwanted})]
             return said + (self._add(which, {**change, "add": words}) if words else [])
         text = getattr(self, which)
+        kept_out = [_KEPT_OUT + words] if which == "negative" else []
         if _whole(text, words):
-            return [self._already_there(which, words)]
+            return self._already_there(which, words, kept_out)
         anchor = _found(text, change.get("after") or "")
         at = end_of_the_term(text, anchor.end()) if anchor else len(text)
         setattr(self, which, _joined(text[:at], words, text[at:]))
-        return [f"Added {_quoted(words)} to the {PROMPTS[which]}."]
+        return [*kept_out, f"Added {_quoted(words)} to the {PROMPTS[which]}."]
 
-    def _already_there(self, which: str, words: str) -> str:
+    def _already_there(self, which: str, words: str, kept_out: list[str]) -> list[str]:
         text = getattr(self, which)
-        index = index_of(text, words) if which == "negative" else None
+        index = index_of(text, words) if which == "negative" and self.take_weights else None
         if index is None:
-            return f"The {PROMPTS[which]} already has {_quoted(words)}."
+            self.already_so += [*kept_out, f"The {PROMPTS[which]} already has {_quoted(words)}."]
+            return []
         setattr(self, which, reweighted(text, index, WEIGHT_STEP))
         before, after = (segments_of(prompt)[index].strip() for prompt in (text, getattr(self, which)))
-        return f"Replaced {_quoted(before)} with {_quoted(after)} in the {PROMPTS[which]}."
+        return [*kept_out, f"Replaced {_quoted(before)} with {_quoted(after)} in the {PROMPTS[which]}."]
 
     def _remove(self, which: str, change: dict) -> list[str]:
-        text = getattr(self, which)
-        parts = [part for part in _parts(str(change["remove"])) if _whole(text, part)]
+        text, asked = getattr(self, which), _parts(str(change["remove"]))
+        parts = [part for part in asked if _whole(text, part)]
         if len(parts) > 1:
             parts = [part for part in parts if self._names_what_he_asked(part)]
+        if which == "negative" and not parts:
+            return [f"Nothing in the Negative Prompt works against {_quoted(part)}." for part in asked]
+        self.took_out = self.took_out or (which == "positive" and bool(parts))
         setattr(self, which, without_phrases(text, parts))
         return [f"Removed {_quoted(part)} from the {PROMPTS[which]}." for part in parts]
 
     _EDITS: ClassVar[dict] = {"replace": _replace, "add": _add, "remove": _remove}
 
+    def _with_what_was_not_found(self, said: list[str]) -> list[str]:
+        shown = self.shown_positive.lower()
+        lines = []
+        for line in said:
+            words = line.removeprefix(_KEPT_OUT)
+            if words == line:
+                lines.append(line)
+            elif not self.took_out and not any(word in shown for word in _naming(words)):
+                lines.append(f"Couldn't find {_quoted(words)} in the Positive Prompt.")
+        return lines
+
     def outcome(self) -> Outcome:
+        said = self._with_what_was_not_found(self.said or self.already_so)
         return Outcome(self.positive, self.negative, self.changes,
-                       " ".join(self.said) or _NOTHING_CHANGED)
+                       " ".join(dict.fromkeys(said)) or _NOTHING_CHANGED)
 
 
 def apply_changes(answer: dict, pair: tuple[str, str], *, asked: list[str],
-                  settings: list[Setting], in_scenes: bool = False) -> Outcome:
-    applying = _Applying(*pair, asked, settings, in_scenes)
+                  settings: list[Setting], prompts: Prompts = _AS_WRITTEN) -> Outcome:
+    applying = _Applying(pair, asked, settings, prompts)
     for change in answer.get("changes") or ():
         applying.change(change)
     return applying.outcome()

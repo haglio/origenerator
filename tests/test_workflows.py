@@ -2511,3 +2511,8 @@ def test_enable_audio_is_a_switch_first_under_audio(workflow):
 
     assert (switch.label, switch.type, switch.switch) == ("Enable audio", ParamType.BOOL, True)
     assert section_title("enable_audio") == "Audio"
+
+
+def test_only_krea_2_says_its_prompts_take_no_weights():
+    assert [name for name, workflow in WORKFLOW_REGISTRY.items()
+            if not workflow.prompts_take_weights] == ["krea2_t2i"]

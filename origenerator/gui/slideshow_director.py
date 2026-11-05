@@ -16,7 +16,11 @@ from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
-from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
+from origenerator.fun_time_bridge import (
+    ask_for_omnipause,
+    ask_for_the_funestra,
+    tell_of_a_lock,
+)
 from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.funscript import funscript_of
 from origenerator.gallery.collection import (
@@ -51,6 +55,7 @@ from origenerator.gui.hud_places import (
 )
 from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
+from origenerator.gui.slideshow_lock import lock_held
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import (
@@ -488,7 +493,8 @@ class SlideshowDirector:
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
-            lock=(self._show_the_locked_generation
+            lock=(partial(lock_held, self._row_for, self._host.show_generation, self.items_of,
+                          partial(tell_of_a_lock, self._session_channel, shape))
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
             at_base=(at_its_regions_base if self._fun_time is not None else None),
@@ -834,11 +840,6 @@ class SlideshowDirector:
         self._slideshow = None
         if not self._giving_them_back and not self._host.reveal(prompt_id):
             self._host.follow_link(prompt_id)
-
-    def _show_the_locked_generation(self, prompt_id: str) -> None:
-        if self._row_for(prompt_id) is None:
-            return
-        self._host.show_generation(prompt_id)
 
     def base_location(self, shape: str) -> str:
         return shaped_key(gallery.ALL_KEY, shape)

@@ -271,6 +271,10 @@
     "landscape_request_open",
     "landscape_request_closed"
   ],
+  "lock_lines": [
+    "portrait_lock_held|{file}",
+    "landscape_lock_held|{file}"
+  ],
   "fix_phrases": [
     "fix face",
     "fix faces",

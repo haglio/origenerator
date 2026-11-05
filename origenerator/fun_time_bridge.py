@@ -19,6 +19,7 @@ from origenerator.fun_time_mode import (
     FILTER_ENHANCED,
     GO_TO,
     HAND_OVER,
+    LOCK_HELD,
     OPEN_SLIDESHOW,
     RELEASE,
     REQUEST_CLOSED,
@@ -55,6 +56,13 @@ def ask_for_the_funestra(dashboard_cmd_file, shape: str) -> None:
 def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
     if dashboard_cmd_file is not None:
         append_command(dashboard_cmd_file, ORIGENERATOR_MODE)
+
+
+def tell_of_a_lock(dashboard_cmd_file, shape: str, file) -> bool:
+    if dashboard_cmd_file is None:
+        return False
+    append_command(dashboard_cmd_file, f"{spelled_for(shape, LOCK_HELD)}|{file}")
+    return True
 
 
 def _split_argument(line: str) -> tuple[str, str, str]:

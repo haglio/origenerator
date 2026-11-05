@@ -139,7 +139,7 @@ def test_a_video_lists_what_its_starting_frame_was_animated_into(make_related):
     related.show_row(video, [_hidden_frame()])
 
     assert _animated(related) == ["vid2"]
-    assert related._animations._heading.text() == "Source image animated in"
+    assert related._animations._heading.text() == "Starting frame animated in"
 
 
 def test_a_video_animated_from_another_videos_starting_frame_points_at_that_video(make_related):
@@ -150,7 +150,7 @@ def test_a_video_animated_from_another_videos_starting_frame_points_at_that_vide
 
     tile = related._source_tile
     assert (tile._prompt_id, tile._heading.text(), tile._item_type_icon.media_type) == (
-        "vid1", "From source image of", "video")
+        "vid1", "From starting frame of", "video")
 
 
 def test_two_videos_animated_from_one_starting_frame_are_not_listed_on_each_other(make_related):

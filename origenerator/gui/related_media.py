@@ -128,7 +128,7 @@ class RelatedMedia(QWidget):
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
         items = self._animated_items(row, start_image_of, videos)
-        self._animations.set_heading("Source image animated in"
+        self._animations.set_heading("Starting frame animated in"
                                      if media_type_of_row(row) == MediaType.VIDEO else "")
         self._animations.show_videos(items)
         self._animations_section.setVisible(not self._animations.isHidden())
@@ -166,7 +166,7 @@ class RelatedMedia(QWidget):
         taken_from = next((video for video in videos if was_taken_from(source_row, video)
                            and start_image_of(video) == source_row), None)
         if taken_from is not None:
-            source_row, heading, media_type = taken_from, "From source image of", MediaType.VIDEO
+            source_row, heading, media_type = taken_from, "From starting frame of", MediaType.VIDEO
         self._source_tile.show_source(
             source_row, self._name_of(source_row["prompt_id"]),
             heading=heading, media_type=media_type,

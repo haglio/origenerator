@@ -226,8 +226,8 @@ def _remove(words: str, *, for_: str, prompt: str = "positive") -> dict:
     return {"prompt": prompt, "remove": words, "for": for_}
 
 
-def _answer(*changes, note: str = "") -> dict:
-    return {"changes": list(changes), "note": note}
+def _answer(*changes) -> dict:
+    return {"changes": list(changes)}
 
 
 class _Model:
@@ -296,12 +296,11 @@ def test_an_answer_that_is_no_list_of_changes_leaves_the_rules_own_edit():
     assert revision.action == DROPPED
 
 
-def test_a_model_that_changes_nothing_says_so_with_its_note_and_there_is_nothing_to_make():
-    revision = work_out("a woman, freckles", "", "more freckles",
-                        ask=_Model(_answer(note="The freckles are already there.")))
+def test_a_model_that_changes_nothing_says_so_and_there_is_nothing_to_make():
+    revision = work_out("a woman, freckles", "", "more freckles", ask=_Model(_answer()))
 
     assert not revision.changed
-    assert revision.answer == "Nothing changed. The freckles are already there."
+    assert revision.answer == "Nothing changed."
 
 
 def test_a_change_answering_none_of_his_words_is_left_out_without_a_word():
@@ -499,7 +498,8 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     content = build_request_messages("a woman, tan", "", "no tan lines", WhatIsKnown(), "S")[1]["content"]
 
     shape = content.rsplit("\n\n", 1)[1]
-    assert shape.startswith('Reply with only a JSON object: {"changes": [...], "note": ""}')
+    assert shape.startswith('Reply with only a JSON object: {"changes": [...]}.')
+    assert "note" not in shape
     assert '"for": "<his words>"' in shape
     assert "thrown away" in shape
     assert "..." not in content.rsplit("\n\n", 1)[0]
@@ -511,12 +511,12 @@ def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_
     def ask(messages, **settings):
         sent["messages"], sent["settings"] = messages, settings
         return {"message": {"content": '{"changes": [{"prompt": "negative", "add": "tan lines", '
-                                       '"for": "no tan lines"}], "note": ""}'}}
+                                       '"for": "no tan lines"}]}'}}
 
     answered = ask_the_model("a woman, tan", "", "no tan lines", WhatIsKnown(EXCHANGE, NOTES), llm=ask)
 
     assert answered == {"changes": [{"prompt": "negative", "add": "tan lines",
-                                     "for": "no tan lines"}], "note": ""}
+                                     "for": "no tan lines"}]}
     assert "a woman, tan" in sent["messages"][-1]["content"]
     assert sent["settings"]["json_answer"] is True
     assert sent["settings"]["reads_tokens"] > 16000

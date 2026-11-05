@@ -634,12 +634,11 @@ def test_a_spoken_request_the_model_changes_nothing_for_says_so_and_makes_nothin
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
-        positive, negative, words,
-        ask=lambda p, n, r, known: {"changes": [], "note": "There is a hat already."})
+        positive, negative, words, ask=lambda p, n, r, known: {"changes": []})
 
     _speak_request(view, qtbot, "Request, a hat, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Nothing changed. There is a hat already."
+    assert words(view._slideshows.showing.shown._note) == "Nothing changed."
     assert not view._live_jobs
 
 

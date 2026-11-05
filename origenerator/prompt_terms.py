@@ -31,7 +31,6 @@ def segments_of(prompt: str) -> list[str]:
 
 
 def unwrapped(segment: str) -> tuple:
-    # ComfyUI: (term:1.2) states its weight; each wrapping paren multiplies by 1.1
     text = (segment or "").strip()
     weight = 1.0
     while len(text) > 1 and text[0] == "(" and _closes_at_end(text):

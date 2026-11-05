@@ -310,15 +310,15 @@ def prompts_touching(request: str, prompts, *, limit: int = 8,
 
 
 _ANSWER_SHAPE = (
-    'Reply with only a JSON object: {"changes": [...], "note": ""}. Each change is one of: '
+    'Reply with only a JSON object: {"changes": [...]}. Each change is one of: '
     '{"setting": "<key>", "to": <value>, "for": "<his words>"} to set a setting, by its [key] and '
     'within its range or choices; {"prompt": "positive" or "negative", "replace": "<words now in '
     'that prompt>", "with": "<new words>", "for": "<his words>"}; {"prompt": ..., "add": "<new '
     'words>", "after": "<words now in that prompt they belong beside>", "for": "<his words>"}; '
     '{"prompt": ..., "remove": "<words now in that prompt>", "for": "<his words>"}. "for" quotes '
     'the words of his, from this request or an earlier one, that the change answers; a change '
-    'answering none of his words is thrown away. "note" is one plain sentence to him only when '
-    'nothing should change, saying why; otherwise "".')
+    'answering none of his words is thrown away. When nothing should change, "changes" is an '
+    'empty list.')
 
 
 def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,

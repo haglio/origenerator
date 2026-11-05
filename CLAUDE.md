@@ -18,7 +18,7 @@ the suite when a **known** blocked term appears in the tracked tree, but a brand
 new performer name it has never seen passes every check and lands. The guard is a
 backstop for names already known; it cannot see the next one.
 
-So fabricate fully. Use `Jane Doe`, `Sample Studio`, `scene one`, the
+So fabricate fully. Use `Jane Doe`, `Sample Studio`, `video one`, the
 `alpha`/`beta`/`gamma` action placeholders the committed `content.example.json`
 already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that video, still that performer. Make
@@ -83,7 +83,7 @@ for one thing cost four. So:
   not tell what it meant. So an agent says image, video and item, to him and
   on the screen. The code's "picture" became "image" (2026-10-25), and a
   picture that was no image took a name of its own: the small one on a tile,
-  a row or a card is a **thumbnail**, one frame of a video or of this window
+  a row or a tile is a **thumbnail**, one frame of a video or of this window
   sent to the headset is a **frame**, his drawings on the sorting window's
   buttons and the OSR2 controls' drawing are **drawings**, and what a run is
   making, in the help for its settings, is the **result**. Saved names keep
@@ -109,7 +109,7 @@ for one thing cost four. So:
   it, and so no caret, is a **leaf folder**: the settings folders at the
   end of each path, which hold the items themselves.
 - **A running Auto-Generate is Auto-Generate, never a loop.** Loop is the
-  slideshow's word, for playing one row of its map over and over ("Loop
+  slideshow's word, for playing one row of its nav map over and over ("Loop
   off" says it stopped). The code called a running Auto-Generate "the
   loop", an agent repeated the word to the user, and he had to ask what it
   meant. So the code names it after the button, and so does every message
@@ -191,7 +191,7 @@ every commit, never a few nearby files in its place.
   before: under `-n` the coverage floor is not stood down for it.
 - A worker that dies natively is named with the test it was running. Three
   `Windows fatal exception: code 0xe0000001` dumps in a green run's output are
-  `tests/test_windows_toast.py` having Windows refuse a notification on
+  `tests/test_windows_toast.py` having Windows refuse a toast on
   purpose, never a crash.
 - `-n` is pytest-xdist's, which the `dev` extra names. A venv without it
   answers `unrecognized arguments: -n`; it goes in with
@@ -199,7 +199,7 @@ every commit, never a few nearby files in its place.
   out of that venv, and nothing else in the venv changes.
 - GitHub still runs the suite shuffled, in four parts on four machines.
 
-## A model picker offers only what its graph can run
+## A model dropdown offers only what its graph can run
 
 `ComfyUI/models/<category>` is a folder, not a catalogue. `checkpoints` holds WAN
 and LTX video models beside the SDXL ones; `diffusion_models` holds WAN, Flux,
@@ -210,9 +210,9 @@ them as choices the user is being asked to make. That is exactly how the SDXL
 T2I form came to show WAN 2.2's high/low expert pairs, with nothing to
 say which one to pick or that neither belonged.
 
-So every picker states what its graph runs: `model_dropdown(key, label, default,
+So every dropdown states what its graph runs: `model_dropdown(key, label, default,
 folder, accepts=…)`, which lists that folder with `list_model_files(category,
-fallback, accepts=…)` and keeps it on the picker, and `list_lora_files(fallback,
+fallback, accepts=…)` and keeps it on the dropdown, and `list_lora_files(fallback,
 accepts=…)`, with `accepts` a family
 from `workflows/model_arch.py`, a tuple of them, or `ANY` for a category that
 genuinely takes anything (the ESRGAN upscalers). Add `expert="high"` / `"low"` on
@@ -292,13 +292,13 @@ Two columns answer it and nothing else does: an image's `image_state`, set in
 the sorting window or the Action list on a Generate tab, and a video's
 `action`, the action picked when it was launched. `action_settings.action_of`
 reads those two and returns "" for a row nobody has said one for, which a
-slideshow's map draws as a row with no action name, in its gutter and on its filter
+slideshow's nav map draws as a row with no action name, in its margin and on its filter
 button (`nav_map.action_of`).
 
 It used to be worked out from the prompt, by matching each action's keywords in
-`actions` against the stored text. That answer named every map row and
+`actions` against the stored text. That answer named every nav map row and
 narrowed the show's action filter, and it was wrong often enough to be worse than
-nothing: it named rows for an action none of them shows, which the user found off the map
+nothing: it named rows for an action none of them shows, which the user found off the nav map
 (2026-09-21). He called the mechanism garbage and had it removed, with the spoken
 "genau it" that animated an image as whatever its prompt read as (2026-09-22).
 `actions` is now a plain list of the action names.
@@ -406,7 +406,7 @@ since taken its name.
 ## A feature the session can reach is half a feature until Fun Time answers it
 
 This app runs two ways — Standalone, and hosted inside a Fun Time session as one
-of the room's managed windows — so anything added here that the session touches
+of Fun Time's managed windows — so anything added here that the session touches
 has a matching half over there, and the two are one piece of work rather than a
 feature and a follow-up. Four shapes it takes: a verb in
 `fun_time_bridge.py` (sent by fun_time's dispatch table and its loop branches;
@@ -553,8 +553,8 @@ is the two hooks that call the guard, below.
   names (musubi's pins are not this app's either), from the Train button beside
   a LoRA row whose pick is one of the overlay's `trainable_loras`
   (`origenerator/look_training.py`). Its steps, each a subcommand on the same
-  job file: `prepare` copies the folder's pictures in as JPEGs named by their
-  contents, so an unchanged picture keeps its copy and its description across
+  job file: `prepare` copies the folder's images in as JPEGs named by their
+  contents, so an unchanged image keeps its copy and its description across
   trainings; `describe` writes a description beside each new copy with
   Florence-2, in a program of its own so the model leaves the card before the
   training; `dataset` puts the recorded trigger words in front of every
@@ -567,7 +567,7 @@ is the two hooks that call the guard, below.
   newest version as `<base> <version>` and never over a file. It works in
   `state/lora training/<base>`, outside the library, because pCloud turns a
   state rewritten every 25 steps into conflicted copies. It prints counts,
-  never a description or a picture's name. The queue only watches this
+  never a description or an image's name. The queue only watches this
   training (`TrainingRun.holds_the_line`), where a fix's holds it.
 - `tools/card_claim.py` — the command for the one claim on the graphics card (`origenerator/card_claim.py`), the file
   `~/.haglio/graphics_card_claim.json` naming who holds it and its Windows
@@ -647,7 +647,7 @@ a restart leaves off, since an Auto-Generate that came back on by itself
 could run unnoticed.
 
 Inside a Fun Time session the window draws what the session asks for -- one
-list per shape, its own borders held still, the room's device and sound --
+list per shape, its own borders held still, Fun Time's device and sound --
 and leaves the standalone choices it overrides as it found them, so a window
 handed back, or the next launch in Standalone, is where he left it.
 
@@ -712,7 +712,7 @@ copy offers itself to Fun Time the moment it has the library, marked as still
 starting until its window is up, so a session opened during its splash takes it
 over and waits for it rather than starting a second (the offer in
 `app_support.origenerator_handoff`). A copy Fun Time opens itself never
-refuses, since refusing would leave the session's room with no Origenerator at
+refuses, since refusing would leave Fun Time's session with no Origenerator at
 all; it is only ever opened when no copy has offered itself.
 
 A change a Fun Time session could show differently gets its hosted half judged

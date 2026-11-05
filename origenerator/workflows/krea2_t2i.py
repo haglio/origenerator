@@ -70,7 +70,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
             "vae": "qwen_image_vae.safetensors",
             "enhance": False,
-            "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
+            "upscale_model": "4xFaceUpDAT.pth",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,

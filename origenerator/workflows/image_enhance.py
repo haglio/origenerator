@@ -42,7 +42,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "scheduler": "normal",
             "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
-            "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
+            "upscale_model": "4xFaceUpDAT.pth",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,

@@ -103,10 +103,10 @@ COMFYUI_PORT = 8188
 LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
 LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 
-_EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
-EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
+EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
+EVOLVER_INBOX_DIR = EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
-EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
+EVOLVER_UPSCALED_DIR = EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 GENAU_SOURCE = haglio_settings.value("genau_source")
 
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"

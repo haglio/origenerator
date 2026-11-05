@@ -3,11 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
+from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple
 
+from app_support.media_renditions import original_rendition
+
 from origenerator import gallery, points_of_interest, trash_collection
-from origenerator.config import EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR, OUTPUT_PLACES
+from origenerator.config import EVOLVER_AI_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR, OUTPUT_PLACES
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
@@ -18,6 +21,7 @@ from origenerator.gallery.collection import (
     folder_collection,
 )
 from origenerator.gallery.custom import index_folders
+from origenerator.gallery.enhance import EnhanceVersion, file_at, upscale_and_original
 from origenerator.gallery.placement import Placement
 from origenerator.gallery.shapes import LANDSCAPE, shape_covers
 from origenerator.generation_state import on_the_map
@@ -44,12 +48,14 @@ class LibrarySnapshot:
                  folder_meta: dict | None = None,
                  name_of: Callable[[str], str] | None = None,
                  custom_collections: list[dict] = (),
-                 trees_from: LibrarySnapshot | None = None):
+                 trees_from: LibrarySnapshot | None = None,
+                 evolvers_folder: Path = EVOLVER_AI_DIR):
         self.rows = rows
         self.held_rows = held_rows
         self.folder_meta = folder_meta or {}
         self._name_of = name_of
         self._custom_records = custom_collections
+        self._evolvers_folder = evolvers_folder
         self._customs: dict[str, list] = {}
         self._ids_at: dict[str | None, frozenset[str]] = {}
         self._slides: dict[tuple, tuple | None] = {}
@@ -189,7 +195,8 @@ class LibrarySnapshot:
         resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
                     if media_type == MediaType.VIDEO else None)
         upscale = self.upscales.upscale_of(resolved[0]) if resolved is not None else None
-        versions = gallery.displayed_versions(row, upscale)
+        versions = (gallery.displayed_versions(row, upscale)
+                    or self._beside_its_original(resolved))
         if len(versions) <= 1:
             return None
         framed_together = parts_framed_together()
@@ -198,6 +205,13 @@ class LibrarySnapshot:
                            points_of_interest.boxes_of(version.file, framed_together=framed_together))
                    for version in versions]
         return str(entries[0].path), entries
+
+    def _beside_its_original(self, resolved) -> list[EnhanceVersion]:
+        original = (original_rendition(resolved[0], self._evolvers_folder)
+                    if resolved is not None else "")
+        if not original:
+            return []
+        return upscale_and_original(file_at(Path(resolved[0])), file_at(Path(original)))
 
     def ids_at(self, key: str | None) -> frozenset[str]:
         if key not in self._ids_at:

@@ -303,3 +303,29 @@ def test_a_reading_scans_evolvers_upscales_once(monkeypatch):
     library.slides_of(library.rows)
 
     assert len(scanned) == 1
+
+
+def _another_sites_upscale(evolvers, *, with_its_original: bool = True):
+    upscale = (evolvers / "2_outbox" / "upscaled_by_orientation" / "landscape" / "example_site"
+               / "scene one_topaz.mp4")
+    original = evolvers / "1_sorted" / "example_site" / "landscape" / "scene one.mp4"
+    for video in (upscale, *((original,) if with_its_original else ())):
+        video.parent.mkdir(parents=True)
+        video.write_bytes(b"video")
+    row = {"prompt_id": "o1", "workflow_name": "outside video: example_site",
+           "source": "outside", "params": "{}", "thumbnail_path": None,
+           "output_files": json.dumps([{"filename": upscale.name, "path": str(upscale)}])}
+    return row, upscale, original
+
+
+def test_another_sites_upscale_steps_to_the_video_it_was_made_from(tmp_path):
+    row, upscale, original = _another_sites_upscale(tmp_path / "AI")
+
+    assert LibrarySnapshot([row], evolvers_folder=tmp_path / "AI").versions_of([row]) == {
+        str(upscale): [(upscale, "video", "Evolved", ()), (original, "video", "Original", ())]}
+
+
+def test_another_sites_upscale_whose_original_is_gone_has_no_other_version(tmp_path):
+    row, _upscale, _original = _another_sites_upscale(tmp_path / "AI", with_its_original=False)
+
+    assert LibrarySnapshot([row], evolvers_folder=tmp_path / "AI").versions_of([row]) == {}

@@ -465,3 +465,14 @@ def test_words_quoted_with_a_space_missing_or_added_are_still_found_where_they_s
                        asked=("freckles, and blurry is fine",))
 
     assert (outcome.positive, outcome.negative) == ("a woman on a couch, freckles", "")
+
+
+def test_a_weight_written_around_some_words_of_a_part_comes_off_where_prompts_take_none():
+    outcome = apply_changes(
+        {"changes": [{"prompt": "positive", "replace": "a woman",
+                      "with": "a (tall:0.8) woman, ((freckles)), (soft (warm:1.2) light:1.1)",
+                      "for": "taller"}]},
+        ("a woman on a couch", "blurry"), asked=["taller"], settings=_SIZE,
+        prompts=Prompts(take_weights=False))
+
+    assert outcome.positive == "a tall woman, freckles, soft warm light on a couch"

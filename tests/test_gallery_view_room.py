@@ -483,6 +483,17 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     win.close()
 
 
+def test_a_slideshow_closed_before_it_became_active_asks_for_no_keyboard_focus(qtbot, monkeypatch):
+    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch)
+    window = slideshow.shown
+
+    window.close()
+    QApplication.processEvents()
+    window.show()
+
+    assert window.focusWidget() is None
+
+
 def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, monkeypatch):
     view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()

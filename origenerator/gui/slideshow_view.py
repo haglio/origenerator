@@ -380,6 +380,9 @@ class SlideshowView(QWidget):
 
     def closeEvent(self, event):
         self._closing = True
+        # Qt: an activation still queued reaches this hidden window, which Qt then remembers as owed the
+        # focus, and it never forgets the address: the next widget allocated there takes the keyboard on show.
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.hide()
         self._pane.close_engine()  # Windows will not move a file the engine holds open
         self.slideshow.close()

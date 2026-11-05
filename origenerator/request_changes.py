@@ -13,6 +13,7 @@ from origenerator.prompt_terms import (
     segments_of,
     tidy,
     unwrapped,
+    without_weights,
 )
 from origenerator.request_settings import Setting, setting_called
 from origenerator.trigger_words import (
@@ -277,9 +278,7 @@ class _Applying:
                 [words for words in left_out.values() if words])
 
     def _as_these_prompts_take(self, words: str) -> str:
-        if self.take_weights:
-            return words
-        return ", ".join(unwrapped(part)[0] for part in _parts(words))
+        return words if self.take_weights else without_weights(words)
 
     def _answers_him(self, change: dict, changed: str) -> bool:
         return answers_him(change.get("for"), self.asked) or self._names_what_he_asked(changed)

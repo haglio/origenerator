@@ -104,6 +104,7 @@ def test_portrait_and_landscape_are_taught_as_width_and_height_never_as_prompt_w
     assert "never write the shape into a prompt" in rule
     assert "the word itself" in rule
     assert "leave Width and Height alone" in rule
+    assert "never put another shape's word" in rule
     assert '"setting": "width"' in prompt
 
 

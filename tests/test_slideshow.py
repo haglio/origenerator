@@ -8,6 +8,7 @@ from origenerator.slideshow import (
     SlideshowFilters,
     SlideshowPlaylist,
     SlideshowState,
+    dealt,
     in_order,
 )
 from tests.slideshow_support import ahead
@@ -520,3 +521,69 @@ def test_the_items_in_play_order_follow_the_pass_rather_than_the_set():
 def test_an_unnamed_generation_matches_none_of_the_unnamed_slides():
     playlist = _playlist()
     assert playlist.holds(None) is False
+
+
+def _weighing(weights: dict):
+    return weights.__getitem__
+
+
+def test_a_pass_dealt_by_weight_leads_with_the_heaviest_and_keeps_every_item():
+    playlist = SlideshowPlaylist(
+        [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")],
+        weight_of=_weighing({"a.png": 1e-12, "b.mp4": 1e12, "c.png": 1e-12}))
+
+    assert playlist.current().path == "b.mp4"
+    assert sorted(slide.path for slide in playlist.in_play_order()) == ["a.png", "b.mp4", "c.png"]
+
+
+def test_each_new_pass_is_dealt_by_weight_again():
+    playlist = SlideshowPlaylist(
+        [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")],
+        weight_of=_weighing({"a.png": 1e-12, "b.mp4": 1e12, "c.png": 1e-12}))
+
+    for _ in range(3):
+        playlist.advance()
+
+    assert playlist.current().path == "b.mp4"
+
+
+_THREE_VIDEOS = [("a.mp4", "video"), ("b.mp4", "video"), ("c.mp4", "video")]
+_ALWAYS_SKIPPED = 0.0
+
+
+def _shuffled(items, weights: dict, *, start=None) -> SlideshowPlaylist:
+    return dealt(items, shuffle=None, start=start, weight_of=_weighing(weights))
+
+
+def _dealt_into(playlist: SlideshowPlaylist) -> list:
+    return sorted(slide.path for slide in playlist.items)
+
+
+def test_a_video_he_always_skips_sits_out_a_shuffled_pass():
+    playlist = _shuffled(_THREE_VIDEOS, {"a.mp4": _ALWAYS_SKIPPED, "b.mp4": 1.0, "c.mp4": 2.0})
+
+    assert _dealt_into(playlist) == ["b.mp4", "c.mp4"]
+
+
+def test_the_item_on_screen_and_what_is_being_made_are_never_the_ones_left_out():
+    items = [("a.mp4", "video"), ("frame.png", LIVE, "g-run"), ("c.mp4", "video")]
+    skipped = dict.fromkeys(("a.mp4", "frame.png", "c.mp4"), _ALWAYS_SKIPPED)
+
+    playlist = _shuffled(items, skipped, start=0)
+
+    assert playlist.current().path == "a.mp4"
+    assert _dealt_into(playlist) == ["a.mp4", "frame.png"]
+
+
+def test_a_pass_is_never_dealt_empty():
+    skipped = dict.fromkeys(("a.mp4", "b.mp4", "c.mp4"), _ALWAYS_SKIPPED)
+
+    assert _dealt_into(_shuffled(_THREE_VIDEOS, skipped)) == ["a.mp4", "b.mp4", "c.mp4"]
+
+
+def test_a_pass_of_the_latest_leaves_nothing_out_whatever_he_skips():
+    skipped = dict.fromkeys(("a.mp4", "b.mp4", "c.mp4"), _ALWAYS_SKIPPED)
+
+    playlist = dealt(_THREE_VIDEOS, shuffle=in_order, start=None, weight_of=_weighing(skipped))
+
+    assert [slide.path for slide in playlist.in_play_order()] == ["a.mp4", "b.mp4", "c.mp4"]

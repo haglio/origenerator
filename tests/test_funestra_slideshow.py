@@ -1275,6 +1275,35 @@ def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qt
     assert slideshow.hud_prompt_id == "id-1x"
 
 
+_WATCHED_MOST = {"one.png": 1.0, "two.png": 1.0, "three.png": 1e12}
+
+
+def _weighing_what_he_watches() -> SlideshowActions:
+    return SlideshowActions(weight_of=lambda path: _WATCHED_MOST[str(path)])
+
+
+def _handed_to_the_funestra(slideshow) -> list[str]:
+    return [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
+
+
+def test_a_shuffled_slideshow_deals_what_he_watches_most_first_and_still_plays_everything(
+        qtbot, tmp_path):
+    slideshow = FunestraSlideshow(Playing(_ITEMS, actions=_weighing_what_he_watches()),
+                                  _seat(tmp_path), _NO_HOSTING)
+    slideshow._timer.stop()
+
+    played = _handed_to_the_funestra(slideshow)
+
+    assert played[0] == "three.png"
+    assert sorted(played) == ["one.png", "three.png", "two.png"]
+
+
+def test_a_slideshow_of_the_latest_plays_in_order_whatever_he_watches_most(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=_weighing_what_he_watches())
+
+    assert _handed_to_the_funestra(slideshow) == ["one.png", "two.png", "three.png"]
+
+
 def _plays(slideshow) -> list[str]:
     return [verb for verb in _sent(slideshow) if verb.startswith("PLAY_FILE")]
 

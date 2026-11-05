@@ -41,7 +41,7 @@ class TrainingOffer:
     tooltip: str
     pictures: int
     folder: Path
-    counted: str = "picture"
+    counted: str = "image"
     trash_tooltip: str | None = None
 
 

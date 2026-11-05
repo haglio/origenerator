@@ -43,7 +43,7 @@ MORE_THAN_ONE_BOX = (
     "• Each box is read on its own. Words in one box are never read together with "
     "words in another, so each box should make sense by itself, and a phrase split "
     "between two boxes loses its meaning.\n"
-    "• On SDXL, the overall sense of the picture comes from the first box alone, so "
+    "• On SDXL, the overall sense of the image comes from the first box alone, so "
     "the first box counts for more than the rest.\n"
     "• Every word in every box shares the model's attention, so each box added makes "
     "every word count for a little less, the first box's included.\n"

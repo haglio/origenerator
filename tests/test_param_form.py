@@ -2550,7 +2550,7 @@ def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot
     assert not controls.isHidden()
     assert (controls.train.text(), controls.train.isEnabled(), controls.train.toolTip()) == (
         "Retrain", True, "Trains it.")
-    assert controls.pictures.text() == "87 pictures"
+    assert controls.pictures.text() == "87 images"
     assert controls.pictures.toolTip() == str(tmp_path)
     controls.train.click()
     assert asked == ["lora"]
@@ -2560,7 +2560,7 @@ def test_a_lora_row_offers_training_only_while_the_form_is_handed_an_offer(qtbot
     form.training.offer("lora", TrainingOffer(label="Retrain", enabled=True, tooltip="Trains it.",
                                               pictures=1, folder=tmp_path), running="Training 10%")
     assert (controls.train.text(), controls.train.isEnabled()) == ("Training 10%", False)
-    assert controls.pictures.text() == "1 picture"
+    assert controls.pictures.text() == "1 image"
 
     form.training.offer("lora", None)
     assert controls.isHidden()

@@ -20,8 +20,9 @@ from origenerator.gui.seed_dropdown import SeedDropdown
 from origenerator.media import MediaType
 from origenerator.model_titles import option_title
 from origenerator.seed_history import SeedHistory
-from origenerator.workflows.base import ParamDef, ParamType, shown_with_what_is_held
+from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
+from origenerator.workflows.model_files import shown_with_what_is_held
 
 NOT_KNOWN = "—"
 

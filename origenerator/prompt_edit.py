@@ -11,6 +11,7 @@ from origenerator.collection_notes import CollectionNotes
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.db_requests import Turn
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
+from origenerator.request_changes import apply_changes
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ ALLOWED = "allowed"
 REWRITTEN = "rewritten"
 
 REQUEST_WINDOW_TOKENS = 32768
-_ASK_TIMEOUT_S = 180.0
+_ASK_TIMEOUT_S = 300.0
 
 
 def _both_spellings(words: set) -> frozenset:
@@ -205,17 +206,6 @@ def _without_nothing_weighted(prompt: str) -> str:
     return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
 
 
-_ELLIPSIS = re.compile(r"\.\.\.|…")
-
-
-def _said(old: str, new: str) -> str:
-    return new if re.search(r"\w", new) else old
-
-
-def _leaves_out(old: str, new: str) -> bool:
-    return bool(_ELLIPSIS.search(new)) and not _ELLIPSIS.search(old)
-
-
 def _plus(prompt: str, term: str) -> str:
     kept = _tidy(prompt)
     return f"{kept}, {term}" if kept else term
@@ -335,36 +325,35 @@ def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = Fa
     scenes, each_negative = (_scenes_of(positive, negative) if in_scenes
                              else ([positive], [negative]))
     told = WhatIsKnown(**known)
+    asked = [request, *(turn[0] for turn in told.exchange)]
     revisions = []
     for scene, scene_negative in zip(scenes, each_negative, strict=True):
-        revision = _answered(scene, scene_negative, parsed,
+        revision = _answered((scene, scene_negative), parsed,
                              partial(ask or ask_the_model, scene, scene_negative, request, told),
-                             told.settings)
+                             told.settings, asked)
         if revision is None:
             return request_applier(in_scenes)(positive, negative, request)
         revisions.append(revision)
     return _joined(positive, negative, each_negative, parsed, revisions)
 
 
-def _answered(positive: str, negative: str, parsed: tuple, asking,
-              settings) -> PromptRevision | None:
+def _answered(pair: tuple[str, str], parsed: tuple, asking, settings,
+              asked: list[str]) -> PromptRevision | None:
+    positive, negative = pair
     polarity, term = parsed
     try:
-        new_positive, new_negative, answer, *more = asking()
+        answer = asking()
     except Exception as exc:  # noqa: BLE001 -- model down or unreadable: the rules' own edit stands
         logger.warning("prompt_edit: the model could not answer the request (%s)",
                        type(exc).__name__)
         return None
-    new_positive = _said(positive, _without_nothing_weighted(new_positive))
-    new_negative = _said(negative, _without_nothing_weighted(new_negative))
-    if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
+    if not isinstance(answer, dict):
         return None
-    changes = request_settings.changes_asked(more[0] if more else None, settings)
-    if (new_positive, new_negative) == (positive, negative) and not answer and not changes:
-        return None
-    return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
-                          REWRITTEN, answer, tuple(changes.items()),
-                          tuple(request_settings.described(changes, settings)))
+    outcome = apply_changes(answer, pair, asked=asked, settings=settings)
+    return PromptRevision(positive, negative, _without_nothing_weighted(outcome.positive),
+                          _without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
+                          outcome.line, tuple(outcome.settings.items()),
+                          tuple(request_settings.described(outcome.settings, settings)))
 
 
 _SHORTEST_ROOT = 3
@@ -422,14 +411,23 @@ def prompts_touching(request: str, prompts, *, limit: int = 8,
 
 
 
+_ANSWER_SHAPE = (
+    'Reply with only a JSON object: {"changes": [...], "note": ""}. Each change is one of: '
+    '{"setting": "<key>", "to": <value>, "for": "<his words>"} to set a setting, by its [key] and '
+    'within its range or choices; {"prompt": "positive" or "negative", "replace": "<words now in '
+    'that prompt>", "with": "<new words>", "for": "<his words>"}; {"prompt": ..., "add": "<new '
+    'words>", "after": "<words now in that prompt they belong beside>", "for": "<his words>"}; '
+    '{"prompt": ..., "remove": "<words now in that prompt>", "for": "<his words>"}. "for" quotes '
+    'the words of his, from this request or an earlier one, that the change answers; a change '
+    'answering none of his words is thrown away. "note" is one plain sentence to him only when '
+    'nothing should change, saying why; otherwise "".')
+
+
 def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,
                            system_prompt: str) -> list[dict]:
     parts = []
     if known.notes is not None and known.notes.complete:
         parts.append(known.notes.as_told())
-    if known.exchange:
-        turns = "\n".join(f"Artist: {turn[0]}\nYou: {turn[1]}" for turn in known.exchange)
-        parts.append(f"THE EXCHANGE SO FAR about this image, oldest first:\n{turns}")
     if known.examples:
         numbered = "\n".join(f"{number}. {prompt}" for number, prompt in enumerate(known.examples, 1))
         parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
@@ -438,24 +436,19 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
         parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
                      + request_settings.as_told(known.settings))
     parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
-    parts.append(f"THE ARTIST NOW ASKS:\n{request}")
-    parts.append(
-        'Reply with only a JSON object with four keys: "positive", holding the whole '
-        'rewritten positive prompt; "negative", holding the whole rewritten negative '
-        'prompt; "answer", one or two plain sentences to the artist on what you '
-        'changed and what in his collection you drew on; and "settings", the settings '
-        "to change by their [key], {} when none.")
-    return [{"role": "system", "content": system_prompt},
+    parts.append(f"HE NOW ASKS:\n{request}")
+    parts.append(_ANSWER_SHAPE)
+    exchange = [message for turn in known.exchange
+                for message in ({"role": "user", "content": turn[0]},
+                                {"role": "assistant", "content": turn[1]})]
+    return [{"role": "system", "content": system_prompt}, *exchange,
             {"role": "user", "content": "\n\n".join(parts)}]
 
 
 def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown, *,
-                  llm=None) -> tuple:
-    obj = local_llm.answer_of((llm or local_llm.ask)(
+                  llm=None) -> dict:
+    return local_llm.answer_of((llm or local_llm.ask)(
         build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT),
         base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
         timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
-        stays_loaded="0"))
-    return (str(obj["positive"]).strip() if "positive" in obj else positive,
-            str(obj["negative"]).strip() if "negative" in obj else negative,
-            str(obj.get("answer") or "").strip(), obj.get("settings"))
+        stays_loaded="0", thinks=True))

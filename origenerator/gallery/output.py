@@ -6,7 +6,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from origenerator.evolver_upscales import UPSCALE_SUFFIX
+from app_support.video_names import UPSCALE_SUFFIX
+
 from origenerator.file_refs import frame_name
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus

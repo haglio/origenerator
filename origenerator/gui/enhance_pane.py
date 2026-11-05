@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPoint, QRect, QSignalBlocker, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
@@ -91,11 +91,12 @@ _AUTO_TOOLTIP = (
 )
 
 _ALL_FIXES_TOOLTIP = (
-    "The tick turns every fix on or off together. A number typed here sets every "
-    "fix to it, including the ones that are off. The number is empty while the "
-    "fixes differ."
+    "The checkbox turns every fix on or off together. A number typed here sets every "
+    "fix to it, including the ones that are off. The number is gray while every "
+    "fix already has it, and white while pressing Enter here would change one."
 )
 
+_APPLIED_NUMBER_CSS = f"color: {TEXT_MUTED.name()};"
 _NO_DETECTOR_TOOLTIP = (
     "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
     "Subpack node pack, put one whose name says \"{}\" in its "
@@ -169,12 +170,12 @@ def _settings_dragged(mime, _source) -> tuple[dict] | None:
     return None if params is None else (params,)
 
 
-def _set_of_tick_and_number(tick, label, number) -> QFrame:
+def _set_of_check_and_number(check, label, number) -> QFrame:
     column = QFrame()
     grid = QGridLayout(column)
     border_as_a_set(column, grid)
     grid.setSpacing(GAP_SMALL)
-    grid.addWidget(tick, 0, 1, Qt.AlignmentFlag.AlignCenter)
+    grid.addWidget(check, 0, 1, Qt.AlignmentFlag.AlignCenter)
     grid.addWidget(label, 1, 0)
     grid.addWidget(number, 1, 1)
     return column
@@ -329,30 +330,25 @@ class EnhancePane(QWidget):
         return host
 
     def _all_fixes_field(self) -> QWidget:
-        tick = TickControl("")
-        tick.setToolTip(_ALL_FIXES_TOOLTIP)
-        tick.clicked.connect(self._tick_every_fix)
+        check = TickControl("")
+        check.setToolTip(_ALL_FIXES_TOOLTIP)
+        check.clicked.connect(self._check_every_fix)
         number = self._fix_number()
         number.setToolTip(_ALL_FIXES_TOOLTIP)
-        number.setKeyboardTracking(False)
-        number.setMinimum(number.minimum() - number.singleStep())
-        number.setSpecialValueText(" ")
         number.valueChanged.connect(self._number_every_fix)
         label = self._labeled("All", number)
-        self._all_fixes_tick, self._all_fixes_number = tick, number
+        self._all_fixes_check, self._all_fixes_number = check, number
         if not self._fixes_that_can_run:
-            for one in (tick, number, label):
+            for one in (check, number, label):
                 one.setEnabled(False)
 
-        return _set_of_tick_and_number(tick, label, number)
+        return _set_of_check_and_number(check, label, number)
 
-    def _tick_every_fix(self, on: bool) -> None:
+    def _check_every_fix(self, on: bool) -> None:
         self._change_every_fix(lambda name: self._fix_checks[name].setChecked(on))
 
     def _number_every_fix(self, value: float) -> None:
-        if value == self._all_fixes_number.minimum():
-            self._show_all_fixes()
-        else:
+        if not self._loading and not self._every_fix_has_the_all_number():
             self._change_every_fix(lambda name: self._fixes[name].setValue(value))
 
     def _change_every_fix(self, change) -> None:
@@ -364,14 +360,18 @@ class EnhancePane(QWidget):
             self._loading = False
         self._emit()
 
+    def _every_fix_has_the_all_number(self) -> bool:
+        return all(self._fixes[name].value() == self._all_fixes_number.value()
+                   for name in self._fixes_that_can_run)
+
     def _show_all_fixes(self) -> None:
-        names = self._fixes_that_can_run
-        self._all_fixes_tick.setChecked(
-            bool(names) and all(self._fix_checks[name].isChecked() for name in names))
-        numbers = {self._fixes[name].value() for name in names}
-        number = self._all_fixes_number
-        with QSignalBlocker(number):
-            number.setValue(numbers.pop() if len(numbers) == 1 else number.minimum())
+        checked = [self._fix_checks[name].isChecked() for name in self._fixes_that_can_run]
+        self._all_fixes_check.setCheckState(
+            Qt.CheckState.Unchecked if not any(checked)
+            else Qt.CheckState.Checked if all(checked)
+            else Qt.CheckState.PartiallyChecked)
+        self._all_fixes_number.setStyleSheet(
+            _APPLIED_NUMBER_CSS if self._every_fix_has_the_all_number() else "")
 
     def _fix_field(self, part) -> QWidget:
         check = TickControl("")
@@ -392,7 +392,7 @@ class EnhancePane(QWidget):
                 one.setToolTip(reason)
         check.toggled.connect(lambda _on, name=part.name: self._fix_toggled(name))
 
-        column = _set_of_tick_and_number(check, label, widget)
+        column = _set_of_check_and_number(check, label, widget)
         column.layout().addWidget(prompts_button, 0, 0, Qt.AlignmentFlag.AlignCenter)
 
         self._fixes[part.name] = widget
@@ -570,6 +570,9 @@ class EnhancePane(QWidget):
                 widget.setValue(float(fixes.get(name, DEFAULT_FIX_DENOISE)))
                 self._fix_checks[name].setChecked(name in fixes)
                 self._show_fix_on(name)
+            numbers = {self._fixes[name].value() for name in self._fixes_that_can_run}
+            if len(numbers) == 1:
+                self._all_fixes_number.setValue(numbers.pop())
         finally:
             self._loading = False
         self._show_all_fixes()

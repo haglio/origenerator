@@ -224,7 +224,18 @@ def _settings_as_offered(row: dict, params: dict) -> dict:
     return full_settings(held_on_the_pane)
 
 
+_SAMPLING_OF_THE_SOURCE = ("cfg", "sampler_name", "scheduler")
+
+
+def _source_model_of(row: dict) -> dict | None:
+    form = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+    return form.source_model_of(parse_params(row.get("params_json"))) if form else None
+
+
 def model_matching_the_source(row: dict) -> str:
+    source_model = _source_model_of(row)
+    if source_model:
+        return source_model["model"]
     checkpoint = parse_params(row.get("params_json")).get("checkpoint")
     if isinstance(checkpoint, str) and checkpoint:
         return checkpoint
@@ -318,13 +329,15 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     params["input_image"] = input_ref
     params["positive_prompt"] = src.get("positive_prompt") or row.get("positive_prompt") or ""
     params["negative_prompt"] = src.get("negative_prompt") or row.get("negative_prompt") or ""
-    params["checkpoint"] = model_matching_the_source(row)
-    for key, value in (settings.params if settings else {}).items():
-        if key not in ENHANCE_SETTING_KEYS:
-            continue
-        if key == "checkpoint" and value == MATCH_SOURCE_MODEL:
-            continue
-        params[key] = value
+    chosen = settings.params if settings else {}
+    source_model = _source_model_of(row)
+    if chosen.get("checkpoint", MATCH_SOURCE_MODEL) == MATCH_SOURCE_MODEL:
+        params["checkpoint"] = model_matching_the_source(row)
+        if source_model:
+            params["source_model"] = source_model
+            params.update({key: source_model["params"][key] for key in _SAMPLING_OF_THE_SOURCE})
+    params.update({key: value for key, value in chosen.items() if key in ENHANCE_SETTING_KEYS
+                   and not (key == "checkpoint" and value == MATCH_SOURCE_MODEL)})
     return params
 
 

@@ -1,18 +1,34 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
+from origenerator.workflows.base import (
+    SOURCE_MODEL_PREFIX,
+    ParamDef,
+    ParamType,
+    WorkflowTemplate,
+    prompt_conditioning,
+)
+from origenerator.workflows.lora_rows import (
+    LORA_KEYS,
+    lora_defaults,
+    lora_rows,
+    picked_loras,
+    strength_key_of,
+)
 from origenerator.workflows.model_arch import KREA2
 from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import QWEN3VL
 
 
+def _nothing_to_avoid(positive_ref: list) -> dict:
+    return {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": positive_ref}}
+
+
 def _negative_conditioning(negative_prompt: str) -> dict:
     if negative_prompt:
         return {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": negative_prompt}}
-    return {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["5", 0]}}
+    return _nothing_to_avoid(["5", 0])
 
 
 def _diffusion_model_loader(unet: str) -> dict:
@@ -31,6 +47,9 @@ class Krea2T2iWorkflow(WorkflowTemplate):
     text_reader = QWEN3VL
     loras_keyed_only_when_named = LORA_KEYS[1:]
     extra_enhance_keys = ("upscale_model",)
+    redraw_model_key = "unet"
+    redraw_keys = ("unet", "clip_name", "vae", "cfg", "sampler_name", "scheduler", *LORA_KEYS,
+                   *map(strength_key_of, LORA_KEYS))
     output_node_id = "10"
     base_output_node_id = "11"
 
@@ -79,9 +98,38 @@ class Krea2T2iWorkflow(WorkflowTemplate):
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
         ]
 
+    def _model_nodes(self, params: dict, prefix: str = "") -> tuple[dict, list]:
+        loras = self.lora_chain(f"{prefix}4", [f"{prefix}1", 0], picked_loras(params, LORA_KEYS))
+        return {
+            f"{prefix}1": _diffusion_model_loader(params["unet"]),
+            f"{prefix}2": {
+                "class_type": "CLIPLoader",
+                "inputs": {"clip_name": params["clip_name"], "type": "krea2", "device": "default"},
+            },
+            f"{prefix}3": {
+                "class_type": "VAELoader",
+                "inputs": {"vae_name": params["vae"]},
+            },
+            **loras.nodes,
+        }, loras.model
+
+    def redraw_refs(self, params: dict, image_ref: list, positive: str,
+                    negative: str) -> tuple[dict, NodeRefs]:
+        prefix = SOURCE_MODEL_PREFIX
+        nodes, model_ref = self._model_nodes(params, prefix)
+        clip_ref = [f"{prefix}2", 0]
+        positive_ref = [f"{prefix}positive", 0]
+        negative_id = f"{prefix}negative"
+        return {
+            **nodes,
+            **prompt_conditioning(positive_ref[0], clip_ref, positive),
+            **(prompt_conditioning(negative_id, clip_ref, negative) if negative
+               else {negative_id: _nothing_to_avoid(positive_ref)}),
+        }, NodeRefs(image=image_ref, model=model_ref, positive=positive_ref,
+                    negative=[negative_id, 0], vae=[f"{prefix}3", 0], clip_ref=clip_ref)
+
     def build_api_payload(self, params: dict) -> dict:
-        loras = self.lora_chain("4", ["1", 0], picked_loras(params, LORA_KEYS))
-        model_ref = loras.model
+        model_nodes, model_ref = self._model_nodes(params)
         tail: dict = {}
         saved_ref = ["9", 0]
         if params.get("enhance"):
@@ -92,16 +140,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             )
             tail, saved_ref = enhanced.nodes, enhanced.image
         return {
-            "1": _diffusion_model_loader(params["unet"]),
-            "2": {
-                "class_type": "CLIPLoader",
-                "inputs": {"clip_name": params["clip_name"], "type": "krea2", "device": "default"},
-            },
-            "3": {
-                "class_type": "VAELoader",
-                "inputs": {"vae_name": params["vae"]},
-            },
-            **loras.nodes,
+            **model_nodes,
             "5": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": ["2", 0], "text": params["positive_prompt"]},

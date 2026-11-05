@@ -26,6 +26,8 @@ def default_enhance_params() -> dict:
 
 def version_settings(params: dict) -> dict:
     settings = {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS}
+    if params.get("source_model"):
+        settings["checkpoint"] = MATCH_SOURCE_MODEL
     fixes = detail_fixes_of(params)
     if fixes:
         settings["enhance_detail_fixes"] = fixes

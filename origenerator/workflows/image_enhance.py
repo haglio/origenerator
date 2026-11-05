@@ -6,13 +6,18 @@ from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate, prompt_conditioning
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
+from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
+from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.model_files import ANY
 from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import CLIP
+from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
 
 ENHANCE_MODEL_FAMILIES = (SDXL,)
+FORMS_THAT_REDRAW = {form.name: form for form in (
+    Krea2T2iWorkflow(), FluxT2iUpscaledWorkflow(), Wan22T2iWorkflow())}
 
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
@@ -75,8 +80,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         return round(size[0] * scale), round(size[1] * scale)
 
     def build_api_payload(self, params: dict) -> dict:
-        refs = NodeRefs(image=["1", 0], model=["2", 0], positive=["3", 0],
-                        negative=["4", 0], vae=["5", 0], clip_ref=["2", 1])
+        model_nodes, refs = self._redrawing_model(params)
         enhanced = self.enhance_image_nodes(refs, params, rescale_to=override_size(params))
         detail, saved_ref = self.detail_fix_nodes(replace(refs, image=enhanced.image), params)
         return {
@@ -84,7 +88,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
-            **(self._redrawing_model_nodes(params) if (params["enhance_denoise"] or detail) else {}),
+            **(model_nodes if params["enhance_denoise"] or detail else {}),
             **enhanced.nodes,
             **detail,
             "12": {
@@ -96,8 +100,15 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             },
         }
 
+    def source_model_of(self, params: dict) -> dict | None:
+        return params.get("source_model")
+
     @staticmethod
-    def _redrawing_model_nodes(params: dict) -> dict:
+    def _redrawing_model(params: dict) -> tuple[dict, NodeRefs]:
+        source = params.get("source_model")
+        if source:
+            return FORMS_THAT_REDRAW[source["workflow"]].redraw_refs(
+                source["params"], ["1", 0], params["positive_prompt"], params["negative_prompt"])
         return {
             "2": {
                 "class_type": "CheckpointLoaderSimple",
@@ -109,4 +120,5 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
             },
-        }
+        }, NodeRefs(image=["1", 0], model=["2", 0], positive=["3", 0],
+                    negative=["4", 0], vae=["5", 0], clip_ref=["2", 1])

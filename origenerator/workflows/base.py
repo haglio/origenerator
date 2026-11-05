@@ -51,6 +51,7 @@ _DETAIL_FEATHER = 5
 _SIZE_SCALE, _SIZE_GET = "size_scale", "size_get"
 _ENH_LOADER, _ENH_UPSCALE, _ENH_RESCALE = "enh_loader", "enh_upscale", "enh_rescale"
 _ENH_ENCODE, _ENH_SAMPLER, _ENH_DECODE = "enh_encode", "enh_sampler", "enh_decode"
+SOURCE_MODEL_PREFIX = "source_"
 
 
 def _text_encode(clip_ref, text: str) -> dict:
@@ -209,8 +210,21 @@ class WorkflowTemplate(ABC):
     text_reader: str | None = None
     loras_keyed_only_when_named: tuple[str, ...] = ()
     extra_enhance_keys: tuple[str, ...] = ()
+    redraw_model_key: str = ""
+    redraw_keys: tuple[str, ...] = ()
     output_node_id: str
     base_output_node_id: str | None = None
+
+    def source_model_of(self, params: dict) -> dict | None:
+        if not self.redraw_model_key or not params.get(self.redraw_model_key):
+            return None
+        filled = {**self.default_params(), **params}
+        return {"workflow": self.name, "model": filled[self.redraw_model_key],
+                "params": {key: filled[key] for key in self.redraw_keys}}
+
+    def redraw_refs(self, params: dict, image_ref: list, positive: str,
+                    negative: str) -> tuple[dict, NodeRefs]:
+        raise NotImplementedError(f"{self.name} has no model an Enhance can redraw with")
 
     @abstractmethod
     def default_params(self) -> dict: ...

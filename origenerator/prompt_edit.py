@@ -32,7 +32,7 @@ ALLOWED = "allowed"
 REWRITTEN = "rewritten"
 
 REQUEST_WINDOW_TOKENS = 32768
-_ASK_TIMEOUT_S = 300.0
+_ASK_TIMEOUT_S = 180.0
 
 
 def _both_spellings(words: set) -> frozenset:
@@ -451,4 +451,4 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
         build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT),
         base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
         timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
-        stays_loaded="0", thinks=True))
+        stays_loaded="0"))

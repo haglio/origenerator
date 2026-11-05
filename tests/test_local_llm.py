@@ -60,13 +60,10 @@ def test_the_answer_is_found_past_a_fence_or_a_preamble_around_it():
     assert local_llm.answer_of(completion) == {"positive": "a", "negative": "b"}
 
 
-def test_the_local_model_is_asked_not_to_think_before_it_answers_unless_told_to():
-    unasked, _answer = _asked(base_url="http://x", model="m", temperature=0.1, timeout=1)
-    asked, _answer = _asked(base_url="http://x", model="m", temperature=0.1, timeout=1,
-                            thinks=True)
+def test_the_local_model_is_asked_not_to_think_before_it_answers():
+    sent, _answer = _asked(base_url="http://x", model="m", temperature=0.1, timeout=1)
 
-    assert unasked["body"]["think"] is False
-    assert asked["body"]["think"] is True
+    assert sent["body"]["think"] is False
 
 
 def test_a_question_asked_in_words_rather_than_json_names_no_format():

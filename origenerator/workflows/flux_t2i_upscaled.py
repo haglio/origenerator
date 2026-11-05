@@ -1,8 +1,20 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
-from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
+from origenerator.workflows.base import (
+    SOURCE_MODEL_PREFIX,
+    ParamDef,
+    ParamType,
+    WorkflowTemplate,
+    prompt_conditioning,
+)
+from origenerator.workflows.lora_rows import (
+    LORA_KEYS,
+    lora_defaults,
+    lora_rows,
+    picked_loras,
+    strength_key_of,
+)
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.parts import NodeRefs
@@ -18,6 +30,9 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     lora_keys = LORA_KEYS
     text_reader = T5
     loras_keyed_only_when_named = LORA_KEYS[1:]
+    redraw_model_key = "unet"
+    redraw_keys = ("unet", "clip_name1", "clip_name2", "vae", "guidance", "cfg", "sampler_name",
+                   "scheduler", *LORA_KEYS, *map(strength_key_of, LORA_KEYS))
     output_node_id = "12"
     base_output_node_id = "17"
 
@@ -70,9 +85,48 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
         ]
 
+    def _model_nodes(self, params: dict, prefix: str = "", lora_id: str = "13"):
+        loras = self.lora_chain(f"{prefix}{lora_id}", [f"{prefix}1", 0],
+                                picked_loras(params, LORA_KEYS), clip_ref=[f"{prefix}2", 0])
+        return {
+            f"{prefix}1": {
+                "class_type": "UnetLoaderGGUF",
+                "inputs": {"unet_name": params["unet"]},
+            },
+            f"{prefix}2": {
+                "class_type": "DualCLIPLoader",
+                "inputs": {
+                    "clip_name1": params["clip_name1"],
+                    "clip_name2": params["clip_name2"],
+                    "type": "flux",
+                    "device": "default",
+                },
+            },
+            f"{prefix}3": {
+                "class_type": "VAELoader",
+                "inputs": {"vae_name": params["vae"]},
+            },
+            **loras.nodes,
+        }, loras
+
+    def redraw_refs(self, params: dict, image_ref: list, positive: str,
+                    negative: str) -> tuple[dict, NodeRefs]:
+        prefix = SOURCE_MODEL_PREFIX
+        nodes, loras = self._model_nodes(params, prefix)
+        positive_id, guided_id, negative_id = f"{prefix}positive", f"{prefix}guided", f"{prefix}negative"
+        return {
+            **nodes,
+            **prompt_conditioning(positive_id, loras.clip_ref, positive),
+            guided_id: {
+                "class_type": "FluxGuidance",
+                "inputs": {"conditioning": [positive_id, 0], "guidance": params["guidance"]},
+            },
+            **prompt_conditioning(negative_id, loras.clip_ref, negative),
+        }, NodeRefs(image=image_ref, model=loras.model, positive=[guided_id, 0],
+                    negative=[negative_id, 0], vae=[f"{prefix}3", 0], clip_ref=loras.clip_ref)
+
     def build_api_payload(self, params: dict) -> dict:
-        loras = self.lora_chain("13", ["1", 0], picked_loras(params, LORA_KEYS),
-                                clip_ref=["2", 0])
+        model_nodes, loras = self._model_nodes(params)
         model_ref, clip_ref = loras.model, loras.clip_ref
         if params.get("enhance"):
             enhanced = self.enhance_image_nodes(
@@ -94,24 +148,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             }
             saved_ref = upscaled_ref = ["11", 0]
         return {
-            "1": {
-                "class_type": "UnetLoaderGGUF",
-                "inputs": {"unet_name": params["unet"]},
-            },
-            "2": {
-                "class_type": "DualCLIPLoader",
-                "inputs": {
-                    "clip_name1": params["clip_name1"],
-                    "clip_name2": params["clip_name2"],
-                    "type": "flux",
-                    "device": "default",
-                },
-            },
-            "3": {
-                "class_type": "VAELoader",
-                "inputs": {"vae_name": params["vae"]},
-            },
-            **loras.nodes,
+            **model_nodes,
             "4": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": clip_ref, "text": params["positive_prompt"]},

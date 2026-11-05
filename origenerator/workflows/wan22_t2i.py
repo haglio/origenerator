@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.base import (
+    SOURCE_MODEL_PREFIX,
+    ParamDef,
+    ParamType,
+    WorkflowTemplate,
+    prompt_conditioning,
+)
 from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.wan_experts import wan_expert_shift_param
@@ -15,6 +21,8 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     model_keys = ("unet_high", "unet_low")
     text_reader = UMT5
     extra_enhance_keys = ("upscale_model",)
+    redraw_model_key = "unet_low"
+    redraw_keys = ("unet_low", "shift_low", "clip_name", "vae_name", "cfg", "sampler_name", "scheduler")
     output_node_id = "14"
     base_output_node_id = "21"
 
@@ -65,6 +73,43 @@ class Wan22T2iWorkflow(WorkflowTemplate):
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
         ]
 
+    @staticmethod
+    def _low_noise_nodes(params: dict, prefix: str = "") -> dict:
+        return {
+            f"{prefix}1": {
+                "class_type": "CLIPLoader",
+                "inputs": {
+                    "clip_name": params["clip_name"],
+                    "type": "wan",
+                    "device": "default",
+                },
+            },
+            f"{prefix}2": {
+                "class_type": "VAELoader",
+                "inputs": {"vae_name": params["vae_name"]},
+            },
+            f"{prefix}4": {
+                "class_type": "UNETLoader",
+                "inputs": {"unet_name": params["unet_low"], "weight_dtype": "default"},
+            },
+            f"{prefix}6": {
+                "class_type": "ModelSamplingSD3",
+                "inputs": {"model": [f"{prefix}4", 0], "shift": params["shift_low"]},
+            },
+        }
+
+    def redraw_refs(self, params: dict, image_ref: list, positive: str,
+                    negative: str) -> tuple[dict, NodeRefs]:
+        prefix = SOURCE_MODEL_PREFIX
+        clip_ref = [f"{prefix}1", 0]
+        positive_id, negative_id = f"{prefix}positive", f"{prefix}negative"
+        return {
+            **self._low_noise_nodes(params, prefix),
+            **prompt_conditioning(positive_id, clip_ref, positive),
+            **prompt_conditioning(negative_id, clip_ref, negative),
+        }, NodeRefs(image=image_ref, model=[f"{prefix}6", 0], positive=[positive_id, 0],
+                    negative=[negative_id, 0], vae=[f"{prefix}2", 0], clip_ref=clip_ref)
+
     def build_api_payload(self, params: dict) -> dict:
         half_steps = params["steps"] // 2
         enhance_nodes: dict = {}
@@ -77,33 +122,14 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             )
             enhance_nodes, enhanced_ref = tail.nodes, tail.image
         return {
-            "1": {
-                "class_type": "CLIPLoader",
-                "inputs": {
-                    "clip_name": params["clip_name"],
-                    "type": "wan",
-                    "device": "default",
-                },
-            },
-            "2": {
-                "class_type": "VAELoader",
-                "inputs": {"vae_name": params["vae_name"]},
-            },
+            **self._low_noise_nodes(params),
             "3": {
                 "class_type": "UNETLoader",
                 "inputs": {"unet_name": params["unet_high"], "weight_dtype": "default"},
             },
-            "4": {
-                "class_type": "UNETLoader",
-                "inputs": {"unet_name": params["unet_low"], "weight_dtype": "default"},
-            },
             "5": {
                 "class_type": "ModelSamplingSD3",
                 "inputs": {"model": ["3", 0], "shift": params["shift_high"]},
-            },
-            "6": {
-                "class_type": "ModelSamplingSD3",
-                "inputs": {"model": ["4", 0], "shift": params["shift_low"]},
             },
             "7": {
                 "class_type": "CLIPTextEncode",

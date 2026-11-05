@@ -44,7 +44,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.record_fold import file_key, fold_record_into, lanes_owed
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import soundless_copies_of
+from origenerator.workflows.base import SOURCE_MODEL_PREFIX, soundless_copies_of
 
 logger = logging.getLogger(__name__)
 
@@ -496,6 +496,8 @@ _GRAPH_SIGNATURES = (
 
 
 def _workflow_from_nodes(graph: dict) -> str | None:
+    if any(str(node_id).startswith(SOURCE_MODEL_PREFIX) for node_id in graph):
+        return ENHANCE_WORKFLOW
     node_types = {n.get("class_type") for n in graph.values()}
     return next(
         (name for name, signatures in _GRAPH_SIGNATURES

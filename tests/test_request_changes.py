@@ -196,3 +196,26 @@ def test_a_replacement_in_words_that_are_not_his_at_all_is_the_models_to_make_wh
     assert outcome.positive == "a woman, bare ears, a bare neck"
     assert outcome.line == ('Replaced "silver ear studs, a necklace" with "bare ears, a bare neck" '
                             "in the Positive Prompt.")
+
+
+def test_a_part_the_replacement_drops_without_his_asking_stays_and_is_said_so():
+    outcome = _applied([{"prompt": "positive", "replace": "a woman, a hat, soft light",
+                         "with": "two women, soft light", "for": "two women"}],
+                       pair=("a woman, a hat, soft light", "blurry"), asked=("two women",))
+
+    assert outcome.positive == "two women, a hat, soft light"
+    assert outcome.line == (
+        'Replaced "a woman" with "two women" in the Positive Prompt. Didn\'t remove "a hat" '
+        "from the Positive Prompt: you didn't ask for that.")
+
+
+def test_each_part_of_a_replacement_he_asked_for_is_said_as_what_it_was():
+    outcome = _applied([{"prompt": "positive", "replace": "a red hat, a dog, grass",
+                         "with": "a blue hat, grass, a cat", "for": "a blue hat"}],
+                       pair=("a red hat, a dog, grass", "blurry"),
+                       asked=("a blue hat, no dog, add a cat",))
+
+    assert outcome.positive == "a blue hat, grass, a cat"
+    assert outcome.line == (
+        'Replaced "red" with "blue" in the Positive Prompt. Removed "a dog" from the Positive '
+        'Prompt. Added "a cat" to the Positive Prompt.')

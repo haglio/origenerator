@@ -65,7 +65,7 @@ from origenerator.gui.param_help import definition_help, param_help, with_traini
 from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.setting_advice import (
-    fix_lora_model_advice,
+    fix_lora_model_warning,
     lost_lora_advice,
     trigger_word_advice,
 )
@@ -264,7 +264,7 @@ class EnhancePane(QWidget):
         )
         self._widgets["checkpoint"] = self._model
         self._model_warning = WarningMark()
-        self._model_warning.pressed.connect(self._use_the_model_a_fixs_lora_was_trained_on)
+        self._model_warning.unsetCursor()
 
         self._upscaler = NoWheelDropdown()
         offer_options(self._upscaler, self._options("upscale_model"))
@@ -520,15 +520,17 @@ class EnhancePane(QWidget):
         self._picked, self._folder, self._source_models = list(picked), folder, _NOT_READ
         self._warn_of_a_fixs_lora_trained_on_another_model()
 
-    def _model_advice(self):
+    def _warn_of_a_fixs_lora_trained_on_another_model(self) -> None:
+        self._model_warning.warn(self._fix_lora_model_warning())
+
+    def _fix_lora_model_warning(self) -> str:
         params = self.settings().params
         trained = {name: model for name, own in fix_prompts(params).items() if own["lora"]
                    if (model := fix_training.trained_on(own["lora"]))}
         if not trained:
-            return None
-        held = params.get("checkpoint")
-        return fix_lora_model_advice(held, self._models_it_runs(held), trained,
-                                     self._options("checkpoint")).get("checkpoint")
+            return ""
+        return fix_lora_model_warning(self._models_it_runs(params.get("checkpoint")), trained,
+                                      self._options("checkpoint"))
 
     def _models_it_runs(self, held) -> frozenset[str] | None:
         if held != MATCH_SOURCE_MODEL:
@@ -537,15 +539,6 @@ class EnhancePane(QWidget):
             self._source_models = (models_matching_the_sources(self._picked) if self._picked
                                    else models_matching_a_folders_sources(self._folder))
         return self._source_models
-
-    def _warn_of_a_fixs_lora_trained_on_another_model(self) -> None:
-        found = self._model_advice()
-        self._model_warning.warn(found.said if found is not None else "")
-
-    def _use_the_model_a_fixs_lora_was_trained_on(self) -> None:
-        found = self._model_advice()
-        if found is not None:
-            _fill(self._model, found.fixed(self._model.currentData()))
 
     def settings(self) -> EnhanceSettings:
         params = {}

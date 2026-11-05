@@ -1789,7 +1789,7 @@ def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, instal
 
 
 _HANDS_LORA = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
-_TRAINED_ON_SAID = "The Hands fix's LoRA was trained on trained_on. Click to use trained_on."
+_TRAINED_ON_SAID = "The Hands fix's LoRA was trained on trained_on."
 
 
 @pytest.fixture
@@ -1821,14 +1821,17 @@ def test_a_ticked_fixs_lora_trained_on_another_model_warns_beside_the_model(hand
         False, _TRAINED_ON_SAID)
 
 
-def test_clicking_the_models_warning_picks_the_model_the_fixs_lora_was_trained_on(
+def test_clicking_the_models_warning_leaves_the_choice_of_model_or_fix_to_the_user(
         qtbot, hands_trained_on):
     pane, edits = hands_trained_on({"hands": 0.45})
+    made_before = len(edits)
 
     qtbot.mouseClick(pane._model_warning, Qt.MouseButton.LeftButton)
 
-    assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
-    assert pane._model_warning.isHidden()
+    assert len(edits) == made_before
+    assert pane._model.currentData() == "picked.safetensors"
+    assert not pane._model_warning.isHidden()
+    assert pane._model_warning.cursor().shape() != Qt.CursorShape.PointingHandCursor
 
 
 def test_no_model_warning_while_the_fix_is_off_or_the_model_is_the_one_it_was_trained_on(
@@ -1883,7 +1886,7 @@ def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
 
 
 _NO_GUARANTEE_SAID = ("There's no guarantee the images here were made by trained_on, which the "
-                      "Hands fix's LoRA was trained on. Click to use trained_on.")
+                      "Hands fix's LoRA was trained on.")
 
 
 @pytest.mark.parametrize("folder", [
@@ -1899,14 +1902,15 @@ def test_matching_the_source_in_a_folder_of_several_models_or_a_collection_says_
         False, _NO_GUARANTEE_SAID)
 
 
-def test_clicking_the_no_guarantee_warning_picks_the_model_the_fixs_lora_was_trained_on(
-        qtbot, hands_trained_on):
+def test_clicking_the_no_guarantee_warning_leaves_the_model_as_it_is(qtbot, hands_trained_on):
     pane, edits = hands_trained_on({"hands": 0.45}, MATCH_SOURCE_MODEL)
     pane.show_images_in_front([])
+    made_before = len(edits)
 
     qtbot.mouseClick(pane._model_warning, Qt.MouseButton.LeftButton)
 
-    assert edits[-1].params["checkpoint"] == "trained_on.safetensors"
+    assert len(edits) == made_before
+    assert pane._model.currentData() == MATCH_SOURCE_MODEL
 
 
 _CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw Amount")

@@ -39,7 +39,7 @@ from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
 )
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
-from origenerator.generation_state import GenerationSource, in_sight, source_of
+from origenerator.generation_state import GenerationSource, on_the_map, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
@@ -655,7 +655,7 @@ class SlideshowDirector:
 
     def _library_of(self, shape: str) -> list[dict]:
         return self._library.get(shape, lambda: filter_rows(
-            [row for row in self._db.list_generations() if in_sight(row)], shape))
+            [row for row in self._db.list_generations() if on_the_map(row)], shape))
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))

@@ -2174,6 +2174,18 @@ def test_widening_the_map_takes_in_nothing_another_site_made(slideshows, tmp_pat
             for slide in director.beyond_the_row_of("g1", shape="portrait")] == ["g2"]
 
 
+def test_videos_made_from_one_hidden_starting_frame_list_each_other_on_the_map(slideshows, tmp_path):
+    frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
+    rows = [frame, _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="h1.png", action="beta", tmp_path=tmp_path)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("v1", shape="portrait")
+
+    assert [(row.label, row.slide.prompt_id) for row in around.column] == [("beta", "v2")]
+    assert [slide.prompt_id for slide in around.group] == ["v2"]
+
+
 def test_a_hidden_starting_frame_stays_off_the_map_of_a_video_made_from_it(slideshows, tmp_path):
     frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
     rows = [frame, _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),

@@ -222,3 +222,19 @@ def test_each_part_of_a_replacement_he_asked_for_is_said_as_what_it_was():
     assert outcome.line == (
         'Replaced "red" with "blue" in the Positive Prompt. Removed "a dog" from the Positive '
         'Prompt. Added "a cat" to the Positive Prompt.')
+
+
+def test_a_switch_away_from_a_lora_the_row_no_longer_offers_still_swaps_its_word(versioned_style):
+    row = ParamDef("lora", "LoRA 1", ParamType.DROPDOWN, "None",
+                   options=["None", "example_style_11.safetensors"], folder="loras")
+    settings = request_settings.settings_to_tell([row], {"lora": "example_style.safetensors"})
+
+    outcome = apply_changes(
+        {"changes": [{"setting": "lora", "to": "Example Style 1.1", "for": "newer version"}]},
+        ("(exmplstyle:1.2), a woman", "blurry"), asked=["use the newer version"],
+        settings=settings)
+
+    assert outcome.settings == {"lora": "example_style_11.safetensors"}
+    assert outcome.positive == "(exmplnew:1.2), a woman"
+    assert outcome.line == ("Set LoRA 1 to Example Style 1.1 (was Example Style 1.0), and swapped "
+                            "its trigger word exmplstyle for exmplnew in the Positive Prompt.")

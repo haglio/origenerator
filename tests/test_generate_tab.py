@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QSplitterHandle,
@@ -79,6 +80,7 @@ from origenerator.library_views import TabViews
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
+from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
@@ -87,7 +89,7 @@ from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
-from tests.text_readers import clap_reader, clip_reader, word_reader
+from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
 
 
@@ -828,6 +830,88 @@ def test_generate_refuses_the_other_problems_it_highlights_and_says_which(tab, p
 
     assert requested == []
     assert tab._generate_btn.text() == says
+
+
+def _press_in_the_popup(monkeypatch, caption):
+    asked = []
+
+    def press(box):
+        asked.append(box.text())
+        next(button for button in box.buttons() if button.text() == caption).click()
+
+    monkeypatch.setattr(QMessageBox, "exec", press)
+    return asked
+
+
+@pytest.fixture
+def prompt_read_as_plain_text(monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "prompt_readings", lambda _workflow, _values: {
+        "positive_prompt": word_reading(76, CUT_OFF),
+        "negative_prompt": word_reading(76, READ_IN_PIECES),
+    })
+
+
+def test_generate_offers_to_remove_emphasis_when_that_is_the_only_problem(tab, prompt_read_as_plain_text, monkeypatch):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    asked = _press_in_the_popup(monkeypatch, "Remove emphasis")
+    tab._param_form.set_values({"positive_prompt": "(a:1.2), ((b)), c"})
+
+    tab._generate_btn.click()
+
+    assert asked == ["This model reads parentheses and numbers as plain text, "
+                     "so they add no strength."]
+    assert tab._param_form.get_values()["positive_prompt"] == "a, b, c"
+    assert requested == []
+    assert tab._generate_btn.text() == "Generate"
+
+
+def test_cancel_in_the_emphasis_popup_leaves_the_prompts_as_they_were(tab, prompt_read_as_plain_text, monkeypatch):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    _press_in_the_popup(monkeypatch, "Cancel")
+    tab._param_form.set_values({"positive_prompt": "(a:1.2), c"})
+
+    tab._generate_btn.click()
+
+    assert tab._param_form.get_values()["positive_prompt"] == "(a:1.2), c"
+    assert requested == []
+
+
+def test_generate_goes_ahead_once_the_emphasis_is_removed(tab, prompt_read_as_plain_text, monkeypatch):
+    requested = []
+    tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
+    _press_in_the_popup(monkeypatch, "Remove emphasis")
+    tab._param_form.set_values({"positive_prompt": "(a:1.2), c"})
+
+    tab._generate_btn.click()
+    tab._generate_btn.click()
+
+    assert len(requested) == 1
+
+
+@pytest.mark.parametrize(("prompt", "says"), [
+    ("(a), (b", "Resolve parentheses first"),
+    ("(a), b:high)", "Resolve parentheses first"),
+    ("(a), b, b", "Resolve unread emphasis first"),
+])
+def test_emphasis_beside_another_problem_gets_no_popup(tab, prompt_read_as_plain_text, prompt, says):
+    tab._param_form.set_values({"positive_prompt": prompt})
+
+    tab._generate_btn.click()
+
+    assert tab._param_form.get_values()["positive_prompt"] == prompt
+    assert tab._generate_btn.text() == says
+
+
+def test_removing_emphasis_leaves_alone_a_prompt_whose_model_reads_it(tab, prompt_read_as_plain_text, monkeypatch):
+    _press_in_the_popup(monkeypatch, "Remove emphasis")
+    tab._param_form.set_values({"positive_prompt": "(a:1.2)", "negative_prompt": "(b:1.2)"})
+
+    tab._generate_btn.click()
+
+    values = tab._param_form.get_values()
+    assert (values["positive_prompt"], values["negative_prompt"]) == ("a", "(b:1.2)")
 
 
 def _generate_color(tab):

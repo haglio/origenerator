@@ -17,13 +17,19 @@ from origenerator.box_breaks import (
 )
 from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
-from origenerator.gui.prompt_marks import PromptProblems, mark_past_the_limit, mark_problems
+from origenerator.gui.prompt_marks import (
+    PromptProblems,
+    has_unread_emphasis,
+    mark_past_the_limit,
+    mark_problems,
+)
 from origenerator.prompt_checks import (
     bad_weights,
     duplicate_things,
     tidied,
     unpaired_parentheses,
     unread_emphasis,
+    without_emphasis,
 )
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES, PromptReading
 
@@ -145,6 +151,10 @@ class PromptBoxes(QWidget):
 
     def rewrite(self, change: Callable[[str], str]) -> None:
         self.edit(change(BOX_BREAK.join(self._texts)))
+
+    def remove_unread_emphasis(self) -> None:
+        if any(has_unread_emphasis(box) for box in self._boxes):
+            self.rewrite(without_emphasis)
 
     def edit(self, value: str) -> None:
         self._history.took(self.value())

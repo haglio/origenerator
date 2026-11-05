@@ -85,8 +85,19 @@ def mark_problems(field: QPlainTextEdit, problems: PromptProblems) -> None:
         marks.rehighlight()
 
 
-def problem_to_resolve(fields: Iterable[QPlainTextEdit]) -> str | None:
+def _problems_found(fields: Iterable[QPlainTextEdit]) -> list[str]:
     found = [marks.problems for marks in (field.findChild(_PromptMarks) for field in fields)
              if marks is not None]
-    return next((says for kind, says in enumerate(_SAYS)
-                 if any(problems[kind] for problems in found)), None)
+    return [says for kind, says in enumerate(_SAYS) if any(problems[kind] for problems in found)]
+
+
+def problem_to_resolve(fields: Iterable[QPlainTextEdit]) -> str | None:
+    return next(iter(_problems_found(fields)), None)
+
+
+def only_unread_emphasis_to_resolve(fields: Iterable[QPlainTextEdit]) -> bool:
+    return _problems_found(fields) == [RESOLVE_UNREAD_EMPHASIS]
+
+
+def has_unread_emphasis(field: QPlainTextEdit) -> bool:
+    return RESOLVE_UNREAD_EMPHASIS in _problems_found([field])

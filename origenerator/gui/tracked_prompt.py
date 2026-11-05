@@ -330,6 +330,16 @@ def track(edit: QPlainTextEdit, baseline: str, *, undo: bool = True) -> None:
         _Tracker(edit, baseline, undo).show_whole_change()
 
 
+def write_undoably(edit: QPlainTextEdit, value: str) -> None:
+    tracker = _tracker_of(edit)
+    if tracker is not None:
+        tracker.take(value)
+        return
+    whole = QTextCursor(edit.document())
+    whole.select(QTextCursor.SelectionType.Document)
+    whole.insertText(value)
+
+
 def write(edit: QPlainTextEdit, value: str) -> None:
     tracker = _tracker_of(edit)
     if tracker is not None:

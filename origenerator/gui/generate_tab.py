@@ -690,7 +690,8 @@ class GenerateTab(DropZones):
             self._why_generate_is_blocked() or (_RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
-        if not self._can_generate() or refused_over_prompts(self._generate_btn, self.prompt_fields()):
+        if not self._can_generate() or refused_over_prompts(
+                self._generate_btn, self.prompt_fields(), self._param_form.remove_unread_emphasis):
             return
         key = self._workflow_dropdown.currentData()
         if self._folder_modify is not None:

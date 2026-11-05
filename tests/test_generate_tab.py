@@ -3679,6 +3679,21 @@ def test_a_second_request_typed_before_generating_is_worked_out_knowing_the_firs
     assert exchange.turns()[-1][1] == 'Removed "a red scarf" from the Positive Prompt.'
 
 
+def test_a_typed_request_tells_the_model_whether_the_tabs_prompts_take_weights(
+        saved_panel, qtbot, monkeypatch):
+    told = []
+    monkeypatch.setattr(prompt_edit, "ask_the_model",
+                        lambda positive, negative, words, known: told.append(known.weights) or {})
+    monkeypatch.setattr(WORKFLOW_REGISTRY["sdxl_t2i"], "prompts_take_weights", False, raising=False)
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman")
+    tab.show_saved_generation(image, [image])
+
+    _ask(tab, qtbot, "freckles")
+
+    qtbot.waitUntil(lambda: told == [False], timeout=5000)
+
+
 def test_the_line_waits_while_the_model_works_out_a_request(saved_panel, qtbot):
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")

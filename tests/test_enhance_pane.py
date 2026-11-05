@@ -13,6 +13,7 @@ from PyQt6.QtGui import (
     QDragMoveEvent,
     QDropEvent,
     QEnterEvent,
+    QFocusEvent,
     QPixmap,
 )
 from PyQt6.QtTest import QTest
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QPushButton,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -181,6 +183,178 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
         "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}
     assert pane._fixes["faces"].toolTip()
     assert pane._fix_checks["faces"].toolTip()
+
+
+def test_a_press_on_the_all_tick_turns_on_every_fix_that_can_run_and_tells_once(qtbot):
+    pane, edits = _panel(qtbot)
+
+    pane._all_fixes_tick.click()
+
+    assert len(edits) == 1
+    assert sorted(edits[-1].params["enhance_detail_fixes"]) == ["faces", "hands"]
+    assert pane._fixes["faces"].isEnabled()
+
+
+def _type_into(field, text):
+    field.lineEdit().selectAll()
+    QTest.keyClicks(field.lineEdit(), text)
+    QTest.keyClick(field.lineEdit(), Qt.Key.Key_Return)
+
+
+def _shown(field):
+    return field.text().strip()
+
+
+def test_a_second_press_on_the_all_tick_turns_every_fix_off(qtbot):
+    pane, edits = _panel(qtbot)
+    pane._all_fixes_tick.click()
+
+    pane._all_fixes_tick.click()
+
+    assert edits[-1].params["enhance_detail_fixes"] == {}
+    assert not pane._fixes["faces"].isEnabled()
+
+
+def test_the_all_tick_shows_ticked_only_while_every_fix_that_can_run_is_on(qtbot):
+    pane, _ = _panel(qtbot)
+    assert not pane._all_fixes_tick.isChecked()
+
+    pane._fix_checks["faces"].setChecked(True)
+    assert not pane._all_fixes_tick.isChecked()
+
+    pane._fix_checks["hands"].setChecked(True)
+    assert pane._all_fixes_tick.isChecked()
+
+    pane._fix_checks["hands"].setChecked(False)
+    assert not pane._all_fixes_tick.isChecked()
+
+
+def test_a_press_on_the_all_tick_with_some_fixes_on_turns_the_rest_on(qtbot):
+    pane, edits = _panel(qtbot)
+    pane._fix_checks["faces"].setChecked(True)
+
+    pane._all_fixes_tick.click()
+
+    assert sorted(edits[-1].params["enhance_detail_fixes"]) == ["faces", "hands"]
+    assert pane._all_fixes_tick.isChecked()
+
+
+def test_settings_shown_in_the_pane_show_on_the_all_tick_and_the_all_number(qtbot):
+    pane, _ = _panel(qtbot)
+
+    pane.show_settings(EnhanceSettings(auto=False, params=full_settings(
+        {"enhance_detail_fixes": {"faces": 0.6, "hands": 0.6}})))
+
+    assert pane._all_fixes_tick.isChecked()
+    assert pane._all_fixes_number.value() == 0.6
+
+
+def test_a_number_typed_into_all_sets_every_fix_that_can_run_on_or_off_and_tells_once(qtbot):
+    pane, edits = _panel(qtbot)
+    pane._fix_checks["faces"].setChecked(True)
+    edits.clear()
+
+    _type_into(pane._all_fixes_number, "0.7")
+
+    assert len(edits) == 1
+    assert edits[-1].params["enhance_detail_fixes"] == {"faces": 0.7}
+    assert pane._fixes["hands"].value() == 0.7
+
+
+def test_a_fix_with_no_detector_is_left_out_of_all(qtbot):
+    pane, edits = _panel(qtbot)
+    before = pane._fixes["teeth"].value()
+
+    pane._all_fixes_tick.click()
+    _type_into(pane._all_fixes_number, "0.7")
+
+    assert "teeth" not in edits[-1].params["enhance_detail_fixes"]
+    assert pane._fixes["teeth"].value() == before
+
+
+def test_the_all_number_is_empty_while_the_fixes_differ_and_comes_back_when_they_match(qtbot):
+    pane, _ = _panel(qtbot)
+    assert pane._all_fixes_number.value() == DEFAULT_FIX_DENOISE
+
+    pane._fixes["hands"].setValue(0.6)
+    assert _shown(pane._all_fixes_number) == ""
+
+    pane._fixes["faces"].setValue(0.6)
+    assert pane._all_fixes_number.value() == 0.6
+
+
+def test_leaving_the_all_number_empty_changes_no_fix(qtbot):
+    pane, edits = _panel(qtbot)
+    pane._fixes["faces"].setValue(0.3)
+    pane._fixes["hands"].setValue(0.6)
+    edits.clear()
+
+    QTest.keyClick(pane._all_fixes_number.lineEdit(), Qt.Key.Key_Return)
+
+    assert edits == []
+    assert (pane._fixes["faces"].value(), pane._fixes["hands"].value()) == (0.3, 0.6)
+    assert _shown(pane._all_fixes_number) == ""
+
+
+def test_stepping_the_all_number_down_past_its_floor_changes_no_fix(qtbot):
+    pane, edits = _panel(qtbot)
+    lowest = pane._fixes["faces"].minimum()
+    _type_into(pane._all_fixes_number, f"{lowest:.2f}")
+    assert pane._fixes["faces"].value() == lowest
+    edits.clear()
+
+    QTest.keyClick(pane._all_fixes_number.lineEdit(), Qt.Key.Key_Down)
+
+    assert edits == []
+    assert pane._fixes["faces"].value() == lowest
+    assert pane._all_fixes_number.value() == lowest
+
+
+def test_with_no_fix_able_to_run_all_is_grayed(qtbot):
+    pane, _ = _panel(qtbot, detectors=())
+
+    for one in (pane._all_fixes_tick, pane._all_fixes_number,
+                pane._label_for(pane._all_fixes_number)):
+        assert not one.isEnabled()
+
+
+def test_all_comes_first_in_the_row_of_fixes_labeled_all_with_no_pencil(qtbot):
+    pane, _ = _panel(qtbot)
+    flow = pane._fixes["faces"].parent().parent().layout()
+    first = flow.itemAt(0).widget()
+
+    assert first is pane._all_fixes_number.parent()
+    assert [label.text() for label in first.findChildren(QLabel)] == ["All"]
+    assert not first.findChildren(QToolButton)
+    assert first.objectName() == pane._fixes["faces"].parent().objectName()
+    assert pane._all_fixes_tick.toolTip()
+    assert pane._all_fixes_number.toolTip()
+    assert pane._all_fixes_number.minimumWidth() == pane._fixes["faces"].minimumWidth()
+
+
+def test_the_all_set_is_as_tall_as_a_fix_with_its_number_on_the_same_line(qtbot):
+    pane, _ = _panel(qtbot)
+    pane.setStyleSheet(build_stylesheet() + pane.styleSheet())
+    _laid_out_at(pane, 2000)
+    fix = pane._fixes["faces"]
+    every = pane._all_fixes_number
+
+    assert every.parent().height() == fix.parent().height()
+    assert every.mapTo(pane, QPoint(0, 0)).y() == fix.mapTo(pane, QPoint(0, 0)).y()
+    assert (pane._all_fixes_tick.mapTo(pane, QPoint(0, 0)).y()
+            == pane._fix_checks["faces"].mapTo(pane, QPoint(0, 0)).y())
+
+
+def test_a_number_typed_into_all_takes_effect_when_the_pane_moves_on_from_it(qtbot):
+    pane, _ = _panel(qtbot)
+    number = pane._all_fixes_number
+    number.lineEdit().selectAll()
+    QTest.keyClicks(number.lineEdit(), "0.7")
+    assert pane._fixes["hands"].value() == DEFAULT_FIX_DENOISE
+
+    QApplication.sendEvent(number, QFocusEvent(QEvent.Type.FocusOut))
+
+    assert pane._fixes["hands"].value() == 0.7
 
 
 def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):

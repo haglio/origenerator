@@ -3662,6 +3662,23 @@ def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
         "on a beach", "img1", "a woman on a couch")
 
 
+def test_a_second_request_typed_before_generating_is_worked_out_knowing_the_first(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=[
+        _a_change(prompt="positive", add="a red scarf", for_="a red scarf"),
+        _a_change(prompt="positive", remove="a red scarf", for_="a red scarf")])
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    tab.show_saved_generation(image, [image])
+    _ask(tab, qtbot, "a red scarf")
+    qtbot.waitUntil(lambda: _positive(tab) == "a woman on a couch, a red scarf", timeout=5000)
+
+    exchange = _ask(tab, qtbot, "that is the wrong place for it, please fix")
+
+    qtbot.waitUntil(lambda: _positive(tab) == "a woman on a couch", timeout=5000)
+    assert exchange.turns()[-1][1] == 'Removed "a red scarf" from the Positive Prompt.'
+
+
 def test_the_line_waits_while_the_model_works_out_a_request(saved_panel, qtbot):
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
@@ -3704,7 +3721,7 @@ class _AnswersHeldBack:
     def __init__(self):
         self._waiting = []
 
-    def ask(self, about, pair, words, *, owner, then, **told):
+    def ask(self, about, pair, words, *, owner, then, since=(), **told):
         self._waiting.append(lambda: then(prompt_edit.work_out(*pair, words, **told)))
 
     def answer_the_first(self):

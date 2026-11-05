@@ -35,7 +35,7 @@ class RequestAnswerer(QObject):
 
     def ask(self, about: str | None, pair: tuple[str, str], words: str, *, owner: QObject, then,
             **told) -> None:
-        exchange = _exchange_of(self._db, about)
+        exchange = [*_exchange_of(self._db, about), *told.pop("since", ())]
         if self._hold is not None:
             self._hold.hold()
         run_off_thread(lambda: self._answer(pair, words, exchange, told),

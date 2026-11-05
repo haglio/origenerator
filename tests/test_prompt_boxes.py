@@ -759,6 +759,20 @@ def test_emphasis_is_highlighted_and_refused_where_the_model_reads_it_as_plain_t
     assert problem_to_resolve([box]) == RESOLVE_UNREAD_EMPHASIS
 
 
+def test_removing_emphasis_can_be_undone_in_one_step(qtbot):
+    sound = _prompt_fields("audio_prompt")
+    qtbot.addWidget(sound)
+    sound.set_reading(word_reading(76, CUT_OFF))
+    sound.set_value("(a:1.2), c")
+
+    sound.remove_unread_emphasis()
+    assert sound.value() == "a, c"
+    (box,) = sound.boxes()
+    qtbot.keyClick(box, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert sound.value() == "(a:1.2), c"
+
+
 def test_emphasis_is_left_plain_where_the_model_reads_it(prompt):
     prompt.set_value("(a:1.2), ((b)), c")
 

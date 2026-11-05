@@ -493,6 +493,13 @@ class ParamForm(QWidget):
         return scenes + [box for widget in self._widgets.values()
                          if isinstance(widget, PromptBoxes) for box in widget.boxes()]
 
+    def remove_unread_emphasis(self) -> None:
+        for widget in self._widgets.values():
+            if isinstance(widget, PromptBoxes):
+                widget.remove_unread_emphasis()
+        if self._scenes is not None:
+            self._scenes.remove_unread_emphasis()
+
     def drop_zones(self) -> tuple[DropZone, ...]:
         return tuple(w for w in self._widgets.values() if isinstance(w, DropZone))
 

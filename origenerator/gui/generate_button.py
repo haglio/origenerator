@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QPlainTextEdit, QPushButton
+from PyQt6.QtWidgets import QMessageBox, QPlainTextEdit, QPushButton
 
-from origenerator.gui.prompt_marks import problem_to_resolve
+from origenerator.gui.prompt_marks import only_unread_emphasis_to_resolve, problem_to_resolve
 
 _GUARD_MS = 2500
 DEFAULT_CAPTION = "Generate"
 RANDOM_SEED_CAPTION = "Generate with Random seed"
+UNREAD_EMPHASIS_QUESTION = ("This model reads parentheses and numbers as plain text, "
+                            "so they add no strength.")
+REMOVE_EMPHASIS = "Remove emphasis"
 
 
 class GenerateButton(QPushButton):
@@ -41,7 +44,23 @@ class GenerateButton(QPushButton):
         self.style().polish(self)
 
 
-def refused_over_prompts(button: GenerateButton, fields: Iterable[QPlainTextEdit]) -> bool:
+def _wants_emphasis_removed(button: GenerateButton) -> bool:
+    popup = QMessageBox(QMessageBox.Icon.Question, "Unread emphasis", UNREAD_EMPHASIS_QUESTION,
+                        QMessageBox.StandardButton.NoButton, button.window())
+    remove = popup.addButton(REMOVE_EMPHASIS, QMessageBox.ButtonRole.AcceptRole)
+    popup.addButton(QMessageBox.StandardButton.Cancel)
+    popup.setDefaultButton(remove)
+    popup.exec()
+    return popup.clickedButton() is remove
+
+
+def refused_over_prompts(button: GenerateButton, fields: Iterable[QPlainTextEdit],
+                         remove_emphasis: Callable[[], None]) -> bool:
+    fields = list(fields)
+    if only_unread_emphasis_to_resolve(fields):
+        if _wants_emphasis_removed(button):
+            remove_emphasis()
+        return True
     problem = problem_to_resolve(fields)
     if problem is not None:
         button.flash_guard(problem)

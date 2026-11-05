@@ -29,7 +29,8 @@ from origenerator.gui.prompt_boxes import (
     set_in_use,
 )
 from origenerator.gui.prompt_field import PromptField
-from origenerator.prompt_checks import tidied
+from origenerator.gui.prompt_marks import has_unread_emphasis
+from origenerator.prompt_checks import tidied, without_emphasis
 from origenerator.prompt_tokens import PromptReading
 from origenerator.workflows.base import (
     ParamDef,
@@ -237,6 +238,11 @@ class ScenesEditor(QWidget):
 
     def text_fields(self) -> list[PromptField]:
         return [field for scene in self._scenes for field in scene.fields.values()]
+
+    def remove_unread_emphasis(self) -> None:
+        for field in self.text_fields():
+            if has_unread_emphasis(field):
+                tracked_prompt.write_undoably(field, without_emphasis(diff_text.live_text(field)))
 
     def fields_beside_their_texts(self, stored: dict) -> list[tuple[PromptField, str | None]]:
         return [(field, scene_text(scene_prompts(stored[key]), index)

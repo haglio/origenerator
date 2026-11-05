@@ -186,10 +186,6 @@ class ParamDef:
         self.type = ParamType(self.type)
 
 
-def shown_with_what_is_held(options, held) -> list:
-    return list(options) if held in options else [*options, held]
-
-
 def sampler_params(defaults: dict) -> list[ParamDef]:
     return [
         ParamDef("sampler_name", "Sampler", ParamType.DROPDOWN, defaults["sampler_name"],

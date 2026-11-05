@@ -8,8 +8,8 @@ from origenerator.base_models import loras_offered_beside
 from origenerator.model_titles import option_title, versioned
 from origenerator.setting_advice import spoken_list
 from origenerator.trigger_words import trigger_words
-from origenerator.workflows.base import ParamDef, ParamType, shown_with_what_is_held
-from origenerator.workflows.model_files import is_no_lora
+from origenerator.workflows.base import ParamDef, ParamType
+from origenerator.workflows.model_files import is_no_lora, shown_with_what_is_held
 
 _TOLD = (ParamType.INT, ParamType.FLOAT, ParamType.DROPDOWN, ParamType.BOOL)
 _ON = ("on", "true", "yes", "1")

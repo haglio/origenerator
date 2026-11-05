@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from origenerator.workflows.base import ParamDef, ParamType, shown_with_what_is_held  # isort: skip
-from origenerator.workflows.model_files import is_no_lora  # isort: skip
+from origenerator.workflows.base import ParamDef, ParamType  # isort: skip
+from origenerator.workflows.model_files import is_no_lora, shown_with_what_is_held  # isort: skip
 from origenerator.base_models import loras_offered_beside
 from origenerator.model_titles import option_title, versioned
 from origenerator.setting_advice import spoken_list

@@ -164,6 +164,37 @@ app only beside a funestra release that names the same one: pip refuses an
 install that asks for two tags of one sibling. Never reinstall `.venv` while
 Origenerator or a Fun Time session may be running.
 
+## The whole test run goes side by side, in about three minutes
+
+```bash
+"<primary checkout>/.venv/Scripts/python.exe" -m pytest -x -q -n 8
+```
+
+from the worktree. That is every test and every check, each once, dealt among
+eight worker processes by pytest-xdist: about two and a half minutes on this
+computer, against eighteen in one process, so it is the run to make before
+every commit, never a few nearby files in its place.
+
+- The coverage floor is held over all eight workers' measurements together;
+  the family's checks and the blocked-word check run in whichever worker each
+  is dealt to.
+- Each worker keeps a state folder of its own (`tests/scratch.py`). A test
+  that writes where two workers meet (a fixed name in the temp folder, a fixed
+  port, a named Windows object) fails only in this run, so give it `tmp_path`
+  or a free port.
+- The workers run below normal priority (`tests/side_by_side.py`), so what he
+  is using on the computer comes first, and the run takes longer while the
+  computer is busy: 5:32 beside his Origenerator and three other suites.
+- `-x` ends the run only once each worker has finished the tests already
+  dealt to it, so a red run can take as long as a green one.
+- A run that names test files or narrows with `-k` goes in one process, as
+  before: under `-n` the coverage floor is not stood down for it.
+- A worker that dies natively is named with the test it was running. Three
+  `Windows fatal exception: code 0xe0000001` dumps in a green run's output are
+  `tests/test_windows_toast.py` having Windows refuse a notification on
+  purpose, never a crash.
+- GitHub still runs the suite shuffled, in four parts on four machines.
+
 ## A model picker offers only what its graph can run
 
 `ComfyUI/models/<category>` is a folder, not a catalogue. `checkpoints` holds WAN

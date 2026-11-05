@@ -46,7 +46,8 @@ dependencies = [
 origenerator = "origenerator.app:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-qt>=4,<5", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3",
+dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-qt>=4,<5", "pytest-timeout>=2.4,<3",
+       "pytest-xdist>=3.8,<4", "vulture>=2.16,<3",
        "ruff==0.16.6"]
 # What voice_core, the family's listener, reads each command with a second time and
 # takes sentences down with. voice_core imports it only when an app asks for either;

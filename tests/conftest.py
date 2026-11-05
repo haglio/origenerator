@@ -44,6 +44,7 @@ from origenerator.gui import (
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
+from tests.side_by_side import run_behind_what_he_is_using
 
 pytest_plugins = ("shared_ui.testing",)
 
@@ -475,6 +476,8 @@ def pytest_configure(config):
         "markers",
         "real_thread_hop: leave the gallery's off-thread work on its pool thread")
     qInstallMessageHandler(_print_qt_message)
+    if hasattr(config, "workerinput"):
+        run_behind_what_he_is_using()
 
 
 @pytest.fixture

@@ -19,7 +19,7 @@ from origenerator.prompt_terms import (
     without_nothing_weighted,
 )
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
-from origenerator.request_changes import apply_changes
+from origenerator.request_changes import Prompts, apply_changes
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -152,20 +152,22 @@ def _joined(positive: str, negative: str, each_negative: list[str], parsed: tupl
         revisions[0].settings, revisions[0].setting_changes)
 
 
-def apply_request(positive: str, negative: str, request: str) -> PromptRevision | None:
+def apply_request(positive: str, negative: str, request: str, *,
+                  weights: bool = True) -> PromptRevision | None:
     parsed = parse_request(request)
     if parsed is None:
         return None
-    return _revised(unboxed(positive or ""), unboxed(negative or ""), parsed)
+    return _revised(unboxed(positive or ""), unboxed(negative or ""), parsed, weights)
 
 
-def apply_request_to_each_scene(positive: str, negative: str, request: str) -> PromptRevision | None:
+def apply_request_to_each_scene(positive: str, negative: str, request: str, *,
+                                weights: bool = True) -> PromptRevision | None:
     parsed = parse_request(request)
     if parsed is None:
         return None
     positive, negative = unboxed(positive or ""), unboxed(negative or "")
     scenes, each_negative = _scenes_of(positive, negative)
-    revisions = [_revised(scene, scene_negative, parsed)
+    revisions = [_revised(scene, scene_negative, parsed, weights)
                  for scene, scene_negative in zip(scenes, each_negative, strict=True)]
     return _joined(positive, negative, each_negative, parsed, revisions)
 
@@ -182,8 +184,9 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     return story_of(after)
 
 
-def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
+def _revised(positive: str, negative: str, parsed: tuple, weights: bool) -> PromptRevision:
     polarity, term = parsed
+    step = WEIGHT_STEP if weights else 0
 
     def made(new_positive, new_negative, action) -> PromptRevision:
         return PromptRevision(positive, negative, new_positive, new_negative,
@@ -195,14 +198,14 @@ def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
             return made(without(positive, index), negative, DROPPED)
         index = index_of(negative, term)
         if index is not None:
-            return made(positive, reweighted(negative, index, WEIGHT_STEP), PUSHED)
+            return made(positive, reweighted(negative, index, step) if step else negative, PUSHED)
         return made(positive, plus(negative, term), EXCLUDED)
     index = index_of(negative, term)
     if index is not None:
         return made(positive, without(negative, index), ALLOWED)
     index = index_of(positive, term)
     if index is not None:
-        return made(reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
+        return made(reweighted(positive, index, step) if step else positive, negative, RAISED)
     return made(plus(positive, term), negative, ADDED)
 
 
@@ -212,6 +215,7 @@ class WhatIsKnown:
     notes: CollectionNotes | None = None
     examples: tuple = ()
     settings: tuple = ()
+    weights: bool = True
 
 
 def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = False, ask=None,
@@ -228,14 +232,14 @@ def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = Fa
     for scene, scene_negative in zip(scenes, each_negative, strict=True):
         revision = _answered((scene, scene_negative), parsed,
                              partial(ask or ask_the_model, scene, scene_negative, request, told),
-                             told.settings, asked)
+                             told, asked)
         if revision is None:
-            return request_applier(in_scenes)(positive, negative, request)
+            return request_applier(in_scenes)(positive, negative, request, weights=told.weights)
         revisions.append(revision)
     return _joined(positive, negative, each_negative, parsed, revisions)
 
 
-def _answered(pair: tuple[str, str], parsed: tuple, asking, settings,
+def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
               asked: list[str]) -> PromptRevision | None:
     positive, negative = pair
     polarity, term = parsed
@@ -247,7 +251,9 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, settings,
         return None
     if not isinstance(answer, dict):
         return None
-    outcome = apply_changes(answer, pair, asked=asked, settings=settings)
+    settings = told.settings
+    outcome = apply_changes(answer, pair, asked=asked, settings=settings,
+                            prompts=Prompts(take_weights=told.weights))
     return PromptRevision(positive, negative, without_nothing_weighted(outcome.positive),
                           without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
                           outcome.line, tuple(outcome.settings.items()),
@@ -321,6 +327,12 @@ _ANSWER_SHAPE = (
     'empty list.')
 
 
+_NO_WEIGHTS = (
+    "THESE PROMPTS TAKE NO WEIGHTS: the image model ignores (term:weight), so never write one. "
+    "For more of something, say it in stronger and more exact words and move it earlier in the "
+    "prompt; for less, say it more mildly or remove it.")
+
+
 def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,
                            system_prompt: str) -> list[dict]:
     parts = []
@@ -333,6 +345,8 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
     if known.settings:
         parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
                      + request_settings.as_told(known.settings))
+    if not known.weights:
+        parts.append(_NO_WEIGHTS)
     parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
     parts.append(f"HE NOW ASKS:\n{request}")
     parts.append(_ANSWER_SHAPE)

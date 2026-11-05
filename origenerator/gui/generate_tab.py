@@ -1241,6 +1241,7 @@ class GenerateTab(DropZones):
             aim.prompt_id, (params.get("positive_prompt") or "", params.get("negative_prompt") or ""),
             words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
+            weights=workflow_named(self._form_workflow_key).prompts_take_weights,
             owner=self,
             then=lambda revision, context=(self._asked, aim): self._on_rewritten(context, revision))
 

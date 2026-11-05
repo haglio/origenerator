@@ -4,6 +4,7 @@ import pytest
 
 from origenerator import request_settings
 from origenerator.request_changes import apply_changes
+from origenerator.trigger_words import with_trigger_words_swapped
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 
 _SIZE = request_settings.settings_to_tell(
@@ -135,12 +136,14 @@ def _lora_switched(picked: str, to: str, positive: str, **how):
                          **how)
 
 
-def test_switching_a_lora_swaps_its_trigger_word_in_the_positive_prompt(versioned_style):
-    outcome = _lora_switched("example_style.safetensors", "Example Style 1.1",
-                             "a woman, (exmplstyle:1.1), soft light")
+def test_switching_a_lora_swaps_its_trigger_word_where_it_stands_as_the_warnings_click_does(
+        versioned_style):
+    prompt = "a woman, (exmplstyle:1.1), soft light, exmplstyle"
+    outcome = _lora_switched("example_style.safetensors", "Example Style 1.1", prompt)
 
     assert outcome.settings == {"lora": "example_style_11.safetensors"}
-    assert outcome.positive == "exmplnew, a woman, soft light"
+    assert outcome.positive == "a woman, (exmplnew:1.1), soft light, exmplnew"
+    assert outcome.positive == with_trigger_words_swapped(prompt, ("exmplstyle",), ("exmplnew",))
     assert outcome.line == ("Set LoRA 1 to Example Style 1.1 (was Example Style 1.0), and swapped "
                             "its trigger word exmplstyle for exmplnew in the Positive Prompt.")
 

@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.video_names import UPSCALE_SUFFIX
+
 from origenerator.media import MediaType, media_type_from_filename
 
-UPSCALE_SUFFIX = "_topaz"
 SHAPES = ("landscape", "portrait")
 
 

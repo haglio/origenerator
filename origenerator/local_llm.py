@@ -34,7 +34,6 @@ class _Answering:
     reads_tokens: int | None = None
     answers_tokens: int | None = None
     stays_loaded: str | None = None
-    thinks: bool = False
 
     def options(self) -> dict:
         options: dict = {"temperature": self.temperature}
@@ -47,8 +46,8 @@ class _Answering:
 
 def ask(messages: list[dict], *, base_url: str, model: str, timeout: float, **how) -> dict:
     answering = _Answering(**how)
-    payload: dict = {"model": model, "messages": messages, "stream": False,
-                     "think": answering.thinks, "options": answering.options()}
+    payload: dict = {"model": model, "messages": messages, "stream": False, "think": False,
+                     "options": answering.options()}
     if answering.json_answer:
         payload["format"] = "json"
     if answering.stays_loaded is not None:

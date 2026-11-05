@@ -893,6 +893,9 @@ def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
     assert view._search.field.text() == ""
 
 
+_TWO_CATS_SAID = 'Replaced "a cat" with "two cats" in the Positive Prompt.'
+
+
 def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
@@ -902,11 +905,12 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     tab = view._generate_pane.current_generate_tab()
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
-        positive, negative, words, ask=lambda p, n, r, known: ("two cats", n, "Two cats."))
+        positive, negative, words, ask=lambda p, n, r, known: {"changes": [
+            {"prompt": "positive", "replace": "a cat", "with": "two cats", "for": "two cats"}]})
     exchange = tab._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "two cats")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
-    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", "Two cats.")], timeout=5000)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
 
     view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
 
@@ -916,7 +920,7 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     assert (record["old_positive"], record["new_positive"]) == ("a cat", "two cats")
     (turn,) = db.requests.exchange_of(job.prompt_id)
     assert (turn.said, turn.answered, turn.old_positive, turn.new_positive) == (
-        "two cats", "Two cats.", "a cat", "two cats")
+        "two cats", _TWO_CATS_SAID, "a cat", "two cats")
 
 
 def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on_its_image(

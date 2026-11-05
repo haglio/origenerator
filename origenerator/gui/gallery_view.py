@@ -1962,7 +1962,7 @@ class GalleryView(QWidget):
             turns=(revision.turn(spoken.text),),
         ))
         self.refresh()
-        return revision.answer or "Request submitted", INFO
+        return "Request submitted", INFO
 
     def delete_enhance_versions(self, prompt_id: str, filenames: list):
         row = self._db.get_generation(prompt_id)

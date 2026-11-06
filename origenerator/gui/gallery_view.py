@@ -279,6 +279,7 @@ def _press_for_the_gallery(event, *, delete, copy_names, undo, redo):
 
 class GalleryView(QWidget):
     run_ended = pyqtSignal(object)
+    quit_asked = pyqtSignal()
 
     def __init__(self, db: Database, *,
                  client: ComfyUIClient | None = None,
@@ -595,6 +596,7 @@ class GalleryView(QWidget):
                 toggle_radio=self._on_radio_toggle,
                 toggle_mic=self._voice.mic_toggled,
                 pause_or_play=self._slideshows.pause_or_play_the_room,
+                quit=self.quit_asked.emit,
             ),
             hosted=self._fun_time is not None,
         )

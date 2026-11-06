@@ -334,12 +334,36 @@ def test_the_play_pause_button_shows_what_a_press_would_do_as_fun_times_does(but
     assert made.play_pause.toolTip() == "Pause everything"
 
 
-def test_a_session_s_own_play_pause_button_stands_in_for_the_room_s(buttons):
+def test_the_play_pause_button_is_lit_exactly_while_everything_plays(buttons):
+    made = buttons()
+    assert made.play_pause.isChecked()
+
+    omnipause.freeze(True)
+    assert not made.play_pause.isChecked()
+
+    made.play_pause.click()
+    assert not made.play_pause.isChecked()
+
+
+def test_the_power_button_quits(buttons):
+    asked = []
+    made = buttons(_handlers(quit=lambda: asked.append(True)))
+
+    made.power.click()
+
+    assert asked == [True]
+    assert made.power.toolTip() == "Quit"
+
+
+def test_a_session_s_own_power_and_play_pause_buttons_stand_in_for_the_room_s(buttons):
     taken = buttons()
 
     taken.become_hosted()
     assert taken.play_pause is None
+    assert taken.power is None
     assert buttons(hosted=True).play_pause is None
+    assert buttons(hosted=True).power is None
 
     taken.become_standalone()
     assert not taken.play_pause.isHidden()
+    assert not taken.power.isHidden()

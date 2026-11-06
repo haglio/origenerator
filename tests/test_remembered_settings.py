@@ -75,6 +75,8 @@ NO_SETTING = {
         widget for tab in _tabs(view) for widget in _within(tab._action)],
     ("Auto-Generate, which a restart leaves off, since one that came back on by itself"
      " could run unnoticed"): lambda view: [view._buttons.auto],
+    "the pause Esc and play/pause share, which a restart leaves playing":
+        lambda view: [view._buttons.play_pause],
 }
 
 OSR2_CONTROLS_PRESSES_REMEMBERED_AS = {

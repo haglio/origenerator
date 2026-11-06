@@ -29,6 +29,7 @@ _.mouseDoubleClickEvent
 _.startDrag
 _.wheelEvent
 _.highlightBlock
+_.nextCheckState
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions

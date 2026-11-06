@@ -2256,3 +2256,57 @@ def test_two_requests_out_at_once_hold_the_line_until_both_have_let_go(qtbot, tm
 
     queue.model_hold.let_go()
     assert client.submit_job.call_count == 1
+
+
+def _a_model_left_loaded(queue, client):
+    handed_when_it_left = []
+    queue.model_hold.hold()
+    queue.model_hold.let_go(lambda: handed_when_it_left.append(client.submit_job.call_count))
+    return handed_when_it_left
+
+
+def test_a_model_left_loaded_is_sent_away_before_comfyui_is_handed_a_job(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    handed_when_it_left = _a_model_left_loaded(queue, client)
+
+    job = _launch_video(queue, "v1", seed=1)
+
+    qtbot.waitUntil(lambda: client.submit_job.call_count == 1, timeout=5000)
+    assert handed_when_it_left == [0]
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [job.prompt_id]
+
+
+def test_a_model_left_loaded_leaves_after_the_minutes_it_may_stay_with_no_request(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    handed_when_it_left = _a_model_left_loaded(queue, client)
+
+    assert queue._model_stays.isActive()
+    assert queue._model_stays.interval() == config.REQUEST_MODEL_STAYS_LOADED_S * 1000
+    assert handed_when_it_left == []
+
+    queue._model_stays.timeout.emit()
+
+    qtbot.waitUntil(lambda: handed_when_it_left == [0], timeout=5000)
+    qtbot.waitUntil(lambda: not queue.model_hold, timeout=5000)
+    assert not queue._model_stays.isActive()
+
+
+def test_a_request_that_left_no_model_loaded_starts_no_wait_for_one_to_leave(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    queue.model_hold.hold()
+
+    queue.model_hold.let_go()
+
+    assert not queue._model_stays.isActive()
+
+
+def test_closing_sends_a_model_left_loaded_away_at_once(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    handed_when_it_left = _a_model_left_loaded(queue, client)
+
+    queue.close()
+
+    assert handed_when_it_left == [0]

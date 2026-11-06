@@ -8,7 +8,11 @@ from functools import partial
 from origenerator import local_llm, request_settings
 from origenerator.box_breaks import unboxed
 from origenerator.collection_notes import CollectionNotes
-from origenerator.config import LOCAL_LLM_BASE_URL, REQUEST_LLM_MODEL
+from origenerator.config import (
+    LOCAL_LLM_BASE_URL,
+    REQUEST_LLM_MODEL,
+    REQUEST_MODEL_STAYS_LOADED_S,
+)
 from origenerator.db_requests import Turn
 from origenerator.prompt_terms import (
     WEIGHT_STEP,
@@ -360,10 +364,13 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
             {"role": "user", "content": "\n\n".join(parts)}]
 
 
+_STAYS_LOADED = f"{REQUEST_MODEL_STAYS_LOADED_S + 60}s"
+
+
 def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown, *,
                   llm=None) -> dict:
     return local_llm.answer_of((llm or local_llm.ask)(
         build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT),
         base_url=LOCAL_LLM_BASE_URL, model=REQUEST_LLM_MODEL, temperature=0.4,
         timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
-        stays_loaded="0"))
+        stays_loaded=_STAYS_LOADED))

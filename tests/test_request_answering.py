@@ -6,50 +6,36 @@ import threading
 from PyQt6 import sip
 from PyQt6.QtWidgets import QWidget
 
-from origenerator import collection_notes
+from origenerator import collection_notes, config
 from origenerator.collection_notes import CollectionNotes
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
-from origenerator.gui.request_answering import RequestAnswerer
+from origenerator.gui.request_answering import RequestAnswerer, leave_the_graphics_card
+from origenerator.queue_line import ModelHold
 from origenerator.workflows.base import story_of
-
-
-class _Hold:
-    def __init__(self):
-        self.holds = 0
-        self.let_go_of = 0
-
-    def hold(self):
-        self.holds += 1
-
-    def let_go(self):
-        self.let_go_of += 1
 
 
 class _Jobs:
     def __init__(self):
-        self.model_hold = _Hold()
+        self.let_go = 0
+        self.model_hold = ModelHold(self._count)
 
-    @property
-    def holds(self):
-        return self.model_hold.holds
-
-    @property
-    def let_go(self):
-        return self.model_hold.let_go_of
+    def _count(self):
+        self.let_go += 1
 
 
 _A_CLIENT = object()
 
 
 def _answerer(qtbot, tmp_path, *, work_out, wait=lambda comfyui, holder, **settings: True,
-              client=_A_CLIENT):
+              client=_A_CLIENT, **stand_ins):
     db = Database(tmp_path / "t.db")
-    jobs = _Jobs()
+    jobs = stand_ins.pop("jobs", _Jobs())
     parent = QWidget()
     qtbot.addWidget(parent)
     answerer = RequestAnswerer(db, jobs, client, notes_path=tmp_path / "notes.json",
-                               work_out=work_out, wait_for_the_graphics_card=wait, parent=parent)
+                               work_out=work_out, wait_for_the_graphics_card=wait, parent=parent,
+                               leave_the_graphics_card=stand_ins.pop("leave_the_graphics_card", lambda: None))
     return answerer, db, jobs, parent
 
 
@@ -71,7 +57,7 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
 
     answerer.ask("g1", ("a woman, a hat", "blurry"), "no hat", owner=parent, then=answers.append)
 
-    assert jobs.holds == 1
+    assert jobs.model_hold
     qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
     assert seen["asked"] == ("a woman, a hat", "blurry", "no hat")
     assert [(turn.said, turn.answered) for turn in seen["exchange"]] == [("a hat", "Gave her a hat.")]
@@ -259,3 +245,84 @@ def test_with_comfyui_busy_a_storys_rules_still_answer_scene_by_scene(qtbot, tmp
 
     qtbot.waitUntil(lambda: bool(answers), timeout=5000)
     assert answers[0].positive == story_of(["a dog, grass", "a cat, grass"])
+
+
+def _answered(qtbot, answerer, parent, words="a hat"):
+    answers = []
+    answerer.ask("g1", ("a woman", ""), words, owner=parent, then=answers.append)
+    qtbot.waitUntil(lambda: len(answers) == 1, timeout=5000)
+    return answers[0]
+
+
+def _the_revision(*_args, **_known):
+    return "the revision"
+
+
+def test_the_model_stays_on_the_graphics_card_after_an_answer_until_it_is_sent_away(qtbot, tmp_path):
+    left = []
+    answerer, _db, jobs, parent = _answerer(qtbot, tmp_path, work_out=_the_revision,
+                                            leave_the_graphics_card=lambda: left.append("left"))
+
+    _answered(qtbot, answerer, parent)
+
+    assert jobs.model_hold.stays
+    assert left == []
+    jobs.model_hold.send_away()()
+    assert left == ["left"]
+
+
+def test_a_request_asked_while_the_model_is_still_loaded_does_not_wait_for_the_card_again(
+        qtbot, tmp_path):
+    waited = []
+
+    def wait(comfyui, holder, **settings):
+        waited.append(holder)
+        return True
+
+    answerer, _db, jobs, parent = _answerer(qtbot, tmp_path, work_out=_the_revision, wait=wait)
+    _answered(qtbot, answerer, parent)
+
+    assert _answered(qtbot, answerer, parent, "a scarf") == "the revision"
+
+    assert len(waited) == 1
+    assert jobs.model_hold.stays
+
+
+def test_an_answer_the_rules_gave_without_the_card_leaves_no_model_to_send_away(qtbot, tmp_path):
+    answerer, _db, jobs, parent = _answerer(qtbot, tmp_path, work_out=None,
+                                            wait=lambda comfyui, holder, **settings: False)
+
+    _answered(qtbot, answerer, parent)
+
+    assert not jobs.model_hold.stays
+
+
+def test_with_no_job_queue_to_send_it_away_the_model_leaves_as_soon_as_it_has_answered(
+        qtbot, tmp_path):
+    left = []
+    answerer, _db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=_the_revision, jobs=None,
+                                             leave_the_graphics_card=lambda: left.append("left"))
+
+    _answered(qtbot, answerer, parent)
+
+    assert left == ["left"]
+
+
+def test_leaving_the_card_unloads_the_requests_model_and_gives_the_claim_back():
+    done = []
+
+    leave_the_graphics_card(unload=lambda **model: done.append(model), give_back=lambda: done.append("claim"))
+
+    assert done == [{"base_url": config.LOCAL_LLM_BASE_URL, "model": config.REQUEST_LLM_MODEL},
+                    "claim"]
+
+
+def test_the_claim_is_given_back_though_the_model_could_not_be_told_to_leave():
+    done = []
+
+    def unload(**_model):
+        raise OSError("Ollama is not running")
+
+    leave_the_graphics_card(unload=unload, give_back=lambda: done.append("claim"))
+
+    assert done == ["claim"]

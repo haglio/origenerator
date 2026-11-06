@@ -39,6 +39,7 @@ from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
+from origenerator.video_records import FiledLoops
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.slideshow_hud_support import open_both_shapes
@@ -605,7 +606,8 @@ def slideshows(monkeypatch):
             DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
                             library=lambda: gallery_pane.library, listing=host.listing,
                             **({"weight_of": records.of, "learn_weights": records.learn,
-                                "record_group_of": records.group_of}
+                                "record_group_of": records.group_of,
+                                "record_loops_of": records.loops_of}
                                if records else {})),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
@@ -2752,9 +2754,13 @@ def _a_session_side_with_its_opening_ready(slideshows, qtbot, gallery_pane):
 
 
 class FakeRecords:
-    def __init__(self, filed=None):
+    def __init__(self, filed=None, loops=None):
         self.learned = []
         self.filed = filed or {}
+        self.loops = loops or {}
+
+    def loops_of(self, item):
+        return self.loops.get(str(item), FiledLoops())
 
     def of(self, item):
         return 4.0
@@ -2872,6 +2878,89 @@ def test_a_slideshow_groups_what_it_made_by_its_image_and_another_sites_videos_b
     assert groups["g1"] == groups["v1"] == groups["v3"]
     assert groups["v2"] != groups["v1"]
     assert groups["o1"] == groups["o2"] != groups["g1"]
+
+
+def _another_sites_videos_on_file(slideshows, tmp_path, loops):
+    rows = [_a_sites(_animation("o1", frame="h1.png", action="alpha", tmp_path=tmp_path)),
+            _a_sites(_animation("o2", frame="h1.png", action="beta", tmp_path=tmp_path)),
+            _a_sites(_animation("o3", frame="h2.png", action="alpha", tmp_path=tmp_path)),
+            _fox("g1", seed=1),
+            {**_animation("v1", frame="g1.png", action="gamma", tmp_path=tmp_path),
+             "workflow_name": "another_workflow"}]
+    records = FakeRecords(loops=loops)
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=records)
+    director.items_of = lambda rows: [
+        (f"{row['prompt_id']}.mp4", "video", row["prompt_id"], None) for row in rows]
+    return director, records
+
+
+def test_another_sites_video_is_mapped_with_the_videos_its_record_groups_it_with(
+        slideshows, tmp_path):
+    director, _records = _another_sites_videos_on_file(
+        slideshows, tmp_path, {"o1.mp4": FiledLoops(actions=("o2.mp4",), seeds=("o3.mp4",))})
+
+    around = director.neighbors_of("o1", shape="portrait")
+
+    assert around.label == "alpha"
+    assert [slide.prompt_id for slide in around.seeds] == ["o3"]
+    assert [(row.label, row.slide.prompt_id) for row in around.column] == [("beta", "o2")]
+    assert [slide.prompt_id for slide in around.group] == ["o2"]
+
+
+def test_the_records_of_every_video_another_site_made_are_learned_before_one_is_mapped(
+        slideshows, tmp_path):
+    director, records = _another_sites_videos_on_file(slideshows, tmp_path, {})
+
+    director.neighbors_of("o1", shape="portrait")
+    director.neighbors_of("o2", shape="portrait")
+
+    assert records.learned == ["o1.mp4", "o2.mp4", "o3.mp4"]
+
+
+def test_a_video_its_record_groups_with_none_in_the_gallery_is_mapped_alone(slideshows, tmp_path):
+    director, _records = _another_sites_videos_on_file(
+        slideshows, tmp_path, {"o1.mp4": FiledLoops(actions=("gone from the gallery.mp4",))})
+
+    around = director.neighbors_of("o1", shape="portrait")
+
+    assert (around.seeds, around.column, around.group) == ((), (), ())
+
+
+def test_what_was_made_here_from_another_sites_video_stays_on_its_map_beside_its_records_group(
+        slideshows, tmp_path):
+    frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
+    rows = [frame,
+            _a_sites(_animation("o1", frame="h1.png", action="alpha", tmp_path=tmp_path)),
+            _a_sites(_animation("o2", frame="h2.png", action="beta", tmp_path=tmp_path)),
+            _animation("v1", frame="h1.png", action="gamma", tmp_path=tmp_path)]
+    records = FakeRecords(loops={"o1.mp4": FiledLoops(actions=("o2.mp4",))})
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=records)
+    director.items_of = lambda rows: [
+        (f"{row['prompt_id']}.mp4", "video", row["prompt_id"], None) for row in rows]
+
+    around = director.neighbors_of("o1", shape="portrait")
+
+    assert [slide.prompt_id for slide in around.group] == ["o2", "v1"]
+    assert [(row.label, row.slide.prompt_id) for row in around.column] == [
+        ("beta", "o2"), ("gamma", "v1")]
+
+
+def test_an_image_another_site_made_keeps_the_map_the_gallery_gives_it(slideshows, tmp_path):
+    rows = [_a_sites(_fox("g1", seed=1)),
+            _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords())
+
+    around = director.neighbors_of("g1", shape="portrait")
+
+    assert [slide.prompt_id for slide in around.group] == ["v1"]
+
+
+def test_more_seeds_of_another_sites_video_are_the_ones_its_record_widens_to(slideshows, tmp_path):
+    director, _records = _another_sites_videos_on_file(
+        slideshows, tmp_path, {"o1.mp4": FiledLoops(more_seeds=("o3.mp4",))})
+
+    assert [slide.prompt_id
+            for slide in director.beyond_the_row_of("o1", shape="portrait")] == ["o3"]
 
 
 def test_a_video_with_no_group_on_its_record_is_a_group_of_its_own(slideshows, tmp_path):

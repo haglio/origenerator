@@ -131,3 +131,13 @@ def test_the_model_is_taught_to_change_only_what_was_asked():
     rule = prompt[prompt.index("Change only what"):].split("\n")[0]
 
     assert "Never add, remove or reword anything he did not ask about" in rule
+
+
+def test_a_word_he_names_is_taught_as_taken_out_alone_with_the_words_around_it_kept():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("When he names one word"):].split("\n")[0]
+
+    assert "only that word" in rule
+    assert "keep the words around it" in rule
+    answer = prompt[prompt.index("- \"maybe the word 'vintage'"):].split("\n")[0].split("->")[1]
+    assert '"replace": "vintage photo of a lake", "with": "photo of a lake"' in answer

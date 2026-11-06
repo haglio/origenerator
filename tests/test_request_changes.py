@@ -476,3 +476,51 @@ def test_a_weight_written_around_some_words_of_a_part_comes_off_where_prompts_ta
         prompts=Prompts(take_weights=False))
 
     assert outcome.positive == "a tall woman, freckles, soft warm light on a couch"
+
+
+_THE_WORD_VINTAGE = ('maybe the word "vintage" is throwing the colors off?',)
+_A_VINTAGE_PHOTO = ("vintage photo of a woman on a couch, soft light", "blurry")
+
+
+def test_a_word_he_quoted_is_taken_out_alone_whatever_else_the_model_takes_with_it():
+    outcome = _applied([{"prompt": "positive", "remove": "vintage photo of", "for": "vintage"}],
+                       pair=_A_VINTAGE_PHOTO, asked=_THE_WORD_VINTAGE)
+
+    assert outcome.positive == "photo of a woman on a couch, soft light"
+    assert outcome.line == 'Removed "vintage" from the Positive Prompt.'
+
+
+def test_new_words_put_where_the_word_he_quoted_stood_are_the_models_to_write():
+    outcome = _applied([{"prompt": "positive", "replace": "vintage photo of", "with": "painting of",
+                         "for": "vintage"}],
+                       pair=_A_VINTAGE_PHOTO, asked=_THE_WORD_VINTAGE)
+
+    assert outcome.positive == "painting of a woman on a couch, soft light"
+
+
+def test_words_he_never_quoted_go_whole_as_the_model_took_them():
+    outcome = _applied([{"prompt": "positive", "remove": "vintage photo of", "for": "vintage"}],
+                       pair=_A_VINTAGE_PHOTO, asked=("no vintage photo please",))
+
+    assert outcome.positive == "a woman on a couch, soft light"
+
+
+@pytest.mark.parametrize("request_", [
+    "take out the word vintage",
+    "is “vintage” throwing the colors off?",
+    "she's too brown. is 'vintage' doing that?",
+])
+def test_a_word_is_his_to_name_with_or_without_quotation_marks(request_):
+    outcome = _applied([{"prompt": "positive", "remove": "vintage photo of", "for": "vintage"}],
+                       pair=_A_VINTAGE_PHOTO, asked=(request_,))
+
+    assert outcome.positive == "photo of a woman on a couch, soft light"
+
+
+def test_a_replacement_that_only_takes_words_out_takes_out_the_one_he_quoted():
+    outcome = _applied([{"prompt": "positive", "replace": "vintage photo of a woman",
+                         "with": "a woman", "for": "vintage"}],
+                       pair=_A_VINTAGE_PHOTO, asked=_THE_WORD_VINTAGE)
+
+    assert outcome.positive == "photo of a woman on a couch, soft light"
+    assert outcome.line == 'Removed "vintage" from the Positive Prompt.'

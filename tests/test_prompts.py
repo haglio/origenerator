@@ -153,3 +153,5 @@ def test_more_of_something_already_there_is_taught_as_every_way_tried_before_giv
     assert "every one of these that is not done yet" in rule
     assert "Only when all of them are already done may you change nothing" in rule
     assert '"tried"' in rule
+    assert 'never "no X"' in rule
+    assert "never take an opposite back out of the negative prompt" in rule

@@ -6,6 +6,7 @@ import random
 import pytest
 from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
+from funestra.hud_osr2 import state_for
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.main_hud import (
     BROKER_PRESS,
@@ -359,11 +360,10 @@ def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
 
 
 def test_with_their_switch_off_the_osr2_controls_say_parked_over_a_device_that_is_on(qtbot):
-    painter = MainHudPainter()
     hud = osr2_controls_hud(FakeMotion(), Osr2Situation(device=Osr2Mode.CONTROLLED, control=OSR2_PARKED))
-    painter.rgba(hud)
+    model = hud.main_hud_model
 
-    assert painter._osr2_state(hud.main_hud_model) == OSR2_PARKED
+    assert state_for(model.osr2, model.osr2_control, paused=model.paused) == OSR2_PARKED
 
 
 def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):

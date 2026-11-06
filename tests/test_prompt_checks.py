@@ -103,6 +103,8 @@ def test_a_thing_in_both_is_found_without_its_weight_and_without_regard_to_capit
     ("a, \nb", "a,\nb"),
     (f"a, b,{BOX_BREAK} c", f"a, b,{BOX_BREAK}c"),
     (f"a,{BOX_BREAK},b", f"a,{BOX_BREAK}b"),
+    (f"a{BOX_BREAK}, b", f"a{BOX_BREAK}b"),
+    (f"a{BOX_BREAK} ,, b", f"a{BOX_BREAK}b"),
 ])
 def test_tidying_cleans_spaces_and_commas(messy, clean):
     assert tidied(messy) == clean

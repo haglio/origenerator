@@ -693,7 +693,7 @@ def test_a_spoken_side_and_collection_plays_it_on_that_region(qtbot, tmp_path, m
     still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(still)
     rows = [{"prompt_id": "new-1", "thumbnail_path": str(still)}]
-    monkeypatch.setattr(view._gallery_pane, "rows_for_collection",
+    monkeypatch.setattr(view._library, "rows_at",
                         lambda key: rows if key == "__recents__::landscape" else [])
     monkeypatch.setattr(view._slideshows, "items_of",
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))

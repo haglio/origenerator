@@ -14,7 +14,9 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
     folder_collection,
 )
+from origenerator.gallery.custom import index_folders
 from origenerator.gallery.placement import Placement
+from origenerator.gallery.shapes import LANDSCAPE, shape_covers
 from origenerator.generation_state import on_the_map
 from origenerator.item_shape import filter_rows, split_key
 from origenerator.media import MediaType
@@ -36,11 +38,15 @@ class LibrarySnapshot:
     def __init__(self, rows: list[dict], held_rows: list[dict] = (), *,
                  folder_meta: dict | None = None,
                  name_of: Callable[[str], str] | None = None,
+                 custom_collections: list[dict] = (),
                  trees_from: LibrarySnapshot | None = None):
         self.rows = rows
         self.held_rows = held_rows
         self.folder_meta = folder_meta or {}
         self._name_of = name_of
+        self._custom_records = custom_collections
+        self._customs: dict[str, list] = {}
+        self._ids_at: dict[str | None, frozenset[str]] = {}
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
         self._on_the_map: dict[str | None, list[dict]] = {}
         self._trees: dict[str, list] = dict(trees_from.trees) if trees_from else {}
@@ -114,12 +120,32 @@ class LibrarySnapshot:
                                                 self.image_index)
         return self._placements[shape]
 
-    def rows_at(self, key: str | None) -> list[dict] | None:
+    def custom_collections(self, shape: str) -> list:
+        if shape not in self._customs:
+            self._customs[shape] = gallery.build_custom_collections(
+                self.tree(shape), [record for record in self._custom_records
+                                   if shape_covers(shape, record["side"] or LANDSCAPE)])
+        return self._customs[shape]
+
+    def folder(self, key: str | None):
+        base, shape = split_key(key)
+        placed = self.placement(shape).folder(base)
+        if placed is not None:
+            return placed
+        return index_folders(self.custom_collections(shape)).get(base) if shape else None
+
+    def rows_at(self, key: str | None) -> list[dict]:
         base, shape = split_key(key)
         collection = folder_collection(base)
-        if collection is None:
-            return None
-        return self.in_collection(collection.which, shape, collection.folder)
+        if collection is not None:
+            return self.in_collection(collection.which, shape, collection.folder)
+        folder = self.folder(key)
+        return gallery.rows_under(folder) if folder is not None else []
+
+    def ids_at(self, key: str | None) -> frozenset[str]:
+        if key not in self._ids_at:
+            self._ids_at[key] = frozenset(row["prompt_id"] for row in self.rows_at(key))
+        return self._ids_at[key]
 
     def in_collection(self, which: str, shape: str | None, folder: str) -> list[dict]:
         placement = self.placement(shape)

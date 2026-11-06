@@ -117,8 +117,6 @@ class SlideshowHost(Protocol):
 
     def shape_in_view(self) -> str: ...
 
-    def group_for_key(self, key: str): ...
-
     def row_for(self, prompt_id: str) -> dict | None: ...
 
     def image_config_index(self) -> dict: ...
@@ -167,21 +165,6 @@ class HeldSlideshow:
     order_label: str
     state: SlideshowState
     filters: SlideshowFilters
-
-
-class _KeptPerModel:
-    def __init__(self, stamp_of):
-        self._stamp_of = stamp_of
-        self._stamp = None
-        self._kept: dict = {}
-
-    def get(self, key, work_out):
-        stamp = self._stamp_of()
-        if stamp != self._stamp:
-            self._stamp, self._kept = stamp, {}
-        if key not in self._kept:
-            self._kept[key] = work_out()
-        return self._kept[key]
 
 
 def _still_up(slideshow):
@@ -262,7 +245,7 @@ class SlideshowDirector:
         self._volume_left_at: VolumeHud | None = None
         self._db = sources.db
         self._names = sources.names
-        gallery_pane = self._gallery_pane = sources.gallery_pane
+        self._gallery_pane = sources.gallery_pane
         self._jobs = sources.jobs
         self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
@@ -289,7 +272,6 @@ class SlideshowDirector:
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
-        self._held_at = _KeptPerModel(gallery_pane.model_stamp)
         self._library = sources.library
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
@@ -692,12 +674,8 @@ class SlideshowDirector:
     def rows_at(self, location) -> list[dict]:
         if not location:
             return []
-        rows = self._gallery_pane.rows_for_collection(location)
-        if rows is None:
-            group = self._host.group_for_key(location)
-            rows = gallery.rows_under(group) if group is not None else []
         return self._one_per_run_where_the_order_is_newest_first(
-            location, what_plays_at(location, rows))
+            location, what_plays_at(location, self._library().rows_at(location)))
 
     def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
         collection = folder_collection(_split_collection_key(location)[0])
@@ -1067,13 +1045,9 @@ class SlideshowDirector:
         row = self._db.get_generation(prompt_id)
         if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             return False
-        held = (self._held_at_location(location) if location
+        held = (self._library().ids_at(location) if location
                 else {r["prompt_id"] for r in self._host.rows_to_play()})
         return prompt_id in held or self._latest_would_take(row, location)
-
-    def _held_at_location(self, location) -> frozenset[str]:
-        return self._held_at.get(location, lambda: frozenset(
-            r["prompt_id"] for r in self.rows_at(location)))
 
     def _latest_would_take(self, row: dict, location) -> bool:
         base, shape = _split_collection_key(location)
@@ -1238,9 +1212,7 @@ class SlideshowDirector:
     def _favorite_prompt_ids(self) -> set[str]:
         marked = set(self._library().favorite_ids)
         for shape in _SHAPES:
-            key = shaped_key(_FAVORITES_KEY, shape)
-            marked.update(row["prompt_id"]
-                          for row in (self._gallery_pane.rows_for_collection(key) or ()))
+            marked.update(self._library().ids_at(shaped_key(_FAVORITES_KEY, shape)))
         return marked
 
     def _enhanced_ids_of(self, rows) -> set[str]:

@@ -61,7 +61,7 @@ from origenerator.gui.pane_place import (
     stand_at,
 )
 from origenerator.gui.picking import Picking
-from origenerator.item_shape import base_of, filter_rows, key_holds
+from origenerator.item_shape import base_of, filter_rows, key_holds, split_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
 
@@ -317,15 +317,10 @@ class GalleryPane(QObject):
         self._showing_search = False
         self._collection_shape: str | None = None
         self._collection_folder = gallery.ALL_KEY
-        self._models_taken = 0
         scroll.verticalScrollBar().valueChanged.connect(self.follow_the_scroll)
         scroll.verticalScrollBar().rangeChanged.connect(self.follow_the_scroll)
 
-    def model_stamp(self) -> int:
-        return self._models_taken
-
     def set_model(self, model: LibrarySnapshot):
-        self._models_taken += 1
         self._model = model
 
     def _open_collection_rows(self, collection: str) -> list[dict]:
@@ -793,7 +788,11 @@ class GalleryPane(QObject):
         return self.rows_for_collection(self._tree.selected_folder_key())
 
     def rows_for_collection(self, key: str | None) -> list[dict] | None:
-        return self._model.rows_at(key)
+        base, shape = split_key(key)
+        collection = folder_collection(base)
+        if collection is None:
+            return None
+        return self._model.in_collection(collection.which, shape, collection.folder)
 
     def show_thumbnails(self, group):
         container, flow = self._fresh_tile_pane()

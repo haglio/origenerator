@@ -159,8 +159,14 @@ def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, 
         return (image.get("workflow_name"), gallery.settings_folder_key(image, image_index),
                 animations.label_of(row))
 
+    def the_video_a_hidden_frame_came_from(row: dict) -> bool:
+        image = animations.image_of(row)
+        return (not by_seed_family and image is not None
+                and source_of(image) == GenerationSource.STARTING_FRAME)
+
     key_of = by_its_seed_family if by_seed_family else by_its_image
-    return {row["prompt_id"]: key_of(row) for row in rows if made_here(row)}
+    return {row["prompt_id"]: key_of(row) for row in rows
+            if made_here(row) or the_video_a_hidden_frame_came_from(row)}
 
 
 def beyond_the_row(current: dict, rows, *, image_index, additions: int = WIDEN_ADDITIONS,

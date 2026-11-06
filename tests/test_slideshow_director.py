@@ -2880,6 +2880,37 @@ def test_a_slideshow_groups_what_it_made_by_its_image_and_another_sites_videos_b
     assert groups["o1"] == groups["o2"] != groups["g1"]
 
 
+def _hidden_frame(prompt_id: str) -> dict:
+    return {**_fox(prompt_id, seed=1), "source": GenerationSource.STARTING_FRAME}
+
+
+def test_videos_made_from_one_hidden_starting_frame_are_one_group_in_the_list(
+        slideshows, tmp_path):
+    rows = [_hidden_frame("h1"), _hidden_frame("h2"),
+            _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="h1.png", action="beta", tmp_path=tmp_path),
+            _animation("v3", frame="h2.png", action="alpha", tmp_path=tmp_path)]
+    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords())
+
+    groups = _groups_of(_group_of_on_the_portrait_side(director, made))
+
+    assert groups["v1"] == groups["v2"] != groups["v3"]
+
+
+def test_a_video_made_here_from_another_sites_videos_starting_frame_is_in_that_videos_group(
+        slideshows, tmp_path):
+    rows = [_hidden_frame("h1"), _hidden_frame("h2"),
+            _a_sites(_animation("o1", frame="h1.png", action="alpha", tmp_path=tmp_path)),
+            _animation("v1", frame="h1.png", action="beta", tmp_path=tmp_path),
+            _a_sites(_animation("o2", frame="h2.png", action="alpha", tmp_path=tmp_path))]
+    filed = {"o1.mp4": "t2v|one", "o2.mp4": "t2v|two"}
+    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords(filed))
+
+    groups = _groups_of(_group_of_on_the_portrait_side(director, made))
+
+    assert groups["o1"] == groups["v1"] != groups["o2"]
+
+
 def _another_sites_videos_on_file(slideshows, tmp_path, loops):
     rows = [_a_sites(_animation("o1", frame="h1.png", action="alpha", tmp_path=tmp_path)),
             _a_sites(_animation("o2", frame="h1.png", action="beta", tmp_path=tmp_path)),
@@ -2943,6 +2974,20 @@ def test_what_was_made_here_from_another_sites_video_stays_on_its_map_beside_its
     assert [slide.prompt_id for slide in around.group] == ["o2", "v1"]
     assert [(row.label, row.slide.prompt_id) for row in around.column] == [
         ("beta", "o2"), ("gamma", "v1")]
+
+
+def test_a_video_with_no_action_has_its_row_in_the_column_of_another_sites_video(
+        slideshows, tmp_path):
+    rows = [_a_sites(_animation("o1", frame="h1.png", action="alpha", tmp_path=tmp_path)),
+            _a_sites(_animation("o2", frame="h1.png", action="", tmp_path=tmp_path))]
+    records = FakeRecords(loops={"o1.mp4": FiledLoops(actions=("o2.mp4",))})
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=records)
+    director.items_of = lambda rows: [
+        (f"{row['prompt_id']}.mp4", "video", row["prompt_id"], None) for row in rows]
+
+    around = director.neighbors_of("o1", shape="portrait")
+
+    assert [(row.label, row.slide.prompt_id) for row in around.column] == [("", "o2")]
 
 
 def test_an_image_another_site_made_keeps_the_map_the_gallery_gives_it(slideshows, tmp_path):

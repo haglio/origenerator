@@ -4,26 +4,49 @@ import json
 import logging
 from collections import deque
 from pathlib import Path
+from typing import NamedTuple
 
 from origenerator import gallery
 from origenerator.action_labels import Labels, labels_of
+from origenerator.gallery.source_image import (
+    image_labels_row,
+    inherits_image_labels,
+    start_images_among,
+)
 from origenerator.generation_state import GenerationStatus, in_sight
+from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
 
 
-def _waits(row: dict, side: str) -> bool:
+class Waiting(NamedTuple):
+    holder: dict
+    shown: dict
+
+
+def _finished(row: dict, kind: str) -> bool:
     return (row.get("status") == GenerationStatus.COMPLETED
             and in_sight(row)
-            and not labels_of(row, side).actions
             and gallery.produced_output(row)
-            and gallery.media_type_of_row(row) == side
+            and gallery.media_type_of_row(row) == kind
             and not gallery.is_enhance_product_row(row))
 
 
-def waiting(rows: list[dict], side: str) -> list[dict]:
-    return sorted((row for row in rows if _waits(row, side)), reverse=True,
-                  key=lambda row: (bool(row.get("starred")), row.get("created_at") or ""))
+def _its_own_image_labels(rows: list[dict]) -> list[Waiting]:
+    start_image_of = start_images_among(
+        [row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE])
+    return [Waiting(image_labels_row(video, start), video) for video in rows
+            if _finished(video, MediaType.VIDEO)
+            and not inherits_image_labels(video, start := start_image_of(video))]
+
+
+def waiting(rows: list[dict], side: str) -> list[Waiting]:
+    found = [Waiting(row, row) for row in rows if _finished(row, side)]
+    if side == MediaType.IMAGE:
+        found += _its_own_image_labels(rows)
+    return sorted((entry for entry in found if not labels_of(entry.holder, side).actions),
+                  reverse=True, key=lambda entry: (bool(entry.shown.get("starred")),
+                                                   entry.shown.get("created_at") or ""))
 
 
 class SetterSession:
@@ -31,7 +54,7 @@ class SetterSession:
         self._line = deque(items)
         self._store = store
         self._side = side
-        self._set: list[tuple[dict, str, Labels]] = []
+        self._set: list[tuple[dict, str, Labels, bool]] = []
 
     @property
     def side(self) -> str:
@@ -47,18 +70,25 @@ class SetterSession:
 
     @property
     def last(self) -> tuple[str, Labels] | None:
-        return self._set[-1][1:] if self._set else None
+        return self._set[-1][1:3] if self._set else None
 
     @property
     def can_undo(self) -> bool:
         return bool(self._set)
 
-    def set_as(self, said: str, labels: Labels) -> None:
+    def set_as(self, said: str, labels: Labels, *, image_checked: tuple[str, ...] | None = None
+               ) -> None:
         if not self._line:
             return
         item = self._line.popleft()
         self._store.set_labels(item["prompt_id"], self._side, labels)
-        self._set.append((item, said, labels))
+        image = item.get("image")
+        its_own = image is not None and not image["inherited"] and image_checked is not None
+        if its_own:
+            had = image["labels"] or Labels()
+            self._store.set_labels(image["prompt_id"], MediaType.IMAGE,
+                                   Labels(had.actions, image_checked))
+        self._set.append((item, said, labels, its_own))
 
     def skip(self) -> None:
         self._line.rotate(-1)
@@ -66,8 +96,11 @@ class SetterSession:
     def undo(self) -> None:
         if not self._set:
             return
-        item, _said, _labels = self._set.pop()
+        item, _said, _labels, its_own = self._set.pop()
         self._store.set_labels(item["prompt_id"], self._side, item.get("labels"))
+        if its_own:
+            self._store.set_labels(item["image"]["prompt_id"], MediaType.IMAGE,
+                                   item["image"]["labels"])
         self._line.appendleft(item)
 
 

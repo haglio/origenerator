@@ -186,12 +186,29 @@ def test_a_video_made_from_an_image_shows_that_images_part_grayed_beside_its_own
             _box(action, MediaType.VIDEO, "third box").isChecked()) == ("delta", False, True)
 
 
-def test_a_video_made_from_no_image_shows_its_own_image_part_and_leaves_its_setting_open(action):
+def test_a_video_made_from_no_image_shows_its_own_image_part_live(action):
     action.show_row(_video(image=Labels(("alpha",))))
 
     image_part = _setter(action, MediaType.IMAGE).parentWidget()
     assert (_listed(action, MediaType.IMAGE), image_part.isEnabled(),
-            _setter(action, MediaType.IMAGE).isHidden()) == ("alpha", True, True)
+            _setter(action, MediaType.IMAGE).isHidden()) == ("alpha", True, False)
+
+
+def test_its_image_button_opens_the_setter_tool_for_images_on_the_video(action, opened):
+    action.show_row(_video("vid-seven"))
+
+    _setter(action, MediaType.IMAGE).click()
+
+    assert opened == [(MediaType.IMAGE, "vid-seven")]
+
+
+def test_a_video_brought_in_shows_the_image_part_of_the_frame_taken_from_it(action, opened):
+    frame = _row("frame", source=GenerationSource.STARTING_FRAME, image=Labels(("beta",)))
+
+    action.show_row(_video("theirs", source=GenerationSource.OUTSIDE), frame)
+    _setter(action, MediaType.IMAGE).click()
+
+    assert (_listed(action, MediaType.IMAGE), opened) == ("beta", [(MediaType.IMAGE, "frame")])
 
 
 def test_a_videos_button_opens_the_setter_tool_for_videos(action, opened):

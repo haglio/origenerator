@@ -211,10 +211,14 @@ def test_a_hidden_starting_frame_is_not_on_latest(tmp_path):
         GenerationSource.OUTSIDE]
 
 
-def test_a_hidden_starting_frame_never_waits_for_its_actions(tmp_path):
+def test_a_hidden_starting_frame_waits_for_its_actions_only_as_the_video_it_was_taken_from(
+        tmp_path):
     db, _video = _bring_in(tmp_path, Record())
 
-    assert waiting(db.list_generations(), MediaType.IMAGE) == []
+    [entry] = waiting(db.list_generations(), MediaType.IMAGE)
+
+    assert (entry.holder["source"], entry.shown["source"]) == (
+        GenerationSource.STARTING_FRAME, GenerationSource.OUTSIDE)
 
 
 def test_a_video_made_from_an_image_shows_its_frame_as_that_image(tmp_path):

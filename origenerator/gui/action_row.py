@@ -64,9 +64,8 @@ class _Side(QWidget):
     def shows(self, prompt_id: str) -> bool:
         return bool(prompt_id) and prompt_id == self._prompt_id
 
-    def show_labels(self, prompt_id: str, labels: Labels, *, opens: bool = True) -> None:
+    def show_labels(self, prompt_id: str, labels: Labels) -> None:
         self._prompt_id = prompt_id
-        self._setter.setVisible(opens)
         self.relabel(labels)
 
     def relabel(self, labels: Labels) -> None:
@@ -117,8 +116,7 @@ class ActionRow(QWidget):
         else:
             holder = image_labels_row(row, start_image)
             inherited = inherits_image_labels(row, start_image)
-            image.show_labels(holder["prompt_id"], labels_of(holder, MediaType.IMAGE),
-                              opens=inherited)
+            image.show_labels(holder["prompt_id"], labels_of(holder, MediaType.IMAGE))
             image.setEnabled(not inherited)
             video.show_labels(row["prompt_id"], labels_of(row, MediaType.VIDEO))
             video.show()

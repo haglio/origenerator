@@ -5,6 +5,7 @@ import json
 from origenerator.action_labels import Labels, stored
 from origenerator.action_setter import Locks, SetterSession, waiting
 from origenerator.gallery.enhance import enhance_file_stem
+from origenerator.generation_state import GenerationSource
 from origenerator.media import MediaType
 
 _SET = Labels(("alpha", "beta"), ("first box",))
@@ -20,6 +21,41 @@ class _Store:
 
 def _items(*prompt_ids, before=None):
     return [{"prompt_id": prompt_id, "labels": before} for prompt_id in prompt_ids]
+
+
+def _a_video(*, inherited, before=None):
+    return [{"prompt_id": "video", "labels": None,
+             "image": {"prompt_id": "frame", "labels": before, "inherited": inherited}}]
+
+
+def test_a_press_on_a_video_saves_its_image_checkboxes_on_the_image_it_holds_its_own():
+    store = _Store()
+    session = SetterSession(_a_video(inherited=False, before=Labels(("gamma",))), store,
+                            MediaType.VIDEO)
+
+    session.set_as("two", _SET, image_checked=("second box",))
+
+    assert store.labels == {"video": (MediaType.VIDEO, _SET),
+                            "frame": (MediaType.IMAGE, Labels(("gamma",), ("second box",)))}
+
+
+def test_a_press_on_a_video_leaves_an_image_it_takes_its_image_labels_from_alone():
+    store = _Store()
+    session = SetterSession(_a_video(inherited=True), store, MediaType.VIDEO)
+
+    session.set_as("two", _SET, image_checked=("second box",))
+
+    assert store.labels == {"video": (MediaType.VIDEO, _SET)}
+
+
+def test_undo_puts_the_image_part_back_as_well():
+    store = _Store()
+    session = SetterSession(_a_video(inherited=False), store, MediaType.VIDEO)
+    session.set_as("two", _SET, image_checked=("second box",))
+
+    session.undo()
+
+    assert store.labels == {"video": (MediaType.VIDEO, None), "frame": (MediaType.IMAGE, None)}
 
 
 def test_a_press_saves_its_labels_on_the_item_on_screen_and_the_next_one_comes_up():
@@ -126,8 +162,8 @@ def _row(prompt_id, filename, *, created="2026-01-01 00:00:00", labels=None, **e
     }
 
 
-def _ids(rows):
-    return [row["prompt_id"] for row in rows]
+def _ids(waiting_now):
+    return [entry.holder["prompt_id"] for entry in waiting_now]
 
 
 def test_only_finished_images_with_no_actions_yet_wait_for_their_actions():
@@ -135,11 +171,38 @@ def test_only_finished_images_with_no_actions_yet_wait_for_their_actions():
         _row("image", "scene_00001_.png"),
         _row("labeled", "scene_00002_.png", labels=Labels(("alpha",))),
         _row("checked only", "scene_00005_.png", labels=Labels((), ("first box",))),
-        _row("video", "scene_00003_.mp4"),
         _row("no-file", None),
     ]
 
     assert _ids(waiting(rows, MediaType.IMAGE)) == ["image", "checked only"]
+
+
+def test_a_video_made_from_no_image_waits_among_the_images_as_itself():
+    rows = [_row("made from words", "words_00001_.mp4"),
+            _row("labeled", "words_00002_.mp4", labels=Labels(("alpha",)))]
+
+    [entry] = waiting(rows, MediaType.IMAGE)
+
+    assert (entry.holder["prompt_id"], entry.shown["prompt_id"]) == (
+        "made from words", "made from words")
+
+
+def test_a_video_made_from_an_image_leaves_its_image_actions_to_that_image():
+    rows = [_row("image", "scene_00001_.png", labels=Labels(("alpha",))),
+            _row("video", "video_00001_.mp4", params_json=json.dumps(
+                {"input_image": "scene_00001_.png"}))]
+
+    assert _ids(waiting(rows, MediaType.IMAGE)) == []
+
+
+def test_a_video_brought_in_waits_among_the_images_to_be_saved_on_the_frame_taken_from_it():
+    frame = _row("frame", "frame_00001_.png", source=GenerationSource.STARTING_FRAME)
+    video = _row("theirs", "theirs_00001_.mp4", source=GenerationSource.OUTSIDE,
+                 params_json=json.dumps({"input_image": "frame_00001_.png"}))
+
+    [entry] = waiting([frame, video], MediaType.IMAGE)
+
+    assert (entry.holder["prompt_id"], entry.shown["prompt_id"]) == ("frame", "theirs")
 
 
 def test_only_finished_videos_with_no_actions_yet_wait_for_their_actions():

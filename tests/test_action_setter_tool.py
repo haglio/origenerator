@@ -96,3 +96,36 @@ def test_each_item_in_line_carries_the_labels_it_has_now_and_one_never_labeled_c
 
     assert {item["prompt_id"]: item["labels"] for item in waiting} == {
         "gen-one": None, "gen-two": Labels((), ("first box",))}
+
+
+def _a_finished_video(db, prompt_id: str, *, made_from: str | None = None) -> None:
+    params = {"positive_prompt": "a red kite flies", "noise_seed": 3}
+    if made_from:
+        params["input_image"] = f"{made_from}.png"
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_i2v",
+                         workflow_version="v1", workflow_json="{}",
+                         params_json=json.dumps(params)))
+    db.update_generation(prompt_id, status="completed", thumbnail_path=f"{prompt_id}_thumb.jpg",
+                         output_files=json.dumps([{"filename": f"{prompt_id}.mp4",
+                                                   "subfolder": ""}]))
+
+
+def test_a_video_in_line_carries_the_image_part_it_takes_from_its_image(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_image(db, "img", 1)
+    db.set_labels("img", MediaType.IMAGE, Labels(("alpha",), ("first box",)))
+    _a_finished_video(db, "vid", made_from="img")
+
+    [item] = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO)
+
+    assert item["image"] == {"prompt_id": "img", "labels": Labels(("alpha",), ("first box",)),
+                             "inherited": True}
+
+
+def test_a_video_made_from_no_image_waits_among_the_images_shown_by_its_first_frame(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_video(db, "vid")
+
+    [item] = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.IMAGE)
+
+    assert (item["prompt_id"], item["path"]) == ("vid", "vid_thumb.jpg")

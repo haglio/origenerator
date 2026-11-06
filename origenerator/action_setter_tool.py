@@ -18,21 +18,56 @@ def _shown_from(row: dict, places, side: str):
     return row.get("thumbnail_path") if side == MediaType.IMAGE else None
 
 
-def waiting_items(db, places, side: str, first: str = "") -> list[dict]:
+def _labels_now(row: dict, side: str):
     from origenerator.action_labels import is_labeled, labels_of
+
+    return labels_of(row, side) if is_labeled(row, side) else None
+
+
+def _image_part(video: dict, start_image_of) -> dict:
+    from origenerator.gallery.source_image import image_labels_row, inherits_image_labels
+
+    start = start_image_of(video)
+    holder = image_labels_row(video, start)
+    return {"prompt_id": holder["prompt_id"], "labels": _labels_now(holder, MediaType.IMAGE),
+            "inherited": inherits_image_labels(video, start)}
+
+
+def _opened_on(first: str, rows: list[dict], line: list):
+    from origenerator.action_setter import Waiting
+
+    if not first:
+        return None
+    found = next((entry for entry in line if entry.holder["prompt_id"] == first), None)
+    if found is not None:
+        return found
+    row = next((row for row in rows if row["prompt_id"] == first), None)
+    return Waiting(row, row) if row is not None else None
+
+
+def waiting_items(db, places, side: str, first: str = "") -> list[dict]:
     from origenerator.action_setter import waiting
+    from origenerator.gallery import media_type_of_row
+    from origenerator.gallery.source_image import start_images_among
     from origenerator.item_names import ItemNames
 
     rows = db.list_generations()
-    line = [row for row in waiting(rows, side) if row["prompt_id"] != first]
-    opened_on = next((row for row in rows if row["prompt_id"] == first), None) if first else None
+    line = waiting(rows, side)
+    opened_on = _opened_on(first, rows, line)
     if opened_on is not None:
-        line.insert(0, opened_on)
+        line = [opened_on, *(entry for entry in line if entry.holder["prompt_id"] != first)]
     names = ItemNames.from_library(db)
-    return [{"prompt_id": row["prompt_id"], "name": names.of(row["prompt_id"]),
-             "path": _shown_from(row, places, side),
-             "labels": labels_of(row, side) if is_labeled(row, side) else None}
-            for row in line]
+    start_image_of = start_images_among(
+        [row for row in rows if media_type_of_row(row) == MediaType.IMAGE])
+    items = []
+    for entry in line:
+        item = {"prompt_id": entry.holder["prompt_id"], "name": names.of(entry.shown["prompt_id"]),
+                "path": _shown_from(entry.holder, places, side),
+                "labels": _labels_now(entry.holder, side)}
+        if side == MediaType.VIDEO:
+            item["image"] = _image_part(entry.holder, start_image_of)
+        items.append(item)
+    return items
 
 
 class AnswersTold:
@@ -65,8 +100,10 @@ def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_
     named = vocabulary(side)
     drawings = {name: str(drawn) for name in named.buttons
                 if (drawn := drawing_for(named.drawing_name(name))) is not None}
+    image_checkboxes = vocabulary(MediaType.IMAGE).checkboxes if side == MediaType.VIDEO else ()
     return ActionSetterWindow(SetterSession(waiting, AnswersTold(db, heard), side),
-                              named, drawings, Locks(STATE_DIR / LOCKS_FILE))
+                              named, drawings, Locks(STATE_DIR / LOCKS_FILE),
+                              image_checkboxes=image_checkboxes)
 
 
 def main() -> int:

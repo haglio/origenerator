@@ -19,10 +19,9 @@ _MAKES_A_SOUND_OUTPUT_THEN_ENDS = textwrap.dedent("""
 """)
 
 _SAYS_AND_LOGS_SOMETHING_THEN_HANGS = textwrap.dedent("""
-    import sys, time
+    import faulthandler, sys, time
     from pathlib import Path
-    from tests.children import say_where_it_hangs
-    say_where_it_hangs(after_s=1)
+    faulthandler.dump_traceback_later(1)
     print("the line it said", flush=True)
     Path(sys.argv[1]).write_text("the line it logged\\n", encoding="utf-8")
 

@@ -19,6 +19,7 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
+from origenerator.output_files import produced_output
 from origenerator.voice.dictation import words_of
 
 
@@ -121,7 +122,8 @@ class RelatedMedia(QWidget):
 
     def show_row(self, row: dict, image_rows: list[dict]) -> None:
         start_image_of = start_images_among([*image_rows, *self._held_of_kind(MediaType.IMAGE)])
-        videos = [*self._video_rows(), *self._held_of_kind(MediaType.VIDEO)]
+        videos = [video for video in (*self._video_rows(), *self._held_of_kind(MediaType.VIDEO))
+                  if produced_output(video)]
         self._show_source_tile(row, start_image_of, videos)
         self._show_source_video_tile(row)
         self._source_section.setVisible(

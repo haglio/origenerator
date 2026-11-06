@@ -101,6 +101,10 @@ def enhance_icon() -> QIcon:
     return qt_icon("plus", color=YELLOW, size=_SIZE)
 
 
+def question_icon() -> QIcon:
+    return qt_icon("question", size=_SIZE)
+
+
 def power_icon() -> QIcon:
     return qt_icon("power", size=_SIZE)
 

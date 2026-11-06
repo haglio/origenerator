@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.colors import BG_PRIMARY
 from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.palette import BLUE, YELLOW, as_hex
+from shared_ui.reference import REFERENCE_WINDOW_TITLE
 from shared_ui.spacing import (
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
@@ -20,6 +21,7 @@ from origenerator.config import RADIO_STATIONS
 from origenerator.gui import icons, omnipause
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_tip import LinkTip, link
+from origenerator.gui.reference_window import ReferenceWindow
 
 
 def _lit(color: str) -> str:
@@ -142,6 +144,7 @@ class GalleryPaneButtons(QWidget):
         self.mic = None
         self.play_pause = None
         self.power = None
+        self.reference = None
         if not hosted:
             self.power = _tool_button(icons.power_icon(), "Quit", handlers.quit)
             self.play_pause = _tool_button(icons.pause_icon(), "", handlers.pause_or_play,
@@ -149,6 +152,12 @@ class GalleryPaneButtons(QWidget):
             self.play_pause.setCheckable(True)
             self.play_pause.setStyleSheet(_LIT)
             omnipause.holds(self.play_pause)
+            self.reference = QToolButton()
+            self.reference.setIcon(icons.question_icon())
+            self.reference.setToolTip(REFERENCE_WINDOW_TITLE)
+            self.reference.setCheckable(True)
+            self.reference.setStyleSheet(_LIT)
+            ReferenceWindow(self.reference)
             self.radio = _tool_button(
                 icons.radio_icon(),
                 f"Origenerator Radio: play {RADIO_STATIONS} library videos at once, "
@@ -173,7 +182,7 @@ class GalleryPaneButtons(QWidget):
             (self.group,),
             (self.favorite, self.enhance, self.delete),
             (self.slideshow, self.auto, self.radio),
-            (self.power, self.play_pause, self.mic),
+            (self.power, self.play_pause, self.reference, self.mic),
         ):
             buttons = tuple(b for b in listed if b is not None)
             gap = _group_gap()
@@ -196,13 +205,13 @@ class GalleryPaneButtons(QWidget):
 
     def become_hosted(self) -> None:
         self._draw_at_the_huds_scale(hosted=True)
-        self._room_switches = (self.radio, self.mic, self.play_pause, self.power)
+        self._room_switches = (self.radio, self.mic, self.play_pause, self.power, self.reference)
         self._show_the_room_switches(False)
-        self.radio = self.mic = self.play_pause = self.power = None
+        self.radio = self.mic = self.play_pause = self.power = self.reference = None
 
     def become_standalone(self) -> None:
         self._draw_at_the_huds_scale(hosted=False)
-        self.radio, self.mic, self.play_pause, self.power = self._room_switches
+        self.radio, self.mic, self.play_pause, self.power, self.reference = self._room_switches
         self._show_the_room_switches(True)
 
     def turn_the_radio_on(self) -> None:

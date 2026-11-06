@@ -45,3 +45,8 @@ def match_slideshow_command(text: str) -> SlideshowCommand | None:
 
 def slideshow_command_phrases() -> frozenset[str]:
     return frozenset(f"{verb} {name}" for verb in _VERBS for name in ("slideshow", "slide show"))
+
+
+def said_to_the_slideshow(*commands: SlideshowCommand) -> tuple[str, ...]:
+    return tuple(f"{verb} slideshow" for command in commands
+                 for verb, meant in _VERBS.items() if meant is command)

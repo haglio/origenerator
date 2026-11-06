@@ -947,7 +947,8 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[3] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
     assert view._buttons.auto in groups[4]
     assert view._buttons.radio in groups[4]
-    assert groups[5] == (view._buttons.power, view._buttons.play_pause, view._buttons.mic)
+    assert groups[5] == (view._buttons.power, view._buttons.play_pause, view._buttons.reference,
+                         view._buttons.mic)
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):

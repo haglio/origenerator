@@ -77,6 +77,7 @@ NO_SETTING = {
      " could run unnoticed"): lambda view: [view._buttons.auto],
     "the pause Esc and play/pause share, which a restart leaves playing":
         lambda view: [view._buttons.play_pause],
+    "the reference, a window opened to look something up": lambda view: [view._buttons.reference],
 }
 
 OSR2_CONTROLS_PRESSES_REMEMBERED_AS = {

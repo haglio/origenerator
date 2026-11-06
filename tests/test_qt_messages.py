@@ -46,6 +46,21 @@ def test_what_qt_says_lands_in_the_apps_log(caplog):
 
 
 @pytest.mark.no_qt_log
+def test_qts_note_on_taking_its_own_video_player_apart_is_logged_for_debugging(caplog):
+    previous = install_qt_message_logging()
+    try:
+        with caplog.at_level(logging.DEBUG, logger="qt"):
+            qWarning("QObject::disconnect: wildcard call disconnects from destroyed signal"
+                     " of QFFmpeg::Demuxer::unnamed")
+    finally:
+        qInstallMessageHandler(previous)
+
+    assert [(r.levelno, r.getMessage()) for r in caplog.records if r.name == "qt"] == [
+        (logging.DEBUG, "QObject::disconnect: wildcard call disconnects from destroyed signal"
+                        " of QFFmpeg::Demuxer::unnamed")]
+
+
+@pytest.mark.no_qt_log
 def test_a_new_install_never_reports_a_run_an_earlier_one_was_counting(caplog):
     before = install_qt_message_logging()
     try:

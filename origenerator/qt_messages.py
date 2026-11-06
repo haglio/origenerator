@@ -15,6 +15,14 @@ _LEVELS = {
 
 logger = logging.getLogger("qt")
 
+_VIDEO_PLAYER_TAKEN_APART = "wildcard call disconnects from destroyed signal of QFFmpeg::"
+
+
+def _level_of(kind, message: str) -> int:
+    if _VIDEO_PLAYER_TAKEN_APART in message:
+        return logging.DEBUG
+    return _LEVELS.get(kind, logging.WARNING)
+
 
 _FIRST_ROUND_NUMBER = 10
 
@@ -51,6 +59,6 @@ def install_qt_message_logging():
     collapse = RepeatCollapser(lambda level, message: logger.log(level, "%s", message))
 
     def log_qt_message(kind, _context, message: str) -> None:
-        collapse(_LEVELS.get(kind, logging.WARNING), message)
+        collapse(_level_of(kind, message), message)
 
     return qInstallMessageHandler(log_qt_message)

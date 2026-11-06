@@ -5,6 +5,8 @@ import inspect
 import os
 
 import pytest
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QWidget
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
@@ -115,6 +117,23 @@ def test_a_running_app_is_redrawn_at_a_new_scale_and_back(qapp):
     assert window.devicePixelRatio() == 1.0
     assert ui_scale.active_scale() == 1.0
     window.close()
+
+
+def test_icons_drawn_after_the_scale_comes_back_down_are_drawn_unscaled(qapp):
+    try:
+        ui_scale.draw_at(1.25)
+        assert _an_icon_drawn_at(QSize(20, 20)).size() == QSize(25, 25)
+        ui_scale.draw_at(1.0)
+
+        assert _an_icon_drawn_at(QSize(20, 20)).size() == QSize(20, 20)
+    finally:
+        ui_scale.draw_at(1.0)
+
+
+def _an_icon_drawn_at(size: QSize) -> QPixmap:
+    canvas = QPixmap(64, 64)
+    canvas.fill(Qt.GlobalColor.red)
+    return QIcon(canvas).pixmap(size)
 
 
 def test_a_qt_that_cannot_be_rescaled_leaves_the_app_at_its_size(monkeypatch):

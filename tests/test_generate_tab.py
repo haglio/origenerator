@@ -40,7 +40,15 @@ from shared_ui.spacing import GAP_MEDIUM
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.model_dropdowns as model_dropdowns_module
-from origenerator import config, evolver_export, gallery, look_training, osr2_driver, prompt_edit
+from origenerator import (
+    config,
+    evolver_export,
+    gallery,
+    library_views,
+    look_training,
+    osr2_driver,
+    prompt_edit,
+)
 from origenerator import export_lane as export_lane_module
 from origenerator.action_settings import CATEGORIES
 from origenerator.box_breaks import BOX_BREAK
@@ -1785,7 +1793,7 @@ def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
     monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
-    monkeypatch.setattr(generate_tab_module, "EVOLVER_UPSCALED_DIR", library)
+    monkeypatch.setattr(library_views, "EVOLVER_UPSCALED_DIR", library)
     return _video_row(db, prompt_id), upscale
 
 

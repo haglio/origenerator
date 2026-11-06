@@ -4,8 +4,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from types import MappingProxyType
+from typing import NamedTuple
 
-from origenerator import gallery, trash_collection
+from origenerator import gallery, points_of_interest, trash_collection
+from origenerator.config import EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR, OUTPUT_PLACES
+from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -20,6 +23,8 @@ from origenerator.gallery.shapes import LANDSCAPE, shape_covers
 from origenerator.generation_state import on_the_map
 from origenerator.item_shape import filter_rows, split_key
 from origenerator.media import MediaType
+from origenerator.one_look import one_look
+from origenerator.workflows.detail_parts import parts_framed_together
 
 
 @dataclass(frozen=True)
@@ -47,6 +52,8 @@ class LibrarySnapshot:
         self._custom_records = custom_collections
         self._customs: dict[str, list] = {}
         self._ids_at: dict[str | None, frozenset[str]] = {}
+        self._slides: dict[tuple, tuple | None] = {}
+        self._versions: dict[tuple, tuple | None] = {}
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
         self._on_the_map: dict[str | None, list[dict]] = {}
         self._trees: dict[str, list] = dict(trees_from.trees) if trees_from else {}
@@ -142,6 +149,50 @@ class LibrarySnapshot:
         folder = self.folder(key)
         return gallery.rows_under(folder) if folder is not None else []
 
+    @cached_property
+    def upscales(self) -> EvolverUpscales:
+        return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
+
+    def slides_of(self, rows) -> list[tuple]:
+        with one_look():
+            slides = [self._once(self._slides, row, self._slide_of) for row in rows]
+        return [slide for slide in slides if slide is not None]
+
+    def versions_of(self, rows) -> dict[str, list]:
+        with one_look():
+            playlists = [self._once(self._versions, row, self._versions_of_one) for row in rows]
+        return dict(playlist for playlist in playlists if playlist is not None)
+
+    @staticmethod
+    def _once(kept: dict, row: dict, work_out):
+        key = (row["prompt_id"], row.get("output_files"), row.get("thumbnail_path"))
+        if key not in kept:
+            kept[key] = work_out(row)
+        return kept[key]
+
+    def _slide_of(self, row: dict) -> tuple | None:
+        resolved = gallery.resolve_preview(row, OUTPUT_PLACES)
+        if resolved is None:
+            return None
+        path, media_type = resolved
+        return (self.upscales.upscale_of(path) or path, media_type, row["prompt_id"],
+                row.get("thumbnail_path"))
+
+    def _versions_of_one(self, row: dict) -> tuple | None:
+        media_type = gallery.media_type_of_row(row)
+        resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
+                    if media_type == MediaType.VIDEO else None)
+        upscale = self.upscales.upscale_of(resolved[0]) if resolved is not None else None
+        versions = gallery.displayed_versions(row, upscale)
+        if len(versions) <= 1:
+            return None
+        framed_together = parts_framed_together()
+        entries = [Version(gallery.output_file_path(version.file, OUTPUT_PLACES), media_type,
+                           version.label,
+                           points_of_interest.boxes_of(version.file, framed_together=framed_together))
+                   for version in versions]
+        return str(entries[0].path), entries
+
     def ids_at(self, key: str | None) -> frozenset[str]:
         if key not in self._ids_at:
             self._ids_at[key] = frozenset(row["prompt_id"] for row in self.rows_at(key))
@@ -180,6 +231,13 @@ class LibrarySnapshot:
 
     def _of_kind(self, kind: MediaType) -> list[dict]:
         return [row for row in self.rows if gallery.media_type_of_row(row) == kind]
+
+
+class Version(NamedTuple):
+    path: object
+    media_type: str
+    label: str = ""
+    points_of_interest: tuple = ()
 
 
 def _each_once(rows) -> list[dict]:

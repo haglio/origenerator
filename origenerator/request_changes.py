@@ -37,6 +37,8 @@ _SAYING_NOTHING = frozenset({
     "its", "there", "from", "into", "than", "then", "also", "just", "some", "any", "all",
 })
 _UNREADABLE = "Couldn't read one of the model's changes."
+_NOTHING_ELSE_TO_DO = ("{} was already in the Positive Prompt, and its opposite already in the "
+                       "Negative Prompt, so I couldn't figure out anything else to do.")
 _LEFT_OUT = re.compile(r"(?:no|without)\s+(?:(?:a|an|any|the)\s+)?(\S.*)", re.IGNORECASE)
 _QUOTED = re.compile(r"""["\u201c]([^"\u201d]+)["\u201d]|(?<!\w)'([^']+)'(?!\w)|\bthe word\s+([\w-]+)""",
                      re.IGNORECASE)
@@ -201,6 +203,7 @@ class _Applying:
         self.said: list[str] = []
         self.already_so: list[str] = []
         self.took_out = False
+        self.gave_up = ""
 
     def _say(self, line: str) -> None:
         self.said += [line]
@@ -236,6 +239,14 @@ class _Applying:
         if held:
             return f", and swapped its trigger word {old[0]} for {new[0]} in the Positive Prompt"
         return f", and put its trigger word {new[0]} in the Positive Prompt"
+
+    def tried(self, tried) -> None:
+        if not isinstance(tried, dict):
+            return
+        wanted = _found(self.positive, str(tried.get("positive") or ""))
+        if (wanted and _found(self.negative, str(tried.get("negative") or ""))
+                and self._answers_him(tried, wanted.group(0))):
+            self.gave_up = _NOTHING_ELSE_TO_DO.format(_quoted(wanted.group(0)))
 
     def change(self, change) -> None:
         if not isinstance(change, dict):
@@ -366,14 +377,15 @@ class _Applying:
             words = line.removeprefix(_KEPT_OUT)
             if words == line:
                 lines.append(line)
-            elif not self.took_out and not any(word in shown for word in _naming(words)):
+            elif (not self.took_out and self._names_what_he_asked(words)
+                  and not any(word in shown for word in _naming(words))):
                 lines.append(f"Couldn't find {_quoted(words)} in the Positive Prompt.")
         return lines
 
     def outcome(self) -> Outcome:
         said = self._with_what_was_not_found(self.said or self.already_so)
         return Outcome(self.positive, self.negative, self.changes,
-                       " ".join(dict.fromkeys(said)) or _NOTHING_CHANGED)
+                       " ".join(dict.fromkeys(said)) or self.gave_up or _NOTHING_CHANGED)
 
 
 def apply_changes(answer: dict, pair: tuple[str, str], *, asked: list[str],
@@ -381,4 +393,5 @@ def apply_changes(answer: dict, pair: tuple[str, str], *, asked: list[str],
     applying = _Applying(pair, asked, settings, prompts)
     for change in answer.get("changes") or ():
         applying.change(change)
+    applying.tried(answer.get("tried"))
     return applying.outcome()

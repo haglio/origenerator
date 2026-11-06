@@ -141,3 +141,15 @@ def test_a_word_he_names_is_taught_as_taken_out_alone_with_the_words_around_it_k
     assert "keep the words around it" in rule
     answer = prompt[prompt.index("- \"maybe the word 'vintage'"):].split("\n")[0].split("->")[1]
     assert '"replace": "vintage photo of a lake", "with": "photo of a lake"' in answer
+
+
+def test_more_of_something_already_there_is_taught_as_every_way_tried_before_giving_up():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("When he wants more of something"):].split("\n")[0]
+
+    for way in ("stronger and more exact words", "raise its weight", "to the front of the positive prompt",
+                "its opposite", "to the negative prompt"):
+        assert way in rule
+    assert "every one of these that is not done yet" in rule
+    assert "Only when all of them are already done may you change nothing" in rule
+    assert '"tried"' in rule

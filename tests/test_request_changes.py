@@ -524,3 +524,47 @@ def test_a_replacement_that_only_takes_words_out_takes_out_the_one_he_quoted():
 
     assert outcome.positive == "photo of a woman on a couch, soft light"
     assert outcome.line == 'Removed "vintage" from the Positive Prompt.'
+
+
+_MORE_COUCH = ("a woman on a velvet couch, soft light", "blurry, bare floor")
+_NOTHING_ELSE_TO_DO = ('"a velvet couch" was already in the Positive Prompt, and its opposite already '
+                       "in the Negative Prompt, so I couldn't figure out anything else to do.")
+
+
+def _gave_up(tried, pair=_MORE_COUCH, changes=()):
+    return apply_changes({"changes": list(changes), "tried": tried}, pair,
+                         asked=["I still can't see the couch"], settings=_SIZE)
+
+
+def test_giving_up_says_what_both_prompts_already_had_for_what_he_asked():
+    outcome = _gave_up({"positive": "a velvet couch", "negative": "bare floor", "for": "the couch"})
+
+    assert (outcome.positive, outcome.negative) == _MORE_COUCH
+    assert outcome.line == _NOTHING_ELSE_TO_DO
+
+
+@pytest.mark.parametrize("tried", [
+    {"positive": "a leather couch", "negative": "bare floor", "for": "the couch"},
+    {"positive": "a velvet couch", "negative": "an empty room", "for": "the couch"},
+    {"positive": "a velvet couch", "for": "the couch"},
+    {"positive": "soft light", "negative": "blurry", "for": "the light"},
+    "a velvet couch",
+])
+def test_giving_up_over_words_the_prompts_do_not_have_or_he_never_asked_about_says_only_that(tried):
+    assert _gave_up(tried).line == "Nothing changed."
+
+
+def test_what_was_tried_is_not_said_beside_a_change_that_was_made():
+    outcome = _gave_up({"positive": "a velvet couch", "negative": "bare floor", "for": "the couch"},
+                       changes=[{"prompt": "positive", "replace": "a velvet couch",
+                                 "with": "a wide velvet couch", "for": "the couch"}])
+
+    assert outcome.line == 'Replaced "a velvet couch" with "a wide velvet couch" in the Positive Prompt.'
+
+
+def test_an_opposite_kept_out_to_bring_out_what_he_asked_for_is_said_only_as_added():
+    outcome = _applied([{"prompt": "negative", "add": "bare floor", "for": "more of the couch"}],
+                       asked=("more of the couch",))
+
+    assert outcome.negative == "blurry, bare floor"
+    assert outcome.line == 'Added "bare floor" to the Negative Prompt.'

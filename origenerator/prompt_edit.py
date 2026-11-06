@@ -324,7 +324,10 @@ _ANSWER_SHAPE = (
     '{"prompt": ..., "remove": "<words now in that prompt>", "for": "<his words>"}. "for" quotes '
     'the words of his, from this request or an earlier one, that the change answers; a change '
     'answering none of his words is thrown away. When nothing should change, "changes" is an '
-    'empty list.')
+    'empty list. When it is empty because every way to bring out what he asked for is already '
+    'done, add "tried": {"positive": "<the words for it now in the positive prompt>", '
+    '"negative": "<the words for its opposite now in the negative prompt>", '
+    '"for": "<his words>"}.')
 
 
 _NO_WEIGHTS = (

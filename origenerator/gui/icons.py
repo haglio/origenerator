@@ -101,6 +101,14 @@ def enhance_icon() -> QIcon:
     return qt_icon("plus", color=YELLOW, size=_SIZE)
 
 
+def play_icon() -> QIcon:
+    return qt_icon("play", size=_SIZE)
+
+
+def pause_icon() -> QIcon:
+    return qt_icon("pause", size=_SIZE)
+
+
 def mic_icon() -> QIcon:
     return qt_icon("mic", size=_SIZE)
 

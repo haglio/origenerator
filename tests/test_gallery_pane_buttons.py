@@ -312,3 +312,34 @@ def test_every_mark_on_the_row_stays_inside_the_familys_inset(buttons):
 def test_the_group_button_offers_a_collection_of_his_own(buttons):
     made = buttons()
     assert made.group.toolTip() == "Group the selected folders into a collection of your own"
+
+
+def test_the_play_pause_button_asks_the_room_to_pause_or_play(buttons):
+    asked = []
+    made = buttons(_handlers(pause_or_play=lambda: asked.append(True)))
+
+    made.play_pause.click()
+
+    assert asked == [True]
+
+
+def test_the_play_pause_button_shows_what_a_press_would_do_as_fun_times_does(buttons):
+    made = buttons()
+    assert made.play_pause.toolTip() == "Pause everything"
+
+    omnipause.freeze(True)
+    assert made.play_pause.toolTip() == "Play everything"
+
+    omnipause.freeze(False)
+    assert made.play_pause.toolTip() == "Pause everything"
+
+
+def test_a_session_s_own_play_pause_button_stands_in_for_the_room_s(buttons):
+    taken = buttons()
+
+    taken.become_hosted()
+    assert taken.play_pause is None
+    assert buttons(hosted=True).play_pause is None
+
+    taken.become_standalone()
+    assert not taken.play_pause.isHidden()

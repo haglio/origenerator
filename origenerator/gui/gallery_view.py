@@ -594,6 +594,7 @@ class GalleryView(QWidget):
                 delete=self._delete_selection,
                 toggle_radio=self._on_radio_toggle,
                 toggle_mic=self._voice.mic_toggled,
+                pause_or_play=self._slideshows.pause_or_play_the_room,
             ),
             hosted=self._fun_time is not None,
         )

@@ -40,7 +40,9 @@ class AnswersTold:
         self._db, self._heard = db, heard
 
     def set_labels(self, prompt_id: str, side: str, labels) -> None:
-        self._db.set_labels(prompt_id, side, labels)
+        from origenerator.published_labels import set_labels
+
+        set_labels(self._db, prompt_id, side, labels)
         self._heard(prompt_id, side, labels)
 
 

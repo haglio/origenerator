@@ -138,6 +138,12 @@ def _read_actions_off_earlier_answers(library: Library):
     return fill_in_labels(library.db)
 
 
+def _publish_labels(library: Library):
+    from origenerator.published_labels import publish
+
+    return publish(library.db)
+
+
 def _reconcile_favorites(library: Library):
     from origenerator.favorite_reconcile import reconcile_favorites
 
@@ -204,6 +210,9 @@ MAINTENANCE = (
     BootPass(None, _read_actions_off_earlier_answers,
              counted="Read the actions of %d item(s) off their earlier answers",
              failure="Reading actions off earlier answers failed: %s"),
+    BootPass(None, _publish_labels,
+             counted="Published the labels of %d video(s)",
+             failure="Publishing the labels of videos failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )

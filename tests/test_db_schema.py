@@ -99,6 +99,7 @@ SCHEMA = {
         ("image_checked", "TEXT", 0, None, 0),
         ("video_actions", "TEXT", 0, None, 0),
         ("video_checked", "TEXT", 0, None, 0),
+        ("combined_labels", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

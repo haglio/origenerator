@@ -3,8 +3,9 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtCore import QPoint, QRect, QSize
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolButton
+from PyQt6.QtWidgets import QApplication, QToolButton
 from shared_ui.colors import BG_PRIMARY
+from shared_ui.reference import REFERENCE_WINDOW_TITLE, ReferenceDialog
 from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
@@ -367,3 +368,25 @@ def test_a_session_s_own_power_and_play_pause_buttons_stand_in_for_the_room_s(bu
     taken.become_standalone()
     assert not taken.play_pause.isHidden()
     assert not taken.power.isHidden()
+
+
+def test_the_question_mark_opens_the_reference_lit_blue_and_closing_the_reference_darkens_it(buttons):
+    made = buttons()
+    assert made.reference.toolTip() == REFERENCE_WINDOW_TITLE
+
+    made.reference.click()
+    [opened] = [window for window in QApplication.topLevelWidgets()
+                if isinstance(window, ReferenceDialog) and window.isVisible()]
+    assert made.reference.isChecked()
+
+    opened.close()
+    assert not made.reference.isChecked()
+
+    made.reference.click()
+    made.reference.click()
+    assert not any(isinstance(window, ReferenceDialog) and window.isVisible()
+                   for window in QApplication.topLevelWidgets())
+
+
+def test_a_session_s_own_reference_stands_in_for_the_room_s(buttons):
+    assert buttons(hosted=True).reference is None

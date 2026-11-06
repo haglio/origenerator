@@ -174,7 +174,11 @@ def phrases_heard_only_outright() -> frozenset[str]:
 
 
 def phrases_for(*commands: AppCommand) -> frozenset[str]:
-    return frozenset(phrase for phrase in spoken_phrases() if _PHRASES[phrase] in commands)
+    return frozenset(phrase for command in commands for phrase in said_as(command))
+
+
+def said_as(command: AppCommand) -> tuple[str, ...]:
+    return tuple(phrase for phrase, meant in _PHRASES.items() if meant == command)
 
 
 def spoken_phrases() -> frozenset[str]:

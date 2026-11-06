@@ -65,9 +65,6 @@ from origenerator.gallery.shapes import (
     TOGETHER as _TOGETHER,
 )
 from origenerator.gallery.shapes import (
-    shape_covers as _shape_covers,
-)
-from origenerator.gallery.shapes import (
     shape_holding as _shape_holding,
 )
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
@@ -1069,8 +1066,8 @@ class GalleryView(QWidget):
         library = self._library = self._reading_of(rows, meta)
         trees = {shape: library.tree(shape) for shape in self._tree.shapes}
         self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_collections_by_shape = _custom_collections_by_shape(
-            trees, self._db.list_custom_collections())
+        self._custom_collections_by_shape = {shape: library.custom_collections(shape)
+                                             for shape in self._tree.shapes}
         self._custom_collections = [folder for folders in self._custom_collections_by_shape.values()
                                 for folder in folders]
         self._search.index.update(rows + self._held_rows, gallery.folder_names_by_row(
@@ -1114,6 +1111,7 @@ class GalleryView(QWidget):
         unmoved = state == self._lists_built_from
         library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
                                   folder_meta=meta, name_of=self._item_names.of,
+                                  custom_collections=self._db.list_custom_collections(),
                                   trees_from=self._library if unmoved else None)
         if not unmoved:
             self._lists_built_from = state
@@ -2733,13 +2731,6 @@ class GalleryView(QWidget):
 
     def pin_generate_tab(self):
         self._generate_pane.pin_current_tab()
-
-
-def _custom_collections_by_shape(trees, records) -> dict[str, list]:
-    return {shape: gallery.build_custom_collections(
-                tree, [record for record in records
-                       if _shape_covers(shape, record["side"] or _LANDSCAPE)])
-            for shape, tree in trees.items()}
 
 
 def _group_workflow(group) -> str | None:

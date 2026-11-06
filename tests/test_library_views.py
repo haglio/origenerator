@@ -5,6 +5,7 @@ import json
 from origenerator import gallery, library_views
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import FAVORITES_KEY, LATEST_KEY, TRASH_KEY
+from origenerator.gallery.custom import custom_collection_key
 from origenerator.gallery.tree import ALL_KEY
 from origenerator.item_shape import filter_rows, shaped_key
 from origenerator.library_views import LibrarySnapshot, LibraryViews
@@ -196,7 +197,7 @@ def test_a_collection_key_with_its_shape_names_what_a_reading_lists_there():
     library = LibrarySnapshot(rows)
 
     assert [row["prompt_id"] for row in library.rows_at(shaped_key(LATEST_KEY, "portrait"))] == ["tall"]
-    assert library.rows_at("not/a/collection") is None
+    assert library.rows_at("not/a/collection") == []
 
 
 def test_a_reading_deals_its_rows_to_a_shape_once_however_often_it_is_asked(monkeypatch):
@@ -226,3 +227,30 @@ def test_a_star_given_after_the_reading_was_taken_still_counts_since_the_gallery
     row["starred"] = 1
 
     assert library.favorite_ids == {"pic-1"}
+
+
+def test_a_folder_key_with_its_shape_names_what_a_reading_holds_under_that_folder():
+    rows = [_made_with("a1", "alpha.safetensors"), _made_with("a2", "alpha.safetensors"),
+            _made_with("b1", "beta.safetensors")]
+    library = LibrarySnapshot(rows)
+    alpha = _models_in(library, "landscape")["alpha"]
+
+    assert [row["prompt_id"] for row in library.rows_at(shaped_key(alpha, "landscape"))] == ["a1", "a2"]
+    assert [row["prompt_id"] for row in library.rows_at(shaped_key(ALL_KEY, "landscape"))] == ["a1", "a2", "b1"]
+    assert library.rows_at(shaped_key("nobody/knows", "landscape")) == []
+    assert library.ids_at(shaped_key(alpha, "landscape")) == frozenset({"a1", "a2"})
+    assert library.ids_at(shaped_key(alpha, "landscape")) is library.ids_at(shaped_key(alpha, "landscape"))
+
+
+def test_a_custom_collection_of_a_shape_gathers_the_folders_and_items_its_record_names():
+    rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors"),
+            _made_with("tall", "alpha.safetensors", shape="portrait")]
+    alpha = _models_in(LibrarySnapshot(rows), "landscape")["alpha"]
+    records = [{"id": 3, "name": "Picks", "side": "landscape", "folders": [alpha], "items": ["b1"]}]
+
+    library = LibrarySnapshot(rows, custom_collections=records)
+
+    (picks,) = library.custom_collections("landscape")
+    assert (picks.key, picks.label) == (custom_collection_key(3), "Picks")
+    assert sorted(row["prompt_id"] for row in library.rows_at(shaped_key(picks.key, "landscape"))) == ["a1", "b1"]
+    assert library.custom_collections("portrait") == []

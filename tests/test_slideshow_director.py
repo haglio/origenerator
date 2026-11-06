@@ -358,25 +358,44 @@ class FakeJobQueue:
 
 
 class FakeGalleryPane:
-    def __init__(self, collections=None, latest=False, searching=False, stamp=None):
+    def __init__(self, collections=None, latest=False, searching=False):
         self.collections = collections or {}
         self.latest = latest
         self.searching = searching
-        self.stamp = stamp
-        self.collections_asked = 0
-
-    def rows_for_collection(self, key):
-        self.collections_asked += 1
-        return self.collections.get(key)
-
-    def model_stamp(self):
-        return object() if self.stamp is None else self.stamp
+        self.library = None
 
     def showing_latest(self):
         return self.latest
 
     def showing_search(self):
         return self.searching
+
+
+class FakeLibrary(LibrarySnapshot):
+    def __init__(self, db, at=None):
+        super().__init__([])
+        self._db = db
+        self.at = {} if at is None else at
+        self.asked = 0
+
+    @property
+    def rows(self):
+        return list(self._db.rows.values())
+
+    @rows.setter
+    def rows(self, _rows):
+        pass
+
+    @property
+    def rows_by_id(self):
+        return {row["prompt_id"]: row for row in self.rows}
+
+    def on_the_map(self, shape):
+        return LibrarySnapshot(self.rows).on_the_map(shape)
+
+    def rows_at(self, key):
+        self.asked += 1
+        return list(self.at.get(key, []))
 
 
 class FakeDB:
@@ -434,9 +453,6 @@ class FakeHost:
 
     def shape_in_view(self):
         return LANDSCAPE
-
-    def group_for_key(self, key):
-        return self.groups.get(key)
 
     def row_for(self, prompt_id):
         return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
@@ -581,11 +597,15 @@ def slideshows(monkeypatch):
     def build(host=None, *, db=None, gallery_pane=None, fun_time=None):
         host = host or FakeHost()
         db = db or FakeDB()
+        gallery_pane = gallery_pane or FakeGalleryPane()
+        gallery_pane.collections.update(
+            {key: gallery.rows_under(group) for key, group in host.groups.items()})
+        gallery_pane.library = FakeLibrary(db, gallery_pane.collections)
         director = SlideshowDirector(
             host,
-            DirectorSources(db=db, gallery_pane=gallery_pane or FakeGalleryPane(),
+            DirectorSources(db=db, gallery_pane=gallery_pane,
                             jobs=FakeJobQueue(), names=ItemNames(db),
-                            library=lambda: LibrarySnapshot(list(db.rows.values()))),
+                            library=lambda: gallery_pane.library),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
@@ -1130,28 +1150,27 @@ def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
 
 
 def test_a_run_turned_down_frame_after_frame_looks_at_the_slideshows_set_once(slideshows):
-    gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]}, stamp="one gallery")
+    gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([_row("g-run")]),
                                        fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
-    gallery_pane.collections_asked = 0
+    gallery_pane.library.asked = 0
 
     for frame in (b"one", b"two", b"three"):
         director.note_generating("g-run", frame)
 
     assert made[0].generating == []
-    assert gallery_pane.collections_asked == 1
+    assert gallery_pane.library.asked == 1
 
 
-def test_a_run_a_collection_lists_only_after_the_next_rebuild_joins_on_the_frame_after_it(slideshows):
-    gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]}, stamp=1)
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([_row("g7")]),
-                                       fun_time=FakeSession())
+def test_a_run_a_collection_lists_only_after_the_next_reading_joins_on_the_frame_after_it(slideshows):
+    gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]})
+    db = FakeDB([_row("g7")])
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=db, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
 
     director.note_generating("g7", b"frame-one")
-    gallery_pane.collections["collection/a"].append(_row("g7"))
-    gallery_pane.stamp = 2
+    gallery_pane.library = FakeLibrary(db, {"collection/a": [_row("g1"), _row("g7")]})
     director.note_generating("g7", b"frame-two")
 
     assert made[0].generating == [("g7", b"frame-two")]

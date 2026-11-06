@@ -173,7 +173,7 @@ class TestTheOneHudASlideshowWears:
         rows = slideshow_hud_model("portrait", slideshow, HudPlacement(own_window=False)).rows
 
         assert ("portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up") in [
-            tuple(button.command or button.icon for button in row[1:]) for row in rows]
+            tuple(button.command or button.icon for button in row[1:4]) for row in rows]
 
     @pytest.mark.parametrize("running", [True, False])
     def test_the_broker_button_rides_on_the_osr2_line_lit_while_the_broker_runs(

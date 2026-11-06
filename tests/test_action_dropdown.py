@@ -169,7 +169,7 @@ def test_a_button_beside_the_list_opens_the_window_that_answers_for_them_all(
     monkeypatch.setattr(QMessageBox, "information",
                         lambda parent, title, text: said.append(text))
     monkeypatch.setattr(action_dropdown, "the_sorting_window",
-                        lambda first="": "Every image already says what it shows.")
+                        lambda first="", heard=None: "Every image already says what it shows.")
 
     dropdown.findChild(QPushButton, SORT_BUTTON).click()
 
@@ -180,7 +180,7 @@ def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second
         dropdown, monkeypatch, qtbot):
     made = []
 
-    def one_window(first=""):
+    def one_window(first="", heard=None):
         window = QWidget()
         qtbot.addWidget(window)
         made.append(window)
@@ -208,9 +208,29 @@ def test_pressing_it_starts_on_the_image_in_front_of_him(dropdown, monkeypatch):
     opened = []
     monkeypatch.setattr(QMessageBox, "information", lambda parent, title, text: None)
     monkeypatch.setattr(action_dropdown, "the_sorting_window",
-                        lambda first="": opened.append(first) or "nothing waiting")
+                        lambda first="", heard=None: opened.append(first) or "nothing waiting")
 
     dropdown.show_row(_row("img-seven", state="state two"))
     dropdown.findChild(QPushButton, SORT_BUTTON).click()
 
     assert opened == ["img-seven"]
+
+
+def test_an_answer_the_window_gives_for_the_image_on_the_tab_shows_in_its_list(
+        dropdown, monkeypatch, qtbot):
+    said = []
+    dropdown.chosen.connect(lambda *args: said.append(args))
+
+    def answering(first="", heard=None):
+        heard(first, "state three")
+        heard("another image", "state one")
+        window = QWidget()
+        qtbot.addWidget(window)
+        return window
+
+    monkeypatch.setattr(action_dropdown, "the_sorting_window", answering)
+    dropdown.show_row(_row("img-seven"))
+
+    dropdown.findChild(QPushButton, SORT_BUTTON).click()
+
+    assert (dropdown.picked(), said) == ("state three", [])

@@ -7,7 +7,7 @@ from PIL import Image
 from origenerator import gallery
 from origenerator.db import Database, NewGeneration
 from origenerator.output_places import OutputPlaces
-from origenerator.sort_images import waiting_images
+from origenerator.sort_images import AnswersTold, waiting_images
 
 
 def test_each_waiting_image_carries_the_name_its_tile_wears(tmp_path):
@@ -68,3 +68,16 @@ def test_a_waiting_image_is_shown_from_its_full_file_and_from_its_thumbnail_once
 
     assert [image["image_path"] for image in waiting_images(db, places)] == [str(tmp_path / "gen-one.png")]
 
+
+
+def test_each_answer_is_saved_and_then_told_to_whoever_asked_to_hear_it(tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _a_finished_image(db, "gen-one", 1)
+    heard = []
+    store = AnswersTold(db, lambda prompt_id, said: heard.append(
+        (prompt_id, said, db.get_generation(prompt_id)["image_state"])))
+
+    store.set_image_state("gen-one", "state one")
+    store.set_image_state("gen-one", None)
+
+    assert heard == [("gen-one", "state one", "state one"), ("gen-one", "", None)]

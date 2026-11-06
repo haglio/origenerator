@@ -1,21 +1,10 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
 
 from origenerator.gallery.groups import child_groups
 from origenerator.gallery.tree import ALL_KEY, folder_chain
 from origenerator.output_files import produced_output
-
-
-@dataclass(frozen=True)
-class PaneModel:
-    recent_rows: list
-    shape_trees: dict
-    listed_rows: list
-    experiment_rows: list
-    trash_rows: list
-    image_index: dict | None = None
 
 
 class Placement:

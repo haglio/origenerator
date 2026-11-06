@@ -28,7 +28,6 @@ from origenerator.gallery.collection import (
     FolderCollection,
     folder_collection,
 )
-from origenerator.gallery.placement import PaneModel, Placement
 from origenerator.gui import icons
 from origenerator.gui.collapsible_section import FOLD, FoldHeader
 from origenerator.gui.corner_buttons import enhance_state
@@ -62,7 +61,8 @@ from origenerator.gui.pane_place import (
     stand_at,
 )
 from origenerator.gui.picking import Picking
-from origenerator.item_shape import base_of, filter_rows, key_holds, split_key
+from origenerator.item_shape import base_of, filter_rows, key_holds
+from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
 
 REROLL_VIDEO = "video"
@@ -88,16 +88,6 @@ class GalleryPaneScrollArea(QScrollArea):
         super().mousePressEvent(event)
 
 
-def _unique_rows(rows) -> list[dict]:
-    seen = set()
-    unique = []
-    for row in rows:
-        if row["prompt_id"] not in seen:
-            seen.add(row["prompt_id"])
-            unique.append(row)
-    return unique
-
-
 def _search_empty_hint(outcome, query: str, scope: str) -> str:
     if outcome.unmatched:
         missing = ", ".join(f"“{word}”" for word in outcome.unmatched)
@@ -118,17 +108,6 @@ def _thumbnails_of(rows) -> list[str]:
             if len(paths) >= _PREVIEW_COUNT:
                 break
     return paths
-
-
-class _Listing:
-    def __init__(self, rows=()):
-        self.rows = list(rows)
-        self._dealt: dict[str | None, list[dict]] = {}
-
-    def on(self, shape: str | None) -> list[dict]:
-        if shape not in self._dealt:
-            self._dealt[shape] = filter_rows(self.rows, shape)
-        return self._dealt[shape]
 
 
 class _KeptTiles:
@@ -278,12 +257,6 @@ class PaneHost:
     tree: TreeNavigation
 
 
-@dataclass(frozen=True)
-class PaneCollection:
-    rows: Callable[[str | None, str], list[dict]]
-    render: Callable[[], None]
-
-
 class GalleryPane(QObject):
     thumbnail_activated = pyqtSignal(str)
     tab_pin_requested = pyqtSignal()
@@ -311,34 +284,24 @@ class GalleryPane(QObject):
         self._queue_model = InFlightItems(
             InFlightSources(db=db, jobs=jobs, auto=auto, tree=self._tree),
             image_rows=host.image_rows,
-            image_index=lambda: self._image_index,
+            image_index=lambda: self._model.image_index,
             callbacks=InFlightCallbacks(
                 cancel=self.cancel_requested.emit,
                 reveal=self.reveal_reroll_requested.emit,
                 go_to_item=self.item_jump_requested.emit,
                 shield=jobs.shield),
         )
-        self._collections = {
-            LATEST_KEY: PaneCollection(
-                rows=lambda shape, folder: self._in_folder(self._recent_rows, shape, folder),
-                render=self._render_latest),
-            FAVORITES_KEY: PaneCollection(
-                rows=self._combined_favorite_rows,
-                render=lambda: self._show_gathered(
-                    self._favorite_items(self._collection_shape, self._collection_folder),
-                    self._favorite_folders(self._collection_shape, self._collection_folder),
-                    show_favorites=False, empty=_NO_FAVORITES)),
-            ENHANCED_KEY: PaneCollection(
-                rows=lambda shape, folder: self._in_folder(self._enhanced_rows, shape, folder),
-                render=lambda: self._show_gathered(
-                    self._open_collection_rows(ENHANCED_KEY), (),
-                    show_favorites=False, empty=_NO_ENHANCED)),
-            EXPERIMENTS_KEY: PaneCollection(
-                rows=lambda shape, folder: self._in_folder(self._experiment_rows, shape, folder),
-                render=self._render_experiments),
-            TRASH_KEY: PaneCollection(
-                rows=lambda shape, folder: self._in_folder(self._trash_rows, shape, folder),
-                render=self._render_trash),
+        self._renders = {
+            LATEST_KEY: self._render_latest,
+            FAVORITES_KEY: lambda: self._show_gathered(
+                self._favorite_items(self._collection_shape, self._collection_folder),
+                self._favorite_folders(self._collection_shape, self._collection_folder),
+                show_favorites=False, empty=_NO_FAVORITES),
+            ENHANCED_KEY: lambda: self._show_gathered(
+                self._open_collection_rows(ENHANCED_KEY), (),
+                show_favorites=False, empty=_NO_ENHANCED),
+            EXPERIMENTS_KEY: self._render_experiments,
+            TRASH_KEY: self._render_trash,
         }
         self._selection = Picking()
         self._listed_folders: list[str] = []
@@ -348,18 +311,12 @@ class GalleryPane(QObject):
         self._inflight_tiles: dict[str, InFlightTile] = {}
         self._inflight_by_key: dict[str, InFlightItem] = {}
         self._inflight_signature: tuple = ()
-        self._recent_rows = _Listing()
+        self._model = LibrarySnapshot([])
         self._pages = _Pages()
-        self._listed = _Listing()
-        self._enhanced_rows = _Listing()
-        self._experiment_rows = _Listing()
-        self._trash_rows = _Listing()
         self._search_rows: list[dict] = []
         self._showing_search = False
         self._collection_shape: str | None = None
         self._collection_folder = gallery.ALL_KEY
-        self._placements: dict[str | None, Placement] = {}
-        self._image_index: dict = {}
         self._models_taken = 0
         scroll.verticalScrollBar().valueChanged.connect(self.follow_the_scroll)
         scroll.verticalScrollBar().rangeChanged.connect(self.follow_the_scroll)
@@ -367,29 +324,13 @@ class GalleryPane(QObject):
     def model_stamp(self) -> int:
         return self._models_taken
 
-    def set_model(self, model: PaneModel):
+    def set_model(self, model: LibrarySnapshot):
         self._models_taken += 1
-        self._recent_rows = _Listing(model.recent_rows)
-        self._listed = _Listing(model.listed_rows)
-        self._enhanced_rows = _Listing(gallery.enhanced_generations(model.listed_rows))
-        self._experiment_rows = _Listing(model.experiment_rows)
-        self._trash_rows = _Listing(model.trash_rows)
-        self._image_index = model.image_index or {}
-        self._placements = {shape: Placement(gallery.all_group(tree), self._image_index)
-                            for shape, tree in model.shape_trees.items()}
+        self._model = model
 
     def _open_collection_rows(self, collection: str) -> list[dict]:
-        return self._collections[collection].rows(self._collection_shape,
-                                                  self._collection_folder)
-
-    def _in_folder(self, listing: _Listing, shape: str | None, folder: str) -> list[dict]:
-        return self._placement(shape).held_by(folder, listing.on(shape))
-
-    def _placement(self, shape: str | None) -> Placement:
-        placement = self._placements.get(shape)
-        if placement is None:
-            placement = Placement(gallery.all_group([]), self._image_index)
-        return placement
+        return self._model.in_collection(collection, self._collection_shape,
+                                         self._collection_folder)
 
     def show_enhancing(self, runs: dict):
         for prompt_id, tile in self._thumb_widgets.items():
@@ -592,7 +533,7 @@ class GalleryPane(QObject):
             return
         self._collection_shape = shape
         self._collection_folder = collection.folder
-        self._collections[collection.which].render()
+        self._renders[collection.which]()
 
     def _render_latest(self):
         container, flow = self._fresh_tile_pane()
@@ -680,9 +621,10 @@ class GalleryPane(QObject):
     def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
         if rows is None:
             rows = self._db.list_generations()
-        held = {row["prompt_id"] for row in self._in_folder(
-            _Listing(row for row in rows if gallery.is_in_progress(row)),
-            self._collection_shape, self._collection_folder)}
+        in_progress = filter_rows([row for row in rows if gallery.is_in_progress(row)],
+                                  self._collection_shape)
+        held = {row["prompt_id"] for row in self._model.placement(self._collection_shape)
+                .held_by(self._collection_folder, in_progress)}
         return _back_of_the_line_first(self._tile_items(rows, requests), held)
 
     def _latest_empty_hint(self) -> str:
@@ -817,18 +759,12 @@ class GalleryPane(QObject):
         return base_of(self._tree.selected_folder_key()) == TRASH_KEY
 
     def _favorite_items(self, shape: str | None, folder: str) -> list[dict]:
-        return self._placement(shape).held_by(folder, gallery.favorite_generations(
-            self._listed.on(shape)))
+        return self._model.placement(shape).held_by(folder, gallery.favorite_generations(
+            self._model.on_shape(shape)))
 
     def _favorite_folders(self, shape: str | None, folder: str) -> list:
-        group = self._placement(shape).folder(folder)
+        group = self._model.placement(shape).folder(folder)
         return gallery.favorite_folders(gallery.child_groups(group)) if group else []
-
-    def _combined_favorite_rows(self, shape: str | None, folder: str) -> list[dict]:
-        return _unique_rows(self._favorite_items(shape, folder) + [
-            row for group in self._favorite_folders(shape, folder)
-            for row in gallery.rows_under(group)
-        ])
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:
@@ -845,11 +781,11 @@ class GalleryPane(QObject):
         return self.selected_collection_rows()
 
     def collection_counts(self, shape: str) -> dict[str, int]:
-        placement = self._placement(shape)
+        placement = self._model.placement(shape)
         tallies = {collection: placement.tally(
-                       self._collections[collection].rows(shape, gallery.ALL_KEY))
+                       self._model.in_collection(collection, shape, gallery.ALL_KEY))
                    for collection in (ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)}
-        tallies[FAVORITES_KEY] = placement.tally_favorites(self._listed.on(shape))
+        tallies[FAVORITES_KEY] = placement.tally_favorites(self._model.on_shape(shape))
         return {FolderCollection(collection, folder).key: count
                 for collection, tally in tallies.items() for folder, count in tally.items()}
 
@@ -857,11 +793,7 @@ class GalleryPane(QObject):
         return self.rows_for_collection(self._tree.selected_folder_key())
 
     def rows_for_collection(self, key: str | None) -> list[dict] | None:
-        base, shape = split_key(key)
-        collection = folder_collection(base)
-        if collection is None:
-            return None
-        return self._collections[collection.which].rows(shape, collection.folder)
+        return self._model.rows_at(key)
 
     def show_thumbnails(self, group):
         container, flow = self._fresh_tile_pane()
@@ -931,7 +863,7 @@ class GalleryPane(QObject):
             return []
         actions = [CornerButton(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
                                 "Randomize video seed")]
-        if gallery.rebuildable_source_image_id_in(row, self._image_index) is not None:
+        if gallery.rebuildable_source_image_id_in(row, self._model.image_index) is not None:
             actions.append(CornerButton(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
                                         "Randomize image seed"))
         return actions

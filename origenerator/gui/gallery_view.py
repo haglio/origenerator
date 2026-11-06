@@ -101,7 +101,6 @@ from origenerator.gui.gallery_pane import (
     GalleryPaneScrollArea,
     LeadTiles,
     PaneHost,
-    PaneModel,
     TreeNavigation,
 )
 from origenerator.gui.gallery_pane_buttons import (
@@ -846,9 +845,6 @@ class GalleryView(QWidget):
     def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()
 
-    def _review_queue(self, rows) -> list[dict]:
-        return gallery.unreviewed_experiments(rows)
-
     def _sync_experiments_bar(self):
         if is_branch_session():
             self._experiments_status.setText(
@@ -1081,18 +1077,10 @@ class GalleryView(QWidget):
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()
-        bumped = gallery.enhancement_recency(rows)
-        self._gallery_pane.set_model(PaneModel(
-            gallery.recent_generations(rows, bumped=bumped),
-            trees,
-            rows,
-            self._review_queue(rows),
-            self._held_rows,
-            image_index=library.image_index,
-        ))
+        self._gallery_pane.set_model(library)
         self._tree_view.populate(
             self._build_sides(trees), folder_meta=meta,
-            recently_worked=gallery.recently_worked_folders(trees, rows, bumped=bumped),
+            recently_worked=gallery.recently_worked_folders(trees, rows, bumped=library.recency),
         )
         self._selection_group = None
         self._selected_row = None
@@ -1124,8 +1112,8 @@ class GalleryView(QWidget):
     def _reading_of(self, rows, meta) -> LibrarySnapshot:
         state = _fingerprint(rows, meta)
         unmoved = state == self._lists_built_from
-        library = LibrarySnapshot(rows, self._db.list_trashed, folder_meta=meta,
-                                  name_of=self._item_names.of,
+        library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
+                                  folder_meta=meta, name_of=self._item_names.of,
                                   trees_from=self._library if unmoved else None)
         if not unmoved:
             self._lists_built_from = state

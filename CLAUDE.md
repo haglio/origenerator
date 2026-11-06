@@ -97,8 +97,7 @@ for one thing cost four. So:
   making, in the help for its settings, is the **result**. Saved names keep
   the old word and are read under the new one in one place each, as the
   recipe ones are: the `picture_state` column is `image_state`
-  (`db_schema.STORED_NAMES`), an overlay's `picture_states` and
-  `picture_state_grid` load as `image_states` and `image_state_grid`, a tab
+  (`db_schema.STORED_NAMES`), a tab
   saved with a `picture_border` restores it as its `media_border`, and the
   folders of his drawings, `pictures_being_looked_over.json` and the
   `outside picture:` workflow names keep theirs. So do the saved names
@@ -488,8 +487,11 @@ would be lost. `tests/test_the_library_windows_launchers.py` holds both to that.
   and library subject matter, so
   they are as uncommittable as the button names and live beside the library.
 - `check_animations.vbs` -> `origenerator.check_animations` -- settles what each
-  of the overlay's `animation_paths` entries runs, one at a time, against a video
-  the user already kept. `animation_samples` finds and orders them,
+  animation the overlay's `video_actions.starts_from` lists runs, one at a time,
+  against a video the user already kept: a video button from an image button, and
+  the same with each of the video buttons' checkboxes, which makes an animation of
+  its own (his ruling, 2026-11-06: a box ticked beside an action causes "a
+  different type of video to be made"). `animation_samples` finds and orders them,
   `animation_check_session` is the walk, `gui/animation_check_window.py` is the
   window, and what is accepted goes to `animation_settings` -- one set of
   settings per (lane, action, image state) in a file of its own beside the library, which

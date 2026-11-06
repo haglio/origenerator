@@ -225,6 +225,24 @@ def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
     assert shaped["negative_prompt"].startswith("beta ")
 
 
+def test_a_loop_of_several_labels_takes_the_words_of_each_that_has_its_own(monkeypatch):
+    monkeypatch.setattr(combine, "_CYCLE_WORDS", {
+        "": {"positive": "a default cycle"},
+        "alpha": {"positive": "an alpha cycle", "negative": "no alpha"},
+        "third box": {"positive": "a third box ending"}})
+
+    assert combine.cycle_words("Alpha", "beta", "Third Box") == (
+        "an alpha cycle a third box ending", "no alpha")
+    assert combine.cycle_words("beta") == ("a default cycle", "")
+
+
+def test_a_loop_whose_own_labels_have_no_words_takes_its_images_words(monkeypatch):
+    monkeypatch.setattr(combine, "_CYCLE_WORDS", {"alpha": {"positive": "an alpha cycle"}})
+
+    assert combine.cycle_names(("beta",), ("alpha",)) == ("beta", "alpha")
+    assert combine.cycle_names(("alpha", "beta"), ("gamma",)) == ("alpha", "beta")
+
+
 def test_an_action_with_its_own_words_gets_them_and_the_rest_get_the_default():
     own = combine.cycle_words("beta")
     default = combine.cycle_words("")

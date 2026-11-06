@@ -18,6 +18,7 @@ from origenerator import (
     action_settings,
     gallery,
 )
+from origenerator.action_labels import Labels, labels_of
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     LATEST_KEY,
@@ -92,9 +93,9 @@ def test_the_action_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
     real = gallery.cycle_shaped
     view._db  # noqa: B018  (the view is built; patch after)
 
-    def spy(params, workflow, category=""):
-        asked.append(category)
-        return real(params, workflow, category)
+    def spy(params, workflow, *names):
+        asked.append(names)
+        return real(params, workflow, *names)
 
     gallery_view_module.gallery.cycle_shaped = spy
     try:
@@ -103,7 +104,7 @@ def test_the_action_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
     finally:
         gallery_view_module.gallery.cycle_shaped = real
 
-    assert asked == ["beta"]
+    assert asked == [("beta",)]
 
 
 def test_the_video_lane_takes_the_mined_settings_as_they_stand(qtbot, tmp_path):
@@ -202,6 +203,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
     db = _combine_db(tmp_path)
     looping = _looping_video(db)
     db.set_settings_source("loop", category="alpha")
+    db.set_labels("loop", MediaType.VIDEO, Labels(("alpha",)))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -314,7 +316,7 @@ def test_category_runs_the_actions_most_used_video(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine.generate_category("img", "dancing")
+    view._combine.generate_category("img", "alpha")
 
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
@@ -331,7 +333,7 @@ def test_refresh_greys_out_the_actions_with_no_video_to_mine(qtbot, tmp_path):
     dropdown = view._combine.widget._category
     enabled = {dropdown.itemText(i) for i in range(1, dropdown.count())
                if dropdown.model().item(i).isEnabled()}
-    assert enabled == {"dancing", "gamma"}
+    assert enabled == {"alpha"}
 
 
 def test_category_prefers_the_overlays_pinned_settings_over_mining(qtbot, tmp_path, monkeypatch):
@@ -342,7 +344,7 @@ def test_category_prefers_the_overlays_pinned_settings_over_mining(qtbot, tmp_pa
     monkeypatch.setattr(combine_controller.action_settings, "most_used_video",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated action must not mine")))
 
-    view._combine.generate_category("img", "gamma")
+    view._combine.generate_category("img", "alpha + third box")
 
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
@@ -426,10 +428,11 @@ def test_a_picked_action_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine.generate_category("img", "dancing")
+    view._combine.generate_category("img", "alpha")
 
     row = _launched_row(view)
-    assert row["action"] == "dancing"
+    assert row["action"] == "alpha"
+    assert labels_of(row, MediaType.VIDEO) == Labels(("alpha",))
     assert row["source_video"] == "vid"
 
 
@@ -438,10 +441,11 @@ def test_a_curated_action_records_the_action_with_no_video_behind_it(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine.generate_category("img", "gamma")
+    view._combine.generate_category("img", "alpha + third box")
 
     row = _launched_row(view)
-    assert row["action"] == "gamma"
+    assert row["action"] == "alpha + third box"
+    assert labels_of(row, MediaType.VIDEO) == Labels(("alpha",), ("third box",))
     assert row["source_video"] is None
 
 
@@ -452,7 +456,7 @@ def test_open_in_generator_marks_the_tab_with_where_the_settings_came_from(qtbot
 
     view._combine._open_combination("img", "vid")
 
-    assert _front_panel(view).settings_source() == ("", "vid", action_settings.VIDEO)
+    assert _front_panel(view).settings_source() == ("", "vid", action_settings.VIDEO, ())
 
 
 def test_a_generate_from_an_opened_combination_still_names_its_video(qtbot, tmp_path):
@@ -491,7 +495,7 @@ def test_a_tab_pointed_at_another_generation_drops_the_settings_source(qtbot, tm
 
     tab.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
 
-    assert tab.settings_source() == ("", None, "")
+    assert tab.settings_source() == ("", None, "", ())
 
 
 def test_a_tab_switched_to_another_workflow_drops_the_settings_source(qtbot, tmp_path):
@@ -503,7 +507,7 @@ def test_a_tab_switched_to_another_workflow_drops_the_settings_source(qtbot, tmp
 
     tab.prefill("sdxl_t2i", _SDXL.default_params())
 
-    assert tab.settings_source() == ("", None, "")
+    assert tab.settings_source() == ("", None, "", ())
 
 
 def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_path):
@@ -554,7 +558,7 @@ def test_an_action_whose_settings_came_from_no_video_links_to_the_image_alone(qt
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._open_category("img", "gamma")
+    view._combine._open_category("img", "alpha + third box")
 
     related = _front_panel(view)._related
     assert related._source_tile._prompt_id == "img"
@@ -735,7 +739,7 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     monkeypatch.setattr(view._generate_pane, "open_config",
                         lambda name, params: opened.append((name, params)))
 
-    view._combine._open_category("img", "gamma")
+    view._combine._open_category("img", "alpha + third box")
 
     (name, params), = opened
     assert name == "wan22_i2v"
@@ -752,7 +756,7 @@ def test_category_noop_and_hints_when_the_action_has_no_video(qtbot, tmp_path, m
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
 
-    view._combine.generate_category("img", "epsilon")
+    view._combine.generate_category("img", "beta")
 
     assert view._live_jobs == {}
     view._client.submit_job.assert_not_called()
@@ -848,7 +852,7 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": "img", "videos": {action_settings.VIDEO: "vid"},
-        "intent": action_settings.VIDEO, "category": "",
+        "intent": action_settings.VIDEO, "category": "", "checked": [],
     }
 
 
@@ -860,7 +864,7 @@ def test_combine_selection_carries_the_lane_and_the_action(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": "img", "videos": {},
-        "intent": action_settings.GENAU, "category": "beta",
+        "intent": action_settings.GENAU, "category": "beta", "checked": [],
     }
 
 
@@ -915,7 +919,7 @@ def test_restore_drops_an_action_the_saved_lane_cannot_answer(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(
-        {"image": "img", "intent": action_settings.GENAU, "category": "dancing"})
+        {"image": "img", "intent": action_settings.GENAU, "category": "alpha + beta"})
 
     assert view._combine.widget.selected_intent() == action_settings.GENAU
     assert view._combine.widget.selected_category() == ""
@@ -948,7 +952,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": None, "videos": {},
-        "intent": action_settings.VIDEO, "category": "",
+        "intent": action_settings.VIDEO, "category": "", "checked": [],
     }
 
 

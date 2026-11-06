@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 from origenerator import (
     gallery,
 )
+from origenerator.action_labels import Labels
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     OUTPUT_PLACES,
@@ -46,6 +47,7 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.new_tile import NewTile
 from origenerator.item_shape import base_of, shaped_key
+from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
 from origenerator.prompt_edit import request_applier
@@ -780,7 +782,8 @@ def _combine_db(tmp_path, *, enhanced=True):
     ))
     db.update_generation("vid", status="completed",
                          output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
-    db.set_settings_source("vid", category="dancing")
+    db.set_settings_source("vid", category="alpha")
+    db.set_labels("vid", MediaType.VIDEO, Labels(("alpha",)))
     return db
 
 
@@ -1110,6 +1113,7 @@ def _genau_db(tmp_path):
     db.update_generation("loop", status="completed",
                          output_files=json.dumps([{"filename": "flf2v_loop_1.mp4", "subfolder": ""}]))
     db.set_settings_source("loop", category="alpha")
+    db.set_labels("loop", MediaType.VIDEO, Labels(("alpha",)))
     db.insert_generation(NewGeneration(
         prompt_id="img_action", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="an image by the window", seed=2,
@@ -1120,7 +1124,7 @@ def _genau_db(tmp_path):
     db.update_generation("img_action", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_action.png", "subfolder": ""},
          {"filename": "sdxl_act_base.png", "subfolder": "", "role": "original"}]))
-    db.set_image_state("img_action", "state two")
+    db.set_labels("img_action", MediaType.IMAGE, Labels(("alpha", "beta")))
     return db
 
 

@@ -7,10 +7,17 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QStyle, QVBoxLayo
 from shared_ui.colors import BG_SECONDARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
+from shared_ui.tick_control import TickControl
 
 from origenerator import action_settings, animation_paths
 from origenerator.gui.action_row import ACTION_LABEL
-from origenerator.gui.combine import Combine, CombineRequest, ZoneLookups, _text_inset
+from origenerator.gui.combine import (
+    Combine,
+    CombineRequest,
+    ZoneLookups,
+    _text_inset,
+    combine_checkbox,
+)
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.recent_videos import RecentVideo
@@ -107,16 +114,16 @@ def _actions(combine):
 def test_the_action_list_carries_the_actions_that_lane_has_a_row_for(qtbot):
     combine = _panel(qtbot)
 
-    assert _actions(combine) == ["alpha", "beta", "gamma", "delta", "epsilon", "dancing"]
+    assert _actions(combine) == ["alpha", "beta", "alpha + beta"]
 
     _pick_lane(combine, action_settings.GENAU)
 
-    assert _actions(combine) == ["alpha", "beta", "gamma"]
+    assert _actions(combine) == ["alpha", "beta"]
 
 
 def test_an_action_the_new_lane_has_no_row_for_is_not_left_picked(qtbot):
     combine = _panel(qtbot)
-    _pick_action(combine, "delta")
+    _pick_action(combine, "alpha + beta")
 
     _pick_lane(combine, action_settings.GENAU)
 
@@ -294,14 +301,49 @@ def test_clicking_open_emits_the_dropped_video_for_the_generator(qtbot):
 def test_clicking_open_with_a_picked_action_emits_the_category(qtbot):
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_action(combine, "delta")
+    _pick_action(combine, "alpha + beta")
     opened = []
     combine.combine_requested.connect(opened.append)
 
     combine._open_btn.click()
 
-    assert opened == [CombineRequest(image_id="img1", category="delta",
+    assert opened == [CombineRequest(image_id="img1", category="alpha + beta",
                                      intent=action_settings.VIDEO, edit_first=True)]
+
+
+def test_a_checkbox_beside_the_action_list_rides_on_what_combine_asks_for(qtbot):
+    combine = _panel(qtbot)
+    combine.image_zone.set_item("img1")
+    _pick_action(combine, "beta")
+    asked = []
+    combine.combine_requested.connect(asked.append)
+    box = combine.findChild(TickControl, combine_checkbox("third box"))
+
+    box.click()
+    combine._generate_btn.click()
+
+    assert asked == [CombineRequest(image_id="img1", category="beta",
+                                    intent=action_settings.VIDEO, checked=("third box",))]
+
+
+def test_the_checkbox_sits_to_the_right_of_the_action_list(qtbot):
+    combine = _panel(qtbot)
+    combine.resize(600, 400)
+    combine.show()
+    box = combine.findChild(TickControl, combine_checkbox("third box"))
+
+    assert box.mapTo(combine, QPoint()).x() > combine._category.mapTo(combine, QPoint()).x()
+    assert abs(box.mapTo(combine, QPoint()).y() - combine._category.mapTo(combine, QPoint()).y()) < (
+        combine._category.height())
+
+
+def test_ticking_the_checkbox_says_so_for_the_actions_to_be_offered_again(qtbot):
+    combine = _panel(qtbot)
+
+    with qtbot.waitSignal(combine.checked_changed):
+        combine.findChild(TickControl, combine_checkbox("third box")).click()
+
+    assert combine.checked_boxes() == ("third box",)
 
 
 def test_a_drag_under_way_lights_only_the_drop_zone_it_fits(qtbot):
@@ -433,29 +475,28 @@ def _enabled(combine, text) -> bool:
 def test_actions_with_no_video_to_mine_are_grayed_out(qtbot):
     combine = _panel(qtbot)
 
-    combine.set_available_categories({"beta", "epsilon"})
+    combine.set_available_categories({"beta", "alpha + beta"})
 
     assert _enabled(combine, "beta")
-    assert _enabled(combine, "epsilon")
-    assert not _enabled(combine, "gamma")
-    assert not _enabled(combine, "dancing")
+    assert _enabled(combine, "alpha + beta")
+    assert not _enabled(combine, "alpha")
     assert _enabled(combine, "(custom)")
 
 
 def test_an_action_becomes_pickable_once_a_video_of_it_exists(qtbot):
     combine = _panel(qtbot)
     combine.set_available_categories(set())
-    assert not _enabled(combine, "dancing")
+    assert not _enabled(combine, "alpha + beta")
 
-    combine.set_available_categories({"dancing"})
+    combine.set_available_categories({"alpha + beta"})
 
-    assert _enabled(combine, "dancing")
+    assert _enabled(combine, "alpha + beta")
 
 
 def test_a_grayed_action_explains_itself(qtbot):
     combine = _panel(qtbot)
     combine.set_available_categories({"beta"})
-    index = combine._category.findText("gamma")
+    index = combine._category.findText("alpha")
     assert "no past" in combine._category.itemData(index, TOOLTIP).lower()
     assert not combine._category.itemData(combine._category.findText("beta"), TOOLTIP)
 
@@ -472,10 +513,11 @@ def test_the_word_action_sits_under_the_dropdown_it_names(qtbot):
     column = combine._action_part.layout()
     order = [column.itemAt(i).widget() for i in range(column.count())]
     named = [w for w in order if isinstance(w, QLabel) and w.text() == ACTION_LABEL]
+    above = column.itemAt(order.index(named[0]) - 1).layout()
 
     assert isinstance(column, QVBoxLayout)
     assert len(named) == 1
-    assert order.index(named[0]) == order.index(combine._category) + 1
+    assert above.itemAt(0).widget() is combine._category
 
 
 def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
@@ -610,10 +652,15 @@ def test_picking_a_recent_video_puts_it_in_the_drop_zone_and_lists_it_first(qtbo
     assert _listed_under_recent(combine) == ["vid1", "vid2"]
 
 
+def _first_widget_of(item):
+    held = item.layout()
+    return held.itemAt(0).widget() if held is not None else item.widget()
+
+
 def test_recent_sits_under_the_action_dropdown_left_of_the_video_drop_zone(qtbot):
     combine = _panel(qtbot)
     column = combine._action_part.layout()
-    order = [column.itemAt(i).widget() for i in range(column.count())]
+    order = [_first_widget_of(column.itemAt(i)) for i in range(column.count())]
     named = next(w for w in order if isinstance(w, QLabel) and w.text() == ACTION_LABEL)
 
     assert order.index(combine._recent_videos) > order.index(named) > order.index(combine._category)
@@ -623,7 +670,7 @@ def test_recent_shows_only_while_custom_is_picked(qtbot):
     combine = _panel(qtbot)
     assert not combine._recent_videos.isHidden()
 
-    _pick_action(combine, "gamma")
+    _pick_action(combine, "beta")
     assert combine._recent_videos.isHidden()
 
     _pick_action(combine, "")
@@ -708,7 +755,7 @@ def test_a_lane_that_has_had_no_video_lists_none_under_recent(qtbot):
 
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     combine = _panel(qtbot)
-    _pick_action(combine, "delta")
+    _pick_action(combine, "alpha + beta")
 
     combine.video_zone.set_item("vid1")
 
@@ -720,7 +767,7 @@ def test_the_video_drop_zone_shows_only_while_custom_is_picked(qtbot):
     combine = _panel(qtbot)
     assert not combine.video_zone.isHidden()
 
-    _pick_action(combine, "gamma")
+    _pick_action(combine, "beta")
     assert combine.video_zone.isHidden()
 
     _pick_action(combine, "")
@@ -730,13 +777,13 @@ def test_the_video_drop_zone_shows_only_while_custom_is_picked(qtbot):
 def test_generate_emits_the_picked_action(qtbot):
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_action(combine, "delta")
+    _pick_action(combine, "alpha + beta")
     cats = []
     combine.combine_requested.connect(cats.append)
 
     combine._generate_btn.click()
 
-    assert cats == [CombineRequest(image_id="img1", category="delta",
+    assert cats == [CombineRequest(image_id="img1", category="alpha + beta",
                                    intent=action_settings.VIDEO)]
 
 
@@ -804,8 +851,8 @@ def test_a_grayed_action_explains_itself_in_the_lanes_own_terms(qtbot):
     _pick_lane(combine, action_settings.GENAU)
     combine.set_available_categories({"beta"})
 
-    reason = combine._category.itemData(combine._category.findText("gamma"), TOOLTIP)
-    assert reason == "No past looping “gamma” flick to take settings from yet"
+    reason = combine._category.itemData(combine._category.findText("alpha"), TOOLTIP)
+    assert reason == "No past looping “alpha” flick to take settings from yet"
 
 
 def test_the_genau_lane_names_what_it_makes_in_the_overlays_word(qtbot):
@@ -818,7 +865,7 @@ def test_the_genau_lane_names_what_it_makes_in_the_overlays_word(qtbot):
 def test_an_action_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
     combine = _panel(qtbot)
     combine.image_zone.set_item("img1")
-    _pick_action(combine, "gamma")
+    _pick_action(combine, "alpha")
     assert combine._generate_btn.isEnabled()
 
     combine.set_available_categories({"beta"})

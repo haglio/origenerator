@@ -3,12 +3,13 @@ from __future__ import annotations
 from origenerator.action_settings import GENAU, VIDEO
 from origenerator.animate_command import AnimateRequest, Answer, what_to_animate
 
-_PATHS = {
-    "animation_paths": {
+_PATHS = {"video_actions": {
+    "buttons": {"alpha": ["alpha"], "beta": ["beta"]},
+    "starts_from": {
         VIDEO: {"alpha": ["state one", "state two"], "beta": ["state two"]},
         GENAU: {"alpha": ["state two"]},
     },
-}
+}}
 
 
 def _asked(lane, action, state):

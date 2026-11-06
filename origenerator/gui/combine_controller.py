@@ -13,10 +13,13 @@ from origenerator import (
     evolver_export,
     gallery,
 )
+from origenerator.action_labels import labels_of
 from origenerator.animate_command import what_to_animate
+from origenerator.animation_names import Animation, image_button_of, labels_for
 from origenerator.check_animations import the_animation_window
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.export_lane import GENAU as GENAU_LANE
+from origenerator.gallery.combine import cycle_names
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine import Combine, CombineParts, ZoneLookups
@@ -27,6 +30,7 @@ from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType, media_type_from_filename
+from origenerator.published_labels import label_the_launch
 from origenerator.video_history import video_history
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -81,6 +85,7 @@ class CombineController(QObject):
         self.widget.animation_settings_requested.connect(self._on_animation_settings)
         self.widget.item_activated.connect(self._host.follow_link)
         self.widget.intent_changed.connect(self._on_intent_changed)
+        self.widget.checked_changed.connect(self._on_checked_changed)
         self.widget.image_zone.changed.connect(self.image_dropped)
         self.widget.video_zone.changed.connect(self.reconcile_generating)
         if parts.client is None:
@@ -165,6 +170,7 @@ class CombineController(QObject):
             "videos": self.widget.dropped_videos(),
             "intent": self.widget.selected_intent(),
             "category": self.widget.selected_category(),
+            "checked": list(self.widget.checked_boxes()),
         }
 
     def restore(self, saved) -> None:
@@ -182,6 +188,7 @@ class CombineController(QObject):
             videos = {self.widget.selected_intent(): saved.get("video")}
         self.widget.set_dropped_videos({lane: video for lane, video in videos.items()
                                        if video and self._accepts_video(video)})
+        self.widget.set_checked_boxes(saved.get("checked") or ())
         self.widget.set_category(saved.get("category") or "")
 
     def rebuildable_videos(self, rows: list[dict]) -> list[dict]:
@@ -192,15 +199,20 @@ class CombineController(QObject):
     def offer_the_actions(self, rows: list[dict]) -> None:
         lane = self.widget.selected_intent()
         offered = action_settings.available_categories(
-            self.rebuildable_videos(rows), lane)
+            self.rebuildable_videos(rows), lane, self.widget.checked_boxes())
         state = self._state_of(self.widget.image_zone.current_id())
         if state:
             offered &= set(animation_paths.actions_for(state, lane))
         self.widget.set_available_categories(offered)
 
     def _state_of(self, image_id: str | None) -> str:
-        row = self._db.get_generation(image_id) if image_id else None
-        return (row or {}).get("image_state") or ""
+        return image_button_of(self._db.get_generation(image_id) if image_id else None)
+
+    def _cycle_names(self, name: str, image_id: str | None) -> tuple[str, ...]:
+        own = labels_for(name)
+        image = self._db.get_generation(image_id) if image_id else None
+        return cycle_names((*own.actions, *own.checked),
+                           labels_of(image, MediaType.IMAGE).actions if image else ())
 
     def image_dropped(self) -> None:
         self.offer_the_actions(self._db.list_generations())
@@ -209,6 +221,9 @@ class CombineController(QObject):
     def _on_intent_changed(self, _intent: str) -> None:
         self.offer_the_actions(self._db.list_generations())
         self.reconcile_generating()
+
+    def _on_checked_changed(self) -> None:
+        self.offer_the_actions(self._db.list_generations())
 
     def reconcile_generating(self) -> None:
         image_id = self.widget.image_zone.current_id()
@@ -219,23 +234,26 @@ class CombineController(QObject):
             built is not None and self._jobs.job_for(self._folder_of(built)) is not None)
 
     def _on_request(self, request) -> None:
+        name = Animation(request.category, request.checked).name if request.category else ""
         if request.edit_first:
-            if request.category:
-                self._open_category(request.image_id, request.category, request.intent)
+            if name:
+                self._open_category(request.image_id, name, request.intent)
             else:
                 self._open_combination(request.image_id, request.video_id,
-                                       intent=request.intent)
-        elif request.category:
-            self._on_generate_category(request.image_id, request.category, request.intent)
+                                       intent=request.intent, checked=request.checked)
+        elif name:
+            self._on_generate_category(request.image_id, name, request.intent)
         else:
-            self._on_generate(request.image_id, request.video_id, request.intent)
+            self._on_generate(request.image_id, request.video_id, request.intent,
+                              request.checked)
 
-    def _on_generate(self, image_id: str, video_id: str, intent: str) -> None:
+    def _on_generate(self, image_id: str, video_id: str, intent: str,
+                     checked: tuple[str, ...] = ()) -> None:
         key = self._show_starting(image_id, video_id=video_id, intent=intent)
 
         def run():
             try:
-                self._generate_combination(image_id, video_id, intent=intent)
+                self._generate_combination(image_id, video_id, intent=intent, checked=checked)
             finally:
                 self._starting.drop(key)
 
@@ -283,16 +301,18 @@ class CombineController(QObject):
         if params is None:
             return None
         if intent == action_settings.GENAU:
-            params = gallery.cycle_shaped(params, workflow, category)
+            params = gallery.cycle_shaped(params, workflow, *self._cycle_names(category, image_id))
         return workflow, params, video_row, image_row
 
     def _open_combination(self, image_id: str, video_id: str,
-                          intent: str = action_settings.VIDEO) -> None:
+                          intent: str = action_settings.VIDEO,
+                          checked: tuple[str, ...] = ()) -> None:
         built = self._combined_params(image_id, video_id, intent)
         if built is None:
             return
         workflow, params, video_row, _image_row = built
-        self._open_prepared(workflow, params, self._image_still(image_id), video_row, ("", video_id, intent))
+        self._open_prepared(workflow, params, self._image_still(image_id), video_row,
+                            ("", video_id, intent, checked))
 
     def _open_prepared(self, workflow, params, still: str | None, video_row, settings_source: tuple) -> None:
         Combine = self._generate_pane_of().open_config(workflow.name, params)
@@ -310,7 +330,8 @@ class CombineController(QObject):
 
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
                               category: str = "",
-                              intent: str = action_settings.VIDEO) -> None:
+                              intent: str = action_settings.VIDEO,
+                              checked: tuple[str, ...] = ()) -> None:
         built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
             return
@@ -322,6 +343,7 @@ class CombineController(QObject):
         if prompt_id:
             self._db.set_settings_source(prompt_id, category=category,
                                          video_prompt_id=video_id)
+            label_the_launch(self._db, prompt_id, category, checked)
             if not category:
                 self._db.record_combine_video_use(intent, video_id, prompt_id)
             self._mark_for_sending(prompt_id, send)
@@ -374,7 +396,8 @@ class CombineController(QObject):
         if built is None or intent != action_settings.GENAU:
             return built
         workflow, params = built
-        return workflow, gallery.cycle_shaped(params, workflow, category)
+        return workflow, gallery.cycle_shaped(params, workflow,
+                                              *self._cycle_names(category, image_id))
 
     def _readied(self, settings: dict, reference: str):
         workflow = WORKFLOW_REGISTRY.get(settings.get("workflow") or "")
@@ -398,6 +421,7 @@ class CombineController(QObject):
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             self._db.set_settings_source(prompt_id, category=category)
+            label_the_launch(self._db, prompt_id, category)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
         return True
@@ -458,7 +482,7 @@ class CombineController(QObject):
         loop = asked.lane == action_settings.GENAU
         if loop and self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
-        answer = what_to_animate(asked, row.get("image_state") or "")
+        answer = what_to_animate(asked, image_button_of(row))
         if answer.action is None:
             return None, answer.said, ERROR if answer.unsupported else WARNING
         action = answer.action

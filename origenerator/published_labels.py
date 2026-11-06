@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from origenerator.action_labels import Labels, combined_actions, labels_of
+from origenerator.animation_names import labels_for
 from origenerator.gallery import media_type_of_row
 from origenerator.gallery.source_image import image_labels_row, start_images_among
 from origenerator.media import MediaType
@@ -34,3 +35,9 @@ def publish(db) -> int:
 def set_labels(db, prompt_id: str, side: str, labels: Labels | None) -> None:
     db.set_labels(prompt_id, side, labels)
     publish(db)
+
+
+def label_the_launch(db, prompt_id: str, name: str = "", checked=()) -> None:
+    labels = labels_for(name) if name else Labels((), tuple(checked))
+    if labels.actions or labels.checked:
+        set_labels(db, prompt_id, MediaType.VIDEO, labels)

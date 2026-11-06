@@ -13,7 +13,12 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from origenerator import comfyui_api, comfyui_launcher, gallery, queue_line
 from origenerator.completion import mark_generation_completed
-from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
+from origenerator.config import (
+    COMFYUI_DIR,
+    COMFYUI_HOST,
+    COMFYUI_PORT,
+    REQUEST_MODEL_STAYS_LOADED_S,
+)
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.gui.errand import Errand
@@ -134,12 +139,19 @@ class JobQueue(QObject):
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
         self._training = None
-        self.model_hold = queue_line.ModelHold(self._pump)
+        self.model_hold = queue_line.ModelHold(self._after_the_model_lets_go)
+        self._model_stays = QTimer(self)
+        self._model_stays.setSingleShot(True)
+        self._model_stays.setInterval(REQUEST_MODEL_STAYS_LOADED_S * 1000)
+        self._model_stays.timeout.connect(self._send_the_model_away)
         self._enhance = None
         self._closed = False
 
     def close(self) -> None:
         self._closed = True
+        leave = self.model_hold.send_away()
+        if leave is not None:
+            leave()
 
     def watch_training(self, training) -> None:
         self._training = training
@@ -329,8 +341,23 @@ class JobQueue(QObject):
         self._waiting.insert(queue_line.insertion_index(self._waiting, job), job)
         queue_line.put_first(self._waiting, self._first)
 
+    def _after_the_model_lets_go(self) -> None:
+        if self.model_hold.stays:
+            self._model_stays.start()
+        self._pump()
+
+    def _send_the_model_away(self) -> bool:
+        leave = self.model_hold.send_away()
+        if leave is None:
+            return False
+        self._model_stays.stop()
+        run_off_thread(leave, lambda _left: self.model_hold.let_go(), owner=self, waits_long=True)
+        return True
+
     def _pump(self):
         while not self._closed and self._waiting and self._free_for_the_next_job():
+            if self._send_the_model_away():
+                return
             if (wait := self._wait_at_the_front()) > 0:
                 self._videos_wait.start(math.ceil(wait * 1000))
                 return

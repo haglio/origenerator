@@ -136,3 +136,4 @@ LOCAL_LLM_BASE_URL = "http://localhost:11434"
 # Censored models served through Ollama refuse explicit edits.
 LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"
 REQUEST_LLM_MODEL = "huihui_ai/Qwen3.8-abliterated:27b-q3_K"
+REQUEST_MODEL_STAYS_LOADED_S = 300

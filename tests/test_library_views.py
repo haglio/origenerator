@@ -4,6 +4,7 @@ import json
 
 from origenerator import gallery
 from origenerator.db import Database, NewGeneration
+from origenerator.item_shape import filter_rows
 from origenerator.library_views import LibrarySnapshot, LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import run_python
@@ -77,8 +78,10 @@ def test_a_settings_folder_is_looked_up_once_for_each_reading(tmp_path, monkeypa
     assert len(lookups) == 1
 
 
-def _listed(prompt_id, *, shape="landscape", source="generated", starred=False):
+def _listed(prompt_id, *, shape="landscape", source="generated", starred=False, seed=1):
     return {"prompt_id": prompt_id, "shape": shape, "source": source, "starred": starred,
+            "workflow_name": "sdxl_t2i", "status": "completed",
+            "params_json": json.dumps({"positive_prompt": "scene one", "seed": seed}),
             "output_files": json.dumps([{"filename": f"{prompt_id}.png"}])}
 
 
@@ -104,3 +107,29 @@ def test_a_reading_knows_which_items_are_starred():
     library = LibrarySnapshot([_listed("pic-1", starred=True), _listed("pic-2")])
 
     assert library.favorite_ids == {"pic-1"}
+
+
+def test_a_readings_tree_of_a_shape_is_the_gallery_tree_of_that_shapes_rows():
+    rows = [_listed("tall", shape="portrait"), _listed("wide"), _listed("tall-too", shape="portrait")]
+    meta = {"image": {"custom_name": "Stills", "starred": True}}
+
+    library = LibrarySnapshot(rows, folder_meta=meta, name_of=lambda prompt_id: prompt_id)
+
+    assert library.image_index == gallery.start_frame_index(rows)
+    assert library.tree("portrait") == gallery.build_gallery_tree(
+        filter_rows(rows, "portrait"), meta, image_index=library.image_index,
+        name_of=lambda prompt_id: prompt_id)
+    assert library.tree("portrait") is library.tree("portrait")
+    assert [row["prompt_id"] for row in gallery.rows_under(library.tree("landscape")[0])] == ["wide"]
+
+
+def test_a_reading_of_a_library_that_has_not_moved_keeps_the_trees_of_the_reading_before_it():
+    rows = [_listed("tall", shape="portrait"), _listed("wide")]
+    before = LibrarySnapshot(rows)
+    before.tree("portrait")
+
+    after = LibrarySnapshot(rows, trees_from=before)
+
+    assert after.tree("portrait") is before.tree("portrait")
+    assert after.image_index is before.image_index
+    assert after.tree("landscape") == before.tree("landscape")

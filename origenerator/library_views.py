@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
+from types import MappingProxyType
 
 from origenerator import gallery, trash_collection
 from origenerator.generation_state import on_the_map
@@ -23,11 +24,35 @@ NO_VIEWS = TabViews()
 
 
 class LibrarySnapshot:
-    def __init__(self, rows: list[dict], trashed: Callable[[], list[dict]] = list):
+    def __init__(self, rows: list[dict], trashed: Callable[[], list[dict]] = list, *,
+                 folder_meta: dict | None = None,
+                 name_of: Callable[[str], str] | None = None,
+                 trees_from: LibrarySnapshot | None = None):
         self.rows = rows
         self._trashed = trashed
+        self.folder_meta = folder_meta or {}
+        self._name_of = name_of
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
         self._on_the_map: dict[str | None, list[dict]] = {}
+        self._trees: dict[str, list] = dict(trees_from.trees) if trees_from else {}
+        self._image_index: dict | None = trees_from.image_index if trees_from else None
+
+    @property
+    def trees(self) -> Mapping[str, list]:
+        return MappingProxyType(self._trees)
+
+    @property
+    def image_index(self) -> dict:
+        if self._image_index is None:
+            self._image_index = gallery.start_frame_index(self.rows)
+        return self._image_index
+
+    def tree(self, shape: str) -> list:
+        if shape not in self._trees:
+            self._trees[shape] = gallery.build_gallery_tree(
+                filter_rows(self.rows, shape), self.folder_meta,
+                image_index=self.image_index, name_of=self._name_of)
+        return self._trees[shape]
 
     @cached_property
     def rows_by_id(self) -> dict[str, dict]:

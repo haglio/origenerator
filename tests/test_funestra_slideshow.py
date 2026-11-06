@@ -580,7 +580,8 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
          "portrait_funscript_jump", "portrait_lock", "portrait_trash", "portrait_fmode",
          "portrait_enhanced", "portrait_reset", "portrait_shuffle", "portrait_latest",
          "portrait_cycle_version"],
-        ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up"]]
+        ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up",
+         "", "portrait_speed_down", "", "portrait_speed_up"]]
 
 
 def _band_button(slideshow, name: str):

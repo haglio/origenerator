@@ -324,3 +324,11 @@ def test_reset_says_the_speed_goes_back_in_the_words_kinos_reset_uses():
 
     assert RESET_PUTS_BACK_THE_SPEED in hosted.tooltip
     assert RESET_PUTS_BACK_THE_SPEED in alone.tooltip
+
+
+def test_the_clip_seconds_and_the_playback_speed_share_one_row():
+    *_rows, shared = slideshow_rows("portrait", SlideshowFacts(clip_seconds=4))
+
+    assert [button.command or button.icon for button in shared] == [
+        "Clip seconds", "portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up",
+        "Playback speed", "portrait_speed_down", "", "portrait_speed_up"]

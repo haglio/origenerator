@@ -14,6 +14,7 @@ from funestra.hud_controls import (
     funscript_jump_button,
     lock_button,
     lock_tooltip,
+    playback_speed_buttons,
     reset_button,
     transport,
     trash_button,
@@ -98,6 +99,7 @@ def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
                group_break=True),
         Button("", f"{seconds}s", "", width=VALUE_W),
         Button(f"{shape}_clip_seconds_up", shared_icon("plus"), "Leave each clip longer"),
+        *playback_speed_buttons(shape, leads_its_row=False),
     )
 
 

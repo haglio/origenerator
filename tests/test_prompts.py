@@ -155,3 +155,5 @@ def test_more_of_something_already_there_is_taught_as_every_way_tried_before_giv
     assert '"tried"' in rule
     assert 'never "no X"' in rule
     assert "never take an opposite back out of the negative prompt" in rule
+    assert "a silver ring stays a silver ring" in rule
+    assert "an opposite does not fight it" in prompt

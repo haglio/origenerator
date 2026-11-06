@@ -98,6 +98,7 @@ from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
+from origenerator.published_labels import set_labels
 from origenerator.regeneration import MADE_ELSEWHERE_TIP, workflow_gone
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
@@ -304,7 +305,7 @@ class GenerateTab(DropZones):
         self._action.changed.connect(self._save_labels)
 
     def _save_labels(self, prompt_id: str, side: str, labels) -> None:
-        self._db.set_labels(prompt_id, side, labels)
+        set_labels(self._db, prompt_id, side, labels)
 
     def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
         self._form_workflow_key = None

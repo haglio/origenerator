@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS generations (
     image_actions TEXT,
     image_checked TEXT,
     video_actions TEXT,
-    video_checked TEXT
+    video_checked TEXT,
+    combined_labels TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -292,6 +293,7 @@ ADDED_COLUMNS = {
         "image_checked": "TEXT",
         "video_actions": "TEXT",
         "video_checked": "TEXT",
+        "combined_labels": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -331,7 +333,7 @@ GENERATION_COLUMNS = (
     "genau_requested_at", "recipe_category", "recipe_video_id",
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
     "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of", "shape",
-    "image_actions", "image_checked", "video_actions", "video_checked",
+    "image_actions", "image_checked", "video_actions", "video_checked", "combined_labels",
 )
 
 

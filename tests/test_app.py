@@ -1096,6 +1096,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.provenance", "stamp_unstamped"),
     ("origenerator.item_shape", "record_shapes"),
     ("origenerator.former_actions", "fill_in_labels"),
+    ("origenerator.published_labels", "publish"),
     ("origenerator.favorite_reconcile", "reconcile_favorites"),
 )
 

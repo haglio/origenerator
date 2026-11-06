@@ -98,6 +98,7 @@ class DirectorSources:
     weight_of: Callable[[object], float] | None = None
     learn_weights: Callable[[list], None] = list
     record_group_of: Callable[[object, bool], Hashable | None] | None = None
+    record_loops_of: Callable[[object], tuple] | None = None
 
     @classmethod
     def of_this_library(cls, **sources) -> DirectorSources:

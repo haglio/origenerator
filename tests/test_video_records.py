@@ -80,9 +80,50 @@ def test_a_video_whose_record_names_no_seed_is_in_no_seed_family(tmp_path):
     assert VideoRecords(records).group_of(videos / "portrait" / "scene one.mp4", True) is None
 
 
+def _made_from(image_seed: str, action: str) -> dict:
+    return {"video": {"prompt": f"the {action} move", "model": "Motion A", "action": action,
+                      "seed": "1"},
+            "source_image": {"positive_prompt": "a lighthouse at dusk", "model": "Model A",
+                             "seed": image_seed}}
+
+
+def test_a_video_loops_with_the_videos_learned_beside_it_that_its_record_groups_it_with(tmp_path):
+    videos, records = _library(tmp_path)
+    filed = {"one alpha.mp4": _made_from("101", "alpha"), "one beta.mp4": _made_from("101", "beta"),
+             "two alpha.mp4": _made_from("202", "alpha"), "two beta.mp4": _made_from("202", "beta")}
+    for name, record in filed.items():
+        _filing(records, name, record)
+    paths = {name: videos / "portrait" / name for name in filed}
+    library = VideoRecords(records)
+    library.learn(paths.values())
+
+    loops = library.loops_of(paths["one alpha.mp4"])
+
+    assert (loops.actions, loops.seeds) == ((str(paths["one beta.mp4"]),),
+                                            (str(paths["two alpha.mp4"]),))
+
+
+def test_more_seeds_of_a_video_are_the_ones_of_its_action_from_the_most_similar_settings(tmp_path):
+    videos, records = _library(tmp_path)
+
+    def made_with(prompt: str, action: str) -> dict:
+        return {"video": {"prompt": prompt, "model": "Motion A", "action": action, "seed": "1"}}
+
+    filed = {"here.mp4": made_with("a lighthouse, dusk, calm sea", "alpha"),
+             "near.mp4": made_with("a lighthouse, dusk, rough sea", "alpha"),
+             "another action.mp4": made_with("a lighthouse, dusk, calm sea", "beta")}
+    for name, record in filed.items():
+        _filing(records, name, record)
+    paths = {name: videos / "portrait" / name for name in filed}
+    library = VideoRecords(records)
+    library.learn(paths.values())
+
+    assert library.loops_of(paths["here.mp4"]).more_seeds == (str(paths["near.mp4"]),)
+
+
 def test_the_library_hands_the_slideshow_one_reader_for_weights_and_groups(tmp_path):
     reads = of_this_library()
 
-    assert set(reads) == {"weight_of", "learn_weights", "record_group_of"}
+    assert set(reads) == {"weight_of", "learn_weights", "record_group_of", "record_loops_of"}
     assert reads["weight_of"].__self__ is reads["record_group_of"].__self__
     assert reads["weight_of"](tmp_path / "scene one.png") == 1.0

@@ -623,7 +623,9 @@ class SlideshowDirector:
         if row is None:
             return NavMapNeighbors()
         around = surroundings(row, self._library().on_the_map(shape),
-                              image_index=self._library().image_index)
+                              image_index=self._library().image_index,
+                              filed=self._groups.loops_filed_for(row, shape=shape,
+                                                                 items_of=self.items_of))
         named = [(generation, self._folder_name(generation), True)
                  for generation in around.configs]
         named += [(generation, label, False) for generation, label in around.actions]
@@ -641,7 +643,8 @@ class SlideshowDirector:
         if row is None:
             return ()
         return self._slides_of(beyond_the_row(
-            row, self._library().on_the_map(shape), image_index=self._library().image_index))
+            row, self._library().on_the_map(shape), image_index=self._library().image_index,
+            filed=self._groups.loops_filed_for(row, shape=shape, items_of=self.items_of)))
 
     def actions_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
         named_for = action_labels(self._library().on_the_map(shape),

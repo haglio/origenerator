@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
+from typing import NamedTuple
+
+from funestra.video_groups import normalize_path_key
 
 from origenerator import gallery
 from origenerator.action_settings import action_of
-from origenerator.generation_state import made_here
+from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType
 from origenerator.search import content_stems
 
@@ -101,30 +104,46 @@ def action_labels(rows, *, image_index) -> dict[str, str]:
     return {row["prompt_id"]: animations.label_of(row) for row in rows}
 
 
-def surroundings(current: dict, rows, *, image_index) -> Surroundings:
+class FiledRows(NamedTuple):
+    actions: tuple[dict, ...] = ()
+    seeds: tuple[dict, ...] = ()
+    more_seeds: tuple[dict, ...] = ()
+
+
+def surroundings(current: dict, rows, *, image_index,
+                 filed: FiledRows | None = None) -> Surroundings:
     animations = _Animations(rows, image_index)
+    own = animations.label_of(current)
+    seeds, configs, group = _made_here_around(current, rows, animations, image_index)
+    if filed is not None:
+        seeds, group = (*filed.seeds, *seeds), (*filed.actions, *group)
+    return Surroundings(
+        label=own,
+        seeds=tuple(seeds),
+        configs=tuple(configs),
+        actions=_one_per_action(
+            (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
+            if label != own),
+        group=tuple(group),
+    )
+
+
+def _made_here_around(current: dict, rows, animations: _Animations, image_index):
     own = animations.label_of(current)
     image = animations.image_of(current)
     if image is None:
         seeds = seed_family(current, rows, image_index=image_index)[1:]
+        configs = config_family(current, rows, image_index=image_index)[1:]
     else:
         seeds = [video
                  for sibling in seed_family(image, rows, image_index=image_index)
                  for video in animations.videos_of(sibling)
                  if video["prompt_id"] != current["prompt_id"]
                  and animations.label_of(video) == own]
+        configs = []
     group = [row for row in animations.group_of(current)
              if row["prompt_id"] != current["prompt_id"] and made_here(row)]
-    return Surroundings(
-        label=own,
-        seeds=tuple(filter(made_here, seeds)),
-        configs=() if image is not None else tuple(filter(made_here, config_family(
-            current, rows, image_index=image_index)[1:])),
-        actions=_one_per_action(
-            (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
-            if label != own),
-        group=tuple(group),
-    )
+    return filter(made_here, seeds), filter(made_here, configs), group
 
 
 def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, Hashable]:
@@ -144,8 +163,12 @@ def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, 
     return {row["prompt_id"]: key_of(row) for row in rows if made_here(row)}
 
 
-def beyond_the_row(current: dict, rows, *, image_index,
-                   additions: int = WIDEN_ADDITIONS) -> list[dict]:
+def beyond_the_row(current: dict, rows, *, image_index, additions: int = WIDEN_ADDITIONS,
+                   filed: FiledRows | None = None) -> list[dict]:
+    if filed is not None:
+        made_here_beyond = beyond_the_row(current, rows, image_index=image_index,
+                                          additions=additions)
+        return [*filed.more_seeds, *made_here_beyond][:max(additions, 0)]
     animations = _Animations(rows, image_index)
     around = surroundings(current, rows, image_index=image_index)
     kept = {current["prompt_id"], *(row["prompt_id"] for row in around.seeds)}
@@ -187,13 +210,19 @@ def one_per_stretch(rows, *, image_index) -> list[dict]:
     return [row for row in rows if row["prompt_id"] in kept]
 
 
-_MADE_HERE, _FILED, _GROUPS = "made here", "filed", "groups"
+_MADE_HERE, _FILED, _GROUPS, _PLAYED = "made here", "filed", "groups", "played"
+
+
+class _PlayedFromAnotherSite(NamedTuple):
+    file_of: dict[str, str]
+    row_at: dict[str, dict]
 
 
 class SlideGroups:
     def __init__(self, *, library: Callable[[], object], sources) -> None:
         self._library = library
         self._record_group_of = sources.record_group_of
+        self._record_loops_of = sources.record_loops_of
         self.learn = sources.learn_weights
         self._read = None
         self._found: dict = {}
@@ -205,6 +234,30 @@ class SlideGroups:
         if key not in self._found:
             self._found[key] = work_out()
         return self._found[key]
+
+    def loops_filed_for(self, row: dict, *, shape: str, items_of) -> FiledRows | None:
+        if source_of(row) != GenerationSource.OUTSIDE or self._record_loops_of is None:
+            return None
+        played = self._kept((_PLAYED, shape), lambda: self._played_from_another_site(
+            shape, items_of))
+        file = played.file_of.get(row["prompt_id"])
+        if file is None:
+            return None
+        return FiledRows(*(
+            tuple(played.row_at[key] for key in map(normalize_path_key, files)
+                  if key in played.row_at)
+            for files in self._record_loops_of(file)))
+
+    def _played_from_another_site(self, shape: str, items_of) -> _PlayedFromAnotherSite:
+        rows = {row["prompt_id"]: row for row in self._library().on_the_map(shape)
+                if source_of(row) == GenerationSource.OUTSIDE}
+        played = [(str(path), rows[prompt_id])
+                  for path, media_type, prompt_id, _thumb in items_of(list(rows.values()))
+                  if media_type == MediaType.VIDEO]
+        self.learn([path for path, _row in played])
+        return _PlayedFromAnotherSite(
+            file_of={row["prompt_id"]: path for path, row in played},
+            row_at={normalize_path_key(path): row for path, row in played})
 
     def __call__(self, slide, by_seed_family: bool, *, shape: str) -> Hashable | None:
         library = self._library()

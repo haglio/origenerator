@@ -32,13 +32,10 @@ from origenerator import (
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
-    EVOLVER_SOURCE,
-    EVOLVER_UPSCALED_DIR,
     OUTPUT_PLACES,
     THUMB_DIR,
 )
 from origenerator.db import Database, NewSeedUse
-from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gallery import (
     EnhanceSettings,
@@ -1394,7 +1391,7 @@ class GenerateTab(DropZones):
         preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is None:
             return None
-        return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE).upscale_of(preview[0])
+        return self._library.now().upscales.upscale_of(preview[0])
 
     def _add_row_for(self, row: dict) -> EnhanceOffer:
         params = enhance_params_for(row, self._enhance_settings)

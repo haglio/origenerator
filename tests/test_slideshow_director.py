@@ -14,7 +14,7 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from PIL import Image
 from PyQt6.QtCore import QRect, Qt
 
-from origenerator import gallery
+from origenerator import gallery, library_views
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     FAVORITES_KEY,
@@ -547,8 +547,8 @@ def test_asking_whether_anything_can_play_lists_no_folder_of_upscales(slideshows
     monkeypatch.setattr(module.gallery, "resolve_preview",
                         lambda row, _places: (f"{row['prompt_id']}.png", "image"))
     scanned = []
-    monkeypatch.setattr(module.EvolverUpscales, "scan",
-                        lambda *args: scanned.append(args) or module.EvolverUpscales({}))
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan",
+                        lambda *args: scanned.append(args) or library_views.EvolverUpscales({}))
 
     assert director.anything_to_play()
     assert scanned == []
@@ -688,7 +688,7 @@ def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_fold
         slideshows, monkeypatch, tmp_path):
     for n in range(3):
         (tmp_path / f"g{n}.png").write_bytes(b"x")
-    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    monkeypatch.setattr(library_views, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     rows = [_row(f"g{n}", files=(f"g{n}.png",)) for n in range(3)]
     director, _host, made = slideshows(FakeHost(rows=rows))
     del director.items_of
@@ -1211,8 +1211,8 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
     upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
-    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
-    monkeypatch.setattr(module, "EVOLVER_UPSCALED_DIR", library)
+    monkeypatch.setattr(library_views, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
+    monkeypatch.setattr(library_views, "EVOLVER_UPSCALED_DIR", library)
     return _row("g1", files=("clip.mp4",)), video, upscale
 
 
@@ -1247,7 +1247,7 @@ def _enhanced_with(places: list[dict]) -> dict:
 
 
 def test_each_version_of_an_enhanced_image_brings_the_places_its_fixes_found(tmp_path, monkeypatch):
-    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    monkeypatch.setattr(library_views, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     face = {"part": "faces", "left": 0.4, "top": 0.1, "right": 0.6, "bottom": 0.3}
 
     ((_key, (enhanced, original)),) = _director().versions_of([_enhanced_with([face])]).items()
@@ -1258,7 +1258,7 @@ def test_each_version_of_an_enhanced_image_brings_the_places_its_fixes_found(tmp
 
 def test_the_eyes_of_two_faces_in_an_enhanced_image_come_back_as_a_close_up_of_each_pair(
         tmp_path, monkeypatch):
-    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
+    monkeypatch.setattr(library_views, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     eyes = [{"part": "eyes", "left": left, "top": 0.1, "right": right, "bottom": 0.19}
             for left, right in ((0.10, 0.25), (0.20, 0.35), (0.33, 0.48), (0.43, 0.58))]
 

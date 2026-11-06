@@ -254,3 +254,52 @@ def test_a_custom_collection_of_a_shape_gathers_the_folders_and_items_its_record
     assert (picks.key, picks.label) == (custom_collection_key(3), "Picks")
     assert sorted(row["prompt_id"] for row in library.rows_at(shaped_key(picks.key, "landscape"))) == ["a1", "b1"]
     assert library.custom_collections("portrait") == []
+
+
+def _resolving_by_id(monkeypatch, resolved: list):
+    def resolve(row, _places):
+        resolved.append(row["prompt_id"])
+        return (f"{row['prompt_id']}.png", "image")
+    monkeypatch.setattr(gallery, "resolve_preview", resolve)
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan",
+                        lambda *args: library_views.EvolverUpscales({}))
+
+
+def test_a_reading_resolves_each_slides_file_once_however_many_sets_ask_for_it(monkeypatch):
+    resolved = []
+    _resolving_by_id(monkeypatch, resolved)
+    rows = [_listed("pic-1"), _listed("pic-2")]
+    library = LibrarySnapshot(rows)
+
+    first = library.slides_of(rows)
+    again = library.slides_of([rows[1]])
+
+    assert first == [("pic-1.png", "image", "pic-1", None), ("pic-2.png", "image", "pic-2", None)]
+    assert again == [first[1]]
+    assert resolved == ["pic-1", "pic-2"]
+
+
+def test_a_row_whose_files_changed_is_resolved_again_within_the_same_reading(monkeypatch):
+    resolved = []
+    _resolving_by_id(monkeypatch, resolved)
+    row = _listed("pic-1")
+    library = LibrarySnapshot([row])
+    library.slides_of([row])
+
+    library.slides_of([{**row, "output_files": json.dumps([{"filename": "pic-1_v2.png"}])}])
+
+    assert resolved == ["pic-1", "pic-1"]
+
+
+def test_a_reading_scans_evolvers_upscales_once(monkeypatch):
+    scanned = []
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, _places: ("pic-1.mp4", "video"))
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan",
+                        lambda *args: scanned.append(args) or library_views.EvolverUpscales({}))
+    library = LibrarySnapshot([_listed("pic-1")])
+
+    library.slides_of(library.rows)
+    library.versions_of(library.rows)
+    library.slides_of(library.rows)
+
+    assert len(scanned) == 1

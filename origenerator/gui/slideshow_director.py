@@ -14,14 +14,8 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QWidget
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
-from origenerator import gallery, points_of_interest
-from origenerator.config import (
-    EVOLVER_SOURCE,
-    EVOLVER_UPSCALED_DIR,
-    FRAMES_BEING_MADE_DIR,
-    OUTPUT_PLACES,
-)
-from origenerator.evolver_upscales import EvolverUpscales
+from origenerator import gallery
+from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
 from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.funscript import funscript_of
@@ -67,7 +61,6 @@ from origenerator.gui.slideshow_wiring import (
     Showing,
     SlideshowActions,
 )
-from origenerator.gui.version_stepper import Version
 from origenerator.item_shape import (
     filter_rows,
     row_shape,
@@ -96,7 +89,6 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.dictation import words_of
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from origenerator.win32 import place_window_in_device_pixels
-from origenerator.workflows.detail_parts import parts_framed_together
 
 logger = logging.getLogger(__name__)
 
@@ -169,13 +161,6 @@ class HeldSlideshow:
 
 def _still_up(slideshow):
     return slideshow if slideshow is not None and slideshow.is_showing() else None
-
-
-def _with_files(rows):
-    for row in rows:
-        resolved = gallery.resolve_preview(row, OUTPUT_PLACES)
-        if resolved is not None:
-            yield row, resolved
 
 
 def _place_of(prompt_id: str, items) -> int | None:
@@ -333,7 +318,8 @@ class SlideshowDirector:
         return _still_up(self._slideshow)
 
     def anything_to_play(self) -> bool:
-        return next(_with_files(self._host.rows_to_play()), None) is not None
+        return any(gallery.resolve_preview(row, OUTPUT_PLACES) is not None
+                   for row in self._host.rows_to_play())
 
     def start(self, *, shape: str | None = None):
         location = self._host.slideshow_location()
@@ -606,32 +592,11 @@ class SlideshowDirector:
         elif built or view.isMinimized():
             view.showFullScreen()
 
-    @looking_once
     def items_of(self, rows) -> list:
-        upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
-        return [(upscales.upscale_of(path) or path, media_type, row["prompt_id"],
-                 row.get("thumbnail_path"))
-                for row, (path, media_type) in _with_files(rows)]
+        return self._library().slides_of(rows)
 
-    @looking_once
     def versions_of(self, rows) -> dict:
-        upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
-        framed_together = parts_framed_together()
-        playlists = {}
-        for row in rows:
-            media_type = gallery.media_type_of_row(row)
-            resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
-                        if media_type == MediaType.VIDEO else None)
-            upscale = upscales.upscale_of(resolved[0]) if resolved is not None else None
-            versions = gallery.displayed_versions(row, upscale)
-            if len(versions) <= 1:
-                continue
-            entries = [Version(gallery.output_file_path(version.file, OUTPUT_PLACES),
-                               media_type, version.label,
-                               points_of_interest.boxes_of(version.file, framed_together=framed_together))
-                       for version in versions]
-            playlists[str(entries[0][0])] = entries
-        return playlists
+        return self._library().versions_of(rows)
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))

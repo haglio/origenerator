@@ -36,17 +36,22 @@ def apply_room_scale(*, in_a_headset: bool) -> float:
 
 
 def draw_at(factor: float) -> None:
-    # QHighDpiScaling::setGlobalFactor is private API exported by Qt6Gui.dll (checked on Qt 6.11); Qt otherwise reads QT_SCALE_FACTOR only at startup.
+    # Both are private API exported by Qt6Gui.dll (checked on Qt 6.11): Qt otherwise reads QT_SCALE_FACTOR only at startup, and setGlobalFactor leaves the application's device pixel ratio, which every QIcon.pixmap draws at, cached at the old factor.
     try:
-        set_global_factor = getattr(ctypes.WinDLL("Qt6Gui.dll"),
-                                    "?setGlobalFactor@QHighDpiScaling@@SAXN@Z")
+        qt_gui = ctypes.WinDLL("Qt6Gui.dll")
+        set_global_factor = getattr(qt_gui, "?setGlobalFactor@QHighDpiScaling@@SAXN@Z")
+        forget_the_old_ratio = getattr(
+            qt_gui, "?resetCachedDevicePixelRatio@QGuiApplicationPrivate@@SAXXZ")
     except (OSError, AttributeError):
         logger.warning("This Qt cannot be rescaled while running; staying at %.3f",
                        active_scale())
         return
     set_global_factor.argtypes = [ctypes.c_double]
     set_global_factor.restype = None
+    forget_the_old_ratio.argtypes = []
+    forget_the_old_ratio.restype = None
     set_global_factor(factor)
+    forget_the_old_ratio()
     if factor == 1.0:
         os.environ.pop(_ENV_VAR, None)
     else:

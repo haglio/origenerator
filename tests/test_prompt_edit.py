@@ -530,7 +530,7 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     assert "..." not in content.rsplit("\n\n", 1)[0]
 
 
-def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_go():
+def test_asking_the_model_sends_one_question_that_reads_long_and_leaves_the_model_loaded():
     sent = {}
 
     def ask(messages, **settings):
@@ -546,7 +546,7 @@ def test_asking_the_model_sends_one_question_that_reads_long_and_lets_the_model_
     assert sent["settings"]["json_answer"] is True
     assert sent["settings"]["model"] == config.REQUEST_LLM_MODEL != config.LOCAL_LLM_MODEL
     assert sent["settings"]["reads_tokens"] > 16000
-    assert sent["settings"]["stays_loaded"] == "0"
+    assert sent["settings"]["stays_loaded"] == f"{config.REQUEST_MODEL_STAYS_LOADED_S + 60}s"
     assert "thinks" not in sent["settings"]
 
 

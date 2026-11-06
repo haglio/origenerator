@@ -353,8 +353,18 @@ card's one claim (`origenerator/card_claim.py`, which the LoRA trainers take too
 ComfyUI to let go of its models, and `let_go_of_the_graphics_card` gives the claim back;
 a Request that waits past `RequestAnswerer`'s deadline is answered by the rules
 in `prompt_edit.apply_request` alone. The Job Queue holds its line while the
-model has the card (`JobQueue.model_hold`), so a job
+model is answering (`JobQueue.model_hold`), so a job
 submitted meanwhile waits rather than meeting a card the model is on.
+
+A Request's model stays loaded after it answers, the claim still this app's, so
+the next Request is answered without loading it again or asking ComfyUI to let go
+of its models a second time. `ModelHold` is the one place that knows it stayed:
+the Job Queue sends it away (`ModelHold.send_away`, then
+`request_answering.leave_the_graphics_card` off the UI thread) before it hands ComfyUI a
+job, after `config.REQUEST_MODEL_STAYS_LOADED_S` with no Request, and as the app
+closes. Ollama is asked to keep the model a minute longer than that, so a copy of
+the app that died takes its model with it. Nothing else may hand ComfyUI a job
+while the app is open without sending the model away the same way.
 
 The notes on the collection (`collection_notes.json` beside the library's
 records, `config.COLLECTION_NOTES_PATH`) are the model's reading of his

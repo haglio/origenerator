@@ -95,9 +95,15 @@ class ActionDropdown(QWidget):
             self._sorting.raise_()
             self._sorting.activateWindow()
             return
-        built = the_sorting_window(self._prompt_id)
+        built = the_sorting_window(self._prompt_id, heard=self._heard)
         if not show_or_say("Sorting images", built, parent=self):
             self._sorting = built
+
+    def _heard(self, prompt_id: str, said: str) -> None:
+        if prompt_id and prompt_id == self._prompt_id:
+            self._prompt_id = ""
+            self.pick(said)
+            self._prompt_id = prompt_id
 
     def _on_picked(self) -> None:
         if self._prompt_id:

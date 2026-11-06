@@ -27,7 +27,20 @@ def waiting_images(db, places, first: str = "") -> list[dict]:
             for row in line]
 
 
-def the_sorting_window(first: str = ""):
+class AnswersTold:
+    def __init__(self, db, heard):
+        self._db, self._heard = db, heard
+
+    def set_image_state(self, prompt_id: str, state: str | None) -> None:
+        self._db.set_image_state(prompt_id, state)
+        self._heard(prompt_id, state or "")
+
+
+def _nobody_listening(_prompt_id: str, _said: str) -> None:
+    pass
+
+
+def the_sorting_window(first: str = "", heard=_nobody_listening):
     from origenerator.action_drawings import drawing_for
     from origenerator.config import DB_PATH, OUTPUT_PLACES
     from origenerator.db import Database
@@ -43,7 +56,7 @@ def the_sorting_window(first: str = ""):
     tiles = state_grid()
     drawings = {tile.state: str(drawn) for tile in tiles
                 if (drawn := drawing_for(tile.state)) is not None}
-    return SortingWindow(SortingSession(waiting, db), tiles, drawings)
+    return SortingWindow(SortingSession(waiting, AnswersTold(db, heard)), tiles, drawings)
 
 
 def main() -> int:

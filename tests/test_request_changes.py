@@ -608,3 +608,42 @@ def test_a_part_put_later_is_said_as_moved_later():
                        pair=("a velvet couch, a woman, soft light", "blurry"), asked=("less couch",))
 
     assert outcome.line == 'Moved "a velvet couch" later in the Positive Prompt.'
+
+
+def test_a_change_quoting_the_prompt_as_it_stood_before_the_change_ahead_of_it_is_still_found():
+    outcome = _applied([{"prompt": "positive", "replace": "a velvet couch", "with": "a wide velvet couch",
+                         "for": "more couch"},
+                        {"prompt": "positive", "replace": _COUCH_LAST[0],
+                         "with": "a wide velvet couch, a woman, soft light", "for": "more couch"}],
+                       pair=_COUCH_LAST, asked=("more couch",))
+
+    assert outcome.positive == "a wide velvet couch, a woman, soft light"
+    assert outcome.line == ('Replaced "a velvet couch" with "a wide velvet couch" in the Positive Prompt. '
+                            'Moved "a wide velvet couch" earlier in the Positive Prompt.')
+
+
+def test_what_the_positive_prompt_calls_for_is_never_kept_out_as_no_of_it():
+    outcome = _applied([{"prompt": "negative", "add": "bare floor, no couch", "for": "more couch"},
+                        {"prompt": "negative", "add": "without a couch", "for": "more couch"}],
+                       pair=_COUCH_LAST, asked=("more couch",))
+
+    assert outcome.negative == "blurry, bare floor"
+    assert outcome.line == 'Added "bare floor" to the Negative Prompt.'
+
+
+def test_something_to_leave_out_written_into_the_negative_prompt_as_no_of_it_goes_in_bare():
+    outcome = _applied([{"prompt": "negative", "add": "no hat", "for": "no hat"}], asked=("no hat",))
+
+    assert outcome.negative == "blurry, hat"
+    assert outcome.line == _NO_HAT
+
+
+def test_words_a_part_already_had_stay_when_its_rewording_puts_a_comma_before_them():
+    outcome = _applied([{"prompt": "positive", "replace": "a velvet couch with a wide carved frame",
+                         "with": "a velvet couch with a huge, carved frame", "for": "more couch"}],
+                       pair=("a woman, a velvet couch with a wide carved frame", "blurry"),
+                       asked=("more couch",))
+
+    assert outcome.positive == "a woman, a velvet couch with a huge, carved frame"
+    assert outcome.line == ('Replaced "a velvet couch with a wide carved frame" with "a velvet couch '
+                            'with a huge, carved frame" in the Positive Prompt.')

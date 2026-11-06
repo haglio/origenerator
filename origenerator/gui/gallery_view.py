@@ -169,7 +169,6 @@ from origenerator.item_shape import (
     base_of as _base_of,
 )
 from origenerator.item_shape import (
-    filter_rows,
     requested_shape,
     row_shape,
     shaped_key,
@@ -359,7 +358,6 @@ class GalleryView(QWidget):
         self._library = LibrarySnapshot([])
         self._live_ids: set[str] = set()
         self._listed_requests: list[dict] = []
-        self._image_index: dict | None = None
 
     @property
     def _image_rows(self) -> list[dict]:
@@ -419,8 +417,6 @@ class GalleryView(QWidget):
         self._custom_collections: list = []
         self._custom_collections_by_shape: dict[str, list] = {}
         self._lists_built_from = None
-        self._lists_by_shape: dict[str, list] = {}
-        self._start_frames: dict = {}
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
         self._trail = (False, False)
@@ -1072,11 +1068,10 @@ class GalleryView(QWidget):
         selected_gen = self.selected_generation()
         reroll_key = self._selected_reroll_key
         self._pending_key = self._pending_selection = None
-        self._library = LibrarySnapshot(rows, self._db.list_trashed)
         self._combine.offer_the_actions(rows)
         trash_collection.settle_regenerations(self._db)
-        start_frames, trees = self._lists_for(rows, meta, self._tree.shapes)
-        self._image_index = start_frames
+        library = self._library = self._reading_of(rows, meta)
+        trees = {shape: library.tree(shape) for shape in self._tree.shapes}
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_collections_by_shape = _custom_collections_by_shape(
             trees, self._db.list_custom_collections())
@@ -1093,7 +1088,7 @@ class GalleryView(QWidget):
             rows,
             self._review_queue(rows),
             self._held_rows,
-            image_index=start_frames,
+            image_index=library.image_index,
         ))
         self._tree_view.populate(
             self._build_sides(trees), folder_meta=meta,
@@ -1126,18 +1121,16 @@ class GalleryView(QWidget):
         for tab in self._generate_pane.generate_tabs():
             tab.refresh_generate_caption()
 
-    def _lists_for(self, rows, meta, shapes):
-        library = _fingerprint(rows, meta)
-        if library != self._lists_built_from:
-            self._lists_built_from = library
-            self._start_frames = gallery.start_frame_index(rows)
-            self._item_names.take(rows, self._held_rows, self._start_frames)
-            self._lists_by_shape = {}
-        for shape in shapes:
-            if shape not in self._lists_by_shape:
-                self._lists_by_shape[shape] = _side_list(
-                    rows, meta, self._start_frames, shape, self._item_names.of)
-        return self._start_frames, {shape: self._lists_by_shape[shape] for shape in shapes}
+    def _reading_of(self, rows, meta) -> LibrarySnapshot:
+        state = _fingerprint(rows, meta)
+        unmoved = state == self._lists_built_from
+        library = LibrarySnapshot(rows, self._db.list_trashed, folder_meta=meta,
+                                  name_of=self._item_names.of,
+                                  trees_from=self._library if unmoved else None)
+        if not unmoved:
+            self._lists_built_from = state
+            self._item_names.take(rows, library.held_rows, library.image_index)
+        return library
 
     def _build_sides(self, trees):
         return [ShapeModel(
@@ -1195,9 +1188,7 @@ class GalleryView(QWidget):
 
 
     def image_config_index(self) -> dict:
-        if self._image_index is None:
-            self._image_index = gallery.build_image_config_index(self._image_rows)
-        return self._image_index
+        return self._library.image_index
 
     def name_search_on_screen(self, query: str, scope: _SearchScope) -> None:
         self._folder_path.show_search(f"Search: “{query}” in ", scope.steps)
@@ -2754,11 +2745,6 @@ class GalleryView(QWidget):
 
     def pin_generate_tab(self):
         self._generate_pane.pin_current_tab()
-
-
-def _side_list(rows, meta, start_frames, shape, name_of):
-    return gallery.build_gallery_tree(filter_rows(rows, shape), meta,
-                                      image_index=start_frames, name_of=name_of)
 
 
 def _custom_collections_by_shape(trees, records) -> dict[str, list]:

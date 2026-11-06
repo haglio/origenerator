@@ -264,6 +264,28 @@ def test_an_image_lists_the_videos_in_the_trash_it_was_animated_into(make_relate
     assert _animated(related) == ["vid1"]
 
 
+def _failed(row):
+    return {**row, "status": "error", "output_files": None, "thumbnail_path": None}
+
+
+def test_a_run_that_failed_to_make_its_video_is_not_among_the_animations(make_related):
+    image = _image_row()
+    related = make_related(_video_row("vid1"), _failed(_video_row("vid2")),
+                           held=[_failed(_video_row("vid3"))])
+
+    related.show_row(image, [image])
+
+    assert _animated(related) == ["vid1"]
+
+
+def test_a_run_that_failed_to_make_its_video_is_not_listed_under_combine(make_related):
+    related = make_related(_combined_row("made1"), _failed(_combined_row("made2")))
+
+    related.show_row(_video_row("vid0"), [_image_row()])
+
+    assert _links(related._combine_section) == [("Source video for", "made1")]
+
+
 def test_a_cut_is_not_among_the_animations_of_the_image_its_clip_was_made_from(make_related):
     image = _image_row()
     related = make_related(_video_row(), _trim_row())

@@ -35,6 +35,7 @@ from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import shaped_key
+from origenerator.library_views import LibrarySnapshot
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.voice.app_commands import AppCommand
@@ -583,7 +584,8 @@ def slideshows(monkeypatch):
         director = SlideshowDirector(
             host,
             DirectorSources(db=db, gallery_pane=gallery_pane or FakeGalleryPane(),
-                            jobs=FakeJobQueue(), names=ItemNames(db)),
+                            jobs=FakeJobQueue(), names=ItemNames(db),
+                            library=lambda: LibrarySnapshot(list(db.rows.values()))),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
@@ -1200,7 +1202,7 @@ def _director():
     return SlideshowDirector(
         FakeHost(),
         DirectorSources(db=db, gallery_pane=FakeGalleryPane(), jobs=FakeJobQueue(),
-                        names=ItemNames(db)),
+                        names=ItemNames(db), library=lambda: LibrarySnapshot([])),
         DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=None))
 
 
@@ -2093,15 +2095,16 @@ def _fox(prompt_id, *, seed):
     return image
 
 
-def test_the_map_reads_the_library_once_for_each_state_of_it(slideshows):
+def test_the_map_is_drawn_against_the_gallerys_reading_of_the_library_never_a_reading_of_its_own(
+        slideshows):
     rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
     db = FakeDB(rows)
-    director, _host, _made = slideshows(_library(rows), db=db, gallery_pane=FakeGalleryPane(stamp=1))
+    director, _host, _made = slideshows(_library(rows), db=db)
 
     director.neighbors_of("g1", shape="portrait")
     director.neighbors_of("g2", shape="portrait")
 
-    assert db.listings == 1
+    assert db.listings == 0
 
 
 def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(slideshows, tmp_path):

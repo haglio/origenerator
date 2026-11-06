@@ -4,7 +4,7 @@ import json
 
 from origenerator import gallery
 from origenerator.db import Database, NewGeneration
-from origenerator.library_views import LibraryViews
+from origenerator.library_views import LibrarySnapshot, LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import run_python
 
@@ -75,3 +75,32 @@ def test_a_settings_folder_is_looked_up_once_for_each_reading(tmp_path, monkeypa
     assert [row["prompt_id"] for row in library.in_settings(folder)] == ["pic-1"]
     library.in_settings(folder)
     assert len(lookups) == 1
+
+
+def _listed(prompt_id, *, shape="landscape", source="generated", starred=False):
+    return {"prompt_id": prompt_id, "shape": shape, "source": source, "starred": starred,
+            "output_files": json.dumps([{"filename": f"{prompt_id}.png"}])}
+
+
+def test_a_reading_finds_each_row_by_its_id():
+    rows = [_listed("pic-1"), _listed("pic-2")]
+
+    library = LibrarySnapshot(rows)
+
+    assert library.rows_by_id["pic-2"] is rows[1]
+    assert library.rows_by_id.get("nobody") is None
+
+
+def test_the_map_of_a_shape_holds_what_is_on_the_map_in_that_shape():
+    rows = [_listed("tall", shape="portrait"), _listed("wide", shape="landscape"),
+            _listed("left-out", shape="portrait", source="left_out")]
+    library = LibrarySnapshot(rows)
+
+    assert [row["prompt_id"] for row in library.on_the_map("portrait")] == ["tall"]
+    assert library.on_the_map("portrait") is library.on_the_map("portrait")
+
+
+def test_a_reading_knows_which_items_are_starred():
+    library = LibrarySnapshot([_listed("pic-1", starred=True), _listed("pic-2")])
+
+    assert library.favorite_ids == {"pic-1"}

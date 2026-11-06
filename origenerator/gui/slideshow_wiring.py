@@ -79,6 +79,7 @@ class DirectorSources:
     gallery_pane: object
     jobs: object
     names: object
+    library: Callable[[], object]
 
 
 @dataclass(frozen=True)

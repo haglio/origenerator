@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from origenerator import gallery, trash_collection
+from origenerator.generation_state import on_the_map
+from origenerator.item_shape import filter_rows
 from origenerator.media import MediaType
 
 
@@ -25,6 +27,15 @@ class LibrarySnapshot:
         self.rows = rows
         self._trashed = trashed
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
+        self._on_the_map: dict[str | None, list[dict]] = {}
+
+    @cached_property
+    def rows_by_id(self) -> dict[str, dict]:
+        return {row["prompt_id"]: row for row in self.rows}
+
+    @cached_property
+    def favorite_ids(self) -> set[str]:
+        return {row["prompt_id"] for row in self.rows if row.get("starred")}
 
     @cached_property
     def image_rows(self) -> list[dict]:
@@ -52,6 +63,12 @@ class LibrarySnapshot:
             self._in_settings[key] = gallery.rows_in_settings(
                 self.rows, key, self.image_config_index)
         return self._in_settings[key]
+
+    def on_the_map(self, shape: str | None) -> list[dict]:
+        if shape not in self._on_the_map:
+            self._on_the_map[shape] = filter_rows(
+                [row for row in self.rows if on_the_map(row)], shape)
+        return self._on_the_map[shape]
 
     def _of_kind(self, kind: MediaType) -> list[dict]:
         return [row for row in self.rows if gallery.media_type_of_row(row) == kind]

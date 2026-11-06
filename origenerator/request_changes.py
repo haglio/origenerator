@@ -154,7 +154,19 @@ def _paired(old: list[str], new: list[str]) -> list[tuple[str, str]]:
             pairs += [(part, part) for part in old[i1:i2]]
         else:
             pairs += _rewritten(old[i1:i2], new[j1:j2])
-    return pairs
+    return _with_a_rewording_kept_whole(pairs)
+
+
+def _with_a_rewording_kept_whole(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    whole: list[tuple[str, str]] = []
+    for before, after in pairs:
+        was, now = whole[-1] if whole else ("", "")
+        if (not before and was and now and was != now
+                and _naming(after) & _naming(was) and not _naming(after) & _naming(now)):
+            whole[-1] = (was, f"{now}, {after}")
+        else:
+            whole.append((before, after))
+    return whole
 
 
 def _only_the_words_that_differ(old: str, new: str) -> tuple[str, str]:
@@ -163,7 +175,8 @@ def _only_the_words_that_differ(old: str, new: str) -> tuple[str, str]:
         before, after = before[1:], after[1:]
     while before and after and before[-1] == after[-1]:
         before, after = before[:-1], after[:-1]
-    differ = (" ".join(before), " ".join(after)) if before and after else (old, new)
+    differ = ((" ".join(before).strip(" ,"), " ".join(after).strip(" ,")) if before and after
+              else (old, new))
     whole = all(words.count("(") == words.count(")") for words in differ)
     return differ if whole else (old, new)
 
@@ -227,6 +240,7 @@ class _Applying:
         self.already_so: list[str] = []
         self.took_out = False
         self.gave_up = ""
+        self.rewritten: dict[str, list[tuple[str, str]]] = {which: [] for which in PROMPTS}
 
     def _say(self, line: str) -> None:
         self.said += [line]
@@ -292,7 +306,8 @@ class _Applying:
         new = self._as_these_prompts_take(str(change.get("with") or ""))
         if not new.strip() or self._only_takes_out_what_he_quoted(old, new):
             return self._remove(which, {"remove": old})
-        found = _found(getattr(self, which), old)
+        found = (_found(getattr(self, which), old)
+                 or _found(getattr(self, which), self._as_it_stands_now(which, old)))
         if found is None:
             return [f"Couldn't find {_quoted(old)} in the {PROMPTS[which]}."]
         there = found.group(0)
@@ -305,8 +320,16 @@ class _Applying:
                                               and len(_parts(kept)) < len(_parts(there)))
             text = getattr(self, which)
             setattr(self, which, text[:found.start()] + kept + text[found.end():])
+            self.rewritten[which] += [(there, kept)]
             said = said or [f"Replaced {_quoted(old)} with {_quoted(new)} in the {PROMPTS[which]}."]
         return said + [line for words in left_out for line in self._add("negative", {"add": words})]
+
+    def _as_it_stands_now(self, which: str, words: str) -> str:
+        for before, after in self.rewritten[which]:
+            was = _found(words, before)
+            if was:
+                words = words[:was.start()] + after + words[was.end():]
+        return words
 
     @staticmethod
     def _without_what_it_leaves_out(which: str, old: str, new: str) -> tuple[str, list[str]]:
@@ -351,6 +374,10 @@ class _Applying:
         if left_out:
             said = [line for unwanted in left_out for line in self._add("negative", {"add": unwanted})]
             return said + (self._add(which, {**change, "add": words}) if words else [])
+        if which == "negative":
+            words = self._kept_out_bare(words)
+        if not words:
+            return []
         text = getattr(self, which)
         kept_out = [_KEPT_OUT + words] if which == "negative" else []
         if _whole(text, words):
@@ -359,6 +386,12 @@ class _Applying:
         at = end_of_the_term(text, anchor.end()) if anchor else len(text)
         setattr(self, which, _joined(text[:at], words, text[at:]))
         return [*kept_out, f"Added {_quoted(words)} to the {PROMPTS[which]}."]
+
+    def _kept_out_bare(self, words: str) -> str:
+        called_for = _naming(self.positive)
+        bare = [_left_out(part) or part for part in _parts(words)
+                if not _naming(_left_out(part)) & called_for]
+        return ", ".join(bare)
 
     def _already_there(self, which: str, words: str, kept_out: list[str]) -> list[str]:
         text = getattr(self, which)

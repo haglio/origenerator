@@ -143,7 +143,6 @@ class VoiceRouter(QObject):
             dictation=RequestDictation(),
             phrases=Phrases(spoken_phrases(), phrases_heard_only_outright(), said_in),
         )
-        self.listener.error.connect(lambda msg: logger.warning("Voice: %s", msg))
         self.listener.heard.connect(self._on_heard)
         self.listener.error.connect(self._on_error)
         self.listener.request.connect(self.on_spoken_request)

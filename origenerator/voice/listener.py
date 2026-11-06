@@ -33,8 +33,7 @@ class CommandAndRequestListener(QObject):
         self._execute_command = None
         self._dictation = dictation
         self._hearing.said.connect(self._on_said)
-        self._hearing.failed.connect(
-            lambda reason: self.error.emit(f"mic unavailable — {reason}"))
+        self._hearing.failed.connect(self._on_failed)
 
     def start_commands(self, execute) -> None:
         self._execute_command = execute
@@ -60,11 +59,17 @@ class CommandAndRequestListener(QObject):
         if self._dictation is not None:
             self._dictation.reset()
 
+    def _on_failed(self, reason: str) -> None:
+        message = f"mic unavailable — {reason}"
+        logger.warning("Voice: %s", message)
+        self.error.emit(message)
+
     def _on_said(self, text: str, spoken_at: float) -> None:
         if self._execute_command is None:
             return
         self.heard.emit(text)
         if not any(char.isalpha() for char in text):
+            logger.info("Voice: a sound with no words in it")
             self.error.emit("Didn't catch that.")
             return
         meaning = self._meaning(text, spoken_at)

@@ -73,6 +73,17 @@ def test_a_sound_with_no_words_in_it_is_answered_as_not_caught(qtbot, noise):
     assert (ran, errors) == ([], ["Didn't catch that."])
 
 
+def test_a_sound_with_no_words_in_it_is_logged_as_information_not_a_warning(qtbot, caplog):
+    listener, hearing = _listener(says=". . . .")
+    listener.start_commands(_ignore)
+
+    with caplog.at_level(logging.DEBUG):
+        hearing.hear()
+
+    assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
+        (logging.INFO, "Voice: a sound with no words in it")]
+
+
 def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypatch):
     built = Mock()
     monkeypatch.setattr("origenerator.voice.listener.Hearing", built)
@@ -262,6 +273,17 @@ def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
     hearing.failed.emit("No module named 'sounddevice'")
 
     assert errors == ["mic unavailable — No module named 'sounddevice'"]
+
+
+def test_a_mic_that_will_not_open_is_logged_as_a_warning(qtbot, caplog):
+    listener, hearing = _listener()
+    listener.start_commands(_ignore)
+
+    with caplog.at_level(logging.DEBUG):
+        hearing.failed.emit("No module named 'sounddevice'")
+
+    assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
+        (logging.WARNING, "Voice: mic unavailable — No module named 'sounddevice'")]
 
 
 def test_it_says_a_request_is_being_taken_from_its_opening_word_until_over(qtbot):

@@ -853,6 +853,15 @@ def test_a_microphone_that_fails_says_so_as_an_error(router):
     assert slideshows.kinds == [ERROR]
 
 
+def test_what_the_listener_answers_with_is_left_to_the_listener_to_log(router, caplog):
+    voice, _host, _slideshows = router()
+
+    with caplog.at_level(logging.DEBUG):
+        voice.listener.error.emit("Didn't catch that.")
+
+    assert caplog.messages == []
+
+
 
 def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     voice, _host, slideshows = router()

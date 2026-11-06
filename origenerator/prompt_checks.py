@@ -105,6 +105,7 @@ def tidied(text: str, *, reads_numbers: bool = False) -> str:
     text = re.sub(rf" *([\n{BOX_BREAK}]) *", r"\1", text)
     text = re.sub(r" +,", ",", text)
     text = re.sub(rf",(?:[ \n{BOX_BREAK}]*,)+", _one_comma, text)
+    text = re.sub(rf"(?<={BOX_BREAK})[, ]+", "", text)
     text = re.sub(r",(?=[^\W\d_]|\()", ", ", text)
     if reads_numbers:
         text = _STACK.sub(_as_a_number, text)

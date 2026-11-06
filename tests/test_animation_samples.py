@@ -8,9 +8,13 @@ from origenerator import animation_samples
 from origenerator.action_settings import GENAU, VIDEO
 
 _PATHS = {
-    "animation_paths": {
-        VIDEO: {"alpha": ["state one", "state two"], "beta": ["state two"]},
-        GENAU: {"alpha": ["state two"]},
+    "image_actions": {"buttons": {"state one": ["one"], "state two": ["two"]}},
+    "video_actions": {
+        "buttons": {"alpha": ["alpha"], "beta": ["beta"]},
+        "starts_from": {
+            VIDEO: {"alpha": ["state one", "state two"], "beta": ["state two"]},
+            GENAU: {"alpha": ["state two"]},
+        },
     },
 }
 
@@ -19,7 +23,8 @@ def _image(prompt_id, state, filename=None):
     return {
         "prompt_id": prompt_id, "workflow_name": "sdxl_t2i", "status": "completed",
         "positive_prompt": "scene one", "params_json": "{}",
-        "image_state": state,
+        "image_actions": json.dumps(_PATHS["image_actions"]["buttons"].get(state, [])) if state
+        else None,
         "output_files": json.dumps([{"filename": filename or f"{prompt_id}.png"}]),
     }
 
@@ -28,7 +33,8 @@ def _video(prompt_id, *, made_from, action="alpha", workflow="wan22_i2v",
           created="2026-01-01 00:00:00", **marks):
     return {
         "prompt_id": prompt_id, "workflow_name": workflow, "status": "completed",
-        "positive_prompt": f"a scene, {action}", "action": action,
+        "positive_prompt": f"a scene, {action}",
+        "video_actions": json.dumps(_PATHS["video_actions"]["buttons"].get(action, [])),
         "params_json": json.dumps({"input_image": f"{made_from}.png [output]"}),
         "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}]),
         "created_at": created, **marks,

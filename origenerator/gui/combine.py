@@ -16,10 +16,12 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_MEDIUM, GAP_SMALL
+from shared_ui.tick_control import TickControl
 
 from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
+from origenerator.action_vocabulary import vocabulary
 from origenerator.content import genau_flick_word
 from origenerator.gui.action_row import ACTION_LABEL
 from origenerator.gui.drop_zone import (
@@ -40,6 +42,10 @@ from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.media import MediaType
 
 _NEUTRAL_LABEL = "(custom)"
+
+
+def combine_checkbox(name: str) -> str:
+    return f"combine.checkbox.{name}"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
 _NEEDS_ACTION_OR_VIDEO = "Pick an action or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
@@ -67,6 +73,7 @@ class CombineRequest:
     category: str = ""
     intent: str = VIDEO
     edit_first: bool = False
+    checked: tuple[str, ...] = ()
 
 
 @dataclass
@@ -84,6 +91,7 @@ class Combine(QWidget):
     combine_requested = pyqtSignal(object)
     animation_settings_requested = pyqtSignal()
     intent_changed = pyqtSignal(str)
+    checked_changed = pyqtSignal()
     item_activated = pyqtSignal(str)
     video_used = pyqtSignal(str, str)
 
@@ -130,12 +138,23 @@ class Combine(QWidget):
             "on the dropped image. Or pick (custom) and drop a specific video instead."
         )
         self._category.currentIndexChanged.connect(self._on_category_changed)
+        self._boxes: dict[str, TickControl] = {}
+        listed_with_its_boxes = QHBoxLayout()
+        listed_with_its_boxes.setContentsMargins(0, 0, 0, 0)
+        listed_with_its_boxes.setSpacing(GAP_MEDIUM)
+        listed_with_its_boxes.addWidget(self._category, 1)
+        for name in vocabulary(MediaType.VIDEO).checkboxes:
+            box = TickControl(name)
+            box.setObjectName(combine_checkbox(name))
+            box.clicked.connect(lambda _checked=False: self._on_checked_changed())
+            self._boxes[name] = box
+            listed_with_its_boxes.addWidget(box)
 
         self._action_part = QWidget()
         action_column = QVBoxLayout(self._action_part)
         action_column.setContentsMargins(0, 0, 0, 0)
         action_column.setSpacing(0)
-        action_column.addWidget(self._category)
+        action_column.addLayout(listed_with_its_boxes)
         named = QLabel(ACTION_LABEL)
         named.setIndent(_text_inset(self._category))
         action_column.addWidget(named)
@@ -225,6 +244,18 @@ class Combine(QWidget):
         self._category.addItem(_NEUTRAL_LABEL)
         self._category.addItems(animation_paths.actions(lane))
         self.set_category(picked)
+
+    def checked_boxes(self) -> tuple[str, ...]:
+        return tuple(name for name, box in self._boxes.items() if box.isChecked())
+
+    def set_checked_boxes(self, names) -> None:
+        for name, box in self._boxes.items():
+            box.setChecked(name in names)
+        self.checked_changed.emit()
+
+    def _on_checked_changed(self) -> None:
+        self.checked_changed.emit()
+        self._sync()
 
     def selected_category(self) -> str:
         index = self._category.currentIndex()
@@ -327,4 +358,5 @@ class Combine(QWidget):
             return
         self.combine_requested.emit(CombineRequest(
             image_id=image_id, video_id=video_id, category=category,
-            intent=self.selected_intent(), edit_first=edit_first))
+            intent=self.selected_intent(), edit_first=edit_first,
+            checked=self.checked_boxes()))

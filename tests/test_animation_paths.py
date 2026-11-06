@@ -6,8 +6,10 @@ from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
 
-_PATHS = {
-    "animation_paths": {
+_PATHS = {"video_actions": {
+    "buttons": {"alpha": ["alpha"], "beta": ["beta"], "gamma": ["gamma"]},
+    "checkboxes": ["third box"],
+    "starts_from": {
         VIDEO: {
             "alpha": ["state one", "state two"],
             "beta": ["state two"],
@@ -17,7 +19,7 @@ _PATHS = {
             "alpha": ["state two"],
         },
     },
-}
+}}
 
 
 @pytest.fixture
@@ -46,27 +48,41 @@ def test_the_table_answers_whether_one_animation_is_on_it(paths):
     assert animation_paths.allows(GENAU, "gamma", "state three") is False
 
 
+def test_an_action_with_a_checkbox_starts_from_the_images_the_action_alone_does(paths):
+    assert animation_paths.allows(VIDEO, "alpha + third box", "state one") is True
+    assert animation_paths.allows(VIDEO, "alpha + third box", "state three") is False
+
+
+def test_every_animation_listed_is_each_action_alone_then_with_each_checkbox(paths):
+    assert animation_paths.every_path() == (
+        (VIDEO, "alpha", "state one"), (VIDEO, "alpha", "state two"),
+        (VIDEO, "alpha + third box", "state one"), (VIDEO, "alpha + third box", "state two"),
+        (VIDEO, "beta", "state two"), (VIDEO, "beta + third box", "state two"),
+        (VIDEO, "gamma", "state three"), (VIDEO, "gamma + third box", "state three"),
+        (GENAU, "alpha", "state two"), (GENAU, "alpha + third box", "state two"))
+
+
 def test_an_overlay_that_predates_the_table_allows_nothing():
     assert animation_paths.actions_for("state one", VIDEO, content={}) == ()
     assert animation_paths.allows(VIDEO, "alpha", "state one", content={}) is False
 
 
 def test_a_malformed_line_costs_that_line_and_no_more():
-    content = {"animation_paths": {
+    content = {"video_actions": {"starts_from": {
         VIDEO: {"alpha": ["state one", 7, ""], "beta": "state two", "": ["state one"]},
         GENAU: [],
-    }}
+    }}}
 
     assert animation_paths.actions_for("state one", VIDEO, content=content) == ("alpha",)
     assert animation_paths.actions_for("state two", VIDEO, content=content) == ()
     assert animation_paths.actions_for("state two", GENAU, content=content) == ()
 
 
-def test_the_example_table_names_only_actions_and_states_the_example_declares():
+def test_the_example_table_names_only_buttons_the_example_declares():
     example = load_content(EXAMPLE_CONTENT, EXAMPLE_CONTENT)
-    actions = set(example["actions"])
-    states = set(example["image_states"])
-    table = example["animation_paths"]
+    actions = set(example["video_actions"]["buttons"])
+    states = set(example["image_actions"]["buttons"])
+    table = example["video_actions"]["starts_from"]
 
     assert table
     for lane, written in table.items():

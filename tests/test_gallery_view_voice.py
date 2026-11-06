@@ -19,6 +19,7 @@ from origenerator import (
     gallery,
     motion_engine,
 )
+from origenerator.action_labels import Labels
 from origenerator.animate_command import AnimateRequest
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.config import (
@@ -42,6 +43,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.gui.source_tile import SourceTile
+from origenerator.media import MediaType
 from origenerator.prompt_edit import work_out
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.commands import match_voice_command as match
@@ -857,8 +859,9 @@ def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_
     ))
     db.update_generation("img_delta", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
-    db.set_image_state("img_delta", "state two")
+    db.set_labels("img_delta", MediaType.IMAGE, Labels(("alpha", "beta")))
     db.set_settings_source("loop", category=None)
+    db.set_labels("loop", MediaType.VIDEO, None)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()

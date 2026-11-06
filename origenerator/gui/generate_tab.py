@@ -218,7 +218,7 @@ class GenerateTab(DropZones):
         self._enhance_settings = EnhanceSettings()
         self._displayed_config: ConfigSnapshot | None = None
         self._folder_modify: FolderModify | None = None
-        self._settings_source: tuple[str, str | None, str] = ("", None, "")
+        self._settings_source: tuple[str, str | None, str, tuple[str, ...]] = ("", None, "", ())
         self._source_video_row: dict | None = None
         self.lora_offers = LoraOffers(lambda: self._param_form,
                                       lambda: workflow_named(self._form_workflow_key),
@@ -707,8 +707,8 @@ class GenerateTab(DropZones):
         return batch
 
     def set_settings_source(self, category: str, video_prompt_id: str | None,
-                            intent: str) -> None:
-        self._settings_source = (category or "", video_prompt_id or None, intent)
+                            intent: str, checked: tuple[str, ...] = ()) -> None:
+        self._settings_source = (category or "", video_prompt_id or None, intent, tuple(checked))
         self._source_video_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
         self._related.show_row(self._the_row_generate_would_make(), self._image_rows())
 
@@ -717,7 +717,7 @@ class GenerateTab(DropZones):
                 "params_json": json.dumps(self._param_form.get_values()),
                 "source_video": self._settings_source[1]}
 
-    def settings_source(self) -> tuple[str, str | None, str]:
+    def settings_source(self) -> tuple[str, str | None, str, tuple[str, ...]]:
         return self._settings_source
 
     def _prompts_differ_from_source(self) -> bool:
@@ -728,7 +728,7 @@ class GenerateTab(DropZones):
                                         self._source_video_row, workflow))
 
     def _forget_settings_source(self) -> None:
-        self._settings_source = ("", None, "")
+        self._settings_source = ("", None, "", ())
         self._source_video_row = None
 
     def _mark_prompt_edits(self) -> None:

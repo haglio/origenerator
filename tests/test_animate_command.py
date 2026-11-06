@@ -30,8 +30,9 @@ def test_the_loop_lane_is_asked_for_by_the_word_this_family_hears_it_as(said):
 
 
 def test_an_action_of_several_words_is_heard_whole():
-    assert match_animate_command("animate as theta form") is None
-    assert match_animate_command("animate as dancing") == AnimateRequest(VIDEO, "dancing")
+    offered = ("alpha", "theta form")
+    assert match_animate_command("animate as theta", offered) is None
+    assert match_animate_command("animate as theta form", offered) == AnimateRequest(VIDEO, "theta form")
 
 
 def test_the_action_may_be_left_out_where_the_image_leaves_no_choice():
@@ -53,9 +54,13 @@ def test_a_sentence_that_merely_mentions_animating_is_left_to_the_prompt():
 def test_the_recognizer_is_asked_to_hear_every_action_in_both_lanes():
     heard = animate_command_phrases()
 
-    for phrase in ("animate as", "animate as alpha", "animate as dancing",
+    for phrase in ("animate as", "animate as alpha", "animate as beta",
                    "animate as go now", "animate as go now alpha"):
         assert phrase in heard
+
+
+def test_an_action_joined_with_a_plus_is_no_phrase_to_say():
+    assert not any("+" in phrase for phrase in animate_command_phrases())
 
 
 def test_every_phrase_the_recognizer_is_asked_to_hear_is_a_command():

@@ -8,7 +8,10 @@ from PIL import Image
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import action_settings, evolver_export, gallery
+from origenerator.action_labels import Labels
+from origenerator.action_vocabulary import vocabulary
 from origenerator.animate_command import AnimateRequest
+from origenerator.animation_names import labels_for
 from origenerator.db import Database
 from origenerator.export_lane import GENAU
 from origenerator.generation_state import GenerationSource
@@ -27,6 +30,7 @@ from tests.thumbnail_rows import square
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
+_IMAGE_WORDS = vocabulary(MediaType.IMAGE)
 LOOP_WORKFLOW = "wan22_flf2v_loop"
 
 
@@ -61,8 +65,16 @@ class FakePanel:
         self.combine_requested = _Signal()
         self.animation_settings_requested = _Signal()
         self.intent_changed = _Signal()
+        self.checked_changed = _Signal()
         self.item_activated = _Signal()
         self.video_used = _Signal()
+        self.checked = ()
+
+    def checked_boxes(self):
+        return self.checked
+
+    def set_checked_boxes(self, names):
+        self.checked = tuple(names)
 
     def selected_intent(self):
         return self.intent
@@ -148,6 +160,7 @@ class FakeDB:
         self.exported = []
         self.uses = []
         self.combinations = []
+        self.labeled = {}
 
     def get_generation(self, prompt_id):
         return self.rows.get(prompt_id)
@@ -157,6 +170,12 @@ class FakeDB:
 
     def set_settings_source(self, prompt_id, *, category="", video_prompt_id=None):
         self.settings_sources.append((prompt_id, category, video_prompt_id))
+
+    def set_labels(self, prompt_id, side, labels):
+        self.labeled[prompt_id] = (side, labels)
+
+    def fill_in(self, column, values):
+        pass
 
     def record_combine_video_use(self, intent, video_prompt_id, generation_prompt_id=None):
         self.uses.append((intent, video_prompt_id, generation_prompt_id))
@@ -200,8 +219,9 @@ class FakeGenerateTab:
         self.source = None
         self.combination = None
 
-    def set_settings_source(self, category, video_id, intent):
+    def set_settings_source(self, category, video_id, intent, checked=()):
         self.source = (category, video_id, intent)
+        self.checked = checked
 
     def show_combination(self, combination):
         self.combination = combination
@@ -246,7 +266,7 @@ def _image(prompt_id="img", *, prompt="a doll on a couch", files=("one.png",),
         "thumbnail_path": f"{prompt_id}-thumb.png",
         "output_files": json.dumps([{"filename": name} for name in files]),
         "params_json": "{}",
-        "image_state": state,
+        "image_actions": json.dumps(list(_IMAGE_WORDS.buttons.get(state, ()))) if state else None,
     }
 
 
@@ -255,7 +275,8 @@ def _video(prompt_id="clip", **given):
     source_image = given.get("source_image")
     return {
         "prompt_id": prompt_id,
-        "action": given.get("action"),
+        "video_actions": (json.dumps(list(labels_for(given["action"]).actions))
+                          if given.get("action") else None),
         "workflow_name": given.get("workflow_name", VIDEO_WORKFLOW),
         "positive_prompt": "a doll on a couch, waving",
         "status": given.get("status", "completed"),
@@ -399,16 +420,25 @@ def test_a_panel_with_no_server_behind_it_hides(qtbot, combine, starting):
 
 
 
-def test_the_session_keeps_the_image_each_lanes_videos_the_lane_and_the_action(combine):
+def test_the_session_keeps_the_image_each_lanes_videos_the_lane_the_action_and_its_boxes(combine):
     controller, _host = combine()
     controller.widget.image_zone.set_item("img")
     controller.widget.set_dropped_videos({action_settings.VIDEO: "clip"})
     controller.widget.set_intent(action_settings.GENAU)
-    controller.widget.set_category("waving")
+    controller.widget.set_category("alpha")
+    controller.widget.set_checked_boxes(("third box",))
 
     assert controller.selection() == {
         "image": "img", "videos": {action_settings.VIDEO: "clip"},
-        "intent": action_settings.GENAU, "category": "waving"}
+        "intent": action_settings.GENAU, "category": "alpha", "checked": ["third box"]}
+
+
+def test_a_restore_ticks_the_boxes_that_were_ticked(combine):
+    controller, _host = combine()
+
+    controller.restore({"intent": action_settings.VIDEO, "checked": ["third box"]})
+
+    assert controller.widget.checked_boxes() == ("third box",)
 
 
 def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combine):
@@ -466,10 +496,10 @@ def test_a_restore_puts_the_lane_in_before_the_action(combine):
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     controller.restore({"image": "img", "video": "clip",
-                        "intent": action_settings.GENAU, "category": "waving"})
+                        "intent": action_settings.GENAU, "category": "alpha"})
 
     assert controller.widget.intent == action_settings.GENAU
-    assert controller.widget.category == "waving"
+    assert controller.widget.category == "alpha"
 
 
 def test_a_restore_skips_an_item_that_no_longer_fits_its_slot(combine):
@@ -506,10 +536,10 @@ def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine, starting)
 def test_a_picked_action_names_itself_rather_than_showing_a_video(combine, starting):
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    controller._show_starting("img", category="waving")
+    controller._show_starting("img", category="alpha")
 
     (row,) = starting.rows()
-    assert row.action == "waving"
+    assert row.action == "alpha"
     assert row.source_video_thumbnail is None
 
 
@@ -546,7 +576,7 @@ def test_a_dropped_pair_notes_the_lane_its_video_was_used_under(combine, monkeyp
     controller, _host = combine(db=db)
 
     controller._generate_combination("img", "clip", intent=action_settings.GENAU)
-    controller._generate_combination("img", "clip", category="waving")
+    controller._generate_combination("img", "clip", category="alpha")
 
     assert db.uses == [(action_settings.GENAU, "clip", "new-run")]
 
@@ -562,6 +592,46 @@ def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
 
 
 
+def test_a_video_combine_makes_is_labeled_with_its_actions_and_its_ticked_boxes(
+        combine, monkeypatch):
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "combined_params",
+                        lambda video_row, image_row, wf: {"seed": 7})
+    db = FakeDB([_image("img", state="state one"), _video("clip", action="alpha")])
+    controller, _host = combine(db=db, jobs=FakeReroll(launches="made"))
+
+    controller._generate_combination("img", "clip", category="alpha + beta + third box")
+
+    assert db.labeled == {"made": (MediaType.VIDEO, Labels(("alpha", "beta"), ("third box",)))}
+
+
+def test_a_dropped_video_combined_with_a_ticked_box_is_labeled_with_the_box_alone(
+        combine, monkeypatch):
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "combined_params",
+                        lambda video_row, image_row, wf: {"seed": 7})
+    db = FakeDB([_image("img"), _video("clip")])
+    controller, _host = combine(db=db, jobs=FakeReroll(launches="made"))
+
+    controller._generate_combination("img", "clip", checked=("third box",))
+
+    assert db.labeled == {"made": (MediaType.VIDEO, Labels((), ("third box",)))}
+
+
+def test_ticking_a_box_offers_the_actions_again_with_it(combine, monkeypatch):
+    asked = []
+    monkeypatch.setattr(module.action_settings, "available_categories",
+                        lambda rows, intent, checked=(): asked.append(checked) or set())
+    controller, _host = combine()
+    controller.widget.set_checked_boxes(("third box",))
+
+    controller.widget.checked_changed.emit()
+
+    assert asked[-1] == ("third box",)
+
+
 def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_model(
         combine, monkeypatch):
     sent = []
@@ -572,9 +642,9 @@ def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_mo
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7})
     controller, host = combine(
-        db=FakeDB([_image("img", state="state one"), _video("clip", action="waving")]))
+        db=FakeDB([_image("img", state="state one"), _video("clip", action="alpha")]))
 
-    controller.generate_category("img", "waving")
+    controller.generate_category("img", "alpha")
 
     assert sent == []
     assert host.revealed == ["folder-of-clip"]
@@ -594,7 +664,7 @@ def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
     jobs = FakeReroll()
     controller, host = combine(db=FakeDB([_image("img")]), jobs=jobs)
 
-    controller.generate_category("img", "waving")
+    controller.generate_category("img", "alpha")
 
     assert mined == []
     assert jobs.prepared[0][0] == f"folder-for-{VIDEO_WORKFLOW}-3"
@@ -608,11 +678,11 @@ def test_an_action_with_no_past_video_says_so_and_launches_nothing(combine,
     jobs = FakeReroll()
     controller, host = combine(db=FakeDB([_image("img")]), jobs=jobs)
 
-    controller.generate_category("img", "waving")
+    controller.generate_category("img", "alpha")
 
     assert jobs.prepared == []
     assert host.told == [("No past video yet",
-                          ("No past “waving” video to take settings from yet — make "
+                          ("No past “alpha” video to take settings from yet — make "
                            "one first, or drop a specific video instead."))]
 
 
@@ -622,11 +692,11 @@ def test_that_hint_lands_at_the_center_top_of_the_slideshow_rather_than_a_dialog
     slideshows = FakeSlideshows(showing=object())
     controller, host = combine(db=FakeDB([_image("img")]), slideshows=slideshows)
 
-    controller.generate_category("img", "waving", action_settings.GENAU)
+    controller.generate_category("img", "alpha", action_settings.GENAU)
 
     assert host.told == []
     assert slideshows.runs_said == [
-        (None, "no past looping “waving” flick to take settings from yet", WARNING)]
+        (None, "no past looping “alpha” flick to take settings from yet", WARNING)]
 
 
 def test_the_stand_in_row_goes_whatever_the_match_answers(combine, starting, monkeypatch):
@@ -635,7 +705,7 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, starting, mon
     controller, _host = combine(db=FakeDB([_image("img")]))
 
     controller.widget.combine_requested.emit(CombineRequest(
-        image_id="img", category="waving", intent=action_settings.VIDEO))
+        image_id="img", category="alpha", intent=action_settings.VIDEO))
 
     assert starting.rows() == []
 
@@ -670,7 +740,7 @@ def test_a_curated_action_opened_shows_the_frame_alone(combine, monkeypatch):
     tab = FakeGenerateTab()
     controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(tab))
 
-    controller._open_category("img", "waving")
+    controller._open_category("img", "alpha")
 
     assert tab.combination == Combination("img-thumb.png")
 
@@ -694,9 +764,9 @@ def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_star
     tab = FakeGenerateTab()
     tabs = FakeTabs(tab)
     controller, host = combine(
-        db=FakeDB([_image("img", state=state), _video("clip", action="waving")]), tabs=tabs)
+        db=FakeDB([_image("img", state=state), _video("clip", action="alpha")]), tabs=tabs)
 
-    controller._open_category("img", "waving")
+    controller._open_category("img", "alpha")
 
     (name, params), = tabs.opened
     workflow = module.WORKFLOW_REGISTRY[name]
@@ -705,7 +775,7 @@ def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_star
     assert (params["positive_prompt"], params["negative_prompt"]) == ("", "")
     assert (_apart_from_the_image_and_the_seeds(params, workflow)
             == _apart_from_the_image_and_the_seeds(workflow.default_params(), workflow))
-    assert tab.source == ("waving", None, action_settings.VIDEO)
+    assert tab.source == ("alpha", None, action_settings.VIDEO)
     assert tab.combination == Combination("img-thumb.png")
     assert host.told == []
 
@@ -724,7 +794,7 @@ def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with
     tabs = FakeTabs(FakeGenerateTab())
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]), tabs=tabs)
 
-    controller._open_category("img", "waving")
+    controller._open_category("img", "alpha")
 
     (_name, params), = tabs.opened
     assert (params["positive_prompt"], params["negative_prompt"]) == ("", "")
@@ -740,7 +810,7 @@ def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
                                 jobs=jobs, tabs=tabs)
 
     controller.widget.combine_requested.emit(CombineRequest(
-        image_id="img", category="waving", intent=lane, edit_first=edit_first))
+        image_id="img", category="alpha", intent=lane, edit_first=edit_first))
 
     ran = tabs.opened if edit_first else [
         (name, params) for _key, name, params in jobs.prepared]
@@ -779,7 +849,7 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(combine,
     controller, _host = combine(db=db)
 
     assert controller.animate_it(
-        "img", AnimateRequest(action_settings.GENAU, "waving"))[1] != ALREADY_GENAUD
+        "img", AnimateRequest(action_settings.GENAU, "alpha"))[1] != ALREADY_GENAUD
 
 
 def test_a_spoken_launch_is_stamped_to_hand_its_clip_on(combine, monkeypatch):
@@ -792,7 +862,7 @@ def test_a_spoken_launch_is_stamped_to_hand_its_clip_on(combine, monkeypatch):
     db = FakeDB([_image("img")])
     controller, _host = combine(db=db)
 
-    controller.generate_category("img", "waving", action_settings.GENAU, send=True)
+    controller.generate_category("img", "alpha", action_settings.GENAU, send=True)
 
     assert db.requested == ["new-run"]
 
@@ -807,7 +877,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(combine, monkeypatch)
     db = FakeDB([_image("img")])
     controller, _host = combine(db=db)
 
-    controller.generate_category("img", "waving", action_settings.GENAU)
+    controller.generate_category("img", "alpha", action_settings.GENAU)
 
     assert db.requested == []
 
@@ -882,7 +952,7 @@ def test_an_action_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_image_conditioned",
                         lambda name: name == VIDEO_WORKFLOW)
     monkeypatch.setattr(module.action_settings, "available_categories",
-                        lambda rows, intent: [r["prompt_id"] for r in rows])
+                        lambda rows, intent, checked=(): [r["prompt_id"] for r in rows])
     controller, _host = combine()
 
     controller.offer_the_actions([_video("clip"), _image("img"),
@@ -895,7 +965,7 @@ def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypat
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     seen = []
     monkeypatch.setattr(module.action_settings, "available_categories",
-                        lambda rows, intent: seen.append(intent) or [])
+                        lambda rows, intent, checked=(): seen.append(intent) or [])
     controller, _host = combine(db=FakeDB([_video("clip")]))
     controller.widget.set_intent(action_settings.GENAU)
 
@@ -916,27 +986,28 @@ def test_a_spoken_action_whose_folder_is_already_making_one_joins_that_run(combi
     jobs = FakeReroll(launches=None, making={f"folder-for-{VIDEO_WORKFLOW}-3"})
     controller, _host = combine(db=db, slideshows=slideshows, jobs=jobs)
 
-    controller.generate_category("img", "waving", send=True)
+    controller.generate_category("img", "alpha", send=True)
 
     assert db.requested == ["the-run-already-going"]
     assert jobs.prepared == []
     assert [message for _pid, message, _kind in slideshows.runs_said] == [module.ALREADY_MAKING_ONE]
 
-_PATHS = {
-    "animation_paths": {
-        action_settings.VIDEO: {"waving": ["state one"], "leaning": ["state one"]},
-        action_settings.GENAU: {"waving": ["state one"]},
+_PATHS = {"video_actions": {
+    "buttons": {"alpha": ["alpha"], "leaning": ["leaning"]},
+    "starts_from": {
+        action_settings.VIDEO: {"alpha": ["state one"], "leaning": ["state one"]},
+        action_settings.GENAU: {"alpha": ["state one"]},
     },
-}
+}}
 
 
 def _paths(monkeypatch):
     monkeypatch.setattr(module.animation_paths, "load_content", lambda: _PATHS)
 
 
-def _no_mining(monkeypatch, available=("waving",)):
+def _no_mining(monkeypatch, available=("alpha",)):
     monkeypatch.setattr(module.action_settings, "available_categories",
-                        lambda rows, intent: list(available))
+                        lambda rows, intent, checked=(): list(available))
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.action_settings, "most_used_video", lambda *a, **k: None)
 
@@ -948,10 +1019,10 @@ def test_animate_as_runs_the_action_it_names_in_the_lane_it_names(combine, monke
     launched = []
     controller.generate_category = lambda *args, **kw: launched.append((args, kw))
 
-    answer = controller.animate_it("img", AnimateRequest(action_settings.GENAU, "waving"))
+    answer = controller.animate_it("img", AnimateRequest(action_settings.GENAU, "alpha"))
 
-    assert answer == ("img", "animating as “waving”", INFO)
-    assert launched == [(("img", "waving", action_settings.GENAU), {"send": True})]
+    assert answer == ("img", "animating as “alpha”", INFO)
+    assert launched == [(("img", "alpha", action_settings.GENAU), {"send": True})]
 
 
 def test_animate_as_with_no_action_said_takes_the_one_the_image_leaves(combine,
@@ -964,13 +1035,13 @@ def test_animate_as_with_no_action_said_takes_the_one_the_image_leaves(combine,
 
     controller.animate_it("img", AnimateRequest(action_settings.GENAU, ""))
 
-    assert launched == [(("img", "waving", action_settings.GENAU), {"send": True})]
+    assert launched == [(("img", "alpha", action_settings.GENAU), {"send": True})]
 
 
 def test_a_full_length_animation_is_left_in_the_gallery_rather_than_handed_on(
         combine, monkeypatch):
     _paths(monkeypatch)
-    _no_mining(monkeypatch, available=("waving", "leaning"))
+    _no_mining(monkeypatch, available=("alpha", "leaning"))
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
     launched = []
     controller.generate_category = lambda *args, **kw: launched.append((args, kw))
@@ -1000,7 +1071,7 @@ def test_an_image_nobody_has_sorted_yet_is_asked_about_first(combine, monkeypatc
     controller, _host = combine(db=FakeDB([_image("img")]))
 
     prompt_id, message, kind = controller.animate_it(
-        "img", AnimateRequest(action_settings.VIDEO, "waving"))
+        "img", AnimateRequest(action_settings.VIDEO, "alpha"))
 
     assert prompt_id is None
     assert "sorted" in message
@@ -1010,7 +1081,7 @@ def test_an_image_nobody_has_sorted_yet_is_asked_about_first(combine, monkeypatc
 def test_animate_as_declines_a_video(combine):
     controller, _host = combine(db=FakeDB([_video("clip")]))
 
-    assert controller.animate_it("clip", AnimateRequest(action_settings.VIDEO, "waving")) == (
+    assert controller.animate_it("clip", AnimateRequest(action_settings.VIDEO, "alpha")) == (
         None, "only an image can be animated", WARNING)
 
 
@@ -1020,10 +1091,10 @@ def test_an_action_with_no_past_video_yet_says_so(combine, monkeypatch):
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
 
     prompt_id, message, kind = controller.animate_it(
-        "img", AnimateRequest(action_settings.GENAU, "waving"))
+        "img", AnimateRequest(action_settings.GENAU, "alpha"))
 
     assert prompt_id is None
-    assert "waving" in message
+    assert "alpha" in message
     assert kind == WARNING
 
 
@@ -1036,7 +1107,7 @@ def test_a_second_loop_asked_for_over_an_image_with_one_coming_is_refused(
                  _video("clip", status="running", requested="now")])
     controller, _host = combine(db=db)
 
-    assert controller.animate_it("img", AnimateRequest(action_settings.GENAU, "waving")) == (
+    assert controller.animate_it("img", AnimateRequest(action_settings.GENAU, "alpha")) == (
         None, ALREADY_GENAUD, WARNING)
 
 
@@ -1044,30 +1115,30 @@ def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,
                                                                      monkeypatch):
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
-                        lambda rows, intent: {"waving", "leaning"})
+                        lambda rows, intent, checked=(): {"alpha", "leaning"})
     controller, _host = combine(db=FakeDB([_image("img", state="state one"),
                                            _video("clip")]))
 
     controller.widget.image_zone.set_item("img")
 
-    assert sorted(controller.widget.available) == ["leaning", "waving"]
+    assert sorted(controller.widget.available) == ["alpha", "leaning"]
 
     monkeypatch.setattr(module.animation_paths, "actions_for",
-                        lambda state, lane, **kw: ("waving",))
+                        lambda state, lane, **kw: ("alpha",))
     controller.image_dropped()
 
-    assert sorted(controller.widget.available) == ["waving"]
+    assert sorted(controller.widget.available) == ["alpha"]
 
 
 def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
-                        lambda rows, intent: {"waving", "leaning"})
+                        lambda rows, intent, checked=(): {"alpha", "leaning"})
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
 
     controller.widget.image_zone.set_item("img")
 
-    assert sorted(controller.widget.available) == ["leaning", "waving"]
+    assert sorted(controller.widget.available) == ["alpha", "leaning"]
 
 
 def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin(
@@ -1079,7 +1150,7 @@ def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin
                         lambda lane, action, state: accepted if state else None)
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
 
-    built = controller._curated_combination("img", "waving")
+    built = controller._curated_combination("img", "alpha")
 
     assert built is not None
     assert built[1]["steps"] == 24
@@ -1092,7 +1163,7 @@ def test_an_image_nobody_sorted_still_gets_the_actions_pin(combine, monkeypatch)
                         lambda lane, action, state: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    built = controller._curated_combination("img", "waving")
+    built = controller._curated_combination("img", "alpha")
 
     assert built is not None
     assert built[1]["steps"] == 4

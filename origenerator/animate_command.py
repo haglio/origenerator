@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from origenerator import animation_paths
-from origenerator.action_settings import CATEGORIES, GENAU, VIDEO
+from origenerator.action_settings import GENAU, VIDEO
+from origenerator.action_vocabulary import vocabulary
+from origenerator.animation_names import JOINER
+from origenerator.media import MediaType
 from origenerator.voice.text import sounds_like, words
 
 # Whisper's renderings of the verb and of the loop lane's sound.
@@ -52,6 +55,11 @@ def _lane_of(rest: list[str]) -> tuple[str, list[str]]:
     return VIDEO, rest
 
 
+def spoken_actions(content: dict | None = None) -> tuple[str, ...]:
+    return tuple(action for action in vocabulary(MediaType.VIDEO, content).buttons
+                 if JOINER not in action)
+
+
 def _action_of(rest: list[str], actions) -> str | None:
     if not rest:
         return ""
@@ -62,16 +70,17 @@ def _action_of(rest: list[str], actions) -> str | None:
     return None
 
 
-def match_animate_command(text: str, actions=CATEGORIES) -> AnimateRequest | None:
+def match_animate_command(text: str, actions=None) -> AnimateRequest | None:
     rest = _after_the_verb(words(text))
     if rest is None:
         return None
     lane, named = _lane_of(rest)
-    action = _action_of(named, actions)
+    action = _action_of(named, spoken_actions() if actions is None else actions)
     return None if action is None else AnimateRequest(lane, action)
 
 
-def animate_command_phrases(actions=CATEGORIES) -> frozenset[str]:
+def animate_command_phrases(actions=None) -> frozenset[str]:
+    actions = spoken_actions() if actions is None else actions
     said = []
     for lane in ("", _GENAU_AS_SAID):
         opening = f"animate as {lane}".strip()
@@ -100,7 +109,7 @@ def what_to_animate(asked: AnimateRequest, state: str, *, content: dict | None =
     return Answer(offered[0])
 
 
-def animate_command_spelling(text: str, actions=CATEGORIES) -> str | None:
+def animate_command_spelling(text: str, actions=None) -> str | None:
     asked = match_animate_command(text, actions)
     if asked is None:
         return None

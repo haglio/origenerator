@@ -44,7 +44,7 @@ class ActionDropdown(QWidget):
         self._dropdown.currentIndexChanged.connect(self._on_picked)
         row.addWidget(self._dropdown, 1)
         self._sorting = None
-        self._sort = QPushButton("Set image actions…", objectName=SORT_BUTTON)
+        self._sort = QPushButton("Set image action…", objectName=SORT_BUTTON)
         self._sort.setToolTip("Set this image's action, then every image nobody "
                               "has answered for, one press apiece")
         self._sort.clicked.connect(self._on_sort)

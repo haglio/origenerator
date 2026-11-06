@@ -199,7 +199,7 @@ def test_the_button_beside_the_list_says_what_pressing_it_sets(dropdown):
     button = dropdown.findChild(QPushButton, SORT_BUTTON)
 
     assert (button.text(), button.toolTip()) == (
-        "Set image actions…",
+        "Set image action…",
         ("Set this image's action, then every image nobody has answered for, "
          "one press apiece"))
 

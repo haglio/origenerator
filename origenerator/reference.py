@@ -16,8 +16,18 @@ def _row(description: str, keys: tuple[str, ...] = (), *, said: tuple[str, ...] 
     return CommandRef(action, said, key_columns=(keys,), detail=detail)
 
 
+_AS_WRITTEN = (("o s r two", "OSR2"), ("osr two", "OSR2"))
+
+
+def _as_written(phrase: str) -> str:
+    for heard, written in _AS_WRITTEN:
+        phrase = phrase.replace(heard, written)
+    return phrase
+
+
 def _said(*commands: AppCommand) -> tuple[str, ...]:
-    return tuple(phrase for command in commands for phrase in said_as(command))
+    return tuple(dict.fromkeys(_as_written(phrase) for command in commands
+                               for phrase in said_as(command)))
 
 
 def _core() -> ReferenceSection:
@@ -41,7 +51,7 @@ def _core() -> ReferenceSection:
                  said=_said(AppCommand.GROUP)),
         )),
         ReferenceGroup("Collections", (
-            _row("Recents", said=_said(AppCommand.LATEST)),
+            _row("Latest", said=_said(AppCommand.LATEST)),
             _row("Favorites", said=_said(AppCommand.FAVORITES)),
             _row("Experiments", said=_said(AppCommand.EXPERIMENTS)),
         )),

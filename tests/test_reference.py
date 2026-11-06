@@ -16,6 +16,10 @@ def _said() -> set[str]:
     return {phrase for row in _rows() for phrase in row.voice}
 
 
+def _written(phrase: str) -> str:
+    return phrase.replace("o s r two", "OSR2").replace("osr two", "OSR2")
+
+
 def _section(title: str):
     return next(section for section in reference_sections() if section.title == title)
 
@@ -26,7 +30,8 @@ def test_the_sections_are_core_the_image_on_screen_the_osr2_and_the_slideshow():
 
 
 def test_every_word_origenerator_answers_is_on_some_row():
-    words = {phrase for phrase, meant in _PHRASES.items() if not isinstance(meant, BarSetting)}
+    words = {_written(phrase) for phrase, meant in _PHRASES.items()
+             if not isinstance(meant, BarSetting)}
 
     assert words - _said() == set()
 
@@ -47,7 +52,15 @@ def test_the_osr2_s_keys_are_the_ones_the_motion_answers():
 
 
 def test_an_action_opens_lowercase_unless_it_opens_with_a_name():
-    names = ("Recents", "Favorites", "Experiments", "Auto-generate", "Origenerator", "Request",
+    names = ("Latest", "Favorites", "Experiments", "Auto-generate", "Origenerator", "Request",
              "HUD")
     for row in _rows():
         assert row.description[0].islower() or row.description.startswith(names), row.description
+
+
+def test_the_osr2_is_written_as_the_app_shows_it_and_each_phrase_once():
+    control = _section("OSR2").rows[0]
+
+    assert "OSR2 control on" in control.voice
+    assert not any("two" in phrase for phrase in control.voice)
+    assert len(control.voice) == len(set(control.voice))

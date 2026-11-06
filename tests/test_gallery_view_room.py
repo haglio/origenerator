@@ -622,7 +622,7 @@ def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
     view.osr2_control.setChecked(True)
     assert view._osr2_motion.active
-    assert view._handle_escape() is True
+    assert view._handle_escape(Qt.KeyboardModifier.NoModifier) is True
     assert view._osr2_motion.frozen
 
 
@@ -745,7 +745,7 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     _press_ctrl_f(view, monkeypatch)
     assert view._find_bar.isVisible()
 
-    assert view._handle_escape() is False
+    assert view._handle_escape(Qt.KeyboardModifier.NoModifier) is False
     assert not omnipause.frozen()
 
 
@@ -830,6 +830,17 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
     assert view._buttons.radio.isChecked()
 
 
+def test_shift_esc_at_a_standalone_slideshow_closes_it_and_leaves_the_room_playing(
+        qtbot, tmp_path, monkeypatch):
+    _view, radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
+
+    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
+
+    qtbot.waitUntil(lambda: not slideshow.shown.isVisible())
+    assert not omnipause.frozen()
+    assert not radio.frozen
+
+
 def test_esc_at_a_standalone_slideshow_has_its_osr2_line_say_parked_until_a_second_plays(
         qtbot, tmp_path, monkeypatch):
     view, _radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
@@ -909,6 +920,23 @@ def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anythi
     assert radio.starts == 0
     assert not view._auto.is_active(key)
     assert not view.osr2_control.isChecked()
+
+
+def test_shift_esc_in_the_gallery_opens_the_slideshow_a_double_click_would_and_leaves_the_room_playing(
+        qtbot, tmp_path, monkeypatch):
+    view, _radio, _key = _startable_view(qtbot, tmp_path, monkeypatch)
+    _viewport_of(view).show_frame(_png_bytes())
+    view.show()
+    view.activateWindow()
+    QTest.qWaitForWindowActive(view)
+
+    gestures.press_key(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
+
+    slideshow = view._slideshows.showing
+    assert slideshow is not None
+    qtbot.addWidget(slideshow.shown)
+    assert not omnipause.frozen()
+    slideshow.close()
 
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):

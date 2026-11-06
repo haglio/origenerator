@@ -458,7 +458,7 @@ class GalleryView(QWidget):
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Escape and self._handle_escape():
+            if event.key() == Qt.Key.Key_Escape and self._handle_escape(event.modifiers()):
                 return True
             if (event.key() == Qt.Key.Key_Escape and self._find_bar.isVisible()
                     and not self._other_window_owns_keys()):
@@ -484,11 +484,16 @@ class GalleryView(QWidget):
         # the base class's answer for one dereferences a freed C++ pointer and aborts.
         return False
 
-    def _handle_escape(self) -> bool:
+    def _handle_escape(self, modifiers) -> bool:
         if self._other_window_owns_keys():
             return False
         if self._escape_cancels_something():
             return False
+        if modifiers & Qt.KeyboardModifier.ShiftModifier and self._fun_time is None:
+            tab = self._generate_pane.current_generate_tab()
+            if tab is not None:
+                tab.open_slideshow()
+            return True
         self._slideshows.pause_or_play_the_room()
         return True
 

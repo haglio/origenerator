@@ -34,7 +34,7 @@ def test_closing_a_gallery_that_was_never_shown_stops_its_poll(qtbot):
 def test_a_closed_gallery_stops_answering_the_rooms_keys(qtbot, monkeypatch):
     view = _gallery(qtbot)
     reached = []
-    monkeypatch.setattr(view, "_handle_escape", lambda: bool(reached.append(True)))
+    monkeypatch.setattr(view, "_handle_escape", lambda _modifiers: bool(reached.append(True)))
     _press_escape_elsewhere(qtbot)
     assert reached
 
@@ -51,7 +51,7 @@ def test_a_gallery_shown_after_a_close_takes_the_keys_back(qtbot, monkeypatch):
 
     view.show()
     reached = []
-    monkeypatch.setattr(view, "_handle_escape", lambda: bool(reached.append(True)))
+    monkeypatch.setattr(view, "_handle_escape", lambda _modifiers: bool(reached.append(True)))
     _press_escape_elsewhere(qtbot)
 
     assert reached

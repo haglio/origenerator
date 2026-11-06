@@ -38,6 +38,8 @@ _SAYING_NOTHING = frozenset({
 })
 _UNREADABLE = "Couldn't read one of the model's changes."
 _LEFT_OUT = re.compile(r"(?:no|without)\s+(?:(?:a|an|any|the)\s+)?(\S.*)", re.IGNORECASE)
+_QUOTED = re.compile(r"""["\u201c]([^"\u201d]+)["\u201d]|(?<!\w)'([^']+)'(?!\w)|\bthe word\s+([\w-]+)""",
+                     re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -59,7 +61,7 @@ def _quoted(value) -> str:
 
 
 def _words_of(text) -> set[str]:
-    return {word.lower() for word in _WORD.findall(str(text or ""))}
+    return {word.lower().strip("'") for word in _WORD.findall(str(text or ""))}
 
 
 def _naming(text) -> set[str]:
@@ -68,6 +70,11 @@ def _naming(text) -> set[str]:
 
 def answers_him(reason, asked: list[str]) -> bool:
     return bool(_naming(reason) & set().union(*(_naming(request) for request in asked)))
+
+
+def _quoted_in(asked: list[str]) -> list[str]:
+    return [next(filter(None, found)).strip() for request in asked
+            for found in _QUOTED.findall(str(request or ""))]
 
 
 def _spaced(words: str) -> str:
@@ -186,6 +193,7 @@ class _Applying:
         self.shown_positive, self.negative = pair
         self.positive = self.shown_positive
         self.asked = asked
+        self.quoted = _quoted_in(asked)
         self.settings = settings
         self.in_scenes = prompts.in_scenes
         self.take_weights = prompts.take_weights
@@ -248,7 +256,7 @@ class _Applying:
     def _replace(self, which: str, change: dict) -> list[str]:
         old = _as_written(getattr(self, which), str(change["replace"]))
         new = self._as_these_prompts_take(str(change.get("with") or ""))
-        if not new.strip():
+        if not new.strip() or self._only_takes_out_what_he_quoted(old, new):
             return self._remove(which, {"remove": old})
         found = _found(getattr(self, which), old)
         if found is None:
@@ -330,7 +338,8 @@ class _Applying:
 
     def _remove(self, which: str, change: dict) -> list[str]:
         text = getattr(self, which)
-        asked = [_as_written(text, part) for part in _parts(str(change["remove"]))]
+        asked = [words for part in _parts(str(change["remove"]))
+                 for words in self._only_what_he_quoted(_as_written(text, part))]
         parts = [part for part in asked if _whole(text, part)]
         if len(parts) > 1:
             parts = [part for part in parts if self._names_what_he_asked(part)]
@@ -339,6 +348,14 @@ class _Applying:
         self.took_out = self.took_out or (which == "positive" and bool(parts))
         setattr(self, which, without_phrases(text, parts))
         return [f"Removed {_quoted(part)} from the {PROMPTS[which]}." for part in parts]
+
+    def _only_what_he_quoted(self, words: str) -> list[str]:
+        return [quote for quote in self.quoted if _whole(words, quote)] or [words]
+
+    def _only_takes_out_what_he_quoted(self, old: str, new: str) -> bool:
+        left = iter(old.lower().split())
+        return (all(word in left for word in new.lower().split())
+                and any(_whole(old, quote) and not _whole(new, quote) for quote in self.quoted))
 
     _EDITS: ClassVar[dict] = {"replace": _replace, "add": _add, "remove": _remove}
 

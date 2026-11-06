@@ -181,7 +181,7 @@ from origenerator.item_shape import (
 from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
-from origenerator.media import MediaType
+from origenerator.library_views import LibrarySnapshot
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
@@ -356,15 +356,25 @@ class GalleryView(QWidget):
         self._generating_tile: GeneratingTile | None = None
 
     def _forget_the_listing(self):
-        self._image_rows: list[dict] = []
+        self._library = LibrarySnapshot([])
         self._live_ids: set[str] = set()
-        self._listed_rows: list[dict] = []
         self._listed_requests: list[dict] = []
         self._image_index: dict | None = None
 
+    @property
+    def _image_rows(self) -> list[dict]:
+        return self._library.image_rows
+
+    @property
+    def _listed_rows(self) -> list[dict]:
+        return self._library.rows
+
+    @property
+    def _held_rows(self) -> list[dict]:
+        return self._library.held_rows
+
     def _build_the_panes(self, db, client):
         self._search = GallerySearchController(self, parent=self)
-        self._held_rows: list[dict] = []
         self._selected_row: dict | None = None
         self._item_names = ItemNames(db)
         self._scroll = GalleryPaneScrollArea()
@@ -417,7 +427,7 @@ class GalleryView(QWidget):
         self._slideshows = SlideshowDirector(
             self,
             DirectorSources(db=db, gallery_pane=self._gallery_pane, jobs=self._jobs,
-                            names=self._item_names),
+                            names=self._item_names, library=lambda: self._library),
             DirectorSurroundings(
                 pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons))
@@ -1062,12 +1072,9 @@ class GalleryView(QWidget):
         selected_gen = self.selected_generation()
         reroll_key = self._selected_reroll_key
         self._pending_key = self._pending_selection = None
-        self._image_rows = [r for r in rows
-                            if gallery.media_type_of_row(r) == MediaType.IMAGE]
+        self._library = LibrarySnapshot(rows, self._db.list_trashed)
         self._combine.offer_the_actions(rows)
-        self._listed_rows = rows
         trash_collection.settle_regenerations(self._db)
-        self._held_rows = trash_collection.trash_items(self._db.list_trashed())
         start_frames, trees = self._lists_for(rows, meta, self._tree.shapes)
         self._image_index = start_frames
         self._live_ids = {row["prompt_id"] for row in rows}

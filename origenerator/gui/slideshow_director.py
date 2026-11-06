@@ -39,7 +39,7 @@ from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
 )
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
-from origenerator.generation_state import GenerationSource, on_the_map, source_of
+from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
@@ -290,8 +290,7 @@ class SlideshowDirector:
         self._filters = SlideshowFilters()
         self._enhance_status: dict[str, str] = {}
         self._held_at = _KeptPerModel(gallery_pane.model_stamp)
-        self._library = _KeptPerModel(gallery_pane.model_stamp)
-        self._rows_by_id = _KeptPerModel(gallery_pane.model_stamp)
+        self._library = sources.library
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._giving_them_back = False
 
@@ -432,8 +431,7 @@ class SlideshowDirector:
         return slideshow
 
     def _listed_rows(self) -> list[dict]:
-        by_id = self._rows_by_id.get(None, lambda: {
-            row["prompt_id"]: row for row in self._db.list_generations()})
+        by_id = self._library().rows_by_id
         rows = (by_id.get(prompt_id) or self._host.row_for(prompt_id)
                 for prompt_id in self._host.listed_prompt_ids())
         return [row for row in rows if row is not None]
@@ -653,10 +651,6 @@ class SlideshowDirector:
             playlists[str(entries[0][0])] = entries
         return playlists
 
-    def _library_of(self, shape: str) -> list[dict]:
-        return self._library.get(shape, lambda: filter_rows(
-            [row for row in self._db.list_generations() if on_the_map(row)], shape))
-
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(rows))
 
@@ -664,7 +658,7 @@ class SlideshowDirector:
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
             return NavMapNeighbors()
-        around = surroundings(row, self._library_of(shape),
+        around = surroundings(row, self._library().on_the_map(shape),
                               image_index=self._host.image_config_index())
         named = [(generation, self._folder_name(generation), True)
                  for generation in around.configs]
@@ -683,10 +677,10 @@ class SlideshowDirector:
         if row is None:
             return ()
         return self._slides_of(beyond_the_row(
-            row, self._library_of(shape), image_index=self._host.image_config_index()))
+            row, self._library().on_the_map(shape), image_index=self._host.image_config_index()))
 
     def actions_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
-        named_for = action_labels(self._library_of(shape),
+        named_for = action_labels(self._library().on_the_map(shape),
                                image_index=self._host.image_config_index())
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
                 if prompt_id in named_for}
@@ -1242,8 +1236,7 @@ class SlideshowDirector:
         self.answer(said, kind=kind)
 
     def _favorite_prompt_ids(self) -> set[str]:
-        marked = {row["prompt_id"] for row in self._db.list_generations()
-                  if row.get("starred")}
+        marked = set(self._library().favorite_ids)
         for shape in _SHAPES:
             key = shaped_key(_FAVORITES_KEY, shape)
             marked.update(row["prompt_id"]

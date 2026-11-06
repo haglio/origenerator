@@ -71,6 +71,7 @@ class ButtonHandlers(NamedTuple):
     toggle_radio: Callable[[bool], None]
     toggle_mic: Callable[[bool], None]
     pause_or_play: Callable[[], None]
+    quit: Callable[[], None]
 
 
 def _landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
@@ -84,7 +85,11 @@ class _SoundSwitch(QToolButton):
 
 
 class _PlayPause(QToolButton):
+    def nextCheckState(self) -> None:
+        pass
+
     def set_frozen(self, frozen: bool) -> None:
+        self.setChecked(not frozen)
         self.setIcon(icons.play_icon() if frozen else icons.pause_icon())
         self.setToolTip("Play everything" if frozen else "Pause everything")
 
@@ -136,9 +141,13 @@ class GalleryPaneButtons(QWidget):
         self.radio = None
         self.mic = None
         self.play_pause = None
+        self.power = None
         if not hosted:
+            self.power = _tool_button(icons.power_icon(), "Quit", handlers.quit)
             self.play_pause = _tool_button(icons.pause_icon(), "", handlers.pause_or_play,
                                            kind=_PlayPause)
+            self.play_pause.setCheckable(True)
+            self.play_pause.setStyleSheet(_LIT)
             omnipause.holds(self.play_pause)
             self.radio = _tool_button(
                 icons.radio_icon(),
@@ -159,13 +168,12 @@ class GalleryPaneButtons(QWidget):
         layout = FlowLayout(self)
         self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
         for listed in (
-            (self.play_pause,),
             (self.back, self.forward),
             (self.undo, self.redo),
             (self.group,),
             (self.favorite, self.enhance, self.delete),
             (self.slideshow, self.auto, self.radio),
-            (self.mic,),
+            (self.power, self.play_pause, self.mic),
         ):
             buttons = tuple(b for b in listed if b is not None)
             gap = _group_gap()
@@ -188,13 +196,13 @@ class GalleryPaneButtons(QWidget):
 
     def become_hosted(self) -> None:
         self._draw_at_the_huds_scale(hosted=True)
-        self._room_switches = (self.radio, self.mic, self.play_pause)
+        self._room_switches = (self.radio, self.mic, self.play_pause, self.power)
         self._show_the_room_switches(False)
-        self.radio = self.mic = self.play_pause = None
+        self.radio = self.mic = self.play_pause = self.power = None
 
     def become_standalone(self) -> None:
         self._draw_at_the_huds_scale(hosted=False)
-        self.radio, self.mic, self.play_pause = self._room_switches
+        self.radio, self.mic, self.play_pause, self.power = self._room_switches
         self._show_the_room_switches(True)
 
     def turn_the_radio_on(self) -> None:

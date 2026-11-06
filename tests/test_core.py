@@ -117,6 +117,18 @@ def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
     assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
 
 
+def test_the_power_button_asks_first_as_ctrl_alt_q_does_and_closes_on_yes(
+        qtbot, tmp_path, monkeypatch):
+    asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    win._gallery_view._buttons.power.click()
+
+    assert len(asked) == 1
+    assert not win.isVisible()
+
+
 def test_closing_it_from_its_title_bar_asks_first(qtbot, tmp_path, monkeypatch):
     asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
     win = _window(qtbot, tmp_path)

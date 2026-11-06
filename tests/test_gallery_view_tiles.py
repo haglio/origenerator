@@ -942,14 +942,12 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     view.refresh()
 
     groups = [buttons for _gap, buttons in view._buttons._groups]
-    assert groups[0] == (view._buttons.play_pause,)
-    assert groups[1] == (view._buttons.back, view._buttons.forward)
-    assert groups[2] == (view._buttons.undo, view._buttons.redo)
-    assert groups[4] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
-    assert view._buttons.auto in groups[5]
-    assert view._buttons.radio in groups[5]
-    assert groups[6] == (view._buttons.mic,)
-    assert view._buttons.mic not in groups[5]
+    assert groups[0] == (view._buttons.back, view._buttons.forward)
+    assert groups[1] == (view._buttons.undo, view._buttons.redo)
+    assert groups[3] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
+    assert view._buttons.auto in groups[4]
+    assert view._buttons.radio in groups[4]
+    assert groups[5] == (view._buttons.power, view._buttons.play_pause, view._buttons.mic)
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -960,11 +958,11 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     _select_first_leaf(view)
 
     gaps = {id(gap): gap for gap, _ in view._buttons._groups}
-    leading, group_gap = view._buttons._groups[0][0], view._buttons._groups[3][0]
+    leading, group_gap = view._buttons._groups[0][0], view._buttons._groups[2][0]
     assert not leading.isVisible()
     assert view._buttons.group.isHidden()
     assert not group_gap.isVisible()
-    assert view._buttons._groups[4][0].isVisible()
+    assert view._buttons._groups[3][0].isVisible()
     assert len(gaps) == len(view._buttons._groups)
 
 

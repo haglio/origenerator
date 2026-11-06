@@ -314,6 +314,17 @@ def test_a_model_that_changes_nothing_says_so_and_there_is_nothing_to_make():
     assert revision.answer == "Nothing changed."
 
 
+def test_a_model_that_gives_up_says_what_the_prompts_already_had():
+    gave_up = {"changes": [], "tried": {"positive": "freckles", "negative": "clear skin",
+                                        "for": "more freckles"}}
+
+    revision = work_out("a woman, freckles", "blurry, clear skin", "more freckles", ask=_Model(gave_up))
+
+    assert not revision.changed
+    assert revision.answer == ('"freckles" was already in the Positive Prompt, and its opposite already '
+                               "in the Negative Prompt, so I couldn't figure out anything else to do.")
+
+
 def test_a_change_answering_none_of_his_words_is_left_out_without_a_word():
     model = _Model(_answer(_replace("natural makeup", "heavy makeup", for_="glamour"),
                            _add("soft light", for_="more light")))
@@ -513,6 +524,9 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     assert "note" not in shape
     assert '"for": "<his words>"' in shape
     assert "thrown away" in shape
+    assert shape.endswith('add "tried": {"positive": "<the words for it now in the positive prompt>", '
+                          '"negative": "<the words for its opposite now in the negative prompt>", '
+                          '"for": "<his words>"}.')
     assert "..." not in content.rsplit("\n\n", 1)[0]
 
 

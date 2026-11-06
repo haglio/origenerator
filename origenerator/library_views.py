@@ -82,6 +82,12 @@ class LibrarySnapshot:
     def rows_by_id(self) -> dict[str, dict]:
         return {row["prompt_id"]: row for row in self.rows}
 
+    def row_for(self, prompt_id: str) -> dict | None:
+        row = self.rows_by_id.get(prompt_id)
+        if row is not None:
+            return row
+        return next((held for held in self.held_rows if held["prompt_id"] == prompt_id), None)
+
     @property
     def favorite_ids(self) -> set[str]:
         return {row["prompt_id"] for row in self.rows if row.get("starred")}

@@ -101,22 +101,6 @@ _SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
 
 
 class SlideshowHost(Protocol):
-    def slideshow_location(self) -> str | None: ...
-
-    def rows_to_play(self) -> list[dict]: ...
-
-    def slideshow_subject(self) -> str: ...
-
-    def shape_in_view(self) -> str: ...
-
-    def row_for(self, prompt_id: str) -> dict | None: ...
-
-    def image_config_index(self) -> dict: ...
-
-    def listed_prompt_ids(self) -> list[str]: ...
-
-    def selected_prompt_ids(self) -> list[str]: ...
-
     def off_thread(self, work, done) -> None: ...
 
     def queue_now(self) -> tuple[list, int]: ...
@@ -230,7 +214,7 @@ class SlideshowDirector:
         self._volume_left_at: VolumeHud | None = None
         self._db = sources.db
         self._names = sources.names
-        self._gallery_pane = sources.gallery_pane
+        self._listing = sources.listing
         self._jobs = sources.jobs
         self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
@@ -319,21 +303,21 @@ class SlideshowDirector:
 
     def anything_to_play(self) -> bool:
         return any(gallery.resolve_preview(row, OUTPUT_PLACES) is not None
-                   for row in self._host.rows_to_play())
+                   for row in self._listing().rows)
 
     def start(self, *, shape: str | None = None):
-        location = self._host.slideshow_location()
+        listing = self._listing()
+        location = listing.location
         base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
         shape = shape or located_on
         switch = _SWITCH_HELD_BY.get(collection.which) if collection is not None else None
         if switch is not None:
-            shape = shape or self._host.shape_in_view()
+            shape = shape or listing.shape
             location = shaped_key(collection.folder, shape)
             rows = together(self.rows_at(location), self.rows_at(shaped_key(collection.key, shape)))
         else:
-            rows = self._one_per_run_where_the_order_is_newest_first(
-                location, self._host.rows_to_play())
+            rows = self._one_per_run_where_the_order_is_newest_first(location, listing.rows)
         items = self.items_of(rows)
         if not items:
             return
@@ -350,15 +334,15 @@ class SlideshowDirector:
                       filters=replace(self._filters, **{switch: True}) if switch else None),
                   **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
-                    self._host.slideshow_subject(), len(items),
+                    listing.subject, len(items),
                     "latest" if latest else "shuffled")
 
     def _picked_since_the_slideshow_up_opened(self) -> list[str]:
-        picked = self._host.selected_prompt_ids()
+        picked = self._listing().picked
         if (_still_up(self._slideshow) is not None
-                and tuple(picked) == self._picked_as_the_slideshow_up_opened):
+                and picked == self._picked_as_the_slideshow_up_opened):
             return []
-        return picked
+        return list(picked)
 
     def _order(self, latest: bool) -> dict:
         return {"shuffle": in_order if latest else None,
@@ -373,12 +357,12 @@ class SlideshowDirector:
             return self.open([], rows=listed, start=0, shuffle=in_order,
                              carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
         rows = (listed if any(row["prompt_id"] == generation for row in listed)
-                else self.rows_at(self._location_of(self._host.row_for(generation))))
+                else self.rows_at(self._location_of(self._row_for(generation))))
         opened_on = [row for row in rows if row["prompt_id"] == generation]
         items = self.items_of(opened_on)
         if not items:
             return self.open([(media[0], media[1], generation, None)], start=0, shuffle=in_order,
-                             rows=[row for row in [self._host.row_for(generation)] if row],
+                             rows=[row for row in [self._row_for(generation)] if row],
                              hud=hud)
         shape = majority_shape(map(row_shape, rows))
         slideshow = self.open(items, rows=opened_on, start=0, shape=shape, shuffle=in_order,
@@ -399,15 +383,16 @@ class SlideshowDirector:
         return slideshow
 
     def _listed_rows(self) -> list[dict]:
-        by_id = self._library().rows_by_id
-        rows = (by_id.get(prompt_id) or self._host.row_for(prompt_id)
-                for prompt_id in self._host.listed_prompt_ids())
+        rows = map(self._row_for, self._listing().shown)
         return [row for row in rows if row is not None]
+
+    def _row_for(self, prompt_id: str) -> dict | None:
+        return self._library().row_for(prompt_id) or self._db.get_generation(prompt_id)
 
     def _location_of(self, row: dict | None) -> str | None:
         if row is None:
             return None
-        key = gallery.settings_folder_key(row, self._host.image_config_index())
+        key = gallery.settings_folder_key(row, self._library().image_index)
         return shaped_key(key, row_shape(row))
 
     @looking_once
@@ -447,7 +432,7 @@ class SlideshowDirector:
             if self._fun_time is None:
                 self._standalone_showing = _one_shape_of_the_set(rows, items) or shape
         self._slideshow = slideshow
-        self._picked_as_the_slideshow_up_opened = tuple(self._host.selected_prompt_ids())
+        self._picked_as_the_slideshow_up_opened = self._listing().picked
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
         self._live_slideshows = [entry for entry in self._live_slideshows
                                  if entry[0] is not slideshow]
@@ -602,11 +587,11 @@ class SlideshowDirector:
         return tuple(Slide.of(item) for item in self.items_of(rows))
 
     def neighbors_of(self, prompt_id: str, *, shape: str) -> NavMapNeighbors:
-        row = self._host.row_for(prompt_id) if prompt_id else None
+        row = self._row_for(prompt_id) if prompt_id else None
         if row is None:
             return NavMapNeighbors()
         around = surroundings(row, self._library().on_the_map(shape),
-                              image_index=self._host.image_config_index())
+                              image_index=self._library().image_index)
         named = [(generation, self._folder_name(generation), True)
                  for generation in around.configs]
         named += [(generation, label, False) for generation, label in around.actions]
@@ -620,15 +605,15 @@ class SlideshowDirector:
         )
 
     def beyond_the_row_of(self, prompt_id: str, *, shape: str) -> tuple[Slide, ...]:
-        row = self._host.row_for(prompt_id) if prompt_id else None
+        row = self._row_for(prompt_id) if prompt_id else None
         if row is None:
             return ()
         return self._slides_of(beyond_the_row(
-            row, self._library().on_the_map(shape), image_index=self._host.image_config_index()))
+            row, self._library().on_the_map(shape), image_index=self._library().image_index))
 
     def actions_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
         named_for = action_labels(self._library().on_the_map(shape),
-                               image_index=self._host.image_config_index())
+                               image_index=self._library().image_index)
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
                 if prompt_id in named_for}
 
@@ -646,7 +631,7 @@ class SlideshowDirector:
         collection = folder_collection(_split_collection_key(location)[0])
         if collection is None or collection.which != _LATEST_KEY:
             return rows
-        return one_per_stretch(rows, image_index=self._host.image_config_index())
+        return one_per_stretch(rows, image_index=self._library().image_index)
 
     def _present_surface(self, view, shape: str):
         if self._fun_time is None:
@@ -724,7 +709,7 @@ class SlideshowDirector:
         return gallery.config_folder_name(
             workflow_name,
             gallery.folder_signature(workflow_name, row.get("params_json"),
-                                     self._host.image_config_index(),
+                                     self._library().image_index,
                                      workflow_version=row.get("workflow_version")),
             self._db.folder_meta_map(),
         )
@@ -796,7 +781,7 @@ class SlideshowDirector:
 
     def _rows_of(self, slides) -> list[dict]:
         ids = (slide.prompt_id for slide in slides if slide.prompt_id is not None)
-        return [row for row in map(self._host.row_for, ids) if row is not None]
+        return [row for row in map(self._row_for, ids) if row is not None]
 
     def put_back(self, held: HeldSlideshow):
         return self.open(list(held.items), rows=self._rows_of(held.items),
@@ -830,7 +815,7 @@ class SlideshowDirector:
             self._host.follow_link(prompt_id)
 
     def _show_the_locked_generation(self, prompt_id: str) -> None:
-        if self._host.row_for(prompt_id) is None:
+        if self._row_for(prompt_id) is None:
             return
         self._host.show_generation(prompt_id)
 
@@ -1011,7 +996,7 @@ class SlideshowDirector:
         if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             return False
         held = (self._library().ids_at(location) if location
-                else {r["prompt_id"] for r in self._host.rows_to_play()})
+                else {r["prompt_id"] for r in self._listing().rows})
         return prompt_id in held or self._latest_would_take(row, location)
 
     def _latest_would_take(self, row: dict, location) -> bool:
@@ -1020,13 +1005,12 @@ class SlideshowDirector:
         if location:
             playing_latest = latest is not None and latest.which == _LATEST_KEY
         else:
-            playing_latest = (self._gallery_pane.showing_latest()
-                               and not self._gallery_pane.showing_search())
+            playing_latest = self._listing().latest
         return bool(playing_latest
                     and source_of(row) == GenerationSource.GENERATED
                     and filter_rows([row], shape)
                     and (latest is None or latest.folder in gallery.folder_chain(
-                        row, self._host.image_config_index())))
+                        row, self._library().image_index)))
 
     def note_in_flight(self, items):
         for slideshow, location in self._live_slideshows:
@@ -1116,7 +1100,7 @@ class SlideshowDirector:
             self.toggle_favorites_filter(command.shape)
             return
         shape = (command.shape if command.shape and self._fun_time is not None
-                else self._host.shape_in_view())
+                else self._listing().shape)
         key = shaped_key(command.collection_key, shape)
         rows = self.rows_at(key)
         items = self.items_of(rows)

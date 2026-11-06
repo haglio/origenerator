@@ -33,6 +33,7 @@ from origenerator.gui.slideshow_director import (
 )
 from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
 from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_wiring import Listing
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
@@ -364,23 +365,27 @@ class FakeGalleryPane:
         self.searching = searching
         self.library = None
 
-    def showing_latest(self):
-        return self.latest
-
-    def showing_search(self):
-        return self.searching
-
 
 class FakeLibrary(LibrarySnapshot):
-    def __init__(self, db, at=None):
+    def __init__(self, db, host, at=None):
         super().__init__([])
         self._db = db
+        self._host = host
         self.at = {} if at is None else at
         self.asked = 0
 
     @property
     def rows(self):
-        return list(self._db.rows.values())
+        return list({row["prompt_id"]: row
+                     for row in (*self._db.rows.values(), *self._host.rows)}.values())
+
+    @property
+    def image_index(self):
+        return gallery.start_frame_index(self.rows)
+
+    @image_index.setter
+    def image_index(self, _index):
+        pass
 
     @rows.setter
     def rows(self, _rows):
@@ -403,6 +408,7 @@ class FakeDB:
         self.rows = {row["prompt_id"]: row for row in rows}
         self.requests = {record["prompt_id"]: record for record in requests}
         self.listings = 0
+        self.gets = 0
 
     def get_request(self, prompt_id):
         return self.requests.get(prompt_id)
@@ -412,6 +418,7 @@ class FakeDB:
         return list(self.rows.values())
 
     def get_generation(self, prompt_id):
+        self.gets += 1
         return self.rows.get(prompt_id)
 
     def folder_meta_map(self):
@@ -441,30 +448,11 @@ class FakeHost:
         self.visible = [row["prompt_id"] for row in self.rows]
         self.picked = []
         self.holding = None
+        self.latest = False
 
-    def slideshow_location(self):
-        return self.location
-
-    def rows_to_play(self):
-        return self.rows
-
-    def slideshow_subject(self):
-        return "this folder"
-
-    def shape_in_view(self):
-        return LANDSCAPE
-
-    def row_for(self, prompt_id):
-        return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
-
-    def image_config_index(self):
-        return {}
-
-    def listed_prompt_ids(self):
-        return list(self.visible)
-
-    def selected_prompt_ids(self):
-        return list(self.picked)
+    def listing(self):
+        return Listing(location=self.location, rows=tuple(self.rows), shown=tuple(self.visible),
+                       picked=tuple(self.picked), shape=LANDSCAPE, latest=self.latest)
 
     def queue_now(self):
         return self.queue
@@ -600,12 +588,12 @@ def slideshows(monkeypatch):
         gallery_pane = gallery_pane or FakeGalleryPane()
         gallery_pane.collections.update(
             {key: gallery.rows_under(group) for key, group in host.groups.items()})
-        gallery_pane.library = FakeLibrary(db, gallery_pane.collections)
+        gallery_pane.library = FakeLibrary(db, host, gallery_pane.collections)
+        host.latest = gallery_pane.latest and not gallery_pane.searching
         director = SlideshowDirector(
             host,
-            DirectorSources(db=db, gallery_pane=gallery_pane,
-                            jobs=FakeJobQueue(), names=ItemNames(db),
-                            library=lambda: gallery_pane.library),
+            DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
+                            library=lambda: gallery_pane.library, listing=host.listing),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
@@ -672,16 +660,13 @@ def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_fo
 def test_a_double_clicked_item_plays_the_rows_the_gallery_pane_listed_without_reading_each_again(
         slideshows):
     rows = [_row("a2"), _row("a1")]
-    host = FakeHost(rows=rows)
-    asked = []
-    host.row_for = asked.append
     db = FakeDB(rows)
-    director, _host, made = slideshows(host, db=db)
+    director, _host, made = slideshows(FakeHost(rows=rows), db=db)
 
     director.open_on_preview(("a2.png", "image"), "a2")
 
     assert [item[2] for item in made[0].items] == ["a2", "a1"]
-    assert asked == []
+    assert db.gets == 0
 
 
 def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_folder(
@@ -1170,7 +1155,7 @@ def test_a_run_a_collection_lists_only_after_the_next_reading_joins_on_the_frame
     director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
 
     director.note_generating("g7", b"frame-one")
-    gallery_pane.library = FakeLibrary(db, {"collection/a": [_row("g1"), _row("g7")]})
+    gallery_pane.library = FakeLibrary(db, _host, {"collection/a": [_row("g1"), _row("g7")]})
     director.note_generating("g7", b"frame-two")
 
     assert made[0].generating == [("g7", b"frame-two")]
@@ -1218,10 +1203,11 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 
 def _director():
     db = FakeDB()
+    host = FakeHost()
     return SlideshowDirector(
-        FakeHost(),
-        DirectorSources(db=db, gallery_pane=FakeGalleryPane(), jobs=FakeJobQueue(),
-                        names=ItemNames(db), library=lambda: LibrarySnapshot([])),
+        host,
+        DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
+                        library=lambda: LibrarySnapshot([]), listing=host.listing),
         DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=None))
 
 
@@ -2082,11 +2068,7 @@ def _animation(prompt_id, *, frame, action, tmp_path, size=(100, 200)):
 
 
 def _library(rows):
-    host = FakeHost(rows=rows)
-    index = gallery.build_image_config_index(
-        [row for row in rows if row["workflow_name"] != "wan22_i2v"])
-    host.image_config_index = lambda: index
-    return host
+    return FakeHost(rows=rows)
 
 
 def test_the_library_of_the_slideshows_side_answers_for_the_map_around_a_generation(slideshows, tmp_path):

@@ -23,7 +23,7 @@ from funestra.hud_controls import (
 from funestra.hud_icons import shared_icon
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import LATEST_LABEL
-from funestra.main_hud import ROW_LABEL_W, VALUE_W
+from funestra.main_hud import VALUE_W
 
 from origenerator.osr2_controls_commands import FILTER, spelled_for
 
@@ -94,12 +94,11 @@ def slideshow_rows(shape: str,
 
 def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
     return (
-        Button("", "Clip seconds", "", width=ROW_LABEL_W),
-        Button(f"{shape}_clip_seconds_down", shared_icon("minus"), "Move on sooner",
-               group_break=True),
+        Button("", "Clip seconds", "", width=FIT_THE_WORD),
+        Button(f"{shape}_clip_seconds_down", shared_icon("minus"), "Move on sooner"),
         Button("", f"{seconds}s", "", width=VALUE_W),
         Button(f"{shape}_clip_seconds_up", shared_icon("plus"), "Leave each clip longer"),
-        *playback_speed_buttons(shape, leads_its_row=False),
+        *playback_speed_buttons(shape, in_a_column_of_labels=False),
     )
 
 

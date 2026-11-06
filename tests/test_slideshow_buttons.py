@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from funestra.hud_button import FIT_THE_WORD
 from funestra.hud_controls import (
     AN_IMAGE,
     RESET_PUTS_BACK_THE_SPEED,
@@ -332,3 +333,12 @@ def test_the_clip_seconds_and_the_playback_speed_share_one_row():
     assert [button.command or button.icon for button in shared] == [
         "Clip seconds", "portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up",
         "Playback speed", "portrait_speed_down", "", "portrait_speed_up"]
+
+
+def test_each_name_on_that_row_keeps_its_controls_close_and_the_second_pair_stands_apart_from_the_first():
+    *_rows, shared = slideshow_rows("portrait", SlideshowFacts(clip_seconds=4))
+    clip_seconds, *_controls, playback_speed, _slower, _rate, _faster = shared
+
+    assert [button.group_break for button in shared] == [
+        False, False, False, False, True, False, False, False]
+    assert (clip_seconds.width, playback_speed.width) == (FIT_THE_WORD, FIT_THE_WORD)

@@ -163,7 +163,9 @@ def _only_the_words_that_differ(old: str, new: str) -> tuple[str, str]:
         before, after = before[1:], after[1:]
     while before and after and before[-1] == after[-1]:
         before, after = before[:-1], after[:-1]
-    return (" ".join(before), " ".join(after)) if before and after else (old, new)
+    differ = (" ".join(before), " ".join(after)) if before and after else (old, new)
+    whole = all(words.count("(") == words.count(")") for words in differ)
+    return differ if whole else (old, new)
 
 
 def _joined(before: str, words: str, after: str) -> str:
@@ -178,6 +180,27 @@ def _said_done(before: str, after: str, prompt: str) -> str:
         return f"Removed {_quoted(before)} from the {prompt}."
     before, after = _only_the_words_that_differ(before, after)
     return f"Replaced {_quoted(before)} with {_quoted(after)} in the {prompt}."
+
+
+def _said_all(made: list[tuple[str, str]], prompt: str) -> list[str]:
+    added = [index for index, (before, _after) in enumerate(made) if not before]
+    removed = [index for index, (_before, after) in enumerate(made) if not after]
+    came_from = {added[place]: removed[was] for place, was in
+                 _each_new_part_with_the_old_one_it_rewrites(
+                     [made[index][0] for index in removed], [made[index][1] for index in added]).items()}
+    said = []
+    for index, (before, after) in enumerate(made):
+        if index in came_from.values():
+            continue
+        if index not in came_from:
+            said.append(_said_done(before, after, prompt))
+            continue
+        was = made[came_from[index]][0]
+        if was.lower() != after.lower():
+            said.append(_said_done(was, after, prompt))
+        where = "earlier" if index < came_from[index] else "later"
+        said.append(f"Moved {_quoted(after)} {where} in the {prompt}.")
+    return said
 
 
 def _trigger_words_of(lora) -> tuple[str, ...]:
@@ -312,15 +335,15 @@ class _Applying:
         asked_for = named or [pair for pair in changed if pair[1]]
         if len(changed) <= 1 or (not named and len(asked_for) == len(changed)):
             return new, []
-        kept, done = [], []
+        kept, made = [], []
         for before, after in pairs:
             if before == after or (before, after) in asked_for:
                 kept.append(after)
                 if before != after:
-                    done.append(_said_done(before, after, prompt))
+                    made.append((before, after))
             else:
                 kept.append(before)
-        return ", ".join(part for part in kept if part), done
+        return ", ".join(part for part in kept if part), _said_all(made, prompt)
 
     def _add(self, which: str, change: dict) -> list[str]:
         words, left_out = self._without_what_it_leaves_out(

@@ -14,6 +14,7 @@ _STACK = re.compile(r"(?<!\\)(\({2,})([^()]*)(\)+)")
 _WEIGHT_CLOSING_A_GROUP = re.compile(r"[ \t]*:[ \t]*[\d.]+[ \t]*(?=\))")
 _ONE_PARENTHESIS_ADDS = 1.1
 _ENDS = " ,\n" + BOX_BREAK
+_EMPTY_GROUP = re.compile(r"(?<!\\)\([ ,\n]*\)")
 
 
 def unpaired_parentheses(text: str) -> tuple[int, ...]:
@@ -100,8 +101,14 @@ def _one_comma(match: re.Match) -> str:
     return "," + (BOX_BREAK if BOX_BREAK in match[0] else "\n" if "\n" in match[0] else "")
 
 
+def _without_empty_groups(text: str) -> str:
+    while (emptier := _EMPTY_GROUP.sub("", text)) != text:
+        text = emptier
+    return text
+
+
 def tidied(text: str, *, reads_numbers: bool = False) -> str:
-    text = re.sub(r"[ \t]+", " ", text)
+    text = _without_empty_groups(re.sub(r"[ \t]+", " ", text))
     text = re.sub(rf" *([\n{BOX_BREAK}]) *", r"\1", text)
     text = re.sub(r" +,", ",", text)
     text = re.sub(rf",(?:[ \n{BOX_BREAK}]*,)+", _one_comma, text)

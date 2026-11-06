@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 
-from origenerator import gallery
+from origenerator import gallery, library_views
 from origenerator.db import Database, NewGeneration
-from origenerator.item_shape import filter_rows
+from origenerator.gallery.collection import FAVORITES_KEY, LATEST_KEY, TRASH_KEY
+from origenerator.gallery.tree import ALL_KEY
+from origenerator.item_shape import filter_rows, shaped_key
 from origenerator.library_views import LibrarySnapshot, LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import run_python
@@ -133,3 +135,94 @@ def test_a_reading_of_a_library_that_has_not_moved_keeps_the_trees_of_the_readin
     assert after.tree("portrait") is before.tree("portrait")
     assert after.image_index is before.image_index
     assert after.tree("landscape") == before.tree("landscape")
+
+
+def _models_in(library, shape):
+    (images,) = library.tree(shape)
+    (workflow,) = gallery.child_groups(images)
+    return {model.label: model.key for model in gallery.child_groups(workflow)}
+
+
+def _made_with(prompt_id, checkpoint, *, shape="landscape", starred=False, source="generated",
+               completed_at="2026-11-01 10:00:00"):
+    row = _listed(prompt_id, shape=shape, starred=starred, source=source)
+    row["params_json"] = json.dumps({"positive_prompt": "scene one", "seed": 1,
+                                     "checkpoint": checkpoint})
+    row["completed_at"] = completed_at
+    return row
+
+
+def test_a_folders_latest_is_what_that_folder_holds_of_the_shape_newest_first():
+    rows = [_made_with("a1", "alpha.safetensors", completed_at="2026-11-01 09:00:00"),
+            _made_with("a2", "alpha.safetensors", completed_at="2026-11-01 11:00:00"),
+            _made_with("b1", "beta.safetensors"),
+            _made_with("tall", "alpha.safetensors", shape="portrait"),
+            _made_with("trial", "alpha.safetensors", source="experiment")]
+    library = LibrarySnapshot(rows)
+
+    latest_in_alpha = library.in_collection(LATEST_KEY, "landscape",
+                                            _models_in(library, "landscape")["alpha"])
+
+    assert [row["prompt_id"] for row in latest_in_alpha] == ["a2", "a1"]
+    assert [row["prompt_id"] for row in library.in_collection(LATEST_KEY, "portrait", ALL_KEY)] == ["tall"]
+
+
+def test_favorites_are_the_starred_items_and_everything_under_a_starred_folder_each_once():
+    rows = [_made_with("a1", "alpha.safetensors", starred=True),
+            _made_with("a2", "alpha.safetensors"),
+            _made_with("b1", "beta.safetensors")]
+    library = LibrarySnapshot(rows)
+    alpha = _models_in(library, "landscape")["alpha"]
+    library = LibrarySnapshot(rows, folder_meta={alpha: {"custom_name": None, "starred": True}})
+
+    favorites = library.in_collection(FAVORITES_KEY, "landscape", ALL_KEY)
+
+    assert sorted(row["prompt_id"] for row in favorites) == ["a1", "a2"]
+
+
+def test_the_trash_of_a_folder_holds_what_was_deleted_from_it():
+    kept = _made_with("a1", "alpha.safetensors")
+    held = [_made_with("d1", "alpha.safetensors"), _made_with("d2", "beta.safetensors")]
+    library = LibrarySnapshot([kept], held)
+
+    in_alpha = library.in_collection(TRASH_KEY, "landscape", _models_in(library, "landscape")["alpha"])
+
+    assert [row["prompt_id"] for row in in_alpha] == ["d1"]
+    assert library.held_rows is held
+
+
+def test_a_collection_key_with_its_shape_names_what_a_reading_lists_there():
+    rows = [_made_with("a1", "alpha.safetensors"), _made_with("tall", "alpha.safetensors", shape="portrait")]
+    library = LibrarySnapshot(rows)
+
+    assert [row["prompt_id"] for row in library.rows_at(shaped_key(LATEST_KEY, "portrait"))] == ["tall"]
+    assert library.rows_at("not/a/collection") is None
+
+
+def test_a_reading_deals_its_rows_to_a_shape_once_however_often_it_is_asked(monkeypatch):
+    dealt = []
+    filter_rows = library_views.filter_rows
+    monkeypatch.setattr(library_views, "filter_rows",
+                        lambda rows, shape: dealt.append(shape) or filter_rows(rows, shape))
+    library = LibrarySnapshot([_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")])
+
+    library.on_shape("landscape")
+    library.in_collection(FAVORITES_KEY, "landscape", ALL_KEY)
+    library.in_collection(LATEST_KEY, "landscape", ALL_KEY)
+    once = len(dealt)
+    library.on_shape("landscape")
+    library.in_collection(FAVORITES_KEY, "landscape", ALL_KEY)
+    library.in_collection(LATEST_KEY, "landscape", ALL_KEY)
+
+    assert library.on_shape("landscape") == filter_rows(library.rows, "landscape")
+    assert len(dealt) == once
+
+
+def test_a_star_given_after_the_reading_was_taken_still_counts_since_the_gallery_stars_rows_in_place():
+    row = _listed("pic-1")
+    library = LibrarySnapshot([row])
+    assert library.favorite_ids == set()
+
+    row["starred"] = 1
+
+    assert library.favorite_ids == {"pic-1"}

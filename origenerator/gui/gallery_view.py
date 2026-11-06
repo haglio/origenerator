@@ -157,6 +157,7 @@ from origenerator.gui.slideshow_director import (
     SlideshowDirector,
 )
 from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_wiring import Listing
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
@@ -418,8 +419,8 @@ class GalleryView(QWidget):
         self._trail = (False, False)
         self._slideshows = SlideshowDirector(
             self,
-            DirectorSources(db=db, gallery_pane=self._gallery_pane, jobs=self._jobs,
-                            names=self._item_names, library=lambda: self._library),
+            DirectorSources(db=db, jobs=self._jobs, names=self._item_names,
+                            library=lambda: self._library, listing=self.listing),
             DirectorSurroundings(
                 pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons))
@@ -1762,6 +1763,14 @@ class GalleryView(QWidget):
             group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
         return rows if self._showing_search() else what_plays_at(self.slideshow_location(), rows)
+
+    def listing(self) -> Listing:
+        pane = self._gallery_pane
+        return Listing(location=self.slideshow_location(), rows=tuple(self.rows_to_play()),
+                       shown=tuple(self.listed_prompt_ids()),
+                       picked=tuple(self.selected_prompt_ids()),
+                       subject=self.slideshow_subject(), shape=self.shape_in_view(),
+                       latest=pane.showing_latest() and not pane.showing_search())
 
     def slideshow_subject(self) -> str:
         if self._showing_search():

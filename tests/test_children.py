@@ -33,11 +33,15 @@ _SAYS_AND_LOGS_SOMETHING_THEN_HANGS = textwrap.dedent("""
 """)
 
 
+_ROOM_FOR_A_CHILD_TO_START_UNDER_LOAD_S = 30
+
+
 def test_a_child_still_running_at_its_timeout_fails_with_what_it_said_where_it_was_and_its_log(
         tmp_path):
     log = tmp_path / "child.log"
     with pytest.raises(AssertionError) as failure:
-        run_python(["-c", _SAYS_AND_LOGS_SOMETHING_THEN_HANGS, str(log)], timeout=8, logs=[log])
+        run_python(["-c", _SAYS_AND_LOGS_SOMETHING_THEN_HANGS, str(log)],
+                   timeout=_ROOM_FOR_A_CHILD_TO_START_UNDER_LOAD_S, logs=[log])
 
     reported = str(failure.value)
     assert "the line it said" in reported

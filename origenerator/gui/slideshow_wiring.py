@@ -74,12 +74,23 @@ NO_DEAL = SetDeal()
 
 
 @dataclass(frozen=True)
+class Listing:
+    location: str | None = None
+    rows: tuple = ()
+    shown: tuple[str, ...] = ()
+    picked: tuple[str, ...] = ()
+    subject: str = "this folder"
+    shape: str = ""
+    latest: bool = False
+
+
+@dataclass(frozen=True)
 class DirectorSources:
     db: object
-    gallery_pane: object
     jobs: object
     names: object
     library: Callable[[], object]
+    listing: Callable[[], Listing]
 
 
 @dataclass(frozen=True)

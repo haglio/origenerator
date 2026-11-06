@@ -405,6 +405,18 @@ def test_esc_leaves_the_slideshow_up(qtbot):
     assert view.isVisible()
 
 
+def test_shift_esc_leaves_the_slideshow_as_a_double_click_does_and_leaves_the_room_playing(qtbot):
+    view = _view(qtbot)
+    closes = []
+    view.slideshow.closed.connect(lambda: closes.append(True))
+
+    _press(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
+
+    qtbot.waitUntil(lambda: not view.isVisible())
+    assert closes == [True]
+    assert not view._paused
+
+
 @_ARROW_KEYS_OR_WASD
 def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
     deleted = []

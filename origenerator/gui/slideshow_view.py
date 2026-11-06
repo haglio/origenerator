@@ -345,7 +345,7 @@ class SlideshowView(QWidget):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self._move_the_hud(key)
         elif key == Qt.Key.Key_Escape:
-            self._toggle_pause()
+            self.close() if shifted else self._toggle_pause()
         elif key == Qt.Key.Key_Left:
             answer(slideshow, "cycle_version_back") if shifted else slideshow.slideshow_step(-1)
         elif key == Qt.Key.Key_Right:

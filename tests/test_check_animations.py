@@ -7,6 +7,7 @@ from origenerator import check_animations, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.basic_enhancement import at_the_basic_settings
 from tests.comfyui_folders import SUITE_FOLDERS
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -40,7 +41,7 @@ def _library(tmp_path):
 def test_a_trial_from_an_image_never_enhanced_is_made_from_its_enhancement(qtbot, tmp_path):
     db = _library(tmp_path)
     client = _client()
-    trial = check_animations._launcher(db, client, gallery.EnhanceSettings())
+    trial = check_animations._launcher(db, client)
 
     said = trial(db.get_generation("sample"), "alpha", "beta")
     (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "image"]
@@ -48,6 +49,7 @@ def test_a_trial_from_an_image_never_enhanced_is_made_from_its_enhancement(qtbot
                               {"outputs": {"12": {"images": [_ENHANCED]}}})
 
     assert said == "Queued. Come back to this one once it has finished."
+    assert at_the_basic_settings(enhance)
     assert gallery.row_output_files(db.get_generation("image"))[0] == _ENHANCED
     (trial_video,) = [row for row in db.list_generations()
                       if row["workflow_name"] == _I2V.name and row["prompt_id"] != "sample"]
@@ -58,7 +60,7 @@ def test_a_trial_from_an_image_never_enhanced_is_made_from_its_enhancement(qtbot
 def test_a_trial_carries_the_prompts_as_edited_under_seeds_the_sample_did_not_use(qtbot, tmp_path):
     db = _library(tmp_path)
     client = _client()
-    trial = check_animations._launcher(db, client, gallery.EnhanceSettings())
+    trial = check_animations._launcher(db, client)
 
     trial(db.get_generation("sample"), "alpha", "beta")
     (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "image"]

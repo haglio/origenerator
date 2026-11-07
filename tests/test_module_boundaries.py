@@ -28,7 +28,6 @@ QT_FREE = (
     "origenerator.favorite_reconcile",
     "origenerator.base_backfill",
     "origenerator.export_lane",
-    "origenerator.enhanced_start_backfill",
     "origenerator.importer",
     "origenerator.db",
     "origenerator.trash_collection",

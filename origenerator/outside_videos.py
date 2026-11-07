@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from app_support import favorites, haglio_settings
+from app_support import haglio_settings
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_key
@@ -79,14 +79,6 @@ def record_of(video: Path, records_folder: Path, *, action: str | None = None) -
                   action=shown.get("action") or None,
                   image_key=seed_group_key(read) if image else None,
                   favorite=recorded.get("favorite") is True)
-
-
-def mark_a_favorite(video: Path, records_folder: Path) -> bool:
-    path = _record_path(video, records_folder)
-    if path is None:
-        return False
-    favorites.mark(path, True)
-    return record_of(video, records_folder).favorite
 
 
 def _recorded(video: Path, records_folder: Path) -> dict:

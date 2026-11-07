@@ -21,7 +21,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.generation_state import GenerationStatus
 from origenerator.inflight import take_in_what_landed
 from origenerator.output_places import OutputFolders
 from origenerator.run_toast import Toast, outcome_of_row, toast_for
@@ -41,8 +41,7 @@ CARRIES_THE_IDENTITY = "ORIGENERATOR_TOAST_IDENTITY"
 
 def runs_left_in_flight(db) -> list[dict]:
     return [row for row in reversed(db.list_generations())
-            if row.get("status") == GenerationStatus.RUNNING
-            and source_of(row) != GenerationSource.BACKFILL]
+            if row.get("status") == GenerationStatus.RUNNING]
 
 
 def take_what_landed(db, api, row: dict, folders: OutputFolders) -> Toast | None:

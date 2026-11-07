@@ -5,10 +5,12 @@ import json
 import re
 import struct
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 
 from origenerator import config
+from origenerator.model_titles import lora_folder, model_title, versioned
 
 SDXL = "sdxl"
 SD15 = "sd15"
@@ -23,6 +25,7 @@ LTX = "ltx"
 KREA2 = "krea2"
 
 _MAX_HEADER_BYTES = 32 * 1024 * 1024
+_TRAINED_AT = ("ss_training_finished_at", "ss_training_started_at")
 
 _MAX_TENSOR_NAMES = 400
 
@@ -303,3 +306,20 @@ def _gguf_skip(handle, value_type: int) -> None:
             _gguf_skip(handle, element_type)
     else:
         handle.read(_GGUF_FIXED_WIDTHS[value_type])
+
+
+def trained_when(path) -> datetime | None:
+    metadata = safetensors_metadata(path)
+    for key in _TRAINED_AT:
+        try:
+            return datetime.fromtimestamp(float(metadata[key])).astimezone()
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
+            continue
+    return None
+
+
+def trained_sentence(lora) -> str:
+    if versioned(model_title(lora)) is None:
+        return ""
+    when = trained_when(lora_folder() / str(lora))
+    return f"Trained {when:%Y-%m-%d %H:%M}." if when is not None else ""

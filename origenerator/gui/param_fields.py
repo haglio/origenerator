@@ -22,6 +22,7 @@ from origenerator.model_titles import option_title
 from origenerator.seed_history import SeedHistory
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
+from origenerator.workflows.model_files import shown_with_what_is_held
 
 NOT_KNOWN = "—"
 
@@ -300,7 +301,7 @@ def offer_options(dropdown: QComboBox, options, tip=lambda _option: None) -> Non
 
 def offer_only(pd: ParamDef, dropdown: QComboBox, options: list) -> None:
     held = dropdown.currentData()
-    shown = options if held in options else [*options, held]
+    shown = shown_with_what_is_held(options, held)
     if [dropdown.itemData(row) for row in range(dropdown.count())] == shown:
         return
     with QSignalBlocker(dropdown):

@@ -67,13 +67,28 @@ class ModelHold:
     def __init__(self, on_let_go) -> None:
         self._holds = 0
         self._on_let_go = on_let_go
+        self._leave = None
 
     def __bool__(self) -> bool:
         return self._holds > 0
 
-    def hold(self) -> None:
+    def hold(self) -> bool:
         self._holds += 1
+        stayed, self._leave = self._leave is not None, None
+        return stayed
 
-    def let_go(self) -> None:
+    def let_go(self, leave=None) -> None:
         self._holds = max(0, self._holds - 1)
+        self._leave = leave or self._leave
         self._on_let_go()
+
+    @property
+    def stays(self) -> bool:
+        return self._leave is not None
+
+    def send_away(self):
+        if self._holds or self._leave is None:
+            return None
+        self._holds += 1
+        leave, self._leave = self._leave, None
+        return leave

@@ -476,6 +476,21 @@ def test_pinning_the_front_tab_sends_the_next_click_to_a_new_one(tabs):
     assert tabs.count() == 2
 
 
+def test_clicking_an_item_another_tab_shows_brings_that_tab_forward(tabs):
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    showing_cat = tabs.current_generate_tab()
+    tabs.pin_current_tab()
+    tabs.load_selection(dog, [cat, dog])
+    tabs.pin_current_tab()
+
+    tabs.load_selection(cat, [cat, dog])
+
+    assert tabs.count() == 2
+    assert tabs.current_generate_tab() is showing_cat
+    assert [tab._displayed_row["prompt_id"] for tab in tabs.generate_tabs()] == ["cat", "dog"]
+
+
 def test_only_one_tab_is_ever_the_preview_tab(tabs):
     cat, dog = _two_generations(tabs)
     tabs.load_selection(cat, [cat, dog])

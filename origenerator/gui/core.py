@@ -57,6 +57,8 @@ SESSION_UI_STATE = (
     ("session_slideshows", GalleryView.remembered_session_slideshows,
      GalleryView.remember_session_slideshows),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
+    ("request_auto_generate", GalleryView.request_auto_generate,
+     GalleryView.set_request_auto_generate),
 )
 
 _PROMPT_HEIGHTS_KEY = "prompt_heights"

@@ -84,6 +84,7 @@ class GeneratePane(QTabWidget):
         self._preview_tab: GenerateTab | None = None
         self._last_close_at = float("-inf")
         self._how_many = HOW_MANY[0]
+        self._request_auto_generate = False
         self._add_subtab()
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
@@ -121,6 +122,14 @@ class GeneratePane(QTabWidget):
         for tab in self.generate_tabs():
             tab.set_how_many(count)
 
+    def request_auto_generate(self) -> bool:
+        return self._request_auto_generate
+
+    def set_request_auto_generate(self, on: bool) -> None:
+        self._request_auto_generate = on
+        for tab in self.generate_tabs():
+            tab.set_request_auto_generate(on)
+
     def current_generate_tab(self) -> GenerateTab | None:
         widget = self.currentWidget()
         return widget if isinstance(widget, GenerateTab) else None
@@ -133,6 +142,8 @@ class GeneratePane(QTabWidget):
         tab.user_edited.connect(lambda p=tab: self._pin_tab(p))
         tab.set_how_many(self._how_many)
         tab.how_many_chosen.connect(self.set_how_many)
+        tab.set_request_auto_generate(self._request_auto_generate)
+        tab.request_auto_generate_chosen.connect(self.set_request_auto_generate)
         tab.generate_requested.connect(
             lambda name, batch, p=tab: self._on_tab_generate(p, name, batch)
         )

@@ -1003,6 +1003,22 @@ def test_one_how_many_serves_every_tab_and_each_tab_opened_after(tabs):
     assert third._how_many.how_many() == 8
 
 
+def _auto_generate_of(tab):
+    return tab._param_form.request_exchange()._auto_generate
+
+
+def test_one_auto_generate_serves_every_tabs_request_and_each_tab_opened_after(tabs):
+    first = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a cat"))
+    second = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
+
+    _auto_generate_of(first).click()
+
+    assert _auto_generate_of(second).isChecked()
+    third = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="an owl"))
+    assert _auto_generate_of(third).isChecked()
+    assert tabs.request_auto_generate()
+
+
 def test_generate_requested_surfaces_from_a_forked_tab(tabs):
     requested = []
     tabs.generate_requested.connect(lambda wf, batch: requested.append(wf))

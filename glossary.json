@@ -142,6 +142,20 @@
       ]
     },
     {
+      "id": "request_auto_generate",
+      "thing": "the switch at the end of a Generate tab's Request line that generates each time the model comes back with its changes",
+      "screen": [
+        "Auto-generate"
+      ],
+      "his_word": "Auto-generate (2026-11-07)",
+      "code_today": [
+        "auto generate"
+      ],
+      "code_word": "auto generate",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words"
+    },
+    {
       "id": "video",
       "thing": "a video the gallery holds",
       "screen": [

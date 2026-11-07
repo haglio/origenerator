@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.fonts import SIZE_HEADING
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
+from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.db_requests import Turn
 from origenerator.gui.diff_text import write_request_change
@@ -44,6 +45,8 @@ _LINES_AT_MOST = 20
 _COMPARED = THUMBNAIL_BOX * 2
 _NOT_MADE = "?"
 _THUMBNAIL_LINES = 2
+_AUTO_GENERATE = "Auto-generate"
+_AUTO_GENERATE_TIP = "Generate each time the model comes back with its changes"
 
 
 def _say(label: QLabel, words: str) -> None:
@@ -247,6 +250,7 @@ class _Conversation(QTextEdit):
 class RequestExchange(QWidget):
     asked = pyqtSignal(str)
     generate_asked = pyqtSignal(int)
+    auto_generate_chosen = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -269,6 +273,10 @@ class RequestExchange(QWidget):
         self._status.hide()
         row.addWidget(line, 1)
         row.addWidget(self._status)
+        self._auto_generate = ToggleSwitch(_AUTO_GENERATE)
+        self._auto_generate.setToolTip(_AUTO_GENERATE_TIP)
+        self._auto_generate.clicked.connect(self.auto_generate_chosen)
+        row.addWidget(self._auto_generate)
         column.addLayout(row)
         self._available = True
 
@@ -329,6 +337,11 @@ class RequestExchange(QWidget):
         self._held[-1].take(turn)
         self._draw()
         self._settle()
+        if self._auto_generate.isChecked() and self._held[-1].changed_something():
+            self.generate_asked.emit(len(self._held) - 1)
+
+    def set_auto_generate(self, on: bool) -> None:
+        self._auto_generate.setChecked(on)
 
     def failed(self) -> None:
         self._held.pop()

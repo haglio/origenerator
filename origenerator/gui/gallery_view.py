@@ -1297,6 +1297,12 @@ class GalleryView(QWidget):
     def set_how_many(self, count) -> None:
         self._generate_pane.set_how_many(count if count in HOW_MANY else HOW_MANY[0])
 
+    def request_auto_generate(self) -> bool:
+        return self._generate_pane.request_auto_generate()
+
+    def set_request_auto_generate(self, on) -> None:
+        self._generate_pane.set_request_auto_generate(on is True)
+
     def _showing_search(self) -> bool:
         return self._gallery_pane.showing_search()
 

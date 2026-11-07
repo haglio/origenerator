@@ -19,6 +19,7 @@ from funestra.robot_hand import WaveformShape
 from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+from shared_ui.hard_to_miss import FadedBackground
 from shared_ui.preview import Preview
 
 from origenerator import action_settings, app_link, downtime, gallery, toast_raising, ui_scale
@@ -46,7 +47,6 @@ from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
 from tests.test_combine import _listed_under_recent
-from tests.test_hard_to_miss import _faded_backgrounds
 
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
 
@@ -91,6 +91,10 @@ def test_no_part_of_the_window_flashes_up_as_a_window_of_its_own_while_it_is_bui
         QApplication.instance().removeEventFilter(shown)
 
     assert shown.names == []
+
+
+def _faded_backgrounds(window):
+    return [faded for faded in window.findChildren(FadedBackground) if faded.isVisible()]
 
 
 def _quit_shortcut(win):

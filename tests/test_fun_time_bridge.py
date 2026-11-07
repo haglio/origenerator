@@ -731,7 +731,7 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
         else (row["thumbnail_path"], "image", row["prompt_id"], row["thumbnail_path"])
         for row in rows])
 
-    view._slideshows.open_on_preview((clicked[0], "image"), clicked[2])
+    view._slideshows.open_in_its_folder((clicked[0], "image"), clicked[2])
 
     played = [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")]
     assert played == [clicked[0], folder[0][0]]

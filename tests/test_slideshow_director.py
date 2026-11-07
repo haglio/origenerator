@@ -636,7 +636,7 @@ def test_a_double_clicked_item_plays_its_folder_newest_first_and_says_latest(sli
     host.visible = ["a2", "a1"]
     director, _host, made = slideshows(host)
 
-    director.open_on_preview(("a2.png", "image"), "a2")
+    director.open_in_its_folder(("a2.png", "image"), "a2")
 
     (slideshow,) = made
     assert slideshow.hud.order_label == LATEST_LABEL
@@ -648,7 +648,7 @@ def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_fo
     host.holding = []
     director, _host, made = slideshows(host)
 
-    director.open_on_preview(("a2.png", "image"), "a2")
+    director.open_in_its_folder(("a2.png", "image"), "a2")
 
     assert [item[2] for item in made[0].items] == ["a2"]
     (fill_in,) = host.holding
@@ -663,7 +663,7 @@ def test_a_double_clicked_item_plays_the_rows_the_gallery_pane_listed_without_re
     db = FakeDB(rows)
     director, _host, made = slideshows(FakeHost(rows=rows), db=db)
 
-    director.open_on_preview(("a2.png", "image"), "a2")
+    director.open_in_its_folder(("a2.png", "image"), "a2")
 
     assert [item[2] for item in made[0].items] == ["a2", "a1"]
     assert db.gets == 0
@@ -688,7 +688,7 @@ def test_a_double_clicked_item_s_slideshow_finds_its_files_by_listing_their_fold
     with monkeypatch.context() as asked:
         asked.setattr(Path, "exists", refused(Path.exists))
         asked.setattr(Path, "is_file", refused(Path.is_file))
-        director.open_on_preview((str(tmp_path / "g1.png"), "image"), "g1")
+        director.open_in_its_folder((str(tmp_path / "g1.png"), "image"), "g1")
 
     assert [item[2] for item in made[0].items] == ["g0", "g1", "g2"]
 
@@ -700,7 +700,7 @@ def test_a_double_clicked_item_s_slideshow_takes_the_shape_its_rows_say_opening_
     monkeypatch.setattr(module, "region_for_items",
                         lambda items: pytest.fail("a file was opened to measure it"))
 
-    director.open_on_preview(("g3.png", "image"), "g3")
+    director.open_in_its_folder(("g3.png", "image"), "g3")
 
     assert made[0].opened_with["shape"] == PORTRAIT
 
@@ -2490,7 +2490,7 @@ def test_a_double_clicked_item_opens_under_the_one_filter_state_and_stays_up(sli
     director, _host, made = slideshows(host)
     director._note_filters(SlideshowFilters(enhanced=True))
 
-    director.open_on_preview(("a2.png", "image"), "a2")
+    director.open_in_its_folder(("a2.png", "image"), "a2")
 
     assert made[0].taken_up == (SlideshowFilters(enhanced=True), True)
 

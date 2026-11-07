@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator.animate_command import lane_said_as
+from origenerator.branch_session import titled
 from origenerator.gui.looping_preview import play_in, stop_what_plays_in
 from origenerator.gui.stylesheet import COMMITS
 
@@ -47,7 +48,7 @@ class AnimationCheckWindow(QWidget):
         self._look = look
         self._submit = submit
         self._still = QPixmap()
-        self.setWindowTitle("Origenerator — how should this be animated?")
+        self.setWindowTitle(titled("Origenerator — how should this be animated?"))
 
         self._heading = QLabel(objectName=HEADING)
         self._heading.setStyleSheet("font-weight: bold;")

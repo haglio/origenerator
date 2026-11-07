@@ -7,14 +7,14 @@ from typing import Any
 from app_support import haglio_settings, siblings
 from funestra.robot_hand import bpm_for_speed
 
-from origenerator.branch_session import is_branch_session
+from origenerator.branch_session import THIS_CHECKOUT, is_branch_session
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.content import load_content
 from origenerator.db_connection import SqliteFile
 from origenerator.db_trash import TrashStore
 from origenerator.output_places import OutputPlaces
 
-PROJECT_DIR = Path(__file__).resolve().parents[1]
+PROJECT_DIR = THIS_CHECKOUT
 _TOLD_WHERE_STATE_IS = os.environ.get("ORIGENERATOR_STATE_DIR")
 STATE_DIR = Path(_TOLD_WHERE_STATE_IS or PROJECT_DIR / "state")
 UI_STATE_PATH = STATE_DIR / "ui_state.json"

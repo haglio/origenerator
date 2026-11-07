@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QStyle,
     QStyleOptionButton,
 )
+from shared_ui.preview import Preview
 
 from origenerator.action_settings import VIDEO
 from origenerator.animation_check_session import AnimationCheckSession
@@ -304,3 +305,13 @@ def test_an_animation_with_neither_says_there_is_nothing_to_go_by(window):
 
     assert _box(made, POSITIVE).toPlainText() == ""
     assert made.findChild(QLabel, BLANK).text() == NO_SAMPLE
+
+
+def test_the_animation_check_opened_in_a_preview_names_the_preview(window, monkeypatch):
+    monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
+    monkeypatch.setattr("origenerator.branch_session.preview_of",
+                        lambda checkout: Preview(feature="Example scene pausing"))
+
+    made, _store, _sent = window()
+
+    assert made.windowTitle() == "Origenerator — how should this be animated? — preview of Example scene pausing"

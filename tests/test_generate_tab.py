@@ -2457,7 +2457,8 @@ def test_the_actions_and_the_workflow_dropdown_line_up_as_a_sections_fields_do(
     host.show()
     tab.layout().activate()
     body = tab._scroll.widget()
-    action = tab._action.form().parentWidget().findChild(QWidget, action_pills(MediaType.IMAGE))
+    action = tab._action.form().parentWidget().findChild(
+        QWidget, action_pills(MediaType.IMAGE)).parentWidget()
 
     assert tab.width() == width
     assert action.mapTo(body, QPoint(0, 0)).x() == tab._workflow_dropdown.mapTo(body, QPoint(0, 0)).x()

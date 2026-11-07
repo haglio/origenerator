@@ -127,19 +127,36 @@ def test_an_image_with_actions_offers_to_edit_them(action):
     assert _setter(action, MediaType.IMAGE).text() == EDIT == "Edit actions with setter tool…"
 
 
-def test_an_image_shows_its_checkboxes_to_the_right_of_its_button_as_it_saved_them(action, qtbot):
+def _top_left(widget: QWidget, within: QWidget) -> QPoint:
+    return widget.mapTo(within, QPoint())
+
+
+def test_an_image_shows_its_checkboxes_as_it_saved_them_before_its_pills_on_one_line(action, qtbot):
     action.show_row(_row(image=Labels(("alpha",), ("second box",))))
     host = _rows(action)
-    host.resize(900, 60)
+    host.resize(900, 200)
     with qtbot.waitExposed(host):
         host.show()
-    button = _setter(action, MediaType.IMAGE)
-
+    pills = _pill_row(action, MediaType.IMAGE)
     boxes = [_box(action, MediaType.IMAGE, name) for name in _BOXES[MediaType.IMAGE]]
 
     assert [box.isChecked() for box in boxes] == [False, True]
-    assert all(box.mapTo(action, box.rect().topLeft()).x()
-               > button.mapTo(action, button.rect().topLeft()).x() for box in boxes)
+    assert all(_top_left(box, host).x() + box.width() <= _top_left(pills, host).x()
+               and _top_left(box, host).y() < _top_left(pills, host).y() + pills.height()
+               for box in boxes)
+
+
+def test_a_videos_checkbox_stands_before_its_pills_too(action, qtbot):
+    action.show_row(_video("vid", video=Labels(("delta",), ("third box",))))
+    host = _rows(action)
+    host.resize(900, 300)
+    with qtbot.waitExposed(host):
+        host.show()
+    box = _box(action, MediaType.VIDEO, "third box")
+    pills = _pill_row(action, MediaType.VIDEO)
+
+    assert box.isChecked()
+    assert _top_left(box, host).x() + box.width() <= _top_left(pills, host).x()
 
 
 def test_clicking_a_checkbox_saves_it_with_the_actions_the_item_already_has(action, qtbot):
@@ -311,7 +328,7 @@ def test_the_pills_wrap_onto_more_lines_rather_than_being_cut_short(action, qtbo
     assert all(pill.width() >= pill.sizeHint().width() for pill in _pills(action, MediaType.IMAGE))
 
 
-def test_the_button_sits_on_a_line_of_its_own_under_the_actions(action):
+def test_the_button_sits_on_a_line_of_its_own_under_the_checkboxes_and_the_actions(action):
     action.show_row(_row(image=Labels(("alpha",))))
     _rows(action).resize(600, 300)
     _rows(action).show()
@@ -319,8 +336,10 @@ def test_the_button_sits_on_a_line_of_its_own_under_the_actions(action):
     setter = _setter(action, MediaType.IMAGE)
     part = setter.parentWidget()
     part.layout().activate()
+    above = [listed, *(_box(action, MediaType.IMAGE, name) for name in _BOXES[MediaType.IMAGE])]
 
-    assert setter.mapTo(part, QPoint()).y() >= listed.mapTo(part, QPoint()).y() + listed.height()
+    assert all(_top_left(setter, part).y() >= _top_left(each, part).y() + each.height()
+               for each in above)
 
 
 def test_each_action_is_a_pill_with_an_x_that_removes_it_and_saves_at_once(action, qtbot):

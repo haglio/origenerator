@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui import folder_path as shared_folder_path
-from shared_ui.colors import TEXT_PRIMARY
+from shared_ui.colors import GREEN, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.spacing import MARGIN_STANDARD
 
@@ -1693,7 +1693,7 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
 
     path = view._folder_path.findChild(shared_folder_path.FolderPath)
     assert list(_path_links(view)) == ["All"]
-    assert icon_then_text("star", "Favorites", color=TEXT_PRIMARY,
+    assert icon_then_text("star", "Favorites", color=GREEN,
                           size=path.fontMetrics().height()) in path.text()
     assert view._folder_path.display_text() == f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Favorites"
 
@@ -1706,7 +1706,7 @@ def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
     view._tree.setCurrentItem(_collection(view, ENHANCED_KEY))
 
     path = view._folder_path.findChild(shared_folder_path.FolderPath)
-    assert icon_then_text("plus", "Enhanced", color=TEXT_PRIMARY,
+    assert icon_then_text("plus", "Enhanced", color=YELLOW,
                           size=path.fontMetrics().height()) in path.text()
 
 

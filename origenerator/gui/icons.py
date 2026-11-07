@@ -55,6 +55,11 @@ _GLYPH_ON_GROUND = 44
 _GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
 
 _STAR_GLYPH = GREEN
+_ENHANCE_MARK = ("plus", YELLOW)
+_DELETE_MARK = ("trash", RED)
+_COLLECTION_MARKS = {
+    FAVORITES_KEY: ("star", _STAR_GLYPH), ENHANCED_KEY: _ENHANCE_MARK, TRASH_KEY: _DELETE_MARK,
+}
 _REROLL_GLYPH = WHITE
 
 _REROLL_MEDIA = 34
@@ -98,7 +103,8 @@ def slideshow_icon() -> QIcon:
 
 
 def enhance_icon() -> QIcon:
-    return qt_icon("plus", color=YELLOW, size=_SIZE)
+    name, color = _ENHANCE_MARK
+    return qt_icon(name, color=color, size=_SIZE)
 
 
 def question_icon() -> QIcon:
@@ -133,7 +139,7 @@ def trash_icon(*, color=None) -> QIcon:
 
 
 def delete_icon() -> QIcon:
-    return trash_icon(color=RED)
+    return trash_icon(color=_DELETE_MARK[1])
 
 
 def star_icon(*, filled: bool) -> QIcon:
@@ -173,8 +179,12 @@ def flask_icon() -> QIcon:
 def collection_icon(collection: str) -> QIcon:
     return {
         LATEST_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
-        ENHANCED_KEY: enhance_icon, EXPERIMENTS_KEY: flask_icon, TRASH_KEY: trash_icon,
+        ENHANCED_KEY: enhance_icon, EXPERIMENTS_KEY: flask_icon, TRASH_KEY: delete_icon,
     }[collection]()
+
+
+def collection_mark(collection: str) -> tuple[str, QColor]:
+    return _COLLECTION_MARKS[collection]
 
 
 def collection_kind_icon(collection: str) -> tuple[QIcon, str]:

@@ -1062,3 +1062,59 @@ def test_a_lora_from_a_training_before_its_program_was_recorded_is_left_where_it
     controller.take_up_trainings()
 
     assert controller.pane.used == []
+
+
+def _pane_set_to(controller, **params):
+    controller.pane.on_changed(
+        gallery.EnhanceSettings(params={**gallery.default_enhance_params(), **params}))
+
+
+def _basic_enhancement_was_asked_for(jobs):
+    defaults = module.WORKFLOW_REGISTRY[ENHANCE].default_params()
+    ((_key, params),) = jobs.prepared
+    assert {key: params[key] for key in gallery.ENHANCE_SETTING_KEYS} == {
+        "checkpoint": defaults["checkpoint"], "upscale_model": defaults["upscale_model"],
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.0,
+        "enhance_detail_fixes": {}, "enhance_fix_prompts": {}}
+    return True
+
+
+def _launching_for_real(monkeypatch):
+    monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+
+
+def test_a_videos_start_image_is_enhanced_at_the_basic_settings_not_the_panes(
+        enhance, monkeypatch):
+    _launching_for_real(monkeypatch)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    _pane_set_to(controller, enhance_scale=3.0, enhance_steps=35, enhance_denoise=0.4,
+                 enhance_detail_fixes={"hands": 0.3})
+
+    controller.enhance_a_videos_start_image(_image("i1"))
+
+    assert _basic_enhancement_was_asked_for(jobs)
+
+
+def test_a_lock_enhances_the_locked_image_at_the_basic_settings_not_the_panes(
+        enhance, monkeypatch):
+    _launching_for_real(monkeypatch)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    _pane_set_to(controller, enhance_scale=3.0, enhance_steps=35, enhance_denoise=0.4)
+
+    assert controller.enhance_from_slideshow("i1") is True
+    assert _basic_enhancement_was_asked_for(jobs)
+
+
+def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch):
+    _launching_for_real(monkeypatch)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    _pane_set_to(controller, enhance_steps=35)
+
+    controller.enhance_it("i1")
+
+    ((_key, params),) = jobs.prepared
+    assert params["enhance_steps"] == 35

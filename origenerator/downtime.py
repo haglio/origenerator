@@ -25,6 +25,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.enhanced_start_backfill import queue_backfill
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
+from origenerator.gallery.enhance_settings import basic_enhance_settings
 from origenerator.generation_state import GenerationSource
 from origenerator.inflight import reconcile_the_backfill
 from origenerator.landed_while_away import THIS_LIBRARY, running_trainings, training_toast
@@ -129,7 +130,7 @@ def _comfyui_busy(client) -> bool:
         return False
 
 
-def queue_the_backfill(jobs, db, rows: list[dict], *, enhance_settings) -> int:
+def queue_the_backfill(jobs, db, rows: list[dict]) -> int:
     from origenerator.gui.enhance_controller import launch_enhancements  # noqa: PLC0415
 
     def launch(video: dict, workflow, params: dict) -> str | None:
@@ -141,7 +142,7 @@ def queue_the_backfill(jobs, db, rows: list[dict], *, enhance_settings) -> int:
 
     def enhance(images: list[dict]) -> int:
         asks = [(image, params) for image in images
-                if (params := gallery.enhance_params_for(image, enhance_settings)) is not None]
+                if (params := gallery.enhance_params_for(image, basic_enhance_settings())) is not None]
         index = gallery.image_config_index_of(rows)
         return sum(1 for *_launch, prompt_id in launch_enhancements(
             jobs, db, asks, index, source=GenerationSource.BACKFILL) if prompt_id)
@@ -162,16 +163,14 @@ def _handed_over(db, client, queue: Callable[[object], int]) -> int:
     return queued
 
 
-def _queue_the_backfill_into(jobs, db, client, ui: AppState) -> int:
+def _queue_the_backfill_into(jobs, db, client) -> int:
     reconcile_the_backfill(db, client, THIS_LIBRARY)
-    return queue_the_backfill(
-        jobs, db, db.list_generations(),
-        enhance_settings=gallery.EnhanceSettings.parse(ui.get("enhance_settings")))
+    return queue_the_backfill(jobs, db, db.list_generations())
 
 
 def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
     def everything(jobs) -> int:
-        return (_queue_the_backfill_into(jobs, db, client, ui)
+        return (_queue_the_backfill_into(jobs, db, client)
                 + queue_the_work_left(jobs, db.list_generations(),
                                       experiments_on=ui.get("experiments_enabled") is True,
                                       policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
@@ -183,8 +182,8 @@ def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
     logger.info("Handed ComfyUI %d run(s) Origenerator left for while it is closed", queued)
 
 
-def hand_comfyui_more_of_the_backfill(db, client, ui: AppState) -> int:
-    queued = _handed_over(db, client, lambda jobs: _queue_the_backfill_into(jobs, db, client, ui))
+def hand_comfyui_more_of_the_backfill(db, client) -> int:
+    queued = _handed_over(db, client, lambda jobs: _queue_the_backfill_into(jobs, db, client))
     if queued:
         logger.info("Handed ComfyUI %d more run(s) of the backfill while Origenerator stays "
                     "closed", queued)
@@ -230,7 +229,7 @@ def main() -> int:
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
         notes_due=lambda: collection_notes.are_due(db, config.COLLECTION_NOTES_PATH),
         take_notes=lambda: collection_notes.take_a_sitting(db, client, config.COLLECTION_NOTES_PATH),
-        queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client, ui),
+        queue_more_backfill=lambda: hand_comfyui_more_of_the_backfill(db, client),
         fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui)))
     print(json.dumps({"did": turn.did, "holds_the_graphics_card": turn.holds_the_graphics_card}))
     return 0

@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from origenerator import downtime, gallery, trash_collection
-from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.enhanced_start_backfill import (
@@ -33,6 +32,7 @@ from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import record_of
 from origenerator.trash import Trash
+from tests.basic_enhancement import at_the_basic_settings
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.story_voices import voices_asked_for
 
@@ -280,13 +280,14 @@ def test_the_work_left_for_while_closed_backfills_videos_and_enhances_their_imag
            start=_plain("enhanced image"))
     jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
 
-    assert downtime.queue_the_backfill(jobs, db, db.list_generations(),
-                                      enhance_settings=gallery.EnhanceSettings.parse(None)) == 2
+    assert downtime.queue_the_backfill(jobs, db, db.list_generations()) == 2
 
     queued = [row for row in db.list_generations() if row["source"] == GenerationSource.BACKFILL]
     assert sorted((row["workflow_name"], row["backfill_of"] or row["enhance_of"])
                   for row in queued) == [("image_enhance", "plain image"),
                                          ("wan22_i2v", "from enhanced")]
+    (enhance,) = [row for row in queued if row["enhance_of"]]
+    assert at_the_basic_settings(enhance)
 
 
 def _comfyui_taking_everything():
@@ -307,8 +308,7 @@ def test_a_story_the_backfill_remakes_while_the_app_is_closed_is_spoken_before_c
     _video(db, "story", made_from="image", starred=True, start=_plain("image"),
            lines=["Come in."])
 
-    assert downtime.hand_comfyui_more_of_the_backfill(
-        db, client, AppState(tmp_path / "ui_state.json")) == 1
+    assert downtime.hand_comfyui_more_of_the_backfill(db, client) == 1
 
     (run,) = [row for row in db.list_generations() if row["source"] == GenerationSource.BACKFILL]
     assert [voice.how for voice in voices] == ["here"]
@@ -328,8 +328,7 @@ def test_a_backfill_run_comfyui_has_no_record_of_is_cleared_so_its_video_is_rema
     _video(db, "video", made_from="image", starred=True, start=_plain("image"))
     _backfill_run(db, "lost", of="video", status=status, made=False)
 
-    assert downtime.hand_comfyui_more_of_the_backfill(
-        db, client, AppState(tmp_path / "ui_state.json")) == 1
+    assert downtime.hand_comfyui_more_of_the_backfill(db, client) == 1
 
     assert [(row["prompt_id"] == "lost", row["backfill_of"]) for row in db.list_generations()
             if row["source"] == GenerationSource.BACKFILL] == [(False, "video")]
@@ -792,3 +791,4 @@ def test_a_video_made_from_the_enhancement_is_left_alone(tmp_path):
     _video(db, "video", made_from="image", starred=True, start=_enhancement("image"))
 
     assert _backfilled(db) == []
+

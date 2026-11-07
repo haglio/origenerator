@@ -205,7 +205,7 @@ def test_the_command_evolver_runs_hands_comfyui_more_of_the_backfill_while_close
     monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
     handed = []
     monkeypatch.setattr(downtime, "hand_comfyui_more_of_the_backfill",
-                        lambda db, client, ui: handed.append((db.path, client.folders)) or 6)
+                        lambda db, client: handed.append((db.path, client.folders)) or 6)
 
     assert downtime.main() == 0
 

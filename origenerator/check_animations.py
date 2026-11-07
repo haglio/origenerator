@@ -4,8 +4,9 @@ from __future__ import annotations
 import json
 
 
-def _launcher(db, client, enhance_settings):
+def _launcher(db, client):
     from origenerator import gallery
+    from origenerator.gallery.enhance_settings import basic_enhance_settings
     from origenerator.generation_config import randomize_seeds
     from origenerator.gui.enhance_controller import launch_enhancements
     from origenerator.gui.job_queue import JobQueue
@@ -20,7 +21,7 @@ def _launcher(db, client, enhance_settings):
              if gallery.media_type_of_row(row) == MediaType.IMAGE])
 
     def enhance(image: dict) -> None:
-        params = gallery.enhance_params_for(image, enhance_settings)
+        params = gallery.enhance_params_for(image, basic_enhance_settings())
         if params is not None:
             launch_enhancements(jobs, db, [(image, params)], image_index())
 
@@ -55,7 +56,6 @@ def the_animation_window():
     from origenerator import action_settings, animation_samples, gallery
     from origenerator.animation_check_session import AnimationCheckSession
     from origenerator.animation_settings import AcceptedSettings
-    from origenerator.app_state import AppState
     from origenerator.comfyui_client import ComfyUIClient
     from origenerator.config import (
         COMFYUI_FOLDERS,
@@ -64,7 +64,6 @@ def the_animation_window():
         DB_PATH,
         OUTPUT_PLACES,
         THUMB_DIR,
-        UI_STATE_PATH,
     )
     from origenerator.db import Database
     from origenerator.gui.animation_check_window import AnimationCheckWindow
@@ -89,8 +88,7 @@ def the_animation_window():
             AcceptedSettings(),
             pinned=action_settings.pinned_settings),
         look,
-        _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS),
-                  gallery.EnhanceSettings.parse(AppState(UI_STATE_PATH).get("enhance_settings"))),
+        _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS)),
     )
 
 

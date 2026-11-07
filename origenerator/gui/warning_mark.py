@@ -22,6 +22,9 @@ class WarningMark(QLabel):
         side = self.fontMetrics().height()
         return QSize(side, side)
 
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()
+
     def paintEvent(self, event):
         side = min(self.width(), self.height())
         painter = QPainter(self)

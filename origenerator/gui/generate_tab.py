@@ -211,6 +211,7 @@ class GenerateTab(DropZones):
     modify_requested = pyqtSignal(str, str, dict)
     cancel_requested = pyqtSignal()
     how_many_chosen = pyqtSignal(int)
+    request_auto_generate_chosen = pyqtSignal(bool)
     displayed_changed = pyqtSignal()
     enhance_requested = pyqtSignal(str)
     versions_delete_requested = pyqtSignal(str, list)
@@ -258,6 +259,7 @@ class GenerateTab(DropZones):
         self._autoshow_held = False
         self._request_aim: _RequestAim | None = None
         self._turn_being_made: int | None = None
+        self._request_auto_generate = False
         self._asked = 0
         self._requests = views.requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
@@ -499,6 +501,12 @@ class GenerateTab(DropZones):
     def set_how_many(self, count: int) -> None:
         self._how_many.set_how_many(count)
 
+    def set_request_auto_generate(self, on: bool) -> None:
+        self._request_auto_generate = on
+        exchange = self._param_form.request_exchange() if self._param_form else None
+        if exchange is not None:
+            exchange.set_auto_generate(on)
+
     def set_making_one_check(self, is_making_one) -> None:
         self._making_one = is_making_one
 
@@ -650,6 +658,9 @@ class GenerateTab(DropZones):
         if form.request_exchange() is not None:
             form.request_exchange().asked.connect(self._on_request_asked)
             form.request_exchange().generate_asked.connect(self._generate_from_turn)
+            form.request_exchange().set_auto_generate(self._request_auto_generate)
+            form.request_exchange().auto_generate_chosen.connect(
+                self.request_auto_generate_chosen)
         self.lora_offers.form_replaced()
         self._form_host_column.addWidget(self._param_form)
         # Qt defers deleteLater, so the outgoing form is still alive here.

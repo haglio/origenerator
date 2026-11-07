@@ -379,3 +379,48 @@ def test_a_turn_whose_item_is_being_made_shows_its_progress_until_the_thumbnail_
 
     assert _placed(exchange, ProgressBar) == []
     assert paths["first"] in exchange._conversation.document().toHtml()
+
+
+def test_auto_generate_sits_at_the_end_of_the_line_and_starts_off(qtbot):
+    exchange = _shown_at(qtbot, 400)
+
+    switch = exchange._auto_generate
+    assert switch.text() == "Auto-generate"
+    assert not switch.isChecked()
+    assert switch.geometry().left() > exchange._line.geometry().right()
+
+
+def test_with_auto_generate_on_each_answer_that_changes_something_is_generated(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    asked = []
+    exchange.generate_asked.connect(asked.append)
+    exchange.set_auto_generate(True)
+    exchange.show_exchange([_changed("a cap", made="first")])
+
+    exchange.add_turn("hello")
+    exchange.answered(("hello", "Hi."))
+    exchange.add_turn("red")
+    exchange.answered(_changed("red"))
+
+    assert asked == [2]
+
+
+def test_with_auto_generate_off_an_answer_waits_for_generate(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    asked = []
+    exchange.generate_asked.connect(asked.append)
+
+    exchange.add_turn("red")
+    exchange.answered(_changed("red"))
+
+    assert asked == []
+
+
+def test_flipping_auto_generate_says_so(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    chosen = []
+    exchange.auto_generate_chosen.connect(chosen.append)
+
+    qtbot.mouseClick(exchange._auto_generate, Qt.MouseButton.LeftButton)
+
+    assert chosen == [True]

@@ -1113,6 +1113,17 @@ def test_how_many_generate_makes_at_once_survives_close_and_reopen(qtbot, tmp_pa
     assert tab._how_many.how_many() == 8
 
 
+def test_the_requests_auto_generate_survives_close_and_reopen(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._generate_pane.set_request_auto_generate(True)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._generate_pane.request_auto_generate()
+
+
 def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("how_many", 7)

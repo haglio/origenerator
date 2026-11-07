@@ -50,12 +50,19 @@ def _tabs(view) -> list:
     return view._generate_pane.generate_tabs()
 
 
+def _request_auto_generates(view) -> list[QWidget]:
+    return [tab._param_form.request_exchange()._auto_generate for tab in _tabs(view)
+            if tab._param_form is not None and tab._param_form.request_exchange() is not None]
+
+
 REMEMBERED = {
     "generate_tabs": lambda view: [
         widget for tab in _tabs(view) for widget in _within(tab)
         if widget is not tab._how_many and not tab._action.isAncestorOf(widget)
+        and widget not in _request_auto_generates(view)
     ] + [view._generate_pane.tabBar()],
     "how_many": lambda view: [tab._how_many for tab in _tabs(view)],
+    "request_auto_generate": _request_auto_generates,
     "toc_shapes": lambda view: [view._tree.separate_button, view._tree.together_button],
     "open_folders": lambda view: view._tree.findChildren(QTreeView),
     "pane_sizes": lambda view: [splitter for splitter in view.findChildren(PaneSplitter)

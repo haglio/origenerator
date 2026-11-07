@@ -286,7 +286,7 @@ def test_an_image_s_animations_in_the_trash_sit_together_in_a_box_labeled_trash(
     tiles = related._animations._host.findChildren(_VideoTile)
     assert _boxed(tiles) == {"vid1": False, "vid2": True, "vid3": True}
     box, = {_trash_box_of(tile) for tile in tiles} - {None}
-    assert box.label.text() == "Trash"
+    assert box.label.text() == "in the Trash"
 
 
 def test_linked_items_in_the_trash_sit_in_a_box_labeled_trash(make_related):

@@ -977,9 +977,9 @@
     },
     {
       "id": "trash_box",
-      "thing": "the dotted box labeled Trash that holds the items in the trash among a tab's linked items, under Source, Requests, Modifications, Animations, Combine and Trims",
+      "thing": "the dashed box labeled in the Trash that holds the items in the trash among a tab's linked items, under Source, Requests, Modifications, Animations, Combine and Trims",
       "screen": [
-        "Trash"
+        "in the Trash"
       ],
       "his_word": "a dotted line box labeled as \"trash\" (2026-11-06)",
       "code_today": [

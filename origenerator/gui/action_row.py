@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
@@ -54,26 +54,25 @@ class _Side(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_MEDIUM)
-        self._pills = PillRow(actions, adder_name=adding_button(side))
-        self._pills.setObjectName(action_pills(side))
-        self._pills.changed.connect(self._pills_changed)
-        column.addWidget(self._pills)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
         column.addLayout(row)
-        self._setter = QPushButton(ADD, objectName=setter_button(side))
-        self._setter.setToolTip(_TIPS[side])
-        self._setter.clicked.connect(lambda: opened(side, self._prompt_id))
-        row.addWidget(self._setter)
         self._boxes: dict[str, TickControl] = {}
         for name in checkboxes:
             box = TickControl(name)
             box.setObjectName(action_checkbox(side, name))
             box.clicked.connect(lambda _checked=False: self._save())
             self._boxes[name] = box
-            row.addWidget(box)
-        row.addStretch(1)
+            row.addWidget(box, 0, Qt.AlignmentFlag.AlignTop)
+        self._pills = PillRow(actions, adder_name=adding_button(side))
+        self._pills.setObjectName(action_pills(side))
+        self._pills.changed.connect(self._pills_changed)
+        row.addWidget(self._pills, 1)
+        self._setter = QPushButton(ADD, objectName=setter_button(side))
+        self._setter.setToolTip(_TIPS[side])
+        self._setter.clicked.connect(lambda: opened(side, self._prompt_id))
+        column.addWidget(self._setter, 0, Qt.AlignmentFlag.AlignLeft)
 
     def shows(self, prompt_id: str) -> bool:
         return bool(prompt_id) and prompt_id == self._prompt_id

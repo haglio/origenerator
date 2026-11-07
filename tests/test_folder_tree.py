@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QEvent, QMimeData, QObject, QPoint, QPointF, QRect, Qt
+from PyQt6.QtCore import QEvent, QItemSelectionModel, QMimeData, QObject, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import (
     QContextMenuEvent,
     QDragEnterEvent,
@@ -981,3 +981,62 @@ def test_picking_another_folder_redraws_the_frozen_folder_it_unpicks(qtbot):
     qtbot.wait(10)
 
     assert any(region.contains(frozen_place) for region in painted.regions)
+
+
+def _ctrl_pick(tree, row):
+    tree.selectionModel().select(tree.indexFromItem(row),
+                                 QItemSelectionModel.SelectionFlag.Select
+                                 | QItemSelectionModel.SelectionFlag.Rows)
+
+
+def _frozen_slot(tree, rows, row):
+    height = tree.visualItemRect(rows["a"]).height()
+    return QPoint(100, tree.frozen_rows().index(row) * height + 2)
+
+
+def test_every_picked_folder_scrolled_past_stays_frozen_with_its_folders(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["a/i/2"])
+    _ctrl_pick(tree, rows["a/i/5"])
+    _scroll_to_the_top(tree, rows["b/i/3"])
+
+    assert tree.frozen_rows() == [rows["a"], rows["a/i"], rows["a/i/2"], rows["a/i/5"],
+                                  rows["b"], rows["b/i"]]
+
+
+def test_ctrl_clicking_a_frozen_folder_adds_it_to_the_picked_folders_where_it_stands(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["b/i/9"])
+    _scroll_to_the_top(tree, rows["b/i/3"])
+    scrolled = tree.verticalScrollBar().value()
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.ControlModifier, _frozen_slot(tree, rows, rows["b"]))
+
+    picked = {id(row) for row in tree.selectedItems()}
+    assert (picked, tree.verticalScrollBar().value()) == (
+        {id(rows["b/i/9"]), id(rows["b"])}, scrolled)
+
+
+def test_ctrl_clicking_a_frozen_picked_folder_unpicks_it(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["a/i/2"])
+    _ctrl_pick(tree, rows["b/i/9"])
+    _scroll_to_the_top(tree, rows["b/i/3"])
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.ControlModifier, _frozen_slot(tree, rows, rows["a/i/2"]))
+
+    assert (tree.selectedItems(), rows["a/i/2"] in tree.frozen_rows()) == ([rows["b/i/9"]], False)
+
+
+def test_shift_clicking_a_frozen_folder_picks_every_row_from_the_last_pick_to_it(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["a/i/2"])
+    _scroll_to_the_top(tree, rows["b/i/3"])
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.ShiftModifier, _frozen_slot(tree, rows, rows["b"]))
+
+    expected = {id(rows[f"a/i/{n}"]) for n in range(2, 30)} | {id(rows["b"])}
+    assert {id(row) for row in tree.selectedItems()} == expected

@@ -47,6 +47,10 @@ class SourceTile(QWidget):
 
         self.hide()
 
+    @property
+    def prompt_id(self) -> str | None:
+        return self._prompt_id
+
     def show_source(self, row: dict, name: str, heading: str | None = None,
                     media_type: str | None = None, gray: bool = False):
         self._prompt_id = row["prompt_id"]

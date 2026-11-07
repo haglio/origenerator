@@ -9,6 +9,7 @@ from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_heading import link_heading
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
+from origenerator.gui.trash_box import place_tiles
 
 
 class _VideoTile(QLabel):
@@ -51,14 +52,15 @@ class Animations(QWidget):
     def set_heading(self, heading: str) -> None:
         _show_heading(self._heading, heading)
 
-    def show_videos(self, items: list[tuple[str, object, object]]):
+    def show_videos(self, items: list[tuple[str, object, object]],
+                    in_trash: frozenset[str] = frozenset()):
         # Qt: deleting the old host stops and frees its tiles' movies.
         self._column.removeWidget(self._host)
         self._host.deleteLater()
         self._host = QWidget()
         flow = FlowLayout(self._host, spacing=6)
-        for prompt_id, movie_path, still_path in items:
-            flow.addWidget(self._make_tile(prompt_id, movie_path, still_path))
+        place_tiles([(self._make_tile(prompt_id, movie_path, still_path), prompt_id in in_trash)
+                     for prompt_id, movie_path, still_path in items], flow.addWidget)
         self._column.addWidget(self._host)
         self.setVisible(bool(items))
 

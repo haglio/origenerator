@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import pytest
-from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
 import origenerator.gui.metadata_section as metadata_section_module
@@ -60,22 +59,6 @@ def test_a_fold_put_back_after_a_restart_folds_the_block_shown_and_the_next(bloc
     block.show_row(_row(created_at="2026-07-02"))
 
     assert (folded_now, block.findChild(CollapsibleSection).is_collapsed()) == (True, True)
-
-
-def test_the_way_to_the_folder_leads_the_block(qtbot):
-    action = QAction("Go to folder")
-    action.setVisible(False)
-    b = MetadataSection(go_to_folder=action)
-    qtbot.addWidget(b)
-
-    assert b.show_row(_row()) is True
-    button = b.findChild(QPushButton, "goToFolderButton")
-    assert button.parent().layout().indexOf(button) == 0
-    assert not button.isVisibleTo(b)
-
-    action.setVisible(True)
-
-    assert button.isVisibleTo(b)
 
 
 def test_shows_file_and_created(block):

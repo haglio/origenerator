@@ -41,6 +41,7 @@ from origenerator.gui.enhance_controller import NOTHING_LEFT_TO_ENHANCE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_pace import DEFAULT_S
+from origenerator.gui.source_tile import SourceTile
 from origenerator.prompt_edit import work_out
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.commands import match_voice_command as match
@@ -752,7 +753,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
 
     section = view._generate_pane.current_generate_tab()._related._requests_section
     assert not section.isHidden()
-    assert [(tile._heading.text(), tile._prompt_id) for tile in section._tiles] == [
+    assert [(tile._heading.text(), tile._prompt_id) for tile in section.findChildren(SourceTile)] == [
         ("Requested from", "orig")]
 
 

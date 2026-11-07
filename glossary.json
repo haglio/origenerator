@@ -976,6 +976,19 @@
       ]
     },
     {
+      "id": "trash_box",
+      "thing": "the dotted box labeled Trash that holds the items in the trash among a tab's linked items, under Source, Requests, Modifications, Animations, Combine and Trims",
+      "screen": [
+        "Trash"
+      ],
+      "his_word": "a dotted line box labeled as \"trash\" (2026-11-06)",
+      "code_today": [
+        "trash box"
+      ],
+      "code_word": "trash box",
+      "status": "his_word"
+    },
+    {
       "id": "collection",
       "thing": "Latest, Favorites, Enhanced, Experiments and Trash: the rows every TOC section leads with",
       "screen": null,

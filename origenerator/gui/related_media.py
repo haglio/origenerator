@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 
@@ -18,6 +18,7 @@ from origenerator.gui.animations import Animations
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.source_tile import SourceTile
+from origenerator.gui.trash_box import place_tiles
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
 from origenerator.voice.dictation import words_of
@@ -35,18 +36,17 @@ class _Links(CollapsibleSection):
         host = QWidget()
         self._flow = FlowLayout(host, spacing=GAP_MEDIUM)
         self.content_form().addRow(host)
-        self._tiles: list[SourceTile] = []
         self.hide()
 
-    def show_links(self, links: list[tuple[str, dict]], name_of: Callable[[str], str]) -> None:
-        for tile in self._tiles:
-            self._flow.removeWidget(tile)
-            tile.setParent(None)
-            tile.deleteLater()
-        self._tiles = [self._tile(heading, row, name_of) for heading, row in links]
-        for tile in self._tiles:
-            self._flow.addWidget(tile)
-        self.setVisible(bool(self._tiles))
+    def show_links(self, links: list[tuple[str, dict]], name_of: Callable[[str], str],
+                   in_trash: frozenset[str] = frozenset()) -> None:
+        while self._flow.count():
+            placed = self._flow.takeAt(0).widget()
+            placed.setParent(None)
+            placed.deleteLater()
+        place_tiles([(self._tile(heading, row, name_of), row["prompt_id"] in in_trash)
+                     for heading, row in links], self._flow.addWidget)
+        self.setVisible(bool(links))
 
     def _tile(self, heading: str, row: dict, name_of) -> SourceTile:
         tile = SourceTile()
@@ -84,6 +84,7 @@ class RelatedMedia(QWidget):
         layout.setSpacing(GAP_MEDIUM)
         self._source_tile = SourceTile()
         self._source_video_tile = SourceTile()
+        self._source_box = None
         self._source_section = self._source_section_of(self._source_tile,
                                                        self._source_video_tile)
         layout.addWidget(self._source_section)
@@ -108,13 +109,13 @@ class RelatedMedia(QWidget):
 
     def _source_section_of(self, *tiles: SourceTile) -> CollapsibleSection:
         side_by_side = QWidget()
-        row = QHBoxLayout(side_by_side)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(GAP_MEDIUM)
+        self._source_row = QHBoxLayout(side_by_side)
+        self._source_row.setContentsMargins(0, 0, 0, 0)
+        self._source_row.setSpacing(GAP_MEDIUM)
+        self._source_row.setAlignment(Qt.AlignmentFlag.AlignLeft)
         for tile in tiles:
             tile.activated.connect(self.link_clicked)
-            row.addWidget(tile)
-        row.addStretch(1)
+            self._source_row.addWidget(tile)
         section = CollapsibleSection("Source")
         section.content_form().addRow(side_by_side)
         section.hide()
@@ -126,13 +127,14 @@ class RelatedMedia(QWidget):
                   if produced_output(video)]
         self._show_source_tile(row, start_image_of, videos)
         self._show_source_video_tile(row)
+        self._place_source_tiles()
         self._source_section.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
         items = self._animated_items(row, start_image_of, videos)
         self._animations.set_heading("Starting frame animated in"
                                      if media_type_of_row(row) == MediaType.VIDEO else "")
-        self._animations.show_videos(items)
+        self._animations.show_videos(items, in_trash=self._trashed())
         self._animations_section.setVisible(not self._animations.isHidden())
         self._show_videos_made_from(row.get("prompt_id"), videos)
         self._follow_the_sections()
@@ -153,6 +155,7 @@ class RelatedMedia(QWidget):
     def clear(self) -> None:
         self._source_tile.clear()
         self._source_video_tile.clear()
+        self._place_source_tiles()
         self._source_section.hide()
         self.show_requests_and_modifications(None)
         self._animations.hide()
@@ -188,7 +191,7 @@ class RelatedMedia(QWidget):
                  if made_from is not None and _is_request(request) == is_request else [])
                 + [(into_heading, made) for record, made in made_into
                    if _is_request(record) == is_request],
-                self._name_of)
+                self._name_of, self._trashed())
         self._follow_the_sections()
 
     def _show_videos_made_from(self, prompt_id: str | None, videos: list[dict]) -> None:
@@ -197,7 +200,7 @@ class RelatedMedia(QWidget):
                 (self._trims_section, "trimmed_from", "Trimmed into")):
             section.show_links([(heading, video) for video in videos
                                 if prompt_id and video.get(names_it) == prompt_id],
-                               self._name_of)
+                               self._name_of, self._trashed())
 
     def _show_source_video_tile(self, row: dict) -> None:
         video_id = row.get("source_video")
@@ -218,6 +221,24 @@ class RelatedMedia(QWidget):
         if frame is not None and was_made_from(row, frame):
             return frame, None, MediaType.IMAGE
         return None, None, None
+
+    def _place_source_tiles(self) -> None:
+        tiles = (self._source_tile, self._source_video_tile)
+        shown = [tile for tile in tiles if not tile.isHidden()]
+        for tile in tiles:
+            self._source_row.removeWidget(tile)
+            tile.setParent(self._source_row.parentWidget())
+        if self._source_box is not None:
+            self._source_row.removeWidget(self._source_box)
+            self._source_box.deleteLater()
+        trashed = self._trashed()
+        self._source_box = place_tiles([(tile, tile.prompt_id in trashed) for tile in shown],
+                                       self._source_row.addWidget)
+        for tile in shown:
+            tile.show()
+
+    def _trashed(self) -> frozenset[str]:
+        return frozenset(held["prompt_id"] for held in self._held_rows())
 
     def _held_of_kind(self, kind: MediaType) -> list[dict]:
         return [held for held in self._held_rows() if media_type_of_row(held) == kind]

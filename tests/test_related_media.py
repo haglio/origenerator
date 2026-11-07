@@ -9,6 +9,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui.animations import _VideoTile
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.source_tile import SourceTile
+from origenerator.gui.trash_box import TrashBox
 
 
 def _image_row(prompt_id="img1", filename="sdxl_t2i_img1.png"):
@@ -262,6 +263,59 @@ def test_an_image_lists_the_videos_in_the_trash_it_was_animated_into(make_relate
     related.show_row(image, [image])
 
     assert _animated(related) == ["vid1"]
+
+
+def _trash_box_of(widget):
+    while widget is not None and not isinstance(widget, TrashBox):
+        widget = widget.parentWidget()
+    return widget
+
+
+def _boxed(tiles):
+    return {tile._prompt_id: _trash_box_of(tile) is not None for tile in tiles
+            if not tile.isHidden()}
+
+
+def test_an_image_s_animations_in_the_trash_sit_together_in_a_box_labeled_trash(make_related):
+    image = _image_row()
+    related = make_related(_video_row("vid1"),
+                           held=[_video_row("vid2"), _video_row("vid3")])
+
+    related.show_row(image, [image])
+
+    tiles = related._animations._host.findChildren(_VideoTile)
+    assert _boxed(tiles) == {"vid1": False, "vid2": True, "vid3": True}
+    box, = {_trash_box_of(tile) for tile in tiles} - {None}
+    assert box.label.text() == "Trash"
+
+
+def test_linked_items_in_the_trash_sit_in_a_box_labeled_trash(make_related):
+    related = make_related(_combined_row("made1"), held=[_combined_row("made2")])
+
+    related.show_row(_video_row("vid0"), [_image_row()])
+
+    assert _boxed(related._combine_section.findChildren(SourceTile)) == {
+        "made1": False, "made2": True}
+
+
+def test_a_source_image_in_the_trash_sits_in_a_box_labeled_trash(make_related):
+    trashed_image = _image_row()
+    related = make_related(held=[trashed_image])
+
+    related.show_row(_video_row(), [])
+
+    assert _boxed([related._source_tile]) == {"img1": True}
+
+
+def test_a_source_image_put_back_from_the_trash_leaves_its_box(make_related):
+    image = _image_row()
+    related = make_related(held=[image])
+    related.show_row(_video_row(), [])
+
+    related._held_rows = list
+    related.show_row(_video_row(), [image])
+
+    assert _boxed([related._source_tile]) == {"img1": False}
 
 
 def _failed(row):

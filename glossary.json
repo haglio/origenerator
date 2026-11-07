@@ -1327,7 +1327,7 @@
     },
     {
       "id": "action_setter_tool",
-      "thing": "the window that sets each image's or each video's actions, one press per item, the image buttons wearing his drawings, the checkboxes and their locks above them; an item set before comes up with its checkboxes as it saved them and a yellow box in place of the gray one around the button it was set with, under a yellow line at the top",
+      "thing": "the window that sets each image's or each video's actions, one press per item, the image buttons wearing his drawings, the checkboxes and their locks above them; an item set before comes up with its checkboxes as it saved them and the button it was set with filled yellow, its name in black, with a yellow line beside the checkboxes saying what the yellow box means",
       "screen": [
         "Origenerator — image action setter tool",
         "Origenerator — video action setter tool",

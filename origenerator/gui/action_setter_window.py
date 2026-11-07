@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import WHITE, YELLOW
+from shared_ui.colors import BLACK, WHITE, YELLOW
 from shared_ui.fonts import SIZE_SMALL, make_font
 from shared_ui.icons import qt_icon
 from shared_ui.palette import BLUE, as_hex
@@ -49,7 +49,8 @@ TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
 
 _NO_BOX_OF_ITS_OWN = "border: none; background: transparent;"
 _SET_BEFORE = "set_before"
-_YELLOW_BOX = f'QToolButton[{_SET_BEFORE}="true"] {{ border: 1px solid {YELLOW.name()}; }}'
+_YELLOW_BOX = (f'QToolButton[{_SET_BEFORE}="true"] {{ border: 1px solid {YELLOW.name()};'
+               f' background-color: {YELLOW.name()}; color: {BLACK.name()}; }}')
 _LIT = f"QToolButton:checked {{ background-color: {as_hex(BLUE)}; border-radius: {BUTTON_RADIUS}px; }}"
 
 
@@ -389,9 +390,10 @@ class ActionSetterWindow(QWidget):
         labels = (item or {}).get("labels") or Labels()
         set_before = self._vocabulary.button_made_of(labels.actions)
         for name, tile in self._tiles.items():
-            tile.setProperty(_SET_BEFORE, name == set_before)
-            tile.style().unpolish(tile)
-            tile.style().polish(tile)
+            for marked in {tile, self._face(name)}:
+                marked.setProperty(_SET_BEFORE, name == set_before)
+                marked.style().unpolish(marked)
+                marked.style().polish(marked)
         self._previously.setHidden(not set_before)
 
     def _set_the_boxes_for(self, item: dict) -> None:

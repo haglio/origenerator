@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
-from shared_ui.colors import YELLOW
+from shared_ui.colors import BLACK, YELLOW
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
@@ -274,13 +274,31 @@ def _set_before(*items):
             for prompt_id, labels in items]
 
 
-def test_the_button_an_item_was_set_with_before_wears_a_yellow_box(window):
-    made, _store, _stage = window(items=_set_before(("first", Labels(("beta", "alpha")))))
+def _fill(made, name) -> str:
+    shot = _tile(made, name).grab().toImage()
+    return shot.pixelColor(shot.width() // 2, 3).name()
+
+
+def _name_color(made, name) -> str:
+    face = _tile(made, name).findChild(QToolButton) or _tile(made, name)
+    face.ensurePolished()
+    return face.palette().color(QPalette.ColorRole.ButtonText).name()
+
+
+@pytest.mark.parametrize("tiles", [
+    _TILES,
+    (Tile("button one", 0, 0), Tile("button three", 1, 0), Tile("button two", 0, 1, rows=2)),
+], ids=["one row", "down two rows"])
+def test_the_button_an_item_was_set_with_before_is_all_yellow_with_its_name_in_black(window, tiles):
+    made, _store, _stage = window(items=_set_before(("first", Labels(("beta", "alpha")))), tiles=tiles)
     made.setStyleSheet(build_stylesheet())
 
-    assert [_edge(made, name) for name in _BUTTONS] == [
-        _edge(made, "button one"), YELLOW.name(), _edge(made, "button one")]
-    assert _edge(made, "button one") != YELLOW.name()
+    assert [(_edge(made, name), _fill(made, name)) for name in _BUTTONS] == [
+        (_edge(made, "button one"), _fill(made, "button one")), (YELLOW.name(), YELLOW.name()),
+        (_edge(made, "button one"), _fill(made, "button one"))]
+    assert YELLOW.name() not in (_edge(made, "button one"), _fill(made, "button one"))
+    assert (_name_color(made, "button two"), _name_color(made, "button one")) == (
+        BLACK.name(), _name_color(made, "button three"))
 
 
 def test_a_yellow_line_beside_the_checkboxes_says_what_the_yellow_box_means(window):

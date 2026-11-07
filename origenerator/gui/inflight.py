@@ -20,8 +20,8 @@ class InFlightItem:
     cancel: Callable[[], None] | None = None
     shield: Callable[[bool], None] | None = None
     shielded: bool = False
-    auto_generating: bool = False
-    stop_auto: Callable[[], None] | None = None
+    populating: bool = False
+    stop_populate: Callable[[], None] | None = None
     foreign_ahead: int | None = None
     starts_at: float | None = None
     job_kind: str = ""
@@ -44,8 +44,8 @@ def queue_lead_text(item: InFlightItem) -> str:
         parts.append(item.job_kind)
     if item.action:
         parts.append(item.action)
-    if item.auto_generating:
-        parts.append("Auto")
+    if item.populating:
+        parts.append("Populate")
     if item.requested:
         parts.append("Request")
     if item.modified:
@@ -64,8 +64,8 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
     if item.action:
         lines.append(f"The “{item.action}” action, picked in Combine")
-    if item.auto_generating:
-        lines.append("Queued by its folder's Auto-Generate")
+    if item.populating:
+        lines.append("Queued by its folder's Populate")
     if item.requested:
         lines.append("Queued by a request")
     if item.modified:
@@ -147,8 +147,8 @@ def cancel_all_question(total: int) -> str:
 CANCEL_TEXT = "Cancel"
 
 
-def cancel_tooltip(auto_generating: bool) -> str:
-    return ("Throw away this seed and start the next" if auto_generating
+def cancel_tooltip(populating: bool) -> str:
+    return ("Throw away this seed and start the next" if populating
             else "Cancel this generation")
 
 
@@ -163,12 +163,12 @@ def clear_queue_tooltip(foreign: int) -> str:
             " queued on ComfyUI")
 
 
-def stop_auto_generate_text() -> str:
-    return "Cancel and stop auto-generating"
+def stop_populate_text() -> str:
+    return "Cancel and stop populating"
 
 
-def stop_auto_generate_tooltip() -> str:
-    return "Throw this run away and switch Auto-Generate off"
+def stop_populate_tooltip() -> str:
+    return "Throw this run away and switch Populate off"
 
 
 def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *,

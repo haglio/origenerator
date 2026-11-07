@@ -49,8 +49,8 @@ def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
     assert tile._cancel.text() == "Cancel"
 
 
-def test_an_auto_generating_folders_tile_says_cancel_and_hovers_the_next_seed(qtbot):
-    tile = GeneratingTile(FakeJob(state="running"), auto_generating=True)
+def test_an_populating_folders_tile_says_cancel_and_hovers_the_next_seed(qtbot):
+    tile = GeneratingTile(FakeJob(state="running"), populating=True)
     qtbot.addWidget(tile)
     assert tile._cancel.text() == "Cancel"
     assert "seed" in tile._cancel.toolTip()

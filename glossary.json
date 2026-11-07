@@ -125,19 +125,18 @@
       "ruled": "2026-10-28, his words; CLAUDE.md, One word per thing"
     },
     {
-      "id": "auto_generate",
+      "id": "populate",
       "thing": "the button over the Gallery pane that keeps a folder making new variations until it is pressed again",
       "screen": [
-        "Auto-generate: repeatedly generate variations of this folder until toggled off"
+        "Populate: repeatedly generate variations of this folder until toggled off"
       ],
-      "his_word": "Auto-Generate (2026-09-28)",
+      "his_word": "Populate (2026-11-07, renamed from Auto-Generate so the Request's switch could take that word)",
       "code_today": [
-        "auto generate",
-        "auto"
+        "populate"
       ],
-      "code_word": "auto generate",
+      "code_word": "populate",
       "status": "ruled",
-      "ruled": "CLAUDE.md, One word per thing: never a loop",
+      "ruled": "2026-11-07, his words; CLAUDE.md, One word per thing: never a loop",
       "retired": [
         "cooking"
       ]
@@ -893,7 +892,7 @@
     },
     {
       "id": "gallery_pane_buttons",
-      "thing": "the row of buttons over the Gallery pane: Back, Forward, Undo, Redo, the slideshow, Auto-generate, Favorite, Enhance, Delete, Radio and Listen",
+      "thing": "the row of buttons over the Gallery pane: Back, Forward, Undo, Redo, the slideshow, Populate, Favorite, Enhance, Delete, Radio and Listen",
       "screen": [
         "Listen: bare words for the collections and this bank"
       ],

@@ -73,8 +73,8 @@ NO_SETTING = {
         view._search.field, *_within(view._find_bar), *_within(view._folder_path)],
     "what one item shows, which the library keeps with the item": lambda view: [
         widget for tab in _tabs(view) for widget in _within(tab._action)],
-    ("Auto-Generate, which a restart leaves off, since one that came back on by itself"
-     " could run unnoticed"): lambda view: [view._buttons.auto],
+    ("Populate, which a restart leaves off, since one that came back on by itself"
+     " could run unnoticed"): lambda view: [view._buttons.populate],
     "the pause Esc and play/pause share, which a restart leaves playing":
         lambda view: [view._buttons.play_pause],
     "the reference, a window opened to look something up": lambda view: [view._buttons.reference],

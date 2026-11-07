@@ -451,7 +451,7 @@ def _line(item) -> JobLine:
         note=starting_row_text(item.starting) or "",
         tooltip=f"{item.caption}\n\n{queue_lead_tooltip(item)}",
         cancelable=item.cancel is not None,
-        cancel_tooltip=cancel_tooltip(item.auto_generating),
+        cancel_tooltip=cancel_tooltip(item.populating),
         shieldable=item.shield is not None,
         shielded=item.shielded,
         can_move_up=item.move_up is not None,

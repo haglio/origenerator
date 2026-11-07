@@ -82,7 +82,7 @@ def redo_icon() -> QIcon:
     return qt_icon("redo_arrow", size=_SIZE)
 
 
-def auto_generate_icon() -> QIcon:
+def populate_icon() -> QIcon:
     return qt_icon("bolt", size=_SIZE)
 
 

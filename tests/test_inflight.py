@@ -14,8 +14,8 @@ from origenerator.gui.inflight import (
     queue_wait_text,
     seconds_until_start,
     starting_row_text,
-    stop_auto_generate_text,
-    stop_auto_generate_tooltip,
+    stop_populate_text,
+    stop_populate_tooltip,
 )
 
 
@@ -44,10 +44,10 @@ def test_the_action_follows_the_kind_so_two_runs_on_one_image_read_apart():
 def test_the_two_marks_at_the_end_are_only_ever_added():
     plain = queue_lead_text(_item(job_kind="Image"))
     assert plain == "~2 min · Image"
-    assert queue_lead_text(_item(job_kind="Image", auto_generating=True)) == plain + " · Auto"
+    assert queue_lead_text(_item(job_kind="Image", populating=True)) == plain + " · Populate"
     assert queue_lead_text(_item(job_kind="Image", requested=True)) == plain + " · Request"
-    assert queue_lead_text(_item(job_kind="Image", auto_generating=True, requested=True)) == (
-        plain + " · Auto · Request")
+    assert queue_lead_text(_item(job_kind="Image", populating=True, requested=True)) == (
+        plain + " · Populate · Request")
     assert queue_lead_text(_item(job_kind="Image", modified=True)) == plain + " · Modify"
 
 
@@ -81,11 +81,11 @@ def test_a_workflow_this_build_has_no_template_for_contributes_no_line():
 
 
 def test_the_hover_names_who_asked_when_it_was_not_a_press_of_generate():
-    lines = queue_lead_tooltip(_item(auto_generating=True, requested=True,
+    lines = queue_lead_tooltip(_item(populating=True, requested=True,
                                      action="beta")).splitlines()
     assert lines[1:] == [
         "The “beta” action, picked in Combine",
-        "Queued by its folder's Auto-Generate",
+        "Queued by its folder's Populate",
         "Queued by a request",
     ]
 
@@ -116,15 +116,15 @@ def test_the_line_over_the_bar_names_what_the_app_is_doing():
 
 
 def test_the_cancel_hover_says_which_of_the_two_the_press_will_do():
-    assert cancel_tooltip(auto_generating=False) == "Cancel this generation"
-    assert cancel_tooltip(auto_generating=True) == (
+    assert cancel_tooltip(populating=False) == "Cancel this generation"
+    assert cancel_tooltip(populating=True) == (
         "Throw away this seed and start the next")
 
 
 def test_the_menu_carries_the_act_the_button_has_no_room_for():
-    assert stop_auto_generate_text() == "Cancel and stop auto-generating"
-    assert stop_auto_generate_tooltip() == (
-        "Throw this run away and switch Auto-Generate off")
+    assert stop_populate_text() == "Cancel and stop populating"
+    assert stop_populate_tooltip() == (
+        "Throw this run away and switch Populate off")
 
 
 def test_a_wait_on_the_users_own_jobs_earns_no_line():

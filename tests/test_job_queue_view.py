@@ -413,15 +413,15 @@ def test_cancel_is_grayed_out_on_a_job_that_cannot_be_stopped_from_here(queue):
     assert cancel.cursor().shape() == Qt.CursorShape.ArrowCursor
 
 
-def test_a_row_from_an_auto_generating_folder_says_cancel_too(queue):
-    queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True),
+def test_a_row_from_an_populating_folder_says_cancel_too(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, populating=True),
                      _item(key="b", status="queued", cancel=lambda: None)])
     assert [row._cancel.text() for row in queue.rows()] == ["Cancel", "Cancel"]
     assert queue.rows()[0]._cancel.toolTip() == "Throw away this seed and start the next"
 
 
-def test_a_rows_cancel_hover_follows_its_folders_auto_generate_in_place(queue):
-    queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True)])
+def test_a_rows_cancel_hover_follows_its_folders_populate_in_place(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, populating=True)])
     row = queue.rows()[0]
 
     queue.set_items([_item(key="a", cancel=lambda: None)])
@@ -510,7 +510,7 @@ def test_a_rows_text_elides_rather_than_widen_the_row_past_a_narrow_strip(queue)
 def test_every_rows_shield_sits_just_left_of_its_cancel(queue):
     queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None),
                      _item(key="b", status="queued", cancel=lambda: None,
-                           shield=lambda _on: None, auto_generating=True)])
+                           shield=lambda _on: None, populating=True)])
     QApplication.processEvents()
 
     rows = queue.rows()
@@ -1128,8 +1128,8 @@ def test_a_row_leads_with_what_the_job_costs_and_what_it_is(queue):
 
 def test_a_row_says_when_nobody_typed_its_prompt(queue):
     queue.set_items([_item(typical_seconds=30.0, job_kind="Image",
-                           auto_generating=True, requested=True)])
-    assert queue.rows()[0]._lead.text() == "~30 sec · Image · Auto · Request"
+                           populating=True, requested=True)])
+    assert queue.rows()[0]._lead.text() == "~30 sec · Image · Populate · Request"
 
 
 def test_a_hand_launched_job_says_neither(queue):

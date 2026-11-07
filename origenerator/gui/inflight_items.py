@@ -25,7 +25,7 @@ TRAINING_KEY = "fix training"
 class InFlightSources:
     db: object
     jobs: object
-    auto: object
+    populate: object
     tree: object
 
 
@@ -42,7 +42,7 @@ class InFlightItems:
                  image_index: Callable[[], dict], callbacks: InFlightCallbacks):
         self._db = sources.db
         self._jobs = sources.jobs
-        self._auto = sources.auto
+        self._populate = sources.populate
         self._tree = sources.tree
         self._image_rows = image_rows
         self._image_index = image_index
@@ -80,7 +80,7 @@ class InFlightItems:
                 cancel = partial(self._on_cancel, pid)
                 shield = partial(self._on_shield, pid)
                 shielded = job.shielded
-                stop_auto = partial(self._auto.stop, folder_key)
+                stop_populate = partial(self._populate.stop, folder_key)
                 state = job.state
                 move_up = (partial(self._jobs.move_up, pid)
                            if self._jobs.can_move_up(pid) else None)
@@ -90,7 +90,7 @@ class InFlightItems:
                 folder_key = gallery.settings_folder_key(row, self._image_index())
                 frame, progress, cancel, foreign, started = None, None, None, None, None
                 starts_at = None
-                pass_progress, stage, stop_auto, state = None, "", None, row.get("status")
+                pass_progress, stage, stop_populate, state = None, "", None, row.get("status")
                 shield, shielded = None, bool(row.get("shielded"))
                 move_up = move_down = None
             workflow_name = row.get("workflow_name") or ""
@@ -120,8 +120,8 @@ class InFlightItems:
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,
-                auto_generating=self._auto.is_active(folder_key),
-                stop_auto=stop_auto,
+                populating=self._populate.is_active(folder_key),
+                stop_populate=stop_populate,
                 foreign_ahead=foreign,
                 starts_at=starts_at,
                 job_kind=kind,

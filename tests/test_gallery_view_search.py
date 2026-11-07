@@ -626,7 +626,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
 
     assert view.current_group() is None
     assert view._current_deletable_folders() == []
-    assert not view._buttons.auto.isVisible()
+    assert not view._buttons.populate.isVisible()
 
 
 def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):

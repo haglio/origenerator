@@ -24,4 +24,4 @@ def test_the_pane_holds_no_view():
     init = next(n for n in _class_def(PANE, "GalleryPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [
-        "self", "scroll", "db", "jobs", "auto", "host"]
+        "self", "scroll", "db", "jobs", "populate", "host"]

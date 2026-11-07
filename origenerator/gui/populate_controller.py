@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
-class AutoGenerateController(QObject):
+class PopulateController(QObject):
     stopped = pyqtSignal(str)
 
     def __init__(self, launch, parent=None):

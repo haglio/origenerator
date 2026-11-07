@@ -20,7 +20,7 @@ class VoiceSources:
 
 @dataclass(frozen=True)
 class VoiceSwitches:
-    auto: QWidget | None
+    populate: QWidget | None
     radio: QWidget | None
     drive: QWidget | None
     mic: QWidget | None

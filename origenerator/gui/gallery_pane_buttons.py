@@ -31,9 +31,9 @@ def _lit(color: str) -> str:
 _LIT = _lit(as_hex(BLUE))
 _LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(YELLOW))
 
-AUTO_ELSEWHERE_TIP = (
-    "Auto-generate is running in another folder<br>"
-    f"{link('auto', 'Go to it')} · click the switch to stop it"
+POPULATE_ELSEWHERE_TIP = (
+    "Populate is running in another folder<br>"
+    f"{link('populate', 'Go to it')} · click the switch to stop it"
 )
 
 
@@ -54,8 +54,8 @@ class ButtonStates(NamedTuple):
     enhance: Button
     delete: Button
     slideshow: Button
-    auto: Button
-    auto_tip: str = ""
+    populate: Button
+    populate_tip: str = ""
 
 
 class ButtonHandlers(NamedTuple):
@@ -64,8 +64,8 @@ class ButtonHandlers(NamedTuple):
     undo: Callable[[], None]
     redo: Callable[[], None]
     start_slideshow: Callable[[], None]
-    toggle_auto: Callable[[bool], None]
-    go_to_auto_generating_folder: Callable[[str], None]
+    toggle_populate: Callable[[bool], None]
+    go_to_populating_folder: Callable[[str], None]
     favorite: Callable[[], None]
     enhance: Callable[[], None]
     group: Callable[[], None]
@@ -124,15 +124,15 @@ class GalleryPaneButtons(QWidget):
             icons.slideshow_icon(), "Play this folder as a slideshow",
             handlers.start_slideshow)
         self.slideshow.hide()
-        self.auto = _tool_button(
-            icons.auto_generate_icon(),
-            "Auto-generate: repeatedly generate variations of this folder until "
+        self.populate = _tool_button(
+            icons.populate_icon(),
+            "Populate: repeatedly generate variations of this folder until "
             "toggled off",
-            handlers.toggle_auto, checkable=True,
+            handlers.toggle_populate, checkable=True,
         )
-        self.auto.setStyleSheet(_LIT)
-        self.auto_tip = LinkTip(self.auto)
-        self.auto_tip.link_activated.connect(handlers.go_to_auto_generating_folder)
+        self.populate.setStyleSheet(_LIT)
+        self.populate_tip = LinkTip(self.populate)
+        self.populate_tip.link_activated.connect(handlers.go_to_populating_folder)
         self.favorite = _tool_button(icons.star_icon(filled=True), "Favorite", handlers.favorite)
         self.enhance = _tool_button(icons.enhance_icon(), "Enhance", handlers.enhance)
         self.group = _tool_button(
@@ -181,7 +181,7 @@ class GalleryPaneButtons(QWidget):
             (self.undo, self.redo),
             (self.group,),
             (self.favorite, self.enhance, self.delete),
-            (self.slideshow, self.auto, self.radio),
+            (self.slideshow, self.populate, self.radio),
             (self.power, self.play_pause, self.reference, self.mic),
         ):
             buttons = tuple(b for b in listed if b is not None)
@@ -235,7 +235,7 @@ class GalleryPaneButtons(QWidget):
             (self.enhance, state.enhance),
             (self.delete, state.delete),
             (self.slideshow, state.slideshow),
-            (self.auto, state.auto),
+            (self.populate, state.populate),
         ):
             button.setEnabled(stands.enabled)
             button.setVisible(stands.visible)
@@ -244,7 +244,7 @@ class GalleryPaneButtons(QWidget):
                 button.blockSignals(True)
                 button.setChecked(stands.checked)
                 button.blockSignals(False)
-        self.auto_tip.set_html(state.auto_tip)
+        self.populate_tip.set_html(state.populate_tip)
         self._show_the_gaps()
 
     def _show_the_gaps(self) -> None:

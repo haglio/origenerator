@@ -287,7 +287,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
         self._note_text = starting_row_text(item.starting) or ""
         self._render_note()
-        self._cancel.setToolTip(cancel_tooltip(item.auto_generating))
+        self._cancel.setToolTip(cancel_tooltip(item.populating))
         _offer(self._cancel, item.cancel is not None)
         _offer(self._shield, item.shield is not None)
         self._shield.setChecked(item.shielded)

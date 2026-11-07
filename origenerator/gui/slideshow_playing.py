@@ -14,6 +14,7 @@ class Playing:
     actions: object = None
     versions: object = None
     opening: object = None
+    locked: bool = False
 
 
 @dataclass(frozen=True)

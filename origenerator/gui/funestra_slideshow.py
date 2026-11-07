@@ -97,7 +97,7 @@ class FunestraSlideshow(QObject):
         self.transport = FunestraTransport(send=self._send, publish=self._publish,
                                            at_defaults=at_defaults)
         self._funestra_locked = False
-        self._locked = False
+        self._locked = playing.locked
         self._keep_told: bool | None = None
         self._gesture_owed = False
         self._refusal_checked = False
@@ -130,6 +130,7 @@ class FunestraSlideshow(QObject):
         if playing.actions is not None:
             self._actions = playing.actions
         self._unlock()
+        self._locked = playing.locked
         self._take_set(replace(playing, opening=None))
         self._versions = {}
         self._take_versions(playing.versions or {})

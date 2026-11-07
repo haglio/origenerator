@@ -73,6 +73,7 @@ class ViewShow:
     versions: object = None
     pace: object = None
     frames: object = None
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -141,7 +142,7 @@ class SlideshowView(QWidget):
         channel = PaneChannel()
         self.slideshow = FunestraSlideshow(
             Playing(items, start=show.start, shuffle=show.shuffle, hud=show.hud, actions=self._actions,
-                    versions=show.versions),
+                    versions=show.versions, locked=show.locked),
             Seat(show.shape, channel,
                  show.frames if show.frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")),
             Hosting(pace=show.pace, shown=self),

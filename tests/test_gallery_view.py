@@ -1299,7 +1299,7 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_a_double_clicked_preview_plays_its_item_alone(qtbot, monkeypatch):
+def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB(_many_latest(120)))
     qtbot.addWidget(view)
@@ -1310,6 +1310,7 @@ def test_a_double_clicked_preview_plays_its_item_alone(qtbot, monkeypatch):
     qtbot.addWidget(slideshow.shown)
 
     assert [item[2] for item in slideshow._set.playlist.in_play_order()] == ["i119"]
+    assert slideshow.locked
     slideshow.close()
 
 

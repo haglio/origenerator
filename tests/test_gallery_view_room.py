@@ -392,6 +392,8 @@ def test_a_double_click_while_auto_generate_runs_opens_on_the_shown_image_alone(
     funestra_of(slideshow.shown)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == [landed]
+    assert view._enhance.run_of(view.row_for(landed)) is None
+    qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
     qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
     assert view._enhance.run_of(view.row_for(landed)) is not None
     slideshow.close()

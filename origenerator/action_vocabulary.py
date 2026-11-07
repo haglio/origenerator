@@ -84,6 +84,11 @@ class Vocabulary(NamedTuple):
         return next((labels for name, labels in self.formerly.items()
                      if normalized_text(name) == heard), None)
 
+    def button_made_of(self, actions) -> str:
+        wanted = frozenset(actions)
+        return next((button for button, made_of in self.buttons.items()
+                     if wanted and frozenset(made_of) == wanted), "")
+
     def drawing_name(self, button: str) -> str:
         return self.drawn_as.get(button, button)
 

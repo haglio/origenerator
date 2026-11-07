@@ -37,16 +37,10 @@ def labels_for(name: str, words: Vocabulary | None = None) -> Labels:
     return Labels(words.buttons.get(animation.action, ()), animation.checked)
 
 
-def button_for(actions, words: Vocabulary) -> str:
-    wanted = frozenset(actions)
-    return next((button for button, made_of in words.buttons.items()
-                 if wanted and frozenset(made_of) == wanted), "")
-
-
 def animation_of(video: dict, words: Vocabulary | None = None) -> str:
     words = _video_words(words)
     labels = labels_of(video, MediaType.VIDEO)
-    action = button_for(labels.actions, words)
+    action = words.button_made_of(labels.actions)
     if not action:
         return ""
     return Animation(action, tuple(box for box in words.checkboxes if box in labels.checked)).name
@@ -55,5 +49,5 @@ def animation_of(video: dict, words: Vocabulary | None = None) -> str:
 def image_button_of(image: dict | None, words: Vocabulary | None = None) -> str:
     if image is None:
         return ""
-    return button_for(labels_of(image, MediaType.IMAGE).actions,
-                      words if words is not None else vocabulary(MediaType.IMAGE))
+    words = words if words is not None else vocabulary(MediaType.IMAGE)
+    return words.button_made_of(labels_of(image, MediaType.IMAGE).actions)

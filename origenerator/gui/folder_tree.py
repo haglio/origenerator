@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon, QPainter
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidget,
 )
-from shared_ui.colors import BLUE
+from shared_ui.colors import BLUE, BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
 from origenerator.gallery.tree import ALL_KEY
@@ -148,9 +148,14 @@ class FolderTree(QTreeWidget):
 
     def paintEvent(self, event):
         super().paintEvent(event)
+        places = self._frozen_places()
+        if not places:
+            return
         painter = QPainter(self.viewport())
-        for row, place in self._frozen_places():
+        for row, place in places:
             self._paint_frozen(painter, self.indexFromItem(row), place)
+        under = places[-1][1].bottom() + 1
+        painter.fillRect(QRect(0, under, self.viewport().width(), 1), BORDER_SUBTLE)
         painter.end()
 
     def _paint_frozen(self, painter, index, place: QRect) -> None:
@@ -246,17 +251,27 @@ class FolderTree(QTreeWidget):
     def _frozen_at(self, point):
         return next((row for row, place in self._frozen_places() if place.contains(point)), None)
 
-    def _bring_back(self, row) -> None:
-        self.scrollToItem(row, QAbstractItemView.ScrollHint.PositionAtTop)
-        bar = self.verticalScrollBar()
-        while bar.value() > bar.minimum() and row in self.frozen_rows():
-            bar.setValue(bar.value() - 1)
-        self.setCurrentItem(row)
+    def _swallowed_by_frozen(self, event) -> bool:
+        if self._frozen_at(event.pos()) is None:
+            return False
+        event.accept()
+        return True
+
+    def mouseDoubleClickEvent(self, event):
+        if not self._swallowed_by_frozen(event):
+            super().mouseDoubleClickEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if not self._swallowed_by_frozen(event):
+            super().mouseReleaseEvent(event)
+
+    def viewportEvent(self, event):
+        if event.type() == QEvent.Type.ContextMenu and self._swallowed_by_frozen(event):
+            return True
+        return super().viewportEvent(event)
 
     def mousePressEvent(self, event):
-        frozen = self._frozen_at(event.pos())
-        if frozen is not None:
-            self._bring_back(frozen)
+        if self._swallowed_by_frozen(event):
             return
         if event.button() != Qt.MouseButton.LeftButton:
             # Qt: QTreeView toggles the caret under any button's press; QAbstractItemView's press only picks the row, so a right-click never shuts a folder

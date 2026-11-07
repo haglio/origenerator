@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidgetItem,
 )
-from shared_ui.colors import BLUE
+from shared_ui.colors import BLUE, BORDER_SUBTLE
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
 from origenerator.gallery.shapes import LANDSCAPE
@@ -889,29 +889,36 @@ def test_a_frozen_folder_looks_as_it_does_in_its_own_place(qtbot, picked):
     assert _strip(tree, frozen_top, place.height()) == in_place
 
 
-def test_clicking_a_frozen_folder_picks_it_and_scrolls_back_to_it(qtbot):
+def test_pressing_a_frozen_folder_does_nothing_yet(qtbot):
     tree, rows = _long_tree(qtbot)
     _scroll_to_the_top(tree, rows["a/i/3"])
-    first_height = tree.visualItemRect(rows["a"]).height()
+    tree.setCurrentItem(rows["a/i/5"])
+    scrolled = tree.verticalScrollBar().value()
 
-    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
-                     pos=QPoint(100, first_height + 2))
+    for button in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton):
+        qtbot.mouseClick(tree.viewport(), button, pos=QPoint(100, 2))
 
-    shown = tree.visualItemRect(rows["a/i"]).top()
-    assert (tree.currentItem(), rows["a/i"] in tree.frozen_rows(), shown >= 0) == (
-        rows["a/i"], False, True)
+    assert (tree.currentItem(), tree.verticalScrollBar().value()) == (rows["a/i/5"], scrolled)
 
 
-def test_right_clicking_a_frozen_folder_offers_its_own_menu(qtbot):
+def test_right_clicking_a_frozen_folder_offers_no_menu_for_the_row_under_it(qtbot):
     tree, rows = _long_tree(qtbot)
     tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     asked = []
-    tree.customContextMenuRequested.connect(lambda pos: asked.append(tree.itemAt(pos)))
+    tree.customContextMenuRequested.connect(asked.append)
     _scroll_to_the_top(tree, rows["a/i/3"])
 
-    at = QPoint(100, tree.visualItemRect(rows["a"]).height() + 2)
-    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.RightButton, pos=at)
+    at = QPoint(100, 2)
     QApplication.sendEvent(tree.viewport(), QContextMenuEvent(
         QContextMenuEvent.Reason.Mouse, at, tree.viewport().mapToGlobal(at)))
 
-    assert asked == [rows["a/i"]]
+    assert asked == []
+
+
+def test_a_gray_line_runs_under_the_frozen_folders(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setStyleSheet(build_stylesheet())
+    _scroll_to_the_top(tree, rows["a/i/3"])
+    under = sum(tree.visualItemRect(row).height() for row in tree.frozen_rows())
+
+    assert set(_strip(tree, under, 1)) == {BORDER_SUBTLE.name()}

@@ -138,11 +138,17 @@ _MODIFY_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
-@dataclass(frozen=True)
+@dataclass
 class _RequestAim:
     prompt_id: str
     shown: tuple[str, str]
     turns: list = field(default_factory=list)
+    asking: str | None = None
+
+    def carried_onto(self, prompt_id: str, shown: tuple[str, str], recorded: int) -> None:
+        self.turns = self.turns[recorded:]
+        self.prompt_id = prompt_id
+        self.shown = shown
 
 
 def _nothing_to_start_from(missing_inputs: list[str]) -> str:
@@ -238,7 +244,7 @@ class GenerateTab(DropZones):
         self._form_checkpoint = None
         self._autoshow_held = False
         self._request_aim: _RequestAim | None = None
-        self._asked = 0
+        self._request_aims: dict[str, _RequestAim] = {}
         self._requests = views.requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
@@ -1215,12 +1221,29 @@ class GenerateTab(DropZones):
             self._request_aim = None
             exchange.set_available(False)
             return
+        prompt_id = row["prompt_id"]
         params = self._settings_shown().params
-        self._request_aim = _RequestAim(
-            prompt_id=row["prompt_id"],
-            shown=(params.get("positive_prompt") or "", params.get("negative_prompt") or ""))
+        shown = (params.get("positive_prompt") or "", params.get("negative_prompt") or "")
+        aim = (self._request_aims.get(prompt_id) or self._aim_carried_onto(prompt_id, shown)
+               or _RequestAim(prompt_id, shown))
+        self._request_aims[prompt_id] = aim
+        self._request_aim = aim
         exchange.set_available(self._displayed_config is not None)
-        exchange.show_exchange(self._db.requests.exchange_of(row["prompt_id"]))
+        exchange.show_exchange([*self._db.requests.exchange_of(prompt_id), *aim.turns],
+                               asking=aim.asking)
+        if aim.turns:
+            self._param_form.set_prompts(aim.turns[-1].new_positive, aim.turns[-1].new_negative,
+                                         typed=True)
+
+    def _aim_carried_onto(self, prompt_id: str, shown: tuple[str, str]) -> _RequestAim | None:
+        was = self._request_aim
+        made = self._db.get_request(prompt_id)
+        if (was is None or made is None or made["source_prompt_id"] != was.prompt_id
+                or not (was.turns or was.asking)):
+            return None
+        self._request_aims.pop(was.prompt_id, None)
+        was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id)))
+        return was
 
     def asked(self) -> dict | None:
         aim = self._request_aim
@@ -1234,7 +1257,7 @@ class GenerateTab(DropZones):
         aim = self._request_aim
         if aim is None or not words:
             return
-        self._asked += 1
+        aim.asking = words
         self._param_form.request_exchange().add_turn(words)
         params = self.current_config().params
         self._requests.ask(
@@ -1243,23 +1266,24 @@ class GenerateTab(DropZones):
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             weights=workflow_named(self._form_workflow_key).prompts_take_weights,
             owner=self,
-            then=lambda revision, context=(self._asked, aim): self._on_rewritten(context, revision))
+            then=lambda revision, aim=aim: self._on_rewritten(aim, revision))
 
-    def _on_rewritten(self, context, revision) -> None:
-        asked, asked_of = context
-        aim = self._request_aim
-        if asked != self._asked or aim is None or aim.prompt_id != asked_of.prompt_id:
-            return
+    def _on_rewritten(self, aim: _RequestAim, revision) -> None:
+        said, aim.asking = aim.asking, None
+        shown = aim is self._request_aim
         exchange = self._param_form.request_exchange()
         if revision is None:
-            exchange.failed()
+            if shown:
+                exchange.failed()
+            return
+        turn = revision.turn(said)
+        aim.turns.append(turn)
+        if not shown:
             return
         if revision.settings:
             self._param_form.set_values({**self._param_form.get_values(), **dict(revision.settings)})
         if revision.changed:
             self._param_form.set_prompts(revision.positive, revision.negative, typed=True)
-        turn = revision.turn(exchange.turns()[-1][0])
-        aim.turns.append(turn)
         exchange.answered(turn)
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:

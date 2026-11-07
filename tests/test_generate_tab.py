@@ -3442,6 +3442,100 @@ class _NeverAnswers:
         pass
 
 
+class _HoldsAnswers:
+    def __init__(self):
+        self.held = []
+
+    def ask(self, *args, then, **settings):
+        self.held.append(then)
+
+
+def _landed(db, prompt_id, prompt, *, asked):
+    _image_being_made(db, prompt_id, prompt=prompt)
+    db.record_request(NewRequest(prompt_id=prompt_id, heard="", new_positive=prompt,
+                                 new_negative="", **asked))
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+        [{"filename": f"sdxl_{prompt_id}.png", "subfolder": "image"}]))
+    return db.get_generation(prompt_id)
+
+
+def test_a_request_typed_while_generating_follows_the_result_that_lands_with_its_change(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=[
+        _TWO_WOMEN, _replacing("on a couch", "on a beach", for_="on a beach")])
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    tab.show_saved_generation(image, [image])
+    _ask(tab, qtbot, "two women")
+    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+    landing = _landed(db, "img2", "two women on a couch", asked=tab.asked())
+    _ask(tab, qtbot, "on a beach")
+    qtbot.waitUntil(lambda: _positive(tab) == "two women on a beach", timeout=5000)
+
+    tab.show_completed_result(landing, [landing])
+
+    exchange = tab._param_form.request_exchange()
+    assert exchange.turns() == [
+        ("two women", _TWO_WOMEN_SAID),
+        ("on a beach", 'Replaced "on a couch" with "on a beach" in the Positive Prompt.')]
+    assert _positive(tab) == "two women on a beach"
+    asked = tab.asked()
+    assert [turn.said for turn in asked["turns"]] == ["on a beach"]
+    assert (asked["source_prompt_id"], asked["old_positive"]) == ("img2", "two women on a couch")
+
+
+def test_an_item_shown_again_keeps_what_was_asked_of_it_meanwhile(saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch)
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    other = _image_row(db, "img2", prompt="a cat", filename="sdxl_img2.png")
+    tab.show_saved_generation(image, [image])
+    _ask(tab, qtbot, "two women")
+    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+
+    tab.show_saved_generation(other, [other])
+    assert tab._param_form.request_exchange().turns() == []
+    assert _positive(tab) == "a cat"
+    tab.show_saved_generation(image, [image])
+
+    assert tab._param_form.request_exchange().turns() == [("two women", _TWO_WOMEN_SAID)]
+    assert _positive(tab) == "two women on a couch"
+
+
+def test_an_answer_for_an_item_no_longer_shown_waits_for_it_to_be_shown_again(saved_panel, qtbot):
+    tab, db = saved_panel
+    tab._requests = _HoldsAnswers()
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    other = _image_row(db, "img2", prompt="a cat", filename="sdxl_img2.png")
+    tab.show_saved_generation(image, [image])
+    _ask(tab, qtbot, "two women")
+    tab.show_saved_generation(other, [other])
+
+    (answer,) = tab._requests.held
+    answer(prompt_edit.PromptRevision("a woman on a couch", "", "two women on a couch", "",
+                                      "two women", "add", "rewritten", _TWO_WOMEN_SAID))
+
+    assert _positive(tab) == "a cat"
+    tab.show_saved_generation(image, [image])
+    assert tab._param_form.request_exchange().turns() == [("two women", _TWO_WOMEN_SAID)]
+    assert _positive(tab) == "two women on a couch"
+
+
+def test_a_request_still_being_worked_out_keeps_the_line_waiting_when_the_item_is_shown_again(
+        saved_panel, qtbot):
+    tab, db = saved_panel
+    tab._requests = _NeverAnswers()
+    image = _image_row(db, "img1", prompt="a cat")
+    tab.show_saved_generation(image, [image])
+    exchange = _ask(tab, qtbot, "a hat")
+
+    tab.refresh_displayed(image, [image])
+
+    assert not exchange._line.isEnabled()
+    assert exchange._status.text() == "updating…"
+    assert exchange.turns() == [("a hat", "")]
+
+
 def test_the_line_waits_while_the_model_works_out_a_request(saved_panel, qtbot):
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
@@ -3469,19 +3563,8 @@ def test_words_that_ask_for_nothing_say_so_and_come_off_the_exchange(saved_panel
     assert tab.asked() is None
 
 
-def test_an_answer_to_a_request_since_superseded_is_dropped(saved_panel, monkeypatch):
-    _rewriting(monkeypatch)
-    tab, db = saved_panel
-    image = _image_row(db, "img1", prompt="a cat")
-    tab.show_saved_generation(image, [image])
-
-    tab._on_rewritten((tab._asked + 1, "img1"), ("an old answer", ""))
-
-    assert _positive(tab) == "a cat"
-
-
 def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch, answer=RuntimeError("no model here"))
+    _rewriting(monkeypatch, answer=_a_change(prompt="positive", add="grass", for_="more grass"))
     tab, db = saved_panel
     video = _video_row(db, positive_prompt=story_of(["a dog running", "a dog asleep"]),
                        scene_frames=[81, 81], frame_count=161)

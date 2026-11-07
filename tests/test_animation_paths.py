@@ -57,6 +57,43 @@ def test_every_animation_listed_is_each_action_alone_then_with_each_checkbox(pat
         (GENAU, "alpha", "state two"), (GENAU, "alpha + third box", "state two"))
 
 
+_COMPOUND = {"video_actions": {
+    "buttons": {"one": ["alpha"], "two": ["beta"], "both": ["alpha", "beta"],
+                "unlisted": ["alpha", "gamma"], "listed": ["alpha", "beta"]},
+    "starts_from": {
+        VIDEO: {
+            "one": ["state three", "state one", "state two"],
+            "two": ["state two", "state four", "state three"],
+            "listed": ["state four"],
+        },
+    },
+}}
+
+
+def test_a_button_of_several_actions_starts_from_the_images_each_of_its_actions_does():
+    assert animation_paths.actions_for("state two", VIDEO, content=_COMPOUND) == (
+        "one", "two", "both")
+    assert animation_paths.actions_for("state one", VIDEO, content=_COMPOUND) == ("one",)
+    assert animation_paths.allows(VIDEO, "both", "state three", content=_COMPOUND) is True
+
+
+def test_the_images_a_button_of_several_actions_starts_from_keep_its_first_actions_order():
+    every = animation_paths.every_path(content=_COMPOUND)
+
+    assert [state for lane, name, state in every if name == "both"] == [
+        "state three", "state two"]
+
+
+def test_a_button_of_several_actions_with_a_line_of_its_own_keeps_that_line():
+    assert animation_paths.allows(VIDEO, "listed", "state four", content=_COMPOUND) is True
+    assert animation_paths.allows(VIDEO, "listed", "state two", content=_COMPOUND) is False
+
+
+def test_a_button_one_of_whose_actions_has_no_button_of_its_own_starts_from_nothing():
+    assert not [path for path in animation_paths.every_path(content=_COMPOUND)
+                if path[1] == "unlisted"]
+
+
 def test_an_overlay_that_predates_the_table_allows_nothing():
     assert animation_paths.actions_for("state one", VIDEO, content={}) == ()
     assert animation_paths.allows(VIDEO, "alpha", "state one", content={}) is False

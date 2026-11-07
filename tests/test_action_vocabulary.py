@@ -117,3 +117,7 @@ def test_a_checkbox_said_alone_keeps_only_a_line_naming_a_checkbox_and_a_button(
     named = vocabulary(MediaType.VIDEO, content)
 
     assert (named.said_alone, named.heard_as) == ({"third box": "four"}, {"four": ("for", "fore")})
+
+
+def test_the_plain_actions_are_every_action_a_button_stands_for_once_in_the_buttons_order():
+    assert vocabulary(MediaType.IMAGE, _IMAGES).plain_actions == ("alpha", "beta", "gamma")

@@ -1104,6 +1104,20 @@
       ]
     },
     {
+      "id": "pill",
+      "thing": "one action on a tab, drawn as a rounded label after the row's name, with an x that removes it; the + in a circle after them opens the actions not yet set as pills to pick from, and a video made from an image shows that image's pills grayed, with no x and no +",
+      "screen": [
+        "Remove",
+        "Add an action"
+      ],
+      "his_word": "pills, 'pills with x's', 'a little + in a circle' (2026-11-06)",
+      "code_today": [
+        "pill"
+      ],
+      "code_word": "pill",
+      "status": "his_word"
+    },
+    {
       "id": "version",
       "thing": "one version of an image: the original, then each enhancement made of it",
       "screen": [

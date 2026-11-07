@@ -11,6 +11,7 @@ from origenerator.gui.slideshow_set import (
     SetDeal,
     SlideshowSet,
     item_note,
+    looping_note,
     narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -323,6 +324,15 @@ def test_looping_the_seeds_plays_the_row_round_under_a_map_that_holds_still():
     assert shown.playing == ("seed", 0)
     assert shown.loop == "seed"
     assert _ids(shown.actions) == ["id-1bx"]
+
+
+@pytest.mark.parametrize("axis", [SEED, ACTION])
+def test_the_looping_line_is_funestras_spelling_of_the_loop_with_its_count(monkeypatch, axis):
+    monkeypatch.setattr("origenerator.gui.slideshow_set.looping_label", lambda named: f"Round the {named}")
+    slideshow_set, _dealt = _mapped()
+    slideshow_set.start_loop(axis, pool=_SEEDS["id-1"])
+
+    assert looping_note(slideshow_set) == f"Round the {axis}: 2"
 
 
 def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():

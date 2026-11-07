@@ -2759,7 +2759,7 @@ def test_locking_an_image_shows_its_enhancement_on_the_move_to_the_finished_imag
     assert _media_on_screen(view) == "a_enhanced.png"
 
 
-def test_an_enhancement_landing_on_a_locked_image_carries_on_the_frames_move(qtbot):
+def test_an_enhancement_landing_on_a_locked_image_carries_on_the_frames_move(qtbot, tmp_path):
     view = _view(qtbot, _KEYED,
                  actions=SlideshowActions(enhance=lambda prompt_id: True))
     engine = _engine(view)
@@ -2767,15 +2767,16 @@ def test_an_enhancement_landing_on_a_locked_image_carries_on_the_frames_move(qtb
     view.slideshow.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
     _settle(view)
     opened_while_it_was_made = len(engine.opened)
+    better = _png(tmp_path / "a_enhanced.png")
 
-    view.slideshow.note_enhanced("id-a", "a_enhanced.png")
+    view.slideshow.note_enhanced("id-a", better)
     _settle(view)
     view.slideshow.note_enhancing({}, frames={})
     _settle(view)
 
     assert len(engine.opened) == opened_while_it_was_made
-    assert engine.swapped[-1] == Path("a_enhanced.png")
-    assert _media_on_screen(view) == "a_enhanced.png"
+    assert engine.swapped[-1] == Path(better)
+    assert _media_on_screen(view) == better
 
 
 def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_new_one(

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GalleryEnvironment:
-    release_files: Callable[[list[Path]], None] | None = None
+    release_files: Callable[..., None] | None = None
     cancel_enhancements: Callable[[list[dict]], None] | None = None
     thumb_dir: Path | None = None
 
@@ -73,7 +73,7 @@ class GalleryEdits:
             "enhance_history": row.get("enhance_history"),
             "thumbnail_path": row.get("thumbnail_path"),
         }
-        ((_row, batch),) = self._trash_files([row], names=set(filenames))
+        ((_row, batch),) = self._trash_files([row], names=set(filenames), the_item_stays=True)
         self._db.update_generation(prompt_id, **updates)
         self._redraw_thumbnail(prompt_id)
 
@@ -106,11 +106,13 @@ class GalleryEdits:
         if self._environment.cancel_enhancements is not None:
             self._environment.cancel_enhancements(rows)
 
-    def _trash_files(self, rows: list[dict], names: set[str] | None = None):
+    def _trash_files(self, rows: list[dict], names: set[str] | None = None, *,
+                     the_item_stays: bool = False):
         # Windows cannot move a file the app still holds open, as a preview does its video.
         by_row = self._files_by_row(rows, names)
         if self._environment.release_files is not None:
-            self._environment.release_files([path for files in by_row for path in files])
+            self._environment.release_files([path for files in by_row for path in files],
+                                            the_item_stays=the_item_stays)
         return [(row, self._trash.store(files)) for row, files in zip(rows, by_row, strict=True)]
 
     def _files_by_row(self, rows: list[dict],

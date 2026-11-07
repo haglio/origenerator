@@ -239,6 +239,23 @@ def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbo
     assert len(first_tab._versions._host.findChildren(_VersionRow)) == 1
 
 
+def test_binning_a_version_tells_the_slideshows_what_the_image_has_left(qtbot, tmp_path):
+    client = _reroll_client()
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=client, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g0"])
+    (job,) = view._jobs.all_jobs
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+    told = []
+    view._slideshows.note_versions_deleted = told.append
+
+    view.delete_enhance_versions("g0", ["image_enhance_00001_.png"])
+
+    assert [row["prompt_id"] for row in told] == ["g0"]
+
+
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

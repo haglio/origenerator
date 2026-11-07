@@ -396,7 +396,7 @@ def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):
     seen = []
     actions, db, output_dir = _actions(
         tmp_path,
-        release_files=lambda paths: seen.append([(p, p.exists()) for p in paths]),
+        release_files=lambda paths, **_: seen.append([(p, p.exists()) for p in paths]),
     )
     row = _completed_row(db, output_dir, "v1", "video/clip.mp4",
                          thumb_dir=tmp_path / "thumbs")
@@ -440,9 +440,19 @@ def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
     assert seen == []
 
 
+def test_deleting_a_version_lets_go_of_it_as_a_file_of_an_item_that_stays(tmp_path):
+    seen = []
+    actions, db, output_dir = _actions(
+        tmp_path, release_files=lambda paths, **told: seen.append((list(paths), told)))
+
+    actions.delete_enhance_versions(_enhanced_row(db, output_dir), ["enhanced.png"])
+
+    assert seen == [([output_dir / "image" / "enhanced.png"], {"the_item_stays": True})]
+
+
 def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
     seen = []
-    actions, db, output_dir = _actions(tmp_path, release_files=seen.extend)
+    actions, db, output_dir = _actions(tmp_path, release_files=lambda paths, **_: seen.extend(paths))
     row = _completed_row(db, output_dir, "e1", "video/exp.mp4")
 
     actions.reject_experiment(row)

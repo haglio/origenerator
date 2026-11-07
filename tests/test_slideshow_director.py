@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 import pytest
 from funestra.hud_placement import HudCorner
-from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL
 from PIL import Image
 from PyQt6.QtCore import QRect, Qt
 
@@ -104,7 +104,6 @@ class FakeSlideshow:
         self.closes = 0
         self.visible = True
         self.ids = set()
-        self.hud_order_label = SHUFFLE_LABEL
         self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
         self.enhanced_items = []
@@ -113,6 +112,7 @@ class FakeSlideshow:
         self.favoritable = True
         self.favorites = 0
         self.released = []
+        self.versions_deleted = []
         self.pause_raises = False
         self.state_at_close = SlideshowState()
         self.played = []
@@ -205,8 +205,11 @@ class FakeSlideshow:
     def set_has_osr2(self, has_it):
         self.has_osr2 = has_it
 
-    def release_media(self, paths):
-        self.released.append(list(paths))
+    def release_media(self, paths, *, the_item_stays=False):
+        self.released.append((list(paths), the_item_stays))
+
+    def note_versions_deleted(self, prompt_id, path, media_type, *, still, versions):
+        self.versions_deleted.append((prompt_id, str(path), media_type, versions))
 
     def reset_in_place(self):
         self.retuned = "in place"
@@ -2056,7 +2059,36 @@ def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):
 
     director.release_media(["one.png"])
 
-    assert [slideshow.released for slideshow in made] == [[["one.png"]], [["one.png"]]]
+    assert [slideshow.released for slideshow in made] == [[(["one.png"], False)],
+                                                          [(["one.png"], False)]]
+
+
+def test_every_surface_hears_that_the_file_a_delete_moves_is_a_version_of_an_item_that_stays(
+        slideshows):
+    director, _host, made = slideshows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
+
+    director.release_media(["one.png"], the_item_stays=True)
+
+    assert [slideshow.released for slideshow in made] == [[(["one.png"], True)],
+                                                          [(["one.png"], True)]]
+
+
+def test_every_surface_hears_which_file_and_versions_an_item_has_left_after_a_delete(
+        slideshows, tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "better.png").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
+    director, _host, made = slideshows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
+
+    director.note_versions_deleted(_row("g1", files=("better.png",)))
+
+    assert [[(pid, Path(path).name) for pid, path, *_ in slideshow.versions_deleted]
+            for slideshow in made] == [[("g1", "better.png")], [("g1", "better.png")]]
 
 
 def _image(prompt_id, prompt, *, seed, steps=50, size=(100, 200)):

@@ -1149,7 +1149,20 @@ def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
     view._release_held_media([tmp_path / "clip.mp4"])
 
     # Windows refuses to move a file that is open, so the paths must reach the slideshow.
-    view._slideshows.showing.release_media.assert_called_once_with([tmp_path / "clip.mp4"])
+    view._slideshows.showing.release_media.assert_called_once_with(
+        [tmp_path / "clip.mp4"], the_item_stays=False)
+
+
+def test_a_slideshow_hears_when_the_file_it_lets_go_of_is_a_version_of_an_item_that_stays(
+        qtbot, tmp_path):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view._slideshows._slideshow = MagicMock()
+
+    view._release_held_media([tmp_path / "better.png"], the_item_stays=True)
+
+    view._slideshows.showing.release_media.assert_called_once_with(
+        [tmp_path / "better.png"], the_item_stays=True)
 
 
 def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):

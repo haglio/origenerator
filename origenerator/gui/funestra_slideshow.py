@@ -312,11 +312,22 @@ class FunestraSlideshow(QObject):
         if not self._comparing:
             self._comparing = True
             self._tell_the_pace()
-        self._send(step_version(delta, [
-            playlist_item(version.path, version.media_type, version.points_of_interest,
-                          scripts=self._scripts_on_opening)
-            for version in versions]))
+        self._send(step_version(delta, [self._version_item(version) for version in versions]))
         self.media_changed.emit()
+
+    def _version_item(self, version: Version):
+        return playlist_item(version.path, version.media_type, version.points_of_interest,
+                             scripts=self._scripts_on_opening)
+
+    def _step_off_a_doomed_version(self, showing: str, doomed: set[str]):
+        versions = self._versions_of_the_slide()
+        at = next((index for index, version in enumerate(versions)
+                   if str(version.path) == showing), None)
+        if at is None:
+            return None
+        below = versions[at + 1:] + versions[:at]
+        staying = next((version for version in below if str(version.path) not in doomed), None)
+        return None if staying is None else (versions[at], staying)
 
     def _leave_the_versions(self) -> None:
         if self._comparing:
@@ -628,6 +639,17 @@ class FunestraSlideshow(QObject):
             self._hand_over()
         self._publish()
 
+    def note_versions_deleted(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
+                              still=None, *, versions: dict) -> None:
+        for slide in self._set.playlist.items:
+            if slide.prompt_id == prompt_id:
+                self._versions.pop(self._file_of(slide), None)
+        self._take_versions(versions)
+        self._set.upgrade(prompt_id, path, media_type, still)
+        if self._set.playlist.replace_item(prompt_id, path, media_type, still):
+            self._hand_over()
+        self._publish()
+
     def _enhance_current(self) -> None:
         current = self._set.playlist.current()
         if self._actions.enhance is None or current is None or current.is_live:
@@ -725,9 +747,14 @@ class FunestraSlideshow(QObject):
     def _flash(self, message: str, *, kind: str = INFO, mark: str = "") -> None:
         self.shown.flash(message, kind=kind, mark=mark)
 
-    def release_media(self, paths) -> None:
-        item = self._on_funestra.item
-        if not item or not any(str(path) == item for path in paths):
+    def release_media(self, paths, *, the_item_stays: bool = False) -> None:
+        doomed = {str(path) for path in paths}
+        showing = self._on_funestra.file or self._on_funestra.item
+        if not showing or not doomed & {showing, self._on_funestra.item}:
+            return
+        step = self._step_off_a_doomed_version(showing, doomed) if the_item_stays else None
+        if step is not None:
+            self._send(step_version(1, [self._version_item(version) for version in step]))
             return
         self._leave_the_versions()
         if len(self._set.playlist) > 1:

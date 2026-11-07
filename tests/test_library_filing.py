@@ -1,4 +1,5 @@
 import _winapi
+from dataclasses import replace
 from pathlib import Path
 
 from origenerator.library_filing import (
@@ -120,6 +121,23 @@ def test_a_finished_videos_files_are_filed_together_under_one_number(tmp_path):
     assert sorted(p.name for p in places.folder("video").iterdir()) == [
         "beta_i2v_00761-audio.mp4", "beta_i2v_00762-audio.mp4", "beta_i2v_00762.mp4",
         "beta_i2v_00762.png"]
+
+
+def test_a_finished_video_passes_over_every_number_a_video_in_kinos_library_wears(tmp_path):
+    places = replace(_places(tmp_path), kino_library=tmp_path / "kino")
+    places.folder("video").mkdir(parents=True)
+    (places.folder("video") / "beta_i2v_00002_.mp4").write_bytes(b"old")
+    for shape, name in (("portrait", "beta_i2v_00004__topaz.mp4"),
+                        ("landscape", "beta_i2v_00006__topaz (1).mp4")):
+        filed_by_kino = tmp_path / "kino" / shape / "sample site" / name
+        filed_by_kino.parent.mkdir(parents=True)
+        filed_by_kino.write_bytes(b"kino's")
+    _saved_by_comfyui(places, "run-two", "video", "beta_i2v_00001_.mp4")
+
+    filed = file_into_library([_listed("run-two", "video", "beta_i2v_00001_.mp4")],
+                              places, "run-two")
+
+    assert filed[0]["filename"] == "beta_i2v_00007_.mp4"
 
 
 def test_a_file_comfyui_reports_outside_the_runs_own_folder_is_left_where_it_is(tmp_path):

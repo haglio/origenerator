@@ -23,7 +23,6 @@ _.dragEnterEvent
 _.dropEvent
 _.contextMenuEvent
 _.expandingDirections
-_.hasHeightForWidth
 _.mouseDoubleClickEvent
 _.startDrag
 _.wheelEvent

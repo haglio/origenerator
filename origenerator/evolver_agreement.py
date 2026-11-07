@@ -15,6 +15,7 @@ class OurSide:
     library_root: Path
     inbox_dir: Path
     upscaled_dir: Path
+    kino_trash: Path
     partial_marker: str
 
 
@@ -23,6 +24,7 @@ def our_side() -> OurSide:
         library_root=config.LIBRARY_ROOT,
         inbox_dir=config.EVOLVER_INBOX_DIR,
         upscaled_dir=config.EVOLVER_UPSCALED_DIR,
+        kino_trash=config.KINO_TRASH_DIR,
         partial_marker=evolver_export.PARTIAL_MARKER,
     )
 
@@ -71,6 +73,8 @@ def disagreements(ours: OurSide, checkout: Path) -> tuple[str, ...]:
         _differing("the inbox a send lands in", ours.inbox_dir, under_library("inbox_dir")),
         _differing("the folder an upscale comes back from",
                    ours.upscaled_dir, under_library("upscaled_dir")),
+        _differing("the Trash a site video leaves Kino for",
+                   ours.kino_trash, under_library("trash_dir")),
         _differing("the mark a half-written copy wears",
                    ours.partial_marker, published.get("partial_marker")),
     )

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from app_support.file_channel import retried_while_held
 
 from origenerator.file_numbers import NUMBERED, next_number, numbered
+
+logger = logging.getLogger(__name__)
 
 _MOVE_ATTEMPTS = 12
 _MOVE_RETRY_DELAY = 0.15
@@ -18,6 +21,7 @@ _MOVE_RETRY_DELAY = 0.15
 class TrashedBatch:
     moves: list[tuple[Path, Path]]
     subdir: Path | None
+    sent_to_kino_trash: list[tuple[Path, Path]] = field(default_factory=list)
 
     def restore(self) -> dict[str, str]:
         renamed = self._renamed_where_taken()
@@ -26,6 +30,10 @@ class TrashedBatch:
             back.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(trashed), str(back))
         self._discard_subdir()
+        for original, held in self.sent_to_kino_trash:
+            if held.is_file() and not original.exists():
+                original.parent.mkdir(parents=True, exist_ok=True)
+                _move(held, original)
         return {original.name: back.name for original, back in renamed.items()}
 
     def _renamed_where_taken(self) -> dict[Path, Path]:
@@ -56,18 +64,20 @@ class TrashedBatch:
         return next((trashed for was, trashed in self.moves if was == Path(original)), None)
 
     def record(self) -> dict:
+        kino = {"sent_to_kino_trash": _as_recorded(self.sent_to_kino_trash)} if self.sent_to_kino_trash else {}
         return {
-            "moves": [[str(original), str(trashed)] for original, trashed in self.moves],
+            "moves": _as_recorded(self.moves),
             "subdir": str(self.subdir) if self.subdir is not None else None,
+            **kino,
         }
 
     @classmethod
     def from_record(cls, record: dict) -> TrashedBatch:
         subdir = (record or {}).get("subdir")
         return cls(
-            moves=[(Path(original), Path(trashed))
-                   for original, trashed in (record or {}).get("moves") or []],
+            moves=_as_read((record or {}).get("moves")),
             subdir=Path(subdir) if subdir else None,
+            sent_to_kino_trash=_as_read((record or {}).get("sent_to_kino_trash")),
         )
 
     def _discard_subdir(self) -> None:
@@ -109,6 +119,39 @@ class Trash:
             shutil.rmtree(child, ignore_errors=True)
             removed += 1
         return removed
+
+
+@dataclass(frozen=True)
+class Kino:
+    library: Path
+    trash: Path
+
+    def plays(self, video: Path) -> bool:
+        return video.is_relative_to(self.library) and video.is_file()
+
+    def take_out(self, videos) -> list[tuple[Path, Path]]:
+        sent = []
+        for video in videos:
+            held = self.trash / video.name
+            if held.exists():
+                continue
+            try:
+                self.trash.mkdir(parents=True, exist_ok=True)
+                _move(video, held)
+            except OSError:
+                logger.warning("Could not take %s out of Kino; it stays there", video.name,
+                               exc_info=True)
+                continue
+            sent.append((video, held))
+        return sent
+
+
+def _as_recorded(moves: list[tuple[Path, Path]]) -> list[list[str]]:
+    return [[str(was), str(now)] for was, now in moves]
+
+
+def _as_read(recorded) -> list[tuple[Path, Path]]:
+    return [(Path(was), Path(now)) for was, now in recorded or []]
 
 
 def _held_as(index: int, name: str) -> str:

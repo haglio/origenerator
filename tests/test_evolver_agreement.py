@@ -9,15 +9,16 @@ from origenerator import config, evolver_agreement, evolver_export
 
 AGREED_INBOX = "videos/videos/2D/AI/0_inbox"
 AGREED_UPSCALED = "videos/videos/2D/AI/2_outbox/upscaled_by_orientation"
+AGREED_TRASH = "videos/videos/2D/AI/2_outbox/trash"
 AGREED_MARKER = ".partial."
 
 
 def _evolver(root: Path, *, inbox=AGREED_INBOX, upscaled=AGREED_UPSCALED,
-             marker=AGREED_MARKER) -> Path:
+             marker=AGREED_MARKER, trash=AGREED_TRASH) -> Path:
     checkout = root / "evolver"
     checkout.mkdir(parents=True, exist_ok=True)
     (checkout / "evolver_contract.json").write_text(json.dumps({
-        "library_relative": {"inbox_dir": inbox, "upscaled_dir": upscaled},
+        "library_relative": {"inbox_dir": inbox, "upscaled_dir": upscaled, "trash_dir": trash},
         "partial_marker": marker,
     }), encoding="utf-8")
     return checkout
@@ -29,6 +30,7 @@ def _ours(*, library=Path("L:/library"), inbox_dir=None, upscaled_dir=None,
         library_root=library,
         inbox_dir=inbox_dir if inbox_dir is not None else library / Path(AGREED_INBOX),
         upscaled_dir=upscaled_dir if upscaled_dir is not None else library / Path(AGREED_UPSCALED),
+        kino_trash=library / Path(AGREED_TRASH),
         partial_marker=marker,
     )
 
@@ -56,6 +58,14 @@ class TestWhenEvolverIsBeside:
         assert len(said) == 1
         assert "by_shape" in said[0]
 
+    def test_a_renamed_trash_folder_is_named_too(self, tmp_path: Path):
+        checkout = _evolver(tmp_path, trash="videos/videos/2D/AI/2_outbox/bin")
+
+        said = evolver_agreement.disagreements(_ours(), checkout)
+
+        assert len(said) == 1
+        assert "bin" in said[0]
+
     def test_a_marker_that_moved_is_a_half_written_clip_ingested(self, tmp_path: Path):
         checkout = _evolver(tmp_path, marker=".writing.")
 
@@ -66,9 +76,9 @@ class TestWhenEvolverIsBeside:
         assert ".partial." in said[0]
 
     def test_every_disagreement_is_reported_at_once(self, tmp_path: Path):
-        checkout = _evolver(tmp_path, inbox="a", upscaled="b", marker="c")
+        checkout = _evolver(tmp_path, inbox="a", upscaled="b", marker="c", trash="d")
 
-        assert len(evolver_agreement.disagreements(_ours(), checkout)) == 3
+        assert len(evolver_agreement.disagreements(_ours(), checkout)) == 4
 
 
 class TestWhenThereIsNoEvolver:
@@ -113,6 +123,7 @@ class TestWhatTheAppCompares:
 
         assert ours.inbox_dir == config.EVOLVER_INBOX_DIR
         assert ours.upscaled_dir == config.EVOLVER_UPSCALED_DIR
+        assert ours.kino_trash == config.KINO_TRASH_DIR
         assert ours.library_root == config.LIBRARY_ROOT
 
     def test_the_lane_folder_is_the_one_all_of_haglio_shares(self):

@@ -8,7 +8,7 @@ from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 
 from origenerator import gallery
-from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS
+from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT, SHAPE_LABELS, TOGETHER
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.gallery_tree import (
@@ -258,6 +258,21 @@ def test_a_rows_path_steps_from_its_side_down_through_every_row_holding_it(qtbot
             held.data(0, TREE_KEY_ROLE) for held in _rows_down_to(row)]
         assert tree.folder_path(row) == PATH_SEPARATOR.join(
             step.name for step in (shape, *steps))
+
+
+def test_a_path_in_the_list_of_both_shapes_starts_at_its_top_folder(qtbot):
+    model = gallery.build_gallery_tree([_image("i1", "a cat")], None)
+    pane = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(pane)
+    pane.choose_shapes(TOGETHER)
+    tree = GalleryTree(pane)
+    tree.populate([ShapeModel(BOTH, model)])
+
+    row = tree.leaf_by_id["i1"]
+
+    assert [step.key for step in tree.path_steps(row)] == [
+        held.data(0, TREE_KEY_ROLE) for held in _rows_down_to(row)]
+    assert tree.folder_path(row).startswith("All  ›  ")
 
 
 def _drawn_down(row):

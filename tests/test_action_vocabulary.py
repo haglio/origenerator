@@ -106,3 +106,14 @@ def test_an_empty_cell_is_a_hole_and_the_cell_after_it_keeps_its_column():
 def test_a_cell_reaching_down_the_rows_is_one_tile_as_tall_as_all_of_them():
     assert tiles(("one", "two"), [[["one", 1, 9]], ["two"]]) == (
         Tile("one", 0, 0, rows=9), Tile("two", 1, 0))
+
+
+def test_a_checkbox_said_alone_keeps_only_a_line_naming_a_checkbox_and_a_button():
+    content = {"video_actions": {
+        "buttons": {"four": ["delta"]}, "checkboxes": ["third box", "fourth box"],
+        "said_alone": {"third box": " four ", "fourth box": "no such button", "nobox": "four"},
+        "heard_as": {"four": ["for", "fore"], "third box": "not a list"},
+    }}
+    named = vocabulary(MediaType.VIDEO, content)
+
+    assert (named.said_alone, named.heard_as) == ({"third box": "four"}, {"four": ("for", "fore")})

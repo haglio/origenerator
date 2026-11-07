@@ -238,6 +238,17 @@
     "checkboxes": [
       "third box"
     ],
+    "heard_as": {
+      "beta": [
+        "bait a"
+      ],
+      "third box": [
+        "bird box"
+      ]
+    },
+    "said_alone": {
+      "third box": "alpha"
+    },
     "formerly": {
       "gamma": {
         "actions": [

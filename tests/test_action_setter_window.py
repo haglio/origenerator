@@ -1,17 +1,27 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QColor, QPalette, QPixmap
-from PyQt6.QtWidgets import QGridLayout, QLabel, QPushButton, QToolButton, QWidget
+from PyQt6.QtWidgets import (
+    QGridLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QToolButton,
+    QWidget,
+)
 from shared_ui.colors import YELLOW
-from shared_ui.spacing import GAP_MEDIUM
+from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
 from origenerator.action_labels import Labels
 from origenerator.action_setter import Locks, SetterSession
-from origenerator.action_vocabulary import Tile, Vocabulary
+from origenerator.action_vocabulary import Tile, Vocabulary, vocabulary
+from origenerator.content import EXAMPLE_CONTENT
 from origenerator.gui.action_setter_window import (
     LAST_LINE,
     PREVIOUSLY_LINE,
@@ -273,7 +283,7 @@ def test_the_button_an_item_was_set_with_before_wears_a_yellow_box(window):
     assert _edge(made, "button one") != YELLOW.name()
 
 
-def test_a_yellow_line_up_top_says_what_the_yellow_box_means(window):
+def test_a_yellow_line_beside_the_checkboxes_says_what_the_yellow_box_means(window):
     made, _store, _stage = window(items=_set_before(("first", Labels(("gamma",)))))
     line = _previously(made)
     line.ensurePolished()
@@ -506,3 +516,55 @@ def test_no_button_or_checkbox_takes_the_keyboard_so_space_fires_nothing_pressed
 
     assert pressable
     assert all(widget.focusPolicy() == Qt.FocusPolicy.NoFocus for widget in pressable)
+
+
+THE_WINDOW_MAXIMIZED_ON_HIS_SCREEN = QSize(2560, 1410 - 31)
+
+
+def _the_example_overlay() -> dict:
+    return json.loads(EXAMPLE_CONTENT.read_text(encoding="utf-8"))
+
+
+def _as_it_opens(qtbot, tmp_path, side, tiles, *, set_before: bool):
+    named = vocabulary(side, _the_example_overlay())
+    named = Vocabulary(named.buttons, tiles or named.tiles, named.checkboxes, {}, {}, {}, {})
+    labels = Labels(next(iter(named.buttons.values())), named.checkboxes) if set_before else None
+    made = ActionSetterWindow(SetterSession(_set_before(("first", labels)), _Store(), side),
+                              named, {}, Locks(tmp_path / f"{set_before}.json"), stage=_Stage())
+    qtbot.addWidget(made)
+    made.setStyleSheet(build_stylesheet())
+    made.resize(THE_WINDOW_MAXIMIZED_ON_HIS_SCREEN)
+    made.show()
+    made.layout().activate()
+    return made
+
+
+def _top(made, widget) -> int:
+    return widget.mapTo(made, QPoint()).y()
+
+
+def _ten_rows_the_grid_has_room_for() -> tuple[Tile, ...]:
+    return tuple(Tile(f"button {n}", n, 0) for n in range(10))
+
+
+@pytest.mark.parametrize(("side", "tiles"), [
+    (MediaType.IMAGE, None),
+    (MediaType.VIDEO, None),
+    (MediaType.IMAGE, _ten_rows_the_grid_has_room_for()),
+])
+def test_neither_setter_tool_needs_a_vertical_scrollbar_with_the_yellow_line_showing(
+        qtbot, tmp_path, side, tiles):
+    shown = _as_it_opens(qtbot, tmp_path, side, tiles, set_before=True)
+    without = _as_it_opens(qtbot, tmp_path, side, tiles, set_before=False)
+    boxes, first_tile = shown._vocabulary.checkboxes, next(iter(shown._tiles))
+    line, box, last_lock = _previously(shown), _box(shown, boxes[0]), _lock(shown, boxes[-1])
+    column = shown.findChild(QScrollArea)
+
+    assert (line.isHidden(), _previously(without).isHidden()) == (False, True)
+    assert (column.verticalScrollBar().maximum(), column.height()) == (
+        0, shown.height() - 2 * MARGIN_STANDARD)
+    assert _top(shown, box) <= _top(shown, line) + line.height() // 2 <= _top(shown, box) + box.height()
+    assert line.mapTo(shown, QPoint()).x() > last_lock.mapTo(shown, QPoint()).x()
+    assert (_top(shown, _tile(shown, first_tile)), column.widget().minimumSizeHint().height()) == (
+        _top(without, _tile(without, first_tile)),
+        without.findChild(QScrollArea).widget().minimumSizeHint().height())

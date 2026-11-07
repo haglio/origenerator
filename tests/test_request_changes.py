@@ -531,35 +531,121 @@ _NOTHING_ELSE_TO_DO = ('"a velvet couch" was already in the Positive Prompt, and
                        "in the Negative Prompt, so I couldn't figure out anything else to do.")
 
 
-def _gave_up(tried, pair=_MORE_COUCH, changes=()):
-    return apply_changes({"changes": list(changes), "tried": tried}, pair,
-                         asked=["I still can't see the couch"], settings=_SIZE)
+_NO_WEIGHTS = Prompts(take_weights=False)
 
 
-def test_giving_up_says_what_both_prompts_already_had_for_what_he_asked():
-    outcome = _gave_up({"positive": "a velvet couch", "negative": "bare floor", "for": "the couch"})
+def _one(change, pair, asked, prompts=_NO_WEIGHTS):
+    return apply_changes({"changes": [change]}, pair, asked=list(asked), settings=_SIZE, prompts=prompts)
+
+
+def test_more_of_something_puts_his_stronger_words_in_moves_it_first_and_keeps_its_opposite_out():
+    outcome = _one({"more": "a small necklace", "stronger": "a large pendant necklace",
+                    "opposite": "bare neck", "for": "more necklace"},
+                   ("a woman on a couch, a small necklace, soft light", "blurry"), ("more necklace",),
+                   prompts=Prompts(take_weights=False, his_words=frozenset({"large", "pendant"})))
+
+    assert outcome.positive == "a large pendant necklace, a woman on a couch, soft light"
+    assert outcome.negative == "blurry, bare neck"
+    assert outcome.line == (
+        'Replaced "a small necklace" with "a large pendant necklace" in the Positive Prompt. '
+        'Moved "a large pendant necklace" earlier in the Positive Prompt. '
+        'Added "bare neck" to the Negative Prompt.')
+
+
+def test_stronger_words_that_his_prompts_never_use_leave_the_part_as_it_is():
+    his = Prompts(take_weights=False, his_words=frozenset({"wide", "brimmed"}))
+    pair = ("photo of a woman, a small straw hat, beach", "blurry")
+
+    invented = _one({"more": "a small straw hat", "stronger": "an enormous straw hat",
+                     "opposite": "bare head", "for": "bigger hat"}, pair, ("bigger hat",), prompts=his)
+    in_his_words = _one({"more": "a small straw hat", "stronger": "a wide brimmed straw hat",
+                         "opposite": "bare head", "for": "bigger hat"}, pair, ("bigger hat",), prompts=his)
+
+    assert invented.positive == "a small straw hat, photo of a woman, beach"
+    assert invented.line == ('Moved "a small straw hat" earlier in the Positive Prompt. '
+                             'Added "bare head" to the Negative Prompt.')
+    assert in_his_words.positive == "a wide brimmed straw hat, photo of a woman, beach"
+
+
+def test_more_of_something_where_the_prompts_take_weights_weighs_it_and_its_opposite_more():
+    outcome = _one({"more": "a velvet couch", "stronger": "a velvet couch", "opposite": "bare floor",
+                    "for": "more couch"}, _MORE_COUCH, ("more couch",), prompts=Prompts())
+
+    assert outcome.positive == "(a woman on a velvet couch:1.1), soft light"
+    assert outcome.negative == "blurry, (bare floor:1.1)"
+    assert outcome.line == (
+        'Replaced "a woman on a velvet couch" with "(a woman on a velvet couch:1.1)" in the Positive '
+        'Prompt. Replaced "bare floor" with "(bare floor:1.1)" in the Negative Prompt.')
+
+
+def test_more_of_something_already_first_in_his_words_with_its_opposite_kept_out_says_so():
+    outcome = _one({"more": "a velvet couch", "stronger": "a velvet couch", "opposite": "bare floor",
+                    "for": "even more couch"}, _MORE_COUCH, ("even more couch",))
 
     assert (outcome.positive, outcome.negative) == _MORE_COUCH
     assert outcome.line == _NOTHING_ELSE_TO_DO
 
 
-@pytest.mark.parametrize("tried", [
-    {"positive": "a leather couch", "negative": "bare floor", "for": "the couch"},
-    {"positive": "a velvet couch", "negative": "an empty room", "for": "the couch"},
-    {"positive": "a velvet couch", "for": "the couch"},
-    {"positive": "soft light", "negative": "blurry", "for": "the light"},
-    "a velvet couch",
-])
-def test_giving_up_over_words_the_prompts_do_not_have_or_he_never_asked_about_says_only_that(tried):
-    assert _gave_up(tried).line == "Nothing changed."
+def test_more_of_something_the_positive_prompt_lacks_puts_it_first_with_its_opposite_kept_out():
+    outcome = _one({"more": "", "stronger": "freckles", "opposite": "clear skin", "for": "more freckles"},
+                   ("a woman on a couch", "blurry"), ("more freckles",))
+
+    assert (outcome.positive, outcome.negative) == ("freckles, a woman on a couch", "blurry, clear skin")
+    assert outcome.line == ('Added "freckles" to the Positive Prompt. '
+                            'Added "clear skin" to the Negative Prompt.')
 
 
-def test_what_was_tried_is_not_said_beside_a_change_that_was_made():
-    outcome = _gave_up({"positive": "a velvet couch", "negative": "bare floor", "for": "the couch"},
-                       changes=[{"prompt": "positive", "replace": "a velvet couch",
-                                 "with": "a wide velvet couch", "for": "the couch"}])
+def test_more_of_something_he_never_asked_about_is_left_out_without_a_word():
+    outcome = _one({"more": "soft light", "stronger": "bright light", "opposite": "dark", "for": "light"},
+                   _MORE_COUCH, ("more couch",))
 
-    assert outcome.line == 'Replaced "a velvet couch" with "a wide velvet couch" in the Positive Prompt.'
+    assert (outcome.positive, outcome.negative) == _MORE_COUCH
+    assert outcome.line == "Nothing changed."
+
+
+def test_something_gone_gives_its_place_to_what_shows_instead_and_is_kept_out():
+    outcome = _one({"gone": "raincoat", "in_positive": "a woman in a yellow raincoat",
+                    "instead": "a woman in a sundress", "for": "remove her raincoat"},
+                   ("a woman in a yellow raincoat, a pier at noon", "blurry"), ("remove her raincoat",))
+
+    assert (outcome.positive, outcome.negative) == ("a woman in a sundress, a pier at noon",
+                                                    "blurry, raincoat")
+    assert outcome.line == ('Replaced "a woman in a yellow raincoat" with "a woman in a sundress" in '
+                            'the Positive Prompt. Added "raincoat" to the Negative Prompt.')
+
+
+def test_something_gone_in_several_kinds_takes_every_kind_out():
+    outcome = _one({"gone": "hat", "in_positive": "a straw hat, a cap", "instead": "", "for": "no hats"},
+                   ("a woman, a straw hat, a cap, a beach", "blurry"), ("no hats",))
+
+    assert (outcome.positive, outcome.negative) == ("a woman, a beach", "blurry, hat")
+    assert outcome.line == ('Removed "a straw hat" from the Positive Prompt. '
+                            'Removed "a cap" from the Positive Prompt. Added "hat" to the Negative Prompt.')
+
+
+def test_something_gone_that_is_already_out_and_kept_out_says_so():
+    outcome = _one({"gone": "raincoat", "in_positive": "", "instead": "",
+                    "for": "try harder to get rid of the raincoat"},
+                   ("a woman on a pier", "blurry, raincoat"), ("try harder to get rid of the raincoat",))
+
+    assert (outcome.positive, outcome.negative) == ("a woman on a pier", "blurry, raincoat")
+    assert outcome.line == ('"raincoat" was already out of the Positive Prompt and in the Negative '
+                            "Prompt, so I couldn't figure out anything else to do.")
+
+
+def test_something_gone_that_is_already_kept_out_where_the_prompts_take_weights_is_kept_out_harder():
+    outcome = _one({"gone": "raincoat", "in_positive": "", "instead": "", "for": "no raincoat"},
+                   ("a woman on a pier", "blurry, raincoat"), ("no raincoat",), prompts=Prompts())
+
+    assert outcome.negative == "blurry, (raincoat:1.1)"
+    assert outcome.line == 'Replaced "raincoat" with "(raincoat:1.1)" in the Negative Prompt.'
+
+
+def test_what_the_positive_prompt_never_had_is_not_said_missing_when_he_names_the_negative_prompt():
+    outcome = _applied([{"prompt": "negative", "add": "hat", "for": "put hat back"}],
+                       asked=("put hat back into the Negative Prompt",))
+
+    assert outcome.line == 'Added "hat" to the Negative Prompt.'
 
 
 def test_an_opposite_kept_out_to_bring_out_what_he_asked_for_is_said_only_as_added():

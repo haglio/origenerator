@@ -50,7 +50,7 @@ from origenerator.item_shape import UNMEASURABLE_SHAPE, base_of, shaped_key
 from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
-from origenerator.prompt_edit import request_applier
+from origenerator.prompt_edit import work_out
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
@@ -926,8 +926,17 @@ def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
     return db
 
 
-def _from_the_words_alone_with_no_local_model(positive, negative, words, *, in_scenes=False, **_):
-    return request_applier(in_scenes)(positive, negative, words)
+def _a_fake_models_answer(positive, negative, words, known):
+    if words.startswith("no "):
+        thing = words.removeprefix("no ")
+        if f"a {thing}" in positive:
+            return {"changes": [{"prompt": "positive", "remove": f"a {thing}", "for": words}]}
+        return {"changes": [{"prompt": "negative", "add": thing, "for": words}]}
+    return {"changes": [{"prompt": "positive", "add": words, "for": words}]}
+
+
+def _worked_out_by_a_fake_model(positive, negative, words, *, in_scenes=False, **_):
+    return work_out(positive, negative, words, in_scenes=in_scenes, ask=_a_fake_models_answer)
 
 
 def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
@@ -935,7 +944,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     keep_on_disk(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
-    view._voice.requests._work_out = _from_the_words_alone_with_no_local_model
+    view._voice.requests._work_out = _worked_out_by_a_fake_model
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._buttons.mic.setChecked(True)
     view.refresh()

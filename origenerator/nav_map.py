@@ -128,7 +128,14 @@ def surroundings(current: dict, rows, *, image_index,
     )
 
 
+def _alike_in_origin(current: dict) -> Callable[[dict], bool]:
+    if made_here(current) or gallery.media_type_of_row(current) == MediaType.VIDEO:
+        return made_here
+    return lambda row: not made_here(row)
+
+
 def _made_here_around(current: dict, rows, animations: _Animations, image_index):
+    alike = _alike_in_origin(current)
     own = animations.label_of(current)
     image = animations.image_of(current)
     if image is None:
@@ -143,7 +150,7 @@ def _made_here_around(current: dict, rows, animations: _Animations, image_index)
         configs = []
     group = [row for row in animations.group_of(current)
              if row["prompt_id"] != current["prompt_id"] and made_here(row)]
-    return filter(made_here, seeds), filter(made_here, configs), group
+    return filter(alike, seeds), filter(alike, configs), group
 
 
 def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, Hashable]:

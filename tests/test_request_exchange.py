@@ -424,3 +424,11 @@ def test_flipping_auto_generate_says_so(qtbot):
     qtbot.mouseClick(exchange._auto_generate, Qt.MouseButton.LeftButton)
 
     assert chosen == [True]
+
+
+def test_a_spoken_turn_with_no_answer_that_changed_something_offers_generate_too(qtbot):
+    exchange = _shown_at(qtbot, 400)
+
+    exchange.show_exchange([Turn("no hat", "", "a hat", "", "a", "")])
+
+    assert len(_placed(exchange, GenerateButton)) == 1

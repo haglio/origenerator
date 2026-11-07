@@ -194,7 +194,7 @@ class _Conversation(QTextEdit):
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
                 cursor.insertImage(picture)
                 self._tips.append(entry.tip)
-        elif entry.answered and entry.changed_something():
+        elif entry.changed_something():
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
             self._reserve(cursor, button, entry)

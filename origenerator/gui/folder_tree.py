@@ -27,6 +27,8 @@ TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
 COUNT_ROLE = Qt.ItemDataRole.UserRole + 4
 RECENT_ROLE = Qt.ItemDataRole.UserRole + 5
 
+_SETTLING_ROUNDS = 4
+
 FOLDER_KEYS_MIME = "application/x-origenerator-folder-keys"
 
 
@@ -58,6 +60,10 @@ def _mark_rect(content: QRect) -> QRect:
 
 def _is_all(row, group_role) -> bool:
     return getattr(row.data(0, group_role), "key", None) == ALL_KEY
+
+
+def _path_of(row, group_role) -> list:
+    return [] if _is_all(row, group_role) else [*_folders_around(row, group_role), row]
 
 
 def _folders_around(row, group_role) -> list:
@@ -131,10 +137,15 @@ class FolderTree(QTreeWidget):
         return group
 
     def frozen_rows(self) -> list:
-        frozen = self._frozen_while_scrolling([])
-        picked = self._picked_path()
-        if picked and self._scrolled_past(picked[-1], frozen):
-            return self._frozen_while_scrolling(picked)
+        held = []
+        for _round in range(_SETTLING_ROUNDS):
+            frozen = self._frozen_while_scrolling(held)
+            passed = self._in_list_order(
+                [folder for row in self.selectedItems() if self._scrolled_past(row, frozen)
+                 for folder in _path_of(row, self._role)])
+            if len(passed) == len(held) and all(a is b for a, b in zip(passed, held, strict=True)):
+                break
+            held = passed
         return frozen
 
     def _frozen_while_scrolling(self, held: list) -> list:
@@ -149,12 +160,6 @@ class FolderTree(QTreeWidget):
             if not _holds(folder, below):
                 return shown
             chain.append(folder)
-
-    def _picked_path(self) -> list:
-        picked = self.currentItem()
-        if picked is None or not picked.isSelected() or _is_all(picked, self._role):
-            return []
-        return [*_folders_around(picked, self._role), picked]
 
     def _scrolled_past(self, row, frozen: list) -> bool:
         place = self.visualItemRect(row)
@@ -296,6 +301,25 @@ class FolderTree(QTreeWidget):
         event.accept()
         return True
 
+    def _pick_frozen(self, row, modifiers) -> None:
+        if not modifiers & (Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.ControlModifier):
+            self._bring_back(row)
+            return
+        scrolls = self.hasAutoScroll()
+        self.setAutoScroll(False)
+        self._pick_in_place(self.indexFromItem(row), modifiers)
+        self.setAutoScroll(scrolls)
+
+    def _pick_in_place(self, index, modifiers) -> None:
+        flags = QItemSelectionModel.SelectionFlag
+        if modifiers & Qt.KeyboardModifier.ShiftModifier and self.currentIndex().isValid():
+            keep = flags.Select if modifiers & Qt.KeyboardModifier.ControlModifier else flags.ClearAndSelect
+            span = self.visualRect(self.currentIndex()).united(self.visualRect(index))
+            self.setSelection(span, keep | flags.Rows)
+            self.selectionModel().setCurrentIndex(index, flags.NoUpdate)
+        else:
+            self.selectionModel().setCurrentIndex(index, flags.Toggle | flags.Rows)
+
     def _bring_back(self, row) -> None:
         self.setCurrentItem(row)
         self.scrollToItem(row, QAbstractItemView.ScrollHint.PositionAtTop)
@@ -325,7 +349,7 @@ class FolderTree(QTreeWidget):
         if frozen is not None:
             event.accept()
             self._pressed_on_frozen = True
-            self._bring_back(frozen)
+            self._pick_frozen(frozen, event.modifiers())
             return
         if event.button() != Qt.MouseButton.LeftButton:
             # Qt: QTreeView toggles the caret under any button's press; QAbstractItemView's press only picks the row, so a right-click never shuts a folder

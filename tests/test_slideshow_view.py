@@ -1657,9 +1657,9 @@ def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
 
 
 def test_comparing_a_videos_versions_holds_the_slideshow_on_them_too(qtbot):
-    view = _view(qtbot, [("clip.mp4", "video", "id-a"), ("b.png", "image", "id-b")])
-    view.slideshow.set_versions({"clip.mp4": [("clip_evolved.mp4", "video", "Evolved"),
-                                  ("clip.mp4", "video", "Original")]})
+    view = _view(qtbot, [("clip_evolved.mp4", "video", "id-a"), ("b.png", "image", "id-b")])
+    view.slideshow.set_versions({"clip_evolved.mp4": [("clip_evolved.mp4", "video", "Evolved"),
+                                                      ("clip.mp4", "video", "Original")]})
 
     _shift(view, Qt.Key.Key_Left)
     _runs_out(view)

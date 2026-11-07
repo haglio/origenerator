@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from funestra.funestra_verbs import (
     CLEAR_FRAME,
+    FORGET_VERSIONS,
     HOLD_PICTURE,
     LET_GO,
     LOCK_OFF,
@@ -18,6 +19,7 @@ from funestra.funestra_verbs import (
     SHOW_FRAME,
     TRASH,
     play_file,
+    step_version,
 )
 from funestra.hud_title import SHUFFLE_LABEL
 from funestra.loop_cycle import LOCK, SEED
@@ -42,7 +44,7 @@ from origenerator.gui.slideshow_set import (
     narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
-from origenerator.gui.version_stepper import VersionStepper
+from origenerator.library_views import Version
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
@@ -50,6 +52,17 @@ from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 logger = logging.getLogger(__name__)
 
 _POLL_MS = 200
+
+
+@dataclass(frozen=True)
+class OnTheFunestra:
+    item: str = ""
+    file: str = ""
+
+
+def _heard(fields: dict) -> OnTheFunestra:
+    status = parse_status(fields)
+    return OnTheFunestra(status.video, fields.get("showing", status.video))
 
 
 class FunestraSlideshow(QObject):
@@ -74,7 +87,7 @@ class FunestraSlideshow(QObject):
         self._pace.changed.connect(self._on_pace_changed)
         self._take_set(playing)
         self._open = True
-        self._showing = ""
+        self._on_funestra = OnTheFunestra()
         def at_defaults() -> bool:
             at_base = self._actions.at_base
             return (not self.locked and self._set.filters == SlideshowFilters()
@@ -89,11 +102,12 @@ class FunestraSlideshow(QObject):
         self._gesture_owed = False
         self._refusal_checked = False
         self._loads_seen: str | None = None
-        self._versions_stepper = VersionStepper()
-        self._versions_stepper.arm(versions or {})
+        self._versions: dict[str, list[Version]] = {}
+        self._comparing = False
+        self._take_versions(versions or {})
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
-            self._showing = self._funestra_status().video
+            self._on_funestra = _heard(self.channel.status())
         self._publish()
         self._hand_over(land=opened_on_a_slide)
         QTimer.singleShot(0, self._look_for_scripts_from_now_on)
@@ -117,7 +131,8 @@ class FunestraSlideshow(QObject):
             self._actions = playing.actions
         self._unlock()
         self._take_set(replace(playing, opening=None))
-        self._versions_stepper.arm(playing.versions or {})
+        self._versions = {}
+        self._take_versions(playing.versions or {})
         self._hand_over(land=True)
         self._publish()
 
@@ -125,9 +140,10 @@ class FunestraSlideshow(QObject):
         current = self._set.playlist.current()
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
         self.channel.write_playlist([self._funestra_item(item) for item in rotated])
-        lands = land and current is not None and self._file_of(current) != self._showing
-        if lands:
-            self._versions_stepper.restart()
+        lands = land and current is not None and self._file_of(current) != self._on_funestra.item
+        if lands and self._comparing:
+            self._comparing = False
+            self._send(FORGET_VERSIONS)
         self._tell_the_pace()
         self._tell_the_keep()
         if lands:
@@ -139,7 +155,7 @@ class FunestraSlideshow(QObject):
         self._hold_what_is_being_made_for_half()
 
     def _funestra_pace(self) -> int:
-        return self._versions_stepper.pace(self._pace.seconds)
+        return 0 if self._comparing else self._pace.seconds
 
     def _tell_the_keep(self) -> None:
         keeps = self._keeps()
@@ -163,7 +179,7 @@ class FunestraSlideshow(QObject):
     def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(Path(self._file_of(slide)))
-        return slide_item(slide, self._versions_stepper.points_of_interest(self._file_of(slide)),
+        return slide_item(slide, self._places_of(self._file_of(slide)),
                           scripts=self._scripts_on_opening)
 
     def _send(self, verb: str) -> None:
@@ -204,8 +220,9 @@ class FunestraSlideshow(QObject):
         self.transport.heard(status, fields)
         self._funestra_locked = status.locked
         self._on_screen.observe(status.video, now=self._clock())
-        if status.video and status.video != self._showing:
-            self._showing = status.video
+        moved = status.video and status.video != self._on_funestra.item
+        self._on_funestra = _heard(fields)
+        if moved:
             self._follow(status.video)
             self._held_short = False
             self._hold_what_is_being_made_for_half()
@@ -238,7 +255,8 @@ class FunestraSlideshow(QObject):
     def _show_what_is_being_made(self) -> None:
         current = self._set.playlist.current()
         frame = None
-        if current is not None and self._file_of(current) == self._showing:
+        if (current is not None and self._file_of(current) == self._on_funestra.item
+                and not self._comparing):
             frame = self._set.frame_being_made_of(current)
         path = None if frame is None else self._frames.write(current.prompt_id, frame)
         if path == self._frame_on_funestra:
@@ -246,39 +264,62 @@ class FunestraSlideshow(QObject):
         self._frame_on_funestra = path
         self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
 
-    def _funestra_status(self):
-        return parse_status(self.channel.status())
-
     def set_versions(self, versions_by_path: dict) -> None:
-        if self._versions_stepper.arm(versions_by_path):
+        self._versions = {}
+        if self._take_versions(versions_by_path):
             self._hand_over()
         self._publish()
 
     def add_versions(self, versions_by_path: dict) -> None:
-        if self._versions_stepper.add(versions_by_path):
+        if self._take_versions(versions_by_path):
             self._hand_over()
         self._publish()
 
+    def _take_versions(self, versions_by_path: dict) -> bool:
+        before = self._places()
+        self._versions.update({str(path): [Version(*version) for version in versions]
+                               for path, versions in versions_by_path.items()})
+        return self._places() != before
+
+    def _places(self) -> dict[str, tuple]:
+        return {path: versions[0].points_of_interest
+                for path, versions in self._versions.items()
+                if versions and versions[0].points_of_interest}
+
+    def _places_of(self, path: str) -> tuple:
+        versions = self._versions.get(path)
+        return versions[0].points_of_interest if versions else ()
+
+    def _versions_of_the_slide(self) -> list[Version]:
+        return self._versions.get(self._current_base(), [])
+
+    def _version_index(self) -> int:
+        versions = self._versions_of_the_slide()
+        return next((index for index, version in enumerate(versions)
+                     if str(version.path) == self._on_funestra.file), 0)
+
     @property
     def has_other_versions(self) -> bool:
-        return len(self._versions_stepper.versions(base=self._current_base())) > 1
+        return len(self._versions_of_the_slide()) > 1
 
     def slideshow_step_version(self, delta: int) -> None:
-        comparing = self._versions_stepper.stepping
-        version = self._versions_stepper.step(delta, base=self._current_base())
-        if version is None:
+        versions = self._versions_of_the_slide()
+        if len(versions) <= 1:
             return
-        if not comparing:
+        if not self._comparing:
+            self._comparing = True
             self._tell_the_pace()
-        self._send(play_file(playlist_item(version.path, version.media_type,
-                                           version.points_of_interest)))
+        self._send(step_version(delta, [
+            playlist_item(version.path, version.media_type, version.points_of_interest,
+                          scripts=self._scripts_on_opening)
+            for version in versions]))
         self.media_changed.emit()
 
     def _leave_the_versions(self) -> None:
-        stepped = self._versions_stepper.stepping
-        self._versions_stepper.restart()
-        if stepped:
-            self._hand_over()
+        if self._comparing:
+            self._comparing = False
+            self._send(FORGET_VERSIONS)
+            self._tell_the_pace()
 
     def _current_base(self) -> str:
         item = self._set.playlist.current()
@@ -289,8 +330,9 @@ class FunestraSlideshow(QObject):
         if showing is None:
             return
         index, item = showing
-        if item is not self._set.playlist.current():
-            self._versions_stepper.restart()
+        if item is not self._set.playlist.current() and self._comparing:
+            self._comparing = False
+            self._send(FORGET_VERSIONS)
         self._set.playlist.jump_to(index)
         self.media_changed.emit()
 
@@ -361,7 +403,7 @@ class FunestraSlideshow(QObject):
             self._send(NEXT)
             return
         self._send(TRASH)
-        self._showing = ""
+        self._on_funestra = OnTheFunestra()
         self._set.forget(item)
         self._set.playlist.remove_current()
         self._frames.forget(item.prompt_id)
@@ -517,8 +559,8 @@ class FunestraSlideshow(QObject):
 
     @property
     def hud_item_note(self) -> str:
-        return item_note(self._set, versions=self._versions_stepper.versions(base=self._current_base()),
-                         version_index=self._versions_stepper.index)
+        return item_note(self._set, versions=self._versions_of_the_slide(),
+                         version_index=self._version_index())
 
     @property
     def hud_favorites_filter(self) -> bool:
@@ -589,7 +631,6 @@ class FunestraSlideshow(QObject):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._set.playlist.replace_item(prompt_id, path, media_type, still):
             if self._set.current_prompt_id() == prompt_id:
-                self._versions_stepper.back_to_the_top()
                 self._frame_on_funestra = None
                 self._send(f"{SHOW_FRAME} {path}")
                 self._take_the_whole_pace_unless_being_made()
@@ -667,8 +708,8 @@ class FunestraSlideshow(QObject):
         current = self._set.playlist.current()
         if current is None or current.is_live or self._frame_on_funestra is not None:
             return None
-        versions = self._versions_stepper.versions(base=self._current_base())
-        shown = versions[self._versions_stepper.index] if self._versions_stepper.stepping and versions else current
+        versions = self._versions_of_the_slide()
+        shown = versions[self._version_index()] if self._comparing and versions else current
         return str(shown.path) if shown.media_type == MediaType.VIDEO else None
 
     def set_paused(self, paused: bool) -> None:
@@ -696,7 +737,8 @@ class FunestraSlideshow(QObject):
         self.shown.flash(message, kind=kind, mark=mark)
 
     def release_media(self, paths) -> None:
-        if not self._showing or not any(str(path) == self._showing for path in paths):
+        item = self._on_funestra.item
+        if not item or not any(str(path) == item for path in paths):
             return
         self._leave_the_versions()
         if len(self._set.playlist) > 1:
@@ -706,7 +748,7 @@ class FunestraSlideshow(QObject):
         self._send(LET_GO)
 
     def state(self) -> SlideshowState:
-        return self._set.state(locked=self.locked, version_index=self._versions_stepper.index)
+        return self._set.state(locked=self.locked, version_index=self._version_index())
 
     def resume(self, state: SlideshowState, *, opened_on_it: bool = False) -> bool:
         if not self._set.resume(state, lead=not opened_on_it):
@@ -735,7 +777,7 @@ class FunestraSlideshow(QObject):
         if not self._open:
             return
         self._open = False
-        if self._versions_stepper.stepping:
+        if self._comparing:
             self._send(f"{SET_PACE} {self._pace.seconds}")
         if self._keep_told and not self._locked:
             self._send(LOCK_OFF)

@@ -73,8 +73,7 @@ class RequestAnswerer(QObject):
 
     def _worked_out(self, pair: tuple[str, str], words: str, exchange, told: dict, by_the_model: bool):
         if not by_the_model:
-            return prompt_edit.request_applier(told.get("in_scenes", False))(
-                *pair, words, weights=told.get("weights", True))
+            return prompt_edit.unanswered(*pair, words, prompt_edit.NO_GRAPHICS_CARD)
         examples = prompt_edit.prompts_touching(words, reversed(_his_prompts(self._db)))
         return self._work_out(*pair, words, exchange=exchange,
                               notes=collection_notes.read(self._notes_path),

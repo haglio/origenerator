@@ -57,6 +57,7 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
 class GeneratePane(QTabWidget):
     tab_added = pyqtSignal(object)
     generate_requested = pyqtSignal(str, list)
+    turn_generate_requested = pyqtSignal(object, str, dict, dict)
     modify_requested = pyqtSignal(str, str, dict)
     folder_requested = pyqtSignal(str)
 
@@ -101,6 +102,11 @@ class GeneratePane(QTabWidget):
         for tab in self.generate_tabs():
             tab.become_standalone()
 
+    def note_in_flight(self, items: list) -> None:
+        readings = {item.key: item.reading for item in items}
+        for tab in self.generate_tabs():
+            tab.note_in_flight(readings)
+
     def generate_tabs(self) -> list[GenerateTab]:
         return [
             w for i in range(self.count())
@@ -133,6 +139,8 @@ class GeneratePane(QTabWidget):
         tab.modify_requested.connect(
             lambda key, name, params, p=tab: self._on_tab_changes(p, key, name, params)
         )
+        tab.turn_generate_requested.connect(
+            lambda name, params, asked, p=tab: self._on_turn_generate(p, name, params, asked))
         self.setCurrentIndex(index)
         if preview:
             self._set_preview_tab(tab)
@@ -266,6 +274,10 @@ class GeneratePane(QTabWidget):
     def _on_tab_generate(self, tab, workflow_name: str, batch: list[dict]):
         self._pin_tab(tab)
         self.generate_requested.emit(workflow_name, batch)
+
+    def _on_turn_generate(self, tab, workflow_name: str, params: dict, asked: dict):
+        self._pin_tab(tab)
+        self.turn_generate_requested.emit(tab, workflow_name, params, asked)
 
     def _on_tab_changes(self, tab, folder_key: str, workflow_name: str,
                            params: dict):

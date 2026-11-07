@@ -193,6 +193,9 @@ class FakeDB:
     def exchange_of(self, prompt_id):
         return []
 
+    def items_asked_into(self, prompt_id):
+        return []
+
     def recent_durations(self, workflow_name, limit=10):
         return [
             r["duration_seconds"] for r in self._rows

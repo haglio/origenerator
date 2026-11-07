@@ -7,6 +7,9 @@ from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.db_requests import Turn
+from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui.inflight import RunReading
+from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.request_exchange import RequestExchange
 
 EXCHANGE = [("a hat", "Gave her a straw hat."), ("make it red", "The hat is red now.")]
@@ -239,7 +242,7 @@ def test_hovering_his_words_or_the_answer_shows_that_turns_change(qtbot):
 
     assert "hat" in tip_on(0)
     assert "hat" in tip_on(1)
-    assert tip_on(2) == ""
+    assert tip_on(3) == ""
 
 
 def test_resting_the_mouse_on_a_turn_opens_its_tooltip_and_on_one_with_no_change_closes_it(qtbot):
@@ -255,7 +258,7 @@ def test_resting_the_mouse_on_a_turn_opens_its_tooltip_and_on_one_with_no_change
 
     rest_on(0)
     assert "hat" in QToolTip.text()
-    rest_on(2)
+    rest_on(3)
     qtbot.waitUntil(lambda: not QToolTip.isVisible(), timeout=2000)
 
 
@@ -310,3 +313,69 @@ def test_a_turn_nothing_was_made_from_shows_a_question_mark_after_and_before_the
     assert paths["second"] in second.tip
     assert second.tip.count("?") == 1
     assert second.tip.index("?") < second.tip.index(paths["second"])
+
+
+def _placed(exchange, kind):
+    return [widget for widget in exchange._conversation.viewport().findChildren(kind)
+            if not widget.isHidden()]
+
+
+def test_a_turn_that_changed_something_and_made_nothing_offers_generate_under_it(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    asked = []
+    exchange.generate_asked.connect(asked.append)
+
+    exchange.show_exchange([("hello", "Hi."), _changed("a cap"), _changed("red")])
+
+    buttons = _placed(exchange, GenerateButton)
+    assert [button.text() for button in buttons] == ["Generate", "Generate"]
+    qtbot.mouseClick(buttons[1], Qt.MouseButton.LeftButton)
+    assert asked == [2]
+
+
+def test_generate_sits_under_its_turns_answer_on_a_line_of_its_own(qtbot):
+    exchange = _shown_at(qtbot, 400)
+
+    exchange.show_exchange([_changed("a cap"), _changed("red")])
+    qtbot.wait(20)
+
+    conversation = exchange._conversation
+    first, _second = _placed(exchange, GenerateButton)
+    answer = conversation.document().findBlockByNumber(1)
+    next_words = conversation.document().findBlockByNumber(3)
+    assert first.y() >= conversation.cursorRect(QTextCursor(answer)).bottom()
+    assert first.geometry().bottom() < conversation.cursorRect(QTextCursor(next_words)).top()
+
+
+def test_a_turn_an_item_was_made_from_shows_its_thumbnail_where_generate_would_be(
+        qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "first")
+    exchange = _shown_at(qtbot, 400)
+    exchange.set_thumbnail_of(paths.get)
+
+    exchange.show_exchange([_changed("a cap", made="first"), _changed("red")])
+
+    assert len(_placed(exchange, GenerateButton)) == 1
+    html = exchange._conversation.document().toHtml()
+    assert paths["first"] in html
+
+
+def test_a_turn_whose_item_is_being_made_shows_its_progress_until_the_thumbnail_comes(
+        qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "first")
+    thumbnails = {}
+    exchange = _shown_at(qtbot, 400)
+    exchange.set_thumbnail_of(thumbnails.get)
+    exchange.show_exchange([_changed("a cap", made="first")])
+
+    exchange.note_in_flight({"first": RunReading(status="running", progress=(3, 10))})
+
+    (bar,) = _placed(exchange, ProgressBar)
+    assert (bar.value(), bar.maximum()) == (3, 10)
+    assert _placed(exchange, GenerateButton) == []
+
+    thumbnails["first"] = paths["first"]
+    exchange.note_in_flight({})
+
+    assert _placed(exchange, ProgressBar) == []
+    assert paths["first"] in exchange._conversation.document().toHtml()

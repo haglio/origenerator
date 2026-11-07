@@ -87,9 +87,10 @@ def _says(slideshow: FunestraSlideshow, **fields) -> None:
 
 
 def _funestra_says(channel: FunestraChannel, *, loads: int = 1, idle: bool = False,
-                   has_funscript: bool = False, **fields) -> None:
+                   has_funscript: bool = False, showing: str | None = None, **fields) -> None:
     lines = {**status_fields(FunestraStatus(**fields)), "loads": str(loads),
-             "idle": "1" if idle else "0", "has_funscript": "1" if has_funscript else "0"}
+             "idle": "1" if idle else "0", "has_funscript": "1" if has_funscript else "0",
+             "showing": fields.get("video", "") if showing is None else showing}
     channel.status_file.write_text(
         "".join(f"{key}={value}\n" for key, value in lines.items()), encoding="utf-8")
 
@@ -881,7 +882,9 @@ def test_a_slideshow_picked_back_up_on_another_version_plays_that_version_locked
                                     locked=True, version_index=1))
 
     sent = _sent(slideshow)
-    assert ("PLAY_FILE one_original.png" in sent, _locks(sent)[-1]) == (True, "LOCK_ON")
+    assert ("NEXT_VERSION one.png|one_original.png" in sent, _locks(sent)[-1]) == (True, "LOCK_ON")
+    _says(slideshow, video="one.png", showing="one_original.png")
+    slideshow.tick()
     assert slideshow.state().version_index == 1
 
 
@@ -891,7 +894,7 @@ def test_the_funestra_reaching_the_slide_a_slideshow_resumed_on_keeps_its_versio
     slideshow.set_versions(_ONE_LISTED_AT_ITS_NEWEST)
     slideshow.resume(SlideshowState(order=("id-1", "id-2", "id-3"), current="id-1", version_index=1))
 
-    _says(slideshow, video="one.png")
+    _says(slideshow, video="one.png", showing="one_original.png")
     slideshow.tick()
 
     assert slideshow.state().version_index == 1
@@ -990,18 +993,20 @@ def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtb
     assert slideshow.locked is False
 
 
-_VERSIONS = {"one.png": [("one_enhanced.png", "image", "Enhancement 1/1"),
-                       ("one.png", "image", "Original")]}
+_VERSIONS = {"one.png": [("one.png", "image", "Enhancement 1/1"),
+                         ("one_base.png", "image", "Original")]}
+_FAMILY = "one.png|one_base.png"
 
 
 class TestVersions:
-    def test_a_step_holds_the_funestra_and_opens_the_other_version_still(self, qtbot, tmp_path):
+    def test_a_step_holds_the_funestra_and_hands_it_the_versions_to_step_through(
+            self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions(_VERSIONS)
 
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one.png"]
+        assert _sent(slideshow) == ["SET_PACE 0", f"NEXT_VERSION {_FAMILY}"]
 
     @pytest.mark.parametrize(("move", "verb"), [
         (lambda slideshow: slideshow.slideshow_step(1), "NEXT"),
@@ -1013,7 +1018,7 @@ class TestVersions:
         (lambda slideshow: slideshow.release_media(["one.png"]), "NEXT"),
     ], ids=["next", "previous", "a cull", "a click on the map", "a new order",
             "letting go of the file"])
-    def test_leaving_the_versions_hands_the_funestra_its_pace_before_it_opens_the_next(
+    def test_leaving_the_versions_forgets_them_and_hands_the_funestra_its_pace_before_the_next(
             self, qtbot, tmp_path, move, verb):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions(_VERSIONS)
@@ -1023,7 +1028,7 @@ class TestVersions:
         move(slideshow)
 
         sent = _sent(slideshow)
-        assert sent.index(f"SET_PACE {slideshow.dwell_s}") < sent.index(verb)
+        assert sent.index("FORGET_VERSIONS") < sent.index(f"SET_PACE {slideshow.dwell_s}") < sent.index(verb)
 
     def test_a_version_landing_while_they_are_compared_holds_the_funestra_on_the_new_one(
             self, qtbot, tmp_path):
@@ -1035,27 +1040,30 @@ class TestVersions:
         slideshow.note_enhanced("id-1", "one_better.png")
         slideshow.add_versions({"one_better.png": [
             ("one_better.png", "image", "Enhancement 2/2"),
-            ("one_enhanced.png", "image", "Enhancement 1/2"),
-            ("one.png", "image", "Original")]})
+            ("one.png", "image", "Enhancement 1/2"),
+            ("one_base.png", "image", "Original")]})
+        _says(slideshow, video="one_better.png")
+        slideshow.tick()
 
         assert f"SET_PACE {slideshow.dwell_s}" not in _sent(slideshow)
         assert _hud(slideshow).item_note == "Enhancement 2/2"
 
-    def test_a_videos_other_version_is_played_with_its_script(
+    def test_a_videos_other_version_is_handed_over_with_its_own_script(
             self, qtbot, tmp_path, monkeypatch):
         scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
-        slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
-        _says(slideshow, video="clip.mp4")
+        slideshow = _slideshow(qtbot, tmp_path, items=[("clip_evolved.mp4", "video", "id-1")])
+        _says(slideshow, video="clip_evolved.mp4")
         slideshow.tick()
         _sent(slideshow)
-        slideshow.set_versions({"clip.mp4": [("clip_upscaled.mp4", "video", "Upscale"),
-                                           ("clip.mp4", "video", "Original")]})
+        slideshow.set_versions({"clip_evolved.mp4": [("clip_evolved.mp4", "video", "Evolved"),
+                                                   ("clip.mp4", "video", "Original")]})
 
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow)[-1] == f"PLAY_FILE clip.mp4	{scripts['clip.mp4']}"
+        assert _sent(slideshow)[-1] == f"NEXT_VERSION clip_evolved.mp4|clip.mp4\t{scripts['clip.mp4']}"
 
-    def test_stepping_on_and_back_walks_the_versions_in_order(self, qtbot, tmp_path):
+    def test_stepping_on_and_back_hands_the_funestra_the_same_versions_each_way(
+            self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions(_VERSIONS)
 
@@ -1063,23 +1071,35 @@ class TestVersions:
         _sent(slideshow)
         slideshow.slideshow_step_version(-1)
 
-        assert _sent(slideshow) == ["PLAY_FILE one_enhanced.png"]
+        assert _sent(slideshow) == [f"PREV_VERSION {_FAMILY}"]
 
     def test_the_sessions_shift_left_counts_the_enhancements_down_and_shift_right_up(
             self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
-        slideshow.set_versions({"one.png": [("one_2.png", "image", "Enhancement 2/2"),
-                                          ("one_1.png", "image", "Enhancement 1/2"),
-                                          ("one.png", "image", "Original")]})
+        slideshow.set_versions({"one.png": [("one.png", "image", "Enhancement 2/2"),
+                                            ("one_1.png", "image", "Enhancement 1/2"),
+                                            ("one_0.png", "image", "Original")]})
 
-        opened = []
+        stepped = []
         for press in ("cycle_version_back", "cycle_version_back",
                       "cycle_version", "cycle_version"):
             answer(slideshow, press)
-            opened += [line for line in _sent(slideshow) if line.startswith("PLAY_FILE")]
+            stepped += [line.partition(" ")[0] for line in _sent(slideshow)
+                        if line.partition(" ")[0] in ("NEXT_VERSION", "PREV_VERSION")]
 
-        assert opened == ["PLAY_FILE one_1.png", "PLAY_FILE one.png",
-                          "PLAY_FILE one_1.png", "PLAY_FILE one_2.png"]
+        assert stepped == ["NEXT_VERSION", "NEXT_VERSION", "PREV_VERSION", "PREV_VERSION"]
+
+    def test_the_version_on_screen_is_read_off_what_the_funestra_says_it_shows(
+            self, qtbot, tmp_path):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_versions(_VERSIONS)
+        slideshow.slideshow_step_version(1)
+
+        _says(slideshow, video="one.png", showing="one_base.png")
+        slideshow.tick()
+
+        assert _hud(slideshow).item_note == "Original"
+        assert slideshow.state().version_index == 1
 
     def test_an_item_filed_once_is_left_alone_rather_than_stepping_the_set(
             self, qtbot, tmp_path):
@@ -1099,21 +1119,22 @@ class TestVersions:
 
         assert slideshow.has_other_versions is True
 
-    def test_moving_to_another_item_starts_that_ones_versions_from_the_top(
+    def test_moving_to_another_item_forgets_the_versions_and_starts_that_ones_from_the_top(
             self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         slideshow.set_versions({**_VERSIONS,
-                              "two.png": [("two_enhanced.png", "image", "Enhancement 1/1"),
-                                          ("two.png", "image", "Original")]})
+                                "two.png": [("two.png", "image", "Enhancement 1/1"),
+                                            ("two_base.png", "image", "Original")]})
         slideshow.slideshow_step_version(1)
         _sent(slideshow)
 
         _says(slideshow, video="two.png")
         slideshow.tick()
-        _sent(slideshow)
+        moved = _sent(slideshow)
         slideshow.slideshow_step_version(1)
 
-        assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE two.png"]
+        assert "FORGET_VERSIONS" in moved
+        assert _sent(slideshow) == ["SET_PACE 0", "NEXT_VERSION two.png|two_base.png"]
 
 
 def _around(prompt_id):
@@ -1739,7 +1760,7 @@ def test_an_image_enhanced_during_the_slideshow_steps_its_versions_on_the_funest
                                                ("one.png", "image", "Original")]})
     slideshow.slideshow_step_version(1)
 
-    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one.png"]
+    assert _sent(slideshow) == ["SET_PACE 0", "NEXT_VERSION one_enhanced.png|one.png"]
 
 
 def test_a_run_being_made_joins_the_funestras_list_on_its_first_frame(qtbot, tmp_path):
@@ -1975,7 +1996,8 @@ def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
 
     slideshow.slideshow_step_version(1)
 
-    assert _sent(slideshow) == ["SET_PACE 0", "PLAY_FILE one-v1.png\t\t0,0,0.5,0.5"]
+    assert _sent(slideshow) == [
+        "SET_PACE 0", "NEXT_VERSION one.png		0.4,0.1,0.6,0.3|one-v1.png		0,0,0.5,0.5"]
 
 
 def _ready_opening(items, *, scripts=None, lead=0, lead_neighbors=None) -> RegionOpening:

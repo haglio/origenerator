@@ -55,7 +55,7 @@ def _likeness(one: frozenset[str], other: frozenset[str]) -> float:
 class Surroundings:
     label: str = ""
     seeds: tuple[dict, ...] = ()
-    configs: tuple[dict, ...] = ()
+    configs: tuple[tuple[dict, str], ...] = ()
     actions: tuple[tuple[dict, str], ...] = ()
     group: tuple[dict, ...] = ()
 
@@ -124,7 +124,7 @@ def surroundings(current: dict, rows, *, image_index,
     return Surroundings(
         label=own,
         seeds=tuple(seeds),
-        configs=tuple(configs),
+        configs=tuple((row, animations.label_of(row)) for row in configs),
         actions=_one_per_action(
             (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
             if label != own),

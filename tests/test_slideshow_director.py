@@ -2110,6 +2110,19 @@ def _fox(prompt_id, *, seed):
     return image
 
 
+def test_a_row_of_the_same_seed_in_other_settings_shows_its_labels_when_it_has_some(slideshows):
+    tweaked = {**_image("c1", "a red fox", seed=1, steps=30),
+               "image_actions": json.dumps(["alpha"]), "image_checked": json.dumps(["first box"])}
+    rows = [_fox("g1", seed=1), tweaked, _image("c2", "a red fox", seed=1, steps=20)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    named = {row.slide.prompt_id: row.label
+             for row in director.neighbors_of("g1", shape="portrait").column}
+
+    assert named == {"c1": "alpha, first box",
+                     "c2": director.neighbors_of("c2", shape="portrait").label}
+
+
 def test_the_map_is_drawn_against_the_gallerys_reading_of_the_library_never_a_reading_of_its_own(
         slideshows):
     rows = [_fox("g1", seed=1), _fox("g2", seed=2)]

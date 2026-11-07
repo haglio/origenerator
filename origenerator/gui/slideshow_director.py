@@ -626,17 +626,21 @@ class SlideshowDirector:
                               image_index=self._library().image_index,
                               filed=self._groups.loops_filed_for(row, shape=shape,
                                                                  items_of=self.items_of))
-        named = [(generation, self._folder_name(generation), True)
-                 for generation in around.configs]
+        named = [(generation, self._name_of(generation, label), True)
+                 for generation, label in around.configs]
         named += [(generation, label, False) for generation, label in around.actions]
         return NavMapNeighbors(
             seeds=self._slides_of(around.seeds),
             column=tuple(NavMapRow(slide, label, configuration)
                          for generation, label, configuration in named
                          for slide in self._slides_of([generation])),
-            label=around.label or self._folder_name(row),
-            group=self._slides_of((*around.configs, *around.group)),
+            label=self._name_of(row, around.label),
+            group=self._slides_of((*(generation for generation, _label in around.configs),
+                                   *around.group)),
         )
+
+    def _name_of(self, generation: dict, label: str) -> str:
+        return label or self._folder_name(generation)
 
     def beyond_the_row_of(self, prompt_id: str, *, shape: str) -> tuple[Slide, ...]:
         row = self._row_for(prompt_id) if prompt_id else None

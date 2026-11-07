@@ -56,10 +56,14 @@ def _mark_rect(content: QRect) -> QRect:
     return QRect(_PAD, content.y() + (content.height() - _DOT) // 2, _DOT, _DOT)
 
 
+def _is_all(row, group_role) -> bool:
+    return getattr(row.data(0, group_role), "key", None) == ALL_KEY
+
+
 def _folders_around(row, group_role) -> list:
     folders = []
     node = row.parent() if row is not None else None
-    while node is not None and getattr(node.data(0, group_role), "key", None) != ALL_KEY:
+    while node is not None and not _is_all(node, group_role):
         folders.append(node)
         node = node.parent()
     return folders[::-1]
@@ -98,6 +102,7 @@ class FolderTree(QTreeWidget):
         self._recent = icons.recent_mark_icon()
         self._hover_key = None
         self._delete_on_picked_rows = True
+        self._pressed_on_frozen = False
         self.setItemDelegate(_CountBeforeName(self))
         self.setIconSize(QSize(_ICON, _ICON))
         # Qt's default 20px indentation leaves a six-level tree in the narrowest column too little room for the label
@@ -126,17 +131,44 @@ class FolderTree(QTreeWidget):
         return group
 
     def frozen_rows(self) -> list:
-        frozen = []
+        frozen = self._frozen_while_scrolling([])
+        picked = self._picked_path()
+        if picked and self._scrolled_past(picked[-1], frozen):
+            return self._frozen_while_scrolling(picked)
+        return frozen
+
+    def _frozen_while_scrolling(self, held: list) -> list:
+        chain = []
         while True:
-            depth = sum(self.visualItemRect(row).height() for row in frozen)
-            folders = _folders_around(self.itemAt(0, depth), self._role)
-            if len(folders) <= len(frozen):
-                return frozen
-            folder = folders[len(frozen)]
-            below = self.itemAt(0, depth + self.visualItemRect(folder).height())
+            shown = self._in_list_order(chain + held)
+            folders = _folders_around(self.itemAt(0, self._height_of(shown)), self._role)
+            if len(folders) <= len(chain) or folders[:len(chain)] != chain:
+                return shown
+            folder = folders[len(chain)]
+            below = self.itemAt(0, self._height_of(self._in_list_order([*chain, folder, *held])))
             if not _holds(folder, below):
-                return frozen
-            frozen.append(folder)
+                return shown
+            chain.append(folder)
+
+    def _picked_path(self) -> list:
+        picked = self.currentItem()
+        if picked is None or not picked.isSelected() or _is_all(picked, self._role):
+            return []
+        return [*_folders_around(picked, self._role), picked]
+
+    def _scrolled_past(self, row, frozen: list) -> bool:
+        place = self.visualItemRect(row)
+        return place.isValid() and place.top() < self._height_of(frozen)
+
+    def _in_list_order(self, rows) -> list:
+        unique = []
+        for row in rows:
+            if not any(row is seen for seen in unique):
+                unique.append(row)
+        return sorted(unique, key=lambda row: self.visualItemRect(row).top())
+
+    def _height_of(self, rows) -> int:
+        return sum(self.visualItemRect(row).height() for row in rows)
 
     def _frozen_places(self) -> list:
         places, top = [], 0
@@ -189,6 +221,9 @@ class FolderTree(QTreeWidget):
             self.viewport().update()
 
     def mouseMoveEvent(self, event):
+        if self._pressed_on_frozen:
+            event.accept()
+            return
         super().mouseMoveEvent(event)
         index = self.indexAt(event.pos())
         hovered = index.data(TREE_KEY_ROLE) if self._group_with_actions(index) else None
@@ -257,11 +292,22 @@ class FolderTree(QTreeWidget):
         event.accept()
         return True
 
+    def _bring_back(self, row) -> None:
+        self.setCurrentItem(row)
+        self.scrollToItem(row, QAbstractItemView.ScrollHint.PositionAtTop)
+        bar = self.verticalScrollBar()
+        while bar.value() > bar.minimum() and row in self.frozen_rows():
+            bar.setValue(bar.value() - 1)
+
     def mouseDoubleClickEvent(self, event):
         if not self._swallowed_by_frozen(event):
             super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._pressed_on_frozen:
+            self._pressed_on_frozen = False
+            event.accept()
+            return
         if not self._swallowed_by_frozen(event):
             super().mouseReleaseEvent(event)
 
@@ -271,7 +317,11 @@ class FolderTree(QTreeWidget):
         return super().viewportEvent(event)
 
     def mousePressEvent(self, event):
-        if self._swallowed_by_frozen(event):
+        frozen = self._frozen_at(event.pos())
+        if frozen is not None:
+            event.accept()
+            self._pressed_on_frozen = True
+            self._bring_back(frozen)
             return
         if event.button() != Qt.MouseButton.LeftButton:
             # Qt: QTreeView toggles the caret under any button's press; QAbstractItemView's press only picks the row, so a right-click never shuts a folder

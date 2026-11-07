@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QFont, QTextCharFormat, QTextCursor, QTextDocument
+from PyQt6.QtGui import QFont, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY
 
@@ -35,10 +35,8 @@ def format_for(kind: str) -> QTextCharFormat:
     return QTextCharFormat()
 
 
-def request_change_html(old_positive: str, old_negative: str, new_positive: str,
-                        new_negative: str, settings=()) -> str:
-    document = QTextDocument()
-    cursor = QTextCursor(document)
+def write_request_change(cursor: QTextCursor, old_positive: str, old_negative: str,
+                         new_positive: str, new_negative: str, settings=()) -> None:
     heading = QTextCharFormat()
     heading.setFontWeight(QFont.Weight.Bold)
 
@@ -64,7 +62,6 @@ def request_change_html(old_positive: str, old_negative: str, new_positive: str,
             cursor.insertText(before, format_for(REMOVED))
             cursor.insertText(" ")
             cursor.insertText(after, format_for(ADDED))
-    return document.toHtml()
 
 
 def hold_value(edit: QPlainTextEdit, value: str | None) -> None:

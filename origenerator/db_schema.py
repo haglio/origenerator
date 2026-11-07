@@ -217,7 +217,8 @@ CREATE TABLE IF NOT EXISTS request_turns (
     new_positive TEXT NOT NULL DEFAULT '',
     new_negative TEXT NOT NULL DEFAULT '',
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-    settings_json TEXT NOT NULL DEFAULT ''
+    settings_json TEXT NOT NULL DEFAULT '',
+    made         TEXT NOT NULL DEFAULT ''
 );
 
 -- A deleted generation the Trash is still holding: the whole row the
@@ -304,6 +305,7 @@ ADDED_COLUMNS = {
     },
     "request_turns": {
         "settings_json": "TEXT NOT NULL DEFAULT ''",
+        "made": "TEXT NOT NULL DEFAULT ''",
     },
     "seed_uses": {
         "media_type": "TEXT",

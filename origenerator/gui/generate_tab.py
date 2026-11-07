@@ -1211,7 +1211,13 @@ class GenerateTab(DropZones):
             prompt_id=row["prompt_id"],
             shown=(params.get("positive_prompt") or "", params.get("negative_prompt") or ""))
         exchange.set_available(self._displayed_config is not None)
-        exchange.show_exchange(self._db.requests.exchange_of(row["prompt_id"]))
+        exchange.set_thumbnail_of(self._thumbnail_of)
+        turns = self._db.requests.exchange_of(row["prompt_id"])
+        exchange.show_exchange(turns, started_on=(
+            self._db.requests.started_on(row["prompt_id"]) if turns else row["prompt_id"]))
+
+    def _thumbnail_of(self, prompt_id: str) -> str | None:
+        return (self._db.get_generation(prompt_id) or {}).get("thumbnail_path")
 
     def asked(self) -> dict | None:
         aim = self._request_aim

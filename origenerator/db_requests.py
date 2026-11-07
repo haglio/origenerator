@@ -17,6 +17,7 @@ class Turn(NamedTuple):
     new_positive: str = ""
     new_negative: str = ""
     settings: str = ""
+    made: str = ""
 
     def changes(self) -> list[tuple[str, str, str]]:
         return [tuple(change) for change in json.loads(self.settings)] if self.settings else []
@@ -90,25 +91,33 @@ class RequestStore(Store):
             conn.executemany(
                 """INSERT INTO request_turns
                        (prompt_id, said, answered, old_positive, old_negative,
-                        new_positive, new_negative, settings_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        new_positive, new_negative, settings_json, made)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [(prompt_id, *Turn(*turn)) for turn in turns])
 
     def _turns_of(self, prompt_id: str) -> list[Turn]:
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT said, answered, old_positive, old_negative, new_positive, new_negative,
-                          settings_json
+                          settings_json, made
                    FROM request_turns WHERE prompt_id = ? ORDER BY id""", (prompt_id,)).fetchall()
-            return [Turn(*row) for row in rows]
+        turns = [Turn(*row) for row in rows]
+        if turns and not turns[-1].made:
+            turns[-1] = turns[-1]._replace(made=prompt_id)
+        return turns
 
-    def exchange_of(self, prompt_id: str) -> list[Turn]:
-        exchange: list[Turn] = []
-        seen: set[str] = set()
+    def _chain(self, prompt_id: str) -> list[str]:
+        chain: list[str] = []
         current: str | None = prompt_id
-        while current and current not in seen:
-            seen.add(current)
-            exchange = self._turns_of(current) + exchange
+        while current and current not in chain:
+            chain.insert(0, current)
             request = self.get_request(current)
             current = request["source_prompt_id"] if request else None
-        return exchange
+        return chain
+
+    def exchange_of(self, prompt_id: str) -> list[Turn]:
+        return [turn for link in self._chain(prompt_id) for turn in self._turns_of(link)]
+
+    def started_on(self, prompt_id: str) -> str | None:
+        root = self._chain(prompt_id)[0]
+        return None if root == prompt_id or self.get_request(root) else root

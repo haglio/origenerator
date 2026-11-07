@@ -89,9 +89,15 @@ def _struck_and_lit(html: str) -> tuple[str, str]:
     return struck.strip(), lit.strip()
 
 
+def request_change_html(*prompts, settings=()) -> str:
+    document = QTextDocument()
+    diff_text.write_request_change(QTextCursor(document), *prompts, settings=settings)
+    return document.toHtml()
+
+
 def test_a_requests_change_renders_both_prompts_whole_with_what_went_struck_and_what_came_lit():
-    html = diff_text.request_change_html("a woman, a hat, beach", "blurry", "a woman, beach",
-                                         "blurry, hat")
+    html = request_change_html("a woman, a hat, beach", "blurry", "a woman, beach",
+                               "blurry, hat")
 
     document = QTextDocument()
     document.setHtml(html)
@@ -103,7 +109,7 @@ def test_a_requests_change_renders_both_prompts_whole_with_what_went_struck_and_
 
 
 def test_a_change_to_the_positive_prompt_alone_renders_only_that_prompt():
-    html = diff_text.request_change_html("a woman", "", "two women", "")
+    html = request_change_html("a woman", "", "two women", "")
 
     document = QTextDocument()
     document.setHtml(html)
@@ -111,8 +117,8 @@ def test_a_change_to_the_positive_prompt_alone_renders_only_that_prompt():
 
 
 def test_a_requests_setting_changes_show_under_the_prompts_label_before_and_after():
-    html = diff_text.request_change_html("a cat", "", "a cat", "",
-                                         settings=[("Width", "1024", "1216")])
+    html = request_change_html("a cat", "", "a cat", "",
+                               settings=[("Width", "1024", "1216")])
 
     document = QTextDocument()
     document.setHtml(html)
@@ -125,7 +131,7 @@ def test_a_requests_setting_changes_show_under_the_prompts_label_before_and_afte
 
 def test_each_of_a_requests_setting_changes_has_a_line_of_its_own():
     document = QTextDocument()
-    document.setHtml(diff_text.request_change_html(
+    document.setHtml(request_change_html(
         "a cat", "", "a cat", "", settings=[("Width", "1024", "1216"), ("Height", "1024", "832")]))
 
     assert "Width: 1024 1216" in document.toPlainText().split("\n")

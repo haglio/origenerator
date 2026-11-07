@@ -3,8 +3,9 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtGui import QColor, QPalette, QPixmap
 from PyQt6.QtWidgets import QGridLayout, QLabel, QPushButton, QToolButton, QWidget
+from shared_ui.colors import YELLOW
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
@@ -13,6 +14,7 @@ from origenerator.action_setter import Locks, SetterSession
 from origenerator.action_vocabulary import Tile, Vocabulary
 from origenerator.gui.action_setter_window import (
     LAST_LINE,
+    PREVIOUSLY_LINE,
     ROOM_FOR_THE_GRID,
     SAME_BUTTON,
     SKIP_BUTTON,
@@ -246,6 +248,55 @@ def test_a_press_saves_the_checked_boxes_with_the_actions(window):
     _tile(made, "button one").click()
 
     assert store.labels == {"first": Labels(("alpha",), ("second box",))}
+
+
+def _edge(made, name) -> str:
+    shot = _tile(made, name).grab().toImage()
+    return shot.pixelColor(0, shot.height() // 2).name()
+
+
+def _previously(made) -> QLabel:
+    return made.findChild(QLabel, PREVIOUSLY_LINE)
+
+
+def _set_before(*items):
+    return [{"prompt_id": prompt_id, "name": "3FA9C0D2 000", "path": None, "labels": labels}
+            for prompt_id, labels in items]
+
+
+def test_the_button_an_item_was_set_with_before_wears_a_yellow_box(window):
+    made, _store, _stage = window(items=_set_before(("first", Labels(("beta", "alpha")))))
+    made.setStyleSheet(build_stylesheet())
+
+    assert [_edge(made, name) for name in _BUTTONS] == [
+        _edge(made, "button one"), YELLOW.name(), _edge(made, "button one")]
+    assert _edge(made, "button one") != YELLOW.name()
+
+
+def test_a_yellow_line_up_top_says_what_the_yellow_box_means(window):
+    made, _store, _stage = window(items=_set_before(("first", Labels(("gamma",)))))
+    line = _previously(made)
+    line.ensurePolished()
+
+    assert (line.isHidden(), line.text(), line.palette().color(QPalette.ColorRole.WindowText).name()) == (
+        False, "yellow box was previously selected", YELLOW.name())
+    assert line.mapTo(made, QPoint()).y() < _tile(made, "button one").mapTo(made, QPoint()).y()
+
+
+def test_an_item_never_set_shows_no_yellow_box_and_no_yellow_line(window):
+    made, _store, _stage = window(items=_set_before(("first", Labels(("gamma",))), ("second", None)))
+    made.setStyleSheet(build_stylesheet())
+
+    _tile(made, "button one").click()
+
+    assert (YELLOW.name() in [_edge(made, name) for name in _BUTTONS], _previously(made).isHidden()) == (
+        False, True)
+
+
+def test_an_item_set_with_actions_no_button_stands_for_shows_no_yellow_line(window):
+    made, _store, _stage = window(items=_set_before(("first", Labels(("beta",)))))
+
+    assert _previously(made).isHidden()
 
 
 def test_each_item_comes_up_with_its_own_checked_boxes(window):

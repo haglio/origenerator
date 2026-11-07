@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from math import ceil
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, pyqtSignal
-from PyQt6.QtGui import QTextBlockFormat, QTextCharFormat, QTextCursor
+from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import (
+    QFont,
+    QImageReader,
+    QTextBlockFormat,
+    QTextCharFormat,
+    QTextCursor,
+    QTextDocument,
+    QTextImageFormat,
+    QTextLength,
+    QTextTableFormat,
+)
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -14,16 +25,20 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
+from shared_ui.fonts import SIZE_HEADING
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 from origenerator.db_requests import Turn
-from origenerator.gui.diff_text import request_change_html
+from origenerator.gui.diff_text import write_request_change
+from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 
 _ASK = "What to change, e.g. two women"
 _NOTHING_TO_ASK_OF = "Pick an image to ask a change of"
 _UPDATING = "updating…"
 _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
+_COMPARED = THUMBNAIL_BOX * 2
+_NOT_MADE = "?"
 
 
 def _say(label: QLabel, words: str) -> None:
@@ -45,10 +60,47 @@ class _Entry:
     def take(self, turn) -> None:
         self.answered = turn[1]
         turn = Turn(*turn)
-        change = (turn.old_positive, turn.old_negative, turn.new_positive, turn.new_negative)
-        settings = turn.changes()
-        self.tip = (request_change_html(*change, settings=settings)
-                    if any(change) or settings else "")
+        self.made = turn.made
+        self._change = (turn.old_positive, turn.old_negative, turn.new_positive, turn.new_negative)
+        self._settings = turn.changes()
+        self.tip = ""
+
+    def compare(self, before: str, thumbnail_of: Callable[[str], str | None] | None) -> None:
+        if not (any(self._change) or self._settings):
+            self.tip = ""
+            return
+        document = QTextDocument()
+        cursor = QTextCursor(document)
+        if thumbnail_of is not None:
+            _write_comparison(cursor, *(thumbnail_of(made) if made else None
+                                        for made in (before, self.made)))
+        write_request_change(cursor, *self._change, settings=self._settings)
+        self.tip = document.toHtml()
+
+
+def _write_comparison(cursor: QTextCursor, *thumbnails: str | None) -> None:
+    shape = QTextTableFormat()
+    shape.setBorder(0)
+    shape.setCellSpacing(GAP_SMALL)
+    shape.setColumnWidthConstraints([QTextLength(QTextLength.Type.FixedLength, _COMPARED.width())]
+                                    * len(thumbnails))
+    table = cursor.insertTable(1, len(thumbnails), shape)
+    for column, thumbnail in enumerate(thumbnails):
+        cell = table.cellAt(0, column).firstCursorPosition()
+        size = QImageReader(thumbnail).size() if thumbnail else QSize()
+        if size.isValid():
+            fitted = size.scaled(_COMPARED, Qt.AspectRatioMode.KeepAspectRatio)
+            picture = QTextImageFormat()
+            picture.setName(thumbnail)
+            picture.setWidth(fitted.width())
+            picture.setHeight(fitted.height())
+            cell.insertImage(picture)
+        else:
+            mark = QTextCharFormat()
+            mark.setFontPointSize(SIZE_HEADING)
+            mark.setFontWeight(QFont.Weight.Bold)
+            cell.insertText(_NOT_MADE, mark)
+    cursor.movePosition(QTextCursor.MoveOperation.End)
 
 
 def _paragraph(cursor: QTextCursor, words: str, color, *, indent: int = 0, above: int = 0) -> None:
@@ -122,6 +174,8 @@ class RequestExchange(QWidget):
         column.setSpacing(GAP_SMALL)
         self._conversation = _Conversation()
         self._held: list[_Entry] = []
+        self._started_on: str | None = None
+        self._thumbnail_of: Callable[[str], str | None] | None = None
         column.addWidget(self._conversation)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -148,15 +202,23 @@ class RequestExchange(QWidget):
     def turns(self) -> list[tuple[str, str]]:
         return [(entry.said, entry.answered) for entry in self._held]
 
+    def set_thumbnail_of(self, thumbnail_of: Callable[[str], str | None]) -> None:
+        self._thumbnail_of = thumbnail_of
+
     def _draw(self) -> None:
+        before = self._started_on or ""
+        for entry in self._held:
+            entry.compare(before, self._thumbnail_of)
+            before = entry.made
         self._conversation.show_entries(self._held)
 
     def _settle(self, status: str = "", *, ready: bool = True) -> None:
         _say(self._status, status)
         self._line.setEnabled(self._available and ready)
 
-    def show_exchange(self, turns) -> None:
+    def show_exchange(self, turns, *, started_on: str | None = None) -> None:
         self._held = [_Entry(turn) for turn in turns]
+        self._started_on = started_on
         self._draw()
         self._settle()
 

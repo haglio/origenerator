@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QPoint, Qt
-from PyQt6.QtGui import QHelpEvent, QTextCursor
+from PyQt6.QtGui import QColor, QHelpEvent, QImage, QTextCursor
 from PyQt6.QtWidgets import QApplication, QToolTip
 from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
@@ -263,3 +263,50 @@ def test_a_place_with_no_turn_has_no_tooltip(qtbot):
     exchange = _shown_at(qtbot, 400)
 
     assert exchange._conversation.tip_at(QPoint(1, 1)) == ""
+
+
+def _thumbnails(tmp_path, *names):
+    paths = {}
+    for name in names:
+        image = QImage(40, 20, QImage.Format.Format_RGB32)
+        image.fill(QColor("gray"))
+        path = tmp_path / f"{name}.png"
+        image.save(str(path))
+        paths[name] = str(path)
+    return paths
+
+
+def _changed(said, made=""):
+    return Turn(said, "Changed it.", "a hat", "", "a cap", "", made=made)
+
+
+def test_hovering_a_turn_shows_the_item_before_it_on_the_left_and_the_one_made_from_it(
+        qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "start", "first", "second")
+    exchange = _exchange(qtbot)
+    exchange.set_thumbnail_of(paths.get)
+
+    exchange.show_exchange([_changed("a cap", made="first"), _changed("red", made="second")],
+                           started_on="start")
+
+    first, second = exchange._entries()
+    assert first.tip.index(paths["start"]) < first.tip.index(paths["first"])
+    assert second.tip.index(paths["first"]) < second.tip.index(paths["second"])
+    assert first.tip.index(paths["first"]) < first.tip.index("cap")
+
+
+def test_a_turn_nothing_was_made_from_shows_a_question_mark_after_and_before_the_next(
+        qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "start", "second")
+    exchange = _exchange(qtbot)
+    exchange.set_thumbnail_of(paths.get)
+
+    exchange.show_exchange([_changed("a cap"), _changed("red", made="second")],
+                           started_on="start")
+
+    first, second = exchange._entries()
+    assert paths["start"] in first.tip
+    assert first.tip.count("?") == 1
+    assert paths["second"] in second.tip
+    assert second.tip.count("?") == 1
+    assert second.tip.index("?") < second.tip.index(paths["second"])

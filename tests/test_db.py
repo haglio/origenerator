@@ -1061,8 +1061,20 @@ def test_the_exchange_that_led_to_an_item_is_every_turn_along_the_way_oldest_fir
         ("brighter", "Brighter.")]
     (first,) = db.requests.exchange_of("gen-1")
     assert first == Turn("a hat", "Gave her a straw hat.", "a woman", "blurry",
-                         "a woman, a straw hat", "blurry")
+                         "a woman, a straw hat", "blurry", made="gen-1")
     assert db.requests.exchange_of("src-1") == []
+
+
+def test_each_turn_knows_the_item_made_from_it_and_the_exchange_where_it_started(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1", source="src-1")
+    db.requests.record_turns("gen-1", [("a hat", "Gave her a hat."), ("red", "Made it red.")])
+    _record(db, "gen-2", source="gen-1")
+    db.requests.record_turns("gen-2", [("brighter", "Brighter.")])
+
+    assert [turn.made for turn in db.requests.exchange_of("gen-2")] == ["", "gen-1", "gen-2"]
+    assert db.requests.started_on("gen-2") == "src-1"
+    assert db.requests.started_on("src-1") is None
 
 
 def test_an_exchange_whose_records_point_at_each_other_still_ends(tmp_path):
@@ -1071,7 +1083,7 @@ def test_an_exchange_whose_records_point_at_each_other_still_ends(tmp_path):
     _record(db, "gen-2", source="gen-1")
     db.requests.record_turns("gen-1", [("a hat", "")])
 
-    assert db.requests.exchange_of("gen-1") == [Turn("a hat")]
+    assert [turn.said for turn in db.requests.exchange_of("gen-1")] == ["a hat"]
 
 
 def test_a_turns_settings_changes_come_back_with_it(tmp_path):
@@ -1096,4 +1108,4 @@ def test_a_turn_outlives_the_item_it_led_to(tmp_path):
 
     db.delete_generation("gen-1")
 
-    assert db.requests.exchange_of("gen-1") == [Turn("a hat", "Gave her a hat.")]
+    assert db.requests.exchange_of("gen-1") == [Turn("a hat", "Gave her a hat.", made="gen-1")]

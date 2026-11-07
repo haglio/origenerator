@@ -16,6 +16,7 @@ from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
     QDropEvent,
+    QImage,
     QPalette,
     QPixmap,
     QTextCursor,
@@ -3242,6 +3243,44 @@ def test_hovering_the_request_that_made_an_image_shows_the_whole_prompts_with_it
     assert "Positive Prompt" in tip
     assert "a hat" in struck
     assert "hat" in lit
+
+
+def _thumbnail_of(db, prompt_id, tmp_path):
+    image = QImage(30, 20, QImage.Format.Format_RGB32)
+    image.fill(Qt.GlobalColor.gray)
+    path = tmp_path / f"{prompt_id}_thumb.png"
+    image.save(str(path))
+    db.update_generation(prompt_id, thumbnail_path=str(path))
+    return str(path)
+
+
+def test_hovering_the_request_shows_the_image_it_was_asked_of_beside_the_one_it_made(
+        saved_panel, tmp_path):
+    tab, db = saved_panel
+    _image_row(db, "src", prompt="a cat, a hat")
+    image = _image_row(db, "img1", prompt="a cat")
+    _request_made(db, "img1", source="src")
+    asked_of, made = _thumbnail_of(db, "src", tmp_path), _thumbnail_of(db, "img1", tmp_path)
+
+    tab.show_saved_generation(db.get_generation("img1"), [image])
+
+    (entry,) = tab._param_form.request_exchange()._entries()
+    assert entry.tip.index(asked_of) < entry.tip.index(made)
+
+
+def test_a_request_asked_of_the_image_on_display_shows_that_image_before_it(
+        saved_panel, qtbot, monkeypatch, tmp_path):
+    _rewriting(monkeypatch)
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    shown = _thumbnail_of(db, "img1", tmp_path)
+    tab.show_saved_generation(db.get_generation("img1"), [image])
+
+    exchange = _ask(tab, qtbot, "two women")
+    qtbot.waitUntil(lambda: exchange.turns() == [("two women", "Done.")], timeout=5000)
+
+    (entry,) = exchange._entries()
+    assert shown in entry.tip
 
 
 def test_an_image_a_request_made_has_its_prompt_fields_marked_like_any_other_images(

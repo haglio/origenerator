@@ -60,6 +60,7 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import made_here
 from origenerator.gui import icons
+from origenerator.gui.action_button import ActionButton
 from origenerator.gui.action_row import ActionRow
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
@@ -328,7 +329,7 @@ class GenerateTab(DropZones):
         return body
 
     def _build_saved_generation_block(self, body: QVBoxLayout, header: LabelForm) -> None:
-        self._metadata_section = MetadataSection(go_to_folder=self._go_to_folder)
+        self._metadata_section = MetadataSection()
         self._metadata_section.hide()
         body.addWidget(self._metadata_section)
         self._action = ActionRow(header)
@@ -402,6 +403,7 @@ class GenerateTab(DropZones):
     def _build_button_row(self) -> FlowLayout:
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
+        btn_row.addWidget(ActionButton(self._go_to_folder, name="goToFolderButton"))
         self._lane_button = QPushButton()
         self._lane_button.clicked.connect(
             lambda _checked=False: self._on_send(self._offered_lane))
@@ -1454,8 +1456,6 @@ class GenerateTab(DropZones):
         row, can_go = self._displayed_row, self._can_go_to_folder
         self._go_to_folder.setVisible(
             row is not None and can_go is not None and can_go(row))
-        if row is not None:
-            self._metadata_section.setVisible(self._metadata_section.has_content())
 
     def _on_versions_delete_requested(self, positions: list):
         row = self._displayed_row

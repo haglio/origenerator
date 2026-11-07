@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QFontMetrics
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -16,7 +16,6 @@ from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import (
-    METADATA_TITLE,
     MetadataFacts,
     MetadataItem,
     metadata_facts,
@@ -34,9 +33,8 @@ def _h(color) -> str:
 
 
 class MetadataSection(QWidget):
-    def __init__(self, parent=None, *, go_to_folder: QAction | None = None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self._go_to_folder = go_to_folder
         self._shown: tuple[dict, Path | None, str] | None = None
         self._section: MetadataFacts | None = None
         self._outer = QVBoxLayout(self)
@@ -57,8 +55,7 @@ class MetadataSection(QWidget):
         return self.has_content()
 
     def has_content(self) -> bool:
-        return self._section is not None or (
-            self._go_to_folder is not None and self._go_to_folder.isVisible())
+        return self._section is not None
 
     def _render(self, section: MetadataFacts | None):
         if self._block is not None:
@@ -66,8 +63,8 @@ class MetadataSection(QWidget):
             self._block.setParent(None)
             self._block.deleteLater()
             self._block = None
-        if section is not None or self._go_to_folder is not None:
-            self._block = _build_section(section, self._go_to_folder, collapsed=self._folded)
+        if section is not None:
+            self._block = _build_section(section, collapsed=self._folded)
             self._block.toggled.connect(self._keep_the_fold)
             self._outer.addWidget(self._block)
 
@@ -83,17 +80,13 @@ class MetadataSection(QWidget):
             self._block.set_collapsed(folded)
 
 
-def _build_section(section: MetadataFacts | None, go_to_folder: QAction | None = None,
-                   *, collapsed: bool = False) -> CollapsibleSection:
-    items = section.items if section is not None else []
-    block = CollapsibleSection(section.title if section is not None else METADATA_TITLE,
-                               collapsed=collapsed)
+def _build_section(section: MetadataFacts, *, collapsed: bool = False) -> CollapsibleSection:
+    items = section.items
+    block = CollapsibleSection(section.title, collapsed=collapsed)
     rows = QWidget()
     layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(GAP_SMALL)
-    if go_to_folder is not None:
-        layout.addWidget(_folder_button(go_to_folder), 0, Qt.AlignmentFlag.AlignLeft)
     label_width = label_column_width(items)
     for item in items:
         layout.addWidget(metadata_row(item, label_width))
@@ -148,24 +141,6 @@ def _reveal_button(target: str) -> QPushButton:
     btn.setToolTip("Show this file in Explorer" if exists else "File not found on disk")
     btn.clicked.connect(lambda _checked=False: show_in_explorer(Path(target)))
     return btn
-
-
-class _ActionButton(ElidingButton):
-    def __init__(self, action: QAction):
-        super().__init__(action.text())
-        self._action = action
-        self.clicked.connect(lambda _checked=False: action.trigger())
-        action.changed.connect(self._follow)
-        self._follow()
-
-    def _follow(self) -> None:
-        self.setVisible(self._action.isVisible())
-        self.setEnabled(self._action.isEnabled())
-        self.setToolTip(self._action.toolTip())
-
-
-def _folder_button(action: QAction) -> QPushButton:
-    return _dressed(_ActionButton(action), "goToFolderButton")
 
 
 def _label_widget(text: str, width: int) -> QLabel:

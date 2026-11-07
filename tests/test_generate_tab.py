@@ -1869,16 +1869,17 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     assert "File" not in _metadata_texts(tab)
 
 
-def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
+def test_the_way_to_the_folder_is_one_button_in_the_row_with_generate(saved_panel):
     tab, db = saved_panel
     tab.set_folder_check(lambda row: True)
     image = _enhanced_image_row(db)
 
     tab.show_saved_generation(image, [image])
 
-    assert not tab._metadata_section.isHidden()
-    assert [b.objectName() for b in tab._metadata_section.findChildren(QPushButton)
-            if b.objectName() != "foldingSectionHeader"] == ["goToFolderButton"]
+    (button,) = tab.findChildren(QPushButton, "goToFolderButton")
+    buttons = _layout_containing(tab._settings_pane.layout(), tab._generate_pair)
+    assert (buttons.indexOf(button), button.isVisibleTo(tab)) == (0, True)
+    assert buttons.indexOf(tab._lane_button) == 1
     for row in _version_rows(tab):
         assert "goToFolderButton" not in [b.objectName()
                                           for b in row.findChildren(QPushButton)]

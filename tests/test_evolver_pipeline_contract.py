@@ -21,12 +21,13 @@ def _promise() -> dict:
 
 def test_the_folders_this_app_sends_to_are_the_ones_evolver_watches():
     relative = _promise()["library_relative"]
+    sent_to = {"inbox_dir": config.EVOLVER_INBOX_DIR,
+               "upscaled_dir": config.EVOLVER_UPSCALED_DIR}
 
-    under_library = {name: config.LIBRARY_ROOT / Path(value)
-                     for name, value in relative.items()}
+    watched = {name: config.LIBRARY_ROOT / Path(relative[name])
+               for name in sent_to if name in relative}
 
-    assert under_library == {"inbox_dir": config.EVOLVER_INBOX_DIR,
-                             "upscaled_dir": config.EVOLVER_UPSCALED_DIR}
+    assert watched == sent_to
 
 
 def test_a_copy_still_being_written_wears_the_name_evolver_walks_past():

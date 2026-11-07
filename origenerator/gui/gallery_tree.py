@@ -19,7 +19,7 @@ from origenerator.gallery.collection import (
     FolderCollection,
     folder_collection,
 )
-from origenerator.gallery.shapes import SHAPE_LABELS, SHAPES
+from origenerator.gallery.shapes import SHAPE_LABELS
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.item_shape import key_holds, shape_of, shaped_key, split_key
@@ -256,7 +256,7 @@ class GalleryTree:
             steps.append(PathStep(_name_of(node), node.data(0, TREE_KEY_ROLE)))
             node = node.parent()
         shape = shape_of(item.data(0, TREE_KEY_ROLE)) if item is not None else None
-        if shape in SHAPES:
+        if shape is not None:
             steps.append(PathStep(SHAPE_LABELS[shape], None))
         return steps[::-1]
 

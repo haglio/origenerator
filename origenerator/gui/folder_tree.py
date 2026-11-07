@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon
-from PyQt6.QtWidgets import QAbstractItemView, QMenu, QStyledItemDelegate, QTreeWidget
+from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon, QPainter
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QMenu,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QTreeWidget,
+)
+from shared_ui.colors import BLUE
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
+from origenerator.gallery.tree import ALL_KEY
 from origenerator.gui import drop_style, icons
 from origenerator.gui.drags import carry, under_way
 from origenerator.gui.generation_drag import dragged_generation
@@ -47,6 +56,23 @@ def _mark_rect(content: QRect) -> QRect:
     return QRect(_PAD, content.y() + (content.height() - _DOT) // 2, _DOT, _DOT)
 
 
+def _folders_around(row, group_role) -> list:
+    folders = []
+    node = row.parent() if row is not None else None
+    while node is not None and getattr(node.data(0, group_role), "key", None) != ALL_KEY:
+        folders.append(node)
+        node = node.parent()
+    return folders[::-1]
+
+
+def _holds(folder, row) -> bool:
+    while row is not None:
+        if row is folder:
+            return True
+        row = row.parent()
+    return False
+
+
 class _CountBeforeName(QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
@@ -85,6 +111,7 @@ class FolderTree(QTreeWidget):
         self._aimed = None
         under_way.started.connect(self._light_for)
         under_way.ended.connect(self._put_out)
+        self.verticalScrollBar().valueChanged.connect(self.viewport().update)
 
     def setCurrentItem(self, item, column=0, command=None):
         # Qt reads the live keyboard modifiers when no command is given, so Ctrl or Shift held during a programmatic move would extend the selection
@@ -97,6 +124,51 @@ class FolderTree(QTreeWidget):
         if group is None or self.model().hasChildren(index) or index.data(DROP_KEY_ROLE):
             return None
         return group
+
+    def frozen_rows(self) -> list:
+        frozen = []
+        while True:
+            depth = sum(self.visualItemRect(row).height() for row in frozen)
+            folders = _folders_around(self.itemAt(0, depth), self._role)
+            if len(folders) <= len(frozen):
+                return frozen
+            folder = folders[len(frozen)]
+            below = self.itemAt(0, depth + self.visualItemRect(folder).height())
+            if not _holds(folder, below):
+                return frozen
+            frozen.append(folder)
+
+    def _frozen_places(self) -> list:
+        places, top = [], 0
+        for row in self.frozen_rows():
+            height = self.visualItemRect(row).height()
+            places.append((row, QRect(0, top, self.viewport().width(), height)))
+            top += height
+        return places
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self.viewport())
+        for row, place in self._frozen_places():
+            self._paint_frozen(painter, self.indexFromItem(row), place)
+        painter.end()
+
+    def _paint_frozen(self, painter, index, place: QRect) -> None:
+        painter.fillRect(place, self.viewport().palette().color(self.viewport().backgroundRole()))
+        content = self.visualRect(index)
+        content.moveTop(place.top())
+        option = QStyleOptionViewItem()
+        self.initViewItemOption(option)
+        option.state |= QStyle.StateFlag.State_Children | QStyle.StateFlag.State_Open
+        if self.selectionModel().isSelected(index):
+            option.state |= QStyle.StateFlag.State_Selected
+            painter.fillRect(QRect(0, place.top(), content.left(), place.height()), BLUE)
+        option.rect = QRect(content.left() - self.indentation(), place.top(),
+                            self.indentation(), place.height())
+        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorBranch, option, painter, self)
+        option.rect = content
+        self.itemDelegate().paint(painter, option, index)
+        self._paint_marks(painter, content, index)
 
     def offer_delete_on_picked_rows(self, offered: bool) -> None:
         if offered != self._delete_on_picked_rows:
@@ -149,10 +221,13 @@ class FolderTree(QTreeWidget):
             drop_style.paint(painter, QRect(0, option.rect.y(), self.viewport().width(),
                                             option.rect.height()), drop_style.GROUNDS[state])
         super().drawRow(painter, option, index)
+        self._paint_marks(painter, self.visualRect(index), index)
+
+    def _paint_marks(self, painter, content: QRect, index) -> None:
         mode = (QIcon.Mode.Selected if self.selectionModel().isSelected(index)
                 else QIcon.Mode.Normal)
         if index.data(RECENT_ROLE):
-            self._recent.paint(painter, _mark_rect(self.visualRect(index)),
+            self._recent.paint(painter, _mark_rect(content),
                                Qt.AlignmentFlag.AlignCenter, mode)
         group = self._group_with_actions(index)
         if group is None:
@@ -160,7 +235,7 @@ class FolderTree(QTreeWidget):
         hovered = index.data(TREE_KEY_ROLE) == self._hover_key
         if not (group.favorite or hovered):
             return
-        star_rect, delete_rect = _action_rects(self.visualRect(index))
+        star_rect, delete_rect = _action_rects(content)
         if group.favorite:
             self._star_on.paint(painter, star_rect, Qt.AlignmentFlag.AlignCenter, mode)
         else:
@@ -168,7 +243,21 @@ class FolderTree(QTreeWidget):
         if hovered and self._offers_delete(index):
             self._delete.paint(painter, delete_rect)
 
+    def _frozen_at(self, point):
+        return next((row for row, place in self._frozen_places() if place.contains(point)), None)
+
+    def _bring_back(self, row) -> None:
+        self.scrollToItem(row, QAbstractItemView.ScrollHint.PositionAtTop)
+        bar = self.verticalScrollBar()
+        while bar.value() > bar.minimum() and row in self.frozen_rows():
+            bar.setValue(bar.value() - 1)
+        self.setCurrentItem(row)
+
     def mousePressEvent(self, event):
+        frozen = self._frozen_at(event.pos())
+        if frozen is not None:
+            self._bring_back(frozen)
+            return
         if event.button() != Qt.MouseButton.LeftButton:
             # Qt: QTreeView toggles the caret under any button's press; QAbstractItemView's press only picks the row, so a right-click never shuts a folder
             QAbstractItemView.mousePressEvent(self, event)

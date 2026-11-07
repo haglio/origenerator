@@ -87,8 +87,17 @@ LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
 
+LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
+LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
+
+EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
+EVOLVER_INBOX_DIR = EVOLVER_AI_DIR / "0_inbox"
+EVOLVER_SOURCE = "origenerator"
+EVOLVER_UPSCALED_DIR = EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
+KINO_TRASH_DIR = EVOLVER_AI_DIR / "2_outbox" / "trash"
+
 OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR,
-                                           trash=TRASH_DIR)
+                                           trash=TRASH_DIR, kino_library=EVOLVER_UPSCALED_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, places=OUTPUT_PLACES, temp=COMFYUI_TEMP_DIR,
@@ -100,14 +109,6 @@ COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
 
-LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
-LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
-
-EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
-EVOLVER_INBOX_DIR = EVOLVER_AI_DIR / "0_inbox"
-EVOLVER_SOURCE = "origenerator"
-EVOLVER_UPSCALED_DIR = EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
-KINO_TRASH_DIR = EVOLVER_AI_DIR / "2_outbox" / "trash"
 GENAU_SOURCE = haglio_settings.value("genau_source")
 
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"

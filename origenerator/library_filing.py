@@ -4,7 +4,9 @@ import contextlib
 import os
 from pathlib import Path
 
+from origenerator.evolver_upscales import filed_upscales
 from origenerator.file_numbers import NUMBERED, next_number, numbered
+from origenerator.gallery.output import stem_as_made
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces, files_under, folders_in
 from origenerator.trash import Trash
@@ -54,7 +56,7 @@ def _videos_comfyui_reports(names: list[str]) -> list[str]:
 
 def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -> list[dict]:
     run = _run_subfolder(places, prompt_id)
-    held = _held_in_trash(places)
+    held = _names_taken(places)
     filed: dict[tuple[str, str], tuple[str, str]] = {}
     for record in files:
         subfolder, name = _key(record)
@@ -70,13 +72,23 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
 def file_what_comfyui_left(places: OutputPlaces) -> int:
     if places.keeps_outputs_in_comfyuis_folder():
         return 0
-    held = _held_in_trash(places)
+    held = _names_taken(places)
     return sum(_file_everything_under(top, places, held) for top in folders_in(places.comfyui)
                if top != places.working and top.name not in ADD_ON_SCRATCH)
 
 
+def _names_taken(places: OutputPlaces) -> set[str]:
+    return _held_in_trash(places) | _names_in_kinos_library(places)
+
+
 def _held_in_trash(places: OutputPlaces) -> set[str]:
     return Trash(places.trash).held_names() if places.trash is not None else set()
+
+
+def _names_in_kinos_library(places: OutputPlaces) -> set[str]:
+    if places.kino_library is None:
+        return set()
+    return {stem_as_made(path) + path.suffix for _site, path in filed_upscales(places.kino_library)}
 
 
 def _file_everything_under(top: Path, places: OutputPlaces, held: set[str]) -> int:

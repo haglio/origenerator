@@ -358,7 +358,8 @@ class SlideshowDirector:
                              carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
         rows = [row for row in [self._row_for(generation)] if row]
         items = self.items_of(rows) or [(media[0], media[1], generation, None)]
-        return self.open(items[:1], rows=rows, start=0, shuffle=in_order, hud=hud)
+        return self.open(items[:1], rows=rows, start=0, shuffle=in_order, hud=hud,
+                         locked=True)
 
     @looking_once
     def open_on_tile(self, generation):

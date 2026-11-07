@@ -372,6 +372,17 @@ def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path
     assert asked == _the_whole_lock_on("id-1")
 
 
+def test_a_slideshow_opened_locked_neither_favorites_nor_enhances(qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, start=0, locked=True,
+                           actions=_recording_the_lock_into(asked))
+
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert (slideshow.locked, "LOCK_ON" in _sent(slideshow), asked) == (True, True, [])
+
+
 def test_a_lock_the_funestra_took_after_moving_on_gives_the_item_it_locked_the_whole_lock(
         qtbot, tmp_path):
     asked = []

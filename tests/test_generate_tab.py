@@ -4729,3 +4729,96 @@ def test_a_tab_with_no_form_has_nothing_to_stop_offering(qtbot, tmp_path):
     tab.lora_offers.stop_offering("look_one.safetensors")
 
     assert tab.lora_value("lora") is None
+
+
+def _turn_runs(tab):
+    asked_for = []
+    tab.turn_generate_requested.connect(
+        lambda workflow, params, asked: asked_for.append((workflow, params, asked)))
+    return asked_for
+
+
+def test_generate_under_a_turn_asked_now_runs_that_turns_prompts_asked_of_the_image_shown(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=[("two women on a couch", "blurry"),
+                                    ("two women on a bed", "blurry")])
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    tab.show_saved_generation(image, [image])
+    exchange = _ask(tab, qtbot, "two women")
+    qtbot.waitUntil(lambda: len(exchange.turns()) == 1 and bool(exchange.turns()[0][1]), timeout=5000)
+    _ask(tab, qtbot, "on a bed")
+    qtbot.waitUntil(lambda: _positive(tab) == "two women on a bed", timeout=5000)
+    asked_for = _turn_runs(tab)
+
+    exchange.generate_asked.emit(0)
+
+    ((workflow, params, asked),) = asked_for
+    assert workflow == image["workflow_name"]
+    assert params["positive_prompt"] == "two women on a couch"
+    assert asked["source_prompt_id"] == "img1"
+    assert [turn.said for turn in asked["turns"]] == ["two women"]
+    assert _positive(tab) == "two women on a bed"
+
+
+def test_once_a_turn_made_an_item_the_turns_after_it_are_asked_of_that_item(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch, answer=[("two women on a couch", "blurry"),
+                                    ("two women on a bed", "blurry")])
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    tab.show_saved_generation(image, [image])
+    exchange = _ask(tab, qtbot, "two women")
+    qtbot.waitUntil(lambda: len(exchange.turns()) == 1 and bool(exchange.turns()[0][1]), timeout=5000)
+    _turn_runs(tab)
+    exchange.generate_asked.emit(0)
+
+    tab.note_turn_made("made-1")
+    _ask(tab, qtbot, "on a bed")
+    qtbot.waitUntil(lambda: _positive(tab) == "two women on a bed", timeout=5000)
+
+    assert [entry.made for entry in exchange._entries()] == ["made-1", ""]
+    asked = tab.asked()
+    assert asked["source_prompt_id"] == "made-1"
+    assert [turn.said for turn in asked["turns"]] == ["on a bed"]
+
+
+def test_generate_under_a_turn_from_an_earlier_exchange_runs_its_item_with_its_prompts(
+        saved_panel):
+    tab, db = saved_panel
+    _image_row(db, "src", prompt="a cat, a hat")
+    image = _image_row(db, "img1", prompt="a cat, a scarf", steps=33)
+    db.record_request(NewRequest(prompt_id="img1", source_prompt_id="src", heard="", asked="scarf"))
+    db.requests.record_turns("img1", [Turn("no hat", "Took it off.", "a cat, a hat", "", "a cat", ""),
+                                      Turn("scarf", "Gave a scarf.", "a cat", "", "a cat, a scarf", "")])
+    tab.show_saved_generation(image, [image])
+    asked_for = _turn_runs(tab)
+
+    tab._param_form.request_exchange().generate_asked.emit(0)
+    tab.note_turn_made("made-1")
+
+    ((_workflow, params, asked),) = asked_for
+    assert (params["positive_prompt"], params["steps"]) == ("a cat", 33)
+    assert asked["source_prompt_id"] == "src"
+    assert [turn.said for turn in asked["turns"]] == ["no hat"]
+    assert [turn.made for turn in db.requests.exchange_of("img1")] == ["made-1", "img1"]
+
+
+def test_generate_under_a_later_turn_of_an_earlier_exchange_marks_that_turn(saved_panel):
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat, a scarf, red")
+    db.record_request(NewRequest(prompt_id="img1", source_prompt_id="src", heard="", asked="red"))
+    db.requests.record_turns("img1", [Turn(said, "Done.", "a", "", f"a {said}", "")
+                                      for said in ("one", "two", "three", "red")])
+    db.requests.mark_made("img1", 1, "made-1")
+    tab.show_saved_generation(image, [image])
+    asked_for = _turn_runs(tab)
+
+    tab._param_form.request_exchange().generate_asked.emit(2)
+    tab.note_turn_made("made-2")
+
+    ((_workflow, params, asked),) = asked_for
+    assert params["positive_prompt"] == "a three"
+    assert asked["source_prompt_id"] == "made-1"
+    assert [turn.made for turn in db.requests.exchange_of("img1")] == [
+        "", "made-1", "made-2", "img1"]

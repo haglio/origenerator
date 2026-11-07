@@ -906,6 +906,33 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
         "two cats", "Two cats.", "a cat", "two cats")
 
 
+def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on_its_image(
+        qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("orig")
+    tab = view._generate_pane.current_generate_tab()
+    view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
+    view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words, ask=lambda p, n, r, known: ("two cats", n, "Two cats."))
+    exchange = tab._param_form.request_exchange()
+    qtbot.keyClicks(exchange._line, "two cats")
+    qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", "Two cats.")], timeout=5000)
+
+    exchange.generate_asked.emit(0)
+
+    (job,) = view._live_jobs.values()
+    record = db.get_request(job.prompt_id)
+    assert (record["asked"], record["source_prompt_id"], record["new_positive"]) == (
+        "two cats", "orig", "two cats")
+    assert tab.displayed_row()["prompt_id"] == "orig"
+    assert [entry.made for entry in exchange._entries()] == [job.prompt_id]
+    assert list(exchange._in_flight) == [job.prompt_id]
+
+
 def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())

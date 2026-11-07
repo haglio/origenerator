@@ -667,6 +667,7 @@ class GalleryView(QWidget):
                 app.aboutToQuit.connect(self._osr2_motion.stop)
             app.aboutToQuit.connect(self._radio.stop)
         self._generate_pane.generate_requested.connect(self._on_generate_requested)
+        self._generate_pane.turn_generate_requested.connect(self._on_turn_generate_requested)
         self._generate_pane.modify_requested.connect(self._on_modify_requested)
         self._generate_pane.folder_requested.connect(self._go_to_folder)
         generate_pane = QWidget()
@@ -927,14 +928,34 @@ class GalleryView(QWidget):
             self._db.list_generations(), workflow, params)
 
     def _on_generate_requested(self, workflow_name: str, batch: list[dict]):
+        launching = self._generate_pane.current_generate_tab()
+        launch = self._launch(workflow_name, batch, launching,
+                              launching.asked() if launching is not None else None)
+        if launch is None:
+            return
+        key, launched = launch
+        if launching is not None:
+            for prompt_id in launched:
+                launching.note_launched(prompt_id, made_of=batch[0])
+        self._stand_on_the_run_in(key, rebuild=True)
+
+    def _on_turn_generate_requested(self, tab, workflow_name: str, params: dict, asked: dict):
+        launch = self._launch(workflow_name, [params], tab, asked)
+        if launch is None:
+            return
+        _key, (prompt_id, *_more) = launch
+        tab.note_turn_made(prompt_id)
+        self.refresh()
+
+    def _launch(self, workflow_name: str, batch: list[dict], launching,
+                asked: dict | None) -> tuple[str, list[str]] | None:
         wf = WORKFLOW_REGISTRY.get(workflow_name)
         if self._client is None or wf is None:
-            return
+            return None
         batch = [{**wf.default_params(), **params} for params in batch]
         key = self.folder_key_for(workflow_name, batch[0])
         if key in self._live_jobs:
-            return
-        launching = self._generate_pane.current_generate_tab()
+            return None
         if self.would_reproduce_a_completed_run(wf, batch[0]):
             batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
@@ -942,10 +963,9 @@ class GalleryView(QWidget):
         launched = [prompt_id for prompt_id in self._jobs.start_batch(key, wf, batch)
                     if prompt_id]
         if not launched:
-            return
+            return None
         if launching is not None:
             category, video_id, intent, checked = launching.settings_source()
-            asked = launching.asked()
             for prompt_id in launched:
                 if category or video_id:
                     self._db.set_settings_source(prompt_id, category=category,
@@ -958,8 +978,7 @@ class GalleryView(QWidget):
                         prompt_id=prompt_id, heard="",
                         new_positive=batch[0].get("positive_prompt", ""),
                         new_negative=batch[0].get("negative_prompt", ""), **asked))
-                launching.note_launched(prompt_id, made_of=batch[0])
-        self._stand_on_the_run_in(key, rebuild=True)
+        return key, launched
 
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
         if rebuild:
@@ -2221,6 +2240,7 @@ class GalleryView(QWidget):
     def _update_queue(self, inflight=None):
         items = self._inflight_items() if inflight is None else inflight
         self._queue.set_items(items, self._foreign_queue.total)
+        self._generate_pane.note_in_flight(items)
         self._slideshows.note_queue(items, self._foreign_queue.total)
         self._slideshows.note_in_flight(items)
 

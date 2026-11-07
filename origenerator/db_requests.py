@@ -95,6 +95,13 @@ class RequestStore(Store):
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [(prompt_id, *Turn(*turn)) for turn in turns])
 
+    def mark_made(self, prompt_id: str, position: int, made: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE request_turns SET made = ? WHERE id =
+                       (SELECT id FROM request_turns WHERE prompt_id = ?
+                        ORDER BY id LIMIT 1 OFFSET ?)""", (made, prompt_id, position))
+
     def _turns_of(self, prompt_id: str) -> list[Turn]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -117,6 +124,9 @@ class RequestStore(Store):
 
     def exchange_of(self, prompt_id: str) -> list[Turn]:
         return [turn for link in self._chain(prompt_id) for turn in self._turns_of(link)]
+
+    def items_asked_into(self, prompt_id: str) -> list[str]:
+        return [link for link in self._chain(prompt_id) for _turn in self._turns_of(link)]
 
     def started_on(self, prompt_id: str) -> str | None:
         root = self._chain(prompt_id)[0]

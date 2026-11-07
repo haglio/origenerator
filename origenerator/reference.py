@@ -33,7 +33,7 @@ def _said(*commands: AppCommand) -> tuple[str, ...]:
 def _core() -> ReferenceSection:
     return ReferenceSection("Core", (
         ReferenceGroup("", (
-            _row("quit — asks first, as the power button does", ("Ctrl+Alt+Q",)),
+            _row("quit", ("Ctrl+Alt+Q",)),
             _row("pause / play everything — stops and starts the sounds and the animations; "
                  "the play/pause button does the same", ("Esc",),
                  said=said_to_the_slideshow(SlideshowCommand.PAUSE)),

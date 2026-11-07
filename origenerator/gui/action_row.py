@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
@@ -17,6 +17,8 @@ from origenerator.media import MediaType
 from origenerator.own_window import show_or_say
 
 ACTION_LABEL = "Action"
+ACTIONS_LABEL = "Actions"
+SIDE_LABELS = {MediaType.IMAGE: "Image Actions", MediaType.VIDEO: "Video Actions"}
 UNSAID = "—"
 ADD = "Add actions with setter tool…"
 EDIT = "Edit actions with setter tool…"
@@ -42,12 +44,17 @@ class _Side(QWidget):
         super().__init__()
         self._side = side
         self._prompt_id = ""
-        row = QHBoxLayout(self)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(GAP_MEDIUM)
+        self._listed = QLabel(UNSAID)
+        self._listed.setWordWrap(True)
+        self._listed.setObjectName(listed_actions(side))
+        column.addWidget(self._listed)
+        row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
-        self._listed = ElidingLabel(UNSAID)
-        self._listed.setObjectName(listed_actions(side))
-        row.addWidget(self._listed, 1)
+        column.addLayout(row)
         self._setter = QPushButton(ADD, objectName=setter_button(side))
         self._setter.setToolTip(_TIPS[side])
         self._setter.clicked.connect(lambda: opened(side, self._prompt_id))
@@ -59,6 +66,7 @@ class _Side(QWidget):
             box.clicked.connect(lambda _checked=False: changed(self._prompt_id, side, self._labels()))
             self._boxes[name] = box
             row.addWidget(box)
+        row.addStretch(1)
         self._actions: tuple[str, ...] = ()
 
     def shows(self, prompt_id: str) -> bool:
@@ -72,7 +80,6 @@ class _Side(QWidget):
         self._actions = labels.actions
         said = ", ".join(labels.actions)
         self._listed.setText(said or UNSAID)
-        self._listed.setToolTip(said)
         self._setter.setText(EDIT if labels.actions else ADD)
         for name, box in self._boxes.items():
             box.setChecked(name in labels.checked)
@@ -92,16 +99,13 @@ class ActionRow(QWidget):
         self._windows: dict[str, QWidget] = {}
         boxes = checkboxes if checkboxes is not None else {
             side: vocabulary(side).checkboxes for side in (MediaType.IMAGE, MediaType.VIDEO)}
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(GAP_MEDIUM)
         self._sides = {side: _Side(side, boxes.get(side, ()), self._open, self.changed.emit)
                        for side in (MediaType.IMAGE, MediaType.VIDEO)}
-        for side in self._sides.values():
-            row.addWidget(side, 1)
+        self._names = {side: ElidingLabel(SIDE_LABELS[side]) for side in self._sides}
         self._form = form
-        form.addRow(LabelCell(WarningMark(), ElidingLabel(ACTION_LABEL), form.label_column), self)
-        form.setRowVisible(self, False)
+        for side, shown in self._sides.items():
+            form.addRow(LabelCell(WarningMark(), self._names[side], form.label_column), shown)
+            form.setRowVisible(shown, False)
 
     def show_row(self, row: dict, start_image: dict | None = None) -> None:
         kind = media_type_of_row(row)
@@ -109,22 +113,26 @@ class ActionRow(QWidget):
             self.clear()
             return
         image, video = self._sides[MediaType.IMAGE], self._sides[MediaType.VIDEO]
+        self._names[MediaType.IMAGE].setText(
+            ACTIONS_LABEL if kind == MediaType.IMAGE else SIDE_LABELS[MediaType.IMAGE])
         if kind == MediaType.IMAGE:
             image.show_labels(row["prompt_id"], labels_of(row, MediaType.IMAGE))
             image.setEnabled(True)
-            video.hide()
         else:
             holder = image_labels_row(row, start_image)
             inherited = inherits_image_labels(row, start_image)
             image.show_labels(holder["prompt_id"], labels_of(holder, MediaType.IMAGE))
             image.setEnabled(not inherited)
             video.show_labels(row["prompt_id"], labels_of(row, MediaType.VIDEO))
-            video.show()
-        image.show()
-        self._form.setRowVisible(self, True)
+        self._form.setRowVisible(image, True)
+        self._form.setRowVisible(video, kind == MediaType.VIDEO)
+
+    def form(self) -> LabelForm:
+        return self._form
 
     def clear(self) -> None:
-        self._form.setRowVisible(self, False)
+        for side in self._sides.values():
+            self._form.setRowVisible(side, False)
 
     def heard(self, prompt_id: str, side: str, labels: Labels | None) -> None:
         if self._sides[side].shows(prompt_id):

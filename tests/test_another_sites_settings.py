@@ -192,7 +192,7 @@ def test_setting_an_ai_videos_labels_leaves_the_words_its_site_gave_it(library):
     tab.show_saved_generation(video, [image])
     name = vocabulary(MediaType.VIDEO).checkboxes[0]
 
-    tab._action.findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
+    tab._action.form().parentWidget().findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
 
     assert labels_of(db.get_generation(video["prompt_id"]), MediaType.VIDEO).checked == (name,)
     assert db.get_generation(video["prompt_id"])["action"] == said_by_the_site

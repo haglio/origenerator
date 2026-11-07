@@ -34,10 +34,6 @@ def _read(content: dict | None) -> dict:
     return load_content() if content is None else content
 
 
-def actions(lane: str = VIDEO, *, content: dict | None = None) -> tuple[str, ...]:
-    return tuple(_table(_read(content)).get(lane, {}))
-
-
 def actions_for(state: str, lane: str = VIDEO, *, content: dict | None = None
              ) -> tuple[str, ...]:
     return tuple(action for action, states in _table(_read(content)).get(lane, {}).items()

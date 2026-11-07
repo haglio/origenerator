@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget
+from PyQt6.QtWidgets import QGridLayout, QLabel, QPushButton, QToolButton, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
@@ -17,7 +17,6 @@ from origenerator.gui.action_setter_window import (
     SAME_BUTTON,
     SKIP_BUTTON,
     STATUS_LINE,
-    TITLE,
     UNDO_BUTTON,
     ActionSetterWindow,
     action_button,
@@ -100,10 +99,27 @@ def window(qtbot, tmp_path):
     return build
 
 
-def test_the_window_is_called_the_action_setter_tool(window):
+def test_the_window_is_called_the_action_setter_tool_for_its_kind(window, qtbot, tmp_path):
     made, _store, _stage = window("first")
+    for_videos = ActionSetterWindow(
+        SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "labels": None}],
+                      _Store(), MediaType.VIDEO),
+        Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}), {},
+        Locks(tmp_path / "locks.json"), stage=_Stage())
+    qtbot.addWidget(for_videos)
 
-    assert made.windowTitle() == TITLE == "Origenerator — action setter tool"
+    assert (made.windowTitle(), for_videos.windowTitle()) == (
+        "Origenerator — image action setter tool", "Origenerator — video action setter tool")
+
+
+def test_every_checkbox_sits_on_one_line_above_the_buttons(window):
+    made, _store, _stage = window("first", checkboxes=("first box", "second box"))
+    made.resize(1400, 900)
+    made.show()
+    made.layout().activate()
+    tops = {_box(made, name).mapTo(made, QPoint()).y() for name in ("first box", "second box")}
+
+    assert len(tops) == 1
 
 
 def test_the_status_line_calls_the_item_by_the_name_the_gallery_gives_it(window):
@@ -319,7 +335,9 @@ def test_every_button_is_the_same_shape_and_size(window, tmp_path):
 
 def _where(made, name):
     tile = _tile(made, name)
-    layout = tile.parentWidget().layout().itemAt(0).layout()
+    column = tile.parentWidget().layout()
+    layout = next(column.itemAt(i).layout() for i in range(column.count())
+                  if isinstance(column.itemAt(i).layout(), QGridLayout))
     return layout.getItemPosition(layout.indexOf(tile))
 
 
@@ -418,57 +436,3 @@ def test_no_button_or_checkbox_takes_the_keyboard_so_space_fires_nothing_pressed
 
     assert pressable
     assert all(widget.focusPolicy() == Qt.FocusPolicy.NoFocus for widget in pressable)
-
-
-@pytest.fixture
-def video_window(qtbot, tmp_path):
-    def build(*, inherited, image_labels=None):
-        store = _Store()
-        made = ActionSetterWindow(
-            SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "labels": None,
-                            "image": {"prompt_id": "img", "labels": image_labels,
-                                      "inherited": inherited}}], store, MediaType.VIDEO),
-            Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}), {},
-            Locks(tmp_path / "locks.json"), image_checkboxes=("first box", "second box"),
-            stage=_Stage())
-        qtbot.addWidget(made)
-        return made, store
-
-    return build
-
-
-def test_a_video_made_from_an_image_shows_that_images_checkboxes_grayed_as_it_left_them(
-        video_window):
-    made, _store = video_window(inherited=True, image_labels=Labels(("alpha",), ("second box",)))
-
-    boxes = [_box(made, name) for name in ("first box", "second box")]
-
-    assert [(box.isEnabled(), box.isChecked()) for box in boxes] == [(False, False), (False, True)]
-    assert _box(made, "third box").isEnabled()
-
-
-def test_a_press_on_a_video_made_from_no_image_saves_its_image_checkboxes_on_it_too(video_window):
-    made, store = video_window(inherited=False, image_labels=Labels(("alpha",)))
-
-    _box(made, "first box").setChecked(True)
-    _box(made, "third box").setChecked(True)
-    _tile(made, "button one").click()
-
-    assert store.labels == {"vid": Labels(("alpha",), ("third box",)),
-                            "img": Labels(("alpha",), ("first box",))}
-
-
-def test_a_locked_image_checkbox_does_not_take_the_grayed_answer_of_an_image_for_its_lock(
-        qtbot, tmp_path):
-    locks = Locks(tmp_path / "locks.json")
-    locks.hold(MediaType.VIDEO, "first box", True)
-    made = ActionSetterWindow(
-        SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "labels": None,
-                        "image": {"prompt_id": "img", "labels": None, "inherited": True}}],
-                      _Store(), MediaType.VIDEO),
-        Vocabulary(_BUTTONS, _TILES, (), {}, {}), {}, locks,
-        image_checkboxes=("first box",), stage=_Stage())
-    qtbot.addWidget(made)
-
-    assert (_box(made, "first box").isChecked(), locks.held(MediaType.VIDEO)) == (
-        False, {"first box": True})

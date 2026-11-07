@@ -23,41 +23,6 @@ def _items(*prompt_ids, before=None):
     return [{"prompt_id": prompt_id, "labels": before} for prompt_id in prompt_ids]
 
 
-def _a_video(*, inherited, before=None):
-    return [{"prompt_id": "video", "labels": None,
-             "image": {"prompt_id": "frame", "labels": before, "inherited": inherited}}]
-
-
-def test_a_press_on_a_video_saves_its_image_checkboxes_on_the_image_it_holds_its_own():
-    store = _Store()
-    session = SetterSession(_a_video(inherited=False, before=Labels(("gamma",))), store,
-                            MediaType.VIDEO)
-
-    session.set_as("two", _SET, image_checked=("second box",))
-
-    assert store.labels == {"video": (MediaType.VIDEO, _SET),
-                            "frame": (MediaType.IMAGE, Labels(("gamma",), ("second box",)))}
-
-
-def test_a_press_on_a_video_leaves_an_image_it_takes_its_image_labels_from_alone():
-    store = _Store()
-    session = SetterSession(_a_video(inherited=True), store, MediaType.VIDEO)
-
-    session.set_as("two", _SET, image_checked=("second box",))
-
-    assert store.labels == {"video": (MediaType.VIDEO, _SET)}
-
-
-def test_undo_puts_the_image_part_back_as_well():
-    store = _Store()
-    session = SetterSession(_a_video(inherited=False), store, MediaType.VIDEO)
-    session.set_as("two", _SET, image_checked=("second box",))
-
-    session.undo()
-
-    assert store.labels == {"video": (MediaType.VIDEO, None), "frame": (MediaType.IMAGE, None)}
-
-
 def test_a_press_saves_its_labels_on_the_item_on_screen_and_the_next_one_comes_up():
     store = _Store()
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)

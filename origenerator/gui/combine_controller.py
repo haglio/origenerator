@@ -15,7 +15,7 @@ from origenerator import (
 )
 from origenerator.action_labels import labels_of
 from origenerator.animate_command import what_to_animate
-from origenerator.animation_names import Animation, image_button_of, labels_for
+from origenerator.animation_names import Animation, image_button_of, labels_for, named
 from origenerator.check_animations import the_animation_window
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.export_lane import GENAU as GENAU_LANE
@@ -486,9 +486,10 @@ class CombineController(QObject):
         if answer.action is None:
             return None, answer.said, ERROR if answer.unsupported else WARNING
         action = answer.action
+        animation = named(action)
         available = action_settings.available_categories(
-            self.rebuildable_videos(self._db.list_generations()), asked.lane)
-        if action not in available:
+            self.rebuildable_videos(self._db.list_generations()), asked.lane, animation.checked)
+        if animation.action not in available:
             return None, action_settings.no_past_video(action, asked.lane), WARNING
         logger.info("animate as: image=%s lane=%s -> action=%s", image_id, asked.lane, action)
         self.generate_category(image_id, action, asked.lane, send=loop)

@@ -1283,7 +1283,8 @@ class GenerateTab(DropZones):
         self.reread_folder_buttons()
         self._basic_section.setVisible(
             self._basic_section.show_row(row, self._upscale_of(row), self._item_name()))
-        self._action.show_row(row, start_images_among(image_rows)(row))
+        start = start_images_among(image_rows)(row)
+        self._action.show_row(row, self._db.get_generation(start["prompt_id"]) if start else None)
         self._related.show_row(row, image_rows)
         self._refresh_versions()
         self._update_lane_button(preview)

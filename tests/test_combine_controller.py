@@ -11,7 +11,7 @@ from origenerator import action_settings, evolver_export, gallery
 from origenerator.action_labels import Labels
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animate_command import AnimateRequest
-from origenerator.animation_names import labels_for
+from origenerator.animation_names import JOINER, labels_for
 from origenerator.db import Database
 from origenerator.export_lane import GENAU
 from origenerator.generation_state import GenerationSource
@@ -1139,6 +1139,48 @@ def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
     controller.widget.image_zone.set_item("img")
 
     assert sorted(controller.widget.available) == ["alpha", "leaning"]
+
+
+def _accepted_only(monkeypatch, *accepted):
+    _paths(monkeypatch)
+    monkeypatch.setattr(module.action_settings, "available_categories",
+                        lambda rows, intent, checked=(): set())
+    monkeypatch.setattr(module.animation_settings, "settings_for",
+                        lambda lane, name, state: {"workflow": VIDEO_WORKFLOW}
+                        if (lane, name, state) in accepted else None)
+
+
+def test_an_action_with_settings_accepted_for_the_dropped_images_button_is_offered(
+        combine, monkeypatch):
+    _accepted_only(monkeypatch, (action_settings.GENAU, "beta", "state one"))
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+    controller.widget.set_intent(action_settings.GENAU)
+
+    controller.widget.image_zone.set_item("img")
+
+    assert sorted(controller.widget.available) == ["beta"]
+
+
+def test_settings_accepted_for_another_lane_or_another_button_offer_nothing(combine, monkeypatch):
+    _accepted_only(monkeypatch, (action_settings.VIDEO, "beta", "state one"),
+                   (action_settings.GENAU, "beta", "state two"))
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+    controller.widget.set_intent(action_settings.GENAU)
+
+    controller.widget.image_zone.set_item("img")
+
+    assert sorted(controller.widget.available) == []
+
+
+def test_the_accepted_settings_asked_for_are_those_of_the_action_with_its_ticked_boxes(
+        combine, monkeypatch):
+    _accepted_only(monkeypatch, (action_settings.VIDEO, f"alpha{JOINER}third box", "state one"))
+    controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
+    controller.widget.checked = ("third box",)
+
+    controller.widget.image_zone.set_item("img")
+
+    assert sorted(controller.widget.available) == ["alpha"]
 
 
 def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin(

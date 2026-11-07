@@ -5,7 +5,6 @@ import pytest
 from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO
 from origenerator.content import EXAMPLE_CONTENT, load_content
-from origenerator.image_states import state_names
 
 _PATHS = {
     "animation_paths": {
@@ -66,7 +65,7 @@ def test_a_malformed_line_costs_that_line_and_no_more():
 def test_the_example_table_names_only_actions_and_states_the_example_declares():
     example = load_content(EXAMPLE_CONTENT, EXAMPLE_CONTENT)
     actions = set(example["actions"])
-    states = set(state_names(example))
+    states = set(example["image_states"])
     table = example["animation_paths"]
 
     assert table

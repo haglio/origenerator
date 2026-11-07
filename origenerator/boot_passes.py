@@ -132,6 +132,12 @@ def _record_shapes(library: Library):
     return record_shapes(library.db)
 
 
+def _read_actions_off_earlier_answers(library: Library):
+    from origenerator.former_actions import fill_in_labels
+
+    return fill_in_labels(library.db)
+
+
 def _reconcile_favorites(library: Library):
     from origenerator.favorite_reconcile import reconcile_favorites
 
@@ -195,6 +201,9 @@ MAINTENANCE = (
     BootPass(None, _record_shapes,
              counted="Recorded the shape of %d item(s)",
              failure="Recording shapes failed: %s"),
+    BootPass(None, _read_actions_off_earlier_answers,
+             counted="Read the actions of %d item(s) off their earlier answers",
+             failure="Reading actions off earlier answers failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )

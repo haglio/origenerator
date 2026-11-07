@@ -4,6 +4,7 @@ import json
 import threading
 from dataclasses import dataclass
 
+from origenerator.action_labels import Labels, columns, stored
 from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
@@ -184,6 +185,18 @@ class GenerationStore(Store):
 
     def set_action(self, prompt_id: str, action: str | None):
         self._set(prompt_id, "recipe_category", action or None)
+
+    def set_labels(self, prompt_id: str, side: str, labels: Labels | None):
+        self.set_many_labels(side, {prompt_id: labels})
+
+    def set_many_labels(self, side: str, labeled: dict[str, Labels | None]):
+        actions, checked = columns(side)
+        with self._connect() as conn:
+            conn.executemany(
+                f"UPDATE generations SET {actions} = ?, {checked} = ? WHERE prompt_id = ?",
+                [(*(stored(labels) if labels is not None else (None, None)), prompt_id)
+                 for prompt_id, labels in labeled.items()],
+            )
 
     def set_shielded(self, prompt_id: str, shielded: bool):
         self._set(prompt_id, "shielded", 1 if shielded else 0)

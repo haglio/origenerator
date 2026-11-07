@@ -133,10 +133,10 @@ loading-screen = ["Updating Origenerator..."]
 preview = true
 
 [tool.haglio.launchers."sort_images.vbs"]
-app = "Origenerator (sorting images)"
-run = "-m origenerator.sort_images"
+app = "Origenerator (action setter tool)"
+run = "-m origenerator.action_setter_tool"
 venv = "primary"
-log = 'state\sort_images_launcher.log'
+log = 'state\action_setter_launcher.log'
 environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
 
 [tool.haglio.launchers."check_animations.vbs"]

@@ -95,6 +95,10 @@ SCHEMA = {
         ("remade_at", "TEXT", 0, None, 0),
         ("old_version_of", "TEXT", 0, None, 0),
         ("shape", "TEXT", 0, None, 0),
+        ("image_actions", "TEXT", 0, None, 0),
+        ("image_checked", "TEXT", 0, None, 0),
+        ("video_actions", "TEXT", 0, None, 0),
+        ("video_checked", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

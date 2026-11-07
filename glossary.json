@@ -1065,9 +1065,10 @@
     },
     {
       "id": "action",
-      "thing": "what a video shows, picked when it is launched; what an image shows, said in the sorting window",
+      "thing": "what an image or a video shows, saved on it as one or more actions with the action setter tool",
       "screen": [
-        "Set image action…",
+        "Add actions with setter tool…",
+        "Edit actions with setter tool…",
         "Action"
       ],
       "his_word": "action (2026-10-30, 2026-10-14, 2026-10-23, 2026-10-26)",
@@ -1308,22 +1309,26 @@
       "status": "agreed"
     },
     {
-      "id": "sorting_window",
-      "thing": "the window that asks what each image shows, one press per image, its buttons wearing his drawings",
+      "id": "action_setter_tool",
+      "thing": "the window that sets each image's or each video's actions, one press per item, the image buttons wearing his drawings, the checkboxes and their locks above them",
       "screen": [
-        "Origenerator — what does this image show?",
+        "Origenerator — action setter tool",
         "Skip",
         "Same as last",
         "Undo"
       ],
-      "his_word": "'the grid of image actions' (2026-10-14); tile (2026-10-14, of one of its buttons)",
+      "his_word": "action setter tool (2026-11-06); 'the grid of image actions' (2026-10-14); tile (2026-10-14, of one of its buttons)",
       "code_today": [
-        "sorting window",
+        "action setter",
         "tile",
         "grid"
       ],
-      "code_word": "sorting window",
-      "status": "agreed"
+      "code_word": "action setter",
+      "status": "ruled",
+      "ruled": "2026-11-06, his words naming the window",
+      "retired": [
+        "sorting window"
+      ]
     },
     {
       "id": "pane",

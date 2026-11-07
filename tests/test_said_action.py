@@ -4,8 +4,10 @@ import json
 import os
 
 from origenerator import said_action
+from origenerator.action_labels import Labels
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
+from origenerator.media import MediaType
 from origenerator.outside_journal import actions_in, said_in
 from origenerator.outside_videos import Places
 from origenerator.slideshow import Slide
@@ -20,11 +22,8 @@ class _Gallery:
     def get_generation(self, prompt_id):
         return self.rows.get(prompt_id)
 
-    def set_action(self, prompt_id, action):
-        self.said.append(("action", prompt_id, action))
-
-    def set_image_state(self, prompt_id, state):
-        self.said.append(("image state", prompt_id, state))
+    def set_labels(self, prompt_id, side, labels):
+        self.said.append((side, prompt_id, labels))
 
     def refresh(self):
         self.reread += 1
@@ -64,6 +63,24 @@ def _a_recorded_video(places: Places, filed_under: str, **fields) -> tuple[dict,
     return row, Slide(video, "video", "o1"), record
 
 
+def _labeled(*, image=(), video=()) -> dict:
+    return {**({"image_actions": json.dumps(list(image))} if image else {}),
+            **({"video_actions": json.dumps(list(video))} if video else {})}
+
+
+def _a_sites_video_set_as_alpha(places: Places) -> tuple[dict, Slide, object]:
+    return _a_recorded_video(places, "example_site", **_labeled(video=["alpha"]),
+                             source=GenerationSource.OUTSIDE)
+
+
+def _picked_before(places: Places, slide: Slide, action: str, at: float) -> None:
+    places.journal.parent.mkdir(parents=True, exist_ok=True)
+    line = {"t": round(at * 1000), "event": "action", "action": action,
+            "path": slide.path.relative_to(places.library_root).as_posix()}
+    with places.journal.open("a", encoding="utf-8", newline="\n") as journal:
+        journal.write(json.dumps(line) + "\n")
+
+
 def _picked(places: Places) -> list[str]:
     return [action for _when, action in actions_in(said_in(places.journal)).values()]
 
@@ -72,47 +89,24 @@ def _recorded(record) -> dict:
     return json.loads(record.read_text(encoding="utf-8"))["video"]
 
 
-class TestSayingAnAction:
-    def test_an_image_is_told_what_it_was_sorted_as(self):
-        db = _Gallery()
-
-        said_action.say(db, "g1", _an_image(), "beta", places_here=_nowhere)
-
-        assert db.said == [("image state", "g1", "beta")]
-
-    def test_a_video_made_here_is_told_its_action_and_no_action_is_told_as_none(self):
-        db = _Gallery()
-
-        said_action.say(db, "v1", _a_video(), "alpha", places_here=_nowhere)
-        said_action.say(db, "v1", _a_video(), "", places_here=_nowhere)
-
-        assert db.said == [("action", "v1", "alpha"), ("action", "v1", None)]
-
-    def test_another_sites_video_has_its_action_written_down_for_the_gallerys_next_entries(
-            self, tmp_path):
-        places = _places(tmp_path)
-        row, _slide, _record = _a_recorded_video(places, "example_site",
-                                                 source=GenerationSource.OUTSIDE)
-        db = _Gallery()
-
-        said_action.say(db, "o1", row, "beta", places_here=lambda: places)
-
-        assert _picked(places) == ["beta"]
-        assert db.said == [("action", "o1", "beta")]
-
-
 class TestStrikingTheActionOnScreen:
-    def test_an_images_action_is_what_it_was_sorted_as(self):
-        db = _Gallery(_an_image(image_state="beta"))
+    def test_an_images_actions_are_the_ones_set_for_it(self):
+        db = _Gallery(_an_image(**_labeled(image=["beta", "gamma"])))
 
-        assert said_action.strike(db, Slide("g1.png", "image", "g1"), _nowhere) == "beta"
-        assert db.said == [("image state", "g1", None)]
+        assert said_action.strike(db, Slide("g1.png", "image", "g1"), _nowhere) == "beta, gamma"
+        assert db.said == [(MediaType.IMAGE, "g1", Labels())]
 
-    def test_a_videos_action_comes_off_the_video(self):
-        db = _Gallery(_a_video(action="alpha"))
+    def test_a_videos_actions_come_off_the_video(self):
+        db = _Gallery(_a_video(**_labeled(video=["alpha"])))
 
         assert said_action.strike(db, Slide("v1.mp4", "video", "v1"), _nowhere) == "alpha"
-        assert db.said == [("action", "v1", None)]
+        assert db.said == [(MediaType.VIDEO, "v1", Labels())]
+
+    def test_a_video_made_from_no_image_loses_the_image_actions_it_holds_as_its_own_too(self):
+        db = _Gallery(_a_video(**_labeled(image=["beta"], video=["alpha"])))
+
+        assert said_action.strike(db, Slide("v1.mp4", "video", "v1"), _nowhere) == "beta, alpha"
+        assert db.said == [(MediaType.IMAGE, "v1", Labels()), (MediaType.VIDEO, "v1", Labels())]
 
     def test_an_item_with_no_action_anywhere_has_none_to_strike(self):
         db = _Gallery(_an_image())
@@ -124,24 +118,22 @@ class TestStrikingTheActionOnScreen:
     def test_another_sites_video_keeps_the_rejection_in_its_record_as_kinos_does(
             self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
-                                               source=GenerationSource.OUTSIDE)
+        row, slide, record = _a_sites_video_set_as_alpha(places)
         db = _Gallery(row)
 
         assert said_action.strike(db, slide, lambda: places) == "alpha"
 
         assert _recorded(record) == {"wrong_action": "alpha", "prompt": "a made-up prompt"}
-        assert db.said == [("action", "o1", None)]
+        assert db.said == [(MediaType.VIDEO, "o1", Labels())]
         assert not places.journal.exists()
 
     def test_a_pick_of_his_evolver_has_yet_to_write_down_is_cancelled_or_it_would_come_back(
             self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
-                                               source=GenerationSource.OUTSIDE)
+        row, slide, record = _a_sites_video_set_as_alpha(places)
         os.utime(record, (1_000_000, 1_000_000))
         db = _Gallery(row)
-        said_action.say(db, "o1", row, "alpha", places_here=lambda: places)
+        _picked_before(places, slide, "alpha", 2_000_000)
 
         assert said_action.strike(db, slide, lambda: places) == "alpha"
 
@@ -150,8 +142,7 @@ class TestStrikingTheActionOnScreen:
     def test_a_pick_evolver_wrote_into_the_record_long_ago_is_not_journaled_again(
             self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
-                                               source=GenerationSource.OUTSIDE)
+        row, slide, record = _a_sites_video_set_as_alpha(places)
         places.journal.parent.mkdir(parents=True)
         places.journal.write_text(json.dumps({
             "t": 1000, "event": "action", "action": "alpha",
@@ -165,13 +156,13 @@ class TestStrikingTheActionOnScreen:
 
     def test_a_video_made_here_loses_it_in_the_record_of_the_upscale_being_played(self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_recorded_video(places, "origenerator", action="alpha")
+        row, slide, record = _a_recorded_video(places, "origenerator", **_labeled(video=["alpha"]))
         db = _Gallery(row)
 
         assert said_action.strike(db, slide, lambda: places) == "alpha"
 
         assert _recorded(record)["wrong_action"] == "alpha"
-        assert db.said == [("action", "o1", None)]
+        assert db.said == [(MediaType.VIDEO, "o1", Labels())]
         assert not places.journal.exists()
 
     def test_an_action_only_the_record_holds_is_struck_there_and_said(self, tmp_path):
@@ -187,8 +178,7 @@ class TestStrikingTheActionOnScreen:
 
 def test_the_slideshows_press_strikes_the_action_and_has_the_gallery_reread(tmp_path):
     places = _places(tmp_path)
-    row, slide, record = _a_recorded_video(places, "example_site", action="alpha",
-                                           source=GenerationSource.OUTSIDE)
+    row, slide, record = _a_sites_video_set_as_alpha(places)
     gallery = _Gallery(row)
 
     assert striking(gallery, gallery, places_here=lambda: places)(slide) == "alpha"

@@ -5,11 +5,13 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from shared_ui.tick_control import TickControl
 
-from origenerator import outside_videos
-from origenerator.action_settings import CATEGORIES
+from origenerator.action_labels import labels_of
+from origenerator.action_vocabulary import vocabulary
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
+from origenerator.gui.action_row import action_checkbox
 from origenerator.gui.generate_pane import parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
@@ -184,17 +186,16 @@ def test_generate_is_grayed_on_an_ai_item_and_says_why(library, qtbot, shown):
     assert tab._generate_btn.toolTip() == "Another site made this — Origenerator can't remake it"
 
 
-def test_picking_an_action_on_an_ai_videos_tab_goes_where_its_star_goes(library, monkeypatch):
-    tab, _db, video, image = library
-    places, picks = object(), []
-    monkeypatch.setattr(outside_videos, "places_here", lambda: places)
-    monkeypatch.setattr(outside_videos, "pick_action",
-                        lambda db, where, row, action: picks.append((where, row["prompt_id"], action)))
+def test_setting_an_ai_videos_labels_leaves_the_words_its_site_gave_it(library):
+    tab, db, video, image = library
+    said_by_the_site = db.get_generation(video["prompt_id"])["action"]
     tab.show_saved_generation(video, [image])
+    name = vocabulary(MediaType.VIDEO).checkboxes[0]
 
-    tab._action.pick(CATEGORIES[1])
+    tab._action.findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
 
-    assert picks == [(places, video["prompt_id"], CATEGORIES[1])]
+    assert labels_of(db.get_generation(video["prompt_id"]), MediaType.VIDEO).checked == (name,)
+    assert db.get_generation(video["prompt_id"])["action"] == said_by_the_site
 
 
 @pytest.mark.parametrize("made", [MediaType.VIDEO, MediaType.IMAGE])

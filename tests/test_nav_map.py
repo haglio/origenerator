@@ -20,7 +20,7 @@ def _image(prompt_id, prompt, *, seed, **given):
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "positive_prompt": prompt,
-        "image_state": given.get("shows"),
+        "image_actions": json.dumps([given["shows"]]) if given.get("shows") else None,
         "seed": seed,
         "params_json": json.dumps({"positive_prompt": prompt, "seed": seed,
                                    "steps": steps, "checkpoint": checkpoint}),
@@ -48,7 +48,7 @@ def _video(prompt_id, prompt, *, noise_seed, frame, **given):
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
         "positive_prompt": prompt,
-        "action": given.get("action"),
+        "video_actions": json.dumps([given["action"]]) if given.get("action") else None,
         "seed": None,
         "params_json": json.dumps({
             "positive_prompt": prompt, "noise_seed": noise_seed, "input_image": frame,
@@ -197,14 +197,22 @@ def test_an_action_loop_plays_the_image_and_every_video_of_it_twins_included():
 
 
 
-def test_the_whole_library_says_what_each_generation_is_named_for():
+def test_the_whole_library_names_each_video_for_its_images_actions_then_its_own():
     source = _image("i1", "a fox", seed=1, shows="beta")
     plain = _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([source, plain])
     runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
 
     assert action_labels([source, plain, runs], image_index=index) == {
-        "i1": "Source image, beta", "i2": "", "v1": "alpha"}
+        "i1": "Source image, beta", "i2": "", "v1": "beta, alpha"}
+
+
+def test_an_action_a_video_shares_with_its_image_is_named_once():
+    source = _image("i1", "a fox", seed=1, shows="beta")
+    index = gallery.build_image_config_index([source])
+    again = _video("v1", "the fox again", noise_seed=5, frame="i1.png", action="beta")
+
+    assert action_labels([source, again], image_index=index)["v1"] == "beta"
 
 
 

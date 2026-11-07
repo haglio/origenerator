@@ -15,6 +15,7 @@ from PIL import Image
 from PyQt6.QtCore import QRect, Qt
 
 from origenerator import gallery, library_views
+from origenerator.action_labels import Labels, columns, labels_of, stored
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     FAVORITES_KEY,
@@ -37,6 +38,7 @@ from origenerator.gui.slideshow_wiring import Listing
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
+from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.video_records import FiledLoops
@@ -422,11 +424,8 @@ class FakeDB:
         self.gets += 1
         return self.rows.get(prompt_id)
 
-    def set_action(self, prompt_id, action):
-        self.rows[prompt_id]["action"] = action
-
-    def set_image_state(self, prompt_id, state):
-        self.rows[prompt_id]["image_state"] = state
+    def set_labels(self, prompt_id, side, labels):
+        self.rows[prompt_id].update(zip(columns(side), stored(labels), strict=True))
 
     def folder_meta_map(self):
         return {}
@@ -2075,7 +2074,7 @@ def _animation(prompt_id, *, frame, action, tmp_path, size=(100, 200)):
     row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
                files=(f"{prompt_id}.mp4",))
     row["params_json"] = json.dumps(params)
-    row["action"] = action
+    row["video_actions"] = json.dumps([action])
     thumb = tmp_path / f"{prompt_id}_thumb.png"
     Image.new("RGB", (width, height)).save(thumb)
     row["thumbnail_path"] = str(thumb)
@@ -2285,14 +2284,14 @@ def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows
 
 
 def test_wrong_action_on_a_slide_takes_the_action_off_its_row_and_the_gallery_rereads(slideshows):
-    rows = [{**_image("g1", "a red fox", seed=1), "image_state": "alpha"}]
+    rows = [{**_image("g1", "a red fox", seed=1), "image_actions": json.dumps(["alpha"])}]
     db = FakeDB(rows)
     director, host, made = slideshows(FakeHost(rows=rows), db=db)
     director.open(director.items_of(rows), location="a-folder", shape="portrait")
 
     assert made[0].actions.strike_action(Slide("g1.png", "image", "g1")) == "alpha"
 
-    assert db.rows["g1"]["image_state"] is None
+    assert labels_of(db.rows["g1"], MediaType.IMAGE) == Labels()
     assert host.reread == 1
 
 

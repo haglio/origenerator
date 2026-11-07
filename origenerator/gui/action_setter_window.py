@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import (
@@ -24,33 +25,49 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import WHITE
 from shared_ui.fonts import SIZE_SMALL, make_font
-from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
+from shared_ui.icons import qt_icon
+from shared_ui.palette import BLUE, as_hex
+from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
+from shared_ui.tick_control import TickControl
+
+from origenerator.action_labels import Labels
 
 ROOM_FOR_THE_GRID = 1260
 MARK = 96
 NAME_LINES = 2
 
-STATUS_LINE = "sorting.status"
-LAST_LINE = "sorting.last"
-SKIP_BUTTON = "sorting.skip"
-SAME_BUTTON = "sorting.same"
-UNDO_BUTTON = "sorting.undo"
+STATUS_LINE = "setter.status"
+LAST_LINE = "setter.last"
+SKIP_BUTTON = "setter.skip"
+SAME_BUTTON = "setter.same"
+UNDO_BUTTON = "setter.undo"
+TITLE = "Origenerator — action setter tool"
+
+_LIT = f"QToolButton:checked {{ background-color: {as_hex(BLUE)}; border-radius: {BUTTON_RADIUS}px; }}"
 
 
-def state_button(state: str) -> str:
-    return f"sorting.state.{state}"
+def action_button(name: str) -> str:
+    return f"setter.action.{name}"
 
 
-def one_term_to_a_line(state: str) -> str:
-    lines = re.sub(r",\s*", "\n", state)
+def checkbox(name: str) -> str:
+    return f"setter.checkbox.{name}"
+
+
+def lock(name: str) -> str:
+    return f"setter.lock.{name}"
+
+
+def one_term_to_a_line(name: str) -> str:
+    lines = re.sub(r",\s*", "\n", name)
     lines = re.sub(r"\s*\+\s*", " +\n", lines)
     return re.sub(r"\s+\(", "\n(", lines).strip()
 
 
-def a_name_for(state: str, room: int, width_of) -> str:
-    if width_of(state) <= room:
-        return state
-    return wrapped_to_fit(one_term_to_a_line(state), room, width_of)
+def a_name_for(name: str, room: int, width_of) -> str:
+    if width_of(name) <= room:
+        return name
+    return wrapped_to_fit(one_term_to_a_line(name), room, width_of)
 
 
 def wrapped_to_fit(text: str, room: int, width_of) -> str:
@@ -66,13 +83,6 @@ def wrapped_to_fit(text: str, room: int, width_of) -> str:
                 standing = tried
         lines.append(standing)
     return "\n".join(lines)
-
-
-def _fitted(source: QPixmap, width: int, height: int) -> QPixmap:
-    if source.isNull() or width < 1 or height < 1:
-        return QPixmap()
-    return source.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,
-                         Qt.TransformationMode.SmoothTransformation)
 
 
 def one_scale_for_all(drawings, side: int) -> float:
@@ -98,65 +108,68 @@ def on_a_white_square(source: QPixmap, side: int, scale: float,
     return canvas
 
 
-class SortingWindow(QWidget):
+class ActionSetterWindow(QWidget):
 
-    NOTHING_LEFT = "Nothing left to sort."
+    NOTHING_LEFT = "Nothing left to set."
     MISSING = "(this one's file is missing)"
 
-    def __init__(self, session, tiles, drawings: dict[str, str], parent=None):
+    def __init__(self, session, vocabulary, drawings: dict[str, str], locks, *,
+                 stage=None, parent=None):
         super().__init__(parent)
         self._session = session
+        self._vocabulary = vocabulary
         self._drawings = dict(drawings)
+        self._locks = locks
         self._tiles: dict[str, QToolButton] = {}
         self._faces: dict[str, QToolButton] = {}
+        self._boxes: dict[str, TickControl] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
-        self._shown = QPixmap()
-        self.setWindowTitle("Origenerator — what does this image show?")
+        self.setWindowTitle(TITLE)
 
-        self._image = QLabel()
-        self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._image.setMinimumSize(320, 320)
+        self._stage = stage if stage is not None else _a_viewport()
+        self._stage.setMinimumSize(320, 320)
         self._status = QLabel(objectName=STATUS_LINE)
         self._last = QLabel(objectName=LAST_LINE)
         for line in (self._status, self._last):
             line.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        stage = QVBoxLayout()
-        stage.setContentsMargins(0, 0, 0, 0)
-        stage.setSpacing(GAP_MEDIUM)
-        stage.addWidget(self._image, 1)
-        stage.addWidget(self._status)
-        stage.addWidget(self._last)
+        shown = QVBoxLayout()
+        shown.setContentsMargins(0, 0, 0, 0)
+        shown.setSpacing(GAP_MEDIUM)
+        shown.addWidget(self._stage, 1)
+        shown.addWidget(self._status)
+        shown.addWidget(self._last)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
                                   MARGIN_STANDARD, MARGIN_STANDARD)
         layout.setSpacing(GAP_MEDIUM)
-        layout.addLayout(stage, 1)
-        layout.addWidget(self._build_states(tiles))
+        layout.addLayout(shown, 1)
+        layout.addWidget(self._build_buttons(vocabulary.tiles))
 
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
         self._show_current()
 
-
-    def _build_states(self, tiles) -> QWidget:
+    def _build_buttons(self, tiles) -> QWidget:
         column = QVBoxLayout()
         column.setSpacing(GAP_MEDIUM)
+        for name in self._vocabulary.checkboxes:
+            column.addLayout(self._checkbox_row(name))
         grid = QGridLayout()
         grid.setSpacing(GAP_MEDIUM)
-        drawings = {tile.state: QPixmap(str(self._drawings[tile.state]))
-                    for tile in tiles if self._drawings.get(tile.state)}
+        drawings = {tile.name: QPixmap(str(self._drawings[tile.name]))
+                    for tile in tiles if self._drawings.get(tile.name)}
         scale = one_scale_for_all(drawings.values(), MARK)
         room = self._room_for_a_name(tiles)
         wide = QFontMetrics(self._name_font).horizontalAdvance
-        named = {tile.state: a_name_for(
-            tile.state, room * tile.columns + GAP_MEDIUM * (tile.columns - 1), wide)
+        named = {tile.name: a_name_for(
+            tile.name, room * tile.columns + GAP_MEDIUM * (tile.columns - 1), wide)
             for tile in tiles}
         for tile in tiles:
             grid.addWidget(
-                self._state_tile(tile.state, drawings.get(tile.state), scale,
-                                 named[tile.state], tile.rows),
+                self._action_tile(tile.name, drawings.get(tile.name), scale,
+                                  named[tile.name], tile.rows),
                 tile.row, tile.column, tile.rows, tile.columns,
                 Qt.AlignmentFlag.AlignCenter)
         self._make_every_tile_one_size(tiles, drawings, scale)
@@ -170,11 +183,11 @@ class SortingWindow(QWidget):
         controls.setSpacing(GAP_MEDIUM)
         for name, caption, tip, press in (
             (SKIP_BUTTON, "Skip",
-             "Leave this one unsorted and come back to it at the end", self._on_skip),
+             "Leave this one as it is and come back to it at the end", self._on_skip),
             (SAME_BUTTON, "Same as last",
-             "Sort this one the way the last one was sorted", self._on_same),
+             "Give this one the actions the last one got", self._on_same),
             (UNDO_BUTTON, "Undo",
-             "Take the last answer back and put its image up again", self._on_undo),
+             "Take the last answer back and put its item up again", self._on_undo),
         ):
             button = QPushButton(caption, objectName=name)
             button.setToolTip(tip)
@@ -193,8 +206,29 @@ class SortingWindow(QWidget):
         scroll.setFixedWidth(inside.sizeHint().width() + 28)
         return scroll
 
+    def _checkbox_row(self, name: str) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(GAP_MEDIUM)
+        box = TickControl(name)
+        box.setObjectName(checkbox(name))
+        box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        held = QToolButton(objectName=lock(name))
+        held.setCheckable(True)
+        held.setIcon(qt_icon("lock"))
+        held.setStyleSheet(_LIT)
+        held.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        held.setChecked(name in self._locks.held(self._session.side))
+        held.setToolTip(_lock_tip(held.isChecked()))
+        held.toggled.connect(lambda locked, name=name: self._on_lock(name, locked))
+        box.toggled.connect(lambda checked, name=name: self._on_box(name, checked))
+        self._boxes[name] = box
+        row.addWidget(box)
+        row.addWidget(held)
+        row.addStretch(1)
+        return row
+
     def _make_every_tile_one_size(self, tiles, drawings, scale) -> None:
-        faces = [self._face(state) for state in self._tiles]
+        faces = [self._face(name) for name in self._tiles]
         if not faces:
             return
         rows = max((tile.row + tile.rows for tile in tiles), default=1)
@@ -207,30 +241,30 @@ class SortingWindow(QWidget):
         self._center_the_block(tiles, tallest, drawings, scale)
         for tile in tiles:
             wide = widest * tile.columns + GAP_MEDIUM * (tile.columns - 1)
-            self._tiles[tile.state].setFixedSize(
+            self._tiles[tile.name].setFixedSize(
                 wide, tallest * tile.rows + GAP_MEDIUM * (tile.rows - 1))
-            if tile.state in self._faces:
-                self._faces[tile.state].setFixedSize(wide, tallest)
+            if tile.name in self._faces:
+                self._faces[tile.name].setFixedSize(wide, tallest)
 
     def _room_for_a_name(self, tiles) -> int:
         metrics = QFontMetrics(self._name_font)
-        named = [one_term_to_a_line(tile.state) for tile in tiles]
-        widest = max(metrics.horizontalAdvance(word)
-                     for name in named for word in name.replace("\n", " ").split())
+        named = [one_term_to_a_line(tile.name) for tile in tiles]
+        widest = max((metrics.horizontalAdvance(word)
+                      for name in named for word in name.replace("\n", " ").split()), default=0)
         room = max(MARK, widest)
         while any(wrapped_to_fit(name, room, metrics.horizontalAdvance).count("\n")
                   >= NAME_LINES for name in named):
             room += 1
         return room
 
-    def _state_tile(self, state: str, drawing: QPixmap | None, scale: float,
-                    name: str, rows: int = 1) -> QToolButton:
-        tile = QToolButton(objectName=state_button(state))
+    def _action_tile(self, name: str, drawing: QPixmap | None, scale: float,
+                     shown: str, rows: int = 1) -> QToolButton:
+        tile = QToolButton(objectName=action_button(name))
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        tile.clicked.connect(lambda _checked=False, state=state: self._on_state(state))
-        self._tiles[state] = tile
-        face = tile if rows == 1 else self._face_in_the_middle_row(state, tile)
-        face.setText(name)
+        tile.clicked.connect(lambda _checked=False, name=name: self._on_action(name))
+        self._tiles[name] = tile
+        face = tile if rows == 1 else self._face_in_the_middle_row(name, tile)
+        face.setText(shown)
         face.setFont(self._name_font)
         face.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         face.setIconSize(QSize(MARK, MARK))
@@ -238,7 +272,7 @@ class SortingWindow(QWidget):
             face.setIcon(QIcon(on_a_white_square(drawing, MARK, scale)))
         return tile
 
-    def _face_in_the_middle_row(self, state: str, tile) -> QToolButton:
+    def _face_in_the_middle_row(self, name: str, tile) -> QToolButton:
         face = QToolButton(tile)
         face.setAutoRaise(True)
         face.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -247,15 +281,15 @@ class SortingWindow(QWidget):
         held.addStretch(1)
         held.addWidget(face, 0, Qt.AlignmentFlag.AlignHCenter)
         held.addStretch(1)
-        self._faces[state] = face
+        self._faces[name] = face
         return face
 
-    def _face(self, state: str) -> QToolButton:
-        return self._faces.get(state, self._tiles[state])
+    def _face(self, name: str) -> QToolButton:
+        return self._faces.get(name, self._tiles[name])
 
     def _draw_at(self, mark: int, drawings, scale: float, above: int = 0) -> None:
-        for state in self._tiles:
-            self._draw_one(self._face(state), drawings.get(state), mark, scale, above)
+        for name in self._tiles:
+            self._draw_one(self._face(name), drawings.get(name), mark, scale, above)
 
     def _draw_one(self, tile, drawing, mark: int, scale: float, above: int) -> None:
         tile.setIconSize(QSize(mark, mark + above))
@@ -266,26 +300,30 @@ class SortingWindow(QWidget):
     def _center_the_block(self, tiles, tallest: int, drawings, scale: float) -> None:
         line = QFontMetrics(self._name_font).height()
         for tile in tiles:
-            face = self._face(tile.state)
+            face = self._face(tile.name)
             spare = tallest - self._mark - line * (face.text().count("\n") + 1)
             if spare > 1:
-                self._draw_one(face, drawings.get(tile.state), self._mark, scale,
+                self._draw_one(face, drawings.get(tile.name), self._mark, scale,
                                spare // 2)
 
 
-    def _on_state(self, state: str) -> None:
+    def _checked(self) -> tuple[str, ...]:
+        return tuple(name for name, box in self._boxes.items() if box.isChecked())
+
+    def _on_action(self, name: str) -> None:
         if self._session.current is None:
             return
-        self._session.sort_as(state)
-        self._said(f"Last: {state}")
+        self._session.set_as(name, Labels(self._vocabulary.buttons[name], self._checked()))
+        self._said(f"Last: {name}")
 
     def _on_same(self) -> None:
-        state = self._session.last_state
-        if self._session.current is None or state is None:
-            self._said("Nothing sorted yet to go by")
+        last = self._session.last
+        if self._session.current is None or last is None:
+            self._said("Nothing set yet to go by")
             return
-        self._session.same()
-        self._said(f"Last: {state}")
+        said, labels = last
+        self._session.set_as(said, Labels(labels.actions, self._checked()))
+        self._said(f"Last: {said}")
 
     def _on_skip(self) -> None:
         if self._session.current is None:
@@ -300,30 +338,52 @@ class SortingWindow(QWidget):
         self._session.undo()
         self._said("Last: undone")
 
+    def _on_lock(self, name: str, locked: bool) -> None:
+        self.findChild(QToolButton, lock(name)).setToolTip(_lock_tip(locked))
+        if locked:
+            self._locks.hold(self._session.side, name, self._boxes[name].isChecked())
+        else:
+            self._locks.let_go(self._session.side, name)
+
+    def _on_box(self, name: str, checked: bool) -> None:
+        if name in self._locks.held(self._session.side):
+            self._locks.hold(self._session.side, name, checked)
+
     def _said(self, line: str) -> None:
         self._last.setText(line)
         self._show_current()
 
-
     def _show_current(self) -> None:
-        image = self._session.current
-        if image is None:
-            self._shown = QPixmap()
-            self._image.clear()
+        item = self._session.current
+        if item is None:
+            self._stage.show_message("")
             self._status.setText(self.NOTHING_LEFT)
             return
-        self._status.setText(f"{self._session.remaining} left · {image.get('name')}")
-        path = image.get("image_path")
-        self._shown = QPixmap(str(path)) if path else QPixmap()
-        self._fill_with_the_image()
+        self._status.setText(f"{self._session.remaining} left · {item.get('name')}")
+        self._set_the_boxes_for(item)
+        path = item.get("path")
+        if path and Path(path).is_file():
+            self._stage.show_media(path, self._session.side)
+        else:
+            self._stage.show_message(self.MISSING)
 
-    def _fill_with_the_image(self) -> None:
-        if self._shown.isNull():
-            self._image.setText(self.MISSING)
-            return
-        self._image.setPixmap(_fitted(self._shown, self._image.width(),
-                                        self._image.height()))
+    def _set_the_boxes_for(self, item: dict) -> None:
+        held = self._locks.held(self._session.side)
+        its_own = (item.get("labels") or Labels()).checked
+        for name, box in self._boxes.items():
+            box.setChecked(held.get(name, name in its_own))
 
-    def resizeEvent(self, event):  # noqa: N802 — Qt override
-        super().resizeEvent(event)
-        self._fill_with_the_image()
+    def closeEvent(self, event) -> None:  # noqa: N802 -- Qt override
+        self._stage.clear()
+        super().closeEvent(event)
+
+
+def _lock_tip(locked: bool) -> str:
+    return ("Kept for every item until you unlock it" if locked
+            else "Lock to keep this box as it is for every item")
+
+
+def _a_viewport():
+    from origenerator.gui.viewport import Viewport  # noqa: PLC0415 -- tests hand the window a stage
+
+    return Viewport()

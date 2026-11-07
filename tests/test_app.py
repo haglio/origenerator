@@ -1095,6 +1095,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
     ("origenerator.provenance", "stamp_unstamped"),
     ("origenerator.item_shape", "record_shapes"),
+    ("origenerator.former_actions", "fill_in_labels"),
     ("origenerator.favorite_reconcile", "reconcile_favorites"),
 )
 

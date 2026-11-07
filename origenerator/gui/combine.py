@@ -21,7 +21,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_SMALL
 from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.content import genau_flick_word
-from origenerator.gui.action_dropdown import ACTION_LABEL
+from origenerator.gui.action_row import ACTION_LABEL
 from origenerator.gui.drop_zone import (
     DROP_A_VIDEO,
     DROP_AN_IMAGE,

@@ -505,7 +505,7 @@ def _fox_library(tmp_path):
             _row("v1", "wan22_i2v",
                  {"positive_prompt": "the fox runs", "noise_seed": 5,
                   "input_image": "sdxl_t2i_g1.png"},
-                 "wan22_i2v_v1.mp4", action="alpha")]
+                 "wan22_i2v_v1.mp4", video_actions=json.dumps(["alpha"]))]
     for row in rows:
         row["thumbnail_path"] = str(tall)
         if row["workflow_name"] == "sdxl_t2i":

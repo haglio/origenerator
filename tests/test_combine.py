@@ -9,7 +9,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
 from origenerator import action_settings, animation_paths
-from origenerator.gui.action_dropdown import ACTION_LABEL
+from origenerator.gui.action_row import ACTION_LABEL
 from origenerator.gui.combine import Combine, CombineRequest, ZoneLookups, _text_inset
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime

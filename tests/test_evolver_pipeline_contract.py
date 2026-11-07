@@ -22,7 +22,8 @@ def _promise() -> dict:
 def test_the_folders_this_app_sends_to_are_the_ones_evolver_watches():
     relative = _promise()["library_relative"]
     sent_to = {"inbox_dir": config.EVOLVER_INBOX_DIR,
-               "upscaled_dir": config.EVOLVER_UPSCALED_DIR}
+               "upscaled_dir": config.EVOLVER_UPSCALED_DIR,
+               "trash_dir": config.KINO_TRASH_DIR}
 
     watched = {name: config.LIBRARY_ROOT / Path(relative[name])
                for name in sent_to if name in relative}

@@ -32,6 +32,8 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
+    EVOLVER_UPSCALED_DIR,
+    KINO_TRASH_DIR,
     OUTPUT_PLACES,
     THUMB_DIR,
     TRASH_DIR,
@@ -183,7 +185,7 @@ from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_labels import label_the_launch
 from origenerator.radio import OrigeneratorRadio
-from origenerator.trash import Trash
+from origenerator.trash import Kino, Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -307,6 +309,7 @@ class GalleryView(QWidget):
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=self._enhance.cancel_for_delete,
+                kino=Kino(EVOLVER_UPSCALED_DIR, KINO_TRASH_DIR),
             ),
         )
         self._foreign_queue = ForeignQueue(running=[], pending=[])

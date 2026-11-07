@@ -7,7 +7,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
-from origenerator.trash import Trash
+from origenerator.trash import Kino, Trash
 
 
 def _completed_row(db, output_dir, pid, file, *, thumb_dir=None):
@@ -694,3 +694,114 @@ class TestTheFoldersItWasGiven:
         actions = GalleryEdits(Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(tmp_path / "output"), Trash(tmp_path / "trash"))
 
         assert actions.thumb_dir is None
+
+
+def _site_video_actions(tmp_path):
+    db = Database(tmp_path / "test.db")
+    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash")
+    kino_trash = kino.trash
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
+                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
+    video = kino.library / "landscape" / "sample site" / "video one.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"site video")
+    db.insert_generation(NewGeneration(
+        prompt_id="v1", workflow_name="outside_video", workflow_version="outside",
+        params_json="{}", workflow_json="{}",
+    ))
+    db.update_generation("v1", status="completed", output_files=json.dumps(
+        [{"filename": video.name, "library_path": str(video)}]))
+    return actions, db, video, kino_trash
+
+
+def test_sending_a_site_video_to_trash_takes_it_out_of_kino(tmp_path):
+    actions, db, video, kino_trash = _site_video_actions(tmp_path)
+
+    actions.delete_rows([db.get_generation("v1")])
+
+    assert not video.exists()
+    assert (kino_trash / "video one.mp4").read_bytes() == b"site video"
+
+
+def test_undoing_a_site_videos_trash_puts_it_back_in_kino(tmp_path):
+    actions, db, video, kino_trash = _site_video_actions(tmp_path)
+    actions.delete_rows([db.get_generation("v1")])
+
+    actions.undo()
+
+    assert video.read_bytes() == b"site video"
+    assert not (kino_trash / "video one.mp4").exists()
+
+
+def test_restoring_a_site_video_from_trash_puts_it_back_in_kino(tmp_path):
+    actions, db, video, _kino_trash = _site_video_actions(tmp_path)
+    actions.delete_rows([db.get_generation("v1")])
+
+    actions.restore_deleted(["v1"])
+
+    assert video.read_bytes() == b"site video"
+
+
+def test_a_site_video_kino_put_back_meanwhile_stays_where_kino_put_it(tmp_path):
+    actions, db, video, kino_trash = _site_video_actions(tmp_path)
+    actions.delete_rows([db.get_generation("v1")])
+    (kino_trash / "video one.mp4").replace(video)
+
+    actions.restore_deleted(["v1"])
+
+    assert video.read_bytes() == b"site video"
+
+
+def test_a_site_video_whose_name_kinos_trash_already_holds_stays_in_kino(tmp_path):
+    actions, db, video, kino_trash = _site_video_actions(tmp_path)
+    kino_trash.mkdir()
+    (kino_trash / "video one.mp4").write_bytes(b"another video")
+
+    actions.delete_rows([db.get_generation("v1")])
+
+    assert video.read_bytes() == b"site video"
+    assert (kino_trash / "video one.mp4").read_bytes() == b"another video"
+
+
+def test_purging_the_trash_leaves_a_site_video_in_kinos_trash(tmp_path):
+    actions, db, _video, kino_trash = _site_video_actions(tmp_path)
+    actions.delete_rows([db.get_generation("v1")])
+
+    actions.purge_deleted(["v1"])
+
+    assert (kino_trash / "video one.mp4").read_bytes() == b"site video"
+
+
+def test_a_file_outside_kinos_library_stays_where_it_is(tmp_path):
+    db = Database(tmp_path / "test.db")
+    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash")
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
+                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
+    elsewhere = tmp_path / "elsewhere" / "video one.mp4"
+    elsewhere.parent.mkdir(parents=True)
+    elsewhere.write_bytes(b"site video")
+    db.insert_generation(NewGeneration(
+        prompt_id="v1", workflow_name="outside_video", workflow_version="outside",
+        params_json="{}", workflow_json="{}",
+    ))
+    db.update_generation("v1", status="completed", output_files=json.dumps(
+        [{"filename": elsewhere.name, "library_path": str(elsewhere)}]))
+
+    actions.delete_rows([db.get_generation("v1")])
+
+    assert elsewhere.read_bytes() == b"site video"
+
+
+def test_a_site_video_kino_will_not_let_go_of_stays_in_kino_and_still_leaves_the_gallery(
+        tmp_path, monkeypatch):
+    actions, db, video, _kino_trash = _site_video_actions(tmp_path)
+
+    def held_open(*_args, **_kwargs):
+        raise PermissionError("in use")
+
+    monkeypatch.setattr("origenerator.trash._move", held_open)
+
+    actions.delete_rows([db.get_generation("v1")])
+
+    assert video.read_bytes() == b"site video"
+    assert db.get_generation("v1") is None

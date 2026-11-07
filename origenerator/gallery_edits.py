@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator import trash_collection
+from origenerator.db_generations import library_paths_in
 from origenerator.gallery import (
     output_disk_files,
     remove_enhance_versions,
@@ -14,6 +15,7 @@ from origenerator.gallery import (
 from origenerator.gallery.output import with_files_renamed
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
+from origenerator.trash import Kino
 from origenerator.undo_stack import UndoEntry, UndoStack
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,7 @@ class GalleryEnvironment:
     release_files: Callable[..., None] | None = None
     cancel_enhancements: Callable[[list[dict]], None] | None = None
     thumb_dir: Path | None = None
+    kino: Kino | None = None
 
 
 class GalleryEdits:
@@ -110,10 +113,21 @@ class GalleryEdits:
                      the_item_stays: bool = False):
         # Windows cannot move a file the app still holds open, as a preview does its video.
         by_row = self._files_by_row(rows, names)
+        in_kino = [self._in_kino(row) if names is None else [] for row in rows]
         if self._environment.release_files is not None:
-            self._environment.release_files([path for files in by_row for path in files],
+            self._environment.release_files([path for files in [*by_row, *in_kino] for path in files],
                                             the_item_stays=the_item_stays)
-        return [(row, self._trash.store(files)) for row, files in zip(rows, by_row, strict=True)]
+        batches = [(row, self._trash.store(files)) for row, files in zip(rows, by_row, strict=True)]
+        for (_row, batch), videos in zip(batches, in_kino, strict=True):
+            batch.sent_to_kino_trash = self._environment.kino.take_out(videos) if videos else []
+        return batches
+
+    def _in_kino(self, row: dict) -> list[Path]:
+        kino = self._environment.kino
+        if kino is None:
+            return []
+        return [video for video in map(Path, library_paths_in(row.get("output_files")))
+                if kino.plays(video)]
 
     def _files_by_row(self, rows: list[dict],
                       names: set[str] | None = None) -> list[list[Path]]:

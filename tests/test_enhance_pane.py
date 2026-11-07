@@ -67,6 +67,8 @@ from origenerator.gui.enhance_versions import (
 )
 from origenerator.gui.prompt_marks import RESOLVE_IN_BOTH_PROMPTS, problem_to_resolve
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.model_titles import model_title
+from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from origenerator.workflows.model_files import NO_LORA
 from tests import gestures
@@ -107,6 +109,15 @@ def test_a_fresh_panel_reads_as_the_workflow_defaults_tick_off(qtbot):
     assert settings.auto is False
     assert settings.params["enhance_scale"] == default_enhance_params()["enhance_scale"]
     assert settings.params["checkpoint"] == MATCH_SOURCE_MODEL
+
+
+def test_the_model_left_to_match_the_source_says_which_model_it_falls_back_to(qtbot):
+    pane, _ = _panel(qtbot)
+    fallback = model_title(WORKFLOW_REGISTRY["image_enhance"].default_params()["checkpoint"])
+
+    assert pane._model.itemText(0) == (
+        f"(match the source image's model, or fall back to default model {fallback})")
+    assert pane._model.itemData(0) == MATCH_SOURCE_MODEL
 
 
 def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):

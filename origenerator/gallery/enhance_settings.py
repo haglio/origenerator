@@ -17,6 +17,11 @@ ENHANCE_SETTING_KEYS = (
 MATCH_SOURCE_MODEL = "(match the source image)"
 
 
+def match_source_model_label() -> str:
+    fallback = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()["checkpoint"]
+    return f"(match the source image's model, or fall back to default model {model_title(fallback)})"
+
+
 def default_enhance_params() -> dict:
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
     params = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}

@@ -124,6 +124,7 @@ from origenerator.gui.generate_pane import GeneratePane, TabViews
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.how_many import HOW_MANY
+from origenerator.gui.icons import collection_mark
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
     CANCEL_TEXT,
@@ -195,7 +196,7 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 1500
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
-_PATH_MARK_OF = {_FAVORITES_KEY: "star", _ENHANCED_KEY: "plus"}
+_PATH_MARK_OF = {key: collection_mark(key) for key in (_FAVORITES_KEY, _ENHANCED_KEY)}
 
 
 class _SearchScope(NamedTuple):
@@ -1323,7 +1324,7 @@ class GalleryView(QWidget):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
         self._folder_path.show_folder(self._tree_view.path_steps(item),
-                                      mark=_PATH_MARK_OF.get(collection.which, ""))
+                                      mark=_PATH_MARK_OF.get(collection.which))
         self._avg_label.setText("")
         self._clear_metadata()
         self._gallery_pane.show_collection(collection.key, shape)

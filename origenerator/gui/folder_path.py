@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 from shared_ui import folder_path as shared_folder_path
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
@@ -29,7 +30,8 @@ class FolderPath(QWidget):
         row.addWidget(CopyButton(self.display_text), 0, Qt.AlignmentFlag.AlignTop)
         row.addWidget(self._path, 1)
 
-    def show_folder(self, steps: Sequence[PathStep], *, mark: str = "") -> None:
+    def show_folder(self, steps: Sequence[PathStep], *,
+                    mark: tuple[str, QColor] | None = None) -> None:
         self._show(steps, links_among=steps[:-1], icons={len(steps) - 1: mark} if mark else None)
 
     def show_search(self, words: str, steps: Sequence[PathStep]) -> None:
@@ -39,7 +41,7 @@ class FolderPath(QWidget):
         self._show([PathStep(text, None)], links_among=())
 
     def _show(self, steps: Sequence[PathStep], *, links_among: Sequence[PathStep],
-              lead: str = "", icons: Mapping[int, str] | None = None) -> None:
+              lead: str = "", icons: Mapping[int, tuple[str, QColor]] | None = None) -> None:
         self._keys = tuple(step.key for step in steps)
         self._path.set_path([step.name for step in steps], lead=lead, icons=icons,
                             linked=[i for i, step in enumerate(links_among) if step.key])

@@ -104,6 +104,14 @@ def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(q
             == icon_pixmap("portrait_beside_landscape", BUTTON_FILLING_ICON, TEXT_PRIMARY).toImage())
 
 
+def test_the_tocs_favorites_enhanced_and_trash_wear_their_colors(qtbot):
+    for collection, name, color in ((icons.FAVORITES_KEY, "star", GREEN),
+                                    (icons.ENHANCED_KEY, "plus", YELLOW),
+                                    (icons.TRASH_KEY, "trash", RED)):
+        drawn = icons.collection_icon(collection).pixmap(QSize(48, 48)).toImage()
+        assert drawn == icon_pixmap(name, 48, color).toImage(), name
+
+
 def test_a_collection_mark_is_drawn_once():
     assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY)
 

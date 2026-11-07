@@ -29,6 +29,15 @@ def default_enhance_params() -> dict:
     return params
 
 
+def basic_enhance_settings() -> EnhanceSettings:
+    defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
+    return EnhanceSettings(params={
+        "checkpoint": defaults["checkpoint"], "upscale_model": defaults["upscale_model"],
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.0,
+        "enhance_detail_fixes": {}, "enhance_fix_prompts": {},
+    })
+
+
 def version_settings(params: dict) -> dict:
     settings = {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS}
     if params.get("source_model"):

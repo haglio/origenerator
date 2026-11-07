@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from origenerator import config, enhance_presets, fix_training, gallery, lora_training
 from origenerator.file_refs import frame_name
+from origenerator.gallery.enhance_settings import basic_enhance_settings
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.enhance_pane import EnhancePane
@@ -250,17 +251,20 @@ class EnhanceController:
         group = self._host.current_group()
         if not isinstance(group, gallery.SettingsGroup):
             return
-        self._enqueue(self._awaiting(group.rows))
+        self._enqueue(self._awaiting(group.rows), self._settings)
         self._host.enhance_offer_changed()
 
     def enhance_items(self, prompt_ids: list[str]) -> None:
         rows = [self._db.get_generation(pid) for pid in prompt_ids]
-        self._enqueue([r for r in rows if r is not None])
+        self._enqueue([r for r in rows if r is not None], self._settings)
 
-    def _enqueue(self, rows: list[dict]) -> None:
+    def enhance_a_videos_start_image(self, row: dict) -> None:
+        self._enqueue([row], basic_enhance_settings())
+
+    def _enqueue(self, rows: list[dict], settings: gallery.EnhanceSettings) -> None:
         asks = []
         for row in rows:
-            params = gallery.enhance_params_for(row, self._settings)
+            params = gallery.enhance_params_for(row, settings)
             if params is None:
                 logger.warning("Enhance skipped for %s: no output file to enhance",
                                row.get("prompt_id"))
@@ -293,15 +297,19 @@ class EnhanceController:
             return
         awaiting = self._awaiting([row])
         if awaiting:
-            self._enqueue(awaiting)
+            self._enqueue(awaiting, self._settings)
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
+        return self._enhance_one(prompt_id, self._settings)
+
+    def _enhance_one(self, prompt_id: str | None,
+                     settings: gallery.EnhanceSettings) -> tuple[str | None, str, str]:
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
             return None, "only a finished image can be enhanced", WARNING
         if gallery.is_enhanced_row(row):
             return None, "this one is enhanced already", WARNING
-        params = gallery.enhance_params_for(row, self._settings)
+        params = gallery.enhance_params_for(row, settings)
         if params is None:
             return None, "this one has no file to enhance", WARNING
         return self._launch_spoken(row, params, "enhance", "enhancing…")
@@ -332,7 +340,7 @@ class EnhanceController:
         return row["prompt_id"], doing, INFO
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        if self.enhance_it(prompt_id)[0] is not None:
+        if self._enhance_one(prompt_id, basic_enhance_settings())[0] is not None:
             return True
         self.put_what_is_locked_first()
         self.reconcile()

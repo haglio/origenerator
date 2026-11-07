@@ -445,8 +445,7 @@ class GalleryView(QWidget):
                 slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane),
             db=db)
         self._jobs.changed.connect(self._enhance.reconcile)
-        self._jobs.enhance_images_with(
-            lambda image: self._enhance.enhance_items([image["prompt_id"]]))
+        self._jobs.enhance_images_with(self._enhance.enhance_a_videos_start_image)
         self._look_training = LookTrainingController(
             self._jobs, info_tabs_of=lambda: self._generate_pane, parent=self)
         self._voice = VoiceRouter(

@@ -92,7 +92,7 @@ for one thing cost four. So:
   on the screen. The code's "picture" became "image" (2026-10-25), and a
   picture that was no image took a name of its own: the small one on a tile,
   a row or a tile is a **thumbnail**, one frame of a video or of this window
-  sent to the headset is a **frame**, his drawings on the sorting window's
+  sent to the headset is a **frame**, his drawings on the action setter tool's
   buttons and the OSR2 controls' drawing are **drawings**, and what a run is
   making, in the help for its settings, is the **result**. Saved names keep
   the old word and are read under the new one in one place each, as the
@@ -292,12 +292,17 @@ then leaves as it is.
 
 ## What a generation shows is said by hand, never read off its prompt
 
-Two columns answer it and nothing else does: an image's `image_state`, set in
-the sorting window or the Action list on a Generate tab, and a video's
-`action`, the action picked when it was launched. `action_settings.action_of`
-reads those two and returns "" for a row nobody has said one for, which a
-slideshow's nav map draws as a row with no action name, in its margin and on its filter
-button (`nav_map.action_of`).
+Each item's labels answer it and nothing else does (`action_labels`): its image
+actions and image checkboxes, and a video's video actions and video checkbox, set
+with the action setter tool or the checkboxes on a Generate tab's Action row. A
+video's image labels are its start image's, or its own when it has none
+(`gallery.source_image.image_labels_row`), and a slideshow's nav map names a row
+for the image's actions and then the video's, each once (`nav_map`). The setter
+tool's buttons stand for those actions, and a press saves the actions, never the
+button (his decision, 2026-11-06); the overlay's `image_actions` and
+`video_actions` say which actions each button stands for. The old `image_state`
+and `action` columns are read only to carry the answers given before that over
+(`former_actions`), and by Combine until it reads the labels too.
 
 It used to be worked out from the prompt, by matching each action's keywords in
 `actions` against the stored text. That answer named every nav map row and
@@ -309,7 +314,7 @@ nothing: it named rows for an action none of them shows, which the user found of
 
 So nothing in this repo may go back to guessing from a prompt, however tempting a
 blank row looks: a blank says the image has not been sorted, which is a thing to
-fix in the sorting window, not in code. The near miss that still counts: a
+fix in the action setter tool, not in code. The near miss that still counts: a
 "fallback" that reads the prompt only when the hand-set answer is missing — that
 is exactly the shape that was removed, and it leaves one question with two
 answers again.
@@ -462,7 +467,7 @@ such a handshake is tried with a preview on each side before it is called
 done. The near miss that still counts: a fix that reaches the previews built
 after it and says nothing about the ones already handed over, which read only
 their own `state/` until their branches are brought up to date.
-## Two windows of this app's that the app has no button for
+## Two windows of this app's with launchers of their own
 
 Both are launched from a `.vbs` of their own beside `launch_origenerator.vbs`,
 both run the primary's venv with `ORIGENERATOR_BRANCH_SESSION=1`, and both read
@@ -471,15 +476,17 @@ and write the LIVE install's library from whichever checkout starts them
 database is one nobody will ever animate from, so a run of either spent on it
 would be lost. `tests/test_the_library_windows_launchers.py` holds both to that.
 
-- `sort_images.vbs` -> `origenerator.sort_images` -- says what each image
-  shows, a press apiece. The vocabulary is the overlay's `image_states` and
-  the answer lands in the row's `image_state`; which images are still
-  waiting and in what order is `image_sorting`, what each press does is
-  `sorting_session`, and the window is `gui/sorting_window.py`. Each state's
-  button wears the user's own drawing of it, found by `action_drawings` in the
+- `sort_images.vbs` -> `origenerator.action_setter_tool` -- the action setter
+  tool for images, a press apiece; a Generate tab's Action row opens it, or the
+  one for videos, on the item it shows. The buttons are the overlay's
+  `image_actions` or `video_actions`, and a press saves the actions the button
+  stands for, with the checkboxes above them, on the item; which items are
+  still waiting and in what order, and what each press does, is
+  `action_setter`, and the window is `gui/action_setter_window.py`. Each
+  image button wears the user's own drawing, found by `action_drawings` in the
   running copy's own `state/picture_states/` and then the live install's: his,
   and library subject matter, so
-  they are as uncommittable as the state names and live beside the library.
+  they are as uncommittable as the button names and live beside the library.
 - `check_animations.vbs` -> `origenerator.check_animations` -- settles what each
   of the overlay's `animation_paths` entries runs, one at a time, against a video
   the user already kept. `animation_samples` finds and orders them,
@@ -497,7 +504,7 @@ would be lost. `tests/test_the_library_windows_launchers.py` holds both to that.
   nobody ever kept a video of, which is the last place `starting_point` looks.
 
 Neither can answer anything the other has not: an animation's samples are videos
-made from images already sorted, so the sorting window comes first and a fresh
+made from images already sorted, so the action setter tool comes first and a fresh
 library shows every animation blank.
 
 ## The commands in `tools/`, and why each one is not a menu item

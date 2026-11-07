@@ -23,11 +23,9 @@ from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator import (
-    action_settings,
     evolver_export,
     gallery,
     request_settings,
-    said_action,
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
@@ -53,6 +51,7 @@ from origenerator.gallery import (
     workflow_output_type,
 )
 from origenerator.gallery.shapes import PORTRAIT
+from origenerator.gallery.source_image import start_images_among
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
@@ -61,7 +60,7 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import made_here
 from origenerator.gui import icons
-from origenerator.gui.action_dropdown import ActionDropdown
+from origenerator.gui.action_row import ActionRow
 from origenerator.gui.basic_section import BasicSection, wrappable
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
@@ -94,7 +93,6 @@ from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.viewport import Viewport
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneFolders, ZoneItems
-from origenerator.image_states import state_names
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
@@ -302,11 +300,11 @@ class GenerateTab(DropZones):
         self._basic_section = BasicSection(go_to_folder=self._go_to_folder)
         self._basic_section.hide()
         body.addWidget(self._basic_section)
-        self._action = ActionDropdown(state_names(), action_settings.CATEGORIES, header)
-        self._action.chosen.connect(self._on_action_chosen)
+        self._action = ActionRow(header)
+        self._action.changed.connect(self._save_labels)
 
-    def _on_action_chosen(self, prompt_id: str, said: str) -> None:
-        said_action.say(self._db, prompt_id, self._displayed_row or {}, said)
+    def _save_labels(self, prompt_id: str, side: str, labels) -> None:
+        self._db.set_labels(prompt_id, side, labels)
 
     def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
         self._form_workflow_key = None
@@ -1284,7 +1282,7 @@ class GenerateTab(DropZones):
         self.reread_folder_buttons()
         self._basic_section.setVisible(
             self._basic_section.show_row(row, self._upscale_of(row), self._item_name()))
-        self._action.show_row(row)
+        self._action.show_row(row, start_images_among(image_rows)(row))
         self._related.show_row(row, image_rows)
         self._refresh_versions()
         self._update_lane_button(preview)

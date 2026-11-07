@@ -7,10 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from origenerator.action_labels import Labels, is_labeled, labels_of
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
 from origenerator.db_schema import STORED_NAMES
+from origenerator.media import MediaType
 from origenerator.provenance import WORKFLOW, WORKFLOW_VERSION
 
 
@@ -126,6 +128,52 @@ def test_an_image_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_
 
     db.set_image_state("pic-001", None)
     assert db.get_generation("pic-001")["image_state"] is None
+
+
+def _an_image(db, prompt_id="pic-001"):
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}"))
+
+
+def test_an_item_keeps_the_labels_set_on_each_side_until_they_are_taken_back(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _an_image(db)
+
+    db.set_labels("pic-001", MediaType.IMAGE, Labels(("alpha", "beta"), ("first box",)))
+    db.set_labels("pic-001", MediaType.VIDEO, Labels((), ("second box",)))
+    labeled = db.get_generation("pic-001")
+    db.set_labels("pic-001", MediaType.IMAGE, None)
+    unlabeled = db.get_generation("pic-001")
+
+    assert (labels_of(labeled, MediaType.IMAGE), labels_of(labeled, MediaType.VIDEO)) == (
+        Labels(("alpha", "beta"), ("first box",)), Labels((), ("second box",)))
+    assert (is_labeled(unlabeled, MediaType.IMAGE), is_labeled(unlabeled, MediaType.VIDEO)) == (
+        False, True)
+
+
+def test_many_items_can_be_labeled_in_one_write(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _an_image(db, "pic-001")
+    _an_image(db, "pic-002")
+
+    db.set_many_labels(MediaType.IMAGE, {"pic-001": Labels(("alpha",)),
+                                         "pic-002": Labels((), ("first box",))})
+
+    assert [labels_of(db.get_generation(p), MediaType.IMAGE) for p in ("pic-001", "pic-002")] == [
+        Labels(("alpha",)), Labels((), ("first box",))]
+
+
+def test_a_trashed_item_comes_back_with_its_labels(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _an_image(db)
+    db.set_labels("pic-001", MediaType.IMAGE, Labels(("alpha",), ("first box",)))
+    db.record_trashed("pic-001", db.get_generation("pic-001"), {})
+    db.delete_generation("pic-001")
+
+    db.restore_generation(db.get_trashed("pic-001")["row"])
+
+    assert labels_of(db.get_generation("pic-001"), MediaType.IMAGE) == Labels(
+        ("alpha",), ("first box",))
 
 
 def test_update_generation(tmp_path):

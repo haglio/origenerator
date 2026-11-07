@@ -1,0 +1,420 @@
+from __future__ import annotations
+
+import pytest
+from PIL import Image
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtWidgets import QLabel, QPushButton, QToolButton, QWidget
+from shared_ui.spacing import GAP_MEDIUM
+from shared_ui.tick_control import TickControl
+
+from origenerator.action_labels import Labels
+from origenerator.action_setter import Locks, SetterSession
+from origenerator.action_vocabulary import Tile, Vocabulary
+from origenerator.gui.action_setter_window import (
+    LAST_LINE,
+    ROOM_FOR_THE_GRID,
+    SAME_BUTTON,
+    SKIP_BUTTON,
+    STATUS_LINE,
+    TITLE,
+    UNDO_BUTTON,
+    ActionSetterWindow,
+    action_button,
+    checkbox,
+    lock,
+    on_a_white_square,
+    one_scale_for_all,
+    one_term_to_a_line,
+    wrapped_to_fit,
+)
+from origenerator.media import MediaType
+
+_BUTTONS = {"button one": ("alpha",), "button two": ("alpha", "beta"), "button three": ("gamma",)}
+_TILES = (Tile("button one", 0, 0), Tile("button two", 0, 1), Tile("button three", 1, 0))
+
+
+class _Store:
+    def __init__(self):
+        self.labels = {}
+
+    def set_labels(self, prompt_id, side, labels):
+        self.labels[prompt_id] = labels
+
+
+class _Stage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.shown = []
+
+    def show_media(self, path, media_type):
+        self.shown.append((str(path), media_type))
+
+    def show_message(self, text):
+        self.shown.append(text)
+
+    def clear(self):
+        self.shown.append(None)
+
+
+def _drawn(path, size=(40, 60), color="gray"):
+    Image.new("RGB", size, color).save(path)
+    return str(path)
+
+
+def _tile(made, name) -> QToolButton:
+    return made.findChild(QToolButton, action_button(name))
+
+
+def _box(made, name) -> TickControl:
+    return made.findChild(TickControl, checkbox(name))
+
+
+def _lock(made, name) -> QToolButton:
+    return made.findChild(QToolButton, lock(name))
+
+
+def _press(made, name) -> QPushButton:
+    return made.findChild(QPushButton, name)
+
+
+def _said(made, name) -> str:
+    return made.findChild(QLabel, name).text()
+
+
+@pytest.fixture
+def window(qtbot, tmp_path):
+    def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
+              side=MediaType.IMAGE, locks=None):
+        store = _Store()
+        listed = items or [{"prompt_id": p, "name": "3FA9C0D2 000", "path": None}
+                           for p in prompt_ids]
+        stage = _Stage()
+        made = ActionSetterWindow(
+            SetterSession(listed, store, side),
+            Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}),
+            drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage)
+        qtbot.addWidget(made)
+        return made, store, stage
+
+    return build
+
+
+def test_the_window_is_called_the_action_setter_tool(window):
+    made, _store, _stage = window("first")
+
+    assert made.windowTitle() == TITLE == "Origenerator — action setter tool"
+
+
+def test_the_status_line_calls_the_item_by_the_name_the_gallery_gives_it(window):
+    made, _store, _stage = window(items=[{"prompt_id": "first", "name": "3FA9C0D2 004"}])
+
+    assert _said(made, STATUS_LINE) == "1 left · 3FA9C0D2 004"
+
+
+def test_pressing_a_button_saves_the_actions_it_stands_for_on_the_item(window):
+    made, store, _stage = window("first", "second")
+
+    _tile(made, "button two").click()
+
+    assert sorted(tile.objectName() for tile in made.findChildren(QToolButton)) == sorted(
+        action_button(name) for name in _BUTTONS)
+    assert store.labels == {"first": Labels(("alpha", "beta"))}
+
+
+def test_the_count_says_how_many_are_left_and_falls_as_they_are_set(window):
+    made, _store, _stage = window("first", "second")
+    before = _said(made, STATUS_LINE)
+
+    _tile(made, "button one").click()
+
+    assert (before[:2], _said(made, STATUS_LINE)[:2]) == ("2 ", "1 ")
+
+
+def test_the_last_line_names_the_button_last_pressed(window):
+    made, _store, _stage = window("first", "second")
+
+    _tile(made, "button one").click()
+
+    assert _said(made, LAST_LINE) == "Last: button one"
+
+
+def test_the_window_says_when_there_is_nothing_left_to_set(window):
+    made, _store, _stage = window("only")
+
+    _tile(made, "button one").click()
+
+    assert _said(made, STATUS_LINE) == ActionSetterWindow.NOTHING_LEFT
+
+
+def test_same_as_last_gives_this_item_the_actions_the_last_one_got(window):
+    made, store, _stage = window("first", "second")
+    _tile(made, "button three").click()
+
+    _press(made, SAME_BUTTON).click()
+
+    assert store.labels == {"first": Labels(("gamma",)), "second": Labels(("gamma",))}
+
+
+def test_same_as_last_with_nothing_set_yet_says_so_and_sets_nothing(window):
+    made, store, _stage = window("first")
+
+    _press(made, SAME_BUTTON).click()
+
+    assert (store.labels, _said(made, LAST_LINE)) == ({}, "Nothing set yet to go by")
+
+
+def test_skipping_leaves_the_item_as_it_was_and_brings_up_the_next(window):
+    made, store, _stage = window("first", "second")
+
+    _press(made, SKIP_BUTTON).click()
+
+    assert (store.labels, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
+
+
+def test_undo_takes_the_last_answer_back_and_puts_its_item_up_again(window):
+    made, store, _stage = window("first", "second")
+    _tile(made, "button one").click()
+
+    _press(made, UNDO_BUTTON).click()
+
+    assert (store.labels, _said(made, STATUS_LINE)[:2]) == ({"first": None}, "2 ")
+
+
+def test_undo_with_nothing_answered_yet_says_so(window):
+    made, _store, _stage = window("first")
+
+    _press(made, UNDO_BUTTON).click()
+
+    assert _said(made, LAST_LINE) == "Nothing to undo"
+
+
+def test_the_item_on_screen_is_put_up_from_its_file_as_what_it_is(window, tmp_path):
+    image = _drawn(tmp_path / "item.png")
+    _made, _store, stage = window(items=[{"prompt_id": "first", "name": "3FA9C0D2 001",
+                                          "path": image}], side=MediaType.VIDEO)
+
+    assert stage.shown == [(image, MediaType.VIDEO)]
+
+
+def test_an_item_whose_file_has_gone_says_so_rather_than_showing_nothing(window, tmp_path):
+    _made, _store, stage = window(items=[{"prompt_id": "first", "name": "3FA9C0D2 001",
+                                          "path": str(tmp_path / "gone.png")}])
+
+    assert stage.shown == [ActionSetterWindow.MISSING]
+
+
+def test_closing_the_window_lets_go_of_what_it_was_showing(window):
+    made, _store, stage = window("first")
+
+    made.close()
+
+    assert stage.shown[-1] is None
+
+
+def test_each_checkbox_stands_above_the_buttons_with_a_lock_beside_it(window):
+    made, _store, _stage = window("first", checkboxes=("first box", "second box"))
+    above = made.findChild(QToolButton, action_button("button one")).mapTo(made, made.rect().topLeft())
+
+    for name in ("first box", "second box"):
+        box, held = _box(made, name), _lock(made, name)
+        assert (box.text(), held.isCheckable(), held.isChecked()) == (name, True, False)
+        assert box.mapTo(made, box.rect().topLeft()).y() < above.y()
+
+
+def test_a_press_saves_the_checked_boxes_with_the_actions(window):
+    made, store, _stage = window("first", checkboxes=("first box", "second box"))
+
+    _box(made, "second box").setChecked(True)
+    _tile(made, "button one").click()
+
+    assert store.labels == {"first": Labels(("alpha",), ("second box",))}
+
+
+def test_each_item_comes_up_with_its_own_checked_boxes(window):
+    made, _store, _stage = window(items=[
+        {"prompt_id": "first", "labels": Labels((), ("first box",))},
+        {"prompt_id": "second", "labels": None},
+    ], checkboxes=("first box",))
+    on_the_first = _box(made, "first box").isChecked()
+
+    _tile(made, "button one").click()
+
+    assert (on_the_first, _box(made, "first box").isChecked()) == (True, False)
+
+
+def test_a_locked_box_stays_as_it_is_for_every_item(window):
+    made, store, _stage = window("first", "second", checkboxes=("first box",))
+    _box(made, "first box").setChecked(True)
+    _lock(made, "first box").setChecked(True)
+
+    _tile(made, "button one").click()
+    _tile(made, "button one").click()
+
+    assert store.labels == {"first": Labels(("alpha",), ("first box",)),
+                            "second": Labels(("alpha",), ("first box",))}
+
+
+def test_a_lock_is_kept_for_the_next_time_the_window_opens(window, tmp_path):
+    locks = Locks(tmp_path / "kept.json")
+    made, _store, _stage = window("first", checkboxes=("first box",), locks=locks)
+    _box(made, "first box").setChecked(True)
+    _lock(made, "first box").setChecked(True)
+
+    again, _store, _stage = window(items=[{"prompt_id": "second", "labels": None}],
+                                   checkboxes=("first box",), locks=Locks(tmp_path / "kept.json"))
+
+    assert (_lock(again, "first box").isChecked(), _box(again, "first box").isChecked()) == (
+        True, True)
+
+
+def test_unlocking_a_box_lets_the_next_item_bring_its_own(window):
+    made, _store, _stage = window("first", "second", checkboxes=("first box",))
+    _box(made, "first box").setChecked(True)
+    _lock(made, "first box").setChecked(True)
+
+    _lock(made, "first box").setChecked(False)
+    _tile(made, "button one").click()
+
+    assert _box(made, "first box").isChecked() is False
+
+
+def test_each_button_wears_its_own_drawing(window, tmp_path):
+    made, _store, _stage = window("first", drawings={"button two": _drawn(tmp_path / "two.png")})
+
+    assert not _tile(made, "button two").icon().isNull()
+
+
+def test_a_button_with_no_drawing_installed_stands_on_its_words(window):
+    made, _store, _stage = window("first")
+
+    assert _tile(made, "button one").icon().isNull()
+    assert _tile(made, "button one").text().replace("\n", " ") == "button one"
+
+
+def test_a_name_of_several_terms_reads_one_term_to_a_line():
+    named = ("alpha, beta gamma", "delta (with epsilon)", "eta + theta")
+
+    assert tuple(one_term_to_a_line(name) for name in named) == (
+        "alpha\nbeta gamma", "delta\n(with epsilon)", "eta +\ntheta")
+
+
+def test_a_drawing_that_will_not_load_is_no_worse_than_none(window, tmp_path):
+    torn = tmp_path / "torn.png"
+    torn.write_bytes(b"not an image at all")
+
+    made, _store, _stage = window("first", drawings={"button one": str(torn)})
+
+    assert _tile(made, "button one").icon().isNull()
+
+
+def test_every_button_is_the_same_shape_and_size(window, tmp_path):
+    made, _store, _stage = window("first", drawings={
+        "button one": _drawn(tmp_path / "one.png"),
+        "button three": _drawn(tmp_path / "three.png", size=(140, 60)),
+    })
+
+    assert len({_tile(made, name).size() for name in _BUTTONS}) == 1
+
+
+def _where(made, name):
+    tile = _tile(made, name)
+    layout = tile.parentWidget().layout().itemAt(0).layout()
+    return layout.getItemPosition(layout.indexOf(tile))
+
+
+def test_the_buttons_sit_where_the_grid_puts_them(window):
+    made, _store, _stage = window("first")
+
+    assert [_where(made, name)[:2] for name in _BUTTONS] == [(0, 0), (0, 1), (1, 0)]
+
+
+def test_a_drawing_is_centered_on_a_white_square():
+    source = QPixmap(40, 20)
+    source.fill(Qt.GlobalColor.black)
+
+    square = on_a_white_square(source, 96, 1.0)
+
+    assert square.size() == QSize(96, 96)
+    assert square.toImage().pixelColor(0, 0) == QColor(Qt.GlobalColor.white)
+    assert square.toImage().pixelColor(48, 48) == QColor(Qt.GlobalColor.black)
+
+
+def test_one_scale_fits_the_largest_drawing_and_leaves_the_others_smaller():
+    big, small = QPixmap(120, 60), QPixmap(60, 30)
+
+    scale = one_scale_for_all((big, small), 96)
+
+    assert (round(big.width() * scale), round(small.width() * scale)) == (96, 48)
+
+
+def test_a_drawing_that_will_not_load_does_not_set_the_scale():
+    assert one_scale_for_all((QPixmap(),), 96) == 1.0
+
+
+def test_a_tile_the_grid_merges_fills_both_of_its_columns(window):
+    made, _store, _stage = window("gen-one", tiles=(Tile("button one", 0, 0, columns=2),
+                                                    Tile("button two", 0, 2)))
+
+    assert _where(made, "button one") == (0, 0, 1, 2)
+    assert _tile(made, "button one").width() == (
+        _tile(made, "button two").width() * 2 + GAP_MEDIUM)
+
+
+def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window):
+    made, _store, _stage = window("gen-one", tiles=(Tile("button one", 0, 0),
+                                                    Tile("button two", 1, 0),
+                                                    Tile("button three", 0, 1, rows=2)))
+
+    assert _where(made, "button three") == (0, 1, 2, 1)
+    assert _tile(made, "button three").height() == (
+        _tile(made, "button one").height() * 2 + GAP_MEDIUM)
+
+
+def _drawing_rows(made, name):
+    shot = _tile(made, name).grab().toImage()
+    return [y for y in range(shot.height())
+            if any(shot.pixelColor(x, y).red() > 150
+                   and shot.pixelColor(x, y).green() < 100
+                   for x in range(shot.width()))]
+
+
+def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
+    names = ("button one", "button two", "button three", "button four")
+    drawings = {name: _drawn(tmp_path / f"{name}.png", color="red") for name in names}
+    made, _store, _stage = window(
+        "gen-one", drawings=drawings,
+        tiles=(Tile("button one", 0, 0), Tile("button two", 1, 0),
+               Tile("button three", 2, 0), Tile("button four", 0, 1, rows=3)))
+
+    def below_the_middle(name):
+        rows = _drawing_rows(made, name)
+        return (rows[0] + rows[-1]) // 2 - _tile(made, name).height() // 2
+
+    assert abs(below_the_middle("button four") - below_the_middle("button two")) <= 2
+
+
+def test_ten_rows_of_buttons_stand_in_the_room_the_window_has(window):
+    rows = 10
+    made, _store, _stage = window("gen-one", tiles=tuple(Tile(f"button {n}", n, 0)
+                                                         for n in range(rows)))
+
+    tall = _tile(made, "button 0").height()
+    assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID
+
+
+def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():
+    assert wrapped_to_fit("alpha beta\ngamma", 9, len) == "alpha\nbeta\ngamma"
+
+
+def test_a_term_that_fits_is_left_on_its_line():
+    assert wrapped_to_fit("alpha beta", 10, len) == "alpha beta"
+
+
+def test_no_button_or_checkbox_takes_the_keyboard_so_space_fires_nothing_pressed_before(window):
+    made, _store, _stage = window("first", checkboxes=("first box",))
+    pressable = (made.findChildren(QToolButton) + made.findChildren(QPushButton)
+                 + made.findChildren(TickControl))
+
+    assert pressable
+    assert all(widget.focusPolicy() == Qt.FocusPolicy.NoFocus for widget in pressable)

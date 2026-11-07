@@ -23,7 +23,7 @@ def test_both_library_windows_run_on_the_primary_checkouts_venv():
 
 @on_windows
 @pytest.mark.parametrize(("file", "module"), [
-    ("sort_images.vbs", "origenerator.sort_images"),
+    ("sort_images.vbs", "origenerator.action_setter_tool"),
     ("check_animations.vbs", "origenerator.check_animations"),
 ])
 def test_a_library_window_reads_the_live_library(file: str, module: str):

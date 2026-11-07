@@ -181,6 +181,7 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         "pinned_genau_settings", "detail_fix_parts", "genau_flick_prompts",
         "model_recommendations", "lora_recommendations",
         "picture_states", "picture_state_grid", "animation_paths",
+        "image_actions", "video_actions", "site_words",
     }
 
 

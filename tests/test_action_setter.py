@@ -1,0 +1,173 @@
+from __future__ import annotations
+
+import json
+
+from origenerator.action_labels import Labels, stored
+from origenerator.action_setter import Locks, SetterSession, waiting
+from origenerator.gallery.enhance import enhance_file_stem
+from origenerator.media import MediaType
+
+_SET = Labels(("alpha", "beta"), ("first box",))
+
+
+class _Store:
+    def __init__(self):
+        self.labels = {}
+
+    def set_labels(self, prompt_id, side, labels):
+        self.labels[prompt_id] = (side, labels)
+
+
+def _items(*prompt_ids, before=None):
+    return [{"prompt_id": prompt_id, "labels": before} for prompt_id in prompt_ids]
+
+
+def test_a_press_saves_its_labels_on_the_item_on_screen_and_the_next_one_comes_up():
+    store = _Store()
+    session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
+
+    session.set_as("two", _SET)
+
+    assert store.labels == {"first": (MediaType.IMAGE, _SET)}
+    assert (session.current["prompt_id"], session.remaining) == ("second", 1)
+
+
+def test_a_press_with_nothing_on_screen_does_nothing():
+    store = _Store()
+    session = SetterSession([], store, MediaType.VIDEO)
+
+    session.set_as("two", _SET)
+
+    assert (store.labels, session.current) == ({}, None)
+
+
+def test_skipping_sends_the_item_to_the_back_of_the_line_unlabeled():
+    store = _Store()
+    session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
+
+    session.skip()
+
+    assert store.labels == {}
+    assert (session.current["prompt_id"], session.remaining) == ("second", 2)
+
+
+def test_undo_puts_back_the_labels_the_item_had_and_puts_it_on_screen_again():
+    store = _Store()
+    before = Labels(("gamma",))
+    session = SetterSession(_items("first", "second", before=before), store, MediaType.IMAGE)
+    session.set_as("two", _SET)
+
+    session.undo()
+
+    assert store.labels == {"first": (MediaType.IMAGE, before)}
+    assert (session.current["prompt_id"], session.remaining) == ("first", 2)
+
+
+def test_undo_takes_an_item_nobody_had_labeled_back_to_unlabeled():
+    store = _Store()
+    session = SetterSession(_items("first"), store, MediaType.VIDEO)
+    session.set_as("two", _SET)
+
+    session.undo()
+
+    assert store.labels == {"first": (MediaType.VIDEO, None)}
+
+
+def test_undo_with_nothing_pressed_yet_changes_nothing():
+    store = _Store()
+    session = SetterSession(_items("first"), store, MediaType.IMAGE)
+
+    session.undo()
+
+    assert (store.labels, session.current["prompt_id"]) == ({}, "first")
+
+
+def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone():
+    session = SetterSession(_items("first", "second"), _Store(), MediaType.IMAGE)
+    before = (session.last, session.can_undo)
+
+    session.set_as("two", _SET)
+    after = (session.last, session.can_undo)
+    session.undo()
+
+    assert (before, after, (session.last, session.can_undo)) == (
+        (None, False), (("two", _SET), True), (None, False))
+
+
+def test_locks_hold_each_checkbox_as_it_was_left_until_they_are_let_go(tmp_path):
+    path = tmp_path / "locks.json"
+    Locks(path).hold(MediaType.IMAGE, "first box", True)
+    Locks(path).hold(MediaType.VIDEO, "third box", False)
+
+    held = Locks(path)
+    before = (held.held(MediaType.IMAGE), held.held(MediaType.VIDEO))
+    held.let_go(MediaType.IMAGE, "first box")
+
+    assert before == ({"first box": True}, {"third box": False})
+    assert Locks(path).held(MediaType.IMAGE) == {}
+
+
+def test_locks_that_cannot_be_read_hold_nothing(tmp_path):
+    path = tmp_path / "locks.json"
+    path.write_text("not json", encoding="utf-8")
+
+    assert Locks(path).held(MediaType.IMAGE) == {}
+
+
+def _row(prompt_id, filename, *, created="2026-01-01 00:00:00", labels=None, **extra):
+    files = [{"filename": filename, "subfolder": "", "type": "output"}] if filename else []
+    actions, checked = stored(labels) if labels is not None else (None, None)
+    return {
+        "prompt_id": prompt_id, "workflow_name": "sdxl_t2i", "workflow_version": "v001",
+        "status": "completed", "params_json": "{}",
+        "output_files": json.dumps(files) if files else None, "created_at": created,
+        "image_actions": actions, "image_checked": checked,
+        "video_actions": actions, "video_checked": checked, **extra,
+    }
+
+
+def _ids(rows):
+    return [row["prompt_id"] for row in rows]
+
+
+def test_only_finished_images_with_no_actions_yet_wait_for_their_actions():
+    rows = [
+        _row("image", "scene_00001_.png"),
+        _row("labeled", "scene_00002_.png", labels=Labels(("alpha",))),
+        _row("checked only", "scene_00005_.png", labels=Labels((), ("first box",))),
+        _row("video", "scene_00003_.mp4"),
+        _row("no-file", None),
+    ]
+
+    assert _ids(waiting(rows, MediaType.IMAGE)) == ["image", "checked only"]
+
+
+def test_only_finished_videos_with_no_actions_yet_wait_for_their_actions():
+    rows = [
+        _row("video", "scene_00001_.mp4"),
+        _row("labeled", "scene_00002_.mp4", labels=Labels(("alpha",))),
+        _row("image", "scene_00003_.png"),
+    ]
+
+    assert _ids(waiting(rows, MediaType.VIDEO)) == ["video"]
+
+
+def test_an_enhancement_waiting_to_be_folded_is_not_a_second_image_to_label():
+    rows = [
+        _row("image", "scene_00001_.png"),
+        _row("its-better-version", f"{enhance_file_stem()}_00001_.png"),
+    ]
+
+    assert _ids(waiting(rows, MediaType.IMAGE)) == ["image"]
+
+
+def test_the_favorites_come_first_and_each_half_runs_newest_backwards():
+    rows = [
+        _row("plain-old", "a_00001_.png", created="2026-01-01 00:00:00"),
+        _row("favorite-old", "b_00001_.png", created="2026-01-02 00:00:00", starred=1),
+        _row("plain-new", "c_00001_.png", created="2026-01-03 00:00:00"),
+        _row("favorite-new", "d_00001_.png", created="2026-01-04 00:00:00", starred=1),
+    ]
+
+    assert _ids(waiting(rows, MediaType.IMAGE)) == [
+        "favorite-new", "favorite-old", "plain-new", "plain-old"]

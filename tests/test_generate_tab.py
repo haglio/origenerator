@@ -24,7 +24,6 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,
     QFormLayout,
     QLabel,
     QMessageBox,
@@ -36,6 +35,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import GAP_MEDIUM
+from shared_ui.tick_control import TickControl
 
 import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
@@ -50,7 +50,8 @@ from origenerator import (
     prompt_edit,
 )
 from origenerator import export_lane as export_lane_module
-from origenerator.action_settings import CATEGORIES
+from origenerator.action_labels import Labels, labels_of
+from origenerator.action_vocabulary import vocabulary
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
@@ -69,6 +70,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_tab as generate_tab_module
+from origenerator.gui.action_row import action_checkbox, listed_actions
 from origenerator.gui.animations import _VideoTile
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
@@ -2442,7 +2444,7 @@ def test_the_enhancements_sit_one_gap_under_the_settings_as_each_section_does(sa
 
 
 @pytest.mark.parametrize("width", [480, 340])
-def test_the_action_and_workflow_dropdowns_line_up_as_a_sections_fields_do(
+def test_the_actions_and_the_workflow_dropdown_line_up_as_a_sections_fields_do(
         qtbot, saved_panel, width):
     tab, db = saved_panel
     image = _image_row(db)
@@ -2454,7 +2456,7 @@ def test_the_action_and_workflow_dropdowns_line_up_as_a_sections_fields_do(
     host.show()
     tab.layout().activate()
     body = tab._scroll.widget()
-    action = tab._action.findChild(QComboBox)
+    action = tab._action.findChild(QLabel, listed_actions(MediaType.IMAGE))
 
     assert tab.width() == width
     assert action.mapTo(body, QPoint(0, 0)).x() == tab._workflow_dropdown.mapTo(body, QPoint(0, 0)).x()
@@ -4445,48 +4447,37 @@ def test_a_fresh_images_dropdowns_mark_what_its_models_page_recommends(blank_pan
                     if form._widgets[key].itemIcon(i).cacheKey() == icons.thumbs_up_icon().cacheKey()}
               for key in ("sampler_name", "scheduler")}
     assert marked == {"sampler_name": {"euler_ancestral"}, "scheduler": {"normal"}}
-def test_saying_what_the_shown_image_shows_lands_on_its_row(saved_panel):
+def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_images_row(saved_panel):
     tab, db = saved_panel
     image = _image_row(db, "img9")
-    states = tab._action.offered()
+    db.set_labels("img9", MediaType.IMAGE, Labels(("alpha",)))
+    tab.show_saved_generation(db.get_generation("img9"), [image])
+    name = vocabulary(MediaType.IMAGE).checkboxes[0]
 
-    tab.show_saved_generation(image, [image])
-    tab._action.pick(states[1])
+    tab._action.findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()
 
-    assert db.get_generation("img9")["image_state"] == states[1]
-
-
-def test_taking_that_answer_back_leaves_the_image_unsorted_again(saved_panel):
-    tab, db = saved_panel
-    image = _image_row(db, "img9")
-    states = tab._action.offered()
-    tab.show_saved_generation(image, [image])
-    tab._action.pick(states[1])
-
-    tab._action.pick("")
-
-    assert db.get_generation("img9")["image_state"] is None
+    assert labels_of(db.get_generation("img9"), MediaType.IMAGE) == Labels(("alpha",), (name,))
 
 
-def test_a_video_on_the_tab_is_offered_the_actions_opened_on_its_own(saved_panel):
+def test_a_video_on_the_tab_lists_the_actions_it_was_set_with(saved_panel):
     tab, db = saved_panel
     _video_row(db, "vid9")
-    db.set_settings_source("vid9", category=CATEGORIES[1])
+    db.set_labels("vid9", MediaType.VIDEO, Labels(("alpha", "beta")))
 
     tab.show_saved_generation(db.get_generation("vid9"), [])
 
     assert not tab._action.isHidden()
-    assert tab._action.offered() == ["", *CATEGORIES]
-    assert tab._action.picked() == CATEGORIES[1]
+    assert tab._action.findChild(QLabel, listed_actions(MediaType.VIDEO)).text() == "alpha, beta"
 
 
-def test_saying_what_action_the_shown_video_is_lands_on_its_row(saved_panel):
+def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_videos_row(saved_panel):
     tab, db = saved_panel
     tab.show_saved_generation(_video_row(db, "vid9"), [])
+    name = vocabulary(MediaType.VIDEO).checkboxes[0]
 
-    tab._action.pick(CATEGORIES[1])
+    tab._action.findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
 
-    assert db.get_generation("vid9")["action"] == CATEGORIES[1]
+    assert labels_of(db.get_generation("vid9"), MediaType.VIDEO) == Labels((), (name,))
 
 
 def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,

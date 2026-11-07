@@ -75,6 +75,12 @@ class Database:
     def set_action(self, prompt_id: str, action: str | None):
         return self.generations.set_action(prompt_id, action)
 
+    def set_labels(self, prompt_id: str, side: str, labels):
+        return self.generations.set_labels(prompt_id, side, labels)
+
+    def set_many_labels(self, side: str, labeled: dict):
+        return self.generations.set_many_labels(side, labeled)
+
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)
 

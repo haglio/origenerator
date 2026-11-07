@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -51,20 +50,6 @@ def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favor
     assert all(set(line) == set(journals["fields"]) for line in lines)
     assert [line["event"] for line in lines] == journals["favorite_events"]
     assert {config.LIBRARY_ROOT / Path(line["path"]) for line in lines} == {video}
-
-
-def test_an_action_picked_here_is_a_line_evolver_writes_into_the_videos_record(tmp_path):
-    promise = _promise()
-    journals = promise["journals"]
-    video, row = _another_sources_video(promise)
-    places = _journaling_into(tmp_path, beside=video)
-
-    outside_videos.pick_action(MagicMock(), places, row, "Wave")
-
-    [line] = _journaled(places)
-    assert set(journals["fields"]) <= set(line)
-    assert (line["event"], line[journals["act_field"]]) == (journals["act_event"], "Wave")
-    assert config.LIBRARY_ROOT / Path(line["path"]) == video
 
 
 def _another_sources_video(promise: dict) -> tuple[Path, dict]:

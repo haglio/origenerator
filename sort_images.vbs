@@ -17,10 +17,10 @@ Else
 End If
 
 Sub Decide()
-  app = "Origenerator (sorting images)"
+  app = "Origenerator (action setter tool)"
   primary = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(root)))
-  logPath = fso.BuildPath(root, "state\sort_images_launcher.log")
-  arguments = "-m origenerator.sort_images"
+  logPath = fso.BuildPath(root, "state\action_setter_launcher.log")
+  arguments = "-m origenerator.action_setter_tool"
   interpreter = fso.BuildPath(primary, ".venv\Scripts\python.exe")
   directory = root
   base = primary

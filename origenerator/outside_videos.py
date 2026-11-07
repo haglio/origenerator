@@ -156,9 +156,8 @@ def journal_favorites(places: Places, rows: list[dict], favorite: bool, *, now=t
     _journal(places, rows, {"event": "favorite" if favorite else "unfavorite"}, now)
 
 
-def pick_action(db, places: Places, video_row: dict, action: str, *, now=time.time) -> None:
-    _journal(places, [video_row], {"event": "action", "action": action}, now)
-    db.set_action(video_row["prompt_id"], action)
+def cancel_picks(places: Places, video_row: dict, *, now=time.time) -> None:
+    _journal(places, [video_row], {"event": "action", "action": ""}, now)
 
 
 def _journal(places: Places, rows: list[dict], said: dict, now) -> None:

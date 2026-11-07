@@ -10,13 +10,13 @@ from PyQt6.QtWidgets import (
 from shared_ui.preview import Preview
 
 from origenerator import (
+    action_setter_tool,
     action_settings,
     animation_settings,
     branch_session,
     check_animations,
     config,
     own_window,
-    sort_images,
 )
 from origenerator.gui import stylesheet
 from origenerator.gui.animation_check_window import (
@@ -44,11 +44,11 @@ def a_library_of_its_own(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_sorting_says_so_when_every_image_already_has_an_action(
+def test_the_action_setter_tool_says_so_when_every_image_already_has_its_actions(
         qapp, a_library_of_its_own, said):
-    assert sort_images.main() == 0
+    assert action_setter_tool.main() == 0
 
-    assert said == ["Every image already says what it shows."]
+    assert said == ["Every image already has its actions."]
 
 
 def test_checking_animations_opens_on_the_first_of_them(
@@ -82,7 +82,7 @@ def test_an_animation_with_no_sample_starts_from_the_actions_own_settings(
 
 def test_each_window_names_itself_to_windows_under_the_apps_own_name():
     assert own_window.taskbar_identity(
-        "Sorting images", None) == "Origenerator.SortingImages"
+        "Action setter tool", None) == "Origenerator.ActionSetterTool"
     assert own_window.taskbar_identity(
         "Checking animations", None) == "Origenerator.CheckingAnimations"
 
@@ -90,14 +90,14 @@ def test_each_window_names_itself_to_windows_under_the_apps_own_name():
 def test_a_window_out_of_a_branch_is_shown_as_a_preview():
     preview = Preview(feature="a branch")
 
-    assert own_window.taskbar_identity("Sorting images", preview).endswith(
+    assert own_window.taskbar_identity("Action setter tool", preview).endswith(
         ".Preview")
 
 
 def test_a_window_out_of_a_branch_wears_the_preview_ink(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "STATE_DIR", tmp_path)
 
-    told = own_window.taskbar_app("Sorting images", "sort_images.vbs",
+    told = own_window.taskbar_app("Action setter tool", "sort_images.vbs",
                                   Preview(feature="a branch"))
 
     assert told.icon == tmp_path / "preview_icon.ico"
@@ -105,7 +105,7 @@ def test_a_window_out_of_a_branch_wears_the_preview_ink(tmp_path, monkeypatch):
 
 
 def test_the_production_apps_own_windows_wear_its_own_icon():
-    told = own_window.taskbar_app("Sorting images", "sort_images.vbs", None)
+    told = own_window.taskbar_app("Action setter tool", "sort_images.vbs", None)
 
     assert told.icon.name == "icon.ico"
 
@@ -118,39 +118,39 @@ def test_what_the_window_is_dressed_as_is_what_this_copy_is(
     monkeypatch.setattr(stylesheet, "dress_application",
                         lambda app, preview: dressed.append(preview))
 
-    assert sort_images.main() == 0
+    assert action_setter_tool.main() == 0
 
     assert dressed == [Preview(feature="a branch")]
 
 
-def test_opening_the_sorting_window_claims_that_name(
+def test_opening_the_action_setter_tool_claims_that_name(
         a_library_of_its_own, said, monkeypatch):
     claimed = []
     monkeypatch.setattr(own_window, "_claim_the_taskbar", claimed.append)
 
-    assert sort_images.main() == 0
+    assert action_setter_tool.main() == 0
 
-    assert claimed == ["Origenerator.SortingImages"]
+    assert claimed == ["Origenerator.ActionSetterTool"]
 
 
 def test_the_taskbar_is_told_the_apps_icon_and_how_to_reopen_the_window():
-    told = own_window.taskbar_app("Sorting images", "sort_images.vbs", None)
+    told = own_window.taskbar_app("Action setter tool", "sort_images.vbs", None)
 
-    assert told.name == "Origenerator — Sorting images"
+    assert told.name == "Origenerator — Action setter tool"
     assert told.icon.name == "icon.ico"
     assert told.relaunch.endswith('sort_images.vbs"')
 
 
-def test_opening_the_sorting_window_dresses_its_taskbar_button(
+def test_opening_the_action_setter_tool_dresses_its_taskbar_button(
         a_library_of_its_own, said, monkeypatch):
     dressed = []
     monkeypatch.setattr(
         own_window, "_dress_the_taskbar_button",
         lambda app, title, launcher, preview: dressed.append((title, launcher)))
 
-    assert sort_images.main() == 0
+    assert action_setter_tool.main() == 0
 
-    assert dressed == [("Sorting images", "sort_images.vbs")]
+    assert dressed == [("Action setter tool", "sort_images.vbs")]
 
 
 def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, said):

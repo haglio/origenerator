@@ -55,6 +55,7 @@ from origenerator.gui.hud_places import (
 )
 from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
+from origenerator.gui.regions_left import RegionLeft, restored_regions, saved_regions
 from origenerator.gui.slideshow_lock import lock_held
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
@@ -254,6 +255,7 @@ class SlideshowDirector:
         self._library = sources.library
         self._groups = SlideGroups(library=self._library, sources=sources)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
+        self._regions_left: dict[str, RegionLeft] = {}
         self._giving_them_back = False
 
     def become_hosted(self, session) -> None:
@@ -663,8 +665,7 @@ class SlideshowDirector:
             location, what_plays_at(location, self._library().rows_at(location)))
 
     def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
-        collection = folder_collection(_split_collection_key(location)[0])
-        if collection is None or collection.which != _LATEST_KEY:
+        if not _plays_latest(location):
             return rows
         return one_per_stretch(rows, image_index=self._library().image_index)
 
@@ -750,11 +751,13 @@ class SlideshowDirector:
         )
 
     def _on_closed(self, slideshow=None):
+        shape = self._shape_of(slideshow) if slideshow is not None else None
         if slideshow is not None:
             self._slideshow_state = self._where_it_stands(slideshow)
+        if shape is not None:
+            self._regions_left[shape] = self._left_on(slideshow)
         self._live_slideshows = [entry for entry in self._live_slideshows
                             if entry[0] is not slideshow]
-        shape = self._shape_of(slideshow) if slideshow is not None else None
         if slideshow is None or self._slideshow is slideshow:
             self._slideshow = next((s for s, _loc in reversed(self._live_slideshows)), None)
         self._host.reconcile_osr2()
@@ -766,6 +769,17 @@ class SlideshowDirector:
         return replace(slideshow.state(),
                        location=next((where for live, where in self._live_slideshows
                                       if live is slideshow), None))
+
+    def _left_on(self, slideshow) -> RegionLeft:
+        return RegionLeft(self._where_it_stands(slideshow), slideshow.filters)
+
+    def remembered_regions(self) -> dict:
+        live = {shape: self._left_on(slideshow) for shape in _SHAPES
+                if (slideshow := self.region_slideshow(shape)) is not None}
+        return saved_regions({**self._regions_left, **live})
+
+    def remember_regions(self, saved) -> None:
+        self._regions_left = restored_regions(saved, _SHAPES)
 
     def _place_left(self) -> SlideshowState:
         up = _still_up(self._slideshow)
@@ -865,6 +879,8 @@ class SlideshowDirector:
             return
         if self._put_back_what_was_taken_over(shape) or self.region_slideshow(shape) is not None:
             return
+        if self._open_where_it_was_left(shape):
+            return
         if not self._fill_region(shape):
             logger.info("Nothing of %s shape to open on the %s region yet", shape, shape)
 
@@ -876,6 +892,24 @@ class SlideshowDirector:
             return False
         logger.info("The %s region takes up the slideshow that was up when the "
                     "session took this window over: %d items", shape, len(taken.items))
+        return True
+
+    def _open_where_it_was_left(self, shape: str) -> bool:
+        left = self._regions_left.get(shape)
+        if left is None:
+            return False
+        location = left.state.location
+        ready = self._openings.of(shape) if location == self.base_location(shape) else None
+        rows = ready.rows if ready is not None else self.rows_at(location)
+        items = ready.items if ready is not None else self.items_of(rows)
+        if not items:
+            return False
+        self.open(items, rows=rows, location=location, shape=shape,
+                  start=_place_of(left.state.current, items),
+                  carrying=Carrying(resume=left.state, filters=left.filters,
+                                    versions=ready.versions if ready is not None else None),
+                  **self._order(_plays_latest(location)))
+        logger.info("The %s region opens where it was left: %d items", shape, len(items))
         return True
 
     def _fill_region(self, shape: str) -> bool:
@@ -1206,6 +1240,11 @@ class SlideshowDirector:
 
     def _enhanced_ids_of(self, rows) -> set[str]:
         return {row["prompt_id"] for row in rows if gallery.is_enhanced_row(row)}
+
+
+def _plays_latest(location) -> bool:
+    collection = folder_collection(_split_collection_key(location)[0])
+    return collection is not None and collection.which == _LATEST_KEY
 
 
 def _volume_saved_as(saved) -> VolumeHud | None:

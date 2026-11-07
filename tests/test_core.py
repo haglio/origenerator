@@ -41,6 +41,7 @@ from origenerator.gui.window_monitor import the_window_on
 from origenerator.item_shape import shaped_key
 from origenerator.media import MediaType
 from origenerator.run_toast import RunOutcome
+from origenerator.slideshow import SlideshowFilters, SlideshowState
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -1799,6 +1800,25 @@ def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_foun
     win.close()
 
     assert AppState(path).get("slideshows") == kept
+
+
+@pytest.mark.parametrize("hosted", [True, False], ids=["in a session", "on its own"])
+def test_a_window_keeps_what_each_sessions_region_was_left_on_from_one_launch_to_the_next(
+        qtbot, tmp_path, hosted):
+    path = tmp_path / "ui.json"
+    kept = json.loads(json.dumps({"portrait": {
+        "state": SlideshowState(current="g5", locked=True, location="__all__::portrait").saved(),
+        "filters": SlideshowFilters(favorites=True).saved()}}))
+    state = AppState(path)
+    state.set("session_slideshows", kept)
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path),
+                  fun_time=_fun_time_session() if hosted else None)
+    assert json.loads(json.dumps(win._gallery_view._slideshows.remembered_regions())) == kept
+    win.close()
+
+    assert AppState(path).get("session_slideshows") == kept
 
 
 def test_a_window_a_session_launched_leaves_the_saved_borders_as_it_found_them(

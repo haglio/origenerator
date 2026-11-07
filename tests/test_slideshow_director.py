@@ -1082,6 +1082,89 @@ def test_a_region_says_how_long_it_took_to_fill(slideshows, caplog):
     assert all(re.search(r", filled in \d+ ms$", message) for message in opened), opened
 
 
+_LEFT_LOOPING_ON_G5 = SlideshowState(order=("g4", "g5"), current="g5", locked=True,
+                                     loop="seed", loop_pool=("g5",))
+_LEFT_NARROWED = SlideshowFilters(favorites=True, action="alpha")
+
+
+def _regions_of_two_images(slideshows, **build):
+    gallery_pane = FakeGalleryPane(collections={
+        ALL_PORTRAIT: [_row("g4"), _row("g5")], ALL_LANDSCAPE: [_row("g6")],
+        LATEST_PORTRAIT: [_image("g5", "a red fox", seed=5), _image("g4", "a blue car", seed=4)]})
+    return slideshows(gallery_pane=gallery_pane, fun_time=FakeSession(), **build)
+
+
+def _left_on_g5(slideshow):
+    slideshow.state_at_close = _LEFT_LOOPING_ON_G5
+    slideshow.filters = _LEFT_NARROWED
+
+
+def test_a_region_opened_for_the_next_session_comes_back_where_the_last_one_left_it(slideshows):
+    director, _host, _made = _regions_of_two_images(slideshows)
+    open_both_shapes(director)
+    _left_on_g5(director.region_slideshow(PORTRAIT))
+
+    director.become_standalone(motion=None)
+    director.become_hosted(FakeSession())
+    open_both_shapes(director)
+
+    back = director.region_slideshow(PORTRAIT)
+    assert back.resumed == replace(_LEFT_LOOPING_ON_G5, location=ALL_PORTRAIT)
+    assert back.taken_up == (_LEFT_NARROWED, True)
+    assert back.items[back.opened_with["start"]][2] == "g5"
+
+
+def test_a_region_comes_back_where_it_was_left_after_origenerator_itself_restarts(slideshows):
+    first, _host, _made = _regions_of_two_images(slideshows)
+    open_both_shapes(first)
+    _left_on_g5(first.region_slideshow(PORTRAIT))
+    saved = json.loads(json.dumps(first.remembered_regions()))
+
+    second, _host, _made = _regions_of_two_images(slideshows)
+    second.remember_regions(saved)
+    open_both_shapes(second)
+
+    back = second.region_slideshow(PORTRAIT)
+    assert back.resumed == replace(_LEFT_LOOPING_ON_G5, location=ALL_PORTRAIT)
+    assert back.taken_up == (_LEFT_NARROWED, True)
+
+
+def test_a_region_left_on_latest_comes_back_on_latest(slideshows):
+    director, _host, _made = _regions_of_two_images(slideshows)
+    director.remember_regions({PORTRAIT: {"state": {"current": "g4", "location": LATEST_PORTRAIT},
+                                          "filters": {}}})
+
+    open_both_shapes(director)
+
+    back = director.region_slideshow(PORTRAIT)
+    assert [item[2] for item in back.items] == ["g5", "g4"]
+    assert back.hud.order_label == LATEST_LABEL
+    assert back.opened_with["shuffle"] is module.in_order
+
+
+def test_a_region_left_on_an_item_since_deleted_still_comes_back_narrowed_as_it_was(slideshows):
+    director, _host, _made = _regions_of_two_images(slideshows)
+    director.remember_regions({PORTRAIT: {
+        "state": {"current": "gone", "location": ALL_PORTRAIT},
+        "filters": SlideshowFilters.saved(_LEFT_NARROWED)}})
+
+    open_both_shapes(director)
+
+    back = director.region_slideshow(PORTRAIT)
+    assert back.opened_with["start"] is None
+    assert back.taken_up == (_LEFT_NARROWED, False)
+
+
+def test_origenerator_on_its_own_keeps_what_each_region_was_left_on(slideshows):
+    director, _host, _made = slideshows()
+    left = {PORTRAIT: {"state": replace(_LEFT_LOOPING_ON_G5, location=ALL_PORTRAIT).saved(),
+                       "filters": SlideshowFilters.saved(_LEFT_NARROWED)}}
+
+    director.remember_regions(left)
+
+    assert director.remembered_regions() == left
+
+
 def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullscreen_slideshow(slideshows):
     director, _host, made = slideshows(fun_time=FakeSession())
     open_both_shapes(director)
@@ -2822,6 +2905,25 @@ def test_a_side_with_its_opening_ready_opens_without_walking_the_library(
     director.fill_the_region(PORTRAIT)
 
     assert [item[2] for item in made[-1].items] == ["g4", "g5"]
+
+
+def test_a_side_left_on_its_whole_library_comes_back_without_walking_the_library(
+        slideshows, qtbot, monkeypatch):
+    gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4"), _row("g5")]})
+    director, _host, made = _a_session_side_with_its_opening_ready(slideshows, qtbot, gallery_pane)
+    director.remember_regions({PORTRAIT: {"state": {"current": "g5", "location": ALL_PORTRAIT},
+                                          "filters": {}}})
+
+    def walked(_rows):
+        raise AssertionError("walked the library on the press")
+
+    monkeypatch.setattr(director, "items_of", walked)
+    monkeypatch.setattr(director, "versions_of", walked)
+
+    director.fill_the_region(PORTRAIT)
+
+    assert made[-1].resumed.current == "g5"
+    assert made[-1].items[made[-1].opened_with["start"]][2] == "g5"
 
 
 def test_the_library_moving_leaves_no_opening_from_before_it(slideshows, qtbot):

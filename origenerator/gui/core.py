@@ -54,6 +54,8 @@ SESSION_UI_STATE = (
     ("enhance_settings", GalleryView.enhance_settings, GalleryView.set_enhance_settings),
     ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
     ("slideshows", GalleryView.remembered_slideshows, GalleryView.remember_slideshows),
+    ("session_slideshows", GalleryView.remembered_session_slideshows,
+     GalleryView.remember_session_slideshows),
     ("how_many", GalleryView.how_many, GalleryView.set_how_many),
 )
 

@@ -1257,6 +1257,12 @@ class GalleryView(QWidget):
         if self._fun_time is None:
             self._slideshows.remember(saved)
 
+    def remembered_session_slideshows(self) -> dict:
+        return self._slideshows.remembered_regions()
+
+    def remember_session_slideshows(self, saved) -> None:
+        self._slideshows.remember_regions(saved)
+
     def how_many(self) -> int:
         return self._generate_pane.how_many()
 

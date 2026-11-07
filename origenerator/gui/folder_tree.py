@@ -170,6 +170,10 @@ class FolderTree(QTreeWidget):
     def _height_of(self, rows) -> int:
         return sum(self.visualItemRect(row).height() for row in rows)
 
+    def selectionChanged(self, selected, deselected):
+        super().selectionChanged(selected, deselected)
+        self.viewport().update()
+
     def _frozen_places(self) -> list:
         places, top = [], 0
         for row in self.frozen_rows():

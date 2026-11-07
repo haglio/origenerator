@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
+from PyQt6.QtCore import QEvent, QMimeData, QObject, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import (
     QContextMenuEvent,
     QDragEnterEvent,
@@ -954,3 +954,30 @@ def test_the_picked_folder_still_ahead_in_the_list_is_not_frozen(qtbot):
     _scroll_to_the_top(tree, rows["a/i/3"])
 
     assert tree.frozen_rows() == [rows["a"], rows["a/i"]]
+
+
+class _PaintedRegions(QObject):
+    def __init__(self):
+        super().__init__()
+        self.regions = []
+
+    def eventFilter(self, _watched, event):
+        if event.type() == QEvent.Type.Paint:
+            self.regions.append(event.region())
+        return False
+
+
+def test_picking_another_folder_redraws_the_frozen_folder_it_unpicks(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["a/i/2"])
+    _scroll_to_the_top(tree, rows["b/i/3"])
+    qtbot.wait(10)
+    height = tree.visualItemRect(rows["a"]).height()
+    frozen_place = QRect(0, 2 * height, tree.viewport().width(), height)
+    painted = _PaintedRegions()
+    tree.viewport().installEventFilter(painted)
+
+    tree.setCurrentItem(rows["b/i/9"])
+    qtbot.wait(10)
+
+    assert any(region.contains(frozen_place) for region in painted.regions)

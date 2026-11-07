@@ -18,13 +18,13 @@ from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
-from origenerator.generation_metadata import UNDATED, BasicItem, Dating, created_item, file_item
+from origenerator.generation_metadata import UNDATED, Dating, MetadataItem, created_item, file_item
 from origenerator.gui import icons, palette
-from origenerator.gui.basic_section import basic_cells, label_column_width
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
+from origenerator.gui.metadata_section import label_column_width, metadata_cells
 from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
@@ -157,7 +157,7 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()
 
-    def _show_facts(self, items: list[BasicItem],
+    def _show_facts(self, items: list[MetadataItem],
                     beside_copy: QWidget | None = None) -> None:
         for widget in self._fact_cells:
             self._facts.removeWidget(widget)
@@ -165,9 +165,9 @@ class _Row(QWidget):
             widget.deleteLater()
         self._fact_cells = []
         self._resting_ink = {}
-        key_width = label_column_width([BasicItem(key, "") for key in _FACT_KEYS])
+        key_width = label_column_width([MetadataItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
-            label, value, copy, reveal = basic_cells(item, key_width)
+            label, value, copy, reveal = metadata_cells(item, key_width)
             beside = (beside_copy,) if beside_copy is not None and copy is not None else ()
             for column, widget in enumerate((label, value, copy, *beside, reveal)):
                 if widget is None:
@@ -207,7 +207,7 @@ class _VersionRow(_Row):
             self._thumbnail.setToolTip("This version's file is no longer on disk")
         items = []
         if version.settings:
-            items.append(BasicItem("Enhancement", version.settings))
+            items.append(MetadataItem("Enhancement", version.settings))
         items.append(file_item(version.file, held_days=dating.held_days))
         items.append(created_item(version.file, dating.created_fallback))
         trash = None
@@ -270,7 +270,7 @@ class _PendingRow(_Row):
             )
         if pending.settings != self._settings:
             self._settings = pending.settings
-            self._show_facts([BasicItem("Enhancement", pending.settings)] if pending.settings else [])
+            self._show_facts([MetadataItem("Enhancement", pending.settings)] if pending.settings else [])
         self.setToolTip(
             f"An enhancement of this image is being generated at {pending.settings}"
             if pending.settings else "An enhancement of this image is being generated"
@@ -287,7 +287,7 @@ class _AddRow(_Row):
         self._thumbnail.setStyleSheet(_ADD_TILE_CSS)
         self._thumbnail.setPixmap(icon_pixmap("plus", _PLUS, BG_PRIMARY))
         if settings:
-            self._show_facts([BasicItem("Enhancement", settings)])
+            self._show_facts([MetadataItem("Enhancement", settings)])
         # Opacity rather than setEnabled: Qt delivers no mouse events to a disabled widget, and the hover is the point.
         if not self._enabled:
             effect = QGraphicsOpacityEffect(self)

@@ -61,7 +61,6 @@ from origenerator.generation_config import (
 from origenerator.generation_state import made_here
 from origenerator.gui import icons
 from origenerator.gui.action_row import ActionRow
-from origenerator.gui.basic_section import BasicSection, wrappable
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
@@ -85,6 +84,7 @@ from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cance
 from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.lora_offers import LoraOffers
 from origenerator.gui.message import set_marked_text
+from origenerator.gui.metadata_section import MetadataSection, wrappable
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowTraits
@@ -328,9 +328,9 @@ class GenerateTab(DropZones):
         return body
 
     def _build_saved_generation_block(self, body: QVBoxLayout, header: LabelForm) -> None:
-        self._basic_section = BasicSection(go_to_folder=self._go_to_folder)
-        self._basic_section.hide()
-        body.addWidget(self._basic_section)
+        self._metadata_section = MetadataSection(go_to_folder=self._go_to_folder)
+        self._metadata_section.hide()
+        body.addWidget(self._metadata_section)
         self._action = ActionRow(header)
         self._action.changed.connect(self._save_actions)
 
@@ -971,7 +971,7 @@ class GenerateTab(DropZones):
 
     def reread_name(self) -> None:
         if self._displayed_row is not None:
-            self._basic_section.setVisible(self._basic_section.show_name(self._item_name()))
+            self._metadata_section.setVisible(self._metadata_section.show_name(self._item_name()))
         for zone in self.reaches():
             zone.reread_name()
 
@@ -1029,7 +1029,7 @@ class GenerateTab(DropZones):
             self._media_border = self._media_split.dragged_sizes() or self._media_border
         return {"folds": self._param_form.folds() if self._param_form else {},
                 "enhancement_levels_folded": self._versions.is_collapsed(),
-                "details_folded": self._basic_section.is_folded(),
+                "details_folded": self._metadata_section.is_folded(),
                 "related_folds": self._related.folds(),
                 "media_border": self._media_border}
 
@@ -1042,7 +1042,7 @@ class GenerateTab(DropZones):
         if isinstance(saved.get("enhancement_levels_folded"), bool):
             self._versions.set_collapsed(saved["enhancement_levels_folded"])
         if isinstance(saved.get("details_folded"), bool):
-            self._basic_section.set_folded(saved["details_folded"])
+            self._metadata_section.set_folded(saved["details_folded"])
         if isinstance(saved.get("related_folds"), dict):
             self._related.set_folds(saved["related_folds"])
         self._media_border = saved.get("media_border", saved.get("picture_border"))
@@ -1378,7 +1378,7 @@ class GenerateTab(DropZones):
                 and configs_match(self._displayed_config, self.current_config()))
 
     def _hide_footer(self):
-        self._basic_section.hide()
+        self._metadata_section.hide()
         self._action.clear()
         self._related.clear()
         self._versions.hide()
@@ -1387,8 +1387,8 @@ class GenerateTab(DropZones):
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         self.reread_folder_buttons()
-        self._basic_section.setVisible(
-            self._basic_section.show_row(row, self._upscale_of(row), self._item_name()))
+        self._metadata_section.setVisible(
+            self._metadata_section.show_row(row, self._upscale_of(row), self._item_name()))
         start = start_images_among(image_rows)(row)
         self._action.show_row(row, self._db.get_generation(start["prompt_id"]) if start else None)
         self._related.show_row(row, image_rows)
@@ -1455,7 +1455,7 @@ class GenerateTab(DropZones):
         self._go_to_folder.setVisible(
             row is not None and can_go is not None and can_go(row))
         if row is not None:
-            self._basic_section.setVisible(self._basic_section.has_content())
+            self._metadata_section.setVisible(self._metadata_section.has_content())
 
     def _on_versions_delete_requested(self, positions: list):
         row = self._displayed_row

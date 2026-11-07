@@ -628,16 +628,16 @@ class SlideshowDirector:
                               image_index=self._library().image_index,
                               filed=self._groups.loops_filed_for(row, shape=shape,
                                                                  items_of=self.items_of))
-        named = [(generation, self._folder_name(generation), True)
-                 for generation in around.configs]
+        named = [(generation, label, True) for generation, label in around.configs]
         named += [(generation, label, False) for generation, label in around.actions]
         return NavMapNeighbors(
             seeds=self._slides_of(around.seeds),
             column=tuple(NavMapRow(slide, label, configuration)
                          for generation, label, configuration in named
                          for slide in self._slides_of([generation])),
-            label=around.label or self._folder_name(row),
-            group=self._slides_of((*around.configs, *around.group)),
+            label=around.label,
+            group=self._slides_of((*(generation for generation, _label in around.configs),
+                                   *around.group)),
         )
 
     def beyond_the_row_of(self, prompt_id: str, *, shape: str) -> tuple[Slide, ...]:
@@ -739,16 +739,6 @@ class SlideshowDirector:
     @property
     def _session_channel(self):
         return None if self._fun_time is None else self._fun_time.dashboard_cmd_file
-
-    def _folder_name(self, row: dict) -> str:
-        workflow_name = row.get("workflow_name") or ""
-        return gallery.config_folder_name(
-            workflow_name,
-            gallery.folder_signature(workflow_name, row.get("params_json"),
-                                     self._library().image_index,
-                                     workflow_version=row.get("workflow_version")),
-            self._db.folder_meta_map(),
-        )
 
     def _on_closed(self, slideshow=None):
         shape = self._shape_of(slideshow) if slideshow is not None else None

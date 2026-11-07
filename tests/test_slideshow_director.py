@@ -2225,6 +2225,18 @@ def _fox(prompt_id, *, seed):
     return image
 
 
+def test_every_row_shows_its_items_labels_and_nothing_when_it_has_none_as_in_kino(slideshows):
+    tweaked = {**_image("c1", "a red fox", seed=1, steps=30),
+               "image_actions": json.dumps(["alpha"]), "image_checked": json.dumps(["first box"])}
+    rows = [_fox("g1", seed=1), tweaked, _image("c2", "a red fox", seed=1, steps=20)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("g1", shape="portrait")
+
+    assert (around.label, {row.slide.prompt_id: row.label for row in around.column}) == (
+        "", {"c1": "alpha, first box", "c2": ""})
+
+
 def test_the_map_is_drawn_against_the_gallerys_reading_of_the_library_never_a_reading_of_its_own(
         slideshows):
     rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
@@ -2247,11 +2259,7 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sli
 
     around = director.neighbors_of("g1", shape="portrait")
 
-    assert [row.slide.prompt_id for row in around.column] == ["g2", "v1"]
-    folder, action = (row.label for row in around.column)
-    assert action == "alpha"
-    assert folder
-    assert folder not in ("alpha", "Source image")
+    assert [(row.slide.prompt_id, row.label) for row in around.column] == [("g2", ""), ("v1", "alpha")]
 
 
 def test_a_video_sits_under_its_images_seed_with_the_image_down_its_column(slideshows, tmp_path):

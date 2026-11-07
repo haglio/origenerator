@@ -40,6 +40,7 @@ from origenerator.gallery import (
     models_matching_a_folders_sources,
     models_matching_the_sources,
 )
+from origenerator.gallery.enhance_settings import match_source_model_label
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_versions import params_from_mime
@@ -273,10 +274,11 @@ class EnhancePane(QWidget):
         settings_column.setSpacing(GAP_SMALL)
         self._model = NoWheelDropdown()
         offer_options(self._model, [MATCH_SOURCE_MODEL, *self._options("checkpoint")])
+        self._model.setItemText(0, match_source_model_label())
         self._model.currentIndexChanged.connect(self._emit)
         self._model.setToolTip(
             "Which model does the refining. Left at "
-            f"\"{MATCH_SOURCE_MODEL}\" each image is enhanced by whatever made "
+            f"\"{match_source_model_label()}\" each image is enhanced by whatever made "
             "it, so it stays in its own style; pick one to pin it instead."
         )
         self._widgets["checkpoint"] = self._model

@@ -12,20 +12,20 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 @dataclass
-class BasicItem:
+class MetadataItem:
     label: str
     value: str
     copy: str | None = None
     reveal: str | None = None
 
 
-BASIC_TITLE = "Basic"
+METADATA_TITLE = "Metadata"
 
 
 @dataclass
-class BasicFacts:
+class MetadataFacts:
     title: str
-    items: list[BasicItem]
+    items: list[MetadataItem]
 
 
 def _output_path(file: dict) -> str:
@@ -56,41 +56,41 @@ UNDATED = Dating()
 
 
 def file_item(file: dict, label: str = "File", *,
-              held_days: int | None = None, places: OutputPlaces | None = None) -> BasicItem:
+              held_days: int | None = None, places: OutputPlaces | None = None) -> MetadataItem:
     filename = file.get("filename") or ""
     full = gallery.output_file_path(file, _places(places))
-    return BasicItem(label, _held_prefix(held_days) + _output_path(file),
+    return MetadataItem(label, _held_prefix(held_days) + _output_path(file),
                     copy=filename, reveal=str(full))
 
 
 def created_item(file: dict, fallback: str = "", *,
-                 places: OutputPlaces | None = None) -> BasicItem:
+                 places: OutputPlaces | None = None) -> MetadataItem:
     full = gallery.output_file_path(file, _places(places))
     try:
         stamp = datetime.fromtimestamp(full.stat().st_mtime).astimezone()
     except OSError:
-        return BasicItem("Created", str(fallback))
-    return BasicItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
+        return MetadataItem("Created", str(fallback))
+    return MetadataItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def basic_facts(row: dict, upscale: Path | None = None, *,
-                  name: str = "") -> BasicFacts | None:
+def metadata_facts(row: dict, upscale: Path | None = None, *,
+                  name: str = "") -> MetadataFacts | None:
     listed = {version.file.get("filename")
               for version in gallery.displayed_versions(row, upscale)}
     files = [f for f in gallery.row_output_files(row)
              if f.get("filename") and f.get("filename") not in listed]
-    items = [BasicItem("Name", name, copy=name)] if name else []
+    items = [MetadataItem("Name", name, copy=name)] if name else []
     if files:
         held = row.get("days_in_trash")
         items += [file_item(f, held_days=held) for f in files]
-        items.append(BasicItem("Created", str(row.get("created_at", ""))))
+        items.append(MetadataItem("Created", str(row.get("created_at", ""))))
     if row.get("provenance") and row.get("workflow_name") in WORKFLOW_REGISTRY:
         items.append(_version_line(json.loads(row["provenance"])))
-    return BasicFacts(BASIC_TITLE, items) if items else None
+    return MetadataFacts(METADATA_TITLE, items) if items else None
 
 
-def _version_line(block: dict) -> BasicItem:
-    return BasicItem("Workflow version", _version_text(block))
+def _version_line(block: dict) -> MetadataItem:
+    return MetadataItem("Workflow version", _version_text(block))
 
 
 def _version_text(block: dict) -> str:

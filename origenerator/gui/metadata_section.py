@@ -16,10 +16,10 @@ from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import (
-    BASIC_TITLE,
-    BasicFacts,
-    BasicItem,
-    basic_facts,
+    METADATA_TITLE,
+    MetadataFacts,
+    MetadataItem,
+    metadata_facts,
 )
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
@@ -33,12 +33,12 @@ def _h(color) -> str:
     return color.name()
 
 
-class BasicSection(QWidget):
+class MetadataSection(QWidget):
     def __init__(self, parent=None, *, go_to_folder: QAction | None = None):
         super().__init__(parent)
         self._go_to_folder = go_to_folder
         self._shown: tuple[dict, Path | None, str] | None = None
-        self._section: BasicFacts | None = None
+        self._section: MetadataFacts | None = None
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._block: CollapsibleSection | None = None
@@ -46,7 +46,7 @@ class BasicSection(QWidget):
 
     def show_row(self, row: dict, upscale=None, name: str = "") -> bool:
         self._shown = (row, upscale, name)
-        self._section = basic_facts(row, upscale, name=name)
+        self._section = metadata_facts(row, upscale, name=name)
         self._render(self._section)
         return self.has_content()
 
@@ -60,7 +60,7 @@ class BasicSection(QWidget):
         return self._section is not None or (
             self._go_to_folder is not None and self._go_to_folder.isVisible())
 
-    def _render(self, section: BasicFacts | None):
+    def _render(self, section: MetadataFacts | None):
         if self._block is not None:
             # Qt: deleteLater alone leaves it among the children until the next loop turn.
             self._block.setParent(None)
@@ -83,10 +83,10 @@ class BasicSection(QWidget):
             self._block.set_collapsed(folded)
 
 
-def _build_section(section: BasicFacts | None, go_to_folder: QAction | None = None,
+def _build_section(section: MetadataFacts | None, go_to_folder: QAction | None = None,
                    *, collapsed: bool = False) -> CollapsibleSection:
     items = section.items if section is not None else []
-    block = CollapsibleSection(section.title if section is not None else BASIC_TITLE,
+    block = CollapsibleSection(section.title if section is not None else METADATA_TITLE,
                                collapsed=collapsed)
     rows = QWidget()
     layout = QVBoxLayout(rows)
@@ -96,17 +96,17 @@ def _build_section(section: BasicFacts | None, go_to_folder: QAction | None = No
         layout.addWidget(_folder_button(go_to_folder), 0, Qt.AlignmentFlag.AlignLeft)
     label_width = label_column_width(items)
     for item in items:
-        layout.addWidget(basic_row(item, label_width))
+        layout.addWidget(metadata_row(item, label_width))
     block.content_form().addRow(rows)
     return block
 
 
-def label_column_width(items: list[BasicItem]) -> int:
+def label_column_width(items: list[MetadataItem]) -> int:
     metrics = QFontMetrics(QApplication.font())
     return max((metrics.horizontalAdvance(item.label) for item in items if item.label), default=0)
 
 
-def basic_cells(item: BasicItem, label_width: int = 0) -> tuple:
+def metadata_cells(item: MetadataItem, label_width: int = 0) -> tuple:
     return (
         _label_widget(item.label, label_width),
         _value_widget(item),
@@ -115,13 +115,13 @@ def basic_cells(item: BasicItem, label_width: int = 0) -> tuple:
     )
 
 
-def basic_row(item: BasicItem, label_width: int = 0) -> QWidget:
+def metadata_row(item: MetadataItem, label_width: int = 0) -> QWidget:
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(GAP_MEDIUM)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    label, value, *buttons = basic_cells(item, label_width)
+    label, value, *buttons = metadata_cells(item, label_width)
     layout.addWidget(label)
     layout.addWidget(value, 1)
     for button in buttons:
@@ -175,7 +175,7 @@ def _label_widget(text: str, width: int) -> QLabel:
     return label
 
 
-def _value_widget(item: BasicItem) -> QLabel:
+def _value_widget(item: MetadataItem) -> QLabel:
     value = QLabel(wrappable(item.value))
     value.setTextInteractionFlags(_SELECTABLE)
     value.setWordWrap(True)

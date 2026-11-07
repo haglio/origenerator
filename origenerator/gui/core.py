@@ -8,8 +8,9 @@ from dataclasses import dataclass, replace
 from app_support.loading_screen import MeetingPlace
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QMainWindow, QMessageBox
+from PyQt6.QtWidgets import QMainWindow
 from shared_ui.foreground import bring_to_front
+from shared_ui.hard_to_miss import sure
 from shared_ui.preview import Preview, window_title
 
 from origenerator import downtime, places_backfill, ui_scale
@@ -22,7 +23,6 @@ from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.gallery_view import GalleryView, Shared
-from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -116,7 +116,7 @@ class Core(QMainWindow):
 
         quit_shortcut = QShortcut(QKeySequence("Ctrl+Alt+Q"), self)
         quit_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        quit_shortcut.activated.connect(self._close_if_sure)
+        quit_shortcut.activated.connect(self.close)
         self._gallery_view.quit_asked.connect(self._close_if_sure)
 
         self._restore_session()
@@ -318,12 +318,7 @@ class Core(QMainWindow):
     def _sure_to_close(self) -> bool:
         if self._fun_time is not None:
             return True
-        with hard_to_miss(self):
-            return QMessageBox.question(
-                self, "Close Origenerator", "Are you sure you want to close Origenerator?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            ) == QMessageBox.StandardButton.Yes
+        return sure(self, "Close Origenerator", "Are you sure you want to close Origenerator?")
 
     def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_UI_STATE:

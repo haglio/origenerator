@@ -19,6 +19,7 @@ from funestra.robot_hand import WaveformShape
 from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+from shared_ui.hard_to_miss import FadedBackground
 from shared_ui.preview import Preview
 
 from origenerator import action_settings, app_link, downtime, gallery, toast_raising, ui_scale
@@ -46,7 +47,6 @@ from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
 from tests.test_combine import _listed_under_recent
-from tests.test_hard_to_miss import _faded_backgrounds
 
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
 
@@ -93,6 +93,10 @@ def test_no_part_of_the_window_flashes_up_as_a_window_of_its_own_while_it_is_bui
     assert shown.names == []
 
 
+def _faded_backgrounds(window):
+    return [faded for faded in window.findChildren(FadedBackground) if faded.isVisible()]
+
+
 def _quit_shortcut(win):
     seq = QKeySequence("Ctrl+Alt+Q")
     for shortcut in win.findChildren(QShortcut):
@@ -117,7 +121,7 @@ def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
     assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
 
 
-def test_the_power_button_asks_first_as_ctrl_alt_q_does_and_closes_on_yes(
+def test_the_power_button_asks_first_and_closes_on_yes(
         qtbot, tmp_path, monkeypatch):
     asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
     win = _window(qtbot, tmp_path)
@@ -176,15 +180,15 @@ def test_the_window_behind_the_close_question_fades_out(qtbot, tmp_path, monkeyp
     assert [faded.geometry() for faded in faded_while_asked] == [win.geometry()]
 
 
-def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
+def test_ctrl_alt_q_closes_without_asking(qtbot, tmp_path, monkeypatch):
     asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
     win = _window(qtbot, tmp_path)
     win.show()
 
     _quit_shortcut(win).activated.emit()
 
-    assert len(asked) == 1
-    assert win.isVisible()
+    assert asked == []
+    assert not win.isVisible()
 
 
 def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(

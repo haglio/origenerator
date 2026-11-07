@@ -693,9 +693,9 @@ def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(
         qtbot, tmp_path, monkeypatch):
     view, _client = _waiting_view(qtbot, tmp_path, backlog=0)
     waiting, = view._live_jobs.values()
-    start = time.monotonic() + 42.5
     monkeypatch.setattr(view._jobs, "starts_at",
-                        lambda prompt_id: start if prompt_id == waiting.prompt_id else None)
+                        lambda prompt_id: time.monotonic() + 42.5
+                        if prompt_id == waiting.prompt_id else None)
 
     view._poll()
 

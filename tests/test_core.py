@@ -846,13 +846,20 @@ def test_close_event_persists_gallery_selection(qtbot, tmp_path):
     assert AppState(path).get("gallery_selection") == "xyz"
 
 
+def _select_where_the_gallery_has_drawn_the_library(win, prompt_id):
+    gallery = win._gallery_view
+    gallery.refresh()
+    gallery.select_generation(prompt_id)
+    gallery.refresh(only_if_moved=True)
+
+
 def test_a_crash_reopens_where_the_user_was_because_the_session_is_saved_as_it_changes(
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(core, "SESSION_PERSIST_INTERVAL_MS", 10)
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
 
-    win._gallery_view.select_generation("xyz")
+    _select_where_the_gallery_has_drawn_the_library(win, "xyz")
 
     qtbot.waitUntil(lambda: AppState(path).get("gallery_selection") == "xyz", timeout=30_000)
 
@@ -873,7 +880,7 @@ def test_a_session_save_the_disk_refuses_is_tried_again_rather_than_ending_the_a
     monkeypatch.setattr(state, "save", save_once_the_disk_allows)
     win = _window(qtbot, tmp_path, state)
 
-    win._gallery_view.select_generation("xyz")
+    _select_where_the_gallery_has_drawn_the_library(win, "xyz")
 
     qtbot.waitUntil(lambda: AppState(path).get("gallery_selection") == "xyz", timeout=30_000)
     assert not refusals

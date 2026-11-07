@@ -304,18 +304,26 @@ class GeneratePane(QTabWidget):
         self.setCurrentWidget(tab)
         return tab
 
+    def tab_showing(self, prompt_id: str) -> GenerateTab | None:
+        return next((tab for tab in self.generate_tabs()
+                     if (tab.displayed_row() or {}).get("prompt_id") == prompt_id), None)
+
     def load_selection(self, row: dict, image_rows: list[dict]):
-        image_index = build_image_config_index(
-            [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
-        key = self._row_settings_key(row, image_index)
-        cur = self.current_generate_tab()
-        if (cur is not None and not cur.is_blank()
-                and cur.workflow_and_signature(image_index) == key):
-            target = cur
-        else:
-            target = self._landing_tab()
+        target = (self.tab_showing(row["prompt_id"])
+                  or self._tab_for_the_same_folder(row, image_rows)
+                  or self._landing_tab())
         target.show_saved_generation(row, image_rows)
         self.setCurrentWidget(target)
+
+    def _tab_for_the_same_folder(self, row: dict, image_rows: list[dict]) -> GenerateTab | None:
+        image_index = build_image_config_index(
+            [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
+        cur = self.current_generate_tab()
+        if (cur is not None and not cur.is_blank()
+                and cur.workflow_and_signature(image_index)
+                == self._row_settings_key(row, image_index)):
+            return cur
+        return None
 
     def tab_that_launched(self, origin: str | None):
         if not origin:

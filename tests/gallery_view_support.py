@@ -48,7 +48,7 @@ from origenerator.gui.new_tile import NewTile
 from origenerator.item_shape import base_of, shaped_key
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
-from origenerator.prompt_edit import request_applier
+from origenerator.prompt_edit import work_out
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -1075,6 +1075,15 @@ def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
     return db
 
 
+def _a_fake_models_answer(positive, negative, words, known):
+    if words.startswith("no "):
+        thing = words.removeprefix("no ")
+        if f"a {thing}" in positive:
+            return {"changes": [{"prompt": "positive", "remove": f"a {thing}", "for": words}]}
+        return {"changes": [{"prompt": "negative", "add": thing, "for": words}]}
+    return {"changes": [{"prompt": "positive", "add": words, "for": words}]}
+
+
 def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("orig.png", "image"))
@@ -1082,7 +1091,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     qtbot.addWidget(view)
     view._voice.requests._work_out = (
         lambda positive, negative, words, *, in_scenes=False, **_:
-            request_applier(in_scenes)(positive, negative, words))
+            work_out(positive, negative, words, in_scenes=in_scenes, ask=_a_fake_models_answer))
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._buttons.mic.setChecked(True)
     view.refresh()

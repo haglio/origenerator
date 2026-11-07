@@ -39,6 +39,8 @@ _SAYING_NOTHING = frozenset({
 _UNREADABLE = "Couldn't read one of the model's changes."
 _NOTHING_ELSE_TO_DO = ("{} was already in the Positive Prompt, and its opposite already in the "
                        "Negative Prompt, so I couldn't figure out anything else to do.")
+_NOTHING_ELSE_TO_KEEP_OUT = ("{} was already out of the Positive Prompt and in the Negative Prompt, "
+                             "so I couldn't figure out anything else to do.")
 _LEFT_OUT = re.compile(r"(?:no|without)\s+(?:(?:a|an|any|the)\s+)?(\S.*)", re.IGNORECASE)
 _QUOTED = re.compile(r"""["\u201c]([^"\u201d]+)["\u201d]|(?<!\w)'([^']+)'(?!\w)|\bthe word\s+([\w-]+)""",
                      re.IGNORECASE)
@@ -48,6 +50,11 @@ _QUOTED = re.compile(r"""["\u201c]([^"\u201d]+)["\u201d]|(?<!\w)'([^']+)'(?!\w)|
 class Prompts:
     in_scenes: bool = False
     take_weights: bool = True
+    his_words: frozenset = frozenset()
+
+
+def words_of_his(texts) -> frozenset:
+    return frozenset().union(*(_words_of(text) for text in texts))
 
 
 @dataclass(frozen=True)
@@ -235,6 +242,7 @@ class _Applying:
         self.settings = settings
         self.in_scenes = prompts.in_scenes
         self.take_weights = prompts.take_weights
+        self.his_words = prompts.his_words
         self.changes: dict = {}
         self.said: list[str] = []
         self.already_so: list[str] = []
@@ -277,21 +285,83 @@ class _Applying:
             return f", and swapped its trigger word {old[0]} for {new[0]} in the Positive Prompt"
         return f", and put its trigger word {new[0]} in the Positive Prompt"
 
-    def tried(self, tried) -> None:
-        if not isinstance(tried, dict):
-            return
-        wanted = _found(self.positive, str(tried.get("positive") or ""))
-        if (wanted and _found(self.negative, str(tried.get("negative") or ""))
-                and self._answers_him(tried, wanted.group(0))):
-            self.gave_up = _NOTHING_ELSE_TO_DO.format(_quoted(wanted.group(0)))
-
     def change(self, change) -> None:
         if not isinstance(change, dict):
             self._say(_UNREADABLE)
         elif "setting" in change:
             self.setting(change)
+        elif "more" in change:
+            self.more(change)
+        elif "gone" in change:
+            self.gone(change)
         else:
             self.prompt(change)
+
+    def more(self, change: dict) -> None:
+        of = str(change.get("more") or "")
+        stronger = self._as_these_prompts_take(str(change.get("stronger") or "") or of)
+        opposite = str(change.get("opposite") or "")
+        if not self._answers_him(change, f"{of} {stronger}"):
+            return
+        part = _as_written(self.positive, of) if of else ""
+        if part and not _words_of(stronger) - _words_of(part) <= self.his_words:
+            stronger = part
+        said = (self._brought_out(part, stronger) if part and _whole(self.positive, part)
+                else self._put_first("positive", stronger))
+        said += self._add("negative", {"add": opposite}) if opposite else []
+        self.said += said
+        if not said:
+            self.gave_up = _NOTHING_ELSE_TO_DO.format(_quoted(part or stronger))
+
+    def _brought_out(self, part: str, stronger: str) -> list[str]:
+        said = []
+        if stronger.lower() != part.lower():
+            said += self._replace("positive", {"replace": part, "with": stronger})
+            part = stronger if _whole(self.positive, stronger) else part
+        return said + self._moved_first(part) + self._weighed_up("positive", part)
+
+    def _put_first(self, which: str, words: str) -> list[str]:
+        text = getattr(self, which)
+        if not words or _whole(text, words):
+            return []
+        setattr(self, which, _joined("", words, text))
+        return [f"Added {_quoted(words)} to the {PROMPTS[which]}."]
+
+    def _moved_first(self, words: str) -> list[str]:
+        parts = _parts(self.positive)
+        at = next((index for index, part in enumerate(parts) if _whole(part, words)), 0)
+        if at == 0:
+            return []
+        self.positive = ", ".join([parts[at], *parts[:at], *parts[at + 1:]])
+        return [f"Moved {_quoted(parts[at])} earlier in the Positive Prompt."]
+
+    def _weighed_up(self, which: str, words: str) -> list[str]:
+        text = getattr(self, which)
+        index = index_of(text, words) if self.take_weights else None
+        if index is None:
+            return []
+        setattr(self, which, reweighted(text, index, WEIGHT_STEP))
+        before, after = (segments_of(prompt)[index].strip() for prompt in (text, getattr(self, which)))
+        return [f"Replaced {_quoted(before)} with {_quoted(after)} in the {PROMPTS[which]}."]
+
+    def gone(self, change: dict) -> None:
+        thing = str(change.get("gone") or "")
+        instead = self._as_these_prompts_take(str(change.get("instead") or ""))
+        if not thing or not self._answers_him(change, thing):
+            return
+        there = [written for part in _parts(str(change.get("in_positive") or ""))
+                 if part and _whole(self.positive, written := _as_written(self.positive, part))]
+        said = []
+        if there and instead:
+            said += self._replace("positive", {"replace": there.pop(0), "with": instead})
+        elif instead:
+            said += self._add("positive", {"add": instead})
+        for part in there:
+            said += self._remove("positive", {"remove": part})
+        said += [line for line in self._add("negative", {"add": thing}) if not line.startswith(_KEPT_OUT)]
+        self.said += said
+        if not said:
+            self.gave_up = _NOTHING_ELSE_TO_KEEP_OUT.format(_quoted(thing))
 
     def prompt(self, change: dict) -> None:
         which = str(change.get("prompt") or "").strip().lower()
@@ -394,14 +464,11 @@ class _Applying:
         return ", ".join(bare)
 
     def _already_there(self, which: str, words: str, kept_out: list[str]) -> list[str]:
-        text = getattr(self, which)
-        index = index_of(text, words) if which == "negative" and self.take_weights else None
-        if index is None:
-            self.already_so += [*kept_out, f"The {PROMPTS[which]} already has {_quoted(words)}."]
-            return []
-        setattr(self, which, reweighted(text, index, WEIGHT_STEP))
-        before, after = (segments_of(prompt)[index].strip() for prompt in (text, getattr(self, which)))
-        return [*kept_out, f"Replaced {_quoted(before)} with {_quoted(after)} in the {PROMPTS[which]}."]
+        said = self._weighed_up(which, words) if which == "negative" else []
+        if said:
+            return [*kept_out, *said]
+        self.already_so += [*kept_out, f"The {PROMPTS[which]} already has {_quoted(words)}."]
+        return []
 
     def _remove(self, which: str, change: dict) -> list[str]:
         text = getattr(self, which)
@@ -426,22 +493,27 @@ class _Applying:
 
     _EDITS: ClassVar[dict] = {"replace": _replace, "add": _add, "remove": _remove}
 
-    def _with_what_was_not_found(self, said: list[str]) -> list[str]:
+    def _with_what_was_not_found(self, said: list[str]) -> str:
         shown = self.shown_positive.lower()
+        he_named_the_negative_prompt = "negative" in self.asked[0].lower() if self.asked else False
         lines = []
         for line in said:
             words = line.removeprefix(_KEPT_OUT)
             if words == line:
                 lines.append(line)
-            elif (not self.took_out and self._names_what_he_asked(words)
+            elif (not self.took_out and not he_named_the_negative_prompt
+                  and self._names_what_he_asked(words)
                   and not any(word in shown for word in _naming(words))):
                 lines.append(f"Couldn't find {_quoted(words)} in the Positive Prompt.")
-        return lines
+        return " ".join(dict.fromkeys(lines))
+
+    def _line(self) -> str:
+        if self.said:
+            return self._with_what_was_not_found(self.said)
+        return self.gave_up or self._with_what_was_not_found(self.already_so) or _NOTHING_CHANGED
 
     def outcome(self) -> Outcome:
-        said = self._with_what_was_not_found(self.said or self.already_so)
-        return Outcome(self.positive, self.negative, self.changes,
-                       " ".join(dict.fromkeys(said)) or self.gave_up or _NOTHING_CHANGED)
+        return Outcome(self.positive, self.negative, self.changes, self._line())
 
 
 def apply_changes(answer: dict, pair: tuple[str, str], *, asked: list[str],
@@ -449,5 +521,4 @@ def apply_changes(answer: dict, pair: tuple[str, str], *, asked: list[str],
     applying = _Applying(pair, asked, settings, prompts)
     for change in answer.get("changes") or ():
         applying.change(change)
-    applying.tried(answer.get("tried"))
     return applying.outcome()

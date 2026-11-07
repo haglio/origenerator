@@ -702,7 +702,7 @@ def test_a_queued_request_is_logged_by_the_images_it_joins_never_by_its_words(
         _speak_request(view, qtbot, "Request, no example lantern, over.")
 
     (job,) = view._live_jobs.values()
-    assert f"Request on orig: term dropped, queued as {job.prompt_id}" in caplog.messages
+    assert f"Request on orig: term rewritten, queued as {job.prompt_id}" in caplog.messages
     for private in ("lantern", "soft light", "blurry"):
         assert private not in caplog.text
 
@@ -795,7 +795,7 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
     view._on_thumbnail_clicked(job.prompt_id)
 
     exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
-    assert exchange.turns() == [("no hat", "")]
+    assert exchange.turns() == [("no hat", 'Removed "a hat" from the Positive Prompt.')]
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

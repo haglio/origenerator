@@ -335,8 +335,10 @@ The model and ComfyUI do not fit on the graphics card together.
 `graphics_card.wait_for_the_graphics_card` waits for ComfyUI's queue to drain, takes the
 card's one claim (`origenerator/card_claim.py`, which the LoRA trainers take too), asks
 ComfyUI to let go of its models, and `let_go_of_the_graphics_card` gives the claim back;
-a Request that waits past `RequestAnswerer`'s deadline is answered by the rules
-in `prompt_edit.apply_request` alone. The Job Queue holds its line while the
+a Request that waits past `RequestAnswerer`'s deadline, or that the model cannot
+answer, changes nothing and says so (`prompt_edit.unanswered`); the word rules that
+once answered in the model's place appended his words to the prompt without a
+word, which he called nonsense (2026-11-06). The Job Queue holds its line while the
 model is answering (`JobQueue.model_hold`), so a job
 submitted meanwhile waits rather than meeting a card the model is on.
 

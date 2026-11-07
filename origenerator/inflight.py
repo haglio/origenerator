@@ -5,7 +5,7 @@ import logging
 from origenerator.completion import extract_completion, mark_generation_completed
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.signatures import parse_params
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.generation_state import GenerationStatus
 from origenerator.library_filing import saved_in_its_run_folder
 from origenerator.output_places import OutputFolders
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -36,12 +36,6 @@ def reconcile_in_flight(db, client, folders: OutputFolders) -> dict:
     return _reconcile(db, client, [r for r in db.list_generations()
                                    if r.get("status") == GenerationStatus.RUNNING],
                       folders, "in-flight generations")
-
-
-def reconcile_the_backfill(db, client, folders: OutputFolders) -> dict:
-    waiting_or_running = [r for r in db.list_generations()
-                          if source_of(r) == GenerationSource.BACKFILL and is_in_progress(r)]
-    return _reconcile(db, client, waiting_or_running, folders, "the backfill's runs")
 
 
 def _reconcile(db, client, rows: list[dict], folders: OutputFolders, what: str) -> dict:

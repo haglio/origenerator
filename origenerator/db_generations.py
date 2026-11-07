@@ -201,30 +201,8 @@ class GenerationStore(Store):
     def set_shielded(self, prompt_id: str, shielded: bool):
         self._set(prompt_id, "shielded", 1 if shielded else 0)
 
-    def set_backfill_of(self, prompt_id: str, video_prompt_id: str):
-        self._set(prompt_id, "backfill_of", video_prompt_id)
-
     def set_source(self, prompt_id: str, source: str):
         self._set(prompt_id, "source", source)
-
-    def take_the_content_of(self, prompt_id: str, remade: dict):
-        self._set(prompt_id, "workflow_version", remade["workflow_version"])
-        self._set(prompt_id, "positive_prompt", remade["positive_prompt"])
-        self._set(prompt_id, "negative_prompt", remade["negative_prompt"])
-        self._set(prompt_id, "seed", remade["seed"])
-        self._set(prompt_id, "params_json", remade["params_json"])
-        self._set(prompt_id, "workflow_json", remade["workflow_json"])
-        self._set(prompt_id, "provenance", remade["provenance"])
-        self.update_generation(prompt_id, output_files=remade["output_files"],
-                               thumbnail_path=remade["thumbnail_path"],
-                               duration_seconds=remade["duration_seconds"])
-
-    def mark_remade(self, prompt_id: str):
-        with self._connect() as conn:
-            conn.execute("UPDATE generations SET remade_at = datetime('now') WHERE prompt_id = ?",
-                         (prompt_id,))
-    def pay_a_fun_time_favorite(self, prompt_id: str):
-        self._set(prompt_id, "fun_time_favorite_owed", 0)
 
     def mark_evolver_exported(self, prompt_id: str):
         self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",

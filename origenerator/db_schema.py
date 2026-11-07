@@ -111,8 +111,8 @@ CREATE TABLE IF NOT EXISTS generations (
     -- The shield on a queue row: while set, nothing the queue does for later
     -- work stops this run partway. On the row so a restart keeps it.
     shielded        INTEGER NOT NULL DEFAULT 0,
-    -- The video a backfill run is made to take the place of, by its prompt_id
-    -- (origenerator.enhanced_start_backfill).
+    -- The video a run of the backfill, retired 2026-11-07, was made to take
+    -- the place of, by its prompt_id.
     backfill_of TEXT,
     -- Set on a backfill run whose old video's copy in Kino was a Fun Time
     -- favorite, which its own copy is to be once Evolver has filed it.

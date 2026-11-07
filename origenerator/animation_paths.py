@@ -27,7 +27,25 @@ def _table(content: dict) -> dict:
                 if isinstance(state, str) and state.strip()))
             if named_states:
                 table.setdefault(lane, {})[action.strip()] = named_states
+    buttons = vocabulary(MediaType.VIDEO, content).buttons
+    for written in table.values():
+        written.update(_compounds(buttons, written))
     return table
+
+
+def _compounds(buttons: dict[str, tuple[str, ...]], written: dict[str, tuple[str, ...]]
+               ) -> dict[str, tuple[str, ...]]:
+    alone = {made_of[0]: written[button] for button, made_of in buttons.items()
+             if len(made_of) == 1 and button in written}
+    derived = {}
+    for button, made_of in buttons.items():
+        if button in written or len(made_of) < 2 or not all(a in alone for a in made_of):
+            continue
+        first, *rest = (alone[action] for action in made_of)
+        states = tuple(state for state in first if all(state in other for other in rest))
+        if states:
+            derived[button] = states
+    return derived
 
 
 def _read(content: dict | None) -> dict:

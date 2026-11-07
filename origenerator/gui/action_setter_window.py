@@ -138,7 +138,9 @@ class ActionSetterWindow(QWidget):
         self._stage.setMinimumSize(320, 320)
         self._previously = QLabel(PREVIOUSLY, objectName=PREVIOUSLY_LINE)
         self._previously.setStyleSheet(f"color: {YELLOW.name()};")
-        self._previously.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        kept = self._previously.sizePolicy()
+        kept.setRetainSizeWhenHidden(True)
+        self._previously.setSizePolicy(kept)
         self._status = QLabel(objectName=STATUS_LINE)
         self._last = QLabel(objectName=LAST_LINE)
         for line in (self._status, self._last):
@@ -151,17 +153,12 @@ class ActionSetterWindow(QWidget):
         shown.addWidget(self._status)
         shown.addWidget(self._last)
 
-        side_by_side = QHBoxLayout()
-        side_by_side.setSpacing(GAP_MEDIUM)
-        side_by_side.addLayout(shown, 1)
-        side_by_side.addWidget(self._build_buttons(vocabulary.tiles))
-
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
         layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
                                   MARGIN_STANDARD, MARGIN_STANDARD)
         layout.setSpacing(GAP_MEDIUM)
-        layout.addWidget(self._previously)
-        layout.addLayout(side_by_side, 1)
+        layout.addLayout(shown, 1)
+        layout.addWidget(self._build_buttons(vocabulary.tiles))
 
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
         self._show_current()
@@ -173,6 +170,7 @@ class ActionSetterWindow(QWidget):
         boxes.setSpacing(GAP_MEDIUM)
         for name in self._vocabulary.checkboxes:
             self._add_checkbox(boxes, name)
+        boxes.addWidget(self._previously)
         boxes.addStretch(1)
         column.addLayout(boxes)
         grid = QGridLayout()

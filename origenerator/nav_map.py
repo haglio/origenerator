@@ -4,12 +4,13 @@ from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from funestra.video_families import labels_text
 from funestra.video_groups import normalize_path_key
 
 from origenerator import gallery
-from origenerator.action_labels import combined_actions, labels_of
 from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType
+from origenerator.published_labels import published
 from origenerator.search import content_stems
 
 WIDEN_ADDITIONS = 6
@@ -83,15 +84,12 @@ class _Animations:
     def videos_of(self, image: dict) -> list[dict]:
         return self._videos_of.get(image["prompt_id"], [])
 
-    def actions_of(self, row: dict) -> tuple[str, ...]:
-        if gallery.media_type_of_row(row) != MediaType.VIDEO:
-            return labels_of(row, MediaType.IMAGE).actions
-        holder = self.image_of(row) or row
-        return combined_actions(labels_of(holder, MediaType.IMAGE), labels_of(row, MediaType.VIDEO))
+    def labels_of_row(self, row: dict) -> tuple[str, ...]:
+        return published(row, self.image_of(row) or row)
 
     def label_of(self, row: dict) -> str:
         source = (SOURCE_IMAGE,) if self.videos_of(row) else ()
-        return ", ".join((*source, *self.actions_of(row)))
+        return labels_text((*source, *self.labels_of_row(row)))
 
     def group_of(self, row: dict) -> list[dict]:
         image = self.image_of(row) or row

@@ -366,3 +366,23 @@ def test_under_an_action_filter_a_group_is_what_a_seed_loop_plays():
     for row in library:
         around = surroundings(row, library, image_index=index)
         assert _sharing_a_key(keys, row["prompt_id"]) == {row["prompt_id"], *_ids(around.seeds)}
+
+
+def test_a_video_is_named_for_every_label_it_publishes_its_checked_boxes_included():
+    source = {**_image("i1", "a fox", seed=1, shows="beta"), "image_checked": json.dumps(["first box"])}
+    index = gallery.build_image_config_index([source])
+    runs = {**_video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha"),
+            "video_checked": json.dumps(["third box"])}
+
+    assert action_labels([source, runs], image_index=index)["v1"] == "beta, alpha, first box, third box"
+
+
+def test_an_image_is_named_for_its_actions_then_its_checked_boxes_as_a_video_is():
+    source = {**_image("i1", "a fox", seed=1, shows="beta"), "image_checked": json.dumps(["first box"])}
+    alone = {**_image("i2", "a fox", seed=2, shows="gamma"), "image_checked": json.dumps(["second box"])}
+    index = gallery.build_image_config_index([source, alone])
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
+
+    named = action_labels([source, alone, runs], image_index=index)
+
+    assert (named["i1"], named["i2"]) == ("Source image, beta, first box", "gamma, second box")

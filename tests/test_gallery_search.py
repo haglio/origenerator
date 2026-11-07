@@ -47,6 +47,9 @@ class FakeHost:
     def search_scope(self):
         return self.scope
 
+    def everything_scope(self):
+        return _ALL
+
     def image_config_index(self) -> dict:
         return {}
 
@@ -97,6 +100,69 @@ def _let_the_widening_land(qtbot, found):
     with qtbot.waitSignal(found._expander.expanded):
         found._expand_timer.stop()
         found._request_expansion()
+
+
+_A_FOLDER = _Scope("All > Folder", {"g1"})
+
+
+def test_search_all_searches_every_item_while_a_folder_is_open(controller):
+    host = FakeHost(scope=_A_FOLDER)
+    found = controller([_row("g1", "a tabby on a wall"), _row("g2", "a tabby in a box")], host=host)
+    _type(found, "tabby")
+
+    found.search_all.click()
+
+    tiles, _terms = host.shown[-1]
+    assert {tile.row["prompt_id"] for tile in tiles} == {"g1", "g2"}
+    assert host.headers[-1] == ("tabby", "All")
+
+
+def test_search_all_keeps_searching_every_item_as_the_words_change(controller):
+    host = FakeHost(scope=_A_FOLDER)
+    found = controller([_row("g1", "a tabby on a wall"), _row("g2", "a tabby in a box")], host=host)
+    _type(found, "tabby")
+    found.search_all.click()
+
+    _type(found, "tabby in")
+
+    assert host.headers[-1] == ("tabby in", "All")
+
+
+def test_picking_a_folder_after_search_all_searches_that_folder(controller):
+    host = FakeHost(scope=_A_FOLDER)
+    found = controller([_row("g1", "a tabby on a wall"), _row("g2", "a tabby in a box")], host=host)
+    _type(found, "tabby")
+    found.search_all.click()
+
+    found.follow_the_folder()
+    found.run()
+
+    assert host.headers[-1] == ("tabby", "All > Folder")
+
+
+def test_a_search_left_and_started_again_searches_the_open_folder(controller):
+    host = FakeHost(scope=_A_FOLDER)
+    found = controller([_row("g1", "a tabby on a wall")], host=host)
+    _type(found, "tabby")
+    found.search_all.click()
+
+    _type(found, "")
+    _type(found, "tabby")
+
+    assert host.headers[-1] == ("tabby", "All > Folder")
+
+
+def test_search_all_is_grayed_until_a_search_can_start(controller):
+    found = controller()
+    grayed_tip = found.search_all.toolTip()
+
+    _type(found, "ta")
+    assert not found.search_all.isEnabled()
+    _type(found, "tab")
+
+    assert found.search_all.isEnabled()
+    assert found.search_all.toolTip() != grayed_tip
+    assert f"{MIN_CHARS} characters" in grayed_tip
 
 
 def test_the_field_shows_a_search_is_still_going_until_its_widening_lands(controller, qtbot):

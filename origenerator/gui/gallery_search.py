@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Protocol
 
 from PyQt6.QtCore import QObject, Qt, QTimer
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from shared_ui.spacing import GAP_SMALL
 
 from origenerator import gallery, search
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
@@ -15,10 +16,17 @@ _EXPAND_DELAY_MS = 700
 _DELAY_MS = 300
 MIN_CHARS = 3
 _SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_MODEL_LORA))
+_SEARCH_ALL_TIP = ("Search every item for what you typed, whatever folder is "
+                   "open in the TOC")
+_SEARCH_ALL_GRAYED_TIP = (f"Type at least {MIN_CHARS} characters in the search "
+                          "box, then press this to search every item rather "
+                          "than only the folder open in the TOC")
 
 
 class SearchHost(Protocol):
     def search_scope(self): ...
+
+    def everything_scope(self): ...
 
     def image_config_index(self) -> dict: ...
 
@@ -42,6 +50,7 @@ class GallerySearchController(QObject):
         self._host = host
         self._index = search.GallerySearch()
         self._query = ""
+        self._everywhere = False
         self._expansions = None
         self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
@@ -70,6 +79,15 @@ class GallerySearchController(QObject):
         )
         self.field.setClearButtonEnabled(True)
         self.field.textChanged.connect(self._on_text_changed)
+        self.search_all = QPushButton("Search all")
+        self.search_all.clicked.connect(self._search_everywhere)
+        self._gray_search_all(True)
+        self.row = QWidget()
+        field_row = QHBoxLayout(self.row)
+        field_row.setContentsMargins(0, 0, 0, 0)
+        field_row.setSpacing(GAP_SMALL)
+        field_row.addWidget(self.field, 1)
+        field_row.addWidget(self.search_all)
 
         self._count = QLabel("")
         self._count.setObjectName("estimateLabel")
@@ -95,6 +113,10 @@ class GallerySearchController(QObject):
         return self._query
 
     @property
+    def everywhere(self) -> bool:
+        return self._everywhere
+
+    @property
     def index(self) -> search.GallerySearch:
         return self._index
 
@@ -113,8 +135,12 @@ class GallerySearchController(QObject):
     def sync_placeholder(self) -> None:
         self.field.set_scope(self._host.search_scope().path)
 
+    def follow_the_folder(self) -> None:
+        self._everywhere = False
+
     def run(self) -> None:
-        scope = self._host.search_scope()
+        scope = (self._host.everything_scope() if self._everywhere
+                 else self._host.search_scope())
         self._outcome = self._index.search(
             self._query, expansions=self._expansions, within=scope.ids
         )
@@ -138,6 +164,7 @@ class GallerySearchController(QObject):
 
     def clear_state(self) -> None:
         self._query = ""
+        self._everywhere = False
         self._expansions = None
         self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
@@ -147,7 +174,7 @@ class GallerySearchController(QObject):
         self.field.set_working(False)
         self.bar.hide()
 
-    def restore(self, query: str) -> None:
+    def restore(self, query: str, everywhere: bool = False) -> None:
         self.field.blockSignals(True)
         try:
             self.field.setText(query)
@@ -155,6 +182,8 @@ class GallerySearchController(QObject):
             self.field.blockSignals(False)
         self.clear_state()
         self._query = query
+        self._everywhere = everywhere and bool(query)
+        self._gray_search_all(len(query) < MIN_CHARS)
         if query:
             self._expansions = self._expander.cached(query)
 
@@ -162,6 +191,7 @@ class GallerySearchController(QObject):
         query = (text or "").strip()
         self._timer.stop()
         self._expand_timer.stop()
+        self._gray_search_all(len(query) < MIN_CHARS)
         if len(query) < MIN_CHARS:
             if self._query:
                 self._exit()
@@ -181,6 +211,17 @@ class GallerySearchController(QObject):
         self._expansions = self._expander.cached(self._query)
         self.run()
         self.field.set_working(self._widening_awaited)
+
+    def _search_everywhere(self) -> None:
+        if not self._query:
+            return
+        self._everywhere = True
+        self._timer.stop()
+        self._run_pending()
+
+    def _gray_search_all(self, grayed: bool) -> None:
+        self.search_all.setEnabled(not grayed)
+        self.search_all.setToolTip(_SEARCH_ALL_GRAYED_TIP if grayed else _SEARCH_ALL_TIP)
 
     def _exit(self) -> None:
         self.clear_state()

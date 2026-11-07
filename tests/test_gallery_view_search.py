@@ -166,6 +166,53 @@ def test_the_all_row_searches_the_whole_library(qtbot):
     assert set(view.listed_prompt_ids()) == {"i1", "v1"}
 
 
+def test_search_all_searches_the_whole_library_and_keeps_the_folder_highlighted(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    videos = _video_workflow(view._tree)
+    view._tree.setCurrentItem(videos)
+    _search_for(view, "cat")
+
+    view._search.search_all.click()
+
+    assert set(view.listed_prompt_ids()) == {"i1", "v1"}
+    assert view._tree.currentItem() is videos
+    assert "I2V" not in view._folder_path.display_text()
+
+
+def test_picking_another_folder_after_search_all_searches_that_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_video_workflow(view._tree))
+    _search_for(view, "cat")
+    view._search.search_all.click()
+
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+
+    assert view.listed_prompt_ids() == ["i1"]
+
+
+def test_back_to_a_search_all_searches_the_whole_library_again(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    videos = _video_workflow(view._tree)
+    view._tree.setCurrentItem(videos)
+    _search_for(view, "cat")
+    view._search.search_all.click()
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+
+    view._navigation.go_back()
+
+    assert view._tree.currentItem() is videos
+    assert set(view.listed_prompt_ids()) == {"i1", "v1"}
+
+
 def test_standing_on_images_searches_the_images_alone(qtbot):
     view = _of_both_kinds(qtbot)
     view._tree.setCurrentItem(_alls(view._tree)["Images"])
@@ -340,8 +387,16 @@ def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     toc = _pane_holding(view._tree)
     assert isinstance(view._search.field, QLineEdit)
     assert toc.isAncestorOf(view._search.field)
-    section = view._search.field.parentWidget().layout()
-    assert section.indexOf(view._search.field) < section.indexOf(view._tree)
+    section = view._tree.parentWidget().layout()
+    assert section.indexOf(view._search.row) < section.indexOf(view._tree)
+
+
+def test_search_all_sits_to_the_right_of_the_search_field(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    row = view._search.row.layout()
+    assert row.indexOf(view._search.field) < row.indexOf(view._search.search_all)
+    assert view._search.search_all.text() == "Search all"
 
 
 def test_search_matches_a_generation_by_its_seed(qtbot):

@@ -58,10 +58,10 @@ class NavigationController:
         view = self._host.selected_folder_key()
         if view is None:
             return
-        location = Location(view, self._search.query, item)
+        location = Location(view, self._search.query, item, self._search.everywhere)
         current = self._history.current()
         if self._redrawing_the_same_search(location, current):
-            if current.query == location.query:
+            if (current.query, current.everywhere) == (location.query, location.everywhere):
                 return
             self._history.replace(location)
         else:
@@ -86,11 +86,11 @@ class NavigationController:
         item = self._host.selected_prompt_id()
         if item is not None and not self._host.pane_holds(item):
             item = None
-        return Location(view, self._search.query, item)
+        return Location(view, self._search.query, item, self._search.everywhere)
 
     def _restore(self, location: Location) -> None:
         with self.off_the_record():
-            self._search.restore(location.query)
+            self._search.restore(location.query, location.everywhere)
             if not self._host.show_folder(location.view):
                 if location.item is not None:
                     self._host.go_to_generation(location.item)

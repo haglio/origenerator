@@ -556,7 +556,7 @@ class GalleryView(QWidget):
         listening = pane_following(self._voice.status)
         self._voice.caption_shown.connect(listening.setVisible)
         finding, toc_column = pane()
-        toc_column.addWidget(self._search.field)
+        toc_column.addWidget(self._search.row)
         toc_column.addWidget(self._tree, 1)
         combining, combining_column = pane()
         combining_column.addWidget(self._combine.widget)
@@ -1237,9 +1237,12 @@ class GalleryView(QWidget):
                                 {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
-            return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self._live_ids)
+            return self.everything_scope()
         return _SearchScope(tuple(self._tree_view.path_steps(item)),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
+
+    def everything_scope(self) -> _SearchScope:
+        return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self._live_ids)
 
     def search_sort(self) -> str:
         return self._search.sort()
@@ -1271,6 +1274,7 @@ class GalleryView(QWidget):
             return
         self._search.sync_placeholder()
         if self._search.query and not self._navigation.suppressed:
+            self._search.follow_the_folder()
             self._search.run()
             return
         self._re_aim()

@@ -45,6 +45,7 @@ UNDO_BUTTON = "setter.undo"
 TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
           MediaType.VIDEO: "Origenerator — video action setter tool"}
 
+_NO_BOX_OF_ITS_OWN = "border: none; background: transparent;"
 _LIT = f"QToolButton:checked {{ background-color: {as_hex(BLUE)}; border-radius: {BUTTON_RADIUS}px; }}"
 
 
@@ -276,7 +277,7 @@ class ActionSetterWindow(QWidget):
 
     def _face_in_the_middle_row(self, name: str, tile) -> QToolButton:
         face = QToolButton(tile)
-        face.setAutoRaise(True)
+        face.setStyleSheet(_NO_BOX_OF_ITS_OWN)
         face.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         held = QVBoxLayout(tile)
         held.setContentsMargins(0, 0, 0, 0)

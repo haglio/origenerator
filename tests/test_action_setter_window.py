@@ -27,6 +27,7 @@ from origenerator.gui.action_setter_window import (
     one_term_to_a_line,
     wrapped_to_fit,
 )
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
 
 _BUTTONS = {"button one": ("alpha",), "button two": ("alpha", "beta"), "button three": ("gamma",)}
@@ -410,6 +411,24 @@ def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
         return (rows[0] + rows[-1]) // 2 - _tile(made, name).height() // 2
 
     assert abs(below_the_middle("button four") - below_the_middle("button two")) <= 2
+
+
+def test_a_tile_down_several_rows_draws_no_box_of_one_row_inside_its_own(window, qtbot):
+    made, _store, _stage = window("gen-one", tiles=(Tile("button one", 0, 0),
+                                                    Tile("button two", 1, 0),
+                                                    Tile("button three", 2, 0),
+                                                    Tile("button four", 0, 1, rows=3)))
+    made.setStyleSheet(build_stylesheet())
+    with qtbot.waitExposed(made):
+        made.show()
+    tall = _tile(made, "button four")
+    face = tall.findChild(QToolButton)
+    shot = tall.grab().toImage()
+    inside = 4
+
+    ground = shot.pixelColor(inside, face.y() - inside).name()
+    assert [shot.pixelColor(inside, y).name()
+            for y in (face.y(), face.y() + face.height() - 1)] == [ground, ground]
 
 
 def test_ten_rows_of_buttons_stand_in_the_room_the_window_has(window):

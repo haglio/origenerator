@@ -116,7 +116,7 @@ class Core(QMainWindow):
 
         quit_shortcut = QShortcut(QKeySequence("Ctrl+Alt+Q"), self)
         quit_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        quit_shortcut.activated.connect(self._close_if_sure)
+        quit_shortcut.activated.connect(self.close)
         self._gallery_view.quit_asked.connect(self._close_if_sure)
 
         self._restore_session()

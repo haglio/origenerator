@@ -1,12 +1,26 @@
 from __future__ import annotations
 
+import pytest
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
-from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
+from PyQt6.QtGui import (
+    QContextMenuEvent,
+    QDragEnterEvent,
+    QDragLeaveEvent,
+    QDragMoveEvent,
+    QDropEvent,
+)
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QStyle,
+    QStyleOptionViewItem,
+    QTreeWidgetItem,
+)
 from shared_ui.colors import BLUE
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
 from origenerator.gallery.shapes import LANDSCAPE
+from origenerator.gallery.tree import ALL_KEY
 from origenerator.gui import folder_tree, icons
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
@@ -803,3 +817,101 @@ def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
 
     assert not move.isAccepted()
     assert dropped == []
+
+
+def _long_tree(qtbot):
+    tree = FolderTree(_ROLE)
+    qtbot.addWidget(tree)
+    every = _folder_row("All", ALL_KEY)
+    tree.addTopLevelItem(every)
+    rows = {}
+    for name in ("a", "b"):
+        folder = _folder_row(name.upper(), name)
+        every.addChild(folder)
+        rows[name] = folder
+        inner = _folder_row(f"{name.upper()} inner", f"{name}/i")
+        folder.addChild(inner)
+        rows[f"{name}/i"] = inner
+        for n in range(30):
+            leaf = _folder_row(f"{name} leaf {n}", f"{name}/i/{n}")
+            inner.addChild(leaf)
+            rows[f"{name}/i/{n}"] = leaf
+    tree.expandAll()
+    tree.resize(320, 200)
+    with qtbot.waitExposed(tree):
+        tree.show()
+    return tree, rows
+
+
+def _scroll_to_the_top(tree, row):
+    tree.scrollToItem(row, QAbstractItemView.ScrollHint.PositionAtTop)
+
+
+def test_scrolled_into_a_folder_its_folders_stay_frozen_at_the_top_without_all(qtbot):
+    tree, rows = _long_tree(qtbot)
+    _scroll_to_the_top(tree, rows["a/i/3"])
+
+    assert tree.frozen_rows() == [rows["a"], rows["a/i"]]
+
+
+def test_a_folder_whose_rows_have_scrolled_past_stays_frozen_no_longer(qtbot):
+    tree, rows = _long_tree(qtbot)
+    _scroll_to_the_top(tree, rows["a/i/29"])
+
+    assert tree.frozen_rows() == []
+
+
+def test_at_the_top_nothing_is_frozen(qtbot):
+    tree, _rows = _long_tree(qtbot)
+
+    assert tree.frozen_rows() == []
+
+
+def _strip(tree, top, height):
+    image = tree.viewport().grab().toImage()
+    return [image.pixelColor(x, y).name() for y in range(top, top + height)
+            for x in range(tree.viewport().width())]
+
+
+@pytest.mark.parametrize("picked", [False, True])
+def test_a_frozen_folder_looks_as_it_does_in_its_own_place(qtbot, picked):
+    tree, rows = _long_tree(qtbot)
+    tree.setStyleSheet(build_stylesheet())
+    if picked:
+        tree.setCurrentItem(rows["a/i"])
+    _scroll_to_the_top(tree, rows["a"])
+    place = tree.visualItemRect(rows["a/i"])
+    in_place = _strip(tree, place.top(), place.height())
+
+    _scroll_to_the_top(tree, rows["a/i/3"])
+    frozen_top = tree.visualItemRect(rows["a"]).height()
+
+    assert _strip(tree, frozen_top, place.height()) == in_place
+
+
+def test_clicking_a_frozen_folder_picks_it_and_scrolls_back_to_it(qtbot):
+    tree, rows = _long_tree(qtbot)
+    _scroll_to_the_top(tree, rows["a/i/3"])
+    first_height = tree.visualItemRect(rows["a"]).height()
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     pos=QPoint(100, first_height + 2))
+
+    shown = tree.visualItemRect(rows["a/i"]).top()
+    assert (tree.currentItem(), rows["a/i"] in tree.frozen_rows(), shown >= 0) == (
+        rows["a/i"], False, True)
+
+
+def test_right_clicking_a_frozen_folder_offers_its_own_menu(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+    asked = []
+    tree.customContextMenuRequested.connect(lambda pos: asked.append(tree.itemAt(pos)))
+    _scroll_to_the_top(tree, rows["a/i/3"])
+
+    at = QPoint(100, tree.visualItemRect(rows["a"]).height() + 2)
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.RightButton, pos=at)
+    QApplication.sendEvent(tree.viewport(), QContextMenuEvent(
+        QContextMenuEvent.Reason.Mouse, at, tree.viewport().mapToGlobal(at)))
+
+    assert asked == [rows["a/i"]]

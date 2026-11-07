@@ -29,7 +29,8 @@ from origenerator.gui.flow_layout import FlowLayout
 
 _X = BUTTON_ICON
 _X_INK = BUTTON_ICON - 2 * BUTTON_ICON_INSET
-_BARE = "border: none; background: transparent;"
+_NO_PADDING = "padding: 0px;"
+_BARE = f"border: none; background: transparent; {_NO_PADDING}"
 
 
 def _height(metrics) -> int:
@@ -37,7 +38,8 @@ def _height(metrics) -> int:
 
 
 def _round(side: int) -> str:
-    return f"border: {HAIRLINE}px solid {BORDER_DEFAULT.name()}; border-radius: {side // 2}px;"
+    return (f"border: {HAIRLINE}px solid {BORDER_DEFAULT.name()}; border-radius: {side // 2}px;"
+            f" {_NO_PADDING}")
 
 
 class Pill(QWidget):

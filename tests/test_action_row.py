@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
+from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.tick_control import TickControl
 
 from origenerator.action_labels import Labels, stored
@@ -28,6 +29,7 @@ from origenerator.gui.action_row import (
 )
 from origenerator.gui.label_cells import LabelForm
 from origenerator.gui.pills import Pill
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
 
 _BOXES = {MediaType.IMAGE: ("first box", "second box"), MediaType.VIDEO: ("third box",)}
@@ -330,6 +332,29 @@ def test_each_action_is_a_pill_with_an_x_that_removes_it_and_saves_at_once(actio
 
     assert caught.args == ["img", MediaType.IMAGE, Labels(("beta",), ("first box",))]
     assert _listed(action, MediaType.IMAGE) == ("beta",)
+
+
+def _inked(drawn) -> int:
+    shot = drawn.toImage()
+    return sum(shot.pixelColor(x, y).lightness() >= TEXT_SECONDARY.lightness() - 40
+               and shot.pixelColor(x, y).alpha() > 128
+               for x in range(shot.width()) for y in range(shot.height()))
+
+
+def _drawn_whole(button: QAbstractButton) -> bool:
+    icon = button.icon().pixmap(button.iconSize())
+    return _inked(button.grab()) >= _inked(icon) * 3 // 4
+
+
+def test_each_pills_x_and_the_plus_are_drawn_whole_under_the_apps_own_look(action, qtbot):
+    _rows(action).setStyleSheet(build_stylesheet())
+    action.show_row(_row(image=Labels(("alpha",))))
+    with qtbot.waitExposed(_rows(action)):
+        _rows(action).show()
+
+    x = _pills(action, MediaType.IMAGE)[0].findChild(QToolButton)
+
+    assert (_drawn_whole(x), _drawn_whole(_adder(action, MediaType.IMAGE))) == (True, True)
 
 
 def test_removing_the_last_pill_turns_the_button_back_to_add(action):

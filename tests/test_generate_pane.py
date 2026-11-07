@@ -491,6 +491,31 @@ def test_clicking_an_item_another_tab_shows_brings_that_tab_forward(tabs):
     assert [tab._displayed_row["prompt_id"] for tab in tabs.generate_tabs()] == ["cat", "dog"]
 
 
+def test_a_tab_whose_settings_bring_it_to_an_item_another_tab_shows_closes(tabs, monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    showing_cat = tabs.current_generate_tab()
+    tabs.pin_current_tab()
+    tabs.load_selection(dog, [cat, dog])
+    tabs.pin_current_tab()
+
+    tabs.current_generate_tab().prefill("sdxl_t2i", json.loads(cat["params_json"]))
+
+    assert tabs.generate_tabs() == [showing_cat]
+
+
+def test_a_restored_session_opens_one_tab_per_item(tabs, monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, _dog = _two_generations(tabs)
+    same = _generate_tab("sdxl_t2i", json.loads(cat["params_json"]))
+
+    tabs.restore_state({"tabs": [same, same], "current": 1})
+
+    assert [tab.displayed_row()["prompt_id"] for tab in tabs.generate_tabs()] == ["cat"]
+    assert tabs.currentIndex() == 0
+
+
 def test_only_one_tab_is_ever_the_preview_tab(tabs):
     cat, dog = _two_generations(tabs)
     tabs.load_selection(cat, [cat, dog])

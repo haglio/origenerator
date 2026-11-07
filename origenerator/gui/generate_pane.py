@@ -123,6 +123,7 @@ class GeneratePane(QTabWidget):
         tab = GenerateTab(self._client, self._db, fun_time=self._fun_time, views=self._views)
         index = self.addTab(tab, tab_mark(tab.tab_icon()), tab.title())
         tab.title_changed.connect(lambda _text, p=tab: self._update_tab(p))
+        tab.displayed_changed.connect(lambda p=tab: self._close_if_a_second_copy(p))
         tab.user_edited.connect(lambda p=tab: self._pin_tab(p))
         tab.set_how_many(self._how_many)
         tab.how_many_chosen.connect(self.set_how_many)
@@ -304,9 +305,21 @@ class GeneratePane(QTabWidget):
         self.setCurrentWidget(tab)
         return tab
 
-    def tab_showing(self, prompt_id: str) -> GenerateTab | None:
+    def tab_showing(self, prompt_id: str, *, besides: GenerateTab | None = None,
+                    ) -> GenerateTab | None:
         return next((tab for tab in self.generate_tabs()
-                     if (tab.displayed_row() or {}).get("prompt_id") == prompt_id), None)
+                     if tab is not besides
+                     and (tab.displayed_row() or {}).get("prompt_id") == prompt_id), None)
+
+    def _close_if_a_second_copy(self, tab: GenerateTab) -> None:
+        shown = (tab.displayed_row() or {}).get("prompt_id")
+        first = self.tab_showing(shown, besides=tab) if shown else None
+        if first is None:
+            return
+        was_in_front = self.currentWidget() is tab
+        self._discard_subtab(self.indexOf(tab))
+        if was_in_front:
+            self.setCurrentWidget(first)
 
     def load_selection(self, row: dict, image_rows: list[dict]):
         target = (self.tab_showing(row["prompt_id"])
@@ -384,6 +397,8 @@ class GeneratePane(QTabWidget):
         for snapshot, launched, layout in restored:
             tab = self._add_subtab()
             tab.restore_config(snapshot)
+            if self.indexOf(tab) < 0:
+                continue
             tab.restore_layout(layout)
             for origin in launched:
                 tab.note_launched(origin)

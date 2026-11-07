@@ -14,6 +14,7 @@ from origenerator import (
     gallery,
 )
 from origenerator.action_labels import labels_of
+from origenerator.action_vocabulary import vocabulary
 from origenerator.animate_command import what_to_animate
 from origenerator.animation_names import Animation, image_button_of, labels_for, named
 from origenerator.check_animations import the_animation_window
@@ -197,12 +198,13 @@ class CombineController(QObject):
                 and self._rebuildable_video_row(row)]
 
     def offer_the_actions(self, rows: list[dict]) -> None:
-        lane = self.widget.selected_intent()
-        offered = action_settings.available_categories(
-            self.rebuildable_videos(rows), lane, self.widget.checked_boxes())
+        lane, checked = self.widget.selected_intent(), tuple(self.widget.checked_boxes())
+        offered = set(action_settings.available_categories(
+            self.rebuildable_videos(rows), lane, checked))
         state = self._state_of(self.widget.image_zone.current_id())
         if state:
             offered &= set(animation_paths.actions_for(state, lane))
+            offered |= _accepted_over(state, lane, checked)
         self.widget.set_available_categories(offered)
 
     def _state_of(self, image_id: str | None) -> str:
@@ -499,3 +501,9 @@ class CombineController(QObject):
 def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:
     return {**dict(video_row), "params_json": json.dumps(params),
             "workflow_version": workflow.version}
+
+
+def _accepted_over(state: str, lane: str, checked: tuple[str, ...]) -> set[str]:
+    return {action for action in vocabulary(MediaType.VIDEO).buttons
+            if animation_settings.settings_for(lane, Animation(action, checked).name, state)
+            is not None}

@@ -8,6 +8,7 @@ from origenerator.animate_command import (
     animate_command_phrases,
     animate_command_spelling,
     match_animate_command,
+    spoken_actions,
 )
 
 
@@ -77,3 +78,49 @@ def test_the_app_says_back_what_it_heard_in_its_own_spelling():
     assert animate_command_spelling("animate as gunow alpha") == "animate as Genau alpha"
     assert animate_command_spelling("Animate as Alpha.") == "animate as alpha"
     assert animate_command_spelling("animate as a painting would") is None
+
+
+_HEARD = {"video_actions": {
+    "buttons": {"alpha": ["alpha"], "beta": ["beta"], "alpha + beta": ["alpha", "beta"]},
+    "checkboxes": ["Third Box"],
+    "heard_as": {"beta": ["bait a", "beater"], "Third Box": ["bird box"]},
+    "said_alone": {"Third Box": "alpha"},
+}}
+
+
+@pytest.mark.parametrize(("said", "meant"), [
+    ("animate as bait a", "beta"),
+    ("animate as beater", "beta"),
+    ("animate as alpha plus beater", "alpha + beta"),
+    ("animate as beater bird box", "beta + Third Box"),
+    ("animate as genau beta bird box", "beta + Third Box"),
+])
+def test_a_name_is_heard_in_every_form_the_overlay_says_it_is_heard_as(said, meant):
+    assert match_animate_command(said, spoken_actions(_HEARD)).action == meant
+
+
+def test_a_checkbox_said_alone_means_the_button_the_overlay_names_with_it_checked():
+    actions = spoken_actions(_HEARD)
+
+    assert match_animate_command("animate as third box", actions).action == "alpha + Third Box"
+    assert match_animate_command("animate as bird box", actions).action == "alpha + Third Box"
+
+
+def test_the_recognizer_is_offered_every_form_a_name_is_heard_as():
+    offered = animate_command_phrases(spoken_actions(_HEARD))
+
+    assert {"animate as bait a", "animate as go now beater bird box",
+            "animate as bird box", "animate as third box"} <= offered
+
+
+def test_a_name_heard_in_another_form_is_said_back_as_its_own_name():
+    assert animate_command_spelling("animate as genau bait a bird box",
+                                    spoken_actions(_HEARD)) == "animate as Genau beta + Third Box"
+    assert animate_command_spelling("animate as bird box",
+                                    spoken_actions(_HEARD)) == "animate as alpha + Third Box"
+
+
+def test_an_overlay_with_no_forms_and_no_lone_checkboxes_hears_only_the_names():
+    plain = {"video_actions": {"buttons": {"beta": ["beta"]}, "checkboxes": ["Third Box"]}}
+
+    assert spoken_actions(plain) == {"beta": "beta", "beta third box": "beta + Third Box"}

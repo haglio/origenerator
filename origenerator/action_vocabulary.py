@@ -73,6 +73,8 @@ class Vocabulary(NamedTuple):
     checkboxes: tuple[str, ...]
     formerly: dict[str, Labels]
     drawn_as: dict[str, str]
+    heard_as: dict[str, tuple[str, ...]]
+    said_alone: dict[str, str]
 
     def read_as(self, said: str) -> Labels | None:
         heard = normalized_text(said)
@@ -93,7 +95,13 @@ def vocabulary(side: str, content: dict | None = None) -> Vocabulary:
     buttons = _buttons(block.get("buttons"))
     formerly = {name.strip(): labels for name, said in _table(block.get("formerly")).items()
                 if isinstance(name, str) and (labels := _labels(said)) is not None}
-    drawn_as = {name: drawing for name, drawing in _table(block.get("drawn_as")).items()
-                if isinstance(name, str) and isinstance(drawing, str) and drawing.strip()}
-    return Vocabulary(buttons, tiles(tuple(buttons), block.get("grid")),
-                      names_in(block.get("checkboxes")), formerly, drawn_as)
+    checkboxes = names_in(block.get("checkboxes"))
+    return Vocabulary(buttons, tiles(tuple(buttons), block.get("grid")), checkboxes, formerly,
+                      _named_strings(block.get("drawn_as")), _buttons(block.get("heard_as")),
+                      {box: button for box, button in _named_strings(block.get("said_alone")).items()
+                       if box in checkboxes and button in buttons})
+
+
+def _named_strings(listed) -> dict[str, str]:
+    return {name.strip(): said.strip() for name, said in _table(listed).items()
+            if isinstance(name, str) and isinstance(said, str) and said.strip()}

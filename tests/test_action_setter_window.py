@@ -91,7 +91,7 @@ def window(qtbot, tmp_path):
         stage = _Stage()
         made = ActionSetterWindow(
             SetterSession(listed, store, side),
-            Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}),
+            Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}, {}, {}),
             drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage)
         qtbot.addWidget(made)
         return made, store, stage
@@ -104,7 +104,7 @@ def test_the_window_is_called_the_action_setter_tool_for_its_kind(window, qtbot,
     for_videos = ActionSetterWindow(
         SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "labels": None}],
                       _Store(), MediaType.VIDEO),
-        Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}), {},
+        Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}, {}, {}), {},
         Locks(tmp_path / "locks.json"), stage=_Stage())
     qtbot.addWidget(for_videos)
 

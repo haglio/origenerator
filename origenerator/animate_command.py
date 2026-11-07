@@ -61,10 +61,22 @@ def _said_as(name: str) -> str:
 
 def spoken_actions(content: dict | None = None) -> dict[str, str]:
     words = vocabulary(MediaType.VIDEO, content)
-    return {" ".join((_said_as(button), *(box.lower() for box in checked))):
-            Animation(button, checked).name
-            for button in words.buttons
-            for checked in ((), *((box,) for box in words.checkboxes))}
+    named = {" ".join((_said_as(button), *(box.lower() for box in checked))):
+             Animation(button, checked).name
+             for button in words.buttons
+             for checked in ((), *((box,) for box in words.checkboxes))}
+    named.update({box.lower(): Animation(button, (box,)).name
+                  for box, button in words.said_alone.items()})
+    return {form: name for said, name in named.items() for form in _forms(said, words.heard_as)}
+
+
+def _forms(said: str, heard_as: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
+    forms = [said]
+    for name, heard in heard_as.items():
+        own = f" {_said_as(name)} "
+        forms.extend(f" {form} ".replace(own, f" {other.lower()} ").strip()
+                     for form in list(forms) if own in f" {form} " for other in heard)
+    return tuple(dict.fromkeys(forms))
 
 
 def _heard_as(actions) -> dict[str, str]:

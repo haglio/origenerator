@@ -260,6 +260,7 @@ class PaneHost:
 class GalleryPane(QObject):
     thumbnail_activated = pyqtSignal(str)
     tab_pin_requested = pyqtSignal()
+    slideshow_requested = pyqtSignal(str)
     item_jump_requested = pyqtSignal(str)
     folder_open_requested = pyqtSignal(str)
     reveal_reroll_requested = pyqtSignal(str)
@@ -880,6 +881,7 @@ class GalleryPane(QObject):
     def _thumbnail_double_clicked(self, prompt_id: str):
         self.thumbnail_activated.emit(prompt_id)
         self.tab_pin_requested.emit()
+        self.slideshow_requested.emit(prompt_id)
 
     def apply_selection(self, prompt_id: str, modifiers):
         self._selection.apply(

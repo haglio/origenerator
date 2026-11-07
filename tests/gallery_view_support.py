@@ -853,8 +853,8 @@ def _enhanced_in_place(db, pid="g0"):
 
 
 def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target=None):
-    shown = view.selected_prompt_id() if media is not None else None
-    slideshow = view._slideshows.open_on_preview(media, shown)
+    slideshow = (view._slideshows.open_on_preview(None, None) if media is None
+                 else view._slideshows.open_in_its_folder(media, view.selected_prompt_id()))
     qtbot.addWidget(slideshow.shown)
     if target is not None:
         _aim_slideshow(view, slideshow, target)

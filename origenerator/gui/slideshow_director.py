@@ -351,11 +351,27 @@ class SlideshowDirector:
 
     @looking_once
     def open_on_preview(self, media, generation):
-        listed = self._listed_rows()
         hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
         if media is None:
+            listed = self._listed_rows()
             return self.open([], rows=listed, start=0, shuffle=in_order,
                              carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
+        rows = [row for row in [self._row_for(generation)] if row]
+        items = self.items_of(rows) or [(media[0], media[1], generation, None)]
+        return self.open(items[:1], rows=rows, start=0, shuffle=in_order, hud=hud)
+
+    @looking_once
+    def open_on_tile(self, generation):
+        row = self._row_for(generation)
+        items = self.items_of([row]) if row is not None else []
+        if not items:
+            return None
+        return self.open_in_its_folder(items[0][:2], generation)
+
+    @looking_once
+    def open_in_its_folder(self, media, generation):
+        listed = self._listed_rows()
+        hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
         rows = (listed if any(row["prompt_id"] == generation for row in listed)
                 else self.rows_at(self._location_of(self._row_for(generation))))
         opened_on = [row for row in rows if row["prompt_id"] == generation]

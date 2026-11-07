@@ -1276,10 +1276,40 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    slideshow = view._slideshows.open_on_preview(("i119.png", "image"), "i119")
+    slideshow = view._slideshows.open_in_its_folder(("i119.png", "image"), "i119")
     qtbot.addWidget(slideshow.shown)
 
     assert len(slideshow._set.playlist.in_play_order()) == 120
+    slideshow.close()
+
+
+def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB(_many_latest(120)))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+
+    view._gallery_pane._thumbnail_double_clicked("i110")
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+
+    assert len(slideshow._set.playlist.in_play_order()) == 120
+    assert slideshow._set.current_prompt_id() == "i110"
+    slideshow.close()
+
+
+def test_a_double_clicked_preview_plays_its_item_alone(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB(_many_latest(120)))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+
+    slideshow = view._slideshows.open_on_preview(("i119.png", "image"), "i119")
+    qtbot.addWidget(slideshow.shown)
+
+    assert [item[2] for item in slideshow._set.playlist.in_play_order()] == ["i119"]
     slideshow.close()
 
 

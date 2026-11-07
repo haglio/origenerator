@@ -424,6 +424,7 @@ class GalleryView(QWidget):
             DirectorSurroundings(
                 pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons))
+        self._gallery_pane.slideshow_requested.connect(self._slideshows.open_on_tile)
         self._starting = StartingRows(self)
         self._starting.changed.connect(self._update_queue)
         self._combine = CombineController(

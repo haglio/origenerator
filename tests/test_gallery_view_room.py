@@ -371,7 +371,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_image(
+def test_a_double_click_while_auto_generate_runs_opens_on_the_shown_image_alone(
         qtbot, tmp_path, monkeypatch):
     def by_id(row, places):
         return (f"{row['prompt_id']}.png", "image")
@@ -391,9 +391,7 @@ def test_a_double_click_while_auto_generate_runs_opens_the_folder_on_the_shown_i
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
-    assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == \
-        view.listed_prompt_ids()
-    assert slideshow._set.playlist.current().prompt_id == landed
+    assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == [landed]
     qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
     assert view._enhance.run_of(view.row_for(landed)) is not None
     slideshow.close()
@@ -411,7 +409,7 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
     folder_b = view.listed_prompt_ids()
     view._tree.setCurrentItem(view._leaf_by_id["a1"])
 
-    slideshow = view._slideshows.open_on_preview(("b1.png", "image"), "b1")
+    slideshow = view._slideshows.open_in_its_folder(("b1.png", "image"), "b1")
     qtbot.addWidget(slideshow.shown)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == folder_b

@@ -110,18 +110,6 @@ def _a_finished_video(db, prompt_id: str, *, made_from: str | None = None) -> No
                                                    "subfolder": ""}]))
 
 
-def test_a_video_in_line_carries_the_image_part_it_takes_from_its_image(tmp_path):
-    db = Database(tmp_path / "gallery.db")
-    _a_finished_image(db, "img", 1)
-    db.set_labels("img", MediaType.IMAGE, Labels(("alpha",), ("first box",)))
-    _a_finished_video(db, "vid", made_from="img")
-
-    [item] = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO)
-
-    assert item["image"] == {"prompt_id": "img", "labels": Labels(("alpha",), ("first box",)),
-                             "inherited": True}
-
-
 def test_a_video_made_from_no_image_waits_among_the_images_shown_by_its_first_frame(tmp_path):
     db = Database(tmp_path / "gallery.db")
     _a_finished_video(db, "vid")

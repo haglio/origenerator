@@ -1069,6 +1069,9 @@
       "screen": [
         "Add actions with setter tool…",
         "Edit actions with setter tool…",
+        "Actions",
+        "Image Actions",
+        "Video Actions",
         "Action"
       ],
       "his_word": "action (2026-10-30, 2026-10-14, 2026-10-23, 2026-10-26)",
@@ -1312,12 +1315,13 @@
       "id": "action_setter_tool",
       "thing": "the window that sets each image's or each video's actions, one press per item, the image buttons wearing his drawings, the checkboxes and their locks above them",
       "screen": [
-        "Origenerator — action setter tool",
+        "Origenerator — image action setter tool",
+        "Origenerator — video action setter tool",
         "Skip",
         "Same as last",
         "Undo"
       ],
-      "his_word": "action setter tool (2026-11-06); 'the grid of image actions' (2026-10-14); tile (2026-10-14, of one of its buttons)",
+      "his_word": "image action setter tool, video action setter tool (2026-11-06); action setter tool (2026-11-06); 'the grid of image actions' (2026-10-14); tile (2026-10-14, of one of its buttons)",
       "code_today": [
         "action setter",
         "tile",

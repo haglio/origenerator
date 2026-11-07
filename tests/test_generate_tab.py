@@ -2456,7 +2456,7 @@ def test_the_actions_and_the_workflow_dropdown_line_up_as_a_sections_fields_do(
     host.show()
     tab.layout().activate()
     body = tab._scroll.widget()
-    action = tab._action.findChild(QLabel, listed_actions(MediaType.IMAGE))
+    action = tab._action.form().parentWidget().findChild(QLabel, listed_actions(MediaType.IMAGE))
 
     assert tab.width() == width
     assert action.mapTo(body, QPoint(0, 0)).x() == tab._workflow_dropdown.mapTo(body, QPoint(0, 0)).x()
@@ -2483,7 +2483,9 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
 
     assert spans == dict.fromkeys(spans, span(tab._form_host))
     assert corner(name).y() == body.layout().contentsMargins().top()
-    assert corner(tab._action).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
+    actions = tab._action.form().parentWidget().findChild(
+        QLabel, listed_actions(MediaType.IMAGE)).parentWidget()
+    assert corner(actions).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
 
 
 def _message(tab):
@@ -4454,7 +4456,7 @@ def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_images_row(saved_panel
     tab.show_saved_generation(db.get_generation("img9"), [image])
     name = vocabulary(MediaType.IMAGE).checkboxes[0]
 
-    tab._action.findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()
+    tab._action.form().parentWidget().findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()
 
     assert labels_of(db.get_generation("img9"), MediaType.IMAGE) == Labels(("alpha",), (name,))
 
@@ -4466,8 +4468,8 @@ def test_a_video_on_the_tab_lists_the_actions_it_was_set_with(saved_panel):
 
     tab.show_saved_generation(db.get_generation("vid9"), [])
 
-    assert not tab._action.isHidden()
-    assert tab._action.findChild(QLabel, listed_actions(MediaType.VIDEO)).text() == "alpha, beta"
+    listed = tab._action.form().parentWidget().findChild(QLabel, listed_actions(MediaType.VIDEO))
+    assert (listed.parentWidget().isHidden(), listed.text()) == (False, "alpha, beta")
 
 
 def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_videos_row(saved_panel):
@@ -4475,7 +4477,7 @@ def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_videos_row(saved_panel
     tab.show_saved_generation(_video_row(db, "vid9"), [])
     name = vocabulary(MediaType.VIDEO).checkboxes[0]
 
-    tab._action.findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
+    tab._action.form().parentWidget().findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
 
     assert labels_of(db.get_generation("vid9"), MediaType.VIDEO) == Labels((), (name,))
 

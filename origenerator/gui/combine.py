@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
-from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.action_vocabulary import vocabulary
 from origenerator.content import genau_flick_word
@@ -131,7 +130,7 @@ class Combine(QWidget):
 
     def _build_the_video_part(self) -> None:
         self._category = QComboBox()
-        self._list_the_actions(VIDEO)
+        self._list_the_actions()
         open_the_list_in_full(self._category)
         self._category.setToolTip(
             "Pick an action and Generate — the app reuses a fitting past video's settings "
@@ -233,17 +232,13 @@ class Combine(QWidget):
     def _on_intent_changed(self, _button, checked: bool):
         # Qt's buttonToggled fires twice for one click, off for the old radio and on for the new.
         if checked:
-            self._list_the_actions(self.selected_intent())
             if not self.selected_category():
                 self._show_dropped()
             self.intent_changed.emit(self.selected_intent())
 
-    def _list_the_actions(self, lane: str) -> None:
-        picked = self.selected_category() if self._category.count() else ""
-        self._category.clear()
+    def _list_the_actions(self) -> None:
         self._category.addItem(_NEUTRAL_LABEL)
-        self._category.addItems(animation_paths.actions(lane))
-        self.set_category(picked)
+        self._category.addItems([tile.name for tile in vocabulary(MediaType.VIDEO).tiles])
 
     def checked_boxes(self) -> tuple[str, ...]:
         return tuple(name for name, box in self._boxes.items() if box.isChecked())

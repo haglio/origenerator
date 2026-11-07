@@ -6,7 +6,7 @@ from typing import NamedTuple
 from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO
 from origenerator.action_vocabulary import vocabulary
-from origenerator.animation_names import JOINER
+from origenerator.animation_names import JOINER, Animation
 from origenerator.media import MediaType
 from origenerator.voice.text import sounds_like, words
 
@@ -55,19 +55,26 @@ def _lane_of(rest: list[str]) -> tuple[str, list[str]]:
     return VIDEO, rest
 
 
-def spoken_actions(content: dict | None = None) -> tuple[str, ...]:
-    return tuple(action for action in vocabulary(MediaType.VIDEO, content).buttons
-                 if JOINER not in action)
+def _said_as(name: str) -> str:
+    return name.replace(JOINER, " plus ").lower()
+
+
+def spoken_actions(content: dict | None = None) -> dict[str, str]:
+    words = vocabulary(MediaType.VIDEO, content)
+    return {" ".join((_said_as(button), *(box.lower() for box in checked))):
+            Animation(button, checked).name
+            for button in words.buttons
+            for checked in ((), *((box,) for box in words.checkboxes))}
+
+
+def _heard_as(actions) -> dict[str, str]:
+    return dict(actions) if isinstance(actions, dict) else {_said_as(a): a for a in actions}
 
 
 def _action_of(rest: list[str], actions) -> str | None:
     if not rest:
         return ""
-    said = " ".join(rest)
-    for action in actions:
-        if action.lower() == said:
-            return action
-    return None
+    return _heard_as(actions).get(" ".join(rest))
 
 
 def match_animate_command(text: str, actions=None) -> AnimateRequest | None:
@@ -85,7 +92,7 @@ def animate_command_phrases(actions=None) -> frozenset[str]:
     for lane in ("", _GENAU_AS_SAID):
         opening = f"animate as {lane}".strip()
         said.append(opening)
-        said.extend(f"{opening} {action.lower()}" for action in actions)
+        said.extend(f"{opening} {spoken}" for spoken in _heard_as(actions))
     return frozenset(said)
 
 

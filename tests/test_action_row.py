@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 
 import pytest
+from PyQt6.QtCore import QPoint
 from PyQt6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QWidget
 from shared_ui.tick_control import TickControl
 
 from origenerator.action_labels import Labels, stored
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_row import (
-    ACTION_LABEL,
     ADD,
     EDIT,
     UNSAID,
@@ -58,16 +58,26 @@ def action(qtbot, opened):
     return ActionRow(LabelForm(host), checkboxes=_BOXES, open_setter=open_setter)
 
 
+def _rows(action):
+    return action.form().parentWidget()
+
+
 def _listed(action, side) -> str:
-    return action.findChild(QLabel, listed_actions(side)).text()
+    return _rows(action).findChild(QLabel, listed_actions(side)).text()
 
 
 def _setter(action, side) -> QPushButton:
-    return action.findChild(QPushButton, setter_button(side))
+    return _rows(action).findChild(QPushButton, setter_button(side))
 
 
 def _box(action, side, name) -> TickControl:
-    return action.findChild(TickControl, action_checkbox(side, name))
+    return _rows(action).findChild(TickControl, action_checkbox(side, name))
+
+
+def _named(action, side) -> str:
+    part = _setter(action, side).parentWidget()
+    cell = action.form().labelForField(part)
+    return next(label.text() for label in cell.findChildren(QLabel) if label.text())
 
 
 def test_an_image_lists_the_actions_it_was_set_with_and_no_dropdown(action):
@@ -92,7 +102,7 @@ def test_an_image_with_actions_offers_to_edit_them(action):
 
 def test_an_image_shows_its_checkboxes_to_the_right_of_its_button_as_it_saved_them(action, qtbot):
     action.show_row(_row(image=Labels(("alpha",), ("second box",))))
-    host = action.parentWidget()
+    host = _rows(action)
     host.resize(900, 60)
     with qtbot.waitExposed(host):
         host.show()
@@ -220,13 +230,36 @@ def test_a_videos_button_opens_the_setter_tool_for_videos(action, opened):
 
 
 def test_a_tab_showing_nothing_shows_no_row(action):
-    action.show_row(_row())
+    action.show_row(_video())
     action.clear()
 
-    assert action.isHidden()
+    assert all(_setter(action, side).parentWidget().isHidden()
+               for side in (MediaType.IMAGE, MediaType.VIDEO))
 
 
-def test_the_row_is_labeled_action(action):
-    name = action.parentWidget().layout().labelForField(action)
+def test_an_images_row_is_actions_and_a_videos_rows_are_image_actions_and_video_actions(action):
+    action.show_row(_row())
+    on_an_image = _named(action, MediaType.IMAGE)
+    action.show_row(_video())
 
-    assert ACTION_LABEL in [label.text() for label in name.findChildren(QLabel)]
+    assert (on_an_image, _named(action, MediaType.IMAGE), _named(action, MediaType.VIDEO)) == (
+        "Actions", "Image Actions", "Video Actions")
+
+
+def test_the_actions_wrap_rather_than_being_cut_short(action):
+    action.show_row(_row(image=Labels(("alpha",))))
+
+    listed = _rows(action).findChild(QLabel, listed_actions(MediaType.IMAGE))
+    assert listed.wordWrap()
+
+
+def test_the_button_sits_on_a_line_of_its_own_under_the_actions(action):
+    action.show_row(_row(image=Labels(("alpha",))))
+    _rows(action).resize(600, 300)
+    _rows(action).show()
+    listed = _rows(action).findChild(QLabel, listed_actions(MediaType.IMAGE))
+    setter = _setter(action, MediaType.IMAGE)
+    part = setter.parentWidget()
+    part.layout().activate()
+
+    assert setter.mapTo(part, QPoint()).y() >= listed.mapTo(part, QPoint()).y() + listed.height()

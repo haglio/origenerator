@@ -32,11 +32,6 @@ def test_a_state_offers_the_actions_its_row_says_yes_to(paths):
     assert animation_paths.actions_for("state two", GENAU) == ("alpha",)
 
 
-def test_a_lane_offers_every_action_the_table_gives_it_in_its_own_order(paths):
-    assert animation_paths.actions(VIDEO) == ("alpha", "beta", "gamma")
-    assert animation_paths.actions(GENAU) == ("alpha",)
-
-
 def test_a_state_no_action_answers_offers_nothing(paths):
     assert animation_paths.actions_for("state one", GENAU) == ()
     assert animation_paths.actions_for("a state the table never heard of", VIDEO) == ()

@@ -31,6 +31,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
 from origenerator.action_labels import Labels
+from origenerator.media import MediaType
 
 ROOM_FOR_THE_GRID = 1260
 MARK = 96
@@ -41,7 +42,8 @@ LAST_LINE = "setter.last"
 SKIP_BUTTON = "setter.skip"
 SAME_BUTTON = "setter.same"
 UNDO_BUTTON = "setter.undo"
-TITLE = "Origenerator — action setter tool"
+TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
+          MediaType.VIDEO: "Origenerator — video action setter tool"}
 
 _LIT = f"QToolButton:checked {{ background-color: {as_hex(BLUE)}; border-radius: {BUTTON_RADIUS}px; }}"
 
@@ -114,7 +116,7 @@ class ActionSetterWindow(QWidget):
     MISSING = "(this one's file is missing)"
 
     def __init__(self, session, vocabulary, drawings: dict[str, str], locks, *,
-                 image_checkboxes: tuple[str, ...] = (), stage=None, parent=None):
+                 stage=None, parent=None):
         super().__init__(parent)
         self._session = session
         self._vocabulary = vocabulary
@@ -122,12 +124,10 @@ class ActionSetterWindow(QWidget):
         self._locks = locks
         self._tiles: dict[str, QToolButton] = {}
         self._faces: dict[str, QToolButton] = {}
-        self._image_boxes: dict[str, TickControl] = {}
         self._boxes: dict[str, TickControl] = {}
-        self._image_checkboxes = image_checkboxes
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
-        self.setWindowTitle(TITLE)
+        self.setWindowTitle(TITLES[session.side])
 
         self._stage = stage if stage is not None else _a_viewport()
         self._stage.setMinimumSize(320, 320)
@@ -156,10 +156,12 @@ class ActionSetterWindow(QWidget):
     def _build_buttons(self, tiles) -> QWidget:
         column = QVBoxLayout()
         column.setSpacing(GAP_MEDIUM)
-        for name in self._image_checkboxes:
-            column.addLayout(self._checkbox_row(name, self._image_boxes))
+        boxes = QHBoxLayout()
+        boxes.setSpacing(GAP_MEDIUM)
         for name in self._vocabulary.checkboxes:
-            column.addLayout(self._checkbox_row(name, self._boxes))
+            self._add_checkbox(boxes, name)
+        boxes.addStretch(1)
+        column.addLayout(boxes)
         grid = QGridLayout()
         grid.setSpacing(GAP_MEDIUM)
         drawings = {tile.name: QPixmap(str(self._drawings[tile.name]))
@@ -210,9 +212,7 @@ class ActionSetterWindow(QWidget):
         scroll.setFixedWidth(inside.sizeHint().width() + 28)
         return scroll
 
-    def _checkbox_row(self, name: str, boxes: dict[str, TickControl]) -> QHBoxLayout:
-        row = QHBoxLayout()
-        row.setSpacing(GAP_MEDIUM)
+    def _add_checkbox(self, row: QHBoxLayout, name: str) -> None:
         box = TickControl(name)
         box.setObjectName(checkbox(name))
         box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -225,11 +225,9 @@ class ActionSetterWindow(QWidget):
         held.setToolTip(_lock_tip(held.isChecked()))
         held.toggled.connect(lambda locked, name=name: self._on_lock(name, locked))
         box.toggled.connect(lambda checked, name=name: self._on_box(name, checked))
-        boxes[name] = box
+        self._boxes[name] = box
         row.addWidget(box)
         row.addWidget(held)
-        row.addStretch(1)
-        return row
 
     def _make_every_tile_one_size(self, tiles, drawings, scale) -> None:
         faces = [self._face(name) for name in self._tiles]
@@ -314,17 +312,10 @@ class ActionSetterWindow(QWidget):
     def _checked(self) -> tuple[str, ...]:
         return tuple(name for name, box in self._boxes.items() if box.isChecked())
 
-    def _image_checked(self) -> tuple[str, ...] | None:
-        image = (self._session.current or {}).get("image")
-        if image is None or image["inherited"]:
-            return None
-        return tuple(name for name, box in self._image_boxes.items() if box.isChecked())
-
     def _on_action(self, name: str) -> None:
         if self._session.current is None:
             return
-        self._session.set_as(name, Labels(self._vocabulary.buttons[name], self._checked()),
-                             image_checked=self._image_checked())
+        self._session.set_as(name, Labels(self._vocabulary.buttons[name], self._checked()))
         self._said(f"Last: {name}")
 
     def _on_same(self) -> None:
@@ -333,8 +324,7 @@ class ActionSetterWindow(QWidget):
             self._said("Nothing set yet to go by")
             return
         said, labels = last
-        self._session.set_as(said, Labels(labels.actions, self._checked()),
-                             image_checked=self._image_checked())
+        self._session.set_as(said, Labels(labels.actions, self._checked()))
         self._said(f"Last: {said}")
 
     def _on_skip(self) -> None:
@@ -358,7 +348,7 @@ class ActionSetterWindow(QWidget):
             self._locks.let_go(self._session.side, name)
 
     def _box(self, name: str) -> TickControl:
-        return self._boxes.get(name) or self._image_boxes[name]
+        return self._boxes[name]
 
     def _on_box(self, name: str, checked: bool) -> None:
         if name in self._locks.held(self._session.side):
@@ -385,13 +375,6 @@ class ActionSetterWindow(QWidget):
     def _set_the_boxes_for(self, item: dict) -> None:
         held = self._locks.held(self._session.side)
         _set(self._boxes, held, (item.get("labels") or Labels()).checked)
-        image = item.get("image")
-        if image is None:
-            return
-        its_image = (image["labels"] or Labels()).checked
-        _set(self._image_boxes, {} if image["inherited"] else held, its_image)
-        for box in self._image_boxes.values():
-            box.setEnabled(not image["inherited"])
 
     def closeEvent(self, event) -> None:  # noqa: N802 -- Qt override
         self._stage.clear()

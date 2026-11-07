@@ -59,7 +59,12 @@ def test_the_recognizer_is_asked_to_hear_every_action_in_both_lanes():
         assert phrase in heard
 
 
-def test_an_action_joined_with_a_plus_is_no_phrase_to_say():
+def test_a_plus_is_said_as_plus_and_a_checkbox_by_its_name_after_the_action():
+    assert match_animate_command("animate as alpha plus beta") == AnimateRequest(
+        VIDEO, "alpha + beta")
+    assert match_animate_command("animate as alpha plus beta third box") == AnimateRequest(
+        VIDEO, "alpha + beta + third box")
+    assert "animate as go now alpha third box" in animate_command_phrases()
     assert not any("+" in phrase for phrase in animate_command_phrases())
 
 

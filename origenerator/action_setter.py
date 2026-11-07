@@ -76,19 +76,12 @@ class SetterSession:
     def can_undo(self) -> bool:
         return bool(self._set)
 
-    def set_as(self, said: str, labels: Labels, *, image_checked: tuple[str, ...] | None = None
-               ) -> None:
+    def set_as(self, said: str, labels: Labels) -> None:
         if not self._line:
             return
         item = self._line.popleft()
         self._store.set_labels(item["prompt_id"], self._side, labels)
-        image = item.get("image")
-        its_own = image is not None and not image["inherited"] and image_checked is not None
-        if its_own:
-            had = image["labels"] or Labels()
-            self._store.set_labels(image["prompt_id"], MediaType.IMAGE,
-                                   Labels(had.actions, image_checked))
-        self._set.append((item, said, labels, its_own))
+        self._set.append((item, said, labels))
 
     def skip(self) -> None:
         self._line.rotate(-1)
@@ -96,11 +89,8 @@ class SetterSession:
     def undo(self) -> None:
         if not self._set:
             return
-        item, _said, _labels, its_own = self._set.pop()
+        item, _said, _labels = self._set.pop()
         self._store.set_labels(item["prompt_id"], self._side, item.get("labels"))
-        if its_own:
-            self._store.set_labels(item["image"]["prompt_id"], MediaType.IMAGE,
-                                   item["image"]["labels"])
         self._line.appendleft(item)
 
 

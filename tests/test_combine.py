@@ -9,7 +9,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 from shared_ui.tick_control import TickControl
 
-from origenerator import action_settings, animation_paths
+from origenerator import action_settings
 from origenerator.gui.action_row import ACTION_LABEL
 from origenerator.gui.combine import (
     Combine,
@@ -111,23 +111,14 @@ def _actions(combine):
     return [combine._category.itemText(i) for i in range(1, combine._category.count())]
 
 
-def test_the_action_list_carries_the_actions_that_lane_has_a_row_for(qtbot):
+def test_the_action_list_carries_every_video_action_in_the_setter_tools_order(qtbot):
     combine = _panel(qtbot)
 
     assert _actions(combine) == ["alpha", "beta", "alpha + beta"]
 
     _pick_lane(combine, action_settings.GENAU)
 
-    assert _actions(combine) == ["alpha", "beta"]
-
-
-def test_an_action_the_new_lane_has_no_row_for_is_not_left_picked(qtbot):
-    combine = _panel(qtbot)
-    _pick_action(combine, "alpha + beta")
-
-    _pick_lane(combine, action_settings.GENAU)
-
-    assert combine.selected_category() == ""
+    assert _actions(combine) == ["alpha", "beta", "alpha + beta"]
 
 
 def test_an_action_both_lanes_carry_stays_picked_across_the_switch(qtbot):
@@ -465,7 +456,7 @@ def test_the_neutral_option_is_custom_leading_the_actions(qtbot):
     assert combine.selected_category() == ""
     items = [combine._category.itemText(i) for i in range(combine._category.count())]
     assert items[0] == "(custom)"
-    assert items[1:] == list(animation_paths.actions(action_settings.VIDEO))
+    assert items[1:] == ["alpha", "beta", "alpha + beta"]
 
 
 def _enabled(combine, text) -> bool:

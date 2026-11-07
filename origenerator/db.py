@@ -84,19 +84,8 @@ class Database:
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)
 
-    def set_backfill_of(self, prompt_id: str, video_prompt_id: str):
-        return self.generations.set_backfill_of(prompt_id, video_prompt_id)
-
     def set_source(self, prompt_id: str, source: str):
         return self.generations.set_source(prompt_id, source)
-
-    def take_the_content_of(self, prompt_id: str, remade: dict):
-        return self.generations.take_the_content_of(prompt_id, remade)
-
-    def mark_remade(self, prompt_id: str):
-        return self.generations.mark_remade(prompt_id)
-    def pay_a_fun_time_favorite(self, prompt_id: str):
-        return self.generations.pay_a_fun_time_favorite(prompt_id)
 
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
@@ -171,7 +160,6 @@ class Database:
     def list_combine_video_uses(self) -> list[dict]:
         return self.combine_video_uses.list_combine_video_uses()
 
-
     def record_trashed(self, prompt_id: str, row: dict, batch: dict, *,
                         deleted_at: str | None = None):
         return self.deletions.record_trashed(prompt_id, row, batch, deleted_at=deleted_at)
@@ -212,7 +200,6 @@ class Database:
     def get_request(self, prompt_id: str) -> dict | None:
         return self.requests.get_request(prompt_id)
 
-
     def folder_meta_map(self) -> dict[str, dict]:
         return self.folder_meta.folder_meta_map()
 
@@ -230,7 +217,6 @@ class Database:
 
     def delete_folder_meta(self, folder_key: str):
         return self.folder_meta.delete_folder_meta(folder_key)
-
 
     def create_custom_collection(self, name: str, folder_id: int | None = None,
                              shape: str | None = None) -> int:

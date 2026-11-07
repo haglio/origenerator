@@ -167,16 +167,6 @@ def test_the_log_names_the_process_left_waiting_on_the_runs(tmp_path, started, c
     assert "4321" in caplog.text
 
 
-def test_quitting_with_only_the_backfills_runs_in_flight_starts_nothing(tmp_path):
-    db = Database(tmp_path / "t.db")
-    _in_flight(db, source="backfill")
-    started = []
-
-    assert landed_while_away.hand_over_what_is_in_flight(
-        db, "Origenerator", spawn=started.append) is False
-    assert started == []
-
-
 def test_quitting_with_nothing_in_flight_starts_nothing(tmp_path):
     db = Database(tmp_path / "t.db")
     started = []

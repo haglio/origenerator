@@ -34,7 +34,7 @@ from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 from shared_ui.testing import brought_to_front
 
-from origenerator import app_link, config, content, evolver_agreement, gallery, trash_collection
+from origenerator import app_link, config, content, gallery
 from origenerator.app import (
     _arm_the_crash_log,
     _configure_logging,
@@ -61,7 +61,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database, NewGeneration
 from origenerator.evolver_export import EvolverInbox
-from origenerator.export_lane import GENAU, KINO
+from origenerator.export_lane import GENAU
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
@@ -69,8 +69,6 @@ from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputPlaces
 from origenerator.passes_on_the_files import (
     file_what_comfyui_left,
-    hand_the_remakes_down_again,
-    put_the_backfill_in_place,
     reconnect_to_running_generations,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -1076,10 +1074,6 @@ _MAINTENANCE_PASSES = (
     ("origenerator.trash_collection", "tend_the_trash"),
     ("origenerator.library_filing", "file_what_comfyui_left"),
     ("origenerator.relocate", "relocate_moved_outputs"),
-    ("origenerator.enhanced_start_backfill", "cancel_backfill"),
-    ("origenerator.enhanced_start_backfill", "fold_completed_backfill"),
-    ("origenerator.enhanced_start_backfill", "pay_the_owed_favorites"),
-    ("origenerator.enhanced_start_backfill", "hand_the_remakes_down_again"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
@@ -1215,62 +1209,6 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
     landed = inbox / GENAU.source / "flf2v_loop_00001-audio.mp4"
     assert landed.read_bytes() == b"with its sound"
     assert db.get_generation("video")["genau_exported_at"]
-
-
-def test_a_backfilled_video_that_landed_while_the_app_was_closed_becomes_its_old_one(
-        tmp_path, monkeypatch):
-    output = tmp_path / "output"
-    (output / "video").mkdir(parents=True)
-    for name, made in (("first_00001.mp4", b"first made"), ("again_00001.mp4", b"made again")):
-        (output / "video" / name).write_bytes(made)
-    monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
-    monkeypatch.setattr(config, "EVOLVER_UPSCALED_DIR", tmp_path / "upscaled")
-    monkeypatch.setattr(evolver_agreement, "records_folder", lambda checkout, root: None)
-    db = Database(tmp_path / "t.db")
-    for prompt_id, filename, source in (("first", "first_00001.mp4", "generated"),
-                                        ("again", "again_00001.mp4", "backfill")):
-        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="wan22_i2v",
-                             workflow_version="v1", params_json="{}", workflow_json="{}",
-                             source=source))
-        db.update_generation(prompt_id, status="completed", output_files=json.dumps(
-            [{"filename": filename, "subfolder": "video", "type": "output"}]))
-    db.set_generation_favorite("first", True)
-    db.set_backfill_of("again", "first")
-    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
-                      thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs",
-                      inbox=EvolverInbox(tmp_path / "0_inbox"))
-
-    assert put_the_backfill_in_place(library) == 1
-
-    assert db.get_generation("first")["starred"]
-    assert db.get_generation("again") is None
-    assert (output / "video" / "first_00001.mp4").read_bytes() == b"made again"
-    [old] = trash_collection.trash_items(db.list_trashed())
-    assert old["old_version_of"] == "first"
-    [held] = gallery.row_output_files(old)
-    assert gallery.output_file_path(held, library.places).read_bytes() == b"first made"
-
-
-def test_opening_the_app_hands_a_video_remade_in_place_to_kino_again(tmp_path):
-    output = tmp_path / "output"
-    (output / "video").mkdir(parents=True)
-    (output / "video" / "first_00001.mp4").write_bytes(b"made again")
-    db = Database(tmp_path / "t.db")
-    db.insert_generation(NewGeneration(prompt_id="first", workflow_name="wan22_i2v", workflow_version="v1",
-                         params_json="{}", workflow_json="{}", source="generated"))
-    db.update_generation("first", status="completed", output_files=json.dumps(
-        [{"filename": "first_00001.mp4", "subfolder": "video", "type": "output"}]))
-    with sqlite3.connect(tmp_path / "t.db") as conn:
-        conn.execute("UPDATE generations SET evolver_exported_at = '2026-01-02 03:04:05'")
-    db.mark_remade("first")
-    inbox = tmp_path / "0_inbox"
-    library = Library(db=db, client=None, places=OutputPlaces.in_one_folder(output),
-                      thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs",
-                      inbox=EvolverInbox(inbox))
-
-    assert hand_the_remakes_down_again(library) == 1
-
-    assert (inbox / KINO.source / "first_00001.mp4").read_bytes() == b"made again"
 
 
 def test_an_enhancement_of_a_deleted_image_goes_to_the_trash_at_startup(tmp_path, monkeypatch):

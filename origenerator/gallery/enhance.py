@@ -28,7 +28,7 @@ from origenerator.gallery.output import (
 )
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource
 from origenerator.media import MediaType
 from origenerator.output_files import parse_file_list, produced_output
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -294,7 +294,7 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
                                      (moment_of(finished or asked_around(run_id)), run_id))
 
     for row in rows:
-        if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW and moves_its_image(row):
+        if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
             target = row.get("enhance_of")
             if not target:
                 name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
@@ -306,9 +306,6 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
                 note(row.get("prompt_id"), entry.get("finished_at"), entry.get("run_id"))
     return recency
 
-
-def moves_its_image(enhance_row: dict) -> bool:
-    return source_of(enhance_row) != GenerationSource.BACKFILL
 
 
 def rows_awaiting_enhancement(folder_rows, enhance_rows) -> list[dict]:

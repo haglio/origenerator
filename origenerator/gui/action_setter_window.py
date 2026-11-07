@@ -31,6 +31,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
 from origenerator.action_labels import Labels
+from origenerator.branch_session import titled
 from origenerator.media import MediaType
 
 ROOM_FOR_THE_GRID = 1260
@@ -133,7 +134,7 @@ class ActionSetterWindow(QWidget):
         self._boxes: dict[str, TickControl] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
-        self.setWindowTitle(TITLES[session.side])
+        self.setWindowTitle(titled(TITLES[session.side]))
 
         self._stage = stage if stage is not None else _a_viewport()
         self._stage.setMinimumSize(320, 320)

@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import BLACK, YELLOW
+from shared_ui.preview import Preview
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
@@ -586,3 +587,13 @@ def test_neither_setter_tool_needs_a_vertical_scrollbar_with_the_yellow_line_sho
     assert (_top(shown, _tile(shown, first_tile)), column.widget().minimumSizeHint().height()) == (
         _top(without, _tile(without, first_tile)),
         without.findChild(QScrollArea).widget().minimumSizeHint().height())
+
+
+def test_the_action_setter_tool_opened_in_a_preview_names_the_preview(window, monkeypatch):
+    monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
+    monkeypatch.setattr("origenerator.branch_session.preview_of",
+                        lambda checkout: Preview(feature="Example scene pausing"))
+
+    made, _store, _stage = window("first")
+
+    assert made.windowTitle() == "Origenerator — image action setter tool — preview of Example scene pausing"

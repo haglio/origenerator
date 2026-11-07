@@ -8,11 +8,13 @@ from origenerator.gui.gallery_navigation import NavigationController
 class FakeSearch:
     def __init__(self, query=""):
         self.query = query
+        self.everywhere = False
         self.restored = []
         self.runs = 0
 
-    def restore(self, query):
+    def restore(self, query, everywhere=False):
         self.query = query
+        self.everywhere = everywhere
         self.restored.append(query)
 
     def run(self):

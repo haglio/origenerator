@@ -8,6 +8,7 @@ class Location:
     view: str
     query: str = ""
     item: str | None = None
+    everywhere: bool = False
 
 
 class NavigationHistory:

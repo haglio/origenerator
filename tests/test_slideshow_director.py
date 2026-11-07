@@ -2172,6 +2172,17 @@ def test_what_another_site_made_stays_off_the_map(slideshows, tmp_path):
     assert {slide.prompt_id for slide in mapped} == {"g3", "v1"}
 
 
+def test_a_sites_pictures_in_one_folder_are_each_others_seeds_and_nothing_made_here_joins_them(
+        slideshows):
+    rows = [_a_sites(_fox("o1", seed=1)), _a_sites(_fox("o2", seed=2)),
+            _a_sites(_fox("o3", seed=3)), _fox("g1", seed=4)]
+    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("o1", shape="portrait")
+
+    assert [slide.prompt_id for slide in around.seeds] == ["o2", "o3"]
+
+
 def test_videos_made_from_a_sites_picture_stay_together_on_the_map(slideshows, tmp_path):
     rows = [_a_sites(_fox("g1", seed=1)),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),

@@ -205,7 +205,7 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
 def test_gallery_pane_button_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
               icons.delete_icon, icons.latest_icon, icons.radio_icon,
-              icons.auto_generate_icon, icons.slideshow_icon, icons.enhance_icon,
+              icons.populate_icon, icons.slideshow_icon, icons.enhance_icon,
               icons.custom_collection_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
     for make in makers:
@@ -223,7 +223,7 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
         for name, make in (
             ("back", icons.back_icon), ("forward", icons.forward_icon),
             ("undo", icons.undo_icon), ("redo", icons.redo_icon),
-            ("auto", icons.auto_generate_icon), ("slideshow", icons.slideshow_icon),
+            ("populate", icons.populate_icon), ("slideshow", icons.slideshow_icon),
             ("enhance", icons.enhance_icon), ("delete", icons.delete_icon),
             ("radio", icons.radio_icon),
             ("group", icons.custom_collection_icon),
@@ -296,7 +296,7 @@ def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
         (icons.forward_icon(), "chevron_right", TEXT_PRIMARY),
         (icons.undo_icon(), "undo_arrow", TEXT_PRIMARY),
         (icons.redo_icon(), "redo_arrow", TEXT_PRIMARY),
-        (icons.auto_generate_icon(), "bolt", TEXT_PRIMARY),
+        (icons.populate_icon(), "bolt", TEXT_PRIMARY),
         (icons.shield_icon(), "shield", TEXT_PRIMARY),
         (icons.slideshow_icon(), "slideshow", TEXT_PRIMARY),
         (icons.enhance_icon(), "plus", YELLOW),

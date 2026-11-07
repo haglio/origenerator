@@ -109,9 +109,9 @@ def test_each_bank_button_has_a_word(said, wanted):
 
 
 def test_a_switch_takes_a_flip_and_an_explicit_way():
-    assert match_app_command("auto") is AppCommand.AUTO
-    assert match_app_command("auto on") is AppCommand.AUTO_ON
-    assert match_app_command("auto off") is AppCommand.AUTO_OFF
+    assert match_app_command("populate") is AppCommand.POPULATE
+    assert match_app_command("populate on") is AppCommand.POPULATE_ON
+    assert match_app_command("populate off") is AppCommand.POPULATE_OFF
     assert match_app_command("drive off") is AppCommand.DRIVE_OFF
     assert match_app_command("radio on") is AppCommand.RADIO_ON
 
@@ -185,7 +185,7 @@ def test_an_empty_utterance_asks_for_nothing():
 def test_the_recognizer_is_asked_to_hear_every_way_a_command_is_said_in_words():
     heard = spoken_phrases()
     for phrase in ("experiments", "go to experiments", "trash", "favorite it", "go to favorites",
-                   "auto generate on",
+                   "populate on",
                    "mic off", "o s r two off", "clear filter", "slow down",
                    "human inspired off", "amp fifty", "center one hundred", "max speed"):
         assert phrase in heard

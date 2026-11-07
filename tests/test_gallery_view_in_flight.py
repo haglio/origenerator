@@ -1045,13 +1045,13 @@ def test_right_clicking_an_inflight_tile_offers_to_cancel_the_run(
     assert view._jobs.all_jobs == []
 
 
-def test_an_auto_generating_folders_tile_offers_a_cancel_and_a_real_stop(
+def test_an_populating_folders_tile_offers_a_cancel_and_a_real_stop(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_latest(view)
@@ -1059,16 +1059,16 @@ def test_an_auto_generating_folders_tile_offers_a_cancel_and_a_real_stop(
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert labels == [["Cancel", "Cancel and stop auto-generating"]]
+    assert labels == [["Cancel", "Cancel and stop populating"]]
 
 
-def test_canceling_from_an_auto_generating_folders_tile_ends_auto_generate_too(
+def test_canceling_from_an_populating_folders_tile_ends_populate_too(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_latest(view)
@@ -1076,7 +1076,7 @@ def test_canceling_from_an_auto_generating_folders_tile_ends_auto_generate_too(
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert not view._auto.is_active(key)
+    assert not view._populate.is_active(key)
     assert view._jobs.all_jobs == []
 
 
@@ -1109,19 +1109,19 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     assert view._jobs.all_jobs == []
 
 
-def test_an_auto_generating_folders_live_tile_offers_the_stop_its_button_cannot(
+def test_an_populating_folders_live_tile_offers_the_stop_its_button_cannot(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel and stop")
 
     view._generating_tile_menu(key, QPoint(0, 0))
 
-    assert labels == [["Cancel", "Cancel and stop auto-generating"]]
-    assert not view._auto.is_active(key)
+    assert labels == [["Cancel", "Cancel and stop populating"]]
+    assert not view._populate.is_active(key)
     assert view._jobs.all_jobs == []
 
 
@@ -2310,20 +2310,20 @@ def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
                      ("Cancel All", "Cancel the job in the Job Queue?")]
 
 
-def test_cancel_all_leaves_auto_generate_on_to_start_its_next_seed(
+def test_cancel_all_leaves_populate_on_to_start_its_next_seed(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     (job,) = view._jobs.all_jobs
     view.refresh()
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
     view._queue._cancel_all.click()
 
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
     (next_seed,) = view._jobs.all_jobs
     assert next_seed.prompt_id != job.prompt_id
 
@@ -2408,7 +2408,7 @@ def test_a_tabs_cancel_hover_answers_for_the_oldest_of_its_runs_in_two_folders(q
     _oldest, newest = tab.launched_runs()
     newest_folder = view._job_folder_key(view._jobs.job_for_origin(newest))
 
-    view._auto.start(newest_folder)
+    view._populate.start(newest_folder)
     view._sync_cancel_buttons()
 
     assert tab._cancel_btn.toolTip() == cancel_tooltip(False)
@@ -2530,14 +2530,14 @@ def test_a_run_that_made_no_file_is_not_loaded_into_the_tab_that_launched_it(qtb
     assert shown == []
 
 
-def test_auto_generate_in_a_video_folder_runs_the_settings_it_read_with_no_image_stage(qtbot,
+def test_populate_in_a_video_folder_runs_the_settings_it_read_with_no_image_stage(qtbot,
                                                                                        tmp_path):
     view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_leaf_of(view, "vid")
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
     names = {job.workflow.name for job in view._jobs.all_jobs}
     assert "wan22_i2v" in names

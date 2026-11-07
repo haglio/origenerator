@@ -104,14 +104,14 @@ class FakeTraining:
 
 
 class FakeAuto:
-    def __init__(self, auto_generating=()):
-        self._auto_generating = set(auto_generating)
+    def __init__(self, populating=()):
+        self._populating = set(populating)
 
     def is_active(self, key):
-        return key in self._auto_generating
+        return key in self._populating
 
     def stop(self, key):
-        self._auto_generating.discard(key)
+        self._populating.discard(key)
 
 
 class FakeTree:
@@ -136,10 +136,10 @@ def build():
     return make
 
 
-def _sources(rows=(), requests=(), jobs=None, auto_generating=(), groups=None):
+def _sources(rows=(), requests=(), jobs=None, populating=(), groups=None):
     return InFlightSources(
         db=FakeDb(rows, requests), jobs=jobs or FakeJobQueue(),
-        auto=FakeAuto(auto_generating), tree=FakeTree(groups))
+        populate=FakeAuto(populating), tree=FakeTree(groups))
 
 
 def _callbacks(cancelled=None, revealed=None, went_to=None, shielded=None):
@@ -172,7 +172,7 @@ def test_a_running_row_no_live_job_holds_still_gets_a_plain_tile(build):
 
     tile, = items
     assert (tile.reading.frame, tile.reading.progress, tile.cancel, tile.shield,
-            tile.stop_auto) == (None, None, None, None, None)
+            tile.stop_populate) == (None, None, None, None, None)
     assert tile.reading.status == "running"
 
 
@@ -259,12 +259,12 @@ def test_a_trainings_row_offers_no_shield_since_nothing_is_sent_while_it_runs(bu
     assert (items[0].shield, items[0].shielded) == (None, False)
 
 
-def test_an_auto_generating_folders_run_offers_next_seed_rather_than_stop(build):
+def test_an_populating_folders_run_offers_next_seed_rather_than_stop(build):
     key = "image/sdxl_t2i/aaa"
-    items = build(sources=_sources([_row("g1", status="running")], auto_generating=[key], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1")]})))
+    items = build(sources=_sources([_row("g1", status="running")], populating=[key], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1")]})))
 
-    assert items[0].auto_generating
-    assert items[0].stop_auto is not None
+    assert items[0].populating
+    assert items[0].stop_populate is not None
 
 
 def test_a_tiles_cancel_and_reveal_are_the_callers_own(build):

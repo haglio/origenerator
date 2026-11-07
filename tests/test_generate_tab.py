@@ -530,8 +530,8 @@ def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(tab):
     assert tab._generate_btn.isEnabled() is True
 
 
-def test_the_cancel_hover_says_next_seed_while_the_folder_auto_generates(tab):
-    tab.set_generating(True, auto_generating=True)
+def test_the_cancel_hover_says_next_seed_while_the_folder_populates(tab):
+    tab.set_generating(True, populating=True)
     assert tab._cancel_btn.text() == "Cancel"
     assert tab._cancel_btn.toolTip() == "Throw away this seed and start the next"
 
@@ -2909,7 +2909,7 @@ def test_a_run_the_tab_only_took_up_leaves_the_red_and_green(saved_panel, qtbot)
     field.setPlainText("a dog on a couch")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
 
-    tab.note_launched("a run of auto-generate")
+    tab.note_launched("a run of Populate")
 
     assert _struck_and_lit(field) == ("cat", "dog")
 

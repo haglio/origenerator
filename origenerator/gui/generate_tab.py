@@ -757,8 +757,8 @@ class GenerateTab(DropZones):
         if any(made_of is not None for made_of in ended):
             self._mark_prompts()
 
-    def set_generating(self, generating: bool, *, auto_generating: bool = False):
-        self._cancel_btn.setToolTip(cancel_tooltip(auto_generating))
+    def set_generating(self, generating: bool, *, populating: bool = False):
+        self._cancel_btn.setToolTip(cancel_tooltip(populating))
         if generating == self._generating:
             return
         self._generating = generating

@@ -56,8 +56,8 @@ def _core() -> ReferenceSection:
             _row("Experiments", said=_said(AppCommand.EXPERIMENTS)),
         )),
         ReferenceGroup("Switches", (
-            _row("Auto-generate on / off",
-                 said=_said(AppCommand.AUTO, AppCommand.AUTO_ON, AppCommand.AUTO_OFF)),
+            _row("Populate on / off",
+                 said=_said(AppCommand.POPULATE, AppCommand.POPULATE_ON, AppCommand.POPULATE_OFF)),
             _row("Origenerator Radio on / off",
                  said=_said(AppCommand.RADIO, AppCommand.RADIO_ON, AppCommand.RADIO_OFF)),
         )),

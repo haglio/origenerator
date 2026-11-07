@@ -945,7 +945,7 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[0] == (view._buttons.back, view._buttons.forward)
     assert groups[1] == (view._buttons.undo, view._buttons.redo)
     assert groups[3] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
-    assert view._buttons.auto in groups[4]
+    assert view._buttons.populate in groups[4]
     assert view._buttons.radio in groups[4]
     assert groups[5] == (view._buttons.power, view._buttons.play_pause, view._buttons.reference,
                          view._buttons.mic)

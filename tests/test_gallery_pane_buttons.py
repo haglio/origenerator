@@ -11,7 +11,7 @@ from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_SIZE_HUD
 from origenerator import ui_scale
 from origenerator.gui import omnipause
 from origenerator.gui.gallery_pane_buttons import (
-    AUTO_ELSEWHERE_TIP,
+    POPULATE_ELSEWHERE_TIP,
     Button,
     ButtonHandlers,
     ButtonStates,
@@ -29,8 +29,8 @@ def _handlers(**overrides) -> ButtonHandlers:
 
 def _state(**overrides) -> ButtonStates:
     fields = {name: Button(tip=name) for name in ButtonStates._fields
-              if name != "auto_tip"}
-    fields["auto_tip"] = ""
+              if name != "populate_tip"}
+    fields["populate_tip"] = ""
     fields.update(overrides)
     return ButtonStates(**fields)
 
@@ -116,7 +116,7 @@ def test_the_bank_opens_with_its_optional_buttons_away(buttons):
 
     assert made.slideshow.isHidden()
     assert made.group.isHidden()
-    assert not made.auto.isHidden()
+    assert not made.populate.isHidden()
 
 
 def test_one_state_writes_every_button(buttons):
@@ -138,39 +138,39 @@ def test_one_state_writes_every_button(buttons):
 
 def test_a_switch_put_where_the_app_already_is_does_not_re_run_the_press(buttons):
     pressed = []
-    made = buttons(_handlers(toggle_auto=pressed.append))
+    made = buttons(_handlers(toggle_populate=pressed.append))
 
-    made.apply(_state(auto=Button(checked=True, tip="running here")))
+    made.apply(_state(populate=Button(checked=True, tip="running here")))
 
-    assert made.auto.isChecked() is True
+    assert made.populate.isChecked() is True
     assert pressed == []
 
 
 def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(buttons):
     made = buttons()
-    made.auto.setChecked(True)
+    made.populate.setChecked(True)
 
     made.apply(_state())
 
-    assert made.auto.isChecked() is True
+    assert made.populate.isChecked() is True
 
 
-def test_auto_generate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(buttons):
+def test_populate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(buttons):
     made = buttons()
 
-    made.apply(_state(auto=Button(tip=""), auto_tip=AUTO_ELSEWHERE_TIP))
+    made.apply(_state(populate=Button(tip=""), populate_tip=POPULATE_ELSEWHERE_TIP))
 
-    assert made.auto.toolTip() == ""
-    assert "Go to it" in made.auto_tip._html
+    assert made.populate.toolTip() == ""
+    assert "Go to it" in made.populate_tip._html
 
 
-def test_the_tip_s_link_leads_wherever_auto_generate_is_now(buttons):
+def test_the_tip_s_link_leads_wherever_populate_is_now(buttons):
     followed = []
-    made = buttons(_handlers(go_to_auto_generating_folder=followed.append))
+    made = buttons(_handlers(go_to_populating_folder=followed.append))
 
-    made.auto_tip.link_activated.emit("auto")
+    made.populate_tip.link_activated.emit("populate")
 
-    assert followed == ["auto"]
+    assert followed == ["populate"]
 
 
 def test_a_group_with_nothing_showing_wears_no_gap(buttons):

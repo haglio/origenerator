@@ -77,7 +77,7 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 
-def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
+def test_words_that_are_no_command_leave_a_running_populate_as_it_was(
         qtbot, tmp_path, monkeypatch):
     hearing = FakeHearing("make it a dog")
     monkeypatch.setattr(voice_router, "CommandAndRequestListener",
@@ -88,7 +88,7 @@ def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
     view.refresh()
     key = _select_first_leaf(view)
     view._buttons.mic.setChecked(True)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     prompt = view._live_jobs[key].params["positive_prompt"]
 
     hearing.hear()
@@ -99,15 +99,15 @@ def test_words_that_are_no_command_leave_a_running_auto_generate_as_it_was(
     assert words(view._voice.status) == "heard: “make it a dog”"
 
 
-def test_auto_generate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
+def test_populate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     view._buttons.mic.setChecked(True)
 
-    view._toggle_auto(True)
-    view._toggle_auto(False)
+    view._toggle_populate(True)
+    view._toggle_populate(False)
 
     assert view._voice.listener.commands_on
 
@@ -118,9 +118,9 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     assert not view._voice.listener.commands_on
-    view._toggle_auto(False)
+    view._toggle_populate(False)
 
     view._buttons.mic.setChecked(True)
     assert view._voice.listener.commands_on
@@ -516,7 +516,7 @@ def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
     assert "image on screen" in words(view._voice.status)
 
 
-def test_start_slideshow_is_heard_with_no_slideshow_and_no_auto_generate(qtbot, tmp_path,
+def test_start_slideshow_is_heard_with_no_slideshow_and_no_populate(qtbot, tmp_path,
                                                           monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     assert view._slideshows.showing is None

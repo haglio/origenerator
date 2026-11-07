@@ -39,7 +39,7 @@ def test_a_hosting_session_hears_the_word_that_opens_a_request():
 
 @pytest.mark.parametrize("phrase", [
     "favorites", "experiments", "start slideshow", "fix hands", "enhance", "undo", "lock",
-    "enhanced only", "clear filter", "auto on",
+    "enhanced only", "clear filter", "populate on",
 ])
 def test_a_hosting_session_hears_what_this_app_answers_while_hosted(phrase):
     assert phrase in hosted_phrases()

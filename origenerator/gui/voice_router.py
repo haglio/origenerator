@@ -36,9 +36,6 @@ from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.voice_wiring import VoiceSources, VoiceSwitches
 from origenerator.setter_voice import setter_phrases
 from origenerator.voice.app_commands import (
-    AUTO_SWITCH as _AUTO,
-)
-from origenerator.voice.app_commands import (
     DRIVE_SWITCH as _DRIVE,
 )
 from origenerator.voice.app_commands import (
@@ -46,6 +43,9 @@ from origenerator.voice.app_commands import (
 )
 from origenerator.voice.app_commands import (
     MOTION_MOVES as _MOTION,
+)
+from origenerator.voice.app_commands import (
+    POPULATE_SWITCH as _POPULATE,
 )
 from origenerator.voice.app_commands import (
     RADIO_SWITCH as _RADIO,
@@ -191,7 +191,7 @@ class VoiceRouter(QObject):
         self._switches.update({_RADIO: radio, _DRIVE: drive, _MIC: mic})
 
     def bind_the_buttons(self, switches: VoiceSwitches, *, actions, enhance) -> None:
-        self._switches = {_AUTO: switches.auto, _RADIO: switches.radio,
+        self._switches = {_POPULATE: switches.populate, _RADIO: switches.radio,
                           _DRIVE: switches.drive, _MIC: switches.mic}
         self._buttons = dict(actions)
         self._enhance = enhance

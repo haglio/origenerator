@@ -371,7 +371,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     slideshow.close()
 
 
-def test_a_double_click_while_auto_generate_runs_opens_on_the_shown_image_alone(
+def test_a_double_click_while_populate_runs_opens_on_the_shown_image_alone(
         qtbot, tmp_path, monkeypatch):
     def by_id(row, places):
         return (f"{row['prompt_id']}.png", "image")
@@ -382,7 +382,7 @@ def test_a_double_click_while_auto_generate_runs_opens_on_the_shown_image_alone(
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._buttons.auto.click()
+    view._buttons.populate.click()
     _generating_tile(view).selected.emit()
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)
@@ -458,19 +458,19 @@ def test_a_slideshow_up_is_what_is_in_front_of_the_tab(qtbot):
 
 
 
-def _auto_generating_view(qtbot, monkeypatch, rows):
+def _populating_view(qtbot, monkeypatch, rows):
     view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
     key = _selected_folder(view)
-    monkeypatch.setattr(view._auto, "is_active", lambda k: k == key)
+    monkeypatch.setattr(view._populate, "is_active", lambda k: k == key)
     return view, key
 
 
 def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     tab = view._generate_pane.current_generate_tab()
     tab._viewport.show_frame(_png_bytes())
 
@@ -495,7 +495,7 @@ def test_a_slideshow_closed_before_it_became_active_asks_for_no_keyboard_focus(q
 
 
 def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, monkeypatch):
-    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()
     view._osr2_driver = driver
     tab = view._generate_pane.current_generate_tab()
@@ -607,7 +607,7 @@ def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, l
 
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
     assert view._slideshows.showing._actions.drive_toggle == view.toggle_osr2_drive
@@ -617,7 +617,7 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
 
 
 def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
-    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Qt's active window outlives the test that opened it.
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
     view.osr2_control.setChecked(True)
@@ -627,7 +627,7 @@ def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
 
 
 def test_the_motion_keys_work_in_core_too(qtbot, monkeypatch):
-    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     _on_screen(qtbot, view, 1400, 900)
 
     gestures.press_key(view, Qt.Key.Key_L)
@@ -637,7 +637,7 @@ def test_the_motion_keys_work_in_core_too(qtbot, monkeypatch):
 
 def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_does(
         qtbot, monkeypatch):
-    view, _key = _auto_generating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     _on_screen(qtbot, view, 1400, 900)
 
     gestures.press_key(view, Qt.Key.Key_9, Qt.KeyboardModifier.KeypadModifier)
@@ -870,13 +870,13 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
         qtbot, tmp_path, monkeypatch):
     view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
     del view._other_window_owns_keys
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     view._buttons.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
     assert omnipause.frozen()
     assert radio.frozen
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
     assert view._buttons.radio.isChecked()
 
     _press_escape_at_the_gallery(view)
@@ -918,7 +918,7 @@ def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anythi
     assert omnipause.frozen()
     assert view._slideshows.showing is None
     assert radio.starts == 0
-    assert not view._auto.is_active(key)
+    assert not view._populate.is_active(key)
     assert not view.osr2_control.isChecked()
 
 

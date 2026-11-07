@@ -293,7 +293,7 @@ def router(qtbot, monkeypatch, starting):
         buttons = dict(buttons or {})
         router.bind_the_buttons(
             VoiceSwitches(
-                auto=buttons.get("auto", FakeButton(tip="Auto-generate")),
+                populate=buttons.get("populate", FakeButton(tip="Populate")),
                 radio=buttons.get("radio", FakeButton(tip="Origenerator Radio")),
                 drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
                 mic=buttons.get("mic", FakeButton(tip="Listen", checked=True))),
@@ -369,7 +369,7 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
 
     assert voice.listener.commands_on is False
     voice.bind_the_buttons(
-        VoiceSwitches(auto=None, radio=None, drive=None, mic=FakeButton(checked=True)),
+        VoiceSwitches(populate=None, radio=None, drive=None, mic=FakeButton(checked=True)),
         enhance=None, actions={})
     voice.sync()
     assert voice.listener.commands_on is True

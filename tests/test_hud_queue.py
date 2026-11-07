@@ -153,7 +153,7 @@ def test_start_now_is_offered_only_while_a_countdown_runs():
 
 def test_a_row_carries_the_button_that_throws_its_job_away():
     section = queue_section([_item("j1", cancel=lambda: None),
-                             _item("j2", cancel=lambda: None, auto_generating=True)], 0)
+                             _item("j2", cancel=lambda: None, populating=True)], 0)
 
     _image, targets = _painted(section)
 

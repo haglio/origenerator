@@ -24,9 +24,9 @@ class AppCommand(Enum):
     REDO = "redo"
     GROUP = "group"
 
-    AUTO = "auto"
-    AUTO_ON = "auto_on"
-    AUTO_OFF = "auto_off"
+    POPULATE = "populate"
+    POPULATE_ON = "populate_on"
+    POPULATE_OFF = "populate_off"
     RADIO = "radio"
     RADIO_ON = "radio_on"
     RADIO_OFF = "radio_off"
@@ -95,7 +95,7 @@ _say(AppCommand.REDO, "redo")
 _say(AppCommand.GROUP, "group", "group folders")
 
 for _words, (_toggle, _on, _off) in (
-    (("auto", "auto generate"), (AppCommand.AUTO, AppCommand.AUTO_ON, AppCommand.AUTO_OFF)),
+    (("populate",), (AppCommand.POPULATE, AppCommand.POPULATE_ON, AppCommand.POPULATE_OFF)),
     (("radio",), (AppCommand.RADIO, AppCommand.RADIO_ON, AppCommand.RADIO_OFF)),
     (("drive", "motion"), (AppCommand.DRIVE, AppCommand.DRIVE_ON, AppCommand.DRIVE_OFF)),
 ):
@@ -140,11 +140,11 @@ MOTION_MOVES: dict[AppCommand, tuple[str, int | bool | None]] = {
     AppCommand.LEARNED_OFF: ("set_learned", False),
 }
 
-AUTO_SWITCH, RADIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH = "auto", "radio", "drive", "mic"
+POPULATE_SWITCH, RADIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH = "populate", "radio", "drive", "mic"
 SWITCHES: dict[AppCommand, tuple[str, bool | None, str]] = {
-    AppCommand.AUTO: (AUTO_SWITCH, None, "auto-generate"),
-    AppCommand.AUTO_ON: (AUTO_SWITCH, True, "auto-generate"),
-    AppCommand.AUTO_OFF: (AUTO_SWITCH, False, "auto-generate"),
+    AppCommand.POPULATE: (POPULATE_SWITCH, None, "Populate"),
+    AppCommand.POPULATE_ON: (POPULATE_SWITCH, True, "Populate"),
+    AppCommand.POPULATE_OFF: (POPULATE_SWITCH, False, "Populate"),
     AppCommand.RADIO: (RADIO_SWITCH, None, "Origenerator Radio"),
     AppCommand.RADIO_ON: (RADIO_SWITCH, True, "Origenerator Radio"),
     AppCommand.RADIO_OFF: (RADIO_SWITCH, False, "Origenerator Radio"),

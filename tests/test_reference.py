@@ -52,7 +52,7 @@ def test_the_osr2_s_keys_are_the_ones_the_motion_answers():
 
 
 def test_an_action_opens_lowercase_unless_it_opens_with_a_name():
-    names = ("Latest", "Favorites", "Experiments", "Auto-generate", "Origenerator", "Request",
+    names = ("Latest", "Favorites", "Experiments", "Populate", "Origenerator", "Request",
              "HUD")
     for row in _rows():
         assert row.description[0].islower() or row.description.startswith(names), row.description

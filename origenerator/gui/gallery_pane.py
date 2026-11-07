@@ -38,8 +38,8 @@ from origenerator.gui.inflight import (
     CANCEL_TEXT,
     InFlightItem,
     cancel_tooltip,
-    stop_auto_generate_text,
-    stop_auto_generate_tooltip,
+    stop_populate_text,
+    stop_populate_tooltip,
 )
 from origenerator.gui.inflight_items import (
     InFlightCallbacks,
@@ -275,7 +275,7 @@ class GalleryPane(QObject):
     selection_changed = pyqtSignal()
     pane_reset = pyqtSignal()
 
-    def __init__(self, scroll, db, jobs, auto, host: PaneHost):
+    def __init__(self, scroll, db, jobs, populate, host: PaneHost):
         super().__init__()
         self._scroll = scroll
         self._db = db
@@ -283,7 +283,7 @@ class GalleryPane(QObject):
         self._tree = host.tree
         self._host = host
         self._queue_model = InFlightItems(
-            InFlightSources(db=db, jobs=jobs, auto=auto, tree=self._tree),
+            InFlightSources(db=db, jobs=jobs, populate=populate, tree=self._tree),
             image_rows=host.image_rows,
             image_index=lambda: self._model.image_index,
             callbacks=InFlightCallbacks(
@@ -663,16 +663,16 @@ class GalleryPane(QObject):
             return
         menu = QMenu(self._scroll)
         discard = menu.addAction(CANCEL_TEXT)
-        discard.setToolTip(cancel_tooltip(item.auto_generating))
+        discard.setToolTip(cancel_tooltip(item.populating))
         stop = None
-        if item.auto_generating and item.stop_auto is not None:
-            stop = menu.addAction(stop_auto_generate_text())
-            stop.setToolTip(stop_auto_generate_tooltip())
+        if item.populating and item.stop_populate is not None:
+            stop = menu.addAction(stop_populate_text())
+            stop.setToolTip(stop_populate_tooltip())
         chosen = menu.exec(global_pos)
         if chosen is discard:
             item.cancel()
         elif stop is not None and chosen is stop:
-            item.stop_auto()
+            item.stop_populate()
             item.cancel()
 
     def _collection_double_clicked(self, prompt_id: str):

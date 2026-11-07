@@ -115,12 +115,15 @@ for one thing cost four. So:
   are other things, and keep their words. A folder with no folders inside
   it, and so no caret, is a **leaf folder**: the settings folders at the
   end of each path, which hold the items themselves.
-- **A running Auto-Generate is Auto-Generate, never a loop.** Loop is the
-  slideshow's word, for playing one row of its nav map over and over ("Loop
-  off" says it stopped). The code called a running Auto-Generate "the
-  loop", an agent repeated the word to the user, and he had to ask what it
-  meant. So the code names it after the button, and so does every message
-  to him.
+- **A running Populate is Populate, never a loop, and Auto-generate is the
+  Request's.** Loop is the slideshow's word, for playing one row of its nav
+  map over and over ("Loop off" says it stopped). The code called a running
+  Populate "the loop", an agent repeated the word to the user, and he had to
+  ask what it meant. So the code names it after the button, and so does
+  every message to him. The button was Auto-Generate until 2026-11-07, when
+  he gave that word to the switch beside a Generate tab's Request, which
+  generates each time the model comes back with its changes, and renamed the
+  button Populate.
 - **The parts no label names have the user's names too, and an agent says
   them: HUD, Job Queue, Core and Standalone.** The **HUD** is the controls a
   Funestra draws over what it plays, a slideshow's included; the **Job
@@ -655,8 +658,8 @@ counts every control a person can set and every press and bar on the
 OSR2 controls, and fails on one that neither a key of the table nor its short list
 of things that are no setting accounts for. So a new control is finished
 when it has its key, or its line there saying why it is no setting -- what is
-being searched for, what one image shows, a nudge, and Auto-generate, which
-a restart leaves off, since an Auto-Generate that came back on by itself
+being searched for, what one image shows, a nudge, and Populate, which
+a restart leaves off, since a Populate that came back on by itself
 could run unnoticed.
 
 Inside a Fun Time session the window draws what the session asks for -- one

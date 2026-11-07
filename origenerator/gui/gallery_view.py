@@ -75,7 +75,6 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, omnipause
-from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
@@ -101,7 +100,7 @@ from origenerator.gui.gallery_pane import (
     TreeNavigation,
 )
 from origenerator.gui.gallery_pane_buttons import (
-    AUTO_ELSEWHERE_TIP,
+    POPULATE_ELSEWHERE_TIP,
     Button,
     ButtonHandlers,
     ButtonStates,
@@ -131,8 +130,8 @@ from origenerator.gui.inflight import (
     clear_queue_tooltip,
     jobs_to_cancel,
     queue_wait_text,
-    stop_auto_generate_text,
-    stop_auto_generate_tooltip,
+    stop_populate_text,
+    stop_populate_tooltip,
 )
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.job_queue_view import JobQueueView
@@ -152,6 +151,7 @@ from origenerator.gui.panes import (
     pane,
     pane_following,
 )
+from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.slideshow_director import (
     DirectorSources,
@@ -315,7 +315,7 @@ class GalleryView(QWidget):
         self._build_ui()
         self._voice.bind_the_buttons(
             VoiceSwitches(
-                auto=self._buttons.auto, radio=self._buttons.radio,
+                populate=self._buttons.populate, radio=self._buttons.radio,
                 drive=self.osr2_control if self._osr2_motion is not None else None,
                 mic=self._buttons.mic),
             enhance=(self._buttons.enhance, self._enhance.enhance_the_selection),
@@ -347,10 +347,10 @@ class GalleryView(QWidget):
         self._jobs.failed.connect(self._on_reroll_failed)
         self._jobs.run_ended.connect(self.run_ended)
         self._generation_failed = GenerationFailed(self)
-        self._auto = AutoGenerateController(self._start_auto_reroll)
-        self._auto.stopped.connect(self._on_auto_stopped)
-        self._auto_generate_settings: dict = {}
-        self._auto_origins: set[str] = set()
+        self._populate = PopulateController(self._start_populate_reroll)
+        self._populate.stopped.connect(self._on_populate_stopped)
+        self._populate_settings: dict = {}
+        self._populate_origins: set[str] = set()
         self._selected_reroll_key: str | None = None
         self._generating_tile: GeneratingTile | None = None
 
@@ -378,7 +378,7 @@ class GalleryView(QWidget):
         self._scroll = GalleryPaneScrollArea()
         DropTarget(self._scroll, self._landing_in_the_open_custom_collection, self._on_dropped)
         self._gallery_pane = GalleryPane(
-            self._scroll, db, self._jobs, self._auto,
+            self._scroll, db, self._jobs, self._populate,
             PaneHost(
                 image_rows=lambda: self._image_rows,
                 animated_preview=self.animated_preview,
@@ -597,8 +597,8 @@ class GalleryView(QWidget):
                 undo=self._undo,
                 redo=self._redo,
                 start_slideshow=self._slideshows.start,
-                toggle_auto=self._toggle_auto,
-                go_to_auto_generating_folder=self._go_to_auto_generating_folder,
+                toggle_populate=self._toggle_populate,
+                go_to_populating_folder=self._go_to_populating_folder,
                 favorite=self._favorite_selection,
                 enhance=self._enhance.enhance_the_selection,
                 group=self._group_selection,
@@ -891,13 +891,13 @@ class GalleryView(QWidget):
                                    if origin not in {o for o, _ in live}})
             job = live[0][1] if live else None
             tab.set_generating(job is not None,
-                                 auto_generating=self._auto_generating(job))
+                                 populating=self._populating(job))
             tab.reread_generate_button()
         self._combine.reconcile_generating()
 
-    def _auto_generating(self, job) -> bool:
+    def _populating(self, job) -> bool:
         key = self._job_folder_key(job)
-        return key is not None and self._auto.is_active(key)
+        return key is not None and self._populate.is_active(key)
 
     def _job_folder_key(self, job) -> str | None:
         if job is None:
@@ -1568,7 +1568,7 @@ class GalleryView(QWidget):
 
     def _generating_tile_for(self, key: str, job) -> GeneratingTile:
         tile = GeneratingTile(job,
-                              auto_generating=self._auto.is_active(key),
+                              populating=self._populate.is_active(key),
                               typical_seconds=self.typical_run_seconds(job),
                               made_from=self._job_made_from(
                                   job, lambda source_video: source_video.get("thumbnail_path")))
@@ -1581,18 +1581,18 @@ class GalleryView(QWidget):
 
     def _generating_tile_menu(self, key: str, global_pos):
         menu = QMenu(self)
-        auto = self._auto.is_active(key)
+        populate = self._populate.is_active(key)
         discard = menu.addAction(CANCEL_TEXT)
-        discard.setToolTip(cancel_tooltip(auto))
+        discard.setToolTip(cancel_tooltip(populate))
         stop = None
-        if auto:
-            stop = menu.addAction(stop_auto_generate_text())
-            stop.setToolTip(stop_auto_generate_tooltip())
+        if populate:
+            stop = menu.addAction(stop_populate_text())
+            stop.setToolTip(stop_populate_tooltip())
         chosen = menu.exec(global_pos)
         if chosen is discard:
             self._cancel_reroll(key)
         elif stop is not None and chosen is stop:
-            self._auto.stop(key)
+            self._populate.stop(key)
             self._cancel_reroll(key)
 
     def _can_modify(self, group) -> bool:
@@ -1678,15 +1678,15 @@ class GalleryView(QWidget):
             return None
         return timing.estimate_seconds(self._db.recent_durations(job.workflow.name))
 
-    def _start_auto_reroll(self, key: str) -> bool:
-        return self._start_reroll(key, from_auto=True)
+    def _start_populate_reroll(self, key: str) -> bool:
+        return self._start_reroll(key, from_populate=True)
 
-    def _start_reroll(self, key: str, *, from_auto: bool = False) -> bool:
+    def _start_reroll(self, key: str, *, from_populate: bool = False) -> bool:
         if self._client is None:
             return False
         if key in self._live_jobs:
             return True
-        settings = self._auto_generate_settings.get(key)
+        settings = self._populate_settings.get(key)
         if settings is not None:
             workflow, params = settings
             self._jobs.start_prepared(key, workflow,
@@ -1694,51 +1694,51 @@ class GalleryView(QWidget):
         else:
             self._jobs.start_reroll(key, self.group_for_key(key), self._image_rows)
         self._claim_launch(key)
-        if not from_auto:
+        if not from_populate:
             self._select_reroll(key)
         else:
-            self._note_auto_launch(key)
+            self._note_populate_launch(key)
             if self._selected_reroll_key == key:
                 self._enter_reroll_selection(key)
         return self._jobs.has(key)
 
-    def _note_auto_launch(self, key: str):
+    def _note_populate_launch(self, key: str):
         job = self._jobs.newest_job_for(key)
         if job is None:
             return
-        self._auto_origins = {origin for origin in self._auto_origins
+        self._populate_origins = {origin for origin in self._populate_origins
                               if self._jobs.job_for_origin(origin) is not None}
-        self._auto_origins.add(job.origin)
+        self._populate_origins.add(job.origin)
 
-    def _toggle_auto(self, checked: bool):
+    def _toggle_populate(self, checked: bool):
         group = self.current_group()
         if not checked:
-            self._auto.stop_all()
+            self._populate.stop_all()
         elif group is not None:
-            self._begin_auto(group.key)
+            self._begin_populate(group.key)
         self._re_aim()
         self._sync_cancel_buttons()
 
-    def _begin_auto(self, key: str):
-        self._capture_auto_generate_settings(key)
-        self._auto.start(key)
-        if self._auto.is_active(key):
+    def _begin_populate(self, key: str):
+        self._capture_populate_settings(key)
+        self._populate.start(key)
+        if self._populate.is_active(key):
             self._set_folder_favorite(key, True)
         else:
-            self._auto_generate_settings.pop(key, None)
+            self._populate_settings.pop(key, None)
 
-    def _capture_auto_generate_settings(self, key: str):
+    def _capture_populate_settings(self, key: str):
         group = (self.current_group() if key == self.selected_folder_key()
                  else self.group_for_key(key))
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
         workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
         if workflow is not None:
-            self._auto_generate_settings[key] = (
+            self._populate_settings[key] = (
                 workflow, filled_params(group.rows[0], workflow))
 
-    def _on_auto_stopped(self, key: str):
-        self._auto_generate_settings.pop(key, None)
+    def _on_populate_stopped(self, key: str):
+        self._populate_settings.pop(key, None)
         if key == self._selected_reroll_key and key not in self._live_jobs:
             self._clear_reroll_selection()
         self._re_aim()
@@ -1771,8 +1771,8 @@ class GalleryView(QWidget):
     def drop_the_request(self) -> None:
         self._voice.drop_the_request()
 
-    def _go_to_auto_generating_folder(self, _href: str):
-        key = self._auto.active_key()
+    def _go_to_populating_folder(self, _href: str):
+        key = self._populate.active_key()
         if key is not None:
             self._stand_on_the_run_in(key, rebuild=True)
 
@@ -1810,12 +1810,12 @@ class GalleryView(QWidget):
         can_go_back, can_go_forward = self._trail
         undo_label = self._edits.undo_label()
         redo_label = self._edits.redo_label()
-        auto_generate_folder = self._auto.active_key()
+        populate_folder = self._populate.active_key()
         group = self.current_group()
-        can_auto_generate = (isinstance(group, gallery.SettingsGroup)
+        can_populate = (isinstance(group, gallery.SettingsGroup)
                              and self._can_reroll(group))
-        elsewhere = (auto_generate_folder is not None
-                     and auto_generate_folder != getattr(group, "key", None))
+        elsewhere = (populate_folder is not None
+                     and populate_folder != getattr(group, "key", None))
         return ButtonStates(
             back=Button(enabled=can_go_back, tip="Back"),
             forward=Button(enabled=can_go_forward, tip="Forward"),
@@ -1832,22 +1832,22 @@ class GalleryView(QWidget):
                        if self._in_the_trash()
                        else Button(visible=self._slideshows.anything_to_play(),
                                    tip=f"Play {self.slideshow_subject()} as a slideshow")),
-            auto=Button(enabled=can_auto_generate or auto_generate_folder is not None,
-                        tip="" if elsewhere else self._auto_tip(can_auto_generate,
-                                                                auto_generate_folder),
-                        checked=auto_generate_folder is not None),
-            auto_tip=AUTO_ELSEWHERE_TIP if elsewhere else "",
+            populate=Button(enabled=can_populate or populate_folder is not None,
+                        tip="" if elsewhere else self._populate_tip(can_populate,
+                                                                populate_folder),
+                        checked=populate_folder is not None),
+            populate_tip=POPULATE_ELSEWHERE_TIP if elsewhere else "",
         )
 
     @staticmethod
-    def _auto_tip(can_auto_generate: bool, auto_generate_folder: str | None) -> str:
-        if auto_generate_folder is not None:
-            return "Auto-generate is running in this folder — click to stop it"
+    def _populate_tip(can_populate: bool, populate_folder: str | None) -> str:
+        if populate_folder is not None:
+            return "Populate is running in this folder — click to stop it"
         return (
-            "Auto-generate: repeatedly generate variations of this folder "
+            "Populate: repeatedly generate variations of this folder "
             "until toggled off"
-            if can_auto_generate else
-            "Auto-generate: open a settings folder to generate variations of it"
+            if can_populate else
+            "Populate: open a settings folder to generate variations of it"
         )
 
     def _favorite_offer(self) -> Button:
@@ -2116,14 +2116,14 @@ class GalleryView(QWidget):
 
     def _cancel_reroll(self, key: str):
         self._jobs.cancel(key)
-        self._auto.note_canceled(key)
+        self._populate.note_canceled(key)
         self._after_a_job_ended_unfinished(key)
 
     def _cancel_job(self, prompt_id: str):
         key = self._job_folder_key(self._jobs.job_for_prompt(prompt_id))
         self._jobs.cancel_job(prompt_id)
         if key is not None:
-            self._auto.note_canceled(key)
+            self._populate.note_canceled(key)
             self._after_a_job_ended_unfinished(key)
 
     def _after_a_job_ended_unfinished(self, key: str):
@@ -2142,9 +2142,9 @@ class GalleryView(QWidget):
 
     def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         run = origin or prompt_id
-        launcher = (None if run in self._auto_origins
+        launcher = (None if run in self._populate_origins
                     else self._generate_pane.tab_that_launched(run))
-        self._auto_origins.discard(run)
+        self._populate_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if (finished_row is not None
                 and finished_row.get("source") == GenerationSource.EXPERIMENT):
@@ -2159,7 +2159,7 @@ class GalleryView(QWidget):
                 finished_row = self._db.get_generation(source_id)
                 self._slideshows.note_enhanced(finished_row)
         self._combine.send_to_genau_if_requested(finished_row)
-        if key == self._selected_reroll_key and not self._auto.is_active(key):
+        if key == self._selected_reroll_key and not self._populate.is_active(key):
             self._clear_reroll_selection()
         self._slideshows.note_landed(finished_row)
         self.refresh()
@@ -2175,7 +2175,7 @@ class GalleryView(QWidget):
                 self._tree.setCurrentItem(item)
         self._enhance.forget(prompt_id)
         self._reconcile_generating()
-        self._auto.note_finished(key)
+        self._populate.note_finished(key)
         self._enhance.enhance_when_wanted(finished_row)
         self._re_aim()
         self._enhance.reconcile()
@@ -2193,7 +2193,7 @@ class GalleryView(QWidget):
                 tab.show_finished_media(finished_row)
 
     def _on_reroll_failed(self, key: str, message: str = ""):
-        self._auto.note_failed(key)
+        self._populate.note_failed(key)
         self._after_a_job_ended_unfinished(key)
         self._generation_failed.say(format_execution_error(message))
 

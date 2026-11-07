@@ -26,7 +26,7 @@ class GeneratingTile(QFrame):
     selected = pyqtSignal()
     context_requested = pyqtSignal(QPoint)
 
-    def __init__(self, job, parent=None, *, auto_generating=False,
+    def __init__(self, job, parent=None, *, populating=False,
                  typical_seconds=None, made_from=_MADE_FROM_NOTHING):
         super().__init__(parent)
         self._job = job
@@ -52,7 +52,7 @@ class GeneratingTile(QFrame):
         layout.addWidget(self._image)
 
         self._cancel = QPushButton(CANCEL_TEXT)
-        self._cancel.setToolTip(cancel_tooltip(auto_generating))
+        self._cancel.setToolTip(cancel_tooltip(populating))
         self._cancel.clicked.connect(self.cancel_requested.emit)
         layout.addWidget(self._cancel)
 

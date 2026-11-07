@@ -397,35 +397,35 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
 
 
 
-def test_toggling_auto_starts_auto_generate(qtbot, tmp_path):
+def test_toggling_populate_starts_populate(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._buttons.auto.click()
+    view._buttons.populate.click()
 
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
     assert key in view._live_jobs
     client.submit_job.assert_called_once()
-    assert view._buttons.auto.isChecked()
+    assert view._buttons.populate.isChecked()
 
 
-def test_auto_generating_in_a_folder_favorites_it(qtbot, tmp_path):
+def test_populating_in_a_folder_favorites_it(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._buttons.auto.click()
+    view._buttons.populate.click()
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
 
 
-def test_auto_generating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_path):
+def test_populating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -433,29 +433,29 @@ def test_auto_generating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_pa
     key = _select_first_leaf(view)
     view._toggle_favorite(key)
 
-    view._buttons.auto.click()
+    view._buttons.populate.click()
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
 
 
-def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
+def test_populate_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     job = view._live_jobs[key]
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     assert client.submit_job.call_count == 2
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
     assert key in view._live_jobs
 
 
-def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
+def test_turning_populate_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
     client = _reroll_client()
     db = _seeded_db(tmp_path)
     db.insert_generation(NewGeneration(
@@ -473,88 +473,88 @@ def test_turning_auto_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path
     settings = _at(_image_workflow(view._tree), 0, 0)
     first = _at(settings, 0).data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(_at(settings, 0))
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
     view._tree.setCurrentItem(_at(settings, 1))
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     second = _selected_folder(view)
 
-    assert view._auto.is_active(second)
-    assert not view._auto.is_active(first)
-    assert view._buttons.auto.isChecked()
+    assert view._populate.is_active(second)
+    assert not view._populate.is_active(first)
+    assert view._buttons.populate.isChecked()
 
 
-def test_toggling_auto_off_stops_auto_generate(qtbot, tmp_path):
+def test_toggling_populate_off_stops_populate(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     job = view._live_jobs[key]
 
-    view._toggle_auto(False)
+    view._toggle_populate(False)
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     assert client.submit_job.call_count == 1
-    assert not view._auto.is_active(key)
+    assert not view._populate.is_active(key)
 
 
-def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
+def test_populate_stops_when_a_variation_fails(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     job = view._live_jobs[key]
 
     client.job_error.emit(job.prompt_id, "boom")
 
-    assert not view._auto.is_active(key)
+    assert not view._populate.is_active(key)
     assert client.submit_job.call_count == 1
 
 
-def test_cancelling_a_reroll_keeps_auto_generate_on_and_tries_another_seed(qtbot, tmp_path):
+def test_cancelling_a_reroll_keeps_populate_on_and_tries_another_seed(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     canceled = view._live_jobs[key].prompt_id
 
     view._cancel_reroll(key)
 
-    assert view._auto.is_active(key)
-    assert view._buttons.auto.isChecked()
+    assert view._populate.is_active(key)
+    assert view._buttons.populate.isChecked()
     assert client.submit_job.call_count == 2
     assert view._live_jobs[key].prompt_id != canceled
 
 
-def test_cancelling_an_auto_folders_job_by_name_keeps_auto_generate_going(qtbot, tmp_path):
+def test_cancelling_an_populate_folders_job_by_name_keeps_populate_going(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     canceled = view._live_jobs[key].prompt_id
 
     view._cancel_job(canceled)
 
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
     assert client.submit_job.call_count == 2
     assert view._live_jobs[key].prompt_id != canceled
 
 
-def test_a_tab_watching_auto_generate_follows_it_onto_the_next_seed(qtbot, tmp_path):
+def test_a_tab_watching_populate_follows_it_onto_the_next_seed(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     _generating_tile(view).selected.emit()
     tab = view._generate_pane.current_generate_tab()
 
@@ -565,22 +565,22 @@ def test_a_tab_watching_auto_generate_follows_it_onto_the_next_seed(qtbot, tmp_p
     assert _frame_shown(tab._viewport, _png_bytes())
 
 
-def test_only_the_auto_toggle_ends_auto_generate_not_a_string_of_cancels(qtbot, tmp_path):
+def test_only_the_populate_toggle_ends_populate_not_a_string_of_cancels(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
     for _ in range(3):
         view._cancel_reroll(key)
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
     assert client.submit_job.call_count == 4
 
-    view._toggle_auto(False)
+    view._toggle_populate(False)
 
-    assert not view._auto.is_active(key)
+    assert not view._populate.is_active(key)
 
 
 def _folder_tab(view, db):
@@ -589,7 +589,7 @@ def _folder_tab(view, db):
     return view._generate_pane.current_generate_tab()
 
 
-def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
+def test_populate_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -597,7 +597,7 @@ def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     _select_first_leaf(view)
     _folder_tab(view, db)
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
     next_seed = "Throw away this seed and start the next"
     assert _generating_tile(view)._cancel.text() == "Cancel"
@@ -607,7 +607,7 @@ def test_auto_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == next_seed
 
 
-def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flight(
+def test_turning_populate_off_hovers_a_plain_cancel_again_with_the_run_still_in_flight(
         qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
@@ -615,9 +615,9 @@ def test_turning_auto_off_hovers_a_plain_cancel_again_with_the_run_still_in_flig
     view.refresh()
     key = _select_first_leaf(view)
     _folder_tab(view, db)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
-    view._toggle_auto(False)
+    view._toggle_populate(False)
 
     assert key in view._live_jobs
     plain = "Cancel this generation"
@@ -642,7 +642,7 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     assert tab.launched_runs() == [job.origin]
 
 
-def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
+def test_populate_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -651,7 +651,7 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     key = _select_first_leaf(view)
     _folder_tab(view, db)
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     first = view._live_jobs[key]
     assert view._generate_pane.current_generate_tab().launched_runs() == [first.origin]
 
@@ -662,7 +662,7 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     assert tab.launched_runs() == [view._live_jobs[key].origin]
 
 
-def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
+def test_populate_opens_no_tabs(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -670,7 +670,7 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     for _ in range(3):
         client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
@@ -684,7 +684,7 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
     assert view._generate_pane.count() == 1
 
 
-def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
+def test_populate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -696,7 +696,7 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     tab._viewport.show_frame = MagicMock()
     tab._viewport.show_media = MagicMock()
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     job = view._live_jobs[key]
     client.preview_image.emit(job.prompt_id, b"a frame")
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
@@ -707,14 +707,14 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     assert view._selected_reroll_key is None
 
 
-def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
+def test_watching_populate_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     _generating_tile(view).selected.emit()
     tab = view._generate_pane.current_generate_tab()
     tab._viewport.show_frame = MagicMock()
@@ -726,18 +726,18 @@ def test_watching_auto_generate_in_the_pane_carries_on_to_the_next_variation(qtb
     tab._viewport.show_frame.assert_called_with(b"the next one")
 
 
-def test_auto_generate_ending_lets_the_pane_go(qtbot, tmp_path):
+def test_populate_ending_lets_the_pane_go(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     _generating_tile(view).selected.emit()
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
-    view._toggle_auto(False)
+    view._toggle_populate(False)
     view._cancel_reroll(key)
 
     assert view._selected_reroll_key is None
@@ -790,31 +790,31 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
     assert view._generate_pane._preview_tab is None
 
 
-def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
+def test_populate_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._buttons.auto.isHidden()
-    assert view._buttons.auto.isEnabled()
+    assert not view._buttons.populate.isHidden()
+    assert view._buttons.populate.isEnabled()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert not view._buttons.auto.isHidden()
-    assert not view._buttons.auto.isEnabled()
-    assert "open a settings folder" in view._buttons.auto.toolTip()
+    assert not view._buttons.populate.isHidden()
+    assert not view._buttons.populate.isEnabled()
+    assert "open a settings folder" in view._buttons.populate.toolTip()
 
 
-def test_the_switchs_tip_takes_you_to_whichever_folder_auto_generate_runs_in(qtbot, tmp_path):
+def test_the_switchs_tip_takes_you_to_whichever_folder_populate_runs_in(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     view._tree.setCurrentItem(_image_workflow(view._tree))
     assert _selected_folder(view) != key
 
-    view._buttons.auto_tip.link_activated.emit("auto")
+    view._buttons.populate_tip.link_activated.emit("populate")
 
     assert _selected_folder(view) == key
 
@@ -1145,32 +1145,32 @@ def test_a_rewrite_lands_in_the_folder_of_its_words_on_the_workflows_defaults(qt
         "sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a dog"))]
 
 
-def test_auto_generate_switched_on_over_a_folder_already_making_one_stays_on(qtbot, tmp_path):
+def test_populate_switched_on_over_a_folder_already_making_one_stays_on(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
     _new_tile(view).add_requested.emit()
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
-    assert view._auto.is_active(key)
+    assert view._populate.is_active(key)
 
 
-def test_switching_auto_generate_off_from_another_folder_stops_it_there(qtbot, tmp_path):
+def test_switching_populate_off_from_another_folder_stops_it_there(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    view._toggle_auto(False)
+    view._toggle_populate(False)
 
-    assert not view._auto.is_active(key)
+    assert not view._populate.is_active(key)
 
 
-def test_auto_generate_that_could_not_launch_forgets_the_settings_it_read(qtbot, tmp_path):
+def test_populate_that_could_not_launch_forgets_the_settings_it_read(qtbot, tmp_path):
     client = _reroll_client()
 
     def refusing(payload, prompt_id):
@@ -1182,31 +1182,31 @@ def test_auto_generate_that_could_not_launch_forgets_the_settings_it_read(qtbot,
     view.refresh()
     _select_first_leaf(view)
 
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
-    assert view._auto_generate_settings == {}
+    assert view._populate_settings == {}
 
 
-def test_auto_generate_ending_forgets_the_settings_it_ran_on(qtbot, tmp_path):
+def test_populate_ending_forgets_the_settings_it_ran_on(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
-    assert key in view._auto_generate_settings
+    view._toggle_populate(True)
+    assert key in view._populate_settings
 
-    view._toggle_auto(False)
+    view._toggle_populate(False)
 
-    assert view._auto_generate_settings == {}
+    assert view._populate_settings == {}
 
 
-def test_watching_auto_generate_the_next_variation_is_the_selection_not_a_saved_item(qtbot, tmp_path):
+def test_watching_populate_the_next_variation_is_the_selection_not_a_saved_item(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
     _generating_tile(view).selected.emit()
 
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
@@ -1215,29 +1215,29 @@ def test_watching_auto_generate_the_next_variation_is_the_selection_not_a_saved_
     assert view.selected_prompt_ids() == []
 
 
-def test_auto_generates_launches_are_remembered_only_while_they_can_still_finish(qtbot, tmp_path):
+def test_populates_launches_are_remembered_only_while_they_can_still_finish(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_auto(True)
+    view._toggle_populate(True)
 
     view._cancel_reroll(key)
 
-    assert view._auto_origins == {view._live_jobs[key].origin}
+    assert view._populate_origins == {view._live_jobs[key].origin}
 
 
-def test_with_auto_generate_running_elsewhere_the_switch_leaves_the_saying_to_its_tip(qtbot, tmp_path):
+def test_with_populate_running_elsewhere_the_switch_leaves_the_saying_to_its_tip(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._toggle_auto(True)
-    assert view._buttons.auto.toolTip() != ""
+    view._toggle_populate(True)
+    assert view._buttons.populate.toolTip() != ""
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert view._buttons.auto.toolTip() == ""
+    assert view._buttons.populate.toolTip() == ""
 
 
 def test_a_seed_re_roll_into_a_folder_already_making_one_starts_nothing(qtbot, tmp_path):

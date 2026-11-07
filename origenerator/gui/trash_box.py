@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_PANEL, TEXT_MUTED
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL, MARGIN_STANDARD
@@ -33,6 +34,17 @@ class TrashBox(QFrame):
         for tile in tiles:
             flow.addWidget(tile)
         column.addWidget(host)
+        self._tiles = tiles
+
+    def sizeHint(self) -> QSize:
+        in_one_row = (sum(tile.sizeHint().expandedTo(tile.minimumSize()).width()
+                          for tile in self._tiles)
+                      + GAP_MEDIUM * (len(self._tiles) - 1))
+        self.ensurePolished()
+        border, inside = self.contentsMargins(), self.layout().contentsMargins()
+        width = (max(in_one_row, self.label.sizeHint().width()) + border.left() + border.right()
+                 + inside.left() + inside.right())
+        return QSize(width, self.heightForWidth(width))
 
 
 def place_tiles(tiles: list[tuple[QWidget, bool]],

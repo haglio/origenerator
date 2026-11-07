@@ -95,9 +95,8 @@ class FlowLayout(QLayout):
                 rows.append([(item, QSize(area.width(), item.sizeHint().height()))])
                 row, x = [], area.x()
                 continue
-            hint = item.sizeHint()
-            hint.setWidth(min(hint.width(), max(area.width(), item.minimumSize().width())))
-            if row and x + hint.width() > area.right():
+            hint = _hint_within(item, area.width())
+            if row and x + hint.width() > area.x() + area.width():
                 rows.append(row)
                 row, x = [], area.x()
             row.append((item, hint))
@@ -123,6 +122,14 @@ class FlowLayout(QLayout):
         if not rows:
             return margin_height
         return y - self._row_spacing - area.y() + margin_height
+
+
+def _hint_within(item, width: int) -> QSize:
+    hint = item.sizeHint()
+    hint.setWidth(min(hint.width(), max(width, item.minimumSize().width())))
+    if item.hasHeightForWidth():
+        hint.setHeight(item.heightForWidth(hint.width()))
+    return hint
 
 
 def _span_of(placed, spacing) -> int:

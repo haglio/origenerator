@@ -37,6 +37,18 @@ def test_flow_layout_fits_more_per_row_when_wider(qtbot):
     assert wide < narrow
 
 
+def test_items_that_exactly_fill_the_width_stay_on_one_row(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host, spacing=8)
+    for _ in range(2):
+        tile = QWidget()
+        tile.setFixedSize(96, 96)
+        layout.addWidget(tile)
+
+    assert layout.heightForWidth(96 + 8 + 96) == 96
+
+
 def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
     host = QWidget()
     qtbot.addWidget(host)

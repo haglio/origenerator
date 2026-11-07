@@ -1034,6 +1034,9 @@ def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtb
 _VERSIONS = {"one.png": [("one.png", "image", "Enhancement 1/1"),
                          ("one_base.png", "image", "Original")]}
 _FAMILY = "one.png|one_base.png"
+_TWO_ENHANCEMENTS = {"one.png": [("one.png", "image", "Enhancement 2/2"),
+                                 ("one_1.png", "image", "Enhancement 1/2"),
+                                 ("one_base.png", "image", "Original")]}
 
 
 class TestVersions:
@@ -1085,6 +1088,31 @@ class TestVersions:
 
         assert f"SET_PACE {slideshow.dwell_s}" not in _sent(slideshow)
         assert _hud(slideshow).item_note == "Enhancement 2/2"
+
+    def test_an_enhancement_about_to_be_deleted_hands_the_funestra_the_next_one_down(
+            self, qtbot, tmp_path):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_versions(_TWO_ENHANCEMENTS)
+        _sent(slideshow)
+
+        slideshow.release_media(["one.png"], the_item_stays=True)
+
+        assert _sent(slideshow) == ["NEXT_VERSION one.png|one_1.png"]
+
+    def test_an_item_left_with_fewer_enhancements_plays_on_at_its_newest_with_only_those(
+            self, qtbot, tmp_path):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_versions(_TWO_ENHANCEMENTS)
+
+        slideshow.note_versions_deleted("id-1", "one_1.png", versions={"one_1.png": [
+            ("one_1.png", "image", "Enhancement 1/1"), ("one_base.png", "image", "Original")]})
+        _sent(slideshow)
+        slideshow.slideshow_step_version(1)
+
+        played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
+        assert played[0] == "one_1.png"
+        assert "one.png" not in played
+        assert _sent(slideshow)[-1] == "NEXT_VERSION one_1.png|one_base.png"
 
     def test_a_videos_other_version_is_handed_over_with_its_own_script(
             self, qtbot, tmp_path, monkeypatch):

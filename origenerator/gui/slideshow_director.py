@@ -1073,6 +1073,15 @@ class SlideshowDirector:
                                   still=row.get("thumbnail_path"))
             surface.add_versions(versions)
 
+    def note_versions_deleted(self, row: dict) -> None:
+        preview = gallery.resolve_preview(row, OUTPUT_PLACES)
+        if preview is None:
+            return
+        versions = self.versions_of([row])
+        for surface in self.surfaces():
+            surface.note_versions_deleted(row["prompt_id"], preview[0], preview[1],
+                                          still=row.get("thumbnail_path"), versions=versions)
+
     def note_enhancing(self, statuses: dict, frames=None) -> None:
         self._enhance_status = dict(statuses)
         for surface in self.surfaces():
@@ -1091,9 +1100,9 @@ class SlideshowDirector:
         if self._slideshow is not None:
             self._slideshow.note_voice_run(prompt_id, message, kind=kind)
 
-    def release_media(self, paths) -> None:
+    def release_media(self, paths, *, the_item_stays: bool = False) -> None:
         for surface in self.surfaces():
-            surface.release_media(paths)
+            surface.release_media(paths, the_item_stays=the_item_stays)
 
     def answer(self, message: str, *, kind: str = INFO) -> None:
         slideshow = self._slideshow

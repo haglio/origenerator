@@ -1921,6 +1921,7 @@ class GalleryView(QWidget):
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
             self._generate_pane.refresh_displayed(updated, self._image_rows)
+            self._slideshows.note_versions_deleted(updated)
         self._re_aim()
 
     def slideshow_location(self):
@@ -2504,10 +2505,10 @@ class GalleryView(QWidget):
             stack.extend(node.child(i) for i in range(node.childCount()))
         return keys
 
-    def _release_held_media(self, paths):
+    def _release_held_media(self, paths, *, the_item_stays: bool = False):
         """Drop every on-screen view of ``paths``: Windows won't move a file while a handle on it is open."""
         self._generate_pane.release_media(paths)
-        self._slideshows.release_media(paths)
+        self._slideshows.release_media(paths, the_item_stays=the_item_stays)
 
     def _delete_rows(self, rows):
         if not rows:

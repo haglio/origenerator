@@ -4,6 +4,7 @@ import json
 import sys
 from typing import TextIO
 
+from origenerator.action_vocabulary import labels_heard_as
 from origenerator.voice.app_commands import AppCommand, phrases_for
 from origenerator.voice.commands import hosted_phrases
 from origenerator.voice.dictation import LEAD_WORDS, request_bias
@@ -12,7 +13,8 @@ from origenerator.voice.dictation import LEAD_WORDS, request_bias
 def main(out: TextIO) -> None:
     json.dump({"phrases": sorted(hosted_phrases()), "openers": list(LEAD_WORDS),
                "speech_hint": request_bias(),
-               "lock_phrases": sorted(phrases_for(AppCommand.LOCK))}, out)
+               "lock_phrases": sorted(phrases_for(AppCommand.LOCK)),
+               "labels_heard_as": labels_heard_as()}, out)
 
 
 if __name__ == "__main__":

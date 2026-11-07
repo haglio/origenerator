@@ -114,3 +114,12 @@ def vocabulary(side: str, content: dict | None = None) -> Vocabulary:
 def _named_strings(listed) -> dict[str, str]:
     return {name.strip(): said.strip() for name, said in _table(listed).items()
             if isinstance(name, str) and isinstance(said, str) and said.strip()}
+
+
+def labels_heard_as(content: dict | None = None) -> dict[str, tuple[str, ...]]:
+    heard: dict[str, tuple[str, ...]] = {}
+    for side in (MediaType.IMAGE, MediaType.VIDEO):
+        words = vocabulary(side, content)
+        for name in (*words.plain_actions, *words.checkboxes):
+            heard[name] = tuple(dict.fromkeys((*heard.get(name, (name,)), *words.heard_as.get(name, ()))))
+    return heard

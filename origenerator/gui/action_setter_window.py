@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import WHITE
+from shared_ui.colors import WHITE, YELLOW
 from shared_ui.fonts import SIZE_SMALL, make_font
 from shared_ui.icons import qt_icon
 from shared_ui.palette import BLUE, as_hex
@@ -39,6 +39,8 @@ NAME_LINES = 2
 
 STATUS_LINE = "setter.status"
 LAST_LINE = "setter.last"
+PREVIOUSLY_LINE = "setter.previously"
+PREVIOUSLY = "yellow box was previously selected"
 SKIP_BUTTON = "setter.skip"
 SAME_BUTTON = "setter.same"
 UNDO_BUTTON = "setter.undo"
@@ -46,6 +48,8 @@ TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
           MediaType.VIDEO: "Origenerator — video action setter tool"}
 
 _NO_BOX_OF_ITS_OWN = "border: none; background: transparent;"
+_SET_BEFORE = "set_before"
+_YELLOW_BOX = f'QToolButton[{_SET_BEFORE}="true"] {{ border: 1px solid {YELLOW.name()}; }}'
 _LIT = f"QToolButton:checked {{ background-color: {as_hex(BLUE)}; border-radius: {BUTTON_RADIUS}px; }}"
 
 
@@ -132,6 +136,9 @@ class ActionSetterWindow(QWidget):
 
         self._stage = stage if stage is not None else _a_viewport()
         self._stage.setMinimumSize(320, 320)
+        self._previously = QLabel(PREVIOUSLY, objectName=PREVIOUSLY_LINE)
+        self._previously.setStyleSheet(f"color: {YELLOW.name()};")
+        self._previously.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status = QLabel(objectName=STATUS_LINE)
         self._last = QLabel(objectName=LAST_LINE)
         for line in (self._status, self._last):
@@ -144,12 +151,17 @@ class ActionSetterWindow(QWidget):
         shown.addWidget(self._status)
         shown.addWidget(self._last)
 
-        layout = QHBoxLayout(self)
+        side_by_side = QHBoxLayout()
+        side_by_side.setSpacing(GAP_MEDIUM)
+        side_by_side.addLayout(shown, 1)
+        side_by_side.addWidget(self._build_buttons(vocabulary.tiles))
+
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
                                   MARGIN_STANDARD, MARGIN_STANDARD)
         layout.setSpacing(GAP_MEDIUM)
-        layout.addLayout(shown, 1)
-        layout.addWidget(self._build_buttons(vocabulary.tiles))
+        layout.addWidget(self._previously)
+        layout.addLayout(side_by_side, 1)
 
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
         self._show_current()
@@ -206,6 +218,7 @@ class ActionSetterWindow(QWidget):
 
         inside = QWidget()
         inside.setLayout(column)
+        inside.setStyleSheet(_YELLOW_BOX)
         scroll = QScrollArea()
         scroll.setWidget(inside)
         scroll.setWidgetResizable(True)
@@ -361,6 +374,7 @@ class ActionSetterWindow(QWidget):
 
     def _show_current(self) -> None:
         item = self._session.current
+        self._mark_the_button_set_before(item)
         if item is None:
             self._stage.show_message("")
             self._status.setText(self.NOTHING_LEFT)
@@ -372,6 +386,15 @@ class ActionSetterWindow(QWidget):
             self._stage.show_media(path, self._session.side)
         else:
             self._stage.show_message(self.MISSING)
+
+    def _mark_the_button_set_before(self, item: dict | None) -> None:
+        labels = (item or {}).get("labels") or Labels()
+        set_before = self._vocabulary.button_made_of(labels.actions)
+        for name, tile in self._tiles.items():
+            tile.setProperty(_SET_BEFORE, name == set_before)
+            tile.style().unpolish(tile)
+            tile.style().polish(tile)
+        self._previously.setHidden(not set_before)
 
     def _set_the_boxes_for(self, item: dict) -> None:
         held = self._locks.held(self._session.side)

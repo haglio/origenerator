@@ -70,7 +70,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_tab as generate_tab_module
-from origenerator.gui.action_row import action_checkbox, listed_actions
+from origenerator.gui.action_row import action_checkbox, action_pills
 from origenerator.gui.animations import _VideoTile
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
@@ -82,6 +82,7 @@ from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
+from origenerator.gui.pills import Pill
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
@@ -2456,7 +2457,7 @@ def test_the_actions_and_the_workflow_dropdown_line_up_as_a_sections_fields_do(
     host.show()
     tab.layout().activate()
     body = tab._scroll.widget()
-    action = tab._action.form().parentWidget().findChild(QLabel, listed_actions(MediaType.IMAGE))
+    action = tab._action.form().parentWidget().findChild(QWidget, action_pills(MediaType.IMAGE))
 
     assert tab.width() == width
     assert action.mapTo(body, QPoint(0, 0)).x() == tab._workflow_dropdown.mapTo(body, QPoint(0, 0)).x()
@@ -2484,7 +2485,7 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     assert spans == dict.fromkeys(spans, span(tab._form_host))
     assert corner(name).y() == body.layout().contentsMargins().top()
     actions = tab._action.form().parentWidget().findChild(
-        QLabel, listed_actions(MediaType.IMAGE)).parentWidget()
+        QWidget, action_pills(MediaType.IMAGE)).parentWidget()
     assert corner(actions).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
 
 
@@ -4468,8 +4469,9 @@ def test_a_video_on_the_tab_lists_the_actions_it_was_set_with(saved_panel):
 
     tab.show_saved_generation(db.get_generation("vid9"), [])
 
-    listed = tab._action.form().parentWidget().findChild(QLabel, listed_actions(MediaType.VIDEO))
-    assert (listed.parentWidget().isHidden(), listed.text()) == (False, "alpha, beta")
+    listed = tab._action.form().parentWidget().findChild(QWidget, action_pills(MediaType.VIDEO))
+    assert (listed.parentWidget().isHidden(), [pill.text() for pill in listed.findChildren(Pill)]) == (
+        False, ["alpha", "beta"])
 
 
 def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_videos_row(saved_panel):

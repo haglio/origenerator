@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
@@ -12,6 +12,7 @@ from origenerator.gallery import media_type_of_row
 from origenerator.gallery.source_image import image_labels_row, inherits_image_labels
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelForm
+from origenerator.gui.pills import PillRow
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.media import MediaType
 from origenerator.own_window import show_or_say
@@ -19,7 +20,6 @@ from origenerator.own_window import show_or_say
 ACTION_LABEL = "Action"
 ACTIONS_LABEL = "Actions"
 SIDE_LABELS = {MediaType.IMAGE: "Image Actions", MediaType.VIDEO: "Video Actions"}
-UNSAID = "—"
 ADD = "Add actions with setter tool…"
 EDIT = "Edit actions with setter tool…"
 
@@ -31,8 +31,12 @@ def setter_button(side: str) -> str:
     return f"action.{side}.setter"
 
 
-def listed_actions(side: str) -> str:
-    return f"action.{side}.listed"
+def action_pills(side: str) -> str:
+    return f"action.{side}.pills"
+
+
+def adding_button(side: str) -> str:
+    return f"action.{side}.add"
 
 
 def action_checkbox(side: str, name: str) -> str:
@@ -40,17 +44,20 @@ def action_checkbox(side: str, name: str) -> str:
 
 
 class _Side(QWidget):
-    def __init__(self, side: str, checkboxes: tuple[str, ...], opened, changed):
+    def __init__(self, side: str, actions: tuple[str, ...], checkboxes: tuple[str, ...], opened,
+                 changed):
         super().__init__()
         self._side = side
         self._prompt_id = ""
+        self._changed = changed
+        self._editable = True
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_MEDIUM)
-        self._listed = QLabel(UNSAID)
-        self._listed.setWordWrap(True)
-        self._listed.setObjectName(listed_actions(side))
-        column.addWidget(self._listed)
+        self._pills = PillRow(actions, adder_name=adding_button(side))
+        self._pills.setObjectName(action_pills(side))
+        self._pills.changed.connect(self._pills_changed)
+        column.addWidget(self._pills)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_MEDIUM)
@@ -63,44 +70,59 @@ class _Side(QWidget):
         for name in checkboxes:
             box = TickControl(name)
             box.setObjectName(action_checkbox(side, name))
-            box.clicked.connect(lambda _checked=False: changed(self._prompt_id, side, self._labels()))
+            box.clicked.connect(lambda _checked=False: self._save())
             self._boxes[name] = box
             row.addWidget(box)
         row.addStretch(1)
-        self._actions: tuple[str, ...] = ()
 
     def shows(self, prompt_id: str) -> bool:
         return bool(prompt_id) and prompt_id == self._prompt_id
 
-    def show_labels(self, prompt_id: str, labels: Labels) -> None:
+    def show_labels(self, prompt_id: str, labels: Labels, *, editable: bool = True) -> None:
         self._prompt_id = prompt_id
+        self._editable = editable
+        self._setter.setVisible(editable)
         self.relabel(labels)
 
     def relabel(self, labels: Labels) -> None:
-        self._actions = labels.actions
-        said = ", ".join(labels.actions)
-        self._listed.setText(said or UNSAID)
-        self._setter.setText(EDIT if labels.actions else ADD)
+        self._pills.show_names(labels.actions, editable=self._editable)
+        self._name_the_setter()
         for name, box in self._boxes.items():
             box.setChecked(name in labels.checked)
 
+    def _name_the_setter(self) -> None:
+        self._setter.setText(EDIT if self._pills.names() else ADD)
+
+    def _pills_changed(self, _names: tuple[str, ...]) -> None:
+        self._name_the_setter()
+        self._save()
+
+    def _save(self) -> None:
+        self._changed(self._prompt_id, self._side, self._labels())
+
     def _labels(self) -> Labels:
-        return Labels(self._actions, tuple(name for name, box in self._boxes.items()
-                                           if box.isChecked()))
+        return Labels(self._pills.names(), tuple(name for name, box in self._boxes.items()
+                                                 if box.isChecked()))
 
 
 class ActionRow(QWidget):
     changed = pyqtSignal(str, str, object)
 
     def __init__(self, form: LabelForm, *, checkboxes: dict[str, tuple[str, ...]] | None = None,
-                 open_setter=the_setter_tool):
+                 actions: dict[str, tuple[str, ...]] | None = None, open_setter=the_setter_tool):
         super().__init__()
         self._open_setter = open_setter
         self._windows: dict[str, QWidget] = {}
-        boxes = checkboxes if checkboxes is not None else {
-            side: vocabulary(side).checkboxes for side in (MediaType.IMAGE, MediaType.VIDEO)}
-        self._sides = {side: _Side(side, boxes.get(side, ()), self._open, self.changed.emit)
-                       for side in (MediaType.IMAGE, MediaType.VIDEO)}
+        sides = (MediaType.IMAGE, MediaType.VIDEO)
+        if checkboxes is None or actions is None:
+            words = {side: vocabulary(side) for side in sides}
+            checkboxes = checkboxes if checkboxes is not None else {
+                side: words[side].checkboxes for side in sides}
+            actions = actions if actions is not None else {
+                side: words[side].plain_actions for side in sides}
+        self._sides = {side: _Side(side, actions.get(side, ()), checkboxes.get(side, ()), self._open,
+                                   self.changed.emit)
+                       for side in sides}
         self._names = {side: ElidingLabel(SIDE_LABELS[side]) for side in self._sides}
         self._form = form
         for side, shown in self._sides.items():
@@ -121,7 +143,8 @@ class ActionRow(QWidget):
         else:
             holder = image_labels_row(row, start_image)
             inherited = inherits_image_labels(row, start_image)
-            image.show_labels(holder["prompt_id"], labels_of(holder, MediaType.IMAGE))
+            image.show_labels(holder["prompt_id"], labels_of(holder, MediaType.IMAGE),
+                              editable=not inherited)
             image.setEnabled(not inherited)
             video.show_labels(row["prompt_id"], labels_of(row, MediaType.VIDEO))
         self._form.setRowVisible(image, True)

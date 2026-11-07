@@ -87,6 +87,10 @@ class Vocabulary(NamedTuple):
     def drawing_name(self, button: str) -> str:
         return self.drawn_as.get(button, button)
 
+    @property
+    def plain_actions(self) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(action for made_of in self.buttons.values() for action in made_of))
+
 
 def vocabulary(side: str, content: dict | None = None) -> Vocabulary:
     if content is None:

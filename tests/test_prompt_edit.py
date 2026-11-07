@@ -9,17 +9,11 @@ from origenerator.box_breaks import BOX_BREAK
 from origenerator.collection_notes import CollectionNotes
 from origenerator.prompt_edit import (
     ADD,
-    ADDED,
-    ALLOWED,
-    DROPPED,
-    EXCLUDED,
-    PUSHED,
-    RAISED,
+    NO_ANSWER,
     REMOVE,
     REWRITTEN,
+    UNANSWERED,
     WhatIsKnown,
-    apply_request,
-    apply_request_to_each_scene,
     ask_the_model,
     build_request_messages,
     parse_request,
@@ -60,162 +54,6 @@ def test_a_request_naming_nothing_reads_as_nothing():
 
 def test_the_term_keeps_its_own_casing():
     assert parse_request("add a Dutch angle") == (ADD, "Dutch angle")
-
-
-
-def test_against_something_in_the_positive_prompt_takes_it_out():
-    revision = apply_request("a woman, silver earrings, soft light", "blurry",
-                             "no silver earrings")
-
-    assert revision.positive == "a woman, soft light"
-    assert revision.negative == "blurry"
-    assert revision.action == DROPPED
-
-
-def test_a_prompt_in_boxes_is_asked_of_read_whole():
-    revision = apply_request(f"a woman, silver earrings,{BOX_BREAK}soft light",
-                             f"blurry,{BOX_BREAK}dim", "no silver earrings")
-
-    assert (revision.old_positive, revision.positive, revision.negative) == (
-        "a woman, silver earrings, soft light", "a woman, soft light", "blurry, dim")
-
-
-def test_against_something_in_neither_prompt_puts_it_in_the_negative():
-    revision = apply_request("a woman, soft light", "blurry", "no silver earrings")
-
-    assert revision.positive == "a woman, soft light"
-    assert revision.negative == "blurry, silver earrings"
-    assert revision.action == EXCLUDED
-
-
-def test_against_something_already_excluded_leans_on_it_harder():
-    revision = apply_request("a woman", "blurry, silver earrings",
-                             "no silver earrings")
-
-    assert revision.negative == "blurry, (silver earrings:1.1)"
-    assert revision.action == PUSHED
-
-
-def test_a_second_push_climbs_from_the_weight_already_there():
-    revision = apply_request("a woman", "(freckles:1.2)", "no freckles")
-
-    assert revision.negative == "(freckles:1.3)"
-
-
-def test_for_something_already_wanted_raises_its_weight():
-    revision = apply_request("a woman, freckles, soft light", "", "more freckles")
-
-    assert revision.positive == "a woman, (freckles:1.1), soft light"
-    assert revision.action == RAISED
-
-
-def test_for_something_in_neither_prompt_adds_it():
-    revision = apply_request("a woman, soft light", "blurry", "more freckles")
-
-    assert revision.positive == "a woman, soft light, freckles"
-    assert revision.action == ADDED
-
-
-def test_for_something_being_excluded_stops_excluding_it():
-    revision = apply_request("a woman", "blurry, freckles", "more freckles")
-
-    assert revision.negative == "blurry"
-    assert revision.positive == "a woman"
-    assert revision.action == ALLOWED
-
-
-def test_a_bracketed_weight_is_read_and_rewritten_explicitly():
-    revision = apply_request("a woman, (freckles)", "", "more freckles")
-
-    assert revision.positive == "a woman, (freckles:1.2)"
-
-
-def test_the_segment_is_the_unit_a_request_acts_on():
-    revision = apply_request("a woman, small silver earrings, soft light", "",
-                             "no silver earrings")
-
-    assert revision.positive == "a woman, soft light"
-
-
-def test_a_comma_inside_a_weighted_group_does_not_split_a_segment():
-    revision = apply_request("(a woman, seated:1.2), freckles", "", "no freckles")
-
-    assert revision.positive == "(a woman, seated:1.2)"
-
-
-def test_dropping_the_only_term_leaves_an_empty_prompt():
-    revision = apply_request("silver earrings", "", "no silver earrings")
-
-    assert revision.positive == ""
-    assert revision.changed
-
-
-def test_a_request_naming_nothing_yields_no_revision():
-    assert apply_request("a woman", "", "no, please") is None
-    assert apply_request_to_each_scene(story_of(["a dog", "a cat"]), "", "no, please") is None
-
-
-def test_a_revision_carries_the_prompts_it_started_from():
-    revision = apply_request("a woman, freckles", "blurry", "no freckles")
-
-    assert revision.old_positive == "a woman, freckles"
-    assert revision.old_negative == "blurry"
-    assert revision.changed
-
-
-@pytest.mark.parametrize(("positive", "negative", "asked", "said"), [
-    ("a woman, freckles", "blurry", "no freckles", "Took out freckles."),
-    ("a woman", "blurry, freckles", "no freckles", "Made freckles stronger in the Negative Prompt."),
-    ("a woman", "blurry", "no freckles", "Added freckles to the Negative Prompt."),
-    ("a woman", "blurry, freckles", "freckles", "Took freckles out of the Negative Prompt."),
-    ("a woman, freckles", "blurry", "freckles", "Made freckles stronger."),
-    ("a woman", "blurry", "freckles", "Added freckles."),
-])
-def test_a_change_the_rules_make_says_what_it_did(positive, negative, asked, said):
-    assert apply_request(positive, negative, asked).answer == said
-
-
-def test_the_rules_take_a_phrase_that_says_more_than_the_term_out_whole():
-    revision = apply_request("a woman wearing a straw hat, freckles", "", "no hat")
-
-    assert revision.positive == "freckles"
-    assert revision.action == DROPPED
-
-
-
-def test_a_prompt_that_tells_no_story_is_asked_of_as_one_however_many_lines_of_dashes_it_holds():
-    revision = apply_request(story_of(["a dog running", "a dog asleep"]), "blurry", "grass")
-
-    assert revision.positive == story_of(["a dog running", "a dog asleep, grass"])
-
-
-def test_a_wish_for_something_new_reaches_every_scene_of_a_story():
-    revision = apply_request_to_each_scene(story_of(["a dog running", "a dog asleep"]), "blurry",
-                             "more grass")
-
-    assert revision.positive == story_of(["a dog running, grass", "a dog asleep, grass"])
-
-
-def test_each_scene_answers_a_request_against_something_by_its_own_prompts():
-    revision = apply_request_to_each_scene(story_of(["a woman, beach", "a woman, sea"]), "blurry",
-                             "no beach")
-
-    assert revision.positive == story_of(["a woman", "a woman, sea"])
-    assert revision.negative == story_of(["blurry", "blurry, beach"])
-
-
-def test_a_negative_every_scene_shares_stays_one_while_the_scenes_change_it_alike():
-    revision = apply_request_to_each_scene(story_of(["a dog running", "a dog asleep"]), "blurry", "no hat")
-
-    assert revision.negative == "blurry, hat"
-
-
-def test_a_storys_revision_names_each_rule_its_scenes_used_once():
-    revision = apply_request_to_each_scene(story_of(["a woman, beach", "a woman, sea", "beach, dusk"]),
-                             "blurry", "no beach")
-
-    assert revision.action == f"{DROPPED}, {EXCLUDED}"
-
 
 
 
@@ -288,23 +126,24 @@ def test_a_term_the_rules_are_sure_of_still_goes_to_the_model_which_knows_the_co
                                "Negative Prompt.")
 
 
-def test_a_model_that_cannot_be_asked_leaves_the_rules_own_edit_and_their_line(caplog):
+def test_a_model_that_cannot_be_asked_changes_nothing_and_says_the_model_did_not_answer(caplog):
     with caplog.at_level(logging.WARNING, logger="origenerator.prompt_edit"):
         revision = work_out("a woman, soft light", "blurry", "freckles",
                             ask=_Model(OSError("the model is down")))
 
-    assert revision.positive == "a woman, soft light, freckles"
-    assert revision.action == ADDED
-    assert revision.answer == "Added freckles."
+    assert not revision.changed
+    assert (revision.positive, revision.negative) == ("a woman, soft light", "blurry")
+    assert revision.action == UNANSWERED
+    assert revision.answer == "The model couldn't answer, so nothing changed."
     assert caplog.messages == ["prompt_edit: the model could not answer the request (OSError)"]
 
 
-def test_an_answer_that_is_no_list_of_changes_leaves_the_rules_own_edit():
+def test_an_answer_that_is_no_list_of_changes_changes_nothing_and_says_the_model_did_not_answer():
     revision = work_out("a woman wearing a straw hat, freckles", "", "no hat",
                         ask=_Model("a woman, freckles"))
 
-    assert revision.positive == "freckles"
-    assert revision.action == DROPPED
+    assert revision.positive == "a woman wearing a straw hat, freckles"
+    assert revision.answer == NO_ANSWER
 
 
 def test_a_model_that_changes_nothing_says_so_and_there_is_nothing_to_make():
@@ -314,11 +153,29 @@ def test_a_model_that_changes_nothing_says_so_and_there_is_nothing_to_make():
     assert revision.answer == "Nothing changed."
 
 
-def test_a_model_that_gives_up_says_what_the_prompts_already_had():
-    gave_up = {"changes": [], "tried": {"positive": "freckles", "negative": "clear skin",
-                                        "for": "more freckles"}}
+def test_the_models_stronger_words_are_held_to_his_own_prompts_and_notes():
+    def asking_for(stronger):
+        return _Model({"changes": [{"more": "a small hat", "stronger": stronger, "opposite": "bare head",
+                                    "for": "bigger hat"}]})
 
-    revision = work_out("a woman, freckles", "blurry, clear skin", "more freckles", ask=_Model(gave_up))
+    invented = work_out("a woman, a small hat", "", "bigger hat", weights=False,
+                        examples=("a woman in a wide hat",), ask=asking_for("a huge hat"))
+    from_his_prompts = work_out("a woman, a small hat", "", "bigger hat", weights=False,
+                                examples=("a woman in a wide hat",), ask=asking_for("a wide hat"))
+    from_his_notes = work_out("a woman, a small hat", "", "bigger hat", weights=False, notes=NOTES,
+                              ask=asking_for("a comma-separated hat"))
+
+    assert invented.positive == "a small hat, a woman"
+    assert from_his_prompts.positive == "a wide hat, a woman"
+    assert from_his_notes.positive == "a comma-separated hat, a woman"
+
+
+def test_a_model_that_finds_nothing_more_to_do_says_what_the_prompts_already_had():
+    nothing_more = {"changes": [{"more": "freckles", "stronger": "freckles", "opposite": "clear skin",
+                                 "for": "more freckles"}]}
+
+    revision = work_out("freckles, a woman", "blurry, clear skin", "more freckles", weights=False,
+                        ask=_Model(nothing_more))
 
     assert not revision.changed
     assert revision.answer == ('"freckles" was already in the Positive Prompt, and its opposite already '
@@ -352,14 +209,15 @@ def test_a_term_the_model_weights_at_nothing_is_taken_out():
     assert (revision.positive, revision.negative) == ("a woman, beach", "blurry")
 
 
-def test_a_synonym_is_the_models_to_find_and_without_it_the_words_stand_alone():
+def test_a_synonym_is_the_models_to_find_and_without_the_model_nothing_changes():
     with_model = work_out("a woman, silver ear studs, soft light", "blurry", "no earrings",
                           ask=_Model(_answer(_remove("silver ear studs", for_="no earrings"))))
     without = work_out("a woman, silver ear studs, soft light", "blurry", "no earrings",
                        ask=_Model(OSError("down")))
 
     assert with_model.positive == "a woman, soft light"
-    assert (without.negative, without.action) == ("blurry, earrings", EXCLUDED)
+    assert (without.positive, without.negative, without.answer) == (
+        "a woman, silver ear studs, soft light", "blurry", NO_ANSWER)
 
 
 def test_a_request_naming_nothing_asks_the_model_nothing_and_yields_no_revision():
@@ -393,14 +251,14 @@ def test_a_storys_scenes_answered_differently_are_answered_scene_by_scene():
                                "Positive Prompt.")
 
 
-def test_a_story_the_model_answered_only_in_part_is_left_to_the_rules():
+def test_a_story_the_model_answered_only_in_part_changes_nothing_and_says_so():
     model = _Model(_answer(_replace("a man", "two men", for_="two men")), OSError("down"))
 
     revision = work_out(story_of(["a man reading", "a man asleep"]), "blurry", "two men",
                         in_scenes=True, ask=model)
 
-    assert revision.positive == story_of(["a man reading, two men", "a man asleep, two men"])
-    assert revision.answer == "Added two men."
+    assert revision.positive == story_of(["a man reading", "a man asleep"])
+    assert revision.answer == NO_ANSWER
 
 
 def test_a_prompt_that_tells_no_story_is_asked_of_the_model_whole():
@@ -524,9 +382,9 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     assert "note" not in shape
     assert '"for": "<his words>"' in shape
     assert "thrown away" in shape
-    assert shape.endswith('add "tried": {"positive": "<the words for it now in the positive prompt>", '
-                          '"negative": "<the words for its opposite now in the negative prompt>", '
-                          '"for": "<his words>"}.')
+    assert '{"more": "<the part of the positive prompt' in shape
+    assert '{"gone": "<the thing he wants gone, bare>"' in shape
+    assert shape.endswith('When nothing should change, "changes" is an empty list.')
     assert "..." not in content.rsplit("\n\n", 1)[0]
 
 
@@ -628,13 +486,3 @@ def test_a_weight_the_model_writes_is_left_out_where_the_prompts_take_none():
                         ask=model)
 
     assert revision.positive == "a woman, freckles, a red scarf"
-
-
-def test_the_rules_own_edit_writes_no_weight_where_the_prompts_take_none():
-    def no_model(*_asked):
-        raise RuntimeError("no model here")
-
-    assert apply_request("a woman, freckles", "", "more freckles").positive == "a woman, (freckles:1.1)"
-    assert not apply_request("a woman, freckles", "", "more freckles", weights=False).changed
-    assert not apply_request("a woman", "hat", "no hat", weights=False).changed
-    assert not work_out("a woman, freckles", "", "more freckles", weights=False, ask=no_model).changed

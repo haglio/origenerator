@@ -90,12 +90,6 @@ def tidy(prompt: str) -> str:
     return re.sub(r"^[\s,]+|[\s,]+$", "", prompt)
 
 
-def without(prompt: str, index: int) -> str:
-    segments = segments_of(prompt)
-    del segments[index]
-    return tidy(",".join(segments))
-
-
 def _format_weight(weight: float) -> str:
     return f"{round(weight, 2):g}"
 
@@ -114,11 +108,6 @@ def without_nothing_weighted(prompt: str) -> str:
     segments = segments_of(prompt)
     kept = [segment for segment in segments if unwrapped(segment)[1] > 0]
     return prompt if len(kept) == len(segments) else tidy(",".join(kept))
-
-
-def plus(prompt: str, term: str) -> str:
-    kept = tidy(prompt)
-    return f"{kept}, {term}" if kept else term
 
 
 _WEIGHTED = re.compile(r"\(([^()]*?)\s*:\s*[0-9]*\.?[0-9]+\s*\)")

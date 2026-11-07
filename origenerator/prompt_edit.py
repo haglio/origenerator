@@ -14,16 +14,9 @@ from origenerator.config import (
     REQUEST_MODEL_STAYS_LOADED_S,
 )
 from origenerator.db_requests import Turn
-from origenerator.prompt_terms import (
-    WEIGHT_STEP,
-    index_of,
-    plus,
-    reweighted,
-    without,
-    without_nothing_weighted,
-)
+from origenerator.prompt_terms import without_nothing_weighted
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
-from origenerator.request_changes import Prompts, apply_changes
+from origenerator.request_changes import Prompts, apply_changes, words_of_his
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -31,13 +24,10 @@ logger = logging.getLogger(__name__)
 ADD = "add"
 REMOVE = "remove"
 
-DROPPED = "dropped"
-PUSHED = "pushed"
-EXCLUDED = "excluded"
-RAISED = "raised"
-ADDED = "added"
-ALLOWED = "allowed"
 REWRITTEN = "rewritten"
+UNANSWERED = "unanswered"
+NO_ANSWER = "The model couldn't answer, so nothing changed."
+NO_GRAPHICS_CARD = "The model couldn't get the graphics card, so nothing changed."
 
 REQUEST_WINDOW_TOKENS = 32768
 _ASK_TIMEOUT_S = 180.0
@@ -156,28 +146,13 @@ def _joined(positive: str, negative: str, each_negative: list[str], parsed: tupl
         revisions[0].settings, revisions[0].setting_changes)
 
 
-def apply_request(positive: str, negative: str, request: str, *,
-                  weights: bool = True) -> PromptRevision | None:
-    parsed = parse_request(request)
-    if parsed is None:
-        return None
-    return _revised(unboxed(positive or ""), unboxed(negative or ""), parsed, weights)
-
-
-def apply_request_to_each_scene(positive: str, negative: str, request: str, *,
-                                weights: bool = True) -> PromptRevision | None:
+def unanswered(positive: str, negative: str, request: str,
+               why: str = NO_ANSWER) -> PromptRevision | None:
     parsed = parse_request(request)
     if parsed is None:
         return None
     positive, negative = unboxed(positive or ""), unboxed(negative or "")
-    scenes, each_negative = _scenes_of(positive, negative)
-    revisions = [_revised(scene, scene_negative, parsed, weights)
-                 for scene, scene_negative in zip(scenes, each_negative, strict=True)]
-    return _joined(positive, negative, each_negative, parsed, revisions)
-
-
-def request_applier(in_scenes: bool):
-    return apply_request_to_each_scene if in_scenes else apply_request
+    return PromptRevision(positive, negative, positive, negative, parsed[1], parsed[0], UNANSWERED, why)
 
 
 def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
@@ -186,43 +161,6 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     if len(set(after)) == 1:
         return after[0]
     return story_of(after)
-
-
-_SAID_BY_THE_RULES = {
-    DROPPED: "Took out {term}.",
-    PUSHED: "Made {term} stronger in the Negative Prompt.",
-    EXCLUDED: "Added {term} to the Negative Prompt.",
-    ALLOWED: "Took {term} out of the Negative Prompt.",
-    RAISED: "Made {term} stronger.",
-    ADDED: "Added {term}.",
-}
-
-
-def _revised(positive: str, negative: str, parsed: tuple, weights: bool) -> PromptRevision:
-    polarity, term = parsed
-    step = WEIGHT_STEP if weights else 0
-
-    def made(new_positive, new_negative, action) -> PromptRevision:
-        said = (_SAID_BY_THE_RULES[action].format(term=term)
-                if (new_positive, new_negative) != (positive, negative) else "")
-        return PromptRevision(positive, negative, new_positive, new_negative,
-                              term, polarity, action, said)
-
-    if polarity == REMOVE:
-        index = index_of(positive, term)
-        if index is not None:
-            return made(without(positive, index), negative, DROPPED)
-        index = index_of(negative, term)
-        if index is not None:
-            return made(positive, reweighted(negative, index, step) if step else negative, PUSHED)
-        return made(positive, plus(negative, term), EXCLUDED)
-    index = index_of(negative, term)
-    if index is not None:
-        return made(positive, without(negative, index), ALLOWED)
-    index = index_of(positive, term)
-    if index is not None:
-        return made(reweighted(positive, index, step) if step else positive, negative, RAISED)
-    return made(plus(positive, term), negative, ADDED)
 
 
 @dataclass(frozen=True)
@@ -250,7 +188,7 @@ def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = Fa
                              partial(ask or ask_the_model, scene, scene_negative, request, told),
                              told, asked)
         if revision is None:
-            return request_applier(in_scenes)(positive, negative, request, weights=told.weights)
+            return unanswered(positive, negative, request)
         revisions.append(revision)
     return _joined(positive, negative, each_negative, parsed, revisions)
 
@@ -269,11 +207,16 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
         return None
     settings = told.settings
     outcome = apply_changes(answer, pair, asked=asked, settings=settings,
-                            prompts=Prompts(take_weights=told.weights))
+                            prompts=Prompts(take_weights=told.weights, his_words=_his_words(told)))
     return PromptRevision(positive, negative, without_nothing_weighted(outcome.positive),
                           without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
                           outcome.line, tuple(outcome.settings.items()),
                           tuple(request_settings.described(outcome.settings, settings)))
+
+
+def _his_words(told: WhatIsKnown) -> frozenset:
+    notes = told.notes.as_told() if told.notes is not None and told.notes.complete else ""
+    return words_of_his([*told.examples, notes])
 
 
 _SHORTEST_ROOT = 3
@@ -337,19 +280,21 @@ _ANSWER_SHAPE = (
     'within its range or choices; {"prompt": "positive" or "negative", "replace": "<words now in '
     'that prompt>", "with": "<new words>", "for": "<his words>"}; {"prompt": ..., "add": "<new '
     'words>", "after": "<words now in that prompt they belong beside>", "for": "<his words>"}; '
-    '{"prompt": ..., "remove": "<words now in that prompt>", "for": "<his words>"}. "for" quotes '
-    'the words of his, from this request or an earlier one, that the change answers; a change '
-    'answering none of his words is thrown away. When nothing should change, "changes" is an '
-    'empty list. When it is empty because every way to bring out what he asked for is already '
-    'done, add "tried": {"positive": "<the words for it now in the positive prompt>", '
-    '"negative": "<the words for its opposite now in the negative prompt>", '
-    '"for": "<his words>"}.')
+    '{"prompt": ..., "remove": "<words now in that prompt>", "for": "<his words>"}; '
+    '{"more": "<the part of the positive prompt that says the thing he wants more of, exactly as '
+    'written, or empty>", "stronger": "<that part in his own stronger words>", "opposite": '
+    '"<what the image shows in its place>", "for": "<his words>"} for more of something; '
+    '{"gone": "<the thing he wants gone, bare>", "in_positive": "<every part of the positive '
+    'prompt that says it or a kind of it, exactly as written, comma-separated, or empty>", '
+    '"instead": "<what the image shows in its place, or empty>", "for": "<his words>"} for '
+    'something gone. "for" quotes the words of his, from this request or an earlier one, that '
+    'the change answers; a change answering none of his words is thrown away. When nothing '
+    'should change, "changes" is an empty list.')
 
 
 _NO_WEIGHTS = (
     "THESE PROMPTS TAKE NO WEIGHTS: the image model ignores (term:weight), so never write one. "
-    "For more of something, say it in stronger and more exact words and move it earlier in the "
-    "prompt; for less, say it more mildly or remove it.")
+    "For less of something, say it more mildly or remove it.")
 
 
 def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,

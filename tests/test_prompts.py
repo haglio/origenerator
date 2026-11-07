@@ -52,42 +52,41 @@ def _request_prompt() -> str:
     return _assigned_strings("prompts.py")["REQUEST_SYSTEM_PROMPT"]
 
 
-def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_make_it_stronger():
+def test_a_complaint_that_something_asked_for_is_missing_is_taught_as_more_of_it():
     prompt = _request_prompt()
-    rule = prompt[prompt.index("didn't appear"):]
+    rule = prompt[prompt.index("When he wants more of something"):].split("\n")[0]
 
-    assert "never remove" in rule.lower()
-    assert "weight" in rule.lower()
+    assert "didn't appear" in rule
+    assert "never remove X for a complaint like that" in rule
     example = prompt[prompt.index("- \"the dog didn't appear\""):].split("\n")[0]
     answer = example.split("->")[1]
-    assert ":1." in answer
+    assert '"more": "a dog"' in answer
     assert '"remove": "animals"' in answer
 
 
-def test_a_complaint_that_something_unwanted_is_still_there_is_taught_as_keep_it_out_harder():
-    prompt = _request_prompt()
-    rule = prompt[prompt.index("A complaint that something he does not want"):].split("\n")[0]
-
-    assert "never remove it from there" in rule
-    assert "weigh more" in rule
-    example = prompt[prompt.index('- "they still have hats"'):].split("\n")[0]
-    assert '"remove": "straw hats"' in example
-    assert '"prompt": "negative", "add": "hats"' in example
-
-
-def test_something_unwanted_the_positive_prompt_never_named_is_taught_as_the_negative_prompts_alone():
+def test_a_complaint_that_something_unwanted_is_still_there_is_taught_as_wanting_it_gone():
     prompt = _request_prompt()
     rule = prompt[prompt.index("Positive prompts cannot negate"):].split("\n")[0]
 
-    assert "change nothing in the positive prompt" in rule
+    assert "X is still there" in rule
+    assert "Never remove X from the negative prompt" in rule
+    assert "weigh more" in rule
+    assert "a raincoat is a coat" in rule
+    example = prompt[prompt.index('- "they still have hats"'):].split("\n")[0]
+    assert '"gone": "hats", "in_positive": "straw hats"' in example
+
+
+def test_something_unwanted_the_positive_prompt_never_named_is_taught_as_gone_with_nothing_to_take_out():
+    prompt = _request_prompt()
+
     for asked in ('- "no scarf please"', '- "she shouldn\'t have gloves"'):
         answer = prompt[prompt.index(asked):].split("\n")[0].split("->")[1]
-        assert '"prompt": "negative"' in answer
-        assert '"prompt": "positive"' not in answer
+        assert '"gone":' in answer
+        assert '"in_positive": ""' in answer
 
 
 def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_asks():
-    rule = _request_prompt()[_request_prompt().index("PROMPTS OF HIS"):].split("\n")[0]
+    rule = _request_prompt()[_request_prompt().index("When PROMPTS OF HIS THAT TOUCH"):].split("\n")[0]
 
     assert "the way those prompts" in rule.lower() or "the way they" in rule.lower()
     assert "one person" in rule
@@ -143,17 +142,17 @@ def test_a_word_he_names_is_taught_as_taken_out_alone_with_the_words_around_it_k
     assert '"replace": "vintage photo of a lake", "with": "photo of a lake"' in answer
 
 
-def test_more_of_something_already_there_is_taught_as_every_way_tried_before_giving_up():
+def test_more_of_something_is_taught_as_his_stronger_words_and_its_opposite_with_the_app_doing_the_rest():
     prompt = _request_prompt()
     rule = prompt[prompt.index("When he wants more of something"):].split("\n")[0]
 
-    for way in ("stronger and more exact words", "raise its weight", "to the front of the positive prompt",
-                "its opposite", "to the negative prompt"):
-        assert way in rule
-    assert "every one of these that is not done yet" in rule
-    assert "Only when all of them are already done may you change nothing" in rule
-    assert '"tried"' in rule
-    assert 'never "no X"' in rule
-    assert "never take an opposite back out of the negative prompt" in rule
+    assert '{"more":' in rule
+    assert "The stronger words are his" in rule
+    assert "the app keeps the part as it is" in rule
+    assert "never words of your own" in rule
     assert "a silver ring stays a silver ring" in rule
-    assert "an opposite does not fight it" in prompt
+    for the_apps in ("moves the part to the front of the positive prompt", "raises its weight",
+                     "puts the opposite into the negative prompt", "never takes an opposite back out"):
+        assert the_apps in rule
+    assert "never no X" in rule
+    assert "an opposite does not fight it" in rule

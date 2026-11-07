@@ -11,8 +11,8 @@ from origenerator.collection_notes import CollectionNotes
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
 from origenerator.gui.request_answering import RequestAnswerer, leave_the_graphics_card
+from origenerator.prompt_edit import NO_GRAPHICS_CARD
 from origenerator.queue_line import ModelHold
-from origenerator.workflows.base import story_of
 
 
 class _Jobs:
@@ -86,19 +86,6 @@ def test_what_was_asked_since_the_item_was_shown_follows_its_saved_exchange(qtbo
         ("a hat", "Gave her a hat."), ("a scarf", "Gave her a scarf.")]
 
 
-def test_the_rules_edit_made_without_the_card_writes_no_weight_where_the_prompts_take_none(
-        qtbot, tmp_path):
-    answerer, _db, _jobs, parent = _answerer(
-        qtbot, tmp_path, work_out=None, wait=lambda comfyui, holder, **settings: False)
-    answers = []
-
-    answerer.ask(None, ("a woman, freckles", ""), "more freckles", weights=False, owner=parent,
-                 then=answers.append)
-
-    qtbot.waitUntil(lambda: len(answers) == 1, timeout=5000)
-    assert not answers[0].changed
-
-
 def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):
     seen = {}
 
@@ -153,7 +140,8 @@ def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path)
     assert answers == []
 
 
-def test_a_comfyui_that_stays_busy_leaves_the_rules_to_answer_without_the_model(qtbot, tmp_path):
+def test_a_comfyui_that_stays_busy_answers_that_the_model_could_not_get_the_graphics_card(
+        qtbot, tmp_path):
     def never(*args, **settings):
         raise AssertionError("the model was asked")
 
@@ -165,8 +153,8 @@ def test_a_comfyui_that_stays_busy_leaves_the_rules_to_answer_without_the_model(
                  then=answers.append)
 
     qtbot.waitUntil(lambda: bool(answers), timeout=5000)
-    assert answers[0].positive == "a woman, soft light"
-    assert answers[0].answer == "Took out hat."
+    assert (answers[0].positive, answers[0].negative) == ("a woman, a hat, soft light", "blurry")
+    assert answers[0].answer == NO_GRAPHICS_CARD
 
 
 def test_with_no_comfyui_the_card_is_not_waited_for(qtbot, tmp_path):
@@ -232,21 +220,6 @@ def test_a_request_about_a_story_is_worked_out_scene_by_scene(qtbot, tmp_path):
     assert told["in_scenes"] is True
 
 
-def test_with_comfyui_busy_a_storys_rules_still_answer_scene_by_scene(qtbot, tmp_path):
-    def never(*args, **settings):
-        raise AssertionError("the model is not asked")
-
-    answerer, _db, _jobs, parent = _answerer(
-        qtbot, tmp_path, work_out=never, wait=lambda comfyui, holder, **settings: False)
-    answers = []
-
-    answerer.ask(None, (story_of(["a dog", "a cat"]), ""), "grass", in_scenes=True, owner=parent,
-                 then=answers.append)
-
-    qtbot.waitUntil(lambda: bool(answers), timeout=5000)
-    assert answers[0].positive == story_of(["a dog, grass", "a cat, grass"])
-
-
 def _answered(qtbot, answerer, parent, words="a hat"):
     answers = []
     answerer.ask("g1", ("a woman", ""), words, owner=parent, then=answers.append)
@@ -288,7 +261,7 @@ def test_a_request_asked_while_the_model_is_still_loaded_does_not_wait_for_the_c
     assert jobs.model_hold.stays
 
 
-def test_an_answer_the_rules_gave_without_the_card_leaves_no_model_to_send_away(qtbot, tmp_path):
+def test_an_answer_given_without_the_card_leaves_no_model_to_send_away(qtbot, tmp_path):
     answerer, _db, jobs, parent = _answerer(qtbot, tmp_path, work_out=None,
                                             wait=lambda comfyui, holder, **settings: False)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import fields, replace
 
-from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL, looping_label
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
 from funestra.satellite_hud import label_is_filtered
 
@@ -481,7 +481,7 @@ def item_note(slideshow_set: SlideshowSet, *, versions, version_index: int) -> s
 
 def looping_note(slideshow_set: SlideshowSet) -> str:
     loop = slideshow_set.loop
-    return f"Looping {loop.axis}s: {len(loop.pool)}"
+    return f"{looping_label(loop.axis)}: {len(loop.pool)}"
 
 
 def thumb_of(slide: Slide) -> str:

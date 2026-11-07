@@ -69,6 +69,18 @@
       "ruled": "2026-10-17, his words; the back and forward buttons' chevrons and the text cursor's caret are other things"
     },
     {
+      "id": "frozen_folder",
+      "thing": "a TOC folder row held at the top of its section while the rows inside it scroll under it, above a thin gray line",
+      "screen": null,
+      "his_word": "frozen (2026-11-07: \"freeze rows of all the Folders you're in\")",
+      "code_today": [
+        "frozen"
+      ],
+      "code_word": "frozen",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; an agent who called them pinned left him unable to tell what was meant"
+    },
+    {
       "id": "leaf_folder",
       "thing": "a folder with no folders inside it, so no caret: the one at the end of a path, which holds the items",
       "screen": null,

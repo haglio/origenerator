@@ -889,16 +889,32 @@ def test_a_frozen_folder_looks_as_it_does_in_its_own_place(qtbot, picked):
     assert _strip(tree, frozen_top, place.height()) == in_place
 
 
-def test_pressing_a_frozen_folder_does_nothing_yet(qtbot):
+def test_clicking_a_frozen_folder_picks_it_and_scrolls_up_to_where_it_sits(qtbot):
     tree, rows = _long_tree(qtbot)
     _scroll_to_the_top(tree, rows["a/i/3"])
-    tree.setCurrentItem(rows["a/i/5"])
-    scrolled = tree.verticalScrollBar().value()
+    first_height = tree.visualItemRect(rows["a"]).height()
 
-    for button in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton):
-        qtbot.mouseClick(tree.viewport(), button, pos=QPoint(100, 2))
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     pos=QPoint(100, first_height + 2))
 
-    assert (tree.currentItem(), tree.verticalScrollBar().value()) == (rows["a/i/5"], scrolled)
+    shown = tree.visualItemRect(rows["a/i"]).top()
+    assert (tree.currentItem(), rows["a/i"] in tree.frozen_rows(), shown >= 0) == (
+        rows["a/i"], False, True)
+
+
+def test_a_click_on_a_frozen_folder_that_moves_a_little_picks_that_folder_alone(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["a/i/1"])
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     pos=tree.visualItemRect(rows["a/i/1"]).center())
+    _scroll_to_the_top(tree, rows["a/i/8"])
+    at = QPoint(100, 2)
+
+    qtbot.mousePress(tree.viewport(), Qt.MouseButton.LeftButton, pos=at)
+    qtbot.mouseMove(tree.viewport(), at + QPoint(3, 1))
+    qtbot.mouseRelease(tree.viewport(), Qt.MouseButton.LeftButton, pos=at + QPoint(3, 1))
+
+    assert tree.selectedItems() == [rows["a"]]
 
 
 def test_right_clicking_a_frozen_folder_offers_no_menu_for_the_row_under_it(qtbot):
@@ -922,3 +938,19 @@ def test_a_gray_line_runs_under_the_frozen_folders(qtbot):
     under = sum(tree.visualItemRect(row).height() for row in tree.frozen_rows())
 
     assert set(_strip(tree, under, 1)) == {BORDER_SUBTLE.name()}
+
+
+def test_the_picked_folder_and_its_folders_stay_frozen_once_scrolled_past_in_list_order(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["a/i/2"])
+    _scroll_to_the_top(tree, rows["b/i/3"])
+
+    assert tree.frozen_rows() == [rows["a"], rows["a/i"], rows["a/i/2"], rows["b"], rows["b/i"]]
+
+
+def test_the_picked_folder_still_ahead_in_the_list_is_not_frozen(qtbot):
+    tree, rows = _long_tree(qtbot)
+    tree.setCurrentItem(rows["b/i/20"])
+    _scroll_to_the_top(tree, rows["a/i/3"])
+
+    assert tree.frozen_rows() == [rows["a"], rows["a/i"]]

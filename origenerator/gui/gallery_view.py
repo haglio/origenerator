@@ -43,9 +43,6 @@ from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
 from origenerator.gallery.collection import (
-    ENHANCED_KEY as _ENHANCED_KEY,
-)
-from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
 from origenerator.gallery.collection import (
@@ -196,7 +193,6 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 1500
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
-_PATH_MARK_OF = {key: collection_mark(key) for key in (_FAVORITES_KEY, _ENHANCED_KEY)}
 
 
 class _SearchScope(NamedTuple):
@@ -1324,7 +1320,7 @@ class GalleryView(QWidget):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
         self._folder_path.show_folder(self._tree_view.path_steps(item),
-                                      mark=_PATH_MARK_OF.get(collection.which))
+                                      mark=collection_mark(collection.which))
         self._avg_label.setText("")
         self._clear_metadata()
         self._gallery_pane.show_collection(collection.key, shape)

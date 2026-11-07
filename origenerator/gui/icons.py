@@ -183,8 +183,8 @@ def collection_icon(collection: str) -> QIcon:
     }[collection]()
 
 
-def collection_mark(collection: str) -> tuple[str, QColor]:
-    return _COLLECTION_MARKS[collection]
+def collection_mark(collection: str) -> tuple[str, QColor] | None:
+    return _COLLECTION_MARKS.get(collection)
 
 
 def collection_kind_icon(collection: str) -> tuple[QIcon, str]:

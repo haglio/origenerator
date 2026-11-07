@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui import folder_path as shared_folder_path
-from shared_ui.colors import GREEN, YELLOW
+from shared_ui.colors import GREEN, RED, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.spacing import MARGIN_STANDARD
 
@@ -40,6 +40,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
+    TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS, TOGETHER
@@ -1707,6 +1708,18 @@ def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
 
     path = view._folder_path.findChild(shared_folder_path.FolderPath)
     assert icon_then_text("plus", "Enhanced", color=YELLOW,
+                          size=path.fontMetrics().height()) in path.text()
+
+
+def test_trashs_path_wears_its_red_can_as_the_toc_does(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
+
+    path = view._folder_path.findChild(shared_folder_path.FolderPath)
+    assert icon_then_text("trash", "Trash", color=RED,
                           size=path.fontMetrics().height()) in path.text()
 
 

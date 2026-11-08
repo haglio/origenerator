@@ -118,13 +118,13 @@ def test_an_image_with_no_actions_shows_no_pills_and_offers_to_add_them(action):
     action.show_row(_row())
 
     assert (_listed(action, MediaType.IMAGE), _setter(action, MediaType.IMAGE).text()) == ((), ADD)
-    assert ADD == "Add actions with setter tool…"
+    assert ADD == "Add with setter tool…"
 
 
 def test_an_image_with_actions_offers_to_edit_them(action):
     action.show_row(_row(image=Labels(("alpha",))))
 
-    assert _setter(action, MediaType.IMAGE).text() == EDIT == "Edit actions with setter tool…"
+    assert _setter(action, MediaType.IMAGE).text() == EDIT == "Edit with setter tool…"
 
 
 def _top_left(widget: QWidget, within: QWidget) -> QPoint:

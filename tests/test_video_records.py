@@ -82,7 +82,7 @@ def test_a_video_whose_record_names_no_seed_is_in_no_seed_group(tmp_path):
 
 def _made_from(image_seed: str, action: str) -> dict:
     return {"video": {"prompt": f"the {action} move", "model": "Motion A", "action": action,
-                      "seed": "1"},
+                      "labels": [action], "seed": "1"},
             "source_image": {"positive_prompt": "a lighthouse at dusk", "model": "Model A",
                              "seed": image_seed}}
 
@@ -107,7 +107,8 @@ def test_more_seeds_of_a_video_are_the_ones_of_its_action_from_the_most_similar_
     videos, records = _library(tmp_path)
 
     def made_with(prompt: str, action: str) -> dict:
-        return {"video": {"prompt": prompt, "model": "Motion A", "action": action, "seed": "1"}}
+        return {"video": {"prompt": prompt, "model": "Motion A", "action": action,
+                          "labels": [action], "seed": "1"}}
 
     filed = {"here.mp4": made_with("a lighthouse, dusk, calm sea", "alpha"),
              "near.mp4": made_with("a lighthouse, dusk, rough sea", "alpha"),

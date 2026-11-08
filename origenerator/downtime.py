@@ -8,16 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
-from shared_ui.preview import taskbar_identity
 
-from origenerator import (
-    collection_notes,
-    config,
-    fix_training,
-    gallery,
-    lora_training,
-    places_backfill,
-)
+from origenerator import collection_notes, config, gallery, places_backfill
 from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
@@ -25,10 +17,8 @@ from origenerator.branch_session import is_branch_session
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.generation_state import GenerationSource
-from origenerator.landed_while_away import running_trainings, training_toast
+from origenerator.landed_while_away import running_trainings
 from origenerator.single_instance import Copies
-from origenerator.toast_raising import raise_toast
-from origenerator.win32 import APP_USER_MODEL_ID
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -49,8 +39,6 @@ class Machine:
     queue_batches: Callable[[], None]
     notes_due: Callable[[], bool]
     take_notes: Callable[[], None]
-    fix_to_train: Callable[[], object]
-    train: Callable[[object], None]
 
 
 def _nothing_while_it_is_in_use(machine: Machine) -> Turn | None:
@@ -72,9 +60,6 @@ def take_a_turn(machine: Machine) -> Turn:
     if machine.notes_due():
         machine.take_notes()
         return Turn("took notes on the collection", machine.training_running())
-    if (fix := machine.fix_to_train()) is not None:
-        machine.train(fix)
-        return Turn(f"started training the {fix.name} fix", True)
     return Turn("nothing to do", machine.training_running())
 
 
@@ -104,16 +89,6 @@ def queue_the_work_left(jobs, rows: list[dict], *, experiments_on: bool, policy)
     return queued + queue_base_renders(rows, lambda workflow, params: jobs.start_prepared(
         f"base_render/{params[BASE_RENDER_TARGET_KEY]}", workflow, params,
         source=GenerationSource.BASE_RENDER))
-
-
-def announce_trainings_that_ended(announce) -> None:
-    for job in fix_training.trainings():
-        status = lora_training.read_status(job) or {}
-        if (job.get("automatic") and status.get("state") in ("done", "failed")
-                and not status.get("taken") and not status.get("announced")):
-            if (toast := training_toast(job)) is not None:
-                announce(toast)
-            lora_training.mark_announced(job)
 
 
 def _comfyui_busy(client) -> bool:
@@ -150,17 +125,6 @@ def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
     logger.info("Handed ComfyUI %d run(s) Origenerator left for while it is closed", queued)
 
 
-def _train(client, part, ui: AppState) -> None:
-    try:
-        client.free_memory()
-    except Exception as e:
-        logger.info("ComfyUI could not be asked to let go of its models: %s", e)
-    settings = gallery.EnhanceSettings.parse(ui.get("enhance_settings"))
-    fix_training.start(fix_training.training_job(
-        part, fix_training.model_to_train_for(settings.params), automatic=True))
-    logger.info("Started training the %s fix while Origenerator is closed", part.name)
-
-
 def main() -> int:
     if is_branch_session():
         print(json.dumps({"did": "nothing: a preview leaves this to production",
@@ -176,20 +140,13 @@ def main() -> int:
     copies = Copies(config.LIBRARY_STATE_DIR)
     ui = AppState(config.UI_STATE_PATH)
 
-    def app_open() -> bool:
-        return copies.one_holds_the_library() or copies.one_is_closing()
-
-    if not app_open():
-        identity = taskbar_identity(APP_USER_MODEL_ID, None)
-        announce_trainings_that_ended(lambda toast: raise_toast(identity, toast))
     turn = take_a_turn(Machine(
-        app_open=app_open,
+        app_open=lambda: copies.one_holds_the_library() or copies.one_is_closing(),
         training_running=lambda: bool(running_trainings()),
         comfyui_busy=lambda: _comfyui_busy(client), batches_due=work_left,
         queue_batches=lambda: hand_comfyui_the_work_left(db, client, ui),
         notes_due=lambda: collection_notes.are_due(db, config.COLLECTION_NOTES_PATH),
-        take_notes=lambda: collection_notes.take_a_sitting(db, client, config.COLLECTION_NOTES_PATH),
-        fix_to_train=fix_training.fix_to_train, train=lambda part: _train(client, part, ui)))
+        take_notes=lambda: collection_notes.take_a_sitting(db, client, config.COLLECTION_NOTES_PATH)))
     print(json.dumps({"did": turn.did, "holds_the_graphics_card": turn.holds_the_graphics_card}))
     return 0
 

@@ -184,9 +184,6 @@ class _KeptTrainer:
     def running(self):
         return self.alive
 
-    def stop(self):
-        self.alive = False
-
 
 def _kind(tmp_path, jobs):
     return types.SimpleNamespace(trainings=lambda: jobs)
@@ -207,21 +204,6 @@ def test_at_launch_a_running_training_is_adopted_and_a_finished_one_taken_once(
                               take=lambda job, lora: (taken.append(lora), lora_training.mark_taken(job)))
 
     assert (adopted, taken) == (["running", "running"], ["finished.safetensors"])
-
-
-def test_at_launch_a_training_evolver_started_while_the_app_was_closed_is_stopped(
-        tmp_path, monkeypatch):
-    automatic = _job_kept(tmp_path, "automatic")
-    automatic["automatic"] = True
-    trainer = _KeptTrainer(alive=True)
-    monkeypatch.setattr(lora_training, "trainer_of", lambda job: trainer)
-    adopted = []
-
-    lora_training.take_up(_kind(tmp_path, [automatic]),
-                          adopt=lambda job, kept: adopted.append(job), take=lambda job, lora: None)
-
-    assert not trainer.running()
-    assert adopted == []
 
 
 def test_a_training_is_current_while_the_pictures_it_kept_are_the_ones_in_the_folder(tmp_path):

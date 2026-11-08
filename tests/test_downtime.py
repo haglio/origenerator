@@ -2,20 +2,18 @@ from __future__ import annotations
 
 import json
 import types
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
-from origenerator import collection_notes, downtime, gallery
+from origenerator import collection_notes, downtime, gallery, lora_training
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.output_places import OutputPlaces
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from tests.comfyui_folders import SUITE_FOLDERS
-
-_HANDS = types.SimpleNamespace(name="hands")
 
 
 @dataclass
@@ -26,17 +24,14 @@ class _Machine:
     training: bool = False
     comfyui_busy: bool = False
     batches_due: bool = False
-    fix: object = None
     queued: int = 0
-    trained: list = field(default_factory=list)
 
     def turn(self) -> downtime.Turn:
         return downtime.take_a_turn(downtime.Machine(
             app_open=lambda: self.app_open, training_running=lambda: self.training,
             comfyui_busy=lambda: self.comfyui_busy, batches_due=lambda: self.batches_due,
             queue_batches=self._queue, notes_due=lambda: self.notes_due,
-            take_notes=self._take_notes,
-            fix_to_train=lambda: self.fix, train=self._train))
+            take_notes=self._take_notes))
 
     def _take_notes(self) -> None:
         self.noted += 1
@@ -46,26 +41,14 @@ class _Machine:
         self.queued += 1
         self.batches_due = False
 
-    def _train(self, part) -> None:
-        self.trained.append(part)
-        self.training = True
-
 
 def test_nothing_is_started_while_origenerator_is_open():
-    machine = _Machine(app_open=True, batches_due=True, fix=_HANDS)
+    machine = _Machine(app_open=True, batches_due=True)
 
     turn = machine.turn()
 
-    assert (machine.queued, machine.trained) == (0, [])
+    assert machine.queued == 0
     assert turn.holds_the_graphics_card is False
-
-
-def test_the_work_origenerator_left_as_it_closed_is_handed_to_comfyui_first():
-    machine = _Machine(batches_due=True, fix=_HANDS)
-
-    machine.turn()
-
-    assert (machine.queued, machine.trained) == (1, [])
 
 
 def test_the_work_origenerator_left_as_it_closed_is_handed_over_before_any_notes():
@@ -76,22 +59,13 @@ def test_the_work_origenerator_left_as_it_closed_is_handed_over_before_any_notes
     assert (machine.queued, machine.noted) == (1, 0)
 
 
-def test_once_comfyui_has_nothing_left_a_fix_whose_photos_changed_is_trained():
-    machine = _Machine(fix=_HANDS)
-
-    turn = machine.turn()
-
-    assert machine.trained == [_HANDS]
-    assert turn.holds_the_graphics_card is True
-
-
 def test_nothing_new_starts_while_a_training_or_comfyui_still_has_the_graphics_card():
-    training = _Machine(training=True, batches_due=True, fix=_HANDS)
-    busy = _Machine(comfyui_busy=True, batches_due=True, fix=_HANDS)
+    training = _Machine(training=True, batches_due=True)
+    busy = _Machine(comfyui_busy=True, batches_due=True)
 
     assert training.turn().holds_the_graphics_card is True
     assert busy.turn().holds_the_graphics_card is False
-    assert [(m.queued, m.trained) for m in (training, busy)] == [(0, []), (0, [])]
+    assert [m.queued for m in (training, busy)] == [0, 0]
 
 
 def test_closing_leaves_work_for_while_closed_and_the_next_launch_takes_it_back(
@@ -205,33 +179,6 @@ def test_the_command_evolver_runs_hands_comfyui_each_file_a_run_reads_as_a_copy_
     assert posted["1"]["inputs"]["image"].endswith("/jane_doe.png [temp]")
 
 
-def _kept(tmp_path, part, *, automatic, **status) -> None:
-    work = tmp_path / "fix training" / part
-    work.mkdir(parents=True)
-    job = {"part": part, "display_name": f"{part.capitalize()} fix 1.0", "work": str(work),
-           "status": str(work / "status.json"),
-           "process": str(work / "process.json"), "automatic": automatic}
-    (work / "job.json").write_text(json.dumps(job), encoding="utf-8")
-    (work / "status.json").write_text(json.dumps(status), encoding="utf-8")
-    (work / "process.json").write_text(json.dumps({"pid": 1, "started": 1, "began": 0.0}),
-                                       encoding="utf-8")
-
-
-def test_a_training_evolver_started_is_announced_once_when_it_ends_unless_already_taken(
-        monkeypatch, tmp_path):
-    monkeypatch.setattr(downtime.config, "FIX_TRAINING_DIR", tmp_path / "fix training")
-    _kept(tmp_path, "hands", automatic=True, state="done", lora="hands 1.safetensors")
-    _kept(tmp_path, "faces", automatic=False, state="done", lora="faces 1.safetensors")
-    _kept(tmp_path, "teeth", automatic=True, state="done", lora="teeth 1.safetensors", taken=True)
-    announced = []
-
-    downtime.announce_trainings_that_ended(announced.append)
-    downtime.announce_trainings_that_ended(announced.append)
-
-    assert [(toast.title, toast.body.split(" · ")[0]) for toast in announced] == [
-        ("LoRA ready", "Hands fix 1.0")]
-
-
 def test_the_command_evolver_runs_holds_the_tile_while_a_look_lora_trains(monkeypatch, tmp_path, capsys):
     _the_command_on_a_scratch_library(monkeypatch, tmp_path)
     _the_app_is(monkeypatch, open_now=True)
@@ -242,10 +189,29 @@ def test_the_command_evolver_runs_holds_the_tile_while_a_look_lora_trains(monkey
     assert json.loads(capsys.readouterr().out)["holds_the_graphics_card"] is True
 
 
+def test_the_command_evolver_runs_leaves_a_fix_whose_photos_changed_for_him_to_train_by_hand(
+        monkeypatch, tmp_path, capsys):
+    _the_command_on_a_scratch_library(monkeypatch, tmp_path)
+    monkeypatch.setattr(downtime.config, "FIX_PHOTOS_DIR", tmp_path / "fixes")
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
+    (tmp_path / "fixes" / "hands").mkdir(parents=True)
+    (tmp_path / "fixes" / "hands" / "one.jpg").write_bytes(b"fabricated photo bytes")
+    _the_app_is(monkeypatch, open_now=False)
+    monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
+    monkeypatch.setattr(collection_notes, "are_due", lambda db, path: False)
+    started = []
+    monkeypatch.setattr(lora_training, "start", lambda job, *args, **kwargs: started.append(job))
+
+    assert downtime.main() == 0
+
+    assert started == []
+    assert json.loads(capsys.readouterr().out) == {
+        "did": "nothing to do", "holds_the_graphics_card": False}
+
+
 def test_the_command_evolver_runs_takes_notes_on_the_collection_while_closed_and_idle(
         monkeypatch, tmp_path, capsys):
     _the_command_on_a_scratch_library(monkeypatch, tmp_path)
-    monkeypatch.setattr(downtime, "announce_trainings_that_ended", lambda announce: None)
     _the_app_is(monkeypatch, open_now=False)
     monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
     monkeypatch.setattr(collection_notes, "are_due", lambda db, path: True)

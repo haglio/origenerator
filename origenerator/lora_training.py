@@ -161,10 +161,6 @@ def mark_taken(job: dict) -> None:
     _mark(job, taken=True)
 
 
-def mark_announced(job: dict) -> None:
-    _mark(job, announced=True)
-
-
 def _mark(job: dict, **marks) -> None:
     Path(job["status"]).write_text(json.dumps(dict(read_status(job) or {}, **marks)),
                                    encoding="utf-8")
@@ -182,9 +178,7 @@ def take_up(kind, *, adopt, take) -> None:
         trainer = trainer_of(job)
         if trainer is None:
             continue
-        if trainer.running() and job.get("automatic"):
-            trainer.stop()
-        elif trainer.running():
+        if trainer.running():
             adopt(job, trainer)
         elif (lora := untaken_lora(job)) is not None:
             take(job, lora)

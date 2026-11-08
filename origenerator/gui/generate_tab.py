@@ -88,7 +88,7 @@ from origenerator.gui.lora_offers import LoraOffers
 from origenerator.gui.message import set_marked_text
 from origenerator.gui.metadata_section import MetadataSection, wrappable
 from origenerator.gui.no_wheel import NoWheelDropdown
-from origenerator.gui.panes import PaneSplitter, pane, pane_border
+from origenerator.gui.panes import PaneSplitter, pane
 from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowRow, WorkflowTraits
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.request_answering import RequestAnswerer
@@ -318,9 +318,9 @@ class GenerateTab(DropZones):
         self._viewport.action_triggered.connect(self.item_action_requested)
         self._viewport.context_requested.connect(self.context_menu_requested)
         self._media_split = PaneSplitter(Qt.Orientation.Vertical)
-        self._viewport_pane, viewport_column = pane()
-        viewport_column.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
-        viewport_column.addWidget(self._viewport)
+        self._viewport_pane, self._viewport_column = pane()
+        self._viewport_column.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        self._viewport_column.addWidget(self._viewport)
         self._media_split.addWidget(self._viewport_pane)
         self._viewport.media_resized.connect(self._reflow_for_the_media)
         return self._viewport
@@ -381,17 +381,15 @@ class GenerateTab(DropZones):
     def _build_settings_pane(self) -> QWidget:
         settings_pane = QWidget()
         column = QVBoxLayout(settings_pane)
-        column.setContentsMargins(0, MARGIN_STANDARD, 0, 0)
+        column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(0)
         buttons = QHBoxLayout()
-        buttons.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, MARGIN_STANDARD)
+        buttons.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
         buttons.setSpacing(BUTTON_GAP)
         buttons.addWidget(ActionButton(self._go_to_folder, name="goToFolderButton"), 0,
                           Qt.AlignmentFlag.AlignTop)
         buttons.addLayout(self._build_button_row(), 1)
-        column.addLayout(buttons)
-        self._settings_border = pane_border()
-        column.addWidget(self._settings_border)
+        self._viewport_column.addLayout(buttons)
         self._settings_split = PaneSplitter(Qt.Orientation.Vertical)
         self._settings_split.addWidget(self._settings_scroll)
         self._settings_split.addWidget(self._item_scroll)
@@ -443,13 +441,13 @@ class GenerateTab(DropZones):
         super().showEvent(event)
         if not self._media_shared:
             self._media_shared = True
-            QTimer.singleShot(0, self._give_the_preview_a_third)
+            QTimer.singleShot(0, self._give_the_preview_half)
 
-    def _give_the_preview_a_third(self) -> None:
+    def _give_the_preview_half(self) -> None:
         split = self._media_split
         whole = sum(split.sizes())
         if whole and split.dragged_sizes() is None and not self._media_side_by_side:
-            split.setSizes([whole // 3, whole - whole // 3])
+            split.setSizes([whole // 2, whole - whole // 2])
 
     def minimumSizeHint(self):
         """Qt takes an explicit setMinimumWidth in place of this hint, not alongside it, so none is set here or on the wrapper."""

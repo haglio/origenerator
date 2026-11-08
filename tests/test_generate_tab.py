@@ -30,7 +30,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
-    QSplitterHandle,
     QWidget,
 )
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
@@ -162,45 +161,11 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
     line_top, line_foot = span(tab._media_split.handle(1))
     generate_top, generate_foot = span(tab._generate_btn.parentWidget())
     settings_top, _ = span(tab._settings_scroll)
-    assert preview_foot <= line_top
-    assert line_foot <= generate_top
-    assert generate_foot <= settings_top
+    assert tab._viewport_pane.isAncestorOf(tab._generate_btn)
+    assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top
 
 
-def test_a_thick_border_held_still_parts_generate_from_the_settings(tab):
-    tab.show()
-    tab.resize(700, 800)
-    QApplication.processEvents()
-
-    def span(widget):
-        top = widget.mapTo(tab, QPoint(0, 0)).y()
-        return top, top + widget.height()
-
-    border = tab._settings_border
-    _, generate_foot = span(tab._generate_btn.parentWidget())
-    border_top, border_foot = span(border)
-    settings_top, _ = span(tab._settings_scroll)
-    assert generate_foot <= border_top
-    assert border_foot <= settings_top
-    assert border.height() == tab._media_split.handleWidth()
-    assert border.mapTo(tab, QPoint(0, 0)).x() == 0
-    assert border.width() == tab.width()
-    assert not isinstance(border, QSplitterHandle)
-
-
-def test_the_border_under_generate_wears_the_gray_of_the_one_above_it(app_chrome, tab):
-    tab.show()
-    tab.resize(700, 800)
-    QApplication.processEvents()
-
-    def gray(widget):
-        image = widget.grab().toImage()
-        return image.pixelColor(image.width() // 2, image.height() // 2)
-
-    assert gray(tab._settings_border) == gray(tab._media_split.handle(1))
-
-
-def test_a_new_tab_gives_the_preview_a_third_and_the_settings_and_metadata_a_third_each(
+def test_a_new_tab_gives_the_preview_half_and_the_settings_and_metadata_a_quarter_each(
         saved_panel):
     tab, db = saved_panel
     tab.resize(700, 1200)
@@ -212,8 +177,8 @@ def test_a_new_tab_gives_the_preview_a_third_and_the_settings_and_metadata_a_thi
 
     preview, rest = tab._media_split.sizes()
     settings, item = tab._settings_split.sizes()
-    assert abs(rest - 2 * preview) <= 2
-    assert abs(settings - item) <= 2
+    assert abs(rest - preview) <= 4
+    assert abs(settings - item) <= 4
 
 
 def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(tab):
@@ -396,13 +361,13 @@ def test_generate_and_the_top_setting_keep_clear_of_the_borders_round_them(tab):
         top = widget.mapTo(tab, QPoint(0, 0)).y()
         return top, top + widget.height()
 
-    _, line_foot = span(tab._media_split.handle(1))
+    _, preview_foot = span(tab._viewport)
     generate_top, generate_foot = span(tab._generate_btn.parentWidget())
-    border_top, border_foot = span(tab._settings_border)
+    line_top, line_foot = span(tab._media_split.handle(1))
     dropdown_top, _ = span(tab._workflow_dropdown)
-    assert generate_top - line_foot >= 8
-    assert border_top - generate_foot >= 8
-    assert dropdown_top - border_foot >= 8
+    assert generate_top - preview_foot >= 8
+    assert line_top - generate_foot >= 8
+    assert dropdown_top - line_foot >= 8
 
 
 def test_the_settings_handle_reaches_the_panes_own_border(tab):
@@ -491,7 +456,7 @@ def test_the_metadata_leads_the_items_area_with_its_related_media_below(tab):
 
 
 def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(tab):
-    buttons = _layout_containing(tab._settings_pane.layout(), tab._generate_btn.parentWidget())
+    buttons = _layout_containing(tab._viewport_pane.layout(), tab._generate_btn.parentWidget())
     assert buttons is not None
     assert buttons.indexOf(tab._lane_button) != -1
     assert buttons.indexOf(tab._cancel_btn) != -1
@@ -1934,12 +1899,12 @@ def test_the_way_to_the_folder_is_one_button_in_the_row_with_generate(saved_pane
     tab.resize(700, 1600)
     tab.show()
     QApplication.processEvents()
-    pane = tab._settings_pane
+    body = tab._settings_scroll.widget()
 
     assert button.isVisibleTo(tab)
-    assert button.mapTo(pane, QPoint(0, 0)).y() == tab._generate_btn.mapTo(pane, QPoint(0, 0)).y()
-    assert button.mapTo(pane, QPoint(0, 0)).x() == tab._settings_scroll.widget().layout(
-        ).contentsMargins().left()
+    assert button.mapTo(tab, QPoint(0, 0)).y() == tab._generate_btn.mapTo(tab, QPoint(0, 0)).y()
+    assert button.mapTo(tab, QPoint(0, 0)).x() == body.mapTo(tab, QPoint(
+        body.layout().contentsMargins().left(), 0)).x()
     for row in _version_rows(tab):
         assert "goToFolderButton" not in [b.objectName()
                                           for b in row.findChildren(QPushButton)]

@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import QFrame, QLayout, QSplitter, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 BORDER_WIDTH = 6
-BORDER_NAME = "paneBorder"
 BORDERED_SET = "borderedSet"
 
 
@@ -28,13 +27,6 @@ def pane_following(status: QWidget) -> QWidget:
 def border_as_a_set(frame: QFrame, layout: QLayout) -> None:
     frame.setObjectName(BORDERED_SET)
     layout.setContentsMargins(MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD, MARGIN_STANDARD)
-
-
-def pane_border() -> QFrame:
-    border = QFrame()
-    border.setObjectName(BORDER_NAME)
-    border.setFixedHeight(BORDER_WIDTH)
-    return border
 
 
 class PaneSplitter(QSplitter):

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QPoint, Qt
-from PyQt6.QtGui import QColor, QHelpEvent, QImage, QTextCursor
+from PyQt6.QtGui import QColor, QHelpEvent, QImage, QTextCursor, QTextDocument
 from PyQt6.QtWidgets import QApplication, QToolTip
-from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
+from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.db_requests import Turn
@@ -309,10 +309,49 @@ def test_a_turn_nothing_was_made_from_shows_a_question_mark_after_and_before_the
 
     first, second = exchange._entries()
     assert paths["start"] in first.tip
-    assert first.tip.count("?") == 1
     assert paths["second"] in second.tip
-    assert second.tip.count("?") == 1
-    assert second.tip.index("?") < second.tip.index(paths["second"])
+    assert [_stand_in_sizes(entry.tip) for entry in (first, second)] == [
+        [None, (192, 96)], [(192, 96), None]]
+
+
+def _stand_in_sizes(tip):
+    document = QTextDocument()
+    document.setHtml(tip)
+    sizes = []
+    block = document.begin()
+    while block.isValid():
+        for fragment in _fragments(block):
+            if fragment.charFormat().isImageFormat():
+                picture = fragment.charFormat().toImageFormat()
+                sizes.append((round(picture.width()), round(picture.height()))
+                             if "not made" in picture.name() else None)
+        block = block.next()
+    return sizes
+
+
+def _fragments(block):
+    it = block.begin()
+    while not it.atEnd():
+        yield it.fragment()
+        it += 1
+
+
+def test_the_stand_in_for_an_item_not_made_is_gray_with_a_question_mark(qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "start")
+    exchange = _exchange(qtbot)
+    exchange.set_thumbnail_of(paths.get)
+
+    exchange.show_exchange([_changed("a cap")], started_on="start")
+
+    (entry,) = exchange._entries()
+    name = next(part.split('"')[0] for part in entry.tip.split('src="')[1:] if "not made" in part)
+    stand_in = QImage(name)
+    assert (stand_in.width(), stand_in.height()) == (192, 96)
+    assert stand_in.pixelColor(2, 2) == BG_TERTIARY
+    marked = [(x, y) for x in range(192) for y in range(96)
+              if stand_in.pixelColor(x, y) != BG_TERTIARY]
+    assert min(y for _x, y in marked) < 30
+    assert max(y for _x, y in marked) > 66
 
 
 def _placed(exchange, kind):

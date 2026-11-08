@@ -3537,6 +3537,30 @@ def test_a_request_typed_while_generating_follows_the_result_that_lands_with_its
     assert (asked["source_prompt_id"], asked["old_positive"]) == ("img2", "two women on a couch")
 
 
+def test_a_request_still_being_answered_when_generate_is_pressed_follows_the_result_that_lands(
+        saved_panel, qtbot):
+    tab, db = saved_panel
+    tab._requests = _HoldsAnswers()
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    tab.show_saved_generation(image, [image])
+    _ask(tab, qtbot, "two women")
+    assert tab.asked() is None
+    tab.note_launched("img2", made_of={"positive_prompt": "a woman on a couch"})
+    _image_being_made(db, "img2", prompt="a woman on a couch")
+    db.update_generation("img2", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_img2.png", "subfolder": "image"}]))
+    landing = db.get_generation("img2")
+
+    tab.show_completed_result(landing, [landing])
+    (answer,) = tab._requests.held
+    answer(prompt_edit.PromptRevision("a woman on a couch", "", "two women on a couch", "",
+                                      "two women", "add", "rewritten", _TWO_WOMEN_SAID))
+
+    assert tab._param_form.request_exchange().turns() == [("two women", _TWO_WOMEN_SAID)]
+    assert _positive(tab) == "two women on a couch"
+    assert tab.asked()["source_prompt_id"] == "img2"
+
+
 def test_an_item_shown_again_keeps_what_was_asked_of_it_meanwhile(saved_panel, qtbot, monkeypatch):
     _rewriting(monkeypatch)
     tab, db = saved_panel

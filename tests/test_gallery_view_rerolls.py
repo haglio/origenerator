@@ -33,6 +33,7 @@ from tests.gallery_view_support import (
     FakeDB,
     _alls,
     _at,
+    _finish_reroll,
     _frame_shown,
     _front_panel,
     _genau_view,
@@ -923,8 +924,7 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
         "two cats", _TWO_CATS_SAID, "a cat", "two cats")
 
 
-def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on_its_image(
-        qtbot, tmp_path):
+def _tab_asked_for_two_cats(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -933,21 +933,54 @@ def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on
     tab = view._generate_pane.current_generate_tab()
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
-        positive, negative, words, ask=lambda p, n, r, known: ("two cats", n, "Two cats."))
+        positive, negative, words, ask=lambda p, n, r, known: {"changes": [
+            {"prompt": "positive", "replace": "a cat", "with": "two cats", "for": "two cats"}]})
     exchange = tab._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "two cats")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
-    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", "Two cats.")], timeout=5000)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
+    return view
+
+
+def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on_its_image(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    tab = view._generate_pane.current_generate_tab()
+    exchange = tab._param_form.request_exchange()
 
     exchange.generate_asked.emit(0)
 
     (job,) = view._live_jobs.values()
-    record = db.get_request(job.prompt_id)
+    record = view._db.get_request(job.prompt_id)
     assert (record["asked"], record["source_prompt_id"], record["new_positive"]) == (
         "two cats", "orig", "two cats")
     assert tab.displayed_row()["prompt_id"] == "orig"
     assert [entry.made for entry in exchange._entries()] == [job.prompt_id]
     assert list(exchange._in_flight) == [job.prompt_id]
+
+
+def _request_turns_shown(view):
+    tab = view._generate_pane.current_generate_tab()
+    return tab._param_form.request_exchange().turns(), tab._param_form._widgets["positive_prompt"].value()
+
+
+def test_what_was_asked_of_an_image_follows_it_into_whichever_tab_shows_it_next(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    view.follow_link("orig")
+    view._on_thumbnail_clicked("orig")
+
+    assert _request_turns_shown(view) == ([("two cats", _TWO_CATS_SAID)], "two cats")
+
+
+def test_the_image_a_request_made_lists_the_request_when_it_lands(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
+    (job,) = view._live_jobs.values()
+
+    _finish_reroll(view, job)
+
+    assert _request_turns_shown(view) == ([("two cats", _TWO_CATS_SAID)], "two cats")
 
 
 def test_a_run_generated_with_no_request_records_none(qtbot, tmp_path):

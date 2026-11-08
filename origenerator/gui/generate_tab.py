@@ -271,7 +271,8 @@ class GenerateTab(DropZones):
         self._request_aim: _RequestAim | None = None
         self._turn_being_made: int | None = None
         self._request_auto_generate = False
-        self._request_aims: dict[str, _RequestAim] = {}
+        self._request_aims: dict[str, _RequestAim] = (
+            views.request_aims if views.request_aims is not None else {})
         self._requests = views.requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
@@ -1274,8 +1275,9 @@ class GenerateTab(DropZones):
     def _aim_carried_onto(self, prompt_id: str, shown: tuple[str, str]) -> _RequestAim | None:
         was = self._request_aim
         made = self._db.get_request(prompt_id)
-        if (was is None or made is None or made["source_prompt_id"] != was.prompt_id
-                or not (was.turns or was.asking)):
+        made_from_this = prompt_id in self._launched_runs or (
+            made is not None and made["source_prompt_id"] == was.prompt_id) if was else False
+        if was is None or not made_from_this or not (was.turns or was.asking):
             return None
         self._request_aims.pop(was.prompt_id, None)
         was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id)))

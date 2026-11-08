@@ -6,7 +6,6 @@ from app_support import wrong_actions
 from PIL import Image
 
 from origenerator import gallery
-from origenerator.action_labels import Labels, labels_of
 from origenerator.action_setter_tool import (
     AnswersTold,
     ThrownInto,
@@ -15,6 +14,7 @@ from origenerator.action_setter_tool import (
 )
 from origenerator.db import Database, NewGeneration
 from origenerator.gui.action_setter_window import ask_to_keep_going
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.sent_back import Returned, SentBack
@@ -49,7 +49,7 @@ def test_the_line_starts_with_the_image_it_was_opened_on(tmp_path):
     db = Database(tmp_path / "origenerator.db")
     _a_finished_image(db, "gen-one", 1)
     _a_finished_image(db, "gen-two", 2)
-    db.set_labels("gen-two", MediaType.IMAGE, Labels(("alpha",)))
+    db.set_actions("gen-two", MediaType.IMAGE, ItemActions(("alpha",)))
 
     waiting = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.IMAGE, "gen-two")
 
@@ -84,26 +84,26 @@ def test_each_answer_is_saved_and_then_told_to_whoever_asked_to_hear_it(tmp_path
     db = Database(tmp_path / "gallery.db")
     _a_finished_image(db, "gen-one", 1)
     heard = []
-    store = AnswersTold(db, lambda prompt_id, side, labels: heard.append(
-        (prompt_id, side, labels, labels_of(db.get_generation(prompt_id), side))))
+    store = AnswersTold(db, lambda prompt_id, side, item_actions: heard.append(
+        (prompt_id, side, item_actions, actions_of(db.get_generation(prompt_id), side))))
 
-    store.set_labels("gen-one", MediaType.IMAGE, Labels(("alpha",), ("first box",)))
+    store.set_actions("gen-one", MediaType.IMAGE, ItemActions(("alpha",), ("first box",)))
 
-    assert heard == [("gen-one", MediaType.IMAGE, Labels(("alpha",), ("first box",)),
-                      Labels(("alpha",), ("first box",)))]
+    assert heard == [("gen-one", MediaType.IMAGE, ItemActions(("alpha",), ("first box",)),
+                      ItemActions(("alpha",), ("first box",)))]
 
 
-def test_each_item_in_line_carries_the_labels_it_has_now_and_one_never_labeled_carries_none(
+def test_each_item_in_line_carries_the_actions_it_has_now_and_one_never_given_any_carries_none(
         tmp_path):
     db = Database(tmp_path / "gallery.db")
     _a_finished_image(db, "gen-one", 1)
     _a_finished_image(db, "gen-two", 2)
-    db.set_labels("gen-two", MediaType.IMAGE, Labels((), ("first box",)))
+    db.set_actions("gen-two", MediaType.IMAGE, ItemActions((), ("first box",)))
 
     waiting = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.IMAGE)
 
-    assert {item["prompt_id"]: item["labels"] for item in waiting} == {
-        "gen-one": None, "gen-two": Labels((), ("first box",))}
+    assert {item["prompt_id"]: item["actions"] for item in waiting} == {
+        "gen-one": None, "gen-two": ItemActions((), ("first box",))}
 
 
 def _a_finished_video(db, prompt_id: str, *, made_from: str | None = None) -> None:
@@ -136,7 +136,7 @@ def test_a_video_said_to_have_the_wrong_actions_comes_first_in_the_line(tmp_path
     _a_finished_video(db, "said")
     _a_finished_video(db, "favorite")
     db.set_generation_favorite("favorite", True)
-    db.set_labels("said", MediaType.VIDEO, Labels(("beta",)))
+    db.set_actions("said", MediaType.VIDEO, ItemActions(("beta",)))
     wrong_actions.say(tmp_path, tmp_path / "said.mp4")
 
     waiting = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO,
@@ -150,8 +150,8 @@ def test_an_item_sent_back_leaves_the_list_once_it_has_its_actions_again(tmp_pat
     _a_finished_video(db, "vid")
     kept = SentBack(tmp_path / "sent_back.json")
     kept.add(("vid",))
-    db.set_labels("vid", MediaType.VIDEO, Labels(("beta",)))
-    db.set_labels("vid", MediaType.IMAGE, Labels(("alpha",)))
+    db.set_actions("vid", MediaType.VIDEO, ItemActions(("beta",)))
+    db.set_actions("vid", MediaType.IMAGE, ItemActions(("alpha",)))
 
     waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO,
                   returned=Returned(kept, tmp_path))

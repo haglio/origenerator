@@ -31,8 +31,8 @@ from shared_ui.palette import BLUE, as_hex
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
-from origenerator.action_labels import Labels
 from origenerator.branch_session import titled
+from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 from origenerator.setter_voice import PRESS, SAME, SKIP, TRASH, UNDO, setter_words
 
@@ -342,7 +342,7 @@ class ActionSetterWindow(QWidget):
     def _on_action(self, name: str) -> None:
         if self._session.current is None:
             return
-        self._session.set_as(name, Labels(self._vocabulary.buttons[name], self._checked()))
+        self._session.set_as(name, ItemActions(self._vocabulary.buttons[name], self._checked()))
         self._last.setText(f"Last: {name}")
         if self._asked_whether_to_go_on():
             self._show_current()
@@ -352,8 +352,8 @@ class ActionSetterWindow(QWidget):
         if self._session.current is None or last is None:
             self._said("Nothing set yet to go by")
             return
-        said, labels = last
-        self._session.set_as(said, Labels(labels.actions, self._checked()))
+        said, item_actions = last
+        self._session.set_as(said, ItemActions(item_actions.actions, self._checked()))
         self._said(f"Last: {said}")
 
     def _asked_whether_to_go_on(self) -> bool:
@@ -436,8 +436,8 @@ class ActionSetterWindow(QWidget):
             self._stage.show_message(self.MISSING)
 
     def _mark_the_button_set_before(self, item: dict | None) -> None:
-        labels = (item or {}).get("labels") or Labels()
-        set_before = self._vocabulary.button_made_of(labels.actions)
+        item_actions = (item or {}).get("actions") or ItemActions()
+        set_before = self._vocabulary.button_made_of(item_actions.actions)
         for name, tile in self._tiles.items():
             for marked in {tile, self._face(name)}:
                 marked.setProperty(_SET_BEFORE, name == set_before)
@@ -447,7 +447,7 @@ class ActionSetterWindow(QWidget):
 
     def _set_the_boxes_for(self, item: dict) -> None:
         held = self._locks.held(self._session.side)
-        _set(self._boxes, held, (item.get("labels") or Labels()).checked)
+        _set(self._boxes, held, (item.get("actions") or ItemActions()).checked)
 
     def closeEvent(self, event) -> None:  # noqa: N802 -- Qt override
         self._stage.clear()

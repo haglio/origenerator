@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from origenerator.action_labels import Labels, labels_of
 from origenerator.action_vocabulary import JOINER, Vocabulary, vocabulary
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 
 
@@ -29,23 +29,23 @@ def named(name: str, words: Vocabulary | None = None) -> Animation:
     return Animation(JOINER.join(parts), tuple(checked))
 
 
-def labels_for(name: str, words: Vocabulary | None = None) -> Labels:
+def item_actions_named(name: str, words: Vocabulary | None = None) -> ItemActions:
     words = _video_words(words)
     animation = named(name, words)
-    return Labels(words.buttons.get(animation.action, ()), animation.checked)
+    return ItemActions(words.buttons.get(animation.action, ()), animation.checked)
 
 
 def animation_of(video: dict, words: Vocabulary | None = None) -> str:
     words = _video_words(words)
-    labels = labels_of(video, MediaType.VIDEO)
-    action = words.button_made_of(labels.actions)
+    item_actions = actions_of(video, MediaType.VIDEO)
+    action = words.button_made_of(item_actions.actions)
     if not action:
         return ""
-    return Animation(action, tuple(box for box in words.checkboxes if box in labels.checked)).name
+    return Animation(action, tuple(box for box in words.checkboxes if box in item_actions.checked)).name
 
 
 def image_button_of(image: dict | None, words: Vocabulary | None = None) -> str:
     if image is None:
         return ""
     words = words if words is not None else vocabulary(MediaType.IMAGE)
-    return words.button_made_of(labels_of(image, MediaType.IMAGE).actions)
+    return words.button_made_of(actions_of(image, MediaType.IMAGE).actions)

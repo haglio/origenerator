@@ -18,7 +18,6 @@ from origenerator import (
     action_settings,
     gallery,
 )
-from origenerator.action_labels import Labels, labels_of
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     LATEST_KEY,
@@ -34,6 +33,7 @@ from origenerator.gui.drags import under_way
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.item_tile import ItemTile
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
@@ -203,7 +203,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
     db = _combine_db(tmp_path)
     looping = _looping_video(db)
     db.set_settings_source("loop", category="alpha")
-    db.set_labels("loop", MediaType.VIDEO, Labels(("alpha",)))
+    db.set_actions("loop", MediaType.VIDEO, ItemActions(("alpha",)))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -432,7 +432,7 @@ def test_a_picked_action_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_pa
 
     row = _launched_row(view)
     assert row["action"] == "alpha"
-    assert labels_of(row, MediaType.VIDEO) == Labels(("alpha",))
+    assert actions_of(row, MediaType.VIDEO) == ItemActions(("alpha",))
     assert row["source_video"] == "vid"
 
 
@@ -445,7 +445,7 @@ def test_a_curated_action_records_the_action_with_no_video_behind_it(qtbot, tmp_
 
     row = _launched_row(view)
     assert row["action"] == "alpha + third box"
-    assert labels_of(row, MediaType.VIDEO) == Labels(("alpha",), ("third box",))
+    assert actions_of(row, MediaType.VIDEO) == ItemActions(("alpha",), ("third box",))
     assert row["source_video"] is None
 
 

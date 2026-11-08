@@ -4,7 +4,6 @@ import json
 import threading
 from dataclasses import dataclass
 
-from origenerator.action_labels import Labels, columns, stored
 from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
@@ -14,6 +13,7 @@ from origenerator.generation_state import (
     GenerationSource,
     GenerationStatus,
 )
+from origenerator.item_actions import ItemActions, columns, stored
 
 LIFECYCLE_COLUMNS = frozenset({
     "status", "output_files", "original_files", "enhance_history",
@@ -186,16 +186,16 @@ class GenerationStore(Store):
     def set_action(self, prompt_id: str, action: str | None):
         self._set(prompt_id, "recipe_category", action or None)
 
-    def set_labels(self, prompt_id: str, side: str, labels: Labels | None):
-        self.set_many_labels(side, {prompt_id: labels})
+    def set_actions(self, prompt_id: str, side: str, item_actions: ItemActions | None):
+        self.set_many_actions(side, {prompt_id: item_actions})
 
-    def set_many_labels(self, side: str, labeled: dict[str, Labels | None]):
+    def set_many_actions(self, side: str, actions_by_id: dict[str, ItemActions | None]):
         actions, checked = columns(side)
         with self._connect() as conn:
             conn.executemany(
                 f"UPDATE generations SET {actions} = ?, {checked} = ? WHERE prompt_id = ?",
-                [(*(stored(labels) if labels is not None else (None, None)), prompt_id)
-                 for prompt_id, labels in labeled.items()],
+                [(*(stored(item_actions) if item_actions is not None else (None, None)), prompt_id)
+                 for prompt_id, item_actions in actions_by_id.items()],
             )
 
     def set_shielded(self, prompt_id: str, shielded: bool):

@@ -4,8 +4,8 @@ from typing import NamedTuple
 
 from funestra.video_families import normalized_text
 
-from origenerator.action_labels import Labels
 from origenerator.content import load_content
+from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 
 _BLOCKS = {MediaType.IMAGE: "image_actions", MediaType.VIDEO: "video_actions"}
@@ -35,10 +35,10 @@ def _table(listed) -> dict:
     return listed if isinstance(listed, dict) else {}
 
 
-def _labels(said) -> Labels | None:
+def _item_actions(said) -> ItemActions | None:
     if not isinstance(said, dict):
         return None
-    return Labels(names_in(said.get("actions")), names_in(said.get("checked")))
+    return ItemActions(names_in(said.get("actions")), names_in(said.get("checked")))
 
 
 def _reach(entry) -> tuple[str, int, int]:
@@ -78,17 +78,17 @@ class Vocabulary(NamedTuple):
     buttons: dict[str, tuple[str, ...]]
     tiles: tuple[Tile, ...]
     checkboxes: tuple[str, ...]
-    formerly: dict[str, Labels]
+    formerly: dict[str, ItemActions]
     drawn_as: dict[str, str]
     heard_as: dict[str, tuple[str, ...]]
     said_alone: dict[str, str]
 
-    def read_as(self, said: str) -> Labels | None:
+    def read_as(self, said: str) -> ItemActions | None:
         heard = normalized_text(said)
         button = next((name for name in self.buttons if normalized_text(name) == heard), None)
         if button is not None:
-            return Labels(self.buttons[button])
-        return next((labels for name, labels in self.formerly.items()
+            return ItemActions(self.buttons[button])
+        return next((item_actions for name, item_actions in self.formerly.items()
                      if normalized_text(name) == heard), None)
 
     def button_made_of(self, actions) -> str:
@@ -117,8 +117,8 @@ def vocabulary(side: str, content: dict | None = None) -> Vocabulary:
         content = load_content()
     block = _table(content.get(_BLOCKS[side]))
     buttons = _buttons(block.get("buttons"))
-    formerly = {name.strip(): labels for name, said in _table(block.get("formerly")).items()
-                if isinstance(name, str) and (labels := _labels(said)) is not None}
+    formerly = {name.strip(): item_actions for name, said in _table(block.get("formerly")).items()
+                if isinstance(name, str) and (item_actions := _item_actions(said)) is not None}
     checkboxes = names_in(block.get("checkboxes"))
     return Vocabulary(buttons, tiles(tuple(buttons), block.get("grid")), checkboxes, formerly,
                       _named_strings(block.get("drawn_as")), _buttons(block.get("heard_as")),
@@ -131,7 +131,7 @@ def _named_strings(listed) -> dict[str, str]:
             if isinstance(name, str) and isinstance(said, str) and said.strip()}
 
 
-def labels_heard_as(content: dict | None = None) -> dict[str, tuple[str, ...]]:
+def actions_heard_as(content: dict | None = None) -> dict[str, tuple[str, ...]]:
     heard: dict[str, tuple[str, ...]] = {}
     for side in (MediaType.IMAGE, MediaType.VIDEO):
         words = vocabulary(side, content)

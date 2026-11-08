@@ -50,7 +50,6 @@ from origenerator import (
     prompt_edit,
 )
 from origenerator import export_lane as export_lane_module
-from origenerator.action_labels import Labels, labels_of
 from origenerator.action_vocabulary import vocabulary
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfyui_client import ComfyUIClient
@@ -86,6 +85,7 @@ from origenerator.gui.pills import Pill
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.item_names import ItemNames
 from origenerator.library_views import TabViews
 from origenerator.media import MediaType
@@ -4454,19 +4454,19 @@ def test_a_fresh_images_dropdowns_mark_what_its_models_page_recommends(blank_pan
 def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_images_row(saved_panel):
     tab, db = saved_panel
     image = _image_row(db, "img9")
-    db.set_labels("img9", MediaType.IMAGE, Labels(("alpha",)))
+    db.set_actions("img9", MediaType.IMAGE, ItemActions(("alpha",)))
     tab.show_saved_generation(db.get_generation("img9"), [image])
     name = vocabulary(MediaType.IMAGE).checkboxes[0]
 
     tab._action.form().parentWidget().findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()
 
-    assert labels_of(db.get_generation("img9"), MediaType.IMAGE) == Labels(("alpha",), (name,))
+    assert actions_of(db.get_generation("img9"), MediaType.IMAGE) == ItemActions(("alpha",), (name,))
 
 
 def test_a_video_on_the_tab_lists_the_actions_it_was_set_with(saved_panel):
     tab, db = saved_panel
     _video_row(db, "vid9")
-    db.set_labels("vid9", MediaType.VIDEO, Labels(("alpha", "beta")))
+    db.set_actions("vid9", MediaType.VIDEO, ItemActions(("alpha", "beta")))
 
     tab.show_saved_generation(db.get_generation("vid9"), [])
 
@@ -4482,7 +4482,7 @@ def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_videos_row(saved_panel
 
     tab._action.form().parentWidget().findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
 
-    assert labels_of(db.get_generation("vid9"), MediaType.VIDEO) == Labels((), (name,))
+    assert actions_of(db.get_generation("vid9"), MediaType.VIDEO) == ItemActions((), (name,))
 
 
 def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_path, monkeypatch,

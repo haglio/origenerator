@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import NamedTuple
 
 from origenerator import gallery
-from origenerator.action_labels import Labels, labels_of
 from origenerator.gallery.source_image import (
-    image_labels_row,
-    inherits_image_labels,
+    image_actions_row,
+    inherits_image_actions,
     start_images_among,
 )
 from origenerator.generation_state import GenerationStatus, in_sight
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
@@ -32,29 +32,29 @@ def _finished(row: dict, kind: str) -> bool:
             and not gallery.is_enhance_product_row(row))
 
 
-def _its_own_image_labels(rows: list[dict]) -> list[Waiting]:
+def _its_own_image_actions(rows: list[dict]) -> list[Waiting]:
     start_image_of = start_images_among(
         [row for row in rows if gallery.media_type_of_row(row) == MediaType.IMAGE])
-    return [Waiting(image_labels_row(video, start), video) for video in rows
+    return [Waiting(image_actions_row(video, start), video) for video in rows
             if _finished(video, MediaType.VIDEO)
-            and not inherits_image_labels(video, start := start_image_of(video))]
+            and not inherits_image_actions(video, start := start_image_of(video))]
 
 
 def waiting(rows: list[dict], side: str, *, sent_back: tuple[str, ...] = ()) -> list[Waiting]:
     found = [Waiting(row, row) for row in rows if _finished(row, side)]
     if side == MediaType.IMAGE:
-        found += _its_own_image_labels(rows)
-    unlabeled = sorted((entry for entry in found if not labels_of(entry.holder, side).actions),
+        found += _its_own_image_actions(rows)
+    without_actions = sorted((entry for entry in found if not actions_of(entry.holder, side).actions),
                        reverse=True, key=lambda entry: (bool(entry.shown.get("starred")),
                                                         entry.shown.get("created_at") or ""))
     order = {prompt_id: place for place, prompt_id in enumerate(sent_back)}
-    return sorted(unlabeled, key=lambda entry: order.get(entry.holder["prompt_id"], len(order)))
+    return sorted(without_actions, key=lambda entry: order.get(entry.holder["prompt_id"], len(order)))
 
 
 class Answer(NamedTuple):
     item: dict
     said: str
-    labels: Labels
+    item_actions: ItemActions
 
 
 class Thrown(NamedTuple):
@@ -86,20 +86,20 @@ class SetterSession:
         return len(self._line)
 
     @property
-    def last(self) -> tuple[str, Labels] | None:
+    def last(self) -> tuple[str, ItemActions] | None:
         answered = next((done for done in reversed(self._done) if isinstance(done, Answer)), None)
-        return (answered.said, answered.labels) if answered is not None else None
+        return (answered.said, answered.item_actions) if answered is not None else None
 
     @property
     def can_undo(self) -> bool:
         return bool(self._done)
 
-    def set_as(self, said: str, labels: Labels) -> None:
+    def set_as(self, said: str, item_actions: ItemActions) -> None:
         if not self._line:
             return
         item = self._line.popleft()
-        self._store.set_labels(item["prompt_id"], self._side, labels)
-        self._done.append(Answer(item, said, labels))
+        self._store.set_actions(item["prompt_id"], self._side, item_actions)
+        self._done.append(Answer(item, said, item_actions))
 
     def skip(self) -> None:
         self._line.rotate(-1)
@@ -118,7 +118,7 @@ class SetterSession:
         if isinstance(done, Thrown):
             self._rubbish.back(_shown_id(done.item))
         else:
-            self._store.set_labels(done.item["prompt_id"], self._side, done.item.get("labels"))
+            self._store.set_actions(done.item["prompt_id"], self._side, done.item.get("actions"))
         self._line.appendleft(done.item)
 
 

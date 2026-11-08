@@ -10,7 +10,7 @@ from funestra.video_groups import normalize_path_key
 from origenerator import gallery
 from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType
-from origenerator.published_labels import published
+from origenerator.published_actions import published
 from origenerator.search import content_stems
 
 WIDEN_ADDITIONS = 6
@@ -84,12 +84,12 @@ class _Animations:
     def videos_of(self, image: dict) -> list[dict]:
         return self._videos_of.get(image["prompt_id"], [])
 
-    def labels_of_row(self, row: dict) -> tuple[str, ...]:
+    def actions_of_row(self, row: dict) -> tuple[str, ...]:
         return published(row, self.image_of(row) or row)
 
-    def label_of(self, row: dict) -> str:
+    def actions_line_of(self, row: dict) -> str:
         source = (SOURCE_IMAGE,) if self.videos_of(row) else ()
-        return labels_text((*source, *self.labels_of_row(row)))
+        return labels_text((*source, *self.actions_of_row(row)))
 
     def group_of(self, row: dict) -> list[dict]:
         image = self.image_of(row) or row
@@ -103,9 +103,9 @@ def _one_per_action(labeled) -> tuple[tuple[dict, str], ...]:
     return tuple((row, label) for label, row in first.items())
 
 
-def action_labels(rows, *, image_index) -> dict[str, str]:
+def actions_lines(rows, *, image_index) -> dict[str, str]:
     animations = _Animations(rows, image_index)
-    return {row["prompt_id"]: animations.label_of(row) for row in rows}
+    return {row["prompt_id"]: animations.actions_line_of(row) for row in rows}
 
 
 class FiledRows(NamedTuple):
@@ -117,16 +117,16 @@ class FiledRows(NamedTuple):
 def surroundings(current: dict, rows, *, image_index,
                  filed: FiledRows | None = None) -> Surroundings:
     animations = _Animations(rows, image_index)
-    own = animations.label_of(current)
+    own = animations.actions_line_of(current)
     seeds, configs, group = _made_here_around(current, rows, animations, image_index)
     if filed is not None:
         seeds, group = (*filed.seeds, *seeds), (*filed.actions, *group)
     return Surroundings(
         label=own,
         seeds=tuple(seeds),
-        configs=tuple((row, animations.label_of(row)) for row in configs),
+        configs=tuple((row, animations.actions_line_of(row)) for row in configs),
         actions=_one_per_action(
-            (row, label) for row, label in ((row, animations.label_of(row)) for row in group)
+            (row, label) for row, label in ((row, animations.actions_line_of(row)) for row in group)
             if label != own),
         group=tuple(group),
     )
@@ -140,7 +140,7 @@ def _alike_in_origin(current: dict) -> Callable[[dict], bool]:
 
 def _made_here_around(current: dict, rows, animations: _Animations, image_index):
     alike = _alike_in_origin(current)
-    own = animations.label_of(current)
+    own = animations.actions_line_of(current)
     image = animations.image_of(current)
     if image is None:
         seeds = seed_group(current, rows, image_index=image_index)[1:]
@@ -150,7 +150,7 @@ def _made_here_around(current: dict, rows, animations: _Animations, image_index)
                  for sibling in seed_group(image, rows, image_index=image_index)
                  for video in animations.videos_of(sibling)
                  if video["prompt_id"] != current["prompt_id"]
-                 and animations.label_of(video) == own]
+                 and animations.actions_line_of(video) == own]
         configs = []
     group = [row for row in animations.group_of(current)
              if row["prompt_id"] != current["prompt_id"] and made_here(row)]
@@ -168,7 +168,7 @@ def group_keys(rows, *, image_index, by_seed_group: bool = False) -> dict[str, H
         if image is None:
             return (row.get("workflow_name"), gallery.settings_folder_key(row, image_index))
         return (image.get("workflow_name"), gallery.settings_folder_key(image, image_index),
-                animations.label_of(row))
+                animations.actions_line_of(row))
 
     def the_video_a_hidden_frame_came_from(row: dict) -> bool:
         image = animations.image_of(row)
@@ -198,7 +198,7 @@ def beyond_the_row(current: dict, rows, *, image_index, additions: int = WIDEN_A
     else:
         candidates = [row for row in rows
                       if gallery.media_type_of_row(row) == MediaType.VIDEO
-                      and animations.label_of(row) == around.label]
+                      and animations.actions_line_of(row) == around.label]
     subject = content_stems(image or current)
     ranked = sorted(
         (

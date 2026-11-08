@@ -183,7 +183,7 @@ from origenerator.library_views import LibrarySnapshot
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
-from origenerator.published_labels import label_the_launch
+from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
 from origenerator.trash import Kino, Trash
 from origenerator.voice.app_commands import AppCommand
@@ -950,7 +950,7 @@ class GalleryView(QWidget):
                 if category or video_id:
                     self._db.set_settings_source(prompt_id, category=category,
                                                  video_prompt_id=video_id)
-                label_the_launch(self._db, prompt_id, category, checked)
+                give_the_launch_its_actions(self._db, prompt_id, category, checked)
                 if video_id and not category:
                     self._db.record_combine_video_use(intent, video_id, prompt_id)
                 if asked is not None:

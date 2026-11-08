@@ -133,9 +133,9 @@ def was_taken_from(frame: dict, video: dict) -> bool:
             and source_of(video) == GenerationSource.OUTSIDE)
 
 
-def inherits_image_labels(video: dict, start_image: dict | None) -> bool:
+def inherits_image_actions(video: dict, start_image: dict | None) -> bool:
     return start_image is not None and not was_taken_from(start_image, video)
 
 
-def image_labels_row(video: dict, start_image: dict | None) -> dict:
+def image_actions_row(video: dict, start_image: dict | None) -> dict:
     return video if start_image is None else start_image

@@ -2,34 +2,34 @@ from __future__ import annotations
 
 import json
 
-from origenerator.action_labels import Labels, stored
 from origenerator.action_setter import Locks, SetterSession, waiting
 from origenerator.gallery.enhance import enhance_file_stem
 from origenerator.generation_state import GenerationSource
+from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
 
-_SET = Labels(("alpha", "beta"), ("first box",))
+_SET = ItemActions(("alpha", "beta"), ("first box",))
 
 
 class _Store:
     def __init__(self):
-        self.labels = {}
+        self.item_actions = {}
 
-    def set_labels(self, prompt_id, side, labels):
-        self.labels[prompt_id] = (side, labels)
+    def set_actions(self, prompt_id, side, item_actions):
+        self.item_actions[prompt_id] = (side, item_actions)
 
 
 def _items(*prompt_ids, before=None):
-    return [{"prompt_id": prompt_id, "labels": before} for prompt_id in prompt_ids]
+    return [{"prompt_id": prompt_id, "actions": before} for prompt_id in prompt_ids]
 
 
-def test_a_press_saves_its_labels_on_the_item_on_screen_and_the_next_one_comes_up():
+def test_a_press_saves_its_actions_on_the_item_on_screen_and_the_next_one_comes_up():
     store = _Store()
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
 
     session.set_as("two", _SET)
 
-    assert store.labels == {"first": (MediaType.IMAGE, _SET)}
+    assert store.item_actions == {"first": (MediaType.IMAGE, _SET)}
     assert (session.current["prompt_id"], session.remaining) == ("second", 1)
 
 
@@ -39,39 +39,39 @@ def test_a_press_with_nothing_on_screen_does_nothing():
 
     session.set_as("two", _SET)
 
-    assert (store.labels, session.current) == ({}, None)
+    assert (store.item_actions, session.current) == ({}, None)
 
 
-def test_skipping_sends_the_item_to_the_back_of_the_line_unlabeled():
+def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions():
     store = _Store()
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
 
     session.skip()
 
-    assert store.labels == {}
+    assert store.item_actions == {}
     assert (session.current["prompt_id"], session.remaining) == ("second", 2)
 
 
-def test_undo_puts_back_the_labels_the_item_had_and_puts_it_on_screen_again():
+def test_undo_puts_back_the_actions_the_item_had_and_puts_it_on_screen_again():
     store = _Store()
-    before = Labels(("gamma",))
+    before = ItemActions(("gamma",))
     session = SetterSession(_items("first", "second", before=before), store, MediaType.IMAGE)
     session.set_as("two", _SET)
 
     session.undo()
 
-    assert store.labels == {"first": (MediaType.IMAGE, before)}
+    assert store.item_actions == {"first": (MediaType.IMAGE, before)}
     assert (session.current["prompt_id"], session.remaining) == ("first", 2)
 
 
-def test_undo_takes_an_item_nobody_had_labeled_back_to_unlabeled():
+def test_undo_takes_an_item_nobody_had_given_actions_back_to_none():
     store = _Store()
     session = SetterSession(_items("first"), store, MediaType.VIDEO)
     session.set_as("two", _SET)
 
     session.undo()
 
-    assert store.labels == {"first": (MediaType.VIDEO, None)}
+    assert store.item_actions == {"first": (MediaType.VIDEO, None)}
 
 
 def test_undo_with_nothing_pressed_yet_changes_nothing():
@@ -80,7 +80,7 @@ def test_undo_with_nothing_pressed_yet_changes_nothing():
 
     session.undo()
 
-    assert (store.labels, session.current["prompt_id"]) == ({}, "first")
+    assert (store.item_actions, session.current["prompt_id"]) == ({}, "first")
 
 
 def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone():
@@ -116,9 +116,9 @@ def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
         ["first"], "second", 1)
 
 
-def test_trash_throws_away_the_item_shown_where_its_labels_live_on_another():
+def test_trash_throws_away_the_item_shown_where_its_actions_live_on_another():
     rubbish = _Bin()
-    session = SetterSession([{"prompt_id": "frame", "shown_id": "video", "labels": None}],
+    session = SetterSession([{"prompt_id": "frame", "shown_id": "video", "actions": None}],
                             _Store(), MediaType.IMAGE, rubbish)
 
     session.trash()
@@ -134,7 +134,7 @@ def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
 
     session.undo()
 
-    assert (rubbish.thrown, store.labels, session.current["prompt_id"], session.remaining) == (
+    assert (rubbish.thrown, store.item_actions, session.current["prompt_id"], session.remaining) == (
         [], {}, "first", 2)
 
 
@@ -176,9 +176,9 @@ def test_locks_that_cannot_be_read_hold_nothing(tmp_path):
     assert Locks(path).held(MediaType.IMAGE) == {}
 
 
-def _row(prompt_id, filename, *, created="2026-01-01 00:00:00", labels=None, **extra):
+def _row(prompt_id, filename, *, created="2026-01-01 00:00:00", item_actions=None, **extra):
     files = [{"filename": filename, "subfolder": "", "type": "output"}] if filename else []
-    actions, checked = stored(labels) if labels is not None else (None, None)
+    actions, checked = stored(item_actions) if item_actions is not None else (None, None)
     return {
         "prompt_id": prompt_id, "workflow_name": "sdxl_t2i", "workflow_version": "v001",
         "status": "completed", "params_json": "{}",
@@ -195,8 +195,8 @@ def _ids(waiting_now):
 def test_only_finished_images_with_no_actions_yet_wait_for_their_actions():
     rows = [
         _row("image", "scene_00001_.png"),
-        _row("labeled", "scene_00002_.png", labels=Labels(("alpha",))),
-        _row("checked only", "scene_00005_.png", labels=Labels((), ("first box",))),
+        _row("given actions", "scene_00002_.png", item_actions=ItemActions(("alpha",))),
+        _row("checked only", "scene_00005_.png", item_actions=ItemActions((), ("first box",))),
         _row("no-file", None),
     ]
 
@@ -205,7 +205,7 @@ def test_only_finished_images_with_no_actions_yet_wait_for_their_actions():
 
 def test_a_video_made_from_no_image_waits_among_the_images_as_itself():
     rows = [_row("made from words", "words_00001_.mp4"),
-            _row("labeled", "words_00002_.mp4", labels=Labels(("alpha",)))]
+            _row("given actions", "words_00002_.mp4", item_actions=ItemActions(("alpha",)))]
 
     [entry] = waiting(rows, MediaType.IMAGE)
 
@@ -214,7 +214,7 @@ def test_a_video_made_from_no_image_waits_among_the_images_as_itself():
 
 
 def test_a_video_made_from_an_image_leaves_its_image_actions_to_that_image():
-    rows = [_row("image", "scene_00001_.png", labels=Labels(("alpha",))),
+    rows = [_row("image", "scene_00001_.png", item_actions=ItemActions(("alpha",))),
             _row("video", "video_00001_.mp4", params_json=json.dumps(
                 {"input_image": "scene_00001_.png"}))]
 
@@ -234,7 +234,7 @@ def test_a_video_brought_in_waits_among_the_images_to_be_saved_on_the_frame_take
 def test_only_finished_videos_with_no_actions_yet_wait_for_their_actions():
     rows = [
         _row("video", "scene_00001_.mp4"),
-        _row("labeled", "scene_00002_.mp4", labels=Labels(("alpha",))),
+        _row("given actions", "scene_00002_.mp4", item_actions=ItemActions(("alpha",))),
         _row("image", "scene_00003_.png"),
     ]
 

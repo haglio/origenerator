@@ -104,6 +104,15 @@ for one thing cost four. So:
   other repos own, each read under the new word there: Funestra's
   `HOLD_PICTURE`, a verb every running Funestra speaks, and app_support's
   loading screen's `pictures.json`.
+- **An item's actions are actions, and a site's word is its site action.**
+  What an item's image actions, video actions and checkboxes say is its
+  actions (`item_actions`, `ItemActions`, `actions_of`), never its labels:
+  the code said labels until 2026-11-07, and he did not know the word. The
+  word another site gives a video it made is its site action, one of the
+  settings that made it, kept in its record's `action` and never one of its
+  actions. Saved names keep the old word, read under the new one: a
+  record's actions are stored under `labels` (`STORED_ACTIONS_KEY`), and the
+  gallery's published list is the `combined_labels` column.
 - **Where the screen names nothing, the code takes the user's word.** The
   list of folders down the left of the gallery is the **TOC** (tree of
   contents, his word since 2026-10-30; table of contents before that), and
@@ -291,17 +300,17 @@ then leaves as it is.
 
 ## What a generation shows is said by hand, never read off its prompt
 
-Each item's labels answer it and nothing else does (`action_labels`): its image
+Each item's actions answer it and nothing else does (`item_actions`): its image
 actions and image checkboxes, and a video's video actions and video checkbox, set
 with the action setter tool or the checkboxes on a Generate tab's Action row. A
-video's image labels are its start image's, or its own when it has none
-(`gallery.source_image.image_labels_row`), and a slideshow's nav map names a row
+video's image actions are its start image's, or its own when it has none
+(`gallery.source_image.image_actions_row`), and a slideshow's nav map names a row
 for the image's actions and then the video's, each once (`nav_map`). The setter
 tool's buttons stand for those actions, and a press saves the actions, never the
 button (his decision, 2026-11-06); the overlay's `image_actions` and
 `video_actions` say which actions each button stands for. The old `image_state`
 and `action` columns are read only to carry the answers given before that over
-(`former_actions`), and by Combine until it reads the labels too.
+(`former_actions`), and by Combine until it reads the actions too.
 
 It used to be worked out from the prompt, by matching each action's keywords in
 `actions` against the stored text. That answer named every nav map row and

@@ -5,8 +5,8 @@ import json
 from app_support import wrong_actions
 
 from origenerator import sent_back
-from origenerator.action_labels import Labels, labels_of
 from origenerator.db import Database, NewGeneration
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 
@@ -24,13 +24,13 @@ def _a_library(tmp_path):
     _a_finished(db, "image-one", "sdxl_t2i", {"filename": "image one.png", "subfolder": ""})
     _a_finished(db, "video-one", "wan22_i2v", {"filename": "video one.mp4", "subfolder": ""},
                 input_image="image one.png")
-    db.set_labels("image-one", MediaType.IMAGE, Labels(("alpha",), ("first box",)))
-    db.set_labels("video-one", MediaType.VIDEO, Labels(("beta",)))
+    db.set_actions("image-one", MediaType.IMAGE, ItemActions(("alpha",), ("first box",)))
+    db.set_actions("video-one", MediaType.VIDEO, ItemActions(("beta",)))
     return db
 
 
-def _labels(db, prompt_id, side):
-    return labels_of(db.get_generation(prompt_id), side)
+def _item_actions(db, prompt_id, side):
+    return actions_of(db.get_generation(prompt_id), side)
 
 
 def test_sending_a_video_back_asks_again_for_its_own_actions_and_its_images(tmp_path):
@@ -40,8 +40,8 @@ def test_sending_a_video_back_asks_again_for_its_own_actions_and_its_images(tmp_
     said = sent_back.send_back(db, "video-one", kept)
 
     assert said == "alpha, beta"
-    assert _labels(db, "video-one", MediaType.VIDEO) == Labels()
-    assert _labels(db, "image-one", MediaType.IMAGE) == Labels()
+    assert _item_actions(db, "video-one", MediaType.VIDEO) == ItemActions()
+    assert _item_actions(db, "image-one", MediaType.IMAGE) == ItemActions()
     assert kept.ids() == ("video-one", "image-one")
 
 
@@ -62,7 +62,7 @@ def test_a_video_fun_time_said_was_wrong_is_sent_back_when_the_app_takes_it_in(t
 
     assert sent_back.take_in(db, places, tmp_path, kept) == 1
 
-    assert _labels(db, "video-one", MediaType.VIDEO) == Labels()
+    assert _item_actions(db, "video-one", MediaType.VIDEO) == ItemActions()
     assert kept.ids() == ("video-one", "image-one")
 
 
@@ -82,12 +82,12 @@ def test_a_video_from_a_site_is_found_by_where_it_was_brought_in_from(tmp_path):
     brought_in = tmp_path / "upscaled" / "portrait" / "sample site" / "scene one.mp4"
     _a_finished(db, "outside-one", "outside video",
                 {"filename": "scene one.mp4", "library_path": str(brought_in)})
-    db.set_labels("outside-one", MediaType.VIDEO, Labels(("beta",)))
+    db.set_actions("outside-one", MediaType.VIDEO, ItemActions(("beta",)))
     kept = sent_back.SentBack(tmp_path / "sent_back.json")
     wrong_actions.say(tmp_path, brought_in)
 
     assert sent_back.take_in(db, OutputPlaces.in_one_folder(tmp_path), tmp_path, kept) == 1
-    assert _labels(db, "outside-one", MediaType.VIDEO) == Labels()
+    assert _item_actions(db, "outside-one", MediaType.VIDEO) == ItemActions()
 
 
 def test_a_video_the_app_has_no_item_for_is_let_go(tmp_path):

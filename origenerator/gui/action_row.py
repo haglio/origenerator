@@ -5,15 +5,15 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
-from origenerator.action_labels import Labels, labels_of
 from origenerator.action_setter_tool import the_setter_tool
 from origenerator.action_vocabulary import vocabulary
 from origenerator.gallery import media_type_of_row
-from origenerator.gallery.source_image import image_labels_row, inherits_image_labels
+from origenerator.gallery.source_image import image_actions_row, inherits_image_actions
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelForm
 from origenerator.gui.pills import PillRow
 from origenerator.gui.warning_mark import WarningMark
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 from origenerator.own_window import show_or_say
 
@@ -77,17 +77,17 @@ class _Side(QWidget):
     def shows(self, prompt_id: str) -> bool:
         return bool(prompt_id) and prompt_id == self._prompt_id
 
-    def show_labels(self, prompt_id: str, labels: Labels, *, editable: bool = True) -> None:
+    def show_actions(self, prompt_id: str, item_actions: ItemActions, *, editable: bool = True) -> None:
         self._prompt_id = prompt_id
         self._editable = editable
         self._setter.setVisible(editable)
-        self.relabel(labels)
+        self.set_actions_again(item_actions)
 
-    def relabel(self, labels: Labels) -> None:
-        self._pills.show_names(labels.actions, editable=self._editable)
+    def set_actions_again(self, item_actions: ItemActions) -> None:
+        self._pills.show_names(item_actions.actions, editable=self._editable)
         self._name_the_setter()
         for name, box in self._boxes.items():
-            box.setChecked(name in labels.checked)
+            box.setChecked(name in item_actions.checked)
 
     def _name_the_setter(self) -> None:
         self._setter.setText(EDIT if self._pills.names() else ADD)
@@ -97,10 +97,10 @@ class _Side(QWidget):
         self._save()
 
     def _save(self) -> None:
-        self._changed(self._prompt_id, self._side, self._labels())
+        self._changed(self._prompt_id, self._side, self._item_actions())
 
-    def _labels(self) -> Labels:
-        return Labels(self._pills.names(), tuple(name for name, box in self._boxes.items()
+    def _item_actions(self) -> ItemActions:
+        return ItemActions(self._pills.names(), tuple(name for name, box in self._boxes.items()
                                                  if box.isChecked()))
 
 
@@ -138,15 +138,15 @@ class ActionRow(QWidget):
         self._names[MediaType.IMAGE].setText(
             ACTIONS_LABEL if kind == MediaType.IMAGE else SIDE_LABELS[MediaType.IMAGE])
         if kind == MediaType.IMAGE:
-            image.show_labels(row["prompt_id"], labels_of(row, MediaType.IMAGE))
+            image.show_actions(row["prompt_id"], actions_of(row, MediaType.IMAGE))
             image.setEnabled(True)
         else:
-            holder = image_labels_row(row, start_image)
-            inherited = inherits_image_labels(row, start_image)
-            image.show_labels(holder["prompt_id"], labels_of(holder, MediaType.IMAGE),
+            holder = image_actions_row(row, start_image)
+            inherited = inherits_image_actions(row, start_image)
+            image.show_actions(holder["prompt_id"], actions_of(holder, MediaType.IMAGE),
                               editable=not inherited)
             image.setEnabled(not inherited)
-            video.show_labels(row["prompt_id"], labels_of(row, MediaType.VIDEO))
+            video.show_actions(row["prompt_id"], actions_of(row, MediaType.VIDEO))
         self._form.setRowVisible(image, True)
         self._form.setRowVisible(video, kind == MediaType.VIDEO)
 
@@ -160,9 +160,9 @@ class ActionRow(QWidget):
     def set_setter_host(self, host) -> None:
         self._setter_host = host
 
-    def heard(self, prompt_id: str, side: str, labels: Labels | None) -> None:
+    def heard(self, prompt_id: str, side: str, item_actions: ItemActions | None) -> None:
         if self._sides[side].shows(prompt_id):
-            self._sides[side].relabel(labels or Labels())
+            self._sides[side].set_actions_again(item_actions or ItemActions())
 
     def _open(self, side: str, prompt_id: str) -> None:
         open_now = self._windows.get(side)

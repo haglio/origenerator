@@ -12,7 +12,7 @@ from tests.media_files import write_mp4
 
 
 def _places(tmp_path) -> Places:
-    return Places(upscaled_dir=tmp_path / "videos" / "outbox",
+    return Places(kino=tmp_path / "videos" / "kino",
                   records_folder=tmp_path / "videos" / "metadata",
                   frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
                   skip_sources=frozenset({"this-app"}), library_root=tmp_path, journal=None)

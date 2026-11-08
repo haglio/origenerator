@@ -32,9 +32,11 @@ def file_what_comfyui_left(library: Library):
 
 
 def follow_moved_files(library: Library):
-    from origenerator.relocate import relocate_moved_outputs
+    from origenerator import config
+    from origenerator.relocate import follow_kinos_upscales_out_of_2_outbox, relocate_moved_outputs
 
-    return relocate_moved_outputs(library.db, library.places)
+    return (follow_kinos_upscales_out_of_2_outbox(library.db, config.LIBRARY_ROOT, config.KINO_DIR)
+            + relocate_moved_outputs(library.db, library.places))
 
 
 def tend_the_trash(library: Library):

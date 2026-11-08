@@ -61,7 +61,7 @@ def _another_sources_video(promise: dict) -> tuple[Path, dict]:
 
 def _journaling_into(folder: Path, *, beside: Path) -> outside_videos.Places:
     return outside_videos.Places(
-        upscaled_dir=beside.parents[2], records_folder=folder, frames_dir=folder,
+        kino=beside.parents[4], records_folder=folder, frames_dir=folder,
         thumb_dir=folder, skip_sources=frozenset(), library_root=config.LIBRARY_ROOT,
         journal=folder / outside_videos.JOURNAL_NAME)
 

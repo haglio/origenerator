@@ -139,6 +139,7 @@ class ParamForm(QWidget):
         self._item_seeds: dict[str, int] = {}
         self._item_thumbnail: str | None = None
         self._pins_reused_seed = traits.pins_reused_seed
+        self._takes_requests = traits.generates_here
         self._hidden_keys = frozenset(traits.hidden_keys)
         self._hidden = {
             pd.key: pd.default for pd in param_defs if pd.key in self._hidden_keys
@@ -244,7 +245,8 @@ class ParamForm(QWidget):
             self._sections[title] = section
             self._present_keys[title] = []
             outer.addWidget(section)
-            if title == "Prompts" and any(pd.key == "positive_prompt" for pd in self._param_defs):
+            if title == "Prompts" and self._takes_requests and any(
+                    pd.key == "positive_prompt" for pd in self._param_defs):
                 outer.addWidget(self._build_request_section())
         outer.addStretch(1)
 

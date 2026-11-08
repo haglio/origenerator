@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from funestra.video_families import action_group_key, seed_group_key
+from funestra.video_families import action_group_key, seed_group_and_seed
 
 from origenerator.video_records import VideoRecords, of_this_library
 
@@ -69,10 +69,10 @@ def test_a_videos_groups_are_the_ones_its_record_gives_it(tmp_path):
     video = videos / "portrait" / "scene one.mp4"
 
     assert VideoRecords(records).group_of(video, False) == action_group_key(_MADE_FROM_AN_IMAGE)
-    assert VideoRecords(records).group_of(video, True) == seed_group_key(_MADE_FROM_AN_IMAGE)[0]
+    assert VideoRecords(records).group_of(video, True) == seed_group_and_seed(_MADE_FROM_AN_IMAGE)[0]
 
 
-def test_a_video_whose_record_names_no_seed_is_in_no_seed_family(tmp_path):
+def test_a_video_whose_record_names_no_seed_is_in_no_seed_group(tmp_path):
     videos, records = _library(tmp_path)
     unseeded = {"video": {"prompt": "a boat on a lake", "model": "Motion B", "action": "beta"}}
     _filing(records, "scene one.mp4", unseeded)

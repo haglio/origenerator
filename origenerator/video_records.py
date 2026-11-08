@@ -11,7 +11,7 @@ from funestra.video_groups import (
     VideoEntry,
     action_group_items,
     normalize_path_key,
-    seed_family_items,
+    seed_group_items,
     widened_seed_items,
 )
 
@@ -48,9 +48,9 @@ class VideoRecords:
     def weight_of(self, item) -> float:
         return self._of(item).weight
 
-    def group_of(self, item, by_seed_family: bool) -> Hashable | None:
+    def group_of(self, item, by_seed_group: bool) -> Hashable | None:
         filed = self._of(item)
-        if not by_seed_family:
+        if not by_seed_group:
             return filed.action_key
         return filed.seed_key[0] if filed.seed_key is not None else None
 
@@ -64,7 +64,7 @@ class VideoRecords:
         actions, seeds, widened = (
             tuple(other for other in gather(self._index, video)
                   if normalize_path_key(other) != key)
-            for gather in (action_group_items, seed_family_items, widened_seed_items))
+            for gather in (action_group_items, seed_group_items, widened_seed_items))
         return FiledLoops(actions, seeds,
                           more_seeds=tuple(other for other in widened if other not in seeds))
 

@@ -8,7 +8,7 @@ from origenerator.nav_map import (
     beyond_the_row,
     group_keys,
     one_per_stretch,
-    seed_family,
+    seed_group,
     surroundings,
 )
 
@@ -37,7 +37,7 @@ def test_the_seed_row_is_the_rest_of_the_items_own_settings_folder():
     sibling = _image("g1", "a red fox in snow", seed=1)
     other_config = _image("g3", "a red fox in snow", seed=3, steps=30)
 
-    row = seed_family(current, [sibling, other_config, current], image_index={})
+    row = seed_group(current, [sibling, other_config, current], image_index={})
 
     assert _ids(row) == ["g2", "g1"]
 
@@ -361,7 +361,7 @@ def test_a_group_is_what_an_action_loop_plays_an_image_with_the_videos_made_from
 def test_under_an_action_filter_a_group_is_what_a_seed_loop_plays():
     library, index = _a_library_of_two_images_and_their_videos()
 
-    keys = group_keys(library, image_index=index, by_seed_family=True)
+    keys = group_keys(library, image_index=index, by_seed_group=True)
 
     for row in library:
         around = surroundings(row, library, image_index=index)

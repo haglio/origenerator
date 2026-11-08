@@ -25,7 +25,7 @@ def _others(current: dict, rows) -> list[dict]:
             and row.get("workflow_name") == workflow]
 
 
-def seed_family(current: dict, rows, *, image_index) -> list[dict]:
+def seed_group(current: dict, rows, *, image_index) -> list[dict]:
     key = gallery.settings_folder_key(current, image_index)
     return [current, *(row for row in _others(current, rows)
                        if gallery.settings_folder_key(row, image_index) == key)]
@@ -143,11 +143,11 @@ def _made_here_around(current: dict, rows, animations: _Animations, image_index)
     own = animations.label_of(current)
     image = animations.image_of(current)
     if image is None:
-        seeds = seed_family(current, rows, image_index=image_index)[1:]
+        seeds = seed_group(current, rows, image_index=image_index)[1:]
         configs = config_family(current, rows, image_index=image_index)[1:]
     else:
         seeds = [video
-                 for sibling in seed_family(image, rows, image_index=image_index)
+                 for sibling in seed_group(image, rows, image_index=image_index)
                  for video in animations.videos_of(sibling)
                  if video["prompt_id"] != current["prompt_id"]
                  and animations.label_of(video) == own]
@@ -157,13 +157,13 @@ def _made_here_around(current: dict, rows, animations: _Animations, image_index)
     return filter(alike, seeds), filter(alike, configs), group
 
 
-def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, Hashable]:
+def group_keys(rows, *, image_index, by_seed_group: bool = False) -> dict[str, Hashable]:
     animations = _Animations(rows, image_index)
 
     def by_its_image(row: dict) -> Hashable:
         return (animations.image_of(row) or row)["prompt_id"]
 
-    def by_its_seed_family(row: dict) -> Hashable:
+    def by_its_seed_group(row: dict) -> Hashable:
         image = animations.image_of(row)
         if image is None:
             return (row.get("workflow_name"), gallery.settings_folder_key(row, image_index))
@@ -172,10 +172,10 @@ def group_keys(rows, *, image_index, by_seed_family: bool = False) -> dict[str, 
 
     def the_video_a_hidden_frame_came_from(row: dict) -> bool:
         image = animations.image_of(row)
-        return (not by_seed_family and image is not None
+        return (not by_seed_group and image is not None
                 and source_of(image) == GenerationSource.STARTING_FRAME)
 
-    key_of = by_its_seed_family if by_seed_family else by_its_image
+    key_of = by_its_seed_group if by_seed_group else by_its_image
     return {row["prompt_id"]: key_of(row) for row in rows
             if made_here(row) or the_video_a_hidden_frame_came_from(row)}
 
@@ -276,13 +276,13 @@ class SlideGroups:
             file_of={row["prompt_id"]: path for path, row in played},
             row_at={normalize_path_key(path): row for path, row in played})
 
-    def __call__(self, slide, by_seed_family: bool, *, shape: str) -> Hashable | None:
+    def __call__(self, slide, by_seed_group: bool, *, shape: str) -> Hashable | None:
         library = self._library()
-        made_here = self._kept((_GROUPS, shape, by_seed_family), lambda: group_keys(
+        made_here = self._kept((_GROUPS, shape, by_seed_group), lambda: group_keys(
             library.on_the_map(shape), image_index=library.image_index,
-            by_seed_family=by_seed_family))
+            by_seed_group=by_seed_group))
         if slide.prompt_id in made_here:
             return (_MADE_HERE, made_here[slide.prompt_id])
-        filed = (self._record_group_of(slide.path, by_seed_family)
+        filed = (self._record_group_of(slide.path, by_seed_group)
                  if self._record_group_of is not None else None)
         return (_FILED, filed) if filed is not None else None

@@ -863,13 +863,13 @@ _A_GROUP_AND_TWO_ALONE = [("fox.png", "image", "id-fox"), ("fox-runs.mp4", "vide
                           ("fox-sleeps.mp4", "video", "id-sleeps"),
                           ("hare.png", "image", "id-hare"), ("owl.mp4", "video", "id-owl")]
 _OF_THE_FOX = {"id-fox": "fox", "id-runs": "fox", "id-sleeps": "fox"}
-_BY_SEED_FAMILY = {"id-runs": "running", "id-owl": "running"}
+_BY_SEED_GROUP = {"id-runs": "running", "id-owl": "running"}
 _THE_FOX = set(_OF_THE_FOX)
 
 
-def _grouping(groups=_OF_THE_FOX, by_seed_family=_BY_SEED_FAMILY):
-    def group_of(slide, seed_family):
-        return (by_seed_family if seed_family else groups).get(slide.prompt_id)
+def _grouping(groups=_OF_THE_FOX, by_seed_group=_BY_SEED_GROUP):
+    def group_of(slide, seed_group):
+        return (by_seed_group if seed_group else groups).get(slide.prompt_id)
     return group_of
 
 
@@ -905,7 +905,7 @@ def test_a_set_picked_back_up_keeps_its_remembered_order_and_still_one_of_each_g
     assert slideshow_set.playlist.order_ids() == ["id-owl", "id-runs", "id-hare"]
 
 
-def test_under_an_action_filter_a_set_deals_one_of_each_seed_family_instead():
+def test_under_an_action_filter_a_set_deals_one_of_each_seed_group_instead():
     named = {"id-fox": "alpha", "id-runs": "alpha", "id-sleeps": "alpha", "id-hare": "alpha",
              "id-owl": "alpha"}
     for _ in range(20):
@@ -984,7 +984,7 @@ def test_stepping_to_one_of_a_group_the_list_left_out_plays_it_next():
 def test_a_step_on_the_map_to_one_of_its_group_the_list_left_out_lands_on_it():
     items = [("one.png", "image", "id-1"), ("one-x.png", "image", "id-1x")]
     slideshow_set, _dealt = _set(items, neighbors=_neighbors,
-                                 group_of=lambda slide, _seed_family: "one image")
+                                 group_of=lambda slide, _seed_group: "one image")
     assert _ids(slideshow_set.playlist.items) == ["id-1"]
 
     assert slideshow_set.jump_to(slideshow_set.nav_target("down"))
@@ -1005,7 +1005,7 @@ def test_a_set_that_is_one_row_loops_all_of_it_though_its_group_would_deal_one()
     slideshow_set = SlideshowSet(row, deal=SetDeal(), actions=SlideshowActions(
         neighbors=lambda pid: NavMapNeighbors(
             seeds=tuple(Slide.of(item) for item in row if item[2] != pid)),
-        group_of=lambda slide, by_seed_family: "one image"))
+        group_of=lambda slide, by_seed_group: "one image"))
 
     assert sorted(slide.prompt_id for slide in slideshow_set.loop.pool) == ["id-1", "id-1b"]
     assert _dealt_ids(slideshow_set) == {"id-1", "id-1b"}

@@ -14,7 +14,7 @@ from typing import NamedTuple
 from app_support import haglio_settings
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
 from app_support.win32 import mutex_name
-from funestra.video_families import seed_group_key
+from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
 from origenerator import config, evolver_agreement
@@ -77,7 +77,7 @@ def record_of(video: Path, records_folder: Path, *, action: str | None = None) -
     return Record(video=_made(shown, PLACES[MediaType.VIDEO]),
                   image=_made(image, PLACES[MediaType.IMAGE]) if image is not None else None,
                   action=shown.get("action") or None,
-                  image_key=seed_group_key(read) if image else None,
+                  image_key=seed_group_and_seed(read) if image else None,
                   favorite=recorded.get("favorite") is True)
 
 

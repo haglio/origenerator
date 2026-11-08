@@ -2901,7 +2901,7 @@ class FakeRecords:
     def learn(self, items):
         self.learned.extend(items)
 
-    def group_of(self, item, by_seed_family):
+    def group_of(self, item, by_seed_group):
         return self.filed.get(str(item))
 
 

@@ -1321,6 +1321,9 @@ class GenerateTab(DropZones):
     def set_fullscreen_factory(self, make):
         self._viewport.set_fullscreen_factory(make)
 
+    def set_setter_host(self, host) -> None:
+        self._action.set_setter_host(host)
+
     def open_slideshow(self):
         return self._viewport.open_fullscreen()
 

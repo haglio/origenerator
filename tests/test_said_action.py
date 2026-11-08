@@ -4,26 +4,20 @@ import json
 import os
 
 from origenerator import said_action
-from origenerator.action_labels import Labels
+from origenerator.action_labels import Labels, labels_of
+from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
 from origenerator.media import MediaType
 from origenerator.outside_journal import actions_in, said_in
 from origenerator.outside_videos import Places
+from origenerator.sent_back import SentBack
 from origenerator.slideshow import Slide
 
 
 class _Gallery:
-    def __init__(self, *rows):
-        self.rows = {row["prompt_id"]: row for row in rows}
-        self.said = []
+    def __init__(self):
         self.reread = 0
-
-    def get_generation(self, prompt_id):
-        return self.rows.get(prompt_id)
-
-    def set_labels(self, prompt_id, side, labels):
-        self.said.append((side, prompt_id, labels))
 
     def refresh(self):
         self.reread += 1
@@ -41,35 +35,51 @@ def _nowhere():
     return None
 
 
-def _an_image(**fields) -> dict:
-    return {"prompt_id": "g1", "workflow_name": "sdxl_t2i",
-            "output_files": json.dumps([{"filename": "g1.png"}]), **fields}
+def _a_finished(db, prompt_id: str, workflow: str, output: dict, *,
+                source=GenerationSource.GENERATED, **params) -> None:
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow,
+                         workflow_version="v1", seed=1, workflow_json="{}", source=source,
+                         params_json=json.dumps({"positive_prompt": "a red kite", "seed": 1,
+                                                 **params})))
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps([output]))
 
 
-def _a_video(prompt_id="v1", **fields) -> dict:
-    return {"prompt_id": prompt_id, "workflow_name": "wan22_i2v",
-            "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}]), **fields}
+def _a_db(tmp_path) -> Database:
+    return Database(tmp_path / "origenerator.db")
 
 
-def _a_recorded_video(places: Places, filed_under: str, **fields) -> tuple[dict, Slide, object]:
-    video = places.upscaled_dir / "portrait" / filed_under / "scene one_topaz.mp4"
+def _an_image(db, labels=None) -> Slide:
+    _a_finished(db, "g1", "sdxl_t2i", {"filename": "g1.png", "subfolder": ""})
+    if labels:
+        db.set_labels("g1", MediaType.IMAGE, labels)
+    return Slide("g1.png", "image", "g1")
+
+
+def _a_video(db, *, image=None, video=None, **params) -> Slide:
+    _a_finished(db, "v1", "wan22_i2v", {"filename": "v1.mp4", "subfolder": ""}, **params)
+    for side, labels in ((MediaType.IMAGE, image), (MediaType.VIDEO, video)):
+        if labels:
+            db.set_labels("v1", side, labels)
+    return Slide("v1.mp4", "video", "v1")
+
+
+def _a_recorded_video(db, places: Places, filed_under: str, *, video=None,
+                      source=GenerationSource.GENERATED) -> tuple[Slide, object]:
+    played = places.upscaled_dir / "portrait" / filed_under / "scene one_topaz.mp4"
     record = (places.records_folder / "outbox" / "portrait" / filed_under
               / "scene one_topaz.json")
     record.parent.mkdir(parents=True)
     record.write_text(json.dumps({"video": {"action": "alpha", "prompt": "a made-up prompt"}}),
                       encoding="utf-8")
-    row = {"prompt_id": "o1", "workflow_name": "wan22_i2v", **fields,
-           "output_files": json.dumps([{"filename": video.name, "library_path": str(video)}])}
-    return row, Slide(video, "video", "o1"), record
+    _a_finished(db, "o1", "wan22_i2v", {"filename": played.name, "library_path": str(played)},
+                source=source)
+    if video:
+        db.set_labels("o1", MediaType.VIDEO, video)
+    return Slide(played, "video", "o1"), record
 
 
-def _labeled(*, image=(), video=()) -> dict:
-    return {**({"image_actions": json.dumps(list(image))} if image else {}),
-            **({"video_actions": json.dumps(list(video))} if video else {})}
-
-
-def _a_sites_video_set_as_alpha(places: Places) -> tuple[dict, Slide, object]:
-    return _a_recorded_video(places, "example_site", **_labeled(video=["alpha"]),
+def _a_sites_video_set_as_alpha(db, places: Places) -> tuple[Slide, object]:
+    return _a_recorded_video(db, places, "example_site", video=Labels(("alpha",)),
                              source=GenerationSource.OUTSIDE)
 
 
@@ -89,107 +99,123 @@ def _recorded(record) -> dict:
     return json.loads(record.read_text(encoding="utf-8"))["video"]
 
 
+def _labels(db, prompt_id, side) -> Labels:
+    return labels_of(db.get_generation(prompt_id), side)
+
+
+def _sent_back(tmp_path) -> SentBack:
+    return SentBack(tmp_path / "sent_back.json")
+
+
 class TestStrikingTheActionOnScreen:
-    def test_an_images_actions_are_the_ones_set_for_it(self):
-        db = _Gallery(_an_image(**_labeled(image=["beta", "gamma"])))
+    def test_an_images_actions_are_asked_for_again(self, tmp_path):
+        db = _a_db(tmp_path)
+        slide = _an_image(db, Labels(("beta", "gamma")))
+        kept = _sent_back(tmp_path)
 
-        assert said_action.strike(db, Slide("g1.png", "image", "g1"), _nowhere) == "beta, gamma"
-        assert db.said == [(MediaType.IMAGE, "g1", Labels())]
+        assert said_action.strike(db, slide, _nowhere, kept) == "beta, gamma"
+        assert (_labels(db, "g1", MediaType.IMAGE), kept.ids()) == (Labels(), ("g1",))
 
-    def test_a_videos_actions_come_off_the_video(self):
-        db = _Gallery(_a_video(**_labeled(video=["alpha"])))
+    def test_a_videos_actions_come_off_the_video(self, tmp_path):
+        db = _a_db(tmp_path)
+        slide = _a_video(db, video=Labels(("alpha",)))
 
-        assert said_action.strike(db, Slide("v1.mp4", "video", "v1"), _nowhere) == "alpha"
-        assert db.said == [(MediaType.VIDEO, "v1", Labels())]
+        assert said_action.strike(db, slide, _nowhere, _sent_back(tmp_path)) == "alpha"
+        assert _labels(db, "v1", MediaType.VIDEO) == Labels()
 
-    def test_a_video_made_from_no_image_loses_the_image_actions_it_holds_as_its_own_too(self):
-        db = _Gallery(_a_video(**_labeled(image=["beta"], video=["alpha"])))
-
-        assert said_action.strike(db, Slide("v1.mp4", "video", "v1"), _nowhere) == "beta, alpha"
-        assert db.said == [(MediaType.IMAGE, "v1", Labels()), (MediaType.VIDEO, "v1", Labels())]
-
-    def test_an_item_with_no_action_anywhere_has_none_to_strike(self):
-        db = _Gallery(_an_image())
-
-        assert said_action.strike(db, Slide("g1.png", "image", "g1"), _nowhere) == ""
-        assert said_action.strike(db, Slide("gone.png", "image", "gone"), _nowhere) == ""
-        assert db.said == []
-
-    def test_another_sites_video_keeps_the_rejection_in_its_record_as_kinos_does(
+    def test_a_video_made_from_no_image_loses_the_image_actions_it_holds_as_its_own_too(
             self, tmp_path):
+        db = _a_db(tmp_path)
+        slide = _a_video(db, image=Labels(("beta",)), video=Labels(("alpha",)))
+
+        assert said_action.strike(db, slide, _nowhere, _sent_back(tmp_path)) == "beta, alpha"
+        assert [_labels(db, "v1", side) for side in (MediaType.IMAGE, MediaType.VIDEO)] == [
+            Labels(), Labels()]
+
+    def test_a_video_made_from_an_image_sends_that_image_back_too(self, tmp_path):
+        db = _a_db(tmp_path)
+        _an_image(db, Labels(("beta",)))
+        slide = _a_video(db, video=Labels(("alpha",)), input_image="g1.png")
+        kept = _sent_back(tmp_path)
+
+        assert said_action.strike(db, slide, _nowhere, kept) == "beta, alpha"
+        assert (_labels(db, "g1", MediaType.IMAGE), kept.ids()) == (Labels(), ("v1", "g1"))
+
+    def test_an_item_with_no_action_anywhere_has_none_to_strike(self, tmp_path):
+        db = _a_db(tmp_path)
+        slide = _an_image(db)
+        kept = _sent_back(tmp_path)
+
+        assert said_action.strike(db, slide, _nowhere, kept) == ""
+        assert said_action.strike(db, Slide("gone.png", "image", "gone"), _nowhere, kept) == ""
+        assert kept.ids() == ()
+
+    def test_the_record_kino_keeps_of_a_sites_video_is_left_as_it_is(self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_sites_video_set_as_alpha(places)
-        db = _Gallery(row)
+        db = _a_db(tmp_path)
+        slide, record = _a_sites_video_set_as_alpha(db, places)
 
-        assert said_action.strike(db, slide, lambda: places) == "alpha"
+        assert said_action.strike(db, slide, lambda: places, _sent_back(tmp_path)) == "alpha"
 
-        assert _recorded(record) == {"wrong_action": "alpha", "prompt": "a made-up prompt"}
-        assert db.said == [(MediaType.VIDEO, "o1", Labels())]
+        assert _recorded(record) == {"action": "alpha", "prompt": "a made-up prompt"}
+        assert _labels(db, "o1", MediaType.VIDEO) == Labels()
         assert not places.journal.exists()
 
     def test_a_pick_of_his_evolver_has_yet_to_write_down_is_cancelled_or_it_would_come_back(
             self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_sites_video_set_as_alpha(places)
+        db = _a_db(tmp_path)
+        slide, record = _a_sites_video_set_as_alpha(db, places)
         os.utime(record, (1_000_000, 1_000_000))
-        db = _Gallery(row)
         _picked_before(places, slide, "alpha", 2_000_000)
 
-        assert said_action.strike(db, slide, lambda: places) == "alpha"
+        assert said_action.strike(db, slide, lambda: places, _sent_back(tmp_path)) == "alpha"
 
         assert _picked(places) == [""]
 
     def test_a_pick_evolver_wrote_into_the_record_long_ago_is_not_journaled_again(
             self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_sites_video_set_as_alpha(places)
+        db = _a_db(tmp_path)
+        slide, _record = _a_sites_video_set_as_alpha(db, places)
         places.journal.parent.mkdir(parents=True)
         places.journal.write_text(json.dumps({
             "t": 1000, "event": "action", "action": "alpha",
             "path": slide.path.relative_to(places.library_root).as_posix()}) + "\n",
             encoding="utf-8")
 
-        assert said_action.strike(_Gallery(row), slide, lambda: places) == "alpha"
+        assert said_action.strike(db, slide, lambda: places, _sent_back(tmp_path)) == "alpha"
 
         assert _picked(places) == ["alpha"]
-        assert _recorded(record)["wrong_action"] == "alpha"
 
-    def test_a_video_made_here_loses_it_in_the_record_of_the_upscale_being_played(self, tmp_path):
+    def test_an_action_only_kinos_record_holds_is_none_of_this_apps_to_strike(self, tmp_path):
         places = _places(tmp_path)
-        row, slide, record = _a_recorded_video(places, "origenerator", **_labeled(video=["alpha"]))
-        db = _Gallery(row)
+        db = _a_db(tmp_path)
+        slide, record = _a_recorded_video(db, places, "origenerator")
 
-        assert said_action.strike(db, slide, lambda: places) == "alpha"
+        assert said_action.strike(db, slide, lambda: places, _sent_back(tmp_path)) == ""
 
-        assert _recorded(record)["wrong_action"] == "alpha"
-        assert db.said == [(MediaType.VIDEO, "o1", Labels())]
-        assert not places.journal.exists()
-
-    def test_an_action_only_the_record_holds_is_struck_there_and_said(self, tmp_path):
-        places = _places(tmp_path)
-        row, slide, record = _a_recorded_video(places, "origenerator")
-        db = _Gallery(row)
-
-        assert said_action.strike(db, slide, lambda: places) == "alpha"
-
-        assert "action" not in _recorded(record)
-        assert db.said == []
+        assert _recorded(record)["action"] == "alpha"
 
 
-def test_the_slideshows_press_strikes_the_action_and_has_the_gallery_reread(tmp_path):
+def test_the_slideshows_press_sends_the_item_back_and_has_the_gallery_reread(tmp_path):
     places = _places(tmp_path)
-    row, slide, record = _a_sites_video_set_as_alpha(places)
-    gallery = _Gallery(row)
+    db = _a_db(tmp_path)
+    slide, _record = _a_sites_video_set_as_alpha(db, places)
+    gallery = _Gallery()
+    kept = _sent_back(tmp_path)
 
-    assert striking(gallery, gallery, places_here=lambda: places)(slide) == "alpha"
+    assert striking(db, gallery, places_here=lambda: places, sent_back=lambda: kept)(slide) == (
+        "alpha")
 
-    assert _recorded(record)["wrong_action"] == "alpha"
-    assert gallery.reread == 1
+    assert (kept.ids(), gallery.reread) == (("o1",), 1)
 
 
-def test_the_slideshows_press_on_a_slide_with_no_action_leaves_the_gallery_as_it_is():
-    gallery = _Gallery(_an_image())
+def test_the_slideshows_press_on_a_slide_with_no_action_leaves_the_gallery_as_it_is(tmp_path):
+    db = _a_db(tmp_path)
+    gallery = _Gallery()
 
-    assert striking(gallery, gallery, places_here=_nowhere)(Slide("g1.png", "image", "g1")) == ""
+    struck = striking(db, gallery, places_here=_nowhere,
+                      sent_back=lambda: _sent_back(tmp_path))(_an_image(db))
 
-    assert gallery.reread == 0
+    assert (struck, gallery.reread) == ("", 0)

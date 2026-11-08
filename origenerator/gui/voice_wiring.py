@@ -15,6 +15,7 @@ class VoiceSources:
     starting: StartingRows
     jobs: object = None
     requests: object = None
+    setters: object = None
 
 
 @dataclass(frozen=True)

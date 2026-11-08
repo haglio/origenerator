@@ -1,6 +1,9 @@
 # ruff: noqa: PLC0415 -- inside the functions, so naming this module costs nothing
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import NamedTuple
+
 from origenerator.media import MediaType
 
 TITLE = "Action setter tool"
@@ -36,17 +39,21 @@ def _opened_on(first: str, rows: list[dict], line: list):
     return Waiting(row, row) if row is not None else None
 
 
-def waiting_items(db, places, side: str, first: str = "") -> list[dict]:
+def waiting_items(db, places, side: str, first: str = "", *, returned=None) -> list[dict]:
     from origenerator.action_setter import waiting
     from origenerator.item_names import ItemNames
+    from origenerator.sent_back import to_the_library
 
+    returned = returned or to_the_library()
+    returned.take_in(db, places)
     rows = db.list_generations()
-    line = waiting(rows, side)
+    line = waiting(rows, side, sent_back=returned.still_waiting(rows))
     opened_on = _opened_on(first, rows, line)
     if opened_on is not None:
         line = [opened_on, *(entry for entry in line if entry.holder["prompt_id"] != first)]
     names = ItemNames.from_library(db)
-    return [{"prompt_id": entry.holder["prompt_id"], "name": names.of(entry.shown["prompt_id"]),
+    return [{"prompt_id": entry.holder["prompt_id"], "shown_id": entry.shown["prompt_id"],
+             "name": names.of(entry.shown["prompt_id"]),
              "path": _shown_from(entry.holder, places, side),
              "labels": _labels_now(entry.holder, side)}
             for entry in line]
@@ -73,7 +80,27 @@ def asks_to_keep_going(first: str):
     return ask_to_keep_going if first else None
 
 
-def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_listening):
+class ThrownInto(NamedTuple):
+    db: object
+    delete_rows: Callable[[list[dict]], object]
+    restore: Callable[[list[str]], object]
+
+    def away(self, prompt_id: str) -> None:
+        row = self.db.get_generation(prompt_id)
+        if row is not None:
+            self.delete_rows([row])
+
+    def back(self, prompt_id: str) -> None:
+        self.restore([prompt_id])
+
+
+class SetterHost(NamedTuple):
+    rubbish: Callable[[object], ThrownInto]
+    listen: Callable[[object], None]
+
+
+def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_listening, *,
+                    host: SetterHost | None = None):
     from origenerator.action_drawings import drawing_for
     from origenerator.action_setter import Locks, SetterSession
     from origenerator.action_vocabulary import vocabulary
@@ -88,15 +115,42 @@ def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_
     named = vocabulary(side)
     drawings = {name: str(drawn) for name in named.buttons
                 if (drawn := drawing_for(named.drawing_name(name))) is not None}
-    return ActionSetterWindow(SetterSession(waiting, AnswersTold(db, heard), side),
-                              named, drawings, Locks(STATE_DIR / LOCKS_FILE),
-                              keep_going=asks_to_keep_going(first))
+    window = ActionSetterWindow(
+        SetterSession(waiting, AnswersTold(db, heard), side,
+                      host.rubbish(db) if host is not None else None),
+        named, drawings, Locks(STATE_DIR / LOCKS_FILE),
+        keep_going=asks_to_keep_going(first))
+    if host is not None:
+        host.listen(window)
+    return window
+
+
+def _its_own_trash(db) -> ThrownInto:
+    from origenerator.config import OUTPUT_PLACES, TRASH_DIR
+    from origenerator.gallery_edits import GalleryEdits
+    from origenerator.trash import Trash
+
+    edits = GalleryEdits(db, OUTPUT_PLACES, Trash(TRASH_DIR))
+    return ThrownInto(db, edits.delete_rows, edits.restore_deleted)
+
+
+def _listening_while_open(window) -> None:
+    from origenerator.voice.hearing import Hearing
+
+    hearing = Hearing(window.words, parent=window)
+    hearing.said.connect(lambda said, _spoken_at: window.hear(said))
+    window.closed.connect(hearing.stop)
+    hearing.start()
+
+
+ON_ITS_OWN = SetterHost(_its_own_trash, _listening_while_open)
 
 
 def main() -> int:
     from origenerator.own_window import open_on_its_own
 
-    return open_on_its_own(TITLE, the_setter_tool, launcher="sort_images.vbs")
+    return open_on_its_own(TITLE, lambda: the_setter_tool(host=ON_ITS_OWN),
+                           launcher="sort_images.vbs")
 
 
 if __name__ == "__main__":

@@ -67,6 +67,13 @@ def tiles(names: tuple[str, ...], arranged) -> tuple[Tile, ...]:
     return (*placed.values(), *(Tile(name, down, across) for across, name in enumerate(left_over)))
 
 
+JOINER = " + "
+
+
+def said_as(name: str) -> str:
+    return name.replace(JOINER, " plus ").lower()
+
+
 class Vocabulary(NamedTuple):
     buttons: dict[str, tuple[str, ...]]
     tiles: tuple[Tile, ...]
@@ -88,6 +95,14 @@ class Vocabulary(NamedTuple):
         wanted = frozenset(actions)
         return next((button for button, made_of in self.buttons.items()
                      if wanted and frozenset(made_of) == wanted), "")
+
+    def spoken_forms(self, said: str) -> tuple[str, ...]:
+        forms = [said]
+        for name, heard in self.heard_as.items():
+            own = f" {said_as(name)} "
+            forms.extend(f" {form} ".replace(own, f" {other.lower()} ").strip()
+                         for form in list(forms) if own in f" {form} " for other in heard)
+        return tuple(dict.fromkeys(forms))
 
     def drawing_name(self, button: str) -> str:
         return self.drawn_as.get(button, button)

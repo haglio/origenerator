@@ -35,6 +35,7 @@ from origenerator.gui.action_setter_window import (
     SAME_BUTTON,
     SKIP_BUTTON,
     STATUS_LINE,
+    TRASH_BUTTON,
     UNDO_BUTTON,
     ActionSetterWindow,
     action_button,
@@ -104,13 +105,13 @@ def _said(made, name) -> str:
 @pytest.fixture
 def window(qtbot, tmp_path):
     def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
-              side=MediaType.IMAGE, locks=None, keep_going=None):
+              side=MediaType.IMAGE, locks=None, keep_going=None, rubbish=None):
         store = _Store()
         listed = items or [{"prompt_id": p, "name": "3FA9C0D2 000", "path": None}
                            for p in prompt_ids]
         stage = _Stage()
         made = ActionSetterWindow(
-            SetterSession(listed, store, side),
+            SetterSession(listed, store, side, rubbish),
             Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}, {}, {}),
             drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage,
             keep_going=keep_going)
@@ -316,6 +317,80 @@ def test_undo_with_nothing_answered_yet_says_so(window):
     _press(made, UNDO_BUTTON).click()
 
     assert _said(made, LAST_LINE) == "Nothing to undo"
+
+
+class _Bin:
+    def __init__(self):
+        self.thrown = []
+        self.stage = None
+
+    def away(self, prompt_id):
+        self.thrown.append((prompt_id, self.stage.shown[-1]))
+
+    def back(self, prompt_id):
+        self.thrown = [(thrown, shown) for thrown, shown in self.thrown if thrown != prompt_id]
+
+
+def _with_a_bin(window, *prompt_ids):
+    rubbish = _Bin()
+    made, store, stage = window(*prompt_ids, rubbish=rubbish)
+    rubbish.stage = stage
+    return made, store, rubbish
+
+
+def test_trash_lets_go_of_the_item_on_screen_then_throws_it_away(window):
+    made, store, rubbish = _with_a_bin(window, "first", "second")
+
+    _press(made, TRASH_BUTTON).click()
+
+    assert (rubbish.thrown, store.labels, _said(made, STATUS_LINE)[:2]) == (
+        [("first", None)], {}, "1 ")
+    assert _said(made, LAST_LINE) == "Last: trashed"
+
+
+def test_undo_brings_the_trashed_item_back_and_puts_it_up_again(window):
+    made, _store, rubbish = _with_a_bin(window, "first", "second")
+    _press(made, TRASH_BUTTON).click()
+
+    _press(made, UNDO_BUTTON).click()
+
+    assert (rubbish.thrown, _said(made, STATUS_LINE)[:2]) == ([], "2 ")
+
+
+def test_the_trash_button_stands_after_undo_in_the_row_under_the_buttons(window):
+    made, _store, _rubbish = _with_a_bin(window, "first")
+    made.resize(1400, 900)
+    made.show()
+    made.layout().activate()
+    lefts = [_press(made, name).mapTo(made, QPoint()) for name in (
+        SKIP_BUTTON, SAME_BUTTON, UNDO_BUTTON, TRASH_BUTTON)]
+
+    assert (len({left.y() for left in lefts}), [left.x() for left in lefts]) == (
+        1, sorted(left.x() for left in lefts))
+
+
+def test_a_buttons_name_said_presses_it(window):
+    made, store, _stage = window("first", "second")
+
+    assert made.hear("button two") is True
+    assert store.labels == {"first": Labels(("alpha", "beta"))}
+
+
+def test_the_words_under_the_buttons_said_do_what_the_buttons_do(window):
+    made, store, rubbish = _with_a_bin(window, "first", "second", "third")
+    made.hear("button three")
+
+    for said in ("same", "undo", "skip", "trash"):
+        made.hear(said)
+
+    assert (store.labels, rubbish.thrown) == (
+        {"first": Labels(("gamma",)), "second": None}, [("third", None)])
+
+
+def test_words_the_setter_tool_does_not_know_are_left_for_the_rest_of_the_app(window):
+    made, store, _stage = window("first")
+
+    assert (made.hear("go to recents"), store.labels) == (False, {})
 
 
 def test_the_item_on_screen_is_put_up_from_its_file_as_what_it_is(window, tmp_path):
@@ -696,3 +771,11 @@ def test_the_action_setter_tool_opened_in_a_preview_names_the_preview(window, mo
     made, _store, _stage = window("first")
 
     assert made.windowTitle() == "Origenerator — image action setter tool — preview of Example scene pausing"
+
+
+def test_skip_said_while_its_button_is_gray_does_nothing(window):
+    made, store, _stage = window("first", "second", keep_going=lambda _parent: True)
+
+    made.hear("skip")
+
+    assert (store.labels, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")

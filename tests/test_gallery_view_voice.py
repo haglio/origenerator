@@ -606,12 +606,12 @@ def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
     assert record["new_positive"] == job.params["positive_prompt"]
 
 
-def test_a_queued_request_says_only_that_it_was_submitted(qtbot, tmp_path, monkeypatch):
+def test_a_queued_request_the_rules_made_says_what_they_changed(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Request submitted"
+    assert words(view._slideshows.showing.shown._note) == "Took out hat."
 
 
 def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
@@ -785,7 +785,7 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
     view._on_thumbnail_clicked(job.prompt_id)
 
     exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
-    assert exchange.turns() == [("no hat", "")]
+    assert exchange.turns() == [("no hat", "Took out hat.")]
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

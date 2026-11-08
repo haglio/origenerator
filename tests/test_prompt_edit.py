@@ -161,7 +161,18 @@ def test_a_revision_carries_the_prompts_it_started_from():
     assert revision.old_positive == "a woman, freckles"
     assert revision.old_negative == "blurry"
     assert revision.changed
-    assert revision.answer == ""
+
+
+@pytest.mark.parametrize(("positive", "negative", "asked", "said"), [
+    ("a woman, freckles", "blurry", "no freckles", "Took out freckles."),
+    ("a woman", "blurry, freckles", "no freckles", "Made freckles stronger in the Negative Prompt."),
+    ("a woman", "blurry", "no freckles", "Added freckles to the Negative Prompt."),
+    ("a woman", "blurry, freckles", "freckles", "Took freckles out of the Negative Prompt."),
+    ("a woman, freckles", "blurry", "freckles", "Made freckles stronger."),
+    ("a woman", "blurry", "freckles", "Added freckles."),
+])
+def test_a_change_the_rules_make_says_what_it_did(positive, negative, asked, said):
+    assert apply_request(positive, negative, asked).answer == said
 
 
 def test_the_rules_take_a_phrase_that_says_more_than_the_term_out_whole():
@@ -260,14 +271,14 @@ def test_a_term_the_rules_are_sure_of_still_goes_to_the_model_which_knows_the_co
     assert revision.answer == "Took the hat off."
 
 
-def test_a_model_that_cannot_be_asked_leaves_the_rules_own_edit_and_nothing_said(caplog):
+def test_a_model_that_cannot_be_asked_leaves_the_rules_own_edit_and_their_line(caplog):
     with caplog.at_level(logging.WARNING, logger="origenerator.prompt_edit"):
         revision = work_out("a woman, soft light", "blurry", "freckles",
                             ask=_Model(OSError("the model is down")))
 
     assert revision.positive == "a woman, soft light, freckles"
     assert revision.action == ADDED
-    assert revision.answer == ""
+    assert revision.answer == "Added freckles."
     assert caplog.messages == ["prompt_edit: the model could not answer the request (OSError)"]
 
 
@@ -312,7 +323,7 @@ def test_an_answer_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer(cap
                             ask=_Model(("A dog with bigger ears ... warm light", "", "Bigger.")))
 
     assert revision.positive == "A dog sits on a porch at sunset, warm light, bigger ears"
-    assert revision.answer == ""
+    assert revision.answer == "Added bigger ears."
     assert caplog.messages == [
         "prompt_edit: the model's rewrite left part of the prompt out; the rules made the change"]
 
@@ -370,7 +381,7 @@ def test_a_story_the_model_answered_only_in_part_is_left_to_the_rules():
                         in_scenes=True, ask=model)
 
     assert revision.positive == story_of(["a man reading, two men", "a man asleep, two men"])
-    assert revision.answer == ""
+    assert revision.answer == "Added two men."
 
 
 def test_a_prompt_that_tells_no_story_is_asked_of_the_model_whole():

@@ -50,19 +50,6 @@ class TrashStore(Store):
         held = (TrashedBatch.from_record(json.loads(batch[0])).holding(original) for batch in batches)
         return next((file for file in held if file is not None and file.is_file()), None)
 
-    def follow_trashed(self, followed) -> int:
-        with self._connect() as conn:
-            held = conn.execute("SELECT prompt_id, row_json, batch_json FROM deletions").fetchall()
-            changed = 0
-            for prompt_id, row_json, batch_json in held:
-                row, batch = json.loads(row_json), json.loads(batch_json)
-                now_row, now_batch = followed(row), followed(batch)
-                if (now_row, now_batch) != (row, batch):
-                    conn.execute("UPDATE deletions SET row_json = ?, batch_json = ? WHERE prompt_id = ?",
-                                 (json.dumps(now_row, default=str), json.dumps(now_batch), prompt_id))
-                    changed += 1
-            return changed
-
     def trashed_library_paths(self) -> set[str]:
         with self._connect() as conn:
             held = conn.execute("SELECT row_json FROM deletions"

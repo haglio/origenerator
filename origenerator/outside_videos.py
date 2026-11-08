@@ -29,7 +29,6 @@ from origenerator.generation_state import GenerationSource, GenerationStatus, ma
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S, Turn
 from origenerator.outside_journal import actions_in, favorites_in, said_in
-from origenerator.relocate import follow_kinos_upscales_out_of_2_outbox
 from origenerator.thumbnail import (
     first_frame_of,
     generate_animated_thumbnail,
@@ -182,7 +181,6 @@ def scan_in_turn(db, places: Places, *, wait_s: float = WAIT_S) -> int:
 
 def scan(db, places: Places, *, grab=first_frame_of,
          videos_per_write: int = VIDEOS_PER_WRITE) -> int:
-    follow_kinos_upscales_out_of_2_outbox(db, places.library_root, places.kino)
     rows = db.list_generations()
     new = [(video, record_of(video.path, places.records_folder))
            for video in outside_videos(places.upscaled_dir, skip_sources=places.skip_sources,

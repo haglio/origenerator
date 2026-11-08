@@ -983,20 +983,3 @@ def test_a_source_named_like_one_of_this_apps_workflows_is_still_a_folder_of_its
 
     assert len(videos.children) == 2
 
-
-def test_a_scan_after_kinos_upscales_left_2_outbox_follows_them_rather_than_bringing_them_in_again(tmp_path):
-    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
-    now = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
-    scan(db, places, grab=_still)
-    old = (tmp_path / "videos" / "videos" / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
-           / "portrait" / "a-site" / "c1_topaz.mp4")
-    for row in db.list_generations():
-        files = json.loads(row.get("output_files") or "[]")
-        for file in files:
-            if file.get("library_path") == str(now):
-                file["library_path"] = str(old)
-        db.update_generation(row["prompt_id"], output_files=json.dumps(files))
-    assert db.library_paths() == {str(old)}
-
-    assert scan(db, places, grab=_still) == 0
-    assert db.library_paths() == {str(now)}

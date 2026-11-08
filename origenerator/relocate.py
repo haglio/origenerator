@@ -3,10 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
-
-from app_support import kino_folder
 
 from origenerator.funscript import funscript_path_for
 from origenerator.gallery.output import parse_file_list, place_of_its_own
@@ -66,39 +63,3 @@ def relocate_moved_outputs(db, places: OutputPlaces) -> int:
         if updates:
             db.update_generation(row["prompt_id"], **updates)
     return moved
-
-
-@dataclass(frozen=True)
-class _OutOf2Outbox:
-    library_root: Path
-    kino: Path
-
-    def __call__(self, value):
-        if isinstance(value, dict):
-            return {key: self._a_file_list(inner) if key in FILE_LISTS else self(inner)
-                    for key, inner in value.items()}
-        if isinstance(value, list):
-            return [self(inner) for inner in value]
-        if isinstance(value, str) and value:
-            went = kino_folder.where_it_went(Path(value), self.library_root, self.kino)
-            return value if went is None else str(went)
-        return value
-
-    def _a_file_list(self, listed):
-        if not isinstance(listed, str):
-            return self(listed)
-        files = parse_file_list(listed)
-        now = self(files)
-        return listed if now == files else json.dumps(now)
-
-
-def follow_kinos_upscales_out_of_2_outbox(db, library_root: Path, kino: Path) -> int:
-    out_of_2_outbox = _OutOf2Outbox(library_root, kino)
-    followed = 0
-    for row in db.list_generations():
-        updates = {column: json.dumps(now) for column in FILE_LISTS
-                   if (was := parse_file_list(row.get(column))) and (now := out_of_2_outbox(was)) != was}
-        if updates:
-            db.update_generation(row["prompt_id"], **updates)
-            followed += 1
-    return followed + db.follow_trashed(out_of_2_outbox)

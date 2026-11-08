@@ -26,23 +26,23 @@ def _image(size=(64, 48)) -> bytes:
     return written.getvalue()
 
 
-def _job(tmp_path, photos: dict, shared: dict | None = None) -> dict:
-    folders = {tmp_path / "hands": photos, tmp_path / "shared": shared or {}}
+def _job(tmp_path, images: dict, shared: dict | None = None) -> dict:
+    folders = {tmp_path / "hands": images, tmp_path / "shared": shared or {}}
     for folder, these in folders.items():
         folder.mkdir()
         for name, data in these.items():
             (folder / name).write_bytes(data)
     work = tmp_path / "work"
     return {"part": "hands",
-            "photos": [str(folder / name) for folder, these in folders.items() for name in these],
-            "photos_folders": [str(folder) for folder in folders], "photo_stamps": {},
+            "images": [str(folder / name) for folder, these in folders.items() for name in these],
+            "images_folders": [str(folder) for folder in folders], "image_stamps": {},
             "trained": str(work / "trained.json"),
             "caption": "close-up photo of hands",
             "detector": str(tmp_path / "hand_yolov8s.pt"), "work": str(work),
             "status": str(work / "status.json"), "log": str(work / "training.log")}
 
 
-def test_a_photo_that_is_no_image_stops_the_cropping_and_says_which_to_take_out_of_where(
+def test_a_image_that_is_no_image_stops_the_cropping_and_says_which_to_take_out_of_where(
         tmp_path):
     job = _job(tmp_path, {"fine.png": _image()}, shared={"broken.jpg": b"not an image"})
 
@@ -53,17 +53,17 @@ def test_a_photo_that_is_no_image_stops_the_cropping_and_says_which_to_take_out_
     assert "broken.jpg" in str(stopped.value)
 
 
-def test_photos_the_detector_finds_the_part_in_none_of_stop_the_training_and_say_so(tmp_path):
+def test_images_the_detector_finds_the_part_in_none_of_stop_the_training_and_say_so(tmp_path):
     job = _job(tmp_path, {"one.png": _image(), "two.png": _image()})
 
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.crop(job, find=lambda image: None)
 
-    assert "any of the 2 photos" in str(stopped.value)
-    assert all(folder in str(stopped.value) for folder in job["photos_folders"])
+    assert "any of the 2 images" in str(stopped.value)
+    assert all(folder in str(stopped.value) for folder in job["images_folders"])
 
 
-def test_each_photo_the_part_is_found_in_becomes_a_square_crop_with_the_fixs_caption(tmp_path):
+def test_each_image_the_part_is_found_in_becomes_a_square_crop_with_the_fixs_caption(tmp_path):
     job = _job(tmp_path, {"found.png": _image((400, 300)), "not.png": _image()})
 
     kept = fix_lora_trainer.crop(
@@ -152,7 +152,7 @@ def test_a_whole_training_crops_under_comfyuis_python_and_then_trains(tmp_path, 
     assert trained == "trained"
 
 
-def test_photos_the_cropping_stopped_on_are_not_trained_on_and_its_reason_stands(
+def test_images_the_cropping_stopped_on_are_not_trained_on_and_its_reason_stands(
         tmp_path, monkeypatch):
     said = {"state": "failed", "message": "Take broken.jpg out."}
     job, done = _whole_run(tmp_path, monkeypatch, crop_code=1, crop_says=said)
@@ -253,7 +253,7 @@ def test_a_training_the_graphics_card_runs_out_of_memory_for_says_so(
     assert "graphics card ran out of memory" in str(stopped.value)
 
 
-def test_a_training_that_breaks_otherwise_clears_the_photos_and_names_the_log(
+def test_a_training_that_breaks_otherwise_clears_the_images_and_names_the_log(
         cropped_job_trained_at_the_suites_priority):
     job = cropped_job_trained_at_the_suites_priority(
         "import sys\nprint('ValueError: bad option')\nsys.exit(1)\n")
@@ -261,7 +261,7 @@ def test_a_training_that_breaks_otherwise_clears_the_photos_and_names_the_log(
     with pytest.raises(fix_lora_trainer.Stopped) as stopped:
         fix_lora_trainer.train(job)
 
-    assert "Nothing about your photos caused it" in str(stopped.value)
+    assert "Nothing about your images caused it" in str(stopped.value)
     assert job["log"] in str(stopped.value)
 
 
@@ -289,10 +289,10 @@ def test_a_finished_training_names_its_lora_and_passes_on_what_it_printed(
     assert "5/10" in capfd.readouterr().out
 
 
-def test_a_finished_training_keeps_a_record_of_the_photos_it_trained_on(
+def test_a_finished_training_keeps_a_record_of_the_images_it_trained_on(
         tmp_path, cropped_job_trained_at_the_suites_priority):
     stamps = {"hands/one.png": [10, 20], "shared/two.png": [30, 40]}
-    job = dict(cropped_job_trained_at_the_suites_priority("print('done')\n"), photo_stamps=stamps,
+    job = dict(cropped_job_trained_at_the_suites_priority("print('done')\n"), image_stamps=stamps,
                trained=str(tmp_path / "work" / "trained.json"))
 
     fix_lora_trainer.train(job)
@@ -305,7 +305,7 @@ def test_a_part_is_cropped_to_a_square_twice_its_size_around_it():
     assert fix_lora_trainer.square_crop((100, 200, 160, 240), (1000, 800)) == (70, 160, 190, 280)
 
 
-def test_a_crop_near_the_photos_edge_or_bigger_than_it_stays_inside_it():
+def test_a_crop_near_the_images_edge_or_bigger_than_it_stays_inside_it():
     assert fix_lora_trainer.square_crop((0, 0, 60, 40), (1000, 800)) == (0, 0, 120, 120)
     assert fix_lora_trainer.square_crop((100, 100, 900, 700), (1000, 800)) == (100, 0, 900, 800)
 
@@ -333,7 +333,7 @@ def test_the_training_writes_its_log_as_utf8_so_a_line_in_japanese_does_not_stop
         "PATH": "C:/bin", "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 
 
-def test_fewer_photos_are_each_seen_more_times_and_every_photo_at_least_once():
+def test_fewer_images_are_each_seen_more_times_and_every_image_at_least_once():
     assert fix_lora_trainer.dataset_folder("C:/work", "hands", 10) == "C:/work/15_hands"
     assert fix_lora_trainer.dataset_folder("C:/work", "hands", 100) == "C:/work/2_hands"
     assert fix_lora_trainer.dataset_folder("C:/work", "hands", 400) == "C:/work/1_hands"

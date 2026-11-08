@@ -10,11 +10,11 @@ from origenerator.model_titles import model_title
 from origenerator.trigger_words import trigger_words_by_lora
 from origenerator.workflows.model_files import NO_LORA
 
-_PICTURES = Path("C:/example/pictures")
+_PICTURES = Path("C:/example/images")
 
 
 def _trainable(monkeypatch, tmp_path, **loras):
-    folder = tmp_path / "pictures"
+    folder = tmp_path / "images"
     folder.mkdir(exist_ok=True)
     content = {"trainable_loras": loras or {"Example Look": {
         "pictures": str(folder), "base_model": "example_raw.safetensors",
@@ -58,16 +58,16 @@ def test_a_lora_of_another_family_than_the_entrys_base_model_is_no_version_of_it
     assert look_training.training_job("Example Look")["output_name"] == "Example Look 1.1"
 
 
-def test_only_pictures_in_the_folder_are_trained_on_whatever_their_kind(tmp_path):
+def test_only_images_in_the_folder_are_trained_on_whatever_their_kind(tmp_path):
     for name in ("b.jpg", "a.PNG", "c.webp", "d.avif", "e.gif", "notes.txt", "f.mp4"):
         (tmp_path / name).write_bytes(b"")
 
-    assert [path.name for path in look_training.picture_files(tmp_path)] == [
+    assert [path.name for path in look_training.image_files(tmp_path)] == [
         "a.PNG", "b.jpg", "c.webp", "d.avif", "e.gif"]
-    assert look_training.picture_files(tmp_path / "not made yet") == []
+    assert look_training.image_files(tmp_path / "not made yet") == []
 
 
-def test_a_look_is_out_of_date_until_a_training_keeps_its_pictures_then_current_until_one_changes(
+def test_a_look_is_out_of_date_until_a_training_keeps_its_images_then_current_until_one_changes(
         monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     folder = _trainable(monkeypatch, tmp_path)
     (folder / "one.jpg").write_bytes(b"one")
@@ -78,7 +78,7 @@ def test_a_look_is_out_of_date_until_a_training_keeps_its_pictures_then_current_
 
     record = tmp_path / "lora training" / "Example Look" / "trained.json"
     record.parent.mkdir(parents=True)
-    record.write_text(json.dumps({"photo_stamps": look_training.picture_stamps("Example Look")}),
+    record.write_text(json.dumps({"photo_stamps": look_training.image_stamps("Example Look")}),
                       encoding="utf-8")
     assert look_training.training_state("Example Look") is TrainingState.CURRENT
 
@@ -86,7 +86,7 @@ def test_a_look_is_out_of_date_until_a_training_keeps_its_pictures_then_current_
     assert look_training.training_state("Example Look") is TrainingState.OUT_OF_DATE
 
 
-def test_a_training_job_names_the_next_version_its_word_its_pictures_and_its_models(
+def test_a_training_job_names_the_next_version_its_word_its_images_and_its_models(
         monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     folder = _trainable(monkeypatch, tmp_path)
     (folder / "one.jpg").write_bytes(b"one")
@@ -97,8 +97,8 @@ def test_a_training_job_names_the_next_version_its_word_its_pictures_and_its_mod
     job = look_training.training_job("Example Look")
 
     assert job["base"] == "Example Look"
-    assert job["pictures_folder"] == str(folder)
-    assert list(job["picture_stamps"]) == ["pictures/one.jpg"]
+    assert job["images_folder"] == str(folder)
+    assert list(job["image_stamps"]) == ["images/one.jpg"]
     assert job["output_name"] == "Example Look 1.2"
     assert job["display_name"] == "Example Look 1.2"
     assert job["lora_folder"] == str(models / "loras" / "looks")
@@ -116,7 +116,7 @@ def test_a_training_job_names_the_next_version_its_word_its_pictures_and_its_mod
 
 def test_the_next_version_trains_on_the_word_the_overlay_names_for_it_over_the_newest_versions(
         monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
-    folder = tmp_path / "pictures"
+    folder = tmp_path / "images"
     folder.mkdir()
     _trainable(monkeypatch, tmp_path, **{"Example Look": {
         "pictures": str(folder), "base_model": "example_raw.safetensors",
@@ -189,13 +189,13 @@ def test_what_a_trainable_lora_offers_beside_its_dropdown(
 
     offer = look_training.training_offer("Example Look", "example_look.safetensors")
 
-    assert (offer.label, offer.enabled, offer.pictures, offer.folder) == ("Retrain", True, 2, folder)
+    assert (offer.label, offer.enabled, offer.images, offer.folder) == ("Retrain", True, 2, folder)
     assert "Example Look" in offer.tooltip
     assert str(folder) in offer.tooltip
     assert "generations come first" in offer.tooltip
 
 
-def test_a_looks_training_counts_and_names_images_never_pictures(
+def test_a_looks_training_names_images_never_pictures_or_photos(
         monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     folder = _trainable(monkeypatch, tmp_path)
     _installed(installed_models, titled_models, worded_loras, ("example_look", "Example Look 1.0"))
@@ -204,6 +204,5 @@ def test_a_looks_training_counts_and_names_images_never_pictures(
     said = [offer.tooltip.replace(str(folder), ""), *(words for stage in training_run.STAGES.values() for words in stage),
             param_help.MORE_THAN_ONE_BOX]
 
-    assert offer.counted == "image"
     assert "the images in" in offer.tooltip
-    assert [line for line in said if "picture" in line.lower()] == []
+    assert [line for line in said if "picture" in line.lower() or "photo" in line.lower()] == []

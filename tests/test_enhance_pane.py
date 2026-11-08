@@ -2292,8 +2292,8 @@ def test_train_in_a_fixs_prompts_asks_for_that_fix_to_be_trained(qtbot):
     assert asked.args == ["hands"]
 
 
-def _fix_photos(monkeypatch, tmp_path, *names):
-    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+def _fix_images(monkeypatch, tmp_path, *names):
+    monkeypatch.setattr(config, "FIX_IMAGES_DIR", tmp_path)
     monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
     if names:
         (tmp_path / "hands").mkdir()
@@ -2302,41 +2302,41 @@ def _fix_photos(monkeypatch, tmp_path, *names):
     return tmp_path / "hands"
 
 
-def test_beside_train_a_fixs_prompts_say_how_many_photos_its_folder_holds(
+def test_beside_train_a_fixs_prompts_say_how_many_images_its_folder_holds(
         qtbot, monkeypatch, tmp_path):
-    folder = _fix_photos(monkeypatch, tmp_path, "one.jpg", "two.png", "notes.txt")
+    folder = _fix_images(monkeypatch, tmp_path, "one.jpg", "two.png", "notes.txt")
     pane, _edits = _panel(qtbot)
 
     pane._fix_prompt_buttons["hands"].click()
 
     window = pane._fix_prompt_windows["hands"]
-    assert window.training.pictures.text() == "2 photos"
-    assert window.training.pictures.toolTip() == str(folder)
+    assert window.training.images.text() == "2 images"
+    assert window.training.images.toolTip() == str(folder)
 
 
-def test_a_fixs_photos_are_counted_again_each_time_its_prompts_come_to_the_front(
+def test_a_fixs_images_are_counted_again_each_time_its_prompts_come_to_the_front(
         qtbot, monkeypatch, tmp_path):
-    folder = _fix_photos(monkeypatch, tmp_path, "one.jpg")
+    folder = _fix_images(monkeypatch, tmp_path, "one.jpg")
     pane, _edits = _panel(qtbot)
     pane._fix_prompt_buttons["hands"].click()
     window = pane._fix_prompt_windows["hands"]
-    assert window.training.pictures.text() == "1 photo"
+    assert window.training.images.text() == "1 image"
 
     (folder / "two.jpg").write_bytes(b"")
     QApplication.sendEvent(window, QEvent(QEvent.Type.WindowActivate))
 
-    assert window.training.pictures.text() == "2 photos"
+    assert window.training.images.text() == "2 images"
 
 
-def test_show_in_explorer_opens_a_fixs_photos_folder_making_it_first_if_need_be(
+def test_show_in_explorer_opens_a_fixs_images_folder_making_it_first_if_need_be(
         qtbot, monkeypatch, tmp_path):
-    folder = _fix_photos(monkeypatch, tmp_path)
+    folder = _fix_images(monkeypatch, tmp_path)
     opened = []
     monkeypatch.setattr(training_controls_module, "open_in_explorer", opened.append)
     pane, _edits = _panel(qtbot)
     pane._fix_prompt_buttons["hands"].click()
     window = pane._fix_prompt_windows["hands"]
-    assert window.training.pictures.text() == "0 photos"
+    assert window.training.images.text() == "0 images"
 
     window.training.folder.click()
 
@@ -2356,12 +2356,12 @@ def test_a_fixs_train_button_says_how_its_training_is_going_until_it_ends(qtbot)
     assert (window.training.train.text(), window.training.train.isEnabled()) == ("Train", True)
 
 
-def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
+def test_a_trained_fixs_button_says_retrain_grayed_until_its_images_change(
         qtbot, monkeypatch, tmp_path):
-    folder = _fix_photos(monkeypatch, tmp_path, "one.jpg")
+    folder = _fix_images(monkeypatch, tmp_path, "one.jpg")
     record = tmp_path / "fix training" / "hands" / "trained.json"
     record.parent.mkdir(parents=True)
-    record.write_text(json.dumps({"photo_stamps": fix_training.photo_stamps(
+    record.write_text(json.dumps({"photo_stamps": fix_training.image_stamps(
         parts.part_named("hands"))}), encoding="utf-8")
     pane, _edits = _panel(qtbot)
     pane._fix_prompt_buttons["hands"].click()
@@ -2376,7 +2376,7 @@ def test_a_trained_fixs_button_says_retrain_grayed_until_its_photos_change(
 
 def test_train_says_it_draws_on_the_shared_folder_only_for_a_fix_that_does(qtbot, monkeypatch):
     monkeypatch.setattr(parts, "_overlay_parts", lambda content=None: (
-        parts.DetailPart("alpha", ("alpha",), ("alpha",), shared_photos=False),))
+        parts.DetailPart("alpha", ("alpha",), ("alpha",), shared_images=False),))
     pane, _edits = _panel(qtbot)
     for name in ("hands", "alpha"):
         pane.open_fix_prompts(name)
@@ -2492,7 +2492,7 @@ def test_a_fix_windows_lora_dropdown_says_when_its_picked_lora_was_trained(
 
 @pytest.fixture
 def fix_in_two_versions(monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
-    _fix_photos(monkeypatch, tmp_path, "one.jpg")
+    _fix_images(monkeypatch, tmp_path, "one.jpg")
     titled_models({})
     worded_loras({"hands 1.0": ["zzold"], "hands 1.1": ["zznew"]})
     gone = installed_models.add("loras", "fixes/hands 1.0.safetensors", arch="sdxl", lora=True)

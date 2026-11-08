@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from origenerator import card_claim
 
-PICTURE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
 LONG_SIDE = 1536
 SHORT_SIDE_AT_LEAST = 512
 DESCRIBER = "florence-community/Florence-2-large"
@@ -39,7 +39,7 @@ def _status(job: dict, **fields) -> None:
     Path(job["status"]).write_text(json.dumps(fields), encoding="utf-8")
 
 
-def _images_folder(job: dict) -> Path:
+def _copies_folder(job: dict) -> Path:
     return Path(job["work"]) / "images"
 
 
@@ -55,18 +55,18 @@ def _output_folder(job: dict) -> Path:
     return Path(job["work"]) / "output"
 
 
-def _copy_name(picture: bytes) -> str:
-    return hashlib.sha256(picture).hexdigest()[:16]
+def _copy_name(image: bytes) -> str:
+    return hashlib.sha256(image).hexdigest()[:16]
 
 
 def prepare(job: dict) -> int:
     from PIL import Image  # noqa: PLC0415
 
-    folder = Path(job["pictures_folder"])
-    images, captions = _images_folder(job), _captions_folder(job)
+    folder = Path(job["images_folder"])
+    images, captions = _copies_folder(job), _captions_folder(job)
     images.mkdir(parents=True, exist_ok=True)
     captions.mkdir(exist_ok=True)
-    sources = sorted(path for path in folder.iterdir() if path.suffix.lower() in PICTURE_SUFFIXES)
+    sources = sorted(path for path in folder.iterdir() if path.suffix.lower() in IMAGE_SUFFIXES)
     kept: set[str] = set()
     copied = too_small = unreadable = 0
     for index, source in enumerate(sources, 1):
@@ -77,18 +77,18 @@ def prepare(job: dict) -> int:
             continue
         try:
             with Image.open(source) as opened:
-                picture = opened.convert("RGB")
+                image = opened.convert("RGB")
         except Exception:
             unreadable += 1
             continue
-        if min(picture.size) < SHORT_SIDE_AT_LEAST:
+        if min(image.size) < SHORT_SIDE_AT_LEAST:
             too_small += 1
             continue
-        if max(picture.size) > LONG_SIDE:
-            scale = LONG_SIDE / max(picture.size)
-            picture = picture.resize((round(picture.width * scale), round(picture.height * scale)),
+        if max(image.size) > LONG_SIDE:
+            scale = LONG_SIDE / max(image.size)
+            image = image.resize((round(image.width * scale), round(image.height * scale)),
                                      Image.LANCZOS)
-        picture.save(images / f"{name}.jpg", quality=95)
+        image.save(images / f"{name}.jpg", quality=95)
         kept.add(name)
         copied += 1
     for copy in images.glob("*.jpg"):
@@ -98,10 +98,10 @@ def prepare(job: dict) -> int:
             (captions / f"{copy.stem}.txt").unlink(missing_ok=True)
             for cached in _cache_folder(job).glob(f"{copy.stem}*"):
                 cached.unlink()
-    print(f"pictures: {len(sources)} in the folder, {copied} copied, {len(kept) - copied} already "
+    print(f"images: {len(sources)} in the folder, {copied} copied, {len(kept) - copied} already "
           f"copied, {too_small} too small, {unreadable} unreadable", flush=True)
     if not kept:
-        raise Stopped(f"No picture in {folder} can be trained on: a picture has to be at least "
+        raise Stopped(f"No image in {folder} can be trained on: an image has to be at least "
                       f"{SHORT_SIDE_AT_LEAST} pixels on its shorter side. Add some there, then "
                       "press Train again.")
     return len(kept)
@@ -116,14 +116,14 @@ def _florence():
     model = Florence2ForConditionalGeneration.from_pretrained(DESCRIBER, dtype=dtype).to(device).eval()
     processor = AutoProcessor.from_pretrained(DESCRIBER)
 
-    def describe(picture) -> str:
-        inputs = processor(text=DESCRIBING_TASK, images=picture, return_tensors="pt").to(device)
+    def describe(image) -> str:
+        inputs = processor(text=DESCRIBING_TASK, images=image, return_tensors="pt").to(device)
         inputs["pixel_values"] = inputs["pixel_values"].to(dtype)
         with torch.inference_mode():
             ids = model.generate(**inputs, max_new_tokens=256, num_beams=3, do_sample=False)
         text = processor.batch_decode(ids, skip_special_tokens=False)[0]
         description = processor.post_process_generation(
-            text, task=DESCRIBING_TASK, image_size=picture.size)[DESCRIBING_TASK]
+            text, task=DESCRIBING_TASK, image_size=image.size)[DESCRIBING_TASK]
         return " ".join(str(description).split())
 
     return describe
@@ -132,7 +132,7 @@ def _florence():
 def describe(job: dict, describer=None, wait_for_idle=None) -> int:
     from PIL import Image  # noqa: PLC0415
 
-    images = sorted(_images_folder(job).glob("*.jpg"))
+    images = sorted(_copies_folder(job).glob("*.jpg"))
     captions = _captions_folder(job)
     captions.mkdir(exist_ok=True)
     _status(job, state="describing", done=0, total=len(images))
@@ -143,15 +143,15 @@ def describe(job: dict, describer=None, wait_for_idle=None) -> int:
     for index, image in enumerate(images, 1):
         if image in missing:
             with Image.open(image) as opened:
-                picture = opened.convert("RGB")
-            (captions / f"{image.stem}.txt").write_text(describer(picture), encoding="utf-8")
+                opened_image = opened.convert("RGB")
+            (captions / f"{image.stem}.txt").write_text(describer(opened_image), encoding="utf-8")
         _status(job, state="describing", done=index, total=len(images))
     print(f"descriptions: {len(missing)} written, {len(images) - len(missing)} kept", flush=True)
     return len(missing)
 
 
 def dataset(job: dict) -> None:
-    images, captions = _images_folder(job), _captions_folder(job)
+    images, captions = _copies_folder(job), _captions_folder(job)
     words = list(job["trigger_words"])
     for image in sorted(images.glob("*.jpg")):
         description = (captions / f"{image.stem}.txt").read_text(encoding="utf-8").strip()
@@ -179,8 +179,8 @@ def cache(job: dict, wait_for_idle=None) -> None:
          settings, "--text_encoder", job["text_encoder"], "--batch_size", "1", "--skip_existing"],
     ):
         if subprocess.run(command, creationflags=_IN_THE_BACKGROUND, check=False).returncode != 0:
-            raise Stopped("Preparing the pictures for the training failed. Nothing about your "
-                          f"pictures caused it; an agent can read why in {job['log']}.")
+            raise Stopped("Preparing the images for the training failed. Nothing about your "
+                          f"images caused it; an agent can read why in {job['log']}.")
 
 
 class Machine:
@@ -374,7 +374,7 @@ def train(job: dict, machine, popen=subprocess.Popen, kill=_end) -> None:
         crashes += 1
         if crashes >= ROUNDS:
             raise Stopped(f"The training program stopped {crashes} times. Nothing about your "
-                          f"pictures caused it; an agent can read why in {job['log']}.")
+                          f"images caused it; an agent can read why in {job['log']}.")
         machine.sleep(60)
 
 
@@ -391,7 +391,7 @@ def install(job: dict) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(made, destination)
     Path(job["trained"]).write_text(
-        json.dumps({"photo_stamps": job["picture_stamps"], "lora": job["lora"]}), encoding="utf-8")
+        json.dumps({"photo_stamps": job["image_stamps"], "lora": job["lora"]}), encoding="utf-8")
     shutil.rmtree(output)
     Path(job["work"], "steps_done.txt").unlink(missing_ok=True)
     _status(job, state="done", lora=job["lora"], trigger_words=job["trigger_words"])
@@ -413,7 +413,7 @@ def run(job: dict) -> None:
         if describing.returncode != 0:
             if _said_why(job):
                 raise Stopped()
-            raise Stopped("Describing the pictures quit without saying why. An agent can read "
+            raise Stopped("Describing the images quit without saying why. An agent can read "
                           f"what it printed in {job['log']}.")
         dataset(job)
         cache(job, wait_for_idle=_wait_for_the_graphics_card)
@@ -425,8 +425,8 @@ def run(job: dict) -> None:
 
 STEPS = {"run": run, "prepare": prepare, "describe": describe, "dataset": dataset, "cache": cache,
          "train": lambda job: train(job, _machine(job)), "install": install}
-_DOING = {"run": "training", "prepare": "copying the pictures", "describe": "describing the pictures",
-          "dataset": "writing the dataset", "cache": "preparing the pictures", "train": "training",
+_DOING = {"run": "training", "prepare": "copying the images", "describe": "describing the images",
+          "dataset": "writing the dataset", "cache": "preparing the images", "train": "training",
           "install": "installing the LoRA"}
 
 

@@ -123,11 +123,11 @@ class EnhanceController:
         if self._training is not None:
             return
         part = part_named(name)
-        folder = fix_training.photos_folder(part)
+        folder = fix_training.images_folder(part)
         folder.mkdir(parents=True, exist_ok=True)
-        if not fix_training.training_photos(part):
+        if not fix_training.training_images(part):
             QMessageBox.information(self.pane, "Train",
-                                    f"Put photos of {name} in {folder}, then press Train again.")
+                                    f"Put images of {name} in {folder}, then press Train again.")
             return
         if config.LORA_TRAINING_PYTHON is None or config.LORA_TRAINING_SCRIPTS is None:
             QMessageBox.information(

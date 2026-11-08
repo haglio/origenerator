@@ -21,20 +21,20 @@ def _a_claim_of_the_tests_own(tmp_path, monkeypatch):
     monkeypatch.setattr(card_claim, "CLAIM", tmp_path / "graphics_card_claim.json")
 
 
-def _picture(size=(1024, 768), color=(200, 30, 30), kind="PNG") -> bytes:
+def _image(size=(1024, 768), color=(200, 30, 30), kind="PNG") -> bytes:
     written = io.BytesIO()
     Image.new("RGB", size, color).save(written, kind)
     return written.getvalue()
 
 
-def _job(tmp_path, pictures: dict | None = None, **more) -> dict:
-    source = tmp_path / "pictures"
+def _job(tmp_path, images: dict | None = None, **more) -> dict:
+    source = tmp_path / "images"
     source.mkdir(exist_ok=True)
-    for name, data in (pictures or {}).items():
+    for name, data in (images or {}).items():
         (source / name).write_bytes(data)
     work = tmp_path / "work"
     return {
-        "base": "Example Look", "pictures_folder": str(source), "picture_stamps": {},
+        "base": "Example Look", "images_folder": str(source), "image_stamps": {},
         "output_name": "Example Look 1.1", "lora_folder": str(tmp_path / "loras"),
         "lora": "Example Look 1.1.safetensors", "display_name": "Example Look 1.1",
         "trigger_words": ["zz"], "base_model": str(tmp_path / "raw.safetensors"),
@@ -56,11 +56,11 @@ def _images(job) -> list[Path]:
     return sorted(Path(job["work"], "images").glob("*.jpg"))
 
 
-def test_every_usable_picture_is_copied_in_as_a_jpeg_no_wider_than_the_trainer_wants(
+def test_every_usable_image_is_copied_in_as_a_jpeg_no_wider_than_the_trainer_wants(
         tmp_path, capsys):
-    job = _job(tmp_path, {"qzx wide.png": _picture((3000, 1500)),
-                          "qzx tiny.jpg": _picture((300, 300), kind="JPEG"),
-                          "notes.txt": b"not a picture", "qzx broken.webp": b"not a picture either"})
+    job = _job(tmp_path, {"qzx wide.png": _image((3000, 1500)),
+                          "qzx tiny.jpg": _image((300, 300), kind="JPEG"),
+                          "notes.txt": b"not a image", "qzx broken.webp": b"not a image either"})
 
     kept = look_lora_trainer.prepare(job)
 
@@ -76,8 +76,8 @@ def test_every_usable_picture_is_copied_in_as_a_jpeg_no_wider_than_the_trainer_w
     assert "qzx" not in said
 
 
-def test_a_picture_already_copied_keeps_its_copy_and_its_description_across_trainings(tmp_path):
-    job = _job(tmp_path, {"one.png": _picture()})
+def test_a_image_already_copied_keeps_its_copy_and_its_description_across_trainings(tmp_path):
+    job = _job(tmp_path, {"one.png": _image()})
     look_lora_trainer.prepare(job)
     (copy,) = _images(job)
     caption = Path(job["work"], "captions", f"{copy.stem}.txt")
@@ -92,15 +92,15 @@ def test_a_picture_already_copied_keeps_its_copy_and_its_description_across_trai
     assert caption.read_text(encoding="utf-8") == "a fabricated description"
 
 
-def test_a_picture_taken_out_of_the_folder_leaves_the_training_with_its_description(tmp_path):
-    one, two = _picture(), _picture(color=(0, 0, 200))
+def test_a_image_taken_out_of_the_folder_leaves_the_training_with_its_description(tmp_path):
+    one, two = _image(), _image(color=(0, 0, 200))
     job = _job(tmp_path, {"one.png": one, "two.png": two})
     look_lora_trainer.prepare(job)
     kept = Path(job["work"], "images", f"{look_lora_trainer._copy_name(one)}.jpg")
     captions = Path(job["work"], "captions")
     for copy in _images(job):
         (captions / f"{copy.stem}.txt").write_text("a fabricated description", encoding="utf-8")
-    Path(job["pictures_folder"], "two.png").unlink()
+    Path(job["images_folder"], "two.png").unlink()
 
     look_lora_trainer.prepare(job)
 
@@ -108,18 +108,18 @@ def test_a_picture_taken_out_of_the_folder_leaves_the_training_with_its_descript
     assert sorted(path.name for path in captions.iterdir()) == [f"{kept.stem}.txt"]
 
 
-def test_a_folder_with_no_usable_picture_stops_the_training_and_says_where_to_put_them(tmp_path):
-    job = _job(tmp_path, {"qzx tiny.jpg": _picture((300, 300), kind="JPEG")})
+def test_a_folder_with_no_usable_image_stops_the_training_and_says_where_to_put_them(tmp_path):
+    job = _job(tmp_path, {"qzx tiny.jpg": _image((300, 300), kind="JPEG")})
 
     with pytest.raises(look_lora_trainer.Stopped) as stopped:
         look_lora_trainer.prepare(job)
 
-    assert job["pictures_folder"] in str(stopped.value)
+    assert job["images_folder"] in str(stopped.value)
     assert "qzx" not in str(stopped.value)
 
 
 def test_every_copy_without_a_description_gets_one_and_none_is_ever_printed(tmp_path, capsys):
-    job = _job(tmp_path, {"one.png": _picture(), "two.png": _picture(color=(0, 0, 200))})
+    job = _job(tmp_path, {"one.png": _image(), "two.png": _image(color=(0, 0, 200))})
     look_lora_trainer.prepare(job)
     one, two = _images(job)
     captions = Path(job["work"], "captions")
@@ -129,20 +129,20 @@ def test_every_copy_without_a_description_gets_one_and_none_is_ever_printed(tmp_
 
     def describer(image):
         described.append(image.size)
-        return "a fabricated description of the picture"
+        return "a fabricated description of the image"
 
     look_lora_trainer.describe(job, describer=describer, wait_for_idle=lambda job: None)
 
     assert described == [(1024, 768)]
     assert (captions / f"{two.stem}.txt").read_text(encoding="utf-8") == (
-        "a fabricated description of the picture")
+        "a fabricated description of the image")
     assert (captions / f"{one.stem}.txt").read_text(encoding="utf-8") == "kept as it was"
     assert _status(job) == {"state": "describing", "done": 2, "total": 2}
     assert "fabricated description" not in capsys.readouterr().out
 
 
 def test_describing_waits_for_the_graphics_card_before_it_loads_its_model(tmp_path):
-    job = _job(tmp_path, {"one.png": _picture()})
+    job = _job(tmp_path, {"one.png": _image()})
     look_lora_trainer.prepare(job)
     order = []
 
@@ -153,7 +153,7 @@ def test_describing_waits_for_the_graphics_card_before_it_loads_its_model(tmp_pa
 
 
 def test_the_dataset_puts_the_trigger_words_before_every_description(tmp_path):
-    job = _job(tmp_path, {"one.png": _picture()})
+    job = _job(tmp_path, {"one.png": _image()})
     look_lora_trainer.prepare(job)
     (copy,) = _images(job)
     captions = Path(job["work"], "captions")
@@ -172,7 +172,7 @@ def test_the_dataset_puts_the_trigger_words_before_every_description(tmp_path):
 
 
 def test_a_lora_trained_on_no_word_gets_the_bare_descriptions(tmp_path):
-    job = _job(tmp_path, {"one.png": _picture()}, trigger_words=[])
+    job = _job(tmp_path, {"one.png": _image()}, trigger_words=[])
     look_lora_trainer.prepare(job)
     (copy,) = _images(job)
     captions = Path(job["work"], "captions")
@@ -430,7 +430,7 @@ def test_the_training_command_asks_musubi_for_a_krea_2_lora_at_the_settings_his_
 
 
 def test_the_finished_lora_is_installed_under_its_version_and_the_training_records_what_it_trained_on(tmp_path):
-    job = _job(tmp_path, picture_stamps={"pictures/one.png": [10, 20]})
+    job = _job(tmp_path, image_stamps={"images/one.png": [10, 20]})
     output = Path(job["work"], "output")
     output.mkdir(parents=True)
     (output / "Example Look 1.1.safetensors").write_bytes(b"lora")
@@ -441,7 +441,7 @@ def test_the_finished_lora_is_installed_under_its_version_and_the_training_recor
 
     assert (Path(job["lora_folder"]) / "Example Look 1.1.safetensors").read_bytes() == b"lora"
     assert json.loads(Path(job["trained"]).read_text(encoding="utf-8")) == {
-        "photo_stamps": {"pictures/one.png": [10, 20]}, "lora": "Example Look 1.1.safetensors"}
+        "photo_stamps": {"images/one.png": [10, 20]}, "lora": "Example Look 1.1.safetensors"}
     assert _status(job) == {"state": "done", "lora": "Example Look 1.1.safetensors", "trigger_words": ["zz"]}
     assert not output.exists()
     assert not Path(job["work"], "steps_done.txt").exists()
@@ -482,7 +482,7 @@ def test_a_run_lets_go_of_the_tile_however_it_ends(tmp_path, monkeypatch):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
     monkeypatch.setattr(look_lora_trainer, "prepare",
-                        lambda job: (_ for _ in ()).throw(look_lora_trainer.Stopped("No pictures.")))
+                        lambda job: (_ for _ in ()).throw(look_lora_trainer.Stopped("No images.")))
     assert card_claim.take("Example Look 1.1 training", os.getpid())
 
     with pytest.raises(look_lora_trainer.Stopped):
@@ -505,10 +505,10 @@ def test_a_step_that_stops_leaves_its_reason_where_the_app_reads_it(tmp_path, mo
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
     Path(job["job_file"]).write_text(json.dumps(job), encoding="utf-8")
-    monkeypatch.setitem(look_lora_trainer.STEPS, "prepare", lambda job: (_ for _ in ()).throw(look_lora_trainer.Stopped("No pictures.")))
+    monkeypatch.setitem(look_lora_trainer.STEPS, "prepare", lambda job: (_ for _ in ()).throw(look_lora_trainer.Stopped("No images.")))
 
     assert look_lora_trainer.main(["prepare", job["job_file"]]) == 1
-    assert _status(job) == {"state": "failed", "message": "No pictures."}
+    assert _status(job) == {"state": "failed", "message": "No images."}
 
 
 def test_a_step_that_breaks_says_what_it_was_doing_and_prints_why_into_the_log(tmp_path, monkeypatch, capsys):

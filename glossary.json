@@ -228,10 +228,13 @@
       ],
       "his_word": "image",
       "code_today": [
-        "image",
-        "picture"
+        "image"
       ],
       "code_word": "image",
+      "retired": [
+        "picture",
+        "photo"
+      ],
       "status": "ruled",
       "ruled": "2026-10-25, CLAUDE.md, One word per thing: an item is an image or a video; saved names (picture_state, picture_states, pictures.json) keep theirs",
       "keep": [
@@ -240,7 +243,15 @@
         "picture_border",
         "pictures_being_looked_over",
         "pictures.json",
-        "HOLD_PICTURE"
+        "HOLD_PICTURE",
+        "\"photo_stamps\"",
+        "\"shared_photos\"",
+        "[\"pictures\"]",
+        "\"outside picture:\"",
+        "close-up photo of",
+        "else \"photo\"",
+        "(\"photo\", \"photograph\"",
+        "(\"picture\", \"image\", \"render\")"
       ]
     },
     {

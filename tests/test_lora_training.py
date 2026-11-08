@@ -156,7 +156,7 @@ def test_a_lora_made_while_the_app_was_closed_is_taken_once(tmp_path):
 
 
 def test_a_training_that_did_not_finish_has_no_lora_to_take(tmp_path):
-    job = _job_kept(tmp_path, "Example Look 1.1", state="failed", message="No pictures.")
+    job = _job_kept(tmp_path, "Example Look 1.1", state="failed", message="No images.")
 
     assert lora_training.untaken_lora(job) is None
 
@@ -206,17 +206,17 @@ def test_at_launch_a_running_training_is_adopted_and_a_finished_one_taken_once(
     assert (adopted, taken) == (["running", "running"], ["finished.safetensors"])
 
 
-def test_a_training_is_current_while_the_pictures_it_kept_are_the_ones_in_the_folder(tmp_path):
-    pictures = [tmp_path / "one.jpg"]
-    pictures[0].write_bytes(b"one")
+def test_a_training_is_current_while_the_images_it_kept_are_the_ones_in_the_folder(tmp_path):
+    images = [tmp_path / "one.jpg"]
+    images[0].write_bytes(b"one")
     trained = tmp_path / "trained.json"
-    stamps = lora_training.picture_stamps(pictures)
+    stamps = lora_training.image_stamps(images)
     assert list(stamps) == [f"{tmp_path.name}/one.jpg"]
     assert lora_training.training_state(trained, stamps) is TrainingState.UNTRAINED
 
     trained.write_text(json.dumps({"photo_stamps": stamps}), encoding="utf-8")
     assert lora_training.training_state(trained, stamps) is TrainingState.CURRENT
 
-    pictures[0].write_bytes(b"one, retouched")
+    images[0].write_bytes(b"one, retouched")
     assert lora_training.training_state(
-        trained, lora_training.picture_stamps(pictures)) is TrainingState.OUT_OF_DATE
+        trained, lora_training.image_stamps(images)) is TrainingState.OUT_OF_DATE

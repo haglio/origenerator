@@ -41,7 +41,7 @@ REQUEST_SYSTEM_PROMPT = (
     "- When SETTINGS HE MAY ALSO CHANGE are listed, a request about one of them (a "
     "LoRA's strength, the size, the steps, the sampler) changes that setting under "
     "\"settings\", by its [key] and within its range or choices, and leaves both prompts "
-    "as they are; a request about the picture leaves \"settings\" empty.\n"
+    "as they are; a request about the image leaves \"settings\" empty.\n"
     "- Reply with ONLY JSON: {\"positive\": \"<full positive>\", \"negative\": "
     "\"<full negative>\", \"answer\": \"<your sentences>\", \"settings\": {}}. Always "
     "include all four, echoing a prompt unchanged if the request didn't touch it.\n"

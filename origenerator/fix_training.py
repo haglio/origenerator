@@ -13,33 +13,33 @@ from origenerator.workflows.detail_parts import detector_folder, detector_for_pa
 TRAINER = lora_training.TRAINERS / "fix_lora_trainer.py"
 HOLDS_THE_LINE = True
 FIRST_STATE = "cropping"
-_PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
 
-def photos_folder(part) -> Path:
-    return config.FIX_PHOTOS_DIR / part.name.lower()
+def images_folder(part) -> Path:
+    return config.FIX_IMAGES_DIR / part.name.lower()
 
 
-def shared_photos_folder() -> Path:
-    return config.FIX_PHOTOS_DIR / "shared"
+def shared_images_folder() -> Path:
+    return config.FIX_IMAGES_DIR / "shared"
 
 
-def photo_files(folder: Path) -> list[Path]:
+def image_files(folder: Path) -> list[Path]:
     if not folder.is_dir():
         return []
-    return sorted(path for path in folder.iterdir() if path.suffix.lower() in _PHOTO_SUFFIXES)
+    return sorted(path for path in folder.iterdir() if path.suffix.lower() in _IMAGE_SUFFIXES)
 
 
 def training_folders(part) -> list[Path]:
-    return [photos_folder(part)] + ([shared_photos_folder()] if part.shared_photos else [])
+    return [images_folder(part)] + ([shared_images_folder()] if part.shared_images else [])
 
 
-def training_photos(part) -> list[Path]:
-    return [photo for folder in training_folders(part) for photo in photo_files(folder)]
+def training_images(part) -> list[Path]:
+    return [image for folder in training_folders(part) for image in image_files(folder)]
 
 
-def photo_stamps(part) -> dict[str, list[int]]:
-    return lora_training.picture_stamps(training_photos(part))
+def image_stamps(part) -> dict[str, list[int]]:
+    return lora_training.image_stamps(training_images(part))
 
 
 def _work_folder(part) -> Path:
@@ -47,21 +47,21 @@ def _work_folder(part) -> Path:
 
 
 def training_state(part) -> TrainingState:
-    return lora_training.training_state(_work_folder(part) / "trained.json", photo_stamps(part))
+    return lora_training.training_state(_work_folder(part) / "trained.json", image_stamps(part))
 
 
 def train_tooltip(part) -> str:
-    folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_photos
+    folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_images
                else f"{part.name.lower()},")
-    return ("Trains this fix a LoRA from the photos in the library's "
+    return ("Trains this fix a LoRA from the images in the library's "
             f"app_data\\origenerator\\fixes\\{folders} each cropped down to the part by the "
             "fix's own detector. Nothing generates while it trains.")
 
 
 def training_offer(part, lora) -> TrainingOffer:
-    folder = photos_folder(part)
+    folder = images_folder(part)
     return lora_training.offer(training_state(part), tooltip=train_tooltip(part),
-                               pictures=len(photo_files(folder)), folder=folder, counted="photo",
+                               images=len(image_files(folder)), folder=folder,
                                trash_tooltip=trash_tooltip(lora))
 
 
@@ -82,9 +82,9 @@ def training_job(part, checkpoint: str) -> dict:
     output_name = f"{part.name} {version}"
     return {
         "part": part.name,
-        "photos": [str(path) for path in training_photos(part)],
-        "photos_folders": [str(folder) for folder in training_folders(part)],
-        "photo_stamps": photo_stamps(part),
+        "images": [str(path) for path in training_images(part)],
+        "images_folders": [str(folder) for folder in training_folders(part)],
+        "image_stamps": image_stamps(part),
         "detector": str(config.COMFYUI_DIR / detector_folder(part) / detector_for_part(part)),
         "caption": f"close-up photo of {part.name}",
         "base_model": str(models / "checkpoints" / checkpoint),

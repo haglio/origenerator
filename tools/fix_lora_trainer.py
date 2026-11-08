@@ -1,4 +1,4 @@
-"""Train a fix's LoRA from photos of its part, for Origenerator -- run by path,
+"""Train a fix's LoRA from images of its part, for Origenerator -- run by path,
 never imported by the app, each step under the Python that can run it:
 
     python fix_lora_trainer.py run job.json     # the one kohya's sd-scripts is installed in
@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from origenerator import card_claim
 
-_TOTAL_PHOTO_SIGHTINGS = 150
+_TOTAL_IMAGE_SIGHTINGS = 150
 
 
 def training_environment(base: dict) -> dict:
@@ -28,7 +28,7 @@ def training_environment(base: dict) -> dict:
 
 
 def dataset_folder(work: str, part: str, count: int) -> str:
-    return f"{work}/{max(1, math.ceil(_TOTAL_PHOTO_SIGHTINGS / count))}_{part}"
+    return f"{work}/{max(1, math.ceil(_TOTAL_IMAGE_SIGHTINGS / count))}_{part}"
 
 
 def train_command(job: dict, dataset: str, python: str = sys.executable) -> list[str]:
@@ -91,7 +91,7 @@ def _finder(job: dict):
         model = YOLO(job["detector"])
     except Exception as error:
         raise Stopped(f"The {job['part'].capitalize()} detector, {Path(job['detector']).name}, "
-                      "couldn't be read, so no photo was cropped. Nothing about your photos "
+                      "couldn't be read, so no image was cropped. Nothing about your images "
                       f"caused it; an agent can read why in {job['log']}.") from error
 
     def find(image):
@@ -115,16 +115,16 @@ def crop(job: dict, find=None) -> int:
     shutil.rmtree(crops, ignore_errors=True)
     crops.mkdir(parents=True)
     find = find or _finder(job)
-    photos = job["photos"]
+    images = job["images"]
     kept = 0
-    for index, photo in enumerate(photos, 1):
-        _status(job, state="cropping", done=index, total=len(photos))
+    for index, path in enumerate(images, 1):
+        _status(job, state="cropping", done=index, total=len(images))
         try:
-            with Image.open(photo) as opened:
+            with Image.open(path) as opened:
                 image = opened.convert("RGB")
         except (OSError, ValueError) as error:
-            raise Stopped(f"{Path(photo).name} couldn't be opened as an image. Take it out of "
-                          f"{Path(photo).parent} or replace it, then press Train "
+            raise Stopped(f"{Path(path).name} couldn't be opened as an image. Take it out of "
+                          f"{Path(path).parent} or replace it, then press Train "
                           "again.") from error
         box = find(image)
         if box is None:
@@ -135,8 +135,8 @@ def crop(job: dict, find=None) -> int:
         kept += 1
     if not kept:
         name = job["part"].capitalize()
-        raise Stopped(f"The {name} detector didn't find {name} in any of the {len(photos)} "
-                      f"photos in {' and '.join(job['photos_folders'])}. Add photos where "
+        raise Stopped(f"The {name} detector didn't find {name} in any of the {len(images)} "
+                      f"images in {' and '.join(job['images_folders'])}. Add images where "
                       f"{name} is clearly visible, then press Train again.")
     return kept
 
@@ -168,7 +168,7 @@ def _why_the_training_stopped(tail: bytes, log: str) -> str:
     if any(sign in tail for sign in _MEMORY_RAN_OUT):
         return ("The graphics card ran out of memory while training. Close anything else "
                 "using it, then press Train again.")
-    return ("The training program stopped with an error. Nothing about your photos caused "
+    return ("The training program stopped with an error. Nothing about your images caused "
             f"it; an agent can read why in {log}.")
 
 
@@ -185,7 +185,7 @@ def train(job: dict) -> None:
     if code != 0:
         raise Stopped(_why_the_training_stopped(tail, job["log"]))
     Path(job["trained"]).write_text(
-        json.dumps({"photo_stamps": job["photo_stamps"], "lora": job["lora"]}), encoding="utf-8")
+        json.dumps({"photo_stamps": job["image_stamps"], "lora": job["lora"]}), encoding="utf-8")
     _status(job, state="done", lora=job["lora"])
 
 
@@ -213,7 +213,7 @@ def run(job: dict) -> None:
         if cropping.returncode != 0:
             if _said_why(job):
                 raise Stopped()
-            raise Stopped("The photo cropping quit without saying why. An agent can read what "
+            raise Stopped("The image cropping quit without saying why. An agent can read what "
                           f"it printed in {job['log']}.")
         train(job)
     finally:
@@ -221,7 +221,7 @@ def run(job: dict) -> None:
 
 
 STEPS = {"run": run, "crop": crop}
-_DOING = {"run": "training", "crop": "cropping the photos"}
+_DOING = {"run": "training", "crop": "cropping the images"}
 
 
 def main(argv: list[str]) -> int:

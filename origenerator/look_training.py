@@ -16,7 +16,7 @@ HOLDS_THE_LINE = False
 FIRST_STATE = "preparing"
 STEPS = 1500
 SAVE_EVERY = 25
-PICTURE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
 
 
 def trainable_loras() -> dict:
@@ -41,18 +41,18 @@ def _model_file(category: str, name: str) -> Path:
     return config.COMFYUI_DIR / "models" / category / name
 
 
-def pictures_folder(base: str) -> Path:
+def images_folder(base: str) -> Path:
     return Path(trainable_loras()[base]["pictures"])
 
 
-def picture_files(folder: Path) -> list[Path]:
+def image_files(folder: Path) -> list[Path]:
     if not folder.is_dir():
         return []
-    return sorted(path for path in folder.iterdir() if path.suffix.lower() in PICTURE_SUFFIXES)
+    return sorted(path for path in folder.iterdir() if path.suffix.lower() in IMAGE_SUFFIXES)
 
 
-def picture_stamps(base: str) -> dict[str, list[int]]:
-    return lora_training.picture_stamps(picture_files(pictures_folder(base)))
+def image_stamps(base: str) -> dict[str, list[int]]:
+    return lora_training.image_stamps(image_files(images_folder(base)))
 
 
 def work_folder(base: str) -> Path:
@@ -62,7 +62,7 @@ def work_folder(base: str) -> Path:
 def training_state(base: str) -> TrainingState:
     if newest_version(base, model_family(base)) is None:
         return TrainingState.UNTRAINED
-    state = lora_training.training_state(work_folder(base) / "trained.json", picture_stamps(base))
+    state = lora_training.training_state(work_folder(base) / "trained.json", image_stamps(base))
     return TrainingState.OUT_OF_DATE if state is TrainingState.UNTRAINED else state
 
 
@@ -74,8 +74,8 @@ def training_job(base: str) -> dict:
     output_name = f"{base} {next_version(base, family)}"
     return {
         "base": base,
-        "pictures_folder": str(pictures_folder(base)),
-        "picture_stamps": picture_stamps(base),
+        "images_folder": str(images_folder(base)),
+        "image_stamps": image_stamps(base),
         "output_name": output_name,
         "display_name": output_name,
         "lora_folder": str(lora_folder() / folder),
@@ -126,11 +126,11 @@ def take(job: dict) -> str:
 
 
 def training_offer(base: str, lora) -> TrainingOffer:
-    folder = pictures_folder(base)
+    folder = images_folder(base)
     return lora_training.offer(
         training_state(base),
         tooltip=(f"Trains the next version of {base} from the images in {folder}. Your own "
                  "generations come first: the training pauses whenever ComfyUI has work and picks "
                  "up where it stopped."),
-        pictures=len(picture_files(folder)), folder=folder,
+        images=len(image_files(folder)), folder=folder,
         trash_tooltip=trash_tooltip(lora, model_family(base)))

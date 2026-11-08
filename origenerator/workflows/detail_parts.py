@@ -26,7 +26,7 @@ class DetailPart:
     avoid: str = ""
     dilation: int = 10
     framed_together: bool = False
-    shared_photos: bool = True
+    shared_images: bool = True
 
 
 # ComfyUI's detector models are named ADetailer-style, and these fragments follow.
@@ -75,7 +75,7 @@ def _overlay_parts(content: dict | None = None) -> tuple:
         parts.append(DetailPart(name, spoken, matches, outline=entry.get("outline") is True,
                                 prompt=_text(entry.get("prompt")),
                                 avoid=_text(entry.get("avoid")),
-                                shared_photos=entry.get("shared_photos") is not False))
+                                shared_images=entry.get("shared_photos") is not False))
     return tuple(parts)
 
 

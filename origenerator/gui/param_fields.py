@@ -33,6 +33,7 @@ class WorkflowTraits:
     hidden_keys: tuple[str, ...] = ()
     pins_reused_seed: bool = True
     lora_keys: tuple[str, ...] = ()
+    generates_here: bool = True
 
 
 @dataclass(frozen=True)

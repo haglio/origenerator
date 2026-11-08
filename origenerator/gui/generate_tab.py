@@ -507,7 +507,8 @@ class GenerateTab(DropZones):
                                size_source=wf.derived_size_source,
                                hidden_keys=wf.enhance_keys(),
                                pins_reused_seed=wf.pins_reused_seed(),
-                               lora_keys=wf.lora_keys),
+                               lora_keys=wf.lora_keys,
+                               generates_here=wf.generates_here),
                 FormHelpers(heights=self._heights,
                             seed_history=SeedHistory(self._seed_uses, self._looping_preview),
                             items=self._zone_items())))

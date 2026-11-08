@@ -186,6 +186,15 @@ def test_generate_is_grayed_on_an_ai_item_and_says_why(library, qtbot, shown):
     assert tab._generate_btn.toolTip() == "Another site made this — Origenerator can't remake it"
 
 
+@pytest.mark.parametrize("shown", ["video", "image"])
+def test_an_ai_item_has_no_request_section(library, shown):
+    tab, _db, video, image = library
+
+    tab.show_saved_generation({"video": video, "image": image}[shown], [image])
+
+    assert tab._param_form.request_exchange() is None
+
+
 def test_setting_an_ai_videos_labels_leaves_the_words_its_site_gave_it(library):
     tab, db, video, image = library
     said_by_the_site = db.get_generation(video["prompt_id"])["action"]

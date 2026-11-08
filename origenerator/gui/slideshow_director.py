@@ -81,7 +81,7 @@ from origenerator.item_shape import (
 from origenerator.media import MediaType
 from origenerator.nav_map import (
     SlideGroups,
-    action_labels,
+    actions_lines,
     beyond_the_row,
     one_per_stretch,
     surroundings,
@@ -649,7 +649,7 @@ class SlideshowDirector:
             filed=self._groups.loops_filed_for(row, shape=shape, items_of=self.items_of)))
 
     def actions_of(self, prompt_ids, *, shape: str) -> dict[str, str]:
-        named_for = action_labels(self._library().on_the_map(shape),
+        named_for = actions_lines(self._library().on_the_map(shape),
                                image_index=self._library().image_index)
         return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
                 if prompt_id in named_for}

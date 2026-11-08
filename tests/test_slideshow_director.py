@@ -15,7 +15,6 @@ from PIL import Image
 from PyQt6.QtCore import QRect, Qt
 
 from origenerator import gallery, library_views
-from origenerator.action_labels import Labels, columns, labels_of, stored
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     FAVORITES_KEY,
@@ -35,6 +34,7 @@ from origenerator.gui.slideshow_director import (
 from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_wiring import Listing
+from origenerator.item_actions import ItemActions, actions_of, columns, stored
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
@@ -427,7 +427,7 @@ class FakeDB:
         self.gets += 1
         return self.rows.get(prompt_id)
 
-    def set_labels(self, prompt_id, side, labels):
+    def set_actions(self, prompt_id, side, labels):
         self.rows[prompt_id].update(zip(columns(side), stored(labels), strict=True))
 
     def folder_meta_map(self):
@@ -2225,7 +2225,7 @@ def _fox(prompt_id, *, seed):
     return image
 
 
-def test_every_row_shows_its_items_labels_and_nothing_when_it_has_none_as_in_kino(slideshows):
+def test_every_row_shows_its_items_actions_and_nothing_when_it_has_none_as_in_kino(slideshows):
     tweaked = {**_image("c1", "a red fox", seed=1, steps=30),
                "image_actions": json.dumps(["alpha"]), "image_checked": json.dumps(["first box"])}
     rows = [_fox("g1", seed=1), tweaked, _image("c2", "a red fox", seed=1, steps=20)]
@@ -2414,7 +2414,7 @@ def test_wrong_action_on_a_slide_takes_the_action_off_its_row_and_the_gallery_re
 
     assert made[0].actions.strike_action(Slide("g1.png", "image", "g1")) == "alpha"
 
-    assert labels_of(db.rows["g1"], MediaType.IMAGE) == Labels()
+    assert actions_of(db.rows["g1"], MediaType.IMAGE) == ItemActions()
     assert host.reread == 1
 
 

@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 
 from origenerator import action_settings
-from origenerator.action_labels import stored
-from origenerator.animation_names import labels_for
+from origenerator.animation_names import item_actions_named
+from origenerator.item_actions import stored
 
 
 def _video(pid, action, created, **params):
-    actions, checked = stored(labels_for(action)) if action else (None, None)
+    actions, checked = stored(item_actions_named(action)) if action else (None, None)
     return {
         "prompt_id": pid,
         "workflow_name": "wan22_i2v",

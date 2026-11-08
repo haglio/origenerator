@@ -4,7 +4,7 @@ import json
 
 from origenerator import gallery
 from origenerator.nav_map import (
-    action_labels,
+    actions_lines,
     beyond_the_row,
     group_keys,
     one_per_stretch,
@@ -203,7 +203,7 @@ def test_the_whole_library_names_each_video_for_its_images_actions_then_its_own(
     index = gallery.build_image_config_index([source, plain])
     runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
 
-    assert action_labels([source, plain, runs], image_index=index) == {
+    assert actions_lines([source, plain, runs], image_index=index) == {
         "i1": "Source image, beta", "i2": "", "v1": "beta, alpha"}
 
 
@@ -212,7 +212,7 @@ def test_an_action_a_video_shares_with_its_image_is_named_once():
     index = gallery.build_image_config_index([source])
     again = _video("v1", "the fox again", noise_seed=5, frame="i1.png", action="beta")
 
-    assert action_labels([source, again], image_index=index)["v1"] == "beta"
+    assert actions_lines([source, again], image_index=index)["v1"] == "beta"
 
 
 
@@ -374,7 +374,7 @@ def test_a_video_is_named_for_every_label_it_publishes_its_checked_boxes_include
     runs = {**_video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha"),
             "video_checked": json.dumps(["third box"])}
 
-    assert action_labels([source, runs], image_index=index)["v1"] == "beta, alpha, first box, third box"
+    assert actions_lines([source, runs], image_index=index)["v1"] == "beta, alpha, first box, third box"
 
 
 def test_an_image_is_named_for_its_actions_then_its_checked_boxes_as_a_video_is():
@@ -383,6 +383,6 @@ def test_an_image_is_named_for_its_actions_then_its_checked_boxes_as_a_video_is(
     index = gallery.build_image_config_index([source, alone])
     runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha")
 
-    named = action_labels([source, alone, runs], image_index=index)
+    named = actions_lines([source, alone, runs], image_index=index)
 
     assert (named["i1"], named["i2"]) == ("Source image, beta, first box", "gamma, second box")

@@ -7,14 +7,14 @@ from typing import NamedTuple
 
 from app_support import wrong_actions
 
-from origenerator.action_labels import Labels, combined_actions, labels_of
 from origenerator.config import EVOLVER_SOURCE, LIBRARY_STATE_DIR
 from origenerator.evolver_upscales import original_stem
 from origenerator.gallery import media_type_of_row
 from origenerator.gallery.output import output_file_path, row_output_files
-from origenerator.gallery.source_image import image_labels_row, start_images_among
+from origenerator.gallery.source_image import image_actions_row, start_images_among
+from origenerator.item_actions import ItemActions, actions_of, combined_actions
 from origenerator.media import MediaType
-from origenerator.published_labels import set_labels
+from origenerator.published_actions import set_actions
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +59,15 @@ def _images_among(rows: list[dict]):
 
 
 def _send_back(db, video: dict, start_image_of, kept: SentBack) -> str:
-    holder = image_labels_row(video, start_image_of(video))
-    asked = {(holder["prompt_id"], MediaType.IMAGE): labels_of(holder, MediaType.IMAGE),
-             (video["prompt_id"], MediaType.VIDEO): labels_of(video, MediaType.VIDEO)}
+    holder = image_actions_row(video, start_image_of(video))
+    asked = {(holder["prompt_id"], MediaType.IMAGE): actions_of(holder, MediaType.IMAGE),
+             (video["prompt_id"], MediaType.VIDEO): actions_of(video, MediaType.VIDEO)}
     said = ", ".join(combined_actions(*asked.values()))
     if not said:
         return ""
-    for (prompt_id, side), labels in asked.items():
-        if labels.actions:
-            set_labels(db, prompt_id, side, Labels())
+    for (prompt_id, side), item_actions in asked.items():
+        if item_actions.actions:
+            set_actions(db, prompt_id, side, ItemActions())
     kept.add(dict.fromkeys(prompt_id for prompt_id, _side in reversed(asked)))
     return said
 
@@ -117,7 +117,7 @@ def take_in(db, places, state_dir, kept: SentBack) -> int:
 
 
 def _waits_on_a_side(row: dict) -> bool:
-    return not all(labels_of(row, side).actions for side in (MediaType.IMAGE, MediaType.VIDEO))
+    return not all(actions_of(row, side).actions for side in (MediaType.IMAGE, MediaType.VIDEO))
 
 
 class Returned(NamedTuple):

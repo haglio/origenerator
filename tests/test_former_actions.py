@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 
-from origenerator.action_labels import Labels, is_labeled, labels_of
 from origenerator.db import Database, NewGeneration
-from origenerator.former_actions import fill_in_labels
+from origenerator.former_actions import fill_in_actions
 from origenerator.generation_state import GenerationSource
+from origenerator.item_actions import ItemActions, actions_of, has_actions
 from origenerator.media import MediaType
 
 _SITE_WORDS = {
@@ -44,11 +44,11 @@ def test_an_images_earlier_answer_becomes_the_actions_its_button_stands_for(tmp_
     db.set_image_state("kept", "One + Two")
     db.set_image_state("renamed", "one, two")
 
-    filled = fill_in_labels(db, _CONTENT)
+    filled = fill_in_actions(db, _CONTENT)
 
     assert filled == 2
-    assert [labels_of(db.get_generation(p), MediaType.IMAGE) for p in ("kept", "renamed")] == [
-        Labels(("alpha", "beta")), Labels(("alpha", "beta"))]
+    assert [actions_of(db.get_generation(p), MediaType.IMAGE) for p in ("kept", "renamed")] == [
+        ItemActions(("alpha", "beta")), ItemActions(("alpha", "beta"))]
 
 
 def test_a_videos_earlier_action_becomes_its_new_actions_and_checkboxes(tmp_path):
@@ -58,20 +58,20 @@ def test_a_videos_earlier_action_becomes_its_new_actions_and_checkboxes(tmp_path
     db.set_action("renamed", "old three")
     db.set_action("now a box", "gone")
 
-    fill_in_labels(db, _CONTENT)
+    fill_in_actions(db, _CONTENT)
 
-    assert [labels_of(db.get_generation(p), MediaType.VIDEO) for p in ("renamed", "now a box")] == [
-        Labels(("gamma",)), Labels((), ("second box",))]
+    assert [actions_of(db.get_generation(p), MediaType.VIDEO) for p in ("renamed", "now a box")] == [
+        ItemActions(("gamma",)), ItemActions((), ("second box",))]
 
 
-def test_an_item_already_labeled_keeps_its_labels(tmp_path):
+def test_an_item_already_given_actions_keeps_them(tmp_path):
     db = Database(tmp_path / "gallery.db")
     _item(db, "img", "img_00001_.png")
     db.set_image_state("img", "one")
-    db.set_labels("img", MediaType.IMAGE, Labels(("beta",)))
+    db.set_actions("img", MediaType.IMAGE, ItemActions(("beta",)))
 
-    assert fill_in_labels(db, _CONTENT) == 0
-    assert labels_of(db.get_generation("img"), MediaType.IMAGE) == Labels(("beta",))
+    assert fill_in_actions(db, _CONTENT) == 0
+    assert actions_of(db.get_generation("img"), MediaType.IMAGE) == ItemActions(("beta",))
 
 
 def test_an_answer_no_button_ever_had_is_left_for_the_setter_tool(tmp_path):
@@ -79,8 +79,8 @@ def test_an_answer_no_button_ever_had_is_left_for_the_setter_tool(tmp_path):
     _item(db, "img", "img_00001_.png")
     db.set_image_state("img", "never a button")
 
-    assert fill_in_labels(db, _CONTENT) == 0
-    assert labels_of(db.get_generation("img"), MediaType.IMAGE) == Labels()
+    assert fill_in_actions(db, _CONTENT) == 0
+    assert actions_of(db.get_generation("img"), MediaType.IMAGE) == ItemActions()
 
 
 def _brought_in(db, said, *, frame_source=GenerationSource.STARTING_FRAME):
@@ -103,18 +103,18 @@ def test_a_video_from_another_site_reads_its_sites_words_onto_itself_and_its_sta
     db = Database(tmp_path / "gallery.db")
     _brought_in(db, "Close Beta Pose, Spray, alpha act")
 
-    fill_in_labels(db, _CONTENT)
+    fill_in_actions(db, _CONTENT)
 
-    assert labels_of(db.get_generation("theirs"), MediaType.VIDEO) == Labels(
+    assert actions_of(db.get_generation("theirs"), MediaType.VIDEO) == ItemActions(
         ("gamma", "alpha"), ("second box",))
-    assert labels_of(db.get_generation("frame"), MediaType.IMAGE) == Labels(("beta",), ("first box",))
+    assert actions_of(db.get_generation("frame"), MediaType.IMAGE) == ItemActions(("beta",), ("first box",))
 
 
 def test_its_sites_own_words_stay_as_the_site_gave_them(tmp_path):
     db = Database(tmp_path / "gallery.db")
     _brought_in(db, "Close Beta Pose, Spray")
 
-    fill_in_labels(db, _CONTENT)
+    fill_in_actions(db, _CONTENT)
 
     assert db.get_generation("theirs")["action"] == "Close Beta Pose, Spray"
 
@@ -123,17 +123,17 @@ def test_a_site_word_that_means_nothing_leaves_the_video_for_the_setter_tool(tmp
     db = Database(tmp_path / "gallery.db")
     _brought_in(db, "Wide Default")
 
-    fill_in_labels(db, _CONTENT)
+    fill_in_actions(db, _CONTENT)
 
-    assert (is_labeled(db.get_generation("theirs"), MediaType.VIDEO),
-            is_labeled(db.get_generation("frame"), MediaType.IMAGE)) == (False, False)
+    assert (has_actions(db.get_generation("theirs"), MediaType.VIDEO),
+            has_actions(db.get_generation("frame"), MediaType.IMAGE)) == (False, False)
 
 
-def test_a_starting_frame_already_labeled_keeps_its_labels(tmp_path):
+def test_a_starting_frame_already_given_actions_keeps_them(tmp_path):
     db = Database(tmp_path / "gallery.db")
     _brought_in(db, "Close Beta Pose", frame_source=GenerationSource.OUTSIDE)
-    db.set_labels("frame", MediaType.IMAGE, Labels(("alpha",)))
+    db.set_actions("frame", MediaType.IMAGE, ItemActions(("alpha",)))
 
-    fill_in_labels(db, _CONTENT)
+    fill_in_actions(db, _CONTENT)
 
-    assert labels_of(db.get_generation("frame"), MediaType.IMAGE) == Labels(("alpha",))
+    assert actions_of(db.get_generation("frame"), MediaType.IMAGE) == ItemActions(("alpha",))

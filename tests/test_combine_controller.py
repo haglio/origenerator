@@ -8,10 +8,9 @@ from PIL import Image
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import action_settings, evolver_export, gallery
-from origenerator.action_labels import Labels
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animate_command import AnimateRequest
-from origenerator.animation_names import JOINER, labels_for
+from origenerator.animation_names import JOINER, item_actions_named
 from origenerator.db import Database
 from origenerator.export_lane import GENAU
 from origenerator.generation_state import GenerationSource
@@ -23,6 +22,7 @@ from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineControlle
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
+from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
@@ -160,7 +160,7 @@ class FakeDB:
         self.exported = []
         self.uses = []
         self.combinations = []
-        self.labeled = {}
+        self.actions_by_id = {}
 
     def get_generation(self, prompt_id):
         return self.rows.get(prompt_id)
@@ -171,8 +171,8 @@ class FakeDB:
     def set_settings_source(self, prompt_id, *, category="", video_prompt_id=None):
         self.settings_sources.append((prompt_id, category, video_prompt_id))
 
-    def set_labels(self, prompt_id, side, labels):
-        self.labeled[prompt_id] = (side, labels)
+    def set_actions(self, prompt_id, side, item_actions):
+        self.actions_by_id[prompt_id] = (side, item_actions)
 
     def fill_in(self, column, values):
         pass
@@ -275,7 +275,7 @@ def _video(prompt_id="clip", **given):
     source_image = given.get("source_image")
     return {
         "prompt_id": prompt_id,
-        "video_actions": (json.dumps(list(labels_for(given["action"]).actions))
+        "video_actions": (json.dumps(list(item_actions_named(given["action"]).actions))
                           if given.get("action") else None),
         "workflow_name": given.get("workflow_name", VIDEO_WORKFLOW),
         "positive_prompt": "a doll on a couch, waving",
@@ -592,7 +592,7 @@ def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
 
 
 
-def test_a_video_combine_makes_is_labeled_with_its_actions_and_its_ticked_boxes(
+def test_a_video_combine_makes_is_given_its_actions_and_its_ticked_boxes(
         combine, monkeypatch):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
@@ -603,10 +603,10 @@ def test_a_video_combine_makes_is_labeled_with_its_actions_and_its_ticked_boxes(
 
     controller._generate_combination("img", "clip", category="alpha + beta + third box")
 
-    assert db.labeled == {"made": (MediaType.VIDEO, Labels(("alpha", "beta"), ("third box",)))}
+    assert db.actions_by_id == {"made": (MediaType.VIDEO, ItemActions(("alpha", "beta"), ("third box",)))}
 
 
-def test_a_dropped_video_combined_with_a_ticked_box_is_labeled_with_the_box_alone(
+def test_a_dropped_video_combined_with_a_ticked_box_is_given_the_box_alone(
         combine, monkeypatch):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
@@ -617,7 +617,7 @@ def test_a_dropped_video_combined_with_a_ticked_box_is_labeled_with_the_box_alon
 
     controller._generate_combination("img", "clip", checked=("third box",))
 
-    assert db.labeled == {"made": (MediaType.VIDEO, Labels((), ("third box",)))}
+    assert db.actions_by_id == {"made": (MediaType.VIDEO, ItemActions((), ("third box",)))}
 
 
 def test_ticking_a_box_offers_the_actions_again_with_it(combine, monkeypatch):

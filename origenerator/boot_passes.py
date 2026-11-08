@@ -131,13 +131,13 @@ def _record_shapes(library: Library):
 
 
 def _read_actions_off_earlier_answers(library: Library):
-    from origenerator.former_actions import fill_in_labels
+    from origenerator.former_actions import fill_in_actions
 
-    return fill_in_labels(library.db)
+    return fill_in_actions(library.db)
 
 
-def _publish_labels(library: Library):
-    from origenerator.published_labels import publish
+def _publish_actions(library: Library):
+    from origenerator.published_actions import publish
 
     return publish(library.db)
 
@@ -202,9 +202,9 @@ MAINTENANCE = (
     BootPass(None, _read_actions_off_earlier_answers,
              counted="Read the actions of %d item(s) off their earlier answers",
              failure="Reading actions off earlier answers failed: %s"),
-    BootPass(None, _publish_labels,
-             counted="Published the labels of %d video(s)",
-             failure="Publishing the labels of videos failed: %s"),
+    BootPass(None, _publish_actions,
+             counted="Published the actions of %d video(s)",
+             failure="Publishing the actions of videos failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )

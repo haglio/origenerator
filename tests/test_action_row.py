@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.tick_control import TickControl
 
-from origenerator.action_labels import Labels, stored
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_row import (
     ADD,
@@ -30,6 +29,7 @@ from origenerator.gui.action_row import (
 from origenerator.gui.label_cells import LabelForm
 from origenerator.gui.pills import Pill
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
 
 _BOXES = {MediaType.IMAGE: ("first box", "second box"), MediaType.VIDEO: ("third box",)}
@@ -110,7 +110,7 @@ def _named(action, side) -> str:
 
 
 def test_an_image_lists_the_actions_it_was_set_with_and_no_dropdown(action):
-    action.show_row(_row(image=Labels(("alpha", "beta"))))
+    action.show_row(_row(image=ItemActions(("alpha", "beta"))))
 
     assert (_listed(action, MediaType.IMAGE), action.findChildren(QComboBox)) == (("alpha", "beta"), [])
 
@@ -123,7 +123,7 @@ def test_an_image_with_no_actions_shows_no_pills_and_offers_to_add_them(action):
 
 
 def test_an_image_with_actions_offers_to_edit_them(action):
-    action.show_row(_row(image=Labels(("alpha",))))
+    action.show_row(_row(image=ItemActions(("alpha",))))
 
     assert _setter(action, MediaType.IMAGE).text() == EDIT == "Edit with setter tool…"
 
@@ -133,7 +133,7 @@ def _top_left(widget: QWidget, within: QWidget) -> QPoint:
 
 
 def test_an_image_shows_its_checkboxes_as_it_saved_them_before_its_pills_on_one_line(action, qtbot):
-    action.show_row(_row(image=Labels(("alpha",), ("second box",))))
+    action.show_row(_row(image=ItemActions(("alpha",), ("second box",))))
     host = _rows(action)
     host.resize(900, 200)
     with qtbot.waitExposed(host):
@@ -148,7 +148,7 @@ def test_an_image_shows_its_checkboxes_as_it_saved_them_before_its_pills_on_one_
 
 
 def test_a_videos_checkbox_stands_before_its_pills_too(action, qtbot):
-    action.show_row(_video("vid", video=Labels(("delta",), ("third box",))))
+    action.show_row(_video("vid", video=ItemActions(("delta",), ("third box",))))
     host = _rows(action)
     host.resize(900, 300)
     with qtbot.waitExposed(host):
@@ -161,12 +161,12 @@ def test_a_videos_checkbox_stands_before_its_pills_too(action, qtbot):
 
 
 def test_clicking_a_checkbox_saves_it_with_the_actions_the_item_already_has(action, qtbot):
-    action.show_row(_row(image=Labels(("alpha",))))
+    action.show_row(_row(image=ItemActions(("alpha",))))
 
     with qtbot.waitSignal(action.changed) as caught:
         _box(action, MediaType.IMAGE, "first box").click()
 
-    assert caught.args == ["img", MediaType.IMAGE, Labels(("alpha",), ("first box",))]
+    assert caught.args == ["img", MediaType.IMAGE, ItemActions(("alpha",), ("first box",))]
 
 
 def test_an_image_shows_no_video_part(action):
@@ -222,15 +222,15 @@ def test_an_answer_the_setter_tool_gives_for_the_item_on_the_tab_shows_at_once(a
     _setter(action, MediaType.IMAGE).click()
     heard = action._windows[MediaType.IMAGE].heard
 
-    heard("img-seven", MediaType.IMAGE, Labels(("gamma",), ("first box",)))
-    heard("another image", MediaType.IMAGE, Labels(("alpha",)))
+    heard("img-seven", MediaType.IMAGE, ItemActions(("gamma",), ("first box",)))
+    heard("another image", MediaType.IMAGE, ItemActions(("alpha",)))
 
     assert (_listed(action, MediaType.IMAGE), _setter(action, MediaType.IMAGE).text(),
             _box(action, MediaType.IMAGE, "first box").isChecked()) == (("gamma",), EDIT, True)
 
 
-def test_an_answer_taken_back_in_the_setter_tool_shows_the_item_unlabeled_again(action):
-    action.show_row(_row("img-seven", image=Labels(("alpha",))))
+def test_an_answer_taken_back_in_the_setter_tool_shows_the_item_without_actions_again(action):
+    action.show_row(_row("img-seven", image=ItemActions(("alpha",))))
     _setter(action, MediaType.IMAGE).click()
 
     action._windows[MediaType.IMAGE].heard("img-seven", MediaType.IMAGE, None)
@@ -239,9 +239,9 @@ def test_an_answer_taken_back_in_the_setter_tool_shows_the_item_unlabeled_again(
 
 
 def test_a_video_made_from_an_image_shows_that_images_part_grayed_beside_its_own(action):
-    image = _row("img", image=Labels(("alpha",), ("first box",)))
+    image = _row("img", image=ItemActions(("alpha",), ("first box",)))
 
-    action.show_row(_video(video=Labels(("delta",), ("third box",))), image)
+    action.show_row(_video(video=ItemActions(("delta",), ("third box",))), image)
 
     image_part = _setter(action, MediaType.IMAGE).parentWidget()
     assert (_listed(action, MediaType.IMAGE), image_part.isEnabled(),
@@ -251,13 +251,13 @@ def test_a_video_made_from_an_image_shows_that_images_part_grayed_beside_its_own
 
 
 def test_a_video_made_from_an_image_offers_no_setter_tool_for_that_images_actions(action):
-    action.show_row(_video(), _row("img", image=Labels(("alpha",))))
+    action.show_row(_video(), _row("img", image=ItemActions(("alpha",))))
 
     assert _setter(action, MediaType.IMAGE).isHidden()
 
 
 def test_a_video_made_from_an_image_shows_its_pills_grayed_with_nothing_to_remove_or_add(action):
-    action.show_row(_video(), _row("img", image=Labels(("alpha",))))
+    action.show_row(_video(), _row("img", image=ItemActions(("alpha",))))
 
     pills = _pills(action, MediaType.IMAGE)
     assert ([pill.isEnabled() for pill in pills], [_has_an_x(pill) for pill in pills],
@@ -265,8 +265,8 @@ def test_a_video_made_from_an_image_shows_its_pills_grayed_with_nothing_to_remov
 
 
 def test_the_next_image_after_a_video_made_from_one_offers_its_setter_tool_and_pills_again(action):
-    action.show_row(_video(), _row("img", image=Labels(("alpha",))))
-    action.show_row(_row("other", image=Labels(("alpha",))))
+    action.show_row(_video(), _row("img", image=ItemActions(("alpha",))))
+    action.show_row(_row("other", image=ItemActions(("alpha",))))
 
     assert (_setter(action, MediaType.IMAGE).isHidden(),
             [_has_an_x(pill) for pill in _pills(action, MediaType.IMAGE)],
@@ -274,7 +274,7 @@ def test_the_next_image_after_a_video_made_from_one_offers_its_setter_tool_and_p
 
 
 def test_a_video_made_from_no_image_shows_its_own_image_part_live(action):
-    action.show_row(_video(image=Labels(("alpha",))))
+    action.show_row(_video(image=ItemActions(("alpha",))))
 
     image_part = _setter(action, MediaType.IMAGE).parentWidget()
     assert (_listed(action, MediaType.IMAGE), image_part.isEnabled(),
@@ -290,7 +290,7 @@ def test_its_image_button_opens_the_setter_tool_for_images_on_the_video(action, 
 
 
 def test_a_video_brought_in_shows_the_image_part_of_the_frame_taken_from_it(action, opened):
-    frame = _row("frame", source=GenerationSource.STARTING_FRAME, image=Labels(("beta",)))
+    frame = _row("frame", source=GenerationSource.STARTING_FRAME, image=ItemActions(("beta",)))
 
     action.show_row(_video("theirs", source=GenerationSource.OUTSIDE), frame)
     _setter(action, MediaType.IMAGE).click()
@@ -325,7 +325,7 @@ def test_an_images_row_is_actions_and_a_videos_rows_are_image_actions_and_video_
 
 def test_the_pills_wrap_onto_more_lines_rather_than_being_cut_short(action, qtbot):
     many = tuple(f"made up action number {n}" for n in range(8))
-    action.show_row(_row(image=Labels(many)))
+    action.show_row(_row(image=ItemActions(many)))
     host = _rows(action)
     host.resize(10, 400)
     with qtbot.waitExposed(host):
@@ -340,7 +340,7 @@ def test_the_pills_wrap_onto_more_lines_rather_than_being_cut_short(action, qtbo
 
 
 def test_the_button_sits_on_a_line_of_its_own_under_the_checkboxes_and_the_actions(action):
-    action.show_row(_row(image=Labels(("alpha",))))
+    action.show_row(_row(image=ItemActions(("alpha",))))
     _rows(action).resize(600, 300)
     _rows(action).show()
     listed = _pill_row(action, MediaType.IMAGE)
@@ -354,13 +354,13 @@ def test_the_button_sits_on_a_line_of_its_own_under_the_checkboxes_and_the_actio
 
 
 def test_each_action_is_a_pill_with_an_x_that_removes_it_and_saves_at_once(action, qtbot):
-    action.show_row(_row(image=Labels(("alpha", "beta"), ("first box",))))
+    action.show_row(_row(image=ItemActions(("alpha", "beta"), ("first box",))))
     alpha = _pills(action, MediaType.IMAGE)[0]
 
     with qtbot.waitSignal(action.changed) as caught:
         alpha.findChild(QToolButton).click()
 
-    assert caught.args == ["img", MediaType.IMAGE, Labels(("beta",), ("first box",))]
+    assert caught.args == ["img", MediaType.IMAGE, ItemActions(("beta",), ("first box",))]
     assert _listed(action, MediaType.IMAGE) == ("beta",)
 
 
@@ -378,7 +378,7 @@ def _drawn_whole(button: QAbstractButton) -> bool:
 
 def test_each_pills_x_and_the_plus_are_drawn_whole_under_the_apps_own_look(action, qtbot):
     _rows(action).setStyleSheet(build_stylesheet())
-    action.show_row(_row(image=Labels(("alpha",))))
+    action.show_row(_row(image=ItemActions(("alpha",))))
     with qtbot.waitExposed(_rows(action)):
         _rows(action).show()
 
@@ -388,7 +388,7 @@ def test_each_pills_x_and_the_plus_are_drawn_whole_under_the_apps_own_look(actio
 
 
 def test_removing_the_last_pill_turns_the_button_back_to_add(action):
-    action.show_row(_row(image=Labels(("alpha",))))
+    action.show_row(_row(image=ItemActions(("alpha",))))
 
     _pills(action, MediaType.IMAGE)[0].findChild(QToolButton).click()
 
@@ -401,7 +401,7 @@ def _offered(action, side) -> list[Pill]:
 
 
 def test_the_plus_offers_the_sides_other_plain_actions_as_pills(action, qtbot):
-    action.show_row(_row(image=Labels(("beta",))))
+    action.show_row(_row(image=ItemActions(("beta",))))
     _rows(action).show()
 
     _adder(action, MediaType.IMAGE).click()
@@ -412,7 +412,7 @@ def test_the_plus_offers_the_sides_other_plain_actions_as_pills(action, qtbot):
 
 
 def test_picking_an_offered_pill_adds_it_and_saves_at_once(action, qtbot):
-    action.show_row(_row(image=Labels(("beta",), ("second box",))))
+    action.show_row(_row(image=ItemActions(("beta",), ("second box",))))
     _rows(action).show()
     _adder(action, MediaType.IMAGE).click()
     gamma = next(pill for pill in _offered(action, MediaType.IMAGE) if pill.text() == "gamma")
@@ -420,7 +420,7 @@ def test_picking_an_offered_pill_adds_it_and_saves_at_once(action, qtbot):
     with qtbot.waitSignal(action.changed) as caught:
         qtbot.mouseClick(gamma, Qt.MouseButton.LeftButton)
 
-    assert caught.args == ["img", MediaType.IMAGE, Labels(("beta", "gamma"), ("second box",))]
+    assert caught.args == ["img", MediaType.IMAGE, ItemActions(("beta", "gamma"), ("second box",))]
     assert (_listed(action, MediaType.IMAGE), _offered(action, MediaType.IMAGE)) == (
         ("beta", "gamma"), [])
 
@@ -438,6 +438,6 @@ def test_the_first_action_picked_turns_the_button_to_edit(action, qtbot):
 
 
 def test_the_plus_is_gone_once_every_action_is_set(action):
-    action.show_row(_row(image=Labels(("gamma", "alpha", "beta"))))
+    action.show_row(_row(image=ItemActions(("gamma", "alpha", "beta"))))
 
     assert _adder(action, MediaType.IMAGE).isHidden()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from origenerator.action_labels import Labels
 from origenerator.action_vocabulary import Tile, tiles, vocabulary
+from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 
 _IMAGES = {"image_actions": {
@@ -53,17 +53,17 @@ def test_the_grid_is_the_rows_the_overlay_arranges_the_buttons_in():
         Tile("two", 0, 0), Tile("one", 0, 1), Tile("three", 1, 0))
 
 
-def test_a_name_a_button_used_to_have_reads_as_the_labels_it_now_means():
+def test_a_name_a_button_used_to_have_reads_as_the_actions_it_now_means():
     named = vocabulary(MediaType.IMAGE, _IMAGES)
 
-    assert named.read_as("old two") == Labels(("alpha", "beta"))
-    assert named.read_as("gone") == Labels((), ("first box",))
+    assert named.read_as("old two") == ItemActions(("alpha", "beta"))
+    assert named.read_as("gone") == ItemActions((), ("first box",))
 
 
 def test_a_buttons_own_name_reads_as_the_actions_it_saves_whatever_its_case_and_spacing():
     named = vocabulary(MediaType.IMAGE, _IMAGES)
 
-    assert named.read_as("  TWO ") == Labels(("alpha", "beta"))
+    assert named.read_as("  TWO ") == ItemActions(("alpha", "beta"))
 
 
 def test_a_name_neither_a_button_nor_one_a_button_had_reads_as_nothing():

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 
-from origenerator.action_labels import Labels
 from origenerator.animation_names import (
     Animation,
     animation_of,
     image_button_of,
-    labels_for,
+    item_actions_named,
     named,
 )
+from origenerator.item_actions import ItemActions
 
 
 def _video(actions, checked=()):
@@ -27,8 +27,8 @@ def test_a_name_reads_back_as_its_action_and_its_checkboxes_whatever_plus_its_ac
 
 
 def test_a_name_stands_for_the_actions_its_button_stands_for_and_its_checkboxes():
-    assert labels_for("alpha + beta + third box") == Labels(("alpha", "beta"), ("third box",))
-    assert labels_for("an action no button has") == Labels()
+    assert item_actions_named("alpha + beta + third box") == ItemActions(("alpha", "beta"), ("third box",))
+    assert item_actions_named("an action no button has") == ItemActions()
 
 
 def test_a_video_is_the_animation_whose_button_stands_for_its_actions_in_any_order():

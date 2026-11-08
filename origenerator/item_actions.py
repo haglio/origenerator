@@ -6,7 +6,7 @@ from typing import NamedTuple
 from origenerator.media import MediaType
 
 
-class Labels(NamedTuple):
+class ItemActions(NamedTuple):
     actions: tuple[str, ...] = ()
     checked: tuple[str, ...] = ()
 
@@ -31,18 +31,18 @@ def _names_in(stored_list) -> tuple[str, ...]:
     return tuple(dict.fromkeys(name for name in listed if isinstance(name, str) and name))
 
 
-def labels_of(row: dict, side: str) -> Labels:
+def actions_of(row: dict, side: str) -> ItemActions:
     actions, checked = columns(side)
-    return Labels(_names_in(row.get(actions)), _names_in(row.get(checked)))
+    return ItemActions(_names_in(row.get(actions)), _names_in(row.get(checked)))
 
 
-def is_labeled(row: dict, side: str) -> bool:
+def has_actions(row: dict, side: str) -> bool:
     return row.get(columns(side)[0]) is not None
 
 
-def stored(labels: Labels) -> tuple[str, str]:
-    return json.dumps(list(labels.actions)), json.dumps(list(labels.checked))
+def stored(item_actions: ItemActions) -> tuple[str, str]:
+    return json.dumps(list(item_actions.actions)), json.dumps(list(item_actions.checked))
 
 
-def combined_actions(*labels: Labels) -> tuple[str, ...]:
-    return tuple(dict.fromkeys(action for each in labels for action in each.actions))
+def combined_actions(*item_actions: ItemActions) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(action for each in item_actions for action in each.actions))

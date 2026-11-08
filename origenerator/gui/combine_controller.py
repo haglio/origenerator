@@ -13,10 +13,9 @@ from origenerator import (
     evolver_export,
     gallery,
 )
-from origenerator.action_labels import labels_of
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animate_command import what_to_animate
-from origenerator.animation_names import Animation, image_button_of, labels_for, named
+from origenerator.animation_names import Animation, image_button_of, item_actions_named, named
 from origenerator.check_animations import the_animation_window
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.export_lane import GENAU as GENAU_LANE
@@ -29,9 +28,10 @@ from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.zone_items import FilesOnly
+from origenerator.item_actions import actions_of
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType, media_type_from_filename
-from origenerator.published_labels import label_the_launch
+from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.video_history import video_history
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -211,10 +211,10 @@ class CombineController(QObject):
         return image_button_of(self._db.get_generation(image_id) if image_id else None)
 
     def _cycle_names(self, name: str, image_id: str | None) -> tuple[str, ...]:
-        own = labels_for(name)
+        own = item_actions_named(name)
         image = self._db.get_generation(image_id) if image_id else None
         return cycle_names((*own.actions, *own.checked),
-                           labels_of(image, MediaType.IMAGE).actions if image else ())
+                           actions_of(image, MediaType.IMAGE).actions if image else ())
 
     def image_dropped(self) -> None:
         self.offer_the_actions(self._db.list_generations())
@@ -345,7 +345,7 @@ class CombineController(QObject):
         if prompt_id:
             self._db.set_settings_source(prompt_id, category=category,
                                          video_prompt_id=video_id)
-            label_the_launch(self._db, prompt_id, category, checked)
+            give_the_launch_its_actions(self._db, prompt_id, category, checked)
             if not category:
                 self._db.record_combine_video_use(intent, video_id, prompt_id)
             self._mark_for_sending(prompt_id, send)
@@ -423,7 +423,7 @@ class CombineController(QObject):
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             self._db.set_settings_source(prompt_id, category=category)
-            label_the_launch(self._db, prompt_id, category)
+            give_the_launch_its_actions(self._db, prompt_id, category)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
         return True

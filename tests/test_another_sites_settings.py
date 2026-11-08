@@ -7,7 +7,6 @@ import pytest
 from PIL import Image
 from shared_ui.tick_control import TickControl
 
-from origenerator.action_labels import labels_of
 from origenerator.action_vocabulary import vocabulary
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
@@ -15,6 +14,7 @@ from origenerator.gui.action_row import action_checkbox
 from origenerator.gui.generate_pane import parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.param_sections import OTHER_TITLE, section_title
+from origenerator.item_actions import actions_of
 from origenerator.media import MediaType
 from origenerator.outside_videos import (
     FrameFolders,
@@ -195,7 +195,7 @@ def test_an_ai_item_has_no_request_section(library, shown):
     assert tab._param_form.request_exchange() is None
 
 
-def test_setting_an_ai_videos_labels_leaves_the_words_its_site_gave_it(library):
+def test_setting_an_ai_videos_actions_leaves_its_site_action(library):
     tab, db, video, image = library
     said_by_the_site = db.get_generation(video["prompt_id"])["action"]
     tab.show_saved_generation(video, [image])
@@ -203,7 +203,7 @@ def test_setting_an_ai_videos_labels_leaves_the_words_its_site_gave_it(library):
 
     tab._action.form().parentWidget().findChild(TickControl, action_checkbox(MediaType.VIDEO, name)).click()
 
-    assert labels_of(db.get_generation(video["prompt_id"]), MediaType.VIDEO).checked == (name,)
+    assert actions_of(db.get_generation(video["prompt_id"]), MediaType.VIDEO).checked == (name,)
     assert db.get_generation(video["prompt_id"])["action"] == said_by_the_site
 
 

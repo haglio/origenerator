@@ -1409,6 +1409,32 @@
       "code_word": "funestra",
       "status": "kept",
       "ruled": "the family's word, ruled with Fun Time"
+    },
+    {
+      "id": "actions",
+      "thing": "the actions set on an item, an image's or a video's, with the setter tool, the pills on a tab or the checkboxes beside them, that the slideshow's nav map and Kino name its rows by",
+      "screen": [
+        "Image actions",
+        "Video actions"
+      ],
+      "his_word": "actions, video actions, image actions (2026-11-07: 'labels' is no word of his)",
+      "code_today": [
+        "actions"
+      ],
+      "code_word": "actions",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words"
+    },
+    {
+      "id": "site_action",
+      "thing": "the word another site gives a video it made, kept in its record's action as one of the settings that made it, never one of its actions",
+      "screen": null,
+      "his_word": "site actions (2026-11-07)",
+      "code_today": [
+        "site action"
+      ],
+      "code_word": "site action",
+      "status": "his_word"
     }
   ]
 }

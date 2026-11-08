@@ -21,7 +21,6 @@ from shared_ui.preview import Preview
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
-from origenerator.action_labels import Labels
 from origenerator.action_setter import Locks, SetterSession
 from origenerator.action_vocabulary import Tile, Vocabulary, vocabulary
 from origenerator.content import EXAMPLE_CONTENT
@@ -48,6 +47,7 @@ from origenerator.gui.action_setter_window import (
     wrapped_to_fit,
 )
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 
 _BUTTONS = {"button one": ("alpha",), "button two": ("alpha", "beta"), "button three": ("gamma",)}
@@ -56,10 +56,10 @@ _TILES = (Tile("button one", 0, 0), Tile("button two", 0, 1), Tile("button three
 
 class _Store:
     def __init__(self):
-        self.labels = {}
+        self.item_actions = {}
 
-    def set_labels(self, prompt_id, side, labels):
-        self.labels[prompt_id] = labels
+    def set_actions(self, prompt_id, side, item_actions):
+        self.item_actions[prompt_id] = item_actions
 
 
 class _Stage(QWidget):
@@ -124,7 +124,7 @@ def window(qtbot, tmp_path):
 def test_the_window_is_called_the_action_setter_tool_for_its_kind(window, qtbot, tmp_path):
     made, _store, _stage = window("first")
     for_videos = ActionSetterWindow(
-        SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "labels": None}],
+        SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "actions": None}],
                       _Store(), MediaType.VIDEO),
         Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}, {}, {}), {},
         Locks(tmp_path / "locks.json"), stage=_Stage())
@@ -157,7 +157,7 @@ def test_pressing_a_button_saves_the_actions_it_stands_for_on_the_item(window):
 
     assert sorted(tile.objectName() for tile in made.findChildren(QToolButton)) == sorted(
         action_button(name) for name in _BUTTONS)
-    assert store.labels == {"first": Labels(("alpha", "beta"))}
+    assert store.item_actions == {"first": ItemActions(("alpha", "beta"))}
 
 
 def test_the_count_says_how_many_are_left_and_falls_as_they_are_set(window):
@@ -211,7 +211,7 @@ def test_quitting_at_the_question_closes_the_tool(window):
 
     _tile(made, "button one").click()
 
-    assert (made.isVisible(), store.labels) == (False, {"first": Labels(("alpha",))})
+    assert (made.isVisible(), store.item_actions) == (False, {"first": ItemActions(("alpha",))})
 
 
 def test_it_asks_only_after_the_first_one(window):
@@ -283,7 +283,7 @@ def test_same_as_last_gives_this_item_the_actions_the_last_one_got(window):
 
     _press(made, SAME_BUTTON).click()
 
-    assert store.labels == {"first": Labels(("gamma",)), "second": Labels(("gamma",))}
+    assert store.item_actions == {"first": ItemActions(("gamma",)), "second": ItemActions(("gamma",))}
 
 
 def test_same_as_last_with_nothing_set_yet_says_so_and_sets_nothing(window):
@@ -291,7 +291,7 @@ def test_same_as_last_with_nothing_set_yet_says_so_and_sets_nothing(window):
 
     _press(made, SAME_BUTTON).click()
 
-    assert (store.labels, _said(made, LAST_LINE)) == ({}, "Nothing set yet to go by")
+    assert (store.item_actions, _said(made, LAST_LINE)) == ({}, "Nothing set yet to go by")
 
 
 def test_skipping_leaves_the_item_as_it_was_and_brings_up_the_next(window):
@@ -299,7 +299,7 @@ def test_skipping_leaves_the_item_as_it_was_and_brings_up_the_next(window):
 
     _press(made, SKIP_BUTTON).click()
 
-    assert (store.labels, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
+    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
 
 
 def test_undo_takes_the_last_answer_back_and_puts_its_item_up_again(window):
@@ -308,7 +308,7 @@ def test_undo_takes_the_last_answer_back_and_puts_its_item_up_again(window):
 
     _press(made, UNDO_BUTTON).click()
 
-    assert (store.labels, _said(made, STATUS_LINE)[:2]) == ({"first": None}, "2 ")
+    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({"first": None}, "2 ")
 
 
 def test_undo_with_nothing_answered_yet_says_so(window):
@@ -343,7 +343,7 @@ def test_trash_lets_go_of_the_item_on_screen_then_throws_it_away(window):
 
     _press(made, TRASH_BUTTON).click()
 
-    assert (rubbish.thrown, store.labels, _said(made, STATUS_LINE)[:2]) == (
+    assert (rubbish.thrown, store.item_actions, _said(made, STATUS_LINE)[:2]) == (
         [("first", None)], {}, "1 ")
     assert _said(made, LAST_LINE) == "Last: trashed"
 
@@ -373,7 +373,7 @@ def test_a_buttons_name_said_presses_it(window):
     made, store, _stage = window("first", "second")
 
     assert made.hear("button two") is True
-    assert store.labels == {"first": Labels(("alpha", "beta"))}
+    assert store.item_actions == {"first": ItemActions(("alpha", "beta"))}
 
 
 def test_the_words_under_the_buttons_said_do_what_the_buttons_do(window):
@@ -383,14 +383,14 @@ def test_the_words_under_the_buttons_said_do_what_the_buttons_do(window):
     for said in ("same", "undo", "skip", "trash"):
         made.hear(said)
 
-    assert (store.labels, rubbish.thrown) == (
-        {"first": Labels(("gamma",)), "second": None}, [("third", None)])
+    assert (store.item_actions, rubbish.thrown) == (
+        {"first": ItemActions(("gamma",)), "second": None}, [("third", None)])
 
 
 def test_words_the_setter_tool_does_not_know_are_left_for_the_rest_of_the_app(window):
     made, store, _stage = window("first")
 
-    assert (made.hear("go to recents"), store.labels) == (False, {})
+    assert (made.hear("go to recents"), store.item_actions) == (False, {})
 
 
 def test_the_item_on_screen_is_put_up_from_its_file_as_what_it_is(window, tmp_path):
@@ -432,7 +432,7 @@ def test_a_press_saves_the_checked_boxes_with_the_actions(window):
     _box(made, "second box").setChecked(True)
     _tile(made, "button one").click()
 
-    assert store.labels == {"first": Labels(("alpha",), ("second box",))}
+    assert store.item_actions == {"first": ItemActions(("alpha",), ("second box",))}
 
 
 def _edge(made, name) -> str:
@@ -445,8 +445,8 @@ def _previously(made) -> QLabel:
 
 
 def _set_before(*items):
-    return [{"prompt_id": prompt_id, "name": "3FA9C0D2 000", "path": None, "labels": labels}
-            for prompt_id, labels in items]
+    return [{"prompt_id": prompt_id, "name": "3FA9C0D2 000", "path": None, "actions": item_actions}
+            for prompt_id, item_actions in items]
 
 
 def _fill(made, name) -> str:
@@ -465,7 +465,7 @@ def _name_color(made, name) -> str:
     (Tile("button one", 0, 0), Tile("button three", 1, 0), Tile("button two", 0, 1, rows=2)),
 ], ids=["one row", "down two rows"])
 def test_the_button_an_item_was_set_with_before_is_all_yellow_with_its_name_in_black(window, tiles):
-    made, _store, _stage = window(items=_set_before(("first", Labels(("beta", "alpha")))), tiles=tiles)
+    made, _store, _stage = window(items=_set_before(("first", ItemActions(("beta", "alpha")))), tiles=tiles)
     made.setStyleSheet(build_stylesheet())
 
     assert [(_edge(made, name), _fill(made, name)) for name in _BUTTONS] == [
@@ -477,7 +477,7 @@ def test_the_button_an_item_was_set_with_before_is_all_yellow_with_its_name_in_b
 
 
 def test_a_yellow_line_beside_the_checkboxes_says_what_the_yellow_box_means(window):
-    made, _store, _stage = window(items=_set_before(("first", Labels(("gamma",)))))
+    made, _store, _stage = window(items=_set_before(("first", ItemActions(("gamma",)))))
     line = _previously(made)
     line.ensurePolished()
 
@@ -487,7 +487,7 @@ def test_a_yellow_line_beside_the_checkboxes_says_what_the_yellow_box_means(wind
 
 
 def test_an_item_never_set_shows_no_yellow_box_and_no_yellow_line(window):
-    made, _store, _stage = window(items=_set_before(("first", Labels(("gamma",))), ("second", None)))
+    made, _store, _stage = window(items=_set_before(("first", ItemActions(("gamma",))), ("second", None)))
     made.setStyleSheet(build_stylesheet())
 
     _tile(made, "button one").click()
@@ -497,15 +497,15 @@ def test_an_item_never_set_shows_no_yellow_box_and_no_yellow_line(window):
 
 
 def test_an_item_set_with_actions_no_button_stands_for_shows_no_yellow_line(window):
-    made, _store, _stage = window(items=_set_before(("first", Labels(("beta",)))))
+    made, _store, _stage = window(items=_set_before(("first", ItemActions(("beta",)))))
 
     assert _previously(made).isHidden()
 
 
 def test_each_item_comes_up_with_its_own_checked_boxes(window):
     made, _store, _stage = window(items=[
-        {"prompt_id": "first", "labels": Labels((), ("first box",))},
-        {"prompt_id": "second", "labels": None},
+        {"prompt_id": "first", "actions": ItemActions((), ("first box",))},
+        {"prompt_id": "second", "actions": None},
     ], checkboxes=("first box",))
     on_the_first = _box(made, "first box").isChecked()
 
@@ -522,8 +522,8 @@ def test_a_locked_box_stays_as_it_is_for_every_item(window):
     _tile(made, "button one").click()
     _tile(made, "button one").click()
 
-    assert store.labels == {"first": Labels(("alpha",), ("first box",)),
-                            "second": Labels(("alpha",), ("first box",))}
+    assert store.item_actions == {"first": ItemActions(("alpha",), ("first box",)),
+                            "second": ItemActions(("alpha",), ("first box",))}
 
 
 def test_a_lock_is_kept_for_the_next_time_the_window_opens(window, tmp_path):
@@ -532,7 +532,7 @@ def test_a_lock_is_kept_for_the_next_time_the_window_opens(window, tmp_path):
     _box(made, "first box").setChecked(True)
     _lock(made, "first box").setChecked(True)
 
-    again, _store, _stage = window(items=[{"prompt_id": "second", "labels": None}],
+    again, _store, _stage = window(items=[{"prompt_id": "second", "actions": None}],
                                    checkboxes=("first box",), locks=Locks(tmp_path / "kept.json"))
 
     assert (_lock(again, "first box").isChecked(), _box(again, "first box").isChecked()) == (
@@ -721,8 +721,8 @@ def _the_example_overlay() -> dict:
 def _as_it_opens(qtbot, tmp_path, side, tiles, *, set_before: bool):
     named = vocabulary(side, _the_example_overlay())
     named = Vocabulary(named.buttons, tiles or named.tiles, named.checkboxes, {}, {}, {}, {})
-    labels = Labels(next(iter(named.buttons.values())), named.checkboxes) if set_before else None
-    made = ActionSetterWindow(SetterSession(_set_before(("first", labels)), _Store(), side),
+    item_actions = ItemActions(next(iter(named.buttons.values())), named.checkboxes) if set_before else None
+    made = ActionSetterWindow(SetterSession(_set_before(("first", item_actions)), _Store(), side),
                               named, {}, Locks(tmp_path / f"{set_before}.json"), stage=_Stage())
     qtbot.addWidget(made)
     made.setStyleSheet(build_stylesheet())
@@ -778,4 +778,4 @@ def test_skip_said_while_its_button_is_gray_does_nothing(window):
 
     made.hear("skip")
 
-    assert (store.labels, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
+    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")

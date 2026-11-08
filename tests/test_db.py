@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from origenerator.action_labels import Labels, is_labeled, labels_of
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
 from origenerator.db_schema import STORED_NAMES
+from origenerator.item_actions import ItemActions, actions_of, has_actions
 from origenerator.media import MediaType
 from origenerator.provenance import WORKFLOW, WORKFLOW_VERSION
 
@@ -135,44 +135,44 @@ def _an_image(db, prompt_id="pic-001"):
                          workflow_version="v002", params_json="{}", workflow_json="{}"))
 
 
-def test_an_item_keeps_the_labels_set_on_each_side_until_they_are_taken_back(tmp_path):
+def test_an_item_keeps_the_actions_set_on_each_side_until_they_are_taken_back(tmp_path):
     db = Database(tmp_path / "test.db")
     _an_image(db)
 
-    db.set_labels("pic-001", MediaType.IMAGE, Labels(("alpha", "beta"), ("first box",)))
-    db.set_labels("pic-001", MediaType.VIDEO, Labels((), ("second box",)))
-    labeled = db.get_generation("pic-001")
-    db.set_labels("pic-001", MediaType.IMAGE, None)
-    unlabeled = db.get_generation("pic-001")
+    db.set_actions("pic-001", MediaType.IMAGE, ItemActions(("alpha", "beta"), ("first box",)))
+    db.set_actions("pic-001", MediaType.VIDEO, ItemActions((), ("second box",)))
+    actions_by_id = db.get_generation("pic-001")
+    db.set_actions("pic-001", MediaType.IMAGE, None)
+    without_actions = db.get_generation("pic-001")
 
-    assert (labels_of(labeled, MediaType.IMAGE), labels_of(labeled, MediaType.VIDEO)) == (
-        Labels(("alpha", "beta"), ("first box",)), Labels((), ("second box",)))
-    assert (is_labeled(unlabeled, MediaType.IMAGE), is_labeled(unlabeled, MediaType.VIDEO)) == (
+    assert (actions_of(actions_by_id, MediaType.IMAGE), actions_of(actions_by_id, MediaType.VIDEO)) == (
+        ItemActions(("alpha", "beta"), ("first box",)), ItemActions((), ("second box",)))
+    assert (has_actions(without_actions, MediaType.IMAGE), has_actions(without_actions, MediaType.VIDEO)) == (
         False, True)
 
 
-def test_many_items_can_be_labeled_in_one_write(tmp_path):
+def test_many_items_can_be_given_actions_in_one_write(tmp_path):
     db = Database(tmp_path / "test.db")
     _an_image(db, "pic-001")
     _an_image(db, "pic-002")
 
-    db.set_many_labels(MediaType.IMAGE, {"pic-001": Labels(("alpha",)),
-                                         "pic-002": Labels((), ("first box",))})
+    db.set_many_actions(MediaType.IMAGE, {"pic-001": ItemActions(("alpha",)),
+                                         "pic-002": ItemActions((), ("first box",))})
 
-    assert [labels_of(db.get_generation(p), MediaType.IMAGE) for p in ("pic-001", "pic-002")] == [
-        Labels(("alpha",)), Labels((), ("first box",))]
+    assert [actions_of(db.get_generation(p), MediaType.IMAGE) for p in ("pic-001", "pic-002")] == [
+        ItemActions(("alpha",)), ItemActions((), ("first box",))]
 
 
-def test_a_trashed_item_comes_back_with_its_labels(tmp_path):
+def test_a_trashed_item_comes_back_with_its_actions(tmp_path):
     db = Database(tmp_path / "test.db")
     _an_image(db)
-    db.set_labels("pic-001", MediaType.IMAGE, Labels(("alpha",), ("first box",)))
+    db.set_actions("pic-001", MediaType.IMAGE, ItemActions(("alpha",), ("first box",)))
     db.record_trashed("pic-001", db.get_generation("pic-001"), {})
     db.delete_generation("pic-001")
 
     db.restore_generation(db.get_trashed("pic-001")["row"])
 
-    assert labels_of(db.get_generation("pic-001"), MediaType.IMAGE) == Labels(
+    assert actions_of(db.get_generation("pic-001"), MediaType.IMAGE) == ItemActions(
         ("alpha",), ("first box",))
 
 

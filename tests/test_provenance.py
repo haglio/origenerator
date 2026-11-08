@@ -359,8 +359,13 @@ def test_a_file_outside_any_checkout_has_no_history_rather_than_an_empty_one(
     assert provenance.version_history(loose) is None
 
 
+_AS_LONG_AS_GIT_TAKES = 300
+
+
 @pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))
-def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(name, tmp_path):
+def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(
+        name, tmp_path, monkeypatch):
+    monkeypatch.setattr(provenance, "_GIT_TIMEOUT_SECONDS", _AS_LONG_AS_GIT_TAKES)
     workflow = WORKFLOW_REGISTRY[name]
     source = Path(inspect.getsourcefile(type(workflow)))
     repo = _checkout(tmp_path)

@@ -87,6 +87,7 @@ class FakeActions:
         self.thumb_dir = thumb_dir
         self.deleted = []
         self.rejected = []
+        self.trashed_files = []
         self.restored = []
         self.purged = []
         self.undo_count = 0
@@ -94,7 +95,7 @@ class FakeActions:
         self._label = None
         self._redo_label = None
 
-    def delete_rows(self, rows):
+    def delete_rows(self, rows, *, pressed_in_kino=None):
         self.deleted.append(list(rows))
         self._label = f"Delete {len(rows)} items"
 
@@ -109,7 +110,12 @@ class FakeActions:
     def delete_enhance_versions(self, row, filenames):
         return True
 
-    def reject_experiment(self, row):
+    def trash_file(self, path):
+        self.trashed_files.append(path)
+
+    trash = GalleryEdits.trash
+
+    def reject_experiment(self, row, *, pressed_in_kino=None):
         self.rejected.append(row)
         self._label = "Reject experiment"
 

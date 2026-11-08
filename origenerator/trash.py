@@ -9,6 +9,7 @@ from pathlib import Path
 
 from app_support.file_channel import retried_while_held
 
+from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.file_numbers import NUMBERED, next_number, numbered
 
 logger = logging.getLogger(__name__)
@@ -125,9 +126,13 @@ class Trash:
 class Kino:
     library: Path
     trash: Path
+    own_source: str
 
     def plays(self, video: Path) -> bool:
         return video.is_relative_to(self.library) and video.is_file()
+
+    def upscales(self) -> EvolverUpscales:
+        return EvolverUpscales.scan(self.library, self.own_source)
 
     def take_out(self, videos) -> list[tuple[Path, Path]]:
         sent = []

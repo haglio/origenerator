@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator import (
+    config,
     gallery,
     trash_collection,
 )
@@ -1356,3 +1357,12 @@ def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):
 
     assert actions.deleted == []
     assert actions.rejected == []
+
+
+def test_no_gallery_the_suite_builds_reaches_the_libraries_kino(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+
+    kino = view._edits._environment.kino
+    assert not kino.library.is_relative_to(config.LIBRARY_ROOT)
+    assert not kino.trash.is_relative_to(config.LIBRARY_ROOT)

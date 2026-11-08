@@ -28,6 +28,7 @@ from origenerator.fun_time_mode import (
     SAY,
     SHAPES,
     TAKE_BACK,
+    TRASH_FILE,
     FunTimeSession,
 )
 from origenerator.osr2_controls_commands import shape_press, shape_spoken_to, spelled_for
@@ -169,6 +170,9 @@ class FunTimeBridge(QObject):
             return
         if keyword == SAY.upper() and marker == ":":
             self._gallery.run_spoken_command(argument, said_at)
+            return
+        if keyword == TRASH_FILE and marker == "|":
+            self._gallery.trash_file(argument)
             return
         self._apply_to_a_shape(line, keyword, marker, argument, said_at)
 

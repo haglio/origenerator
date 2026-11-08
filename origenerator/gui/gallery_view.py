@@ -33,6 +33,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
+    EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
     KINO_TRASH_DIR,
     OUTPUT_PLACES,
@@ -308,7 +309,7 @@ class GalleryView(QWidget):
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=self._enhance.cancel_for_delete,
-                kino=Kino(EVOLVER_UPSCALED_DIR, KINO_TRASH_DIR),
+                kino=Kino(EVOLVER_UPSCALED_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE),
             ),
         )
         self._foreign_queue = ForeignQueue(running=[], pending=[])
@@ -2002,13 +2003,17 @@ class GalleryView(QWidget):
 
     def trash_generation(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)
-        if row is None:
-            return
-        if gallery.unreviewed_experiments([row]):
-            self._edits.reject_experiment(row)
+        if row is not None and self._edits.trash(row):
             self._re_aim()
-        else:
-            self._edits.delete_rows([row])
+
+    def trash_file(self, path: str):
+        try:
+            self._edits.trash_file(path)
+        except OSError:
+            logger.exception("Could not send %s to Trash", path)
+            return
+        self.refresh()
+        self._re_aim()
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         if self._client is None:

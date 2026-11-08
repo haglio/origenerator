@@ -32,6 +32,7 @@ from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import ORIGENERATOR_MODE, answer
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
+    FakeActions,
     FakeDB,
     _enhanced_image,
     _generating_tile,
@@ -1001,6 +1002,17 @@ def test_a_clip_the_session_names_that_this_app_made_asks_the_room_to_show_this_
     _press(bridge, tmp_path, r"GO_TO|C:\library\videos\wan22_i2v_00007_.mp4")
 
     assert _the_room_was_told(tmp_path) == ["origenerator_activate"]
+
+
+def test_a_video_the_session_sends_to_trash_goes_to_this_apps_trash(qtbot, tmp_path):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path), actions=actions)
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+
+    _press(bridge, tmp_path, r"TRASH_FILE|C:\library\upscaled\portrait\site\scene one.mp4")
+
+    assert actions.trashed_files == [r"C:\library\upscaled\portrait\site\scene one.mp4"]
 
 
 def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):

@@ -61,6 +61,7 @@ OPEN_SLIDESHOW = "open_slideshow"
 CLOSE_SLIDESHOW = "close_slideshow"
 SIDE_VERBS = (OPEN_SLIDESHOW, CLOSE_SLIDESHOW)
 GO_TO = "GO_TO"
+TRASH_FILE = "TRASH_FILE"
 SAY = "say"
 SAID_AT = " @"
 REQUEST_OPEN = "request_open"
@@ -111,6 +112,7 @@ def command_lines() -> tuple[str, ...]:
         f"{HAND_OVER}|{{frames}}|{{input}}",
         f"{GO_TO}|{{file}}",
         f"{SAY.upper()}:{{words}}",
+        f"{TRASH_FILE}|{{file}}",
         *(line for shape in SHAPES for line in _lines_said_to(shape)),
     )
 

@@ -698,7 +698,7 @@ class TestTheFoldersItWasGiven:
 
 def _site_video_actions(tmp_path):
     db = Database(tmp_path / "test.db")
-    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash")
+    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash", own_source="origenerator")
     kino_trash = kino.trash
     actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
                            Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
@@ -774,7 +774,7 @@ def test_purging_the_trash_leaves_a_site_video_in_kinos_trash(tmp_path):
 
 def test_a_file_outside_kinos_library_stays_where_it_is(tmp_path):
     db = Database(tmp_path / "test.db")
-    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash")
+    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash", own_source="origenerator")
     actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
                            Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
     elsewhere = tmp_path / "elsewhere" / "video one.mp4"
@@ -805,3 +805,89 @@ def test_a_site_video_kino_will_not_let_go_of_stays_in_kino_and_still_leaves_the
 
     assert video.read_bytes() == b"site video"
     assert db.get_generation("v1") is None
+
+
+def _own_video_actions(tmp_path):
+    db = Database(tmp_path / "test.db")
+    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash", own_source="origenerator")
+    output_dir = tmp_path / "output"
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(output_dir),
+                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
+    _completed_row(db, output_dir, "v1", "wan22_i2v_00007_.mp4")
+    upscale = kino.library / "portrait" / "origenerator" / "wan22_i2v_00007__topaz.mp4"
+    upscale.parent.mkdir(parents=True)
+    upscale.write_bytes(b"upscale")
+    return actions, db, upscale, kino.trash
+
+
+def test_sending_a_video_this_app_made_to_trash_takes_its_upscale_out_of_kino(tmp_path):
+    actions, db, upscale, kino_trash = _own_video_actions(tmp_path)
+
+    actions.delete_rows([db.get_generation("v1")])
+
+    assert not upscale.exists()
+    assert (kino_trash / upscale.name).read_bytes() == b"upscale"
+
+
+def test_restoring_a_video_this_app_made_puts_its_upscale_back_in_kino(tmp_path):
+    actions, db, upscale, _kino_trash = _own_video_actions(tmp_path)
+    actions.delete_rows([db.get_generation("v1")])
+
+    actions.restore_deleted(["v1"])
+
+    assert upscale.read_bytes() == b"upscale"
+
+
+def test_a_kino_copy_sent_to_trash_sends_its_whole_gallery_entry_there(tmp_path):
+    actions, db, video, kino_trash = _site_video_actions(tmp_path)
+
+    actions.trash_file(video)
+
+    assert db.get_generation("v1") is None
+    assert [record["prompt_id"] for record in db.list_trashed()] == ["v1"]
+    assert (kino_trash / video.name).read_bytes() == b"site video"
+
+
+def test_an_upscale_sent_to_trash_sends_the_generation_it_copies_there(tmp_path):
+    actions, db, upscale, kino_trash = _own_video_actions(tmp_path)
+
+    actions.trash_file(upscale)
+
+    assert db.get_generation("v1") is None
+    assert (kino_trash / upscale.name).read_bytes() == b"upscale"
+
+
+def test_a_kino_video_the_gallery_has_no_entry_for_still_leaves_kino_for_its_trash(tmp_path):
+    actions, db, video, kino_trash = _site_video_actions(tmp_path)
+    stranger = video.with_name("video two.mp4")
+    stranger.write_bytes(b"another site video")
+
+    actions.trash_file(stranger)
+
+    assert (kino_trash / stranger.name).read_bytes() == b"another site video"
+    assert db.get_generation("v1") is not None
+
+
+def test_a_file_outside_kino_the_gallery_has_no_entry_for_stays_where_it_is(tmp_path):
+    actions, _db, _video, _kino_trash = _site_video_actions(tmp_path)
+    elsewhere = tmp_path / "elsewhere" / "video two.mp4"
+    elsewhere.parent.mkdir()
+    elsewhere.write_bytes(b"another video")
+
+    actions.trash_file(elsewhere)
+
+    assert elsewhere.read_bytes() == b"another video"
+
+
+def test_a_renamed_copy_of_an_upscale_sent_to_trash_leaves_kino_with_its_generation(tmp_path):
+    actions, _db, upscale, kino_trash = _own_video_actions(tmp_path)
+    copy = upscale.with_name("wan22_i2v_00007__topaz (1).mp4")
+    upscale.rename(copy)
+
+    actions.trash_file(copy)
+    left = not copy.exists()
+    actions.restore_deleted(["v1"])
+
+    assert left
+    assert copy.read_bytes() == b"upscale"
+    assert not (kino_trash / copy.name).exists()

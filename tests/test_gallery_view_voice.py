@@ -439,6 +439,12 @@ def _speak_request(view, qtbot, *utterances):
     for text in utterances:
         view._voice.listener.speak(text)
     qtbot.waitUntil(lambda: view.slideshows.showing.shown._promise.note == "", timeout=5000)
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+
+
+def _every_job_is_with_comfyui(view) -> bool:
+    return all(view._db.get_generation(job.prompt_id)["status"] != "pending"
+               for job in view._live_jobs.values())
 
 
 def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):

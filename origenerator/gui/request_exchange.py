@@ -99,11 +99,11 @@ def _fitted(thumbnail: str | None, box: QSize) -> QTextImageFormat | None:
     if not size.isValid():
         return None
     fitted = size.scaled(box, Qt.AspectRatioMode.KeepAspectRatio)
-    picture = QTextImageFormat()
-    picture.setName(thumbnail)
-    picture.setWidth(fitted.width())
-    picture.setHeight(fitted.height())
-    return picture
+    image_format = QTextImageFormat()
+    image_format.setName(thumbnail)
+    image_format.setWidth(fitted.width())
+    image_format.setHeight(fitted.height())
+    return image_format
 
 
 def _write_comparison(cursor: QTextCursor, *thumbnails: str | None) -> None:
@@ -113,13 +113,13 @@ def _write_comparison(cursor: QTextCursor, *thumbnails: str | None) -> None:
     shape.setColumnWidthConstraints([QTextLength(QTextLength.Type.FixedLength, _COMPARED.width())]
                                     * len(thumbnails))
     table = cursor.insertTable(1, len(thumbnails), shape)
-    pictures = [_fitted(thumbnail, _COMPARED) for thumbnail in thumbnails]
-    made = next((picture for picture in pictures if picture is not None), None)
+    image_formats = [_fitted(thumbnail, _COMPARED) for thumbnail in thumbnails]
+    made = next((image_format for image_format in image_formats if image_format is not None), None)
     size = (QSize(round(made.width()), round(made.height())) if made is not None
             else _COMPARED)
-    for column, picture in enumerate(pictures):
+    for column, image_format in enumerate(image_formats):
         cell = table.cellAt(0, column).firstCursorPosition()
-        cell.insertImage(picture if picture is not None else _not_made(size))
+        cell.insertImage(image_format if image_format is not None else _not_made(size))
     cursor.movePosition(QTextCursor.MoveOperation.End)
 
 
@@ -139,11 +139,11 @@ def _not_made(size: QSize) -> QTextImageFormat:
         painter.drawText(stand_in.rect(), Qt.AlignmentFlag.AlignCenter, _NOT_MADE)
         painter.end()
         stand_in.save(str(path))
-    picture = QTextImageFormat()
-    picture.setName(str(path))
-    picture.setWidth(size.width())
-    picture.setHeight(size.height())
-    return picture
+    image_format = QTextImageFormat()
+    image_format.setName(str(path))
+    image_format.setWidth(size.width())
+    image_format.setHeight(size.height())
+    return image_format
 
 
 def _block(cursor: QTextCursor, *, indent: int = 0, above: int = 0) -> None:
@@ -214,10 +214,10 @@ class _Conversation(QTextEdit):
             bar.show_progress(made.reading.caption(), *made.reading.bars())
             self._reserve(cursor, bar, entry)
         elif entry.made:
-            picture = _fitted(made.thumbnail, self._thumbnail_box())
-            if picture is not None:
+            image_format = _fitted(made.thumbnail, self._thumbnail_box())
+            if image_format is not None:
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
-                cursor.insertImage(picture)
+                cursor.insertImage(image_format)
                 self._tips.append(entry.tip)
         elif entry.changed_something():
             button = GenerateButton(self.viewport())

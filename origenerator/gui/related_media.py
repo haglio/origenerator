@@ -17,7 +17,7 @@ from origenerator.gallery import (
 from origenerator.gui.animations import Animations
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.source_tile import SourceTile
+from origenerator.gui.source_tile import NO_HEADING, SourceTile
 from origenerator.gui.trash_box import place_tiles
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
@@ -196,8 +196,8 @@ class RelatedMedia(QWidget):
 
     def _show_videos_made_from(self, prompt_id: str | None, videos: list[dict]) -> None:
         for section, names_it, heading in (
-                (self._combine_section, "source_video", "Source video for"),
-                (self._trims_section, "trimmed_from", "Trimmed into")):
+                (self._combine_section, "source_video", NO_HEADING),
+                (self._trims_section, "trimmed_from", NO_HEADING)):
             section.show_links([(heading, video) for video in videos
                                 if prompt_id and video.get(names_it) == prompt_id],
                                self._name_of, self._trashed())

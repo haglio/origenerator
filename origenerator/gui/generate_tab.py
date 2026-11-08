@@ -62,9 +62,11 @@ from origenerator.generation_state import made_here
 from origenerator.gui import icons
 from origenerator.gui.action_button import ActionButton
 from origenerator.gui.action_row import ActionRow
+from origenerator.gui.collapsible_section import line_up_the_labels
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
+from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import (
     Dating,
     EnhanceOffer,
@@ -123,6 +125,7 @@ from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, wo
 logger = logging.getLogger(__name__)
 
 _CAPTION_DELAY_MS = 250
+TYPICAL_TIME = "Typical time"
 _RANDOM_SEED_TIP = (
     "These settings have already been generated with this exact seed, so "
     "Generate draws a fresh one rather than re-creating the same file. "
@@ -296,14 +299,16 @@ class GenerateTab(DropZones):
         item_body.addStretch(1)
         self._build_workflow_dropdown(settings_body)
         settings_body.addStretch(1)
+        self._settings_pane = self._build_settings_pane()
         ItemArea(self._item_scroll,
                  (self._metadata_section, self._related, self._versions),
-                 on_shown=self._share_the_settings_pane)
-        self._settings_pane = self._build_settings_pane()
+                 self._settings_split,
+                 dragged=lambda: self._settings_split.dragged_sizes() is not None)
         self._media_split.addWidget(self._settings_pane)
         self._media_split.hold_still(self._fun_time is not None)
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
+        self._media_shared = False
         self._media_border: list[int] | None = None
         self._settings_border_sizes: list[int] | None = None
         self._on_workflow_changed()
@@ -326,6 +331,17 @@ class GenerateTab(DropZones):
         body.addWidget(self._metadata_section)
         self._action = ActionRow(self._metadata_section.form())
         self._action.changed.connect(self._save_actions)
+        self._cannot_remake_note = QLabel()
+        self._cannot_remake_note.setObjectName("cannotRemakeNote")
+        self._cannot_remake_note.setWordWrap(True)
+        self._metadata_section.add_note(self._cannot_remake_note)
+        self._estimate_label = ElidingLabel()
+        self._estimate_label.setObjectName("estimateLabel")
+        self._metadata_section.add_line(TYPICAL_TIME, self._estimate_label)
+
+    def _reflect_metadata(self) -> None:
+        self._metadata_section.setVisible(self._metadata_section.has_content())
+        line_up_the_labels(self)
 
     def _save_actions(self, prompt_id: str, side: str, item_actions) -> None:
         set_actions(self._db, prompt_id, side, item_actions)
@@ -340,15 +356,6 @@ class GenerateTab(DropZones):
         self._workflow_dropdown.currentIndexChanged.connect(self._note_user_edit)
         self._workflow_warning = WarningMark()
         self._workflow_warning.pressed.connect(self._resolve_every_warning)
-        self._cannot_remake_note = QLabel()
-        self._cannot_remake_note.setObjectName("cannotRemakeNote")
-        self._cannot_remake_note.setWordWrap(True)
-        self._cannot_remake_note.hide()
-        body.addWidget(self._cannot_remake_note)
-        self._estimate_label = QLabel()
-        self._estimate_label.setObjectName("estimateLabel")
-        self._estimate_label.setWordWrap(True)
-        body.addWidget(self._estimate_label)
         self._form_host = QWidget()
         self._form_host_column = QVBoxLayout(self._form_host)
         self._form_host_column.setContentsMargins(0, 0, 0, 0)
@@ -376,29 +383,27 @@ class GenerateTab(DropZones):
         column = QVBoxLayout(settings_pane)
         column.setContentsMargins(0, MARGIN_STANDARD, 0, 0)
         column.setSpacing(0)
-        buttons = self._build_button_row()
+        buttons = QHBoxLayout()
         buttons.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, MARGIN_STANDARD)
+        buttons.setSpacing(BUTTON_GAP)
+        buttons.addWidget(ActionButton(self._go_to_folder, name="goToFolderButton"), 0,
+                          Qt.AlignmentFlag.AlignTop)
+        buttons.addLayout(self._build_button_row(), 1)
         column.addLayout(buttons)
         self._settings_border = pane_border()
         column.addWidget(self._settings_border)
         self._settings_split = PaneSplitter(Qt.Orientation.Vertical)
-        self._settings_split.addWidget(self._item_scroll)
         self._settings_split.addWidget(self._settings_scroll)
-        self._settings_split.setStretchFactor(0, 1)
-        self._settings_split.setStretchFactor(1, 2)
+        self._settings_split.addWidget(self._item_scroll)
+        self._settings_split.setStretchFactor(0, 2)
+        self._settings_split.setStretchFactor(1, 1)
         self._settings_split.hold_still(self._fun_time is not None)
         column.addWidget(self._settings_split, 1)
         return settings_pane
 
-    def _share_the_settings_pane(self) -> None:
-        if self._settings_split.dragged_sizes() is None:
-            whole = sum(self._settings_split.sizes())
-            self._settings_split.setSizes([whole // 3, whole - whole // 3])
-
     def _build_button_row(self) -> FlowLayout:
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
-        btn_row.addWidget(ActionButton(self._go_to_folder, name="goToFolderButton"))
         self._lane_button = QPushButton()
         self._lane_button.clicked.connect(
             lambda _checked=False: self._on_send(self._offered_lane))
@@ -434,6 +439,13 @@ class GenerateTab(DropZones):
         line.addWidget(self._unsend_button)
         return row
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        split = self._media_split
+        if not self._media_shared and split.dragged_sizes() is None and not self._media_side_by_side:
+            self._media_shared = True
+            split.setSizes([split.widget(i).sizeHint().height() for i in range(split.count())])
+
     def minimumSizeHint(self):
         """Qt takes an explicit setMinimumWidth in place of this hint, not alongside it, so none is set here or on the wrapper."""
         hint = super().minimumSizeHint()
@@ -456,7 +468,8 @@ class GenerateTab(DropZones):
         note = self._why_the_item_cannot_be_remade()
         set_marked_text(self._cannot_remake_note, wrappable(note or ""), mark="warning" if note else "",
                         color=YELLOW)
-        self._cannot_remake_note.setVisible(note is not None)
+        self._metadata_section.show_line(self._cannot_remake_note, note is not None)
+        self._reflect_metadata()
 
     def _why_generate_is_blocked(self) -> str | None:
         workflow = workflow_named(self._workflow_dropdown.currentData())
@@ -705,11 +718,11 @@ class GenerateTab(DropZones):
 
     def _refresh_estimate(self):
         wf = workflow_named(self._workflow_dropdown.currentData())
-        self._estimate_label.setVisible(wf is not None and wf.generates_here)
-        if wf is not None and wf.generates_here:
-            self._estimate_label.setText(
-                f"Typical time: {estimate_label(self._db.recent_durations(wf.name))}"
-            )
+        shown = wf is not None and wf.generates_here
+        if shown:
+            self._estimate_label.setText(estimate_label(self._db.recent_durations(wf.name)))
+        self._metadata_section.show_line(self._estimate_label, shown)
+        self._reflect_metadata()
 
     def refresh_generate_caption(self):
         self._caption_timer.start()
@@ -979,7 +992,8 @@ class GenerateTab(DropZones):
 
     def reread_name(self) -> None:
         if self._displayed_row is not None:
-            self._metadata_section.setVisible(self._metadata_section.show_name(self._item_name()))
+            self._metadata_section.show_name(self._item_name())
+            self._reflect_metadata()
         for zone in self.reaches():
             zone.reread_name()
 
@@ -1391,8 +1405,9 @@ class GenerateTab(DropZones):
                 and configs_match(self._displayed_config, self.current_config()))
 
     def _hide_footer(self):
-        self._metadata_section.hide()
+        self._metadata_section.clear_facts()
         self._action.clear()
+        self._reflect_metadata()
         self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None
@@ -1403,7 +1418,7 @@ class GenerateTab(DropZones):
         self._metadata_section.show_row(row, self._upscale_of(row), self._item_name())
         start = start_images_among(image_rows)(row)
         self._action.show_row(row, self._db.get_generation(start["prompt_id"]) if start else None)
-        self._metadata_section.setVisible(self._metadata_section.has_content())
+        self._reflect_metadata()
         self._related.show_row(row, image_rows)
         self._refresh_versions()
         self._update_lane_button(preview)

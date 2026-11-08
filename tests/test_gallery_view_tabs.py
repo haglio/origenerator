@@ -372,7 +372,7 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
 
     view._on_thumbnail_clicked("v1")
     estimate = view._generate_pane.current_generate_tab()._estimate_label
-    assert estimate.text() == "Typical time: ~12 min (based on 3 runs)"
+    assert estimate.text() == "~12 min (based on 3 runs)"
 
 
 def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):

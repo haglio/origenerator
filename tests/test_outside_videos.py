@@ -8,7 +8,7 @@ from contextlib import closing
 from pathlib import Path
 
 from app_support import haglio_settings
-from funestra.video_families import seed_group_key
+from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
 from origenerator import config, evolver_agreement, funscript_backfill, trash_collection
@@ -112,7 +112,7 @@ def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
                       "seed": "22", "model": "Image Model", "style": "Image Style",
                       "resolution": "1024", "aspect_ratio": "9:16", "quality": "Medium",
                       "creativity": "High"}, created="2025-03-01"),
-        action="Wave", image_key=seed_group_key(recorded),
+        action="Wave", image_key=seed_group_and_seed(recorded),
         favorite=True)
 
 

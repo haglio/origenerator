@@ -114,3 +114,12 @@ def test_an_item_sent_back_twice_stands_in_the_list_once(tmp_path):
     kept.add(("video-one",))
 
     assert kept.ids() == ("video-one",)
+
+
+def test_a_list_that_cannot_be_written_sends_nothing_back_and_does_not_stop_the_app(tmp_path):
+    (tmp_path / "a file").write_text("", encoding="utf-8")
+    kept = sent_back.SentBack(tmp_path / "a file" / "sent_back.json")
+
+    kept.add(("video-one",))
+
+    assert kept.ids() == ()

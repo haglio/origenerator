@@ -877,8 +877,8 @@ class FakeTrainingRun:
 
 
 @pytest.fixture
-def photos(monkeypatch, tmp_path):
-    monkeypatch.setattr(config, "FIX_PHOTOS_DIR", tmp_path)
+def images(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_IMAGES_DIR", tmp_path)
     monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
     monkeypatch.setattr(config, "LORA_TRAINING_PYTHON", tmp_path / "python.exe")
     monkeypatch.setattr(config, "LORA_TRAINING_SCRIPTS", tmp_path / "sd-scripts")
@@ -888,8 +888,8 @@ def photos(monkeypatch, tmp_path):
     return tmp_path
 
 
-def test_train_with_no_photos_makes_the_fixs_folder_and_says_to_put_them_there(
-        enhance, photos, monkeypatch):
+def test_train_with_no_images_makes_the_fixs_folder_and_says_to_put_them_there(
+        enhance, images, monkeypatch):
     told = []
     monkeypatch.setattr(module.QMessageBox, "information",
                         lambda parent, title, text: told.append(text))
@@ -897,25 +897,25 @@ def test_train_with_no_photos_makes_the_fixs_folder_and_says_to_put_them_there(
 
     controller.pane.fix_training_requested.emit("hands")
 
-    assert (photos / "hands").is_dir()
-    assert str(photos / "hands") in told[0]
+    assert (images / "hands").is_dir()
+    assert str(images / "hands") in told[0]
     assert _training_runs == []
 
 
-def test_train_with_photos_in_the_shared_folder_alone_trains_that_fix(enhance, photos):
-    (photos / "shared").mkdir()
-    (photos / "shared" / "everyone.jpg").write_bytes(b"")
+def test_train_with_images_in_the_shared_folder_alone_trains_that_fix(enhance, images):
+    (images / "shared").mkdir()
+    (images / "shared" / "everyone.jpg").write_bytes(b"")
     controller, _host = enhance()
 
     controller.pane.fix_training_requested.emit("hands")
 
     (run,) = _training_runs
-    assert run.job["photos"] == [str(photos / "shared" / "everyone.jpg")]
+    assert run.job["images"] == [str(images / "shared" / "everyone.jpg")]
 
 
-def test_train_with_photos_trains_that_fix_for_the_enhancements_model(enhance, photos):
-    (photos / "hands").mkdir()
-    (photos / "hands" / "one.jpg").write_bytes(b"")
+def test_train_with_images_trains_that_fix_for_the_enhancements_model(enhance, images):
+    (images / "hands").mkdir()
+    (images / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.restore_settings(json.dumps({"params": {"checkpoint": "sample_xl.safetensors"}}))
 
@@ -927,9 +927,9 @@ def test_train_with_photos_trains_that_fix_for_the_enhancements_model(enhance, p
     assert run.job["base_model"].endswith("sample_xl.safetensors")
 
 
-def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
-    (photos / "hands").mkdir()
-    (photos / "hands" / "one.jpg").write_bytes(b"")
+def test_a_finished_training_puts_its_lora_on_that_fix(enhance, images):
+    (images / "hands").mkdir()
+    (images / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.pane.fix_training_requested.emit("hands")
     (run,) = _training_runs
@@ -947,11 +947,11 @@ def test_a_finished_training_puts_its_lora_on_that_fix(enhance, photos):
 
 
 def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start(
-        enhance, photos, monkeypatch):
+        enhance, images, monkeypatch):
     told = []
     monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: told.append(args))
-    (photos / "hands").mkdir()
-    (photos / "hands" / "one.jpg").write_bytes(b"")
+    (images / "hands").mkdir()
+    (images / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.pane.fix_training_requested.emit("hands")
     (run,) = _training_runs
@@ -964,9 +964,9 @@ def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start
     assert len(_training_runs) == 2
 
 
-def test_going_to_a_training_from_the_queue_opens_its_fixs_prompts(enhance, photos):
-    (photos / "hands").mkdir()
-    (photos / "hands" / "one.jpg").write_bytes(b"")
+def test_going_to_a_training_from_the_queue_opens_its_fixs_prompts(enhance, images):
+    (images / "hands").mkdir()
+    (images / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()
     controller.pane.fix_training_requested.emit("hands")
     (run,) = _training_runs
@@ -985,8 +985,8 @@ class _KeptTrainer:
         return self.alive
 
 
-def _kept_training(photos, part="hands", **status) -> dict:
-    work = photos / "fix training" / part
+def _kept_training(images, part="hands", **status) -> dict:
+    work = images / "fix training" / part
     work.mkdir(parents=True)
     job = {"part": part, "display_name": f"{part.capitalize()} fix 1.0", "work": str(work),
            "status": str(work / "status.json"), "job_file": str(work / "job.json"),
@@ -998,8 +998,8 @@ def _kept_training(photos, part="hands", **status) -> dict:
 
 
 def test_a_training_an_earlier_launch_left_running_is_taken_up_and_holds_the_line(
-        enhance, photos, monkeypatch):
-    _kept_training(photos)
+        enhance, images, monkeypatch):
+    _kept_training(images)
     trainer = _KeptTrainer(alive=True)
     monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: trainer)
     controller, _host = enhance()
@@ -1012,8 +1012,8 @@ def test_a_training_an_earlier_launch_left_running_is_taken_up_and_holds_the_lin
 
 
 def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
-        enhance, photos, monkeypatch):
-    _kept_training(photos, state="done", lora="fixes\\hands 2026-10-21 1500.safetensors")
+        enhance, images, monkeypatch):
+    _kept_training(images, state="done", lora="fixes\\hands 2026-10-21 1500.safetensors")
     monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: _KeptTrainer(alive=False))
     controller, _host = enhance()
 
@@ -1025,8 +1025,8 @@ def test_a_lora_a_training_made_while_the_app_was_closed_goes_on_its_fix_once(
 
 
 def test_a_training_that_ended_while_the_app_was_closed_still_counts_toward_the_next_countdown(
-        enhance, photos, monkeypatch):
-    job = _kept_training(photos, state="done", lora="fixes\\hands 2026-10-21 1500.safetensors")
+        enhance, images, monkeypatch):
+    job = _kept_training(images, state="done", lora="fixes\\hands 2026-10-21 1500.safetensors")
     ended = Path(job["status"]).stat().st_mtime
     monkeypatch.setattr(module.lora_training, "trainer_of",
                         lambda kept: SimpleNamespace(running=lambda: False, began=ended - 2580.0))
@@ -1038,8 +1038,8 @@ def test_a_training_that_ended_while_the_app_was_closed_still_counts_toward_the_
 
 
 def test_a_lora_from_a_training_before_its_program_was_recorded_is_left_where_it_was_put(
-        enhance, photos, monkeypatch):
-    _kept_training(photos, state="done", lora="fixes\\hands 2026-10-19 1444.safetensors")
+        enhance, images, monkeypatch):
+    _kept_training(images, state="done", lora="fixes\\hands 2026-10-19 1444.safetensors")
     monkeypatch.setattr(module.lora_training, "trainer_of", lambda job: None)
     controller, _host = enhance()
 

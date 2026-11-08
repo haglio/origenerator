@@ -4608,7 +4608,7 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     blank_panel._param_form.set_values({"lora": "example_look.safetensors"})
 
     assert not controls.isHidden()
-    assert (controls.train.text(), controls.pictures.text()) == ("Retrain", "1 image")
+    assert (controls.train.text(), controls.images.text()) == ("Retrain", "1 image")
     controls.train.click()
     assert asked == ["lora"]
     blank_panel.lora_offers.show_training("Example Look", "Training 10%")
@@ -4667,7 +4667,7 @@ def test_an_old_version_of_a_lora_offers_the_trash_where_the_newest_offers_retra
     assert (controls.train.isHidden(), controls.trash.isHidden()) == (True, False)
     assert controls.trash.toolTip() == (
         "Moves Example Look 1.0 to the Recycle Bin. Example Look 1.1 stays.")
-    assert controls.pictures.text() == "1 image"
+    assert controls.images.text() == "1 image"
 
     form.set_values({"lora": "look_two.safetensors"})
     assert (controls.train.isHidden(), controls.trash.isHidden()) == (False, True)

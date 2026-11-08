@@ -189,13 +189,13 @@ def test_the_command_evolver_runs_holds_the_tile_while_a_look_lora_trains(monkey
     assert json.loads(capsys.readouterr().out)["holds_the_graphics_card"] is True
 
 
-def test_the_command_evolver_runs_leaves_a_fix_whose_photos_changed_for_him_to_train_by_hand(
+def test_the_command_evolver_runs_leaves_a_fix_whose_images_changed_for_him_to_train_by_hand(
         monkeypatch, tmp_path, capsys):
     _the_command_on_a_scratch_library(monkeypatch, tmp_path)
-    monkeypatch.setattr(downtime.config, "FIX_PHOTOS_DIR", tmp_path / "fixes")
+    monkeypatch.setattr(downtime.config, "FIX_IMAGES_DIR", tmp_path / "fixes")
     monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["hand_yolov8s.pt"])
     (tmp_path / "fixes" / "hands").mkdir(parents=True)
-    (tmp_path / "fixes" / "hands" / "one.jpg").write_bytes(b"fabricated photo bytes")
+    (tmp_path / "fixes" / "hands" / "one.jpg").write_bytes(b"fabricated image bytes")
     _the_app_is(monkeypatch, open_now=False)
     monkeypatch.setattr(downtime, "_comfyui_busy", lambda client: False)
     monkeypatch.setattr(collection_notes, "are_due", lambda db, path: False)

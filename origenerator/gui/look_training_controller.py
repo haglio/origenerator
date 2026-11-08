@@ -39,9 +39,9 @@ class LookTrainingController:
         if config.KREA2_TRAINING_PYTHON is None or config.KREA2_TRAINING_SCRIPTS is None:
             QMessageBox.information(self._parent, "Train", NO_PROGRAM)
             return
-        folder = look_training.pictures_folder(base)
+        folder = look_training.images_folder(base)
         folder.mkdir(parents=True, exist_ok=True)
-        if not look_training.picture_files(folder):
+        if not look_training.image_files(folder):
             QMessageBox.information(self._parent, "Train",
                                     f"Put images of {base} in {folder}, then press Train again.")
             return

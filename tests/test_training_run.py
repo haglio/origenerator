@@ -96,7 +96,7 @@ def test_a_training_reads_how_far_its_cropping_and_then_its_steps_have_got(
     run, _queue, started = _run(qtbot, monkeypatch, tmp_path)
     run.begin()
     qtbot.waitUntil(lambda: bool(started))
-    assert (run.reading().status, run.reading().stage) == (JobState.RUNNING, "Cropping photos")
+    assert (run.reading().status, run.reading().stage) == (JobState.RUNNING, "Cropping images")
 
     _say(tmp_path, state="cropping", done=2, total=8)
     qtbot.waitUntil(lambda: run.reading().pass_progress == (2, 8))

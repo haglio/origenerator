@@ -24,12 +24,12 @@ class TrainingState(Enum):
     OUT_OF_DATE = "out of date"
 
 
-def training_state(trained: Path, picture_stamps: dict) -> TrainingState:
+def training_state(trained: Path, image_stamps: dict) -> TrainingState:
     try:
         kept = json.loads(trained.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return TrainingState.UNTRAINED
-    if kept.get("photo_stamps") == picture_stamps:
+    if kept.get("photo_stamps") == image_stamps:
         return TrainingState.CURRENT
     return TrainingState.OUT_OF_DATE
 
@@ -39,9 +39,8 @@ class TrainingOffer:
     label: str
     enabled: bool
     tooltip: str
-    pictures: int
+    images: int
     folder: Path
-    counted: str = "image"
     trash_tooltip: str | None = None
 
 
@@ -50,11 +49,11 @@ def offer(state: TrainingState, **shown) -> TrainingOffer:
                          state is not TrainingState.CURRENT, **shown)
 
 
-def picture_stamps(pictures: list[Path]) -> dict[str, list[int]]:
+def image_stamps(images: list[Path]) -> dict[str, list[int]]:
     stamps = {}
-    for picture in pictures:
-        found = picture.stat()
-        stamps[f"{picture.parent.name}/{picture.name}"] = [found.st_size, found.st_mtime_ns]
+    for image in images:
+        found = image.stat()
+        stamps[f"{image.parent.name}/{image.name}"] = [found.st_size, found.st_mtime_ns]
     return stamps
 
 

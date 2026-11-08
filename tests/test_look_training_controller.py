@@ -56,7 +56,7 @@ class FakeTrainingRun:
 
 @pytest.fixture
 def look(monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
-    folder = tmp_path / "pictures"
+    folder = tmp_path / "images"
     folder.mkdir()
     monkeypatch.setattr(look_training, "load_content", lambda: {"trainable_loras": {"Example Look": {
         "pictures": str(folder), "base_model": "example_raw.safetensors",
@@ -107,7 +107,7 @@ def test_train_with_no_training_program_set_up_says_so(look, monkeypatch):
     assert _runs == []
 
 
-def test_train_with_no_pictures_makes_the_folder_and_says_to_put_them_there(look, monkeypatch):
+def test_train_with_no_images_makes_the_folder_and_says_to_put_them_there(look, monkeypatch):
     told = _told(monkeypatch)
     tab = FakeGenerateTab()
     controller = _controller([tab])

@@ -35,8 +35,8 @@ class TrainingControls(QWidget):
         trash = IconButton(icons.delete_icon(), "", "deleteButton")
         folder = reveal_button()
         self.train, self.trash, self.folder = train, trash, folder
-        self.pictures = QLabel()
-        for widget in (self.train, self.trash, self.pictures, self.folder):
+        self.images = QLabel()
+        for widget in (self.train, self.trash, self.images, self.folder):
             row.addWidget(widget)
         self._folder: Path | None = None
         train.clicked.connect(self.train_requested)
@@ -55,8 +55,8 @@ class TrainingControls(QWidget):
         offers_the_trash = offer.trash_tooltip is not None and running is None
         self.train.setVisible(not offers_the_trash)
         _shown_with_tip(self.trash, offers_the_trash, offer.trash_tooltip or "")
-        self.pictures.setText(f"{offer.pictures} {offer.counted}{'' if offer.pictures == 1 else 's'}")
-        self.pictures.setToolTip(str(offer.folder))
+        self.images.setText(f"{offer.images} image{'' if offer.images == 1 else 's'}")
+        self.images.setToolTip(str(offer.folder))
         self.folder.setToolTip(f"Open {offer.folder} in Explorer")
 
     def _open_folder(self) -> None:

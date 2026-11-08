@@ -781,7 +781,7 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
 
     assert tab._param_form.get_values()["positive_prompt"] == "cat"
     assert tab.displayed_row() is None
-    assert tab._metadata_section.isHidden()
+    assert tab._metadata_section._fact_rows == 0
     tab._viewport.clear.assert_called()
     assert not tab.is_blank()
 

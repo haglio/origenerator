@@ -14,6 +14,7 @@ from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 from origenerator.media import MediaType
 
 _DEFAULT_HEADING = "From source image"
+NO_HEADING = ""
 _DEFAULT_MEDIA_TYPE = MediaType.IMAGE
 
 
@@ -55,6 +56,7 @@ class SourceTile(QWidget):
                     media_type: str | None = None, gray: bool = False):
         self._prompt_id = row["prompt_id"]
         self._heading.setText(heading or _DEFAULT_HEADING)
+        self._heading.setVisible(heading != NO_HEADING)
         self._item_type_icon.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
         self._name.setText(name)
         thumb = self._scaled_thumb(row.get("thumbnail_path"))

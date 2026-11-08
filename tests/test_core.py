@@ -1139,15 +1139,15 @@ def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path
     tab = first._gallery_view._generate_pane.currentWidget()
     tab.prefill("sdxl_t2i", {})
     sections = tab._param_form._sections
-    assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (False, True)
-    sections["Seed"]._header.click()
+    assert (sections["Prompts & Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (False, True)
+    sections["Prompts & Seed"]._header.click()
     sections["Size"]._header.click()
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
     sections = reopened._gallery_view._generate_pane.currentWidget()._param_form._sections
-    assert (sections["Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
+    assert (sections["Prompts & Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
 
 
 def test_a_tabs_enhancements_and_details_come_back_folded(qtbot, tmp_path):

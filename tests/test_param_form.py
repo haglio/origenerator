@@ -78,7 +78,7 @@ def test_a_form_with_a_prompt_has_a_request_section_right_after_its_prompts(qtbo
     qtbot.addWidget(form)
 
     titles = _section_titles(form)
-    assert titles[titles.index("Prompts") + 1] == "Request"
+    assert titles[titles.index("Prompts & Seed") + 1] == "Request"
     assert form.request_exchange() is not None
 
 
@@ -1291,9 +1291,9 @@ def test_fields_are_grouped_into_collapsible_sections(qtbot):
         ParamDef("steps", "Steps", "int", 20),
     ])
     qtbot.addWidget(form)
-    assert isinstance(form._sections["Prompts"], CollapsibleSection)
-    assert "positive_prompt" in form._present_keys["Prompts"]
-    assert "seed" in form._present_keys["Seed"]
+    assert isinstance(form._sections["Prompts & Seed"], CollapsibleSection)
+    assert "positive_prompt" in form._present_keys["Prompts & Seed"]
+    assert "seed" in form._present_keys["Prompts & Seed"]
     assert "steps" in form._present_keys["Calibration"]
 
 
@@ -1302,16 +1302,15 @@ def test_empty_sections_are_hidden(qtbot):
     qtbot.addWidget(form)
     with qtbot.waitExposed(form):
         form.show()
-    assert form._sections["Seed"].isHidden() is False
-    assert form._sections["Prompts"].isHidden() is True
+    assert form._sections["Prompts & Seed"].isHidden() is False
     assert form._sections["Video"].isHidden() is True
 
 
 def test_prompts_seed_and_the_workflow_start_open_the_rest_collapsed(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
     qtbot.addWidget(form)
-    assert form._sections["Prompts"].is_collapsed() is False
-    assert form._sections["Seed"].is_collapsed() is False
+    assert form._sections["Prompts & Seed"].is_collapsed() is False
+    assert form._sections["Prompts & Seed"].is_collapsed() is False
     assert form._sections["Workflow, Models & LoRAs"].is_collapsed() is False
     assert form._sections["Calibration"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
@@ -1579,7 +1578,7 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     assert len(editor.fields("positive_prompt")) == 1
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
-    assert form._present_keys["Prompts"] == ["scene_frames"]
+    assert form._present_keys["Prompts & Seed"] == ["scene_frames"]
 
 
 def test_a_scenes_prompts_mark_unpaired_parentheses_and_its_spoken_line_does_not(qtbot):
@@ -2258,7 +2257,7 @@ def test_a_trigger_word_warning_beside_two_fields_is_one_line_of_each_warning_it
     line = f"LoRA 1: Example Style 1.0. {_TRIGGER_WORD_SAID}"
     assert form.every_warning() == line
     assert [form._sections[title].warning.toolTip()
-            for title in ("Prompts", "Workflow, Models & LoRAs")] == [line, line]
+            for title in ("Prompts & Seed", "Workflow, Models & LoRAs")] == [line, line]
 
 
 def test_one_click_adds_once_a_word_two_loras_both_lack(qtbot):

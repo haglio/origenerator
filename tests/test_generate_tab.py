@@ -77,7 +77,7 @@ from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _PendingRow, _VersionRow
-from origenerator.gui.generate_tab import GenerateTab
+from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.look_training_controller import LookTrainingController
@@ -365,6 +365,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
 def test_the_pane_keeps_a_margin_round_its_contents(tab):
     tab.show()
     tab.resize(700, 800)
+    QApplication.processEvents()
 
     top_left = tab._viewport.mapTo(tab, tab._viewport.rect().topLeft())
     assert top_left.x() == 8
@@ -376,7 +377,8 @@ def test_the_pane_keeps_a_margin_round_its_contents(tab):
     assert bar_side - form.mapTo(tab, form.rect().topRight()).x() == 8
     generate = tab._generate_btn.parentWidget()
     assert tab.width() - generate.mapTo(tab, generate.rect().topRight()).x() - 1 == 8
-    lower = viewport.mapTo(tab, viewport.rect().bottomLeft()).y()
+    item_viewport = tab._item_scroll.viewport()
+    lower = item_viewport.mapTo(tab, item_viewport.rect().bottomLeft()).y()
     assert tab.height() - lower - 1 == 8
 
 
@@ -420,14 +422,58 @@ def _layout_containing(root, widget):
     return None
 
 
-def test_the_item_scrolls_above_the_settings_with_a_border_between(tab):
+def test_the_settings_scroll_nearest_the_preview_with_the_item_under_a_border(tab):
     for widget in (tab._metadata_section, tab._related._source_tile,
                    tab._related._animations, tab._versions):
         assert _is_descendant(widget, tab._item_scroll)
     assert _is_descendant(tab._param_form, tab._settings_scroll)
     split = tab._settings_split
     assert (split.orientation(), split.widget(0), split.widget(1)) == (
-        Qt.Orientation.Vertical, tab._item_scroll, tab._settings_scroll)
+        Qt.Orientation.Vertical, tab._settings_scroll, tab._item_scroll)
+
+
+def _leaves_outside_sections(tab, scroll):
+    body = scroll.widget()
+
+    def in_a_section(widget):
+        node = widget.parentWidget()
+        while node is not None and node is not body:
+            if isinstance(node, CollapsibleSection):
+                return True
+            node = node.parentWidget()
+        return False
+
+    return [type(widget).__name__ for widget in body.findChildren(QWidget)
+            if widget.isVisibleTo(body) and not widget.findChildren(QWidget)
+            and not in_a_section(widget)]
+
+
+@pytest.mark.parametrize("shown", ["nothing", "image", "video"])
+def test_nothing_on_a_tab_scrolls_outside_a_section(installed_models, saved_panel, shown):
+    tab, db = saved_panel
+    if shown != "nothing":
+        row = (_image_made_with(db, "retired_checkpoint.safetensors") if shown == "image"
+               else _video_row(db, input_image="sdxl_img1.png"))
+        tab.show_saved_generation(row, [_image_row(db)])
+    tab.resize(700, 1600)
+    tab.show()
+    QApplication.processEvents()
+
+    assert (_leaves_outside_sections(tab, tab._settings_scroll),
+            _leaves_outside_sections(tab, tab._item_scroll)) == ([], [])
+
+
+def test_every_sections_labels_end_at_one_right_edge(app_chrome, installed_models, saved_panel):
+    tab, db = saved_panel
+    tab.show_saved_generation(_image_made_with(db, "retired_checkpoint.safetensors"),
+                              [_image_row(db)])
+    tab.resize(700, 1600)
+    tab.show()
+    QApplication.processEvents()
+
+    edges = {cell.mapTo(tab, QPoint(cell.width(), 0)).x()
+             for cell in tab.findChildren(LabelCell) if cell.isVisibleTo(tab)}
+    assert len(edges) == 1
 
 
 def test_a_shown_item_takes_a_third_of_the_pane_and_leaves_the_settings_two(saved_panel):
@@ -435,12 +481,12 @@ def test_a_shown_item_takes_a_third_of_the_pane_and_leaves_the_settings_two(save
     tab.resize(480, 1400)
     tab.show()
     QApplication.processEvents()
-    assert tab._item_scroll.isHidden()
 
     image = _image_row(db)
     tab.show_saved_generation(image, [image])
+    QApplication.processEvents()
 
-    item, settings = tab._settings_split.sizes()
+    settings, item = tab._settings_split.sizes()
     assert abs(settings - 2 * item) <= 2
 
 
@@ -1624,12 +1670,12 @@ def _spy_panel(qtbot, db):
 
 def test_estimate_label_reflects_recent_durations(qtbot):
     tab = _spy_panel(qtbot, SpyDB(durations=[700.0, 724.0, 800.0]))
-    assert tab._estimate_label.text() == "Typical time: ~12 min (based on 3 runs)"
+    assert tab._estimate_label.text() == "~12 min (based on 3 runs)"
 
 
 def test_estimate_label_when_no_history(qtbot):
     tab = _spy_panel(qtbot, SpyDB(durations=[]))
-    assert tab._estimate_label.text() == "Typical time: No timing data yet"
+    assert tab._estimate_label.text() == "No timing data yet"
 
 
 def test_the_two_parts_match_a_stored_generation_of_the_same_settings(tab):
@@ -1711,6 +1757,13 @@ def saved_panel(qtbot, tmp_path, installed_models):
     return tab, db
 
 
+def _shown_metadata(tab):
+    form = tab._metadata_section.form()
+    return [form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().findChild(ElidingLabel).text()
+            for row in range(form.rowCount())
+            if form.isRowVisible(row) and form.itemAt(row, QFormLayout.ItemRole.LabelRole)]
+
+
 def _metadata_texts(tab):
     return [lbl.text().replace("\u200b", "")
             for lbl in tab._metadata_section.findChildren(QLabel)]
@@ -1733,7 +1786,7 @@ def test_a_tab_showing_an_item_puts_its_name_on_the_name_line(qtbot, tmp_path):
 def test_a_fresh_tab_shows_no_footer(saved_panel):
     tab, _db = saved_panel
     assert tab._displayed_row is None
-    assert tab._metadata_section.isHidden()
+    assert _shown_metadata(tab) == [TYPICAL_TIME]
     assert tab._versions.isHidden()
     assert tab._related._animations.isHidden()
     assert tab._related._source_tile.isHidden()
@@ -1828,7 +1881,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video(saved_panel, 
     rows = _version_rows(tab)
     assert [row._title.text() for row in rows] == ["Evolved", "Original"]
     assert upscale.name in _row_texts(rows[0])
-    assert {text for text in _metadata_texts(tab) if text} == set(SIDE_LABELS.values())
+    assert _shown_metadata(tab) == [*SIDE_LABELS.values(), TYPICAL_TIME]
 
 
 def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkeypatch,
@@ -1894,9 +1947,15 @@ def test_the_way_to_the_folder_is_one_button_in_the_row_with_generate(saved_pane
     tab.show_saved_generation(image, [image])
 
     (button,) = tab.findChildren(QPushButton, "goToFolderButton")
-    buttons = _layout_containing(tab._settings_pane.layout(), tab._generate_pair)
-    assert (buttons.indexOf(button), button.isVisibleTo(tab)) == (0, True)
-    assert buttons.indexOf(tab._lane_button) == 1
+    tab.resize(700, 1600)
+    tab.show()
+    QApplication.processEvents()
+    pane = tab._settings_pane
+
+    assert button.isVisibleTo(tab)
+    assert button.mapTo(pane, QPoint(0, 0)).y() == tab._generate_btn.mapTo(pane, QPoint(0, 0)).y()
+    assert button.mapTo(pane, QPoint(0, 0)).x() == tab._settings_scroll.widget().layout(
+        ).contentsMargins().left()
     for row in _version_rows(tab):
         assert "goToFolderButton" not in [b.objectName()
                                           for b in row.findChildren(QPushButton)]
@@ -2117,7 +2176,7 @@ def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
     monkeypatch.setattr(tab, "_recent_matching_row", lambda: None)
     tab.show_recent_preview()
 
-    assert tab._metadata_section.isHidden()
+    assert _shown_metadata(tab) == [TYPICAL_TIME]
     assert tab._versions.isHidden()
     assert tab._related._source_tile.isHidden()
     assert tab._lane_button.isHidden()
@@ -2440,7 +2499,7 @@ def test_each_area_keeps_one_gap_between_its_sections(saved_panel):
     gaps = {**_gaps_between_sections(tab, tab._item_scroll),
             **_gaps_between_sections(tab, tab._settings_scroll)}
 
-    assert {"Enhancements", "Seed"} <= set(gaps)
+    assert {"Enhancements", "Request"} <= set(gaps)
     assert gaps == dict.fromkeys(gaps, GAP_MEDIUM)
 
 
@@ -2646,23 +2705,15 @@ def test_an_image_made_with_a_model_that_is_not_installed_says_so_under_the_work
     assert _message(tab) == ""
 
 
-def test_the_note_heads_the_settings_above_the_typical_time_and_the_sections(
-        installed_models, saved_panel):
+def test_the_note_and_the_typical_time_are_metadata(installed_models, saved_panel):
     tab, db = saved_panel
     image = _image_made_with(db, "retired_checkpoint.safetensors")
     tab.show_saved_generation(image, [image])
-    tab.show()
-    tab.resize(700, 1600)
-    QApplication.processEvents()
+    metadata = tab._metadata_section.findChild(CollapsibleSection).content()
 
-    def span(widget):
-        top = widget.mapTo(tab, QPoint(0, 0)).y()
-        return top, top + widget.height()
-
-    note_top, note_foot = span(tab._cannot_remake_note)
-    typical_time_top, typical_time_foot = span(tab._estimate_label)
-    form_top, _ = span(tab._form_host)
-    assert note_top < note_foot <= typical_time_top < typical_time_foot <= form_top
+    assert (metadata.isAncestorOf(tab._cannot_remake_note),
+            metadata.isAncestorOf(tab._estimate_label)) == (True, True)
+    assert "Typical time" in [label.text() for label in metadata.findChildren(ElidingLabel)]
 
 
 def test_the_note_wears_the_yellow_of_a_warning(app_chrome, installed_models, saved_panel):

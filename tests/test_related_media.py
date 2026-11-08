@@ -55,7 +55,7 @@ def _request(prompt_id, source_prompt_id, asked=""):
 
 
 def _links(section):
-    return [(tile._heading.text(), tile._prompt_id)
+    return [(None if tile._heading.isHidden() else tile._heading.text(), tile._prompt_id)
             for tile in section.findChildren(SourceTile) if not tile.isHidden()]
 
 
@@ -180,7 +180,7 @@ def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combi
 
     section = related._combine_section
     assert section._title == "Combine"
-    assert _links(section) == [("Source video for", "made1"), ("Source video for", "made2")]
+    assert _links(section) == [(None, "made1"), (None, "made2")]
 
 
 def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(make_related):
@@ -221,7 +221,7 @@ def _drawn_links(related, row, image_rows):
     drawn |= {(shown, video) for video in _animated(related)}
     for section in (related._requests_section, related._modifications_section,
                     related._combine_section, related._trims_section):
-        drawn |= {(other, shown) if heading.endswith(" from") else (shown, other)
+        drawn |= {(other, shown) if heading and heading.endswith(" from") else (shown, other)
                   for heading, other in _links(section)}
     return drawn
 
@@ -337,7 +337,7 @@ def test_a_run_that_failed_to_make_its_video_is_not_listed_under_combine(make_re
 
     related.show_row(_video_row("vid0"), [_image_row()])
 
-    assert _links(related._combine_section) == [("Source video for", "made1")]
+    assert _links(related._combine_section) == [(None, "made1")]
 
 
 def test_a_cut_is_not_among_the_animations_of_the_image_its_clip_was_made_from(make_related):
@@ -537,7 +537,7 @@ def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
 
     section = related._trims_section
     assert section._title == "Trims"
-    assert _links(section) == [("Trimmed into", "cut1"), ("Trimmed into", "cut2")]
+    assert _links(section) == [(None, "cut1"), (None, "cut2")]
 
 
 def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):

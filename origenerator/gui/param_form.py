@@ -250,7 +250,7 @@ class ParamForm(QWidget):
             self._sections[title] = section
             self._present_keys[title] = []
             outer.addWidget(section)
-            if title == "Prompts" and self._takes_requests and any(
+            if title == param_sections.PROMPTS_TITLE and self._takes_requests and any(
                     pd.key == "positive_prompt" for pd in self._param_defs):
                 outer.addWidget(self._build_request_section())
         outer.addStretch(1)

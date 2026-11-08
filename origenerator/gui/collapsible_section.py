@@ -169,3 +169,11 @@ class CollapsibleSection(QWidget):
 
     def content_form(self) -> LabelForm:
         return self._form
+
+
+def line_up_the_labels(within: QWidget) -> None:
+    columns = [section.content_form().label_column
+               for section in within.findChildren(CollapsibleSection)]
+    widest = max((column.natural_width() for column in columns), default=0)
+    for column in columns:
+        column.widen_to(widest)

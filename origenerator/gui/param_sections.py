@@ -14,12 +14,13 @@ class Section:
 
 
 WORKFLOW_TITLE = "Workflow, Models & LoRAs"
+PROMPTS_TITLE = "Prompts & Seed"
 
 SECTIONS: tuple[Section, ...] = (
-    Section("Prompts", ("positive_prompt", "scene_frames", "scene_lines",
-                        "negative_prompt", "input_image", "video", "video_start"),
+    Section(PROMPTS_TITLE, ("positive_prompt", "scene_frames", "scene_lines",
+                            "negative_prompt", "input_image", "video", "video_start",
+                            "noise_seed", "seed"),
             collapsed=False),
-    Section("Seed", ("noise_seed", "seed"), collapsed=False),
     Section(WORKFLOW_TITLE, (
         "checkpoint", "unet", *keys_with_strengths(LORA_KEYS), "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",

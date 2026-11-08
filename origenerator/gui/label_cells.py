@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PyQt6 import sip
 from PyQt6.QtCore import QRect, QSize
 from PyQt6.QtWidgets import QWIDGETSIZE_MAX, QFormLayout, QHBoxLayout, QWidget
 
@@ -10,18 +11,33 @@ class LabelColumn:
     def __init__(self):
         self._cells: list[LabelCell] = []
         self._room = QWIDGETSIZE_MAX
+        self._floor = 0
 
     def join(self, cell: LabelCell) -> None:
         self._cells.append(cell)
 
+    def natural_width(self) -> int:
+        return max((cell.natural_width() for cell in self._living()), default=0)
+
+    def _living(self) -> list[LabelCell]:
+        self._cells = [cell for cell in self._cells if not sip.isdeleted(cell)]
+        return self._cells
+
     def width(self) -> int:
-        return min(max(cell.natural_width() for cell in self._cells), self._room)
+        return min(max(self.natural_width(), self._floor), self._room)
+
+    def widen_to(self, floor: int) -> None:
+        if floor == self._floor:
+            return
+        self._floor = floor
+        for cell in self._living():
+            cell.updateGeometry()
 
     def fit_in(self, room: int) -> None:
         if room == self._room:
             return
         self._room = room
-        for cell in self._cells:
+        for cell in self._living():
             cell.updateGeometry()
 
 

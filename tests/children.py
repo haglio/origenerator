@@ -20,12 +20,16 @@ def run_python(args: list[str], *, timeout: float = HANG_AFTER_S, logs: Iterable
     try:
         return subprocess.run([sys.executable, *args], cwd=REPO_ROOT, timeout=timeout,
                               capture_output=True, encoding="utf-8", errors="replace",
-                              check=check, **hidden_subprocess_kwargs(), **kwargs)
+                              check=check, **a_child_no_run_can_starve(), **kwargs)
     except subprocess.TimeoutExpired as timed_out:
         raise AssertionError("\n".join([
             f"the child was still running {timeout:g} s after it started",
             "--- its output", _text(timed_out.stdout), "--- its errors", _text(timed_out.stderr),
             *(line for log in logs for line in _tail(log))])) from None
+
+
+def a_child_no_run_can_starve() -> dict:
+    return hidden_subprocess_kwargs(creationflags=subprocess.NORMAL_PRIORITY_CLASS)
 
 
 def say_where_it_hangs(*, after_s: float = HANG_AFTER_S - 10) -> None:

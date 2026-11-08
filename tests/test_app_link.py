@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from origenerator import app_link, config
+from tests.children import a_child_no_run_can_starve
 
 
 def test_a_link_names_the_generation_it_opens():
@@ -200,7 +201,8 @@ def test_the_handler_windows_runs_answers_out_of_its_own_checkout(tmp_path):
         [sys.executable, str(app_link.CHECKOUT / app_link.HANDLER),
          app_link.LIVE_LAUNCHER, "https://example.test/"],
         cwd=tmp_path, capture_output=True, text=True, timeout=60,
-        env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, check=False)
+        env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, check=False,
+        **a_child_no_run_can_starve())
 
     assert handler.returncode == 2, handler.stderr
     assert handler.stdout == ""

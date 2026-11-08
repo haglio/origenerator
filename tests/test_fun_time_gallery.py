@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import NamedTuple
 
+from funestra.hud_title import F_MODE_LABEL
 from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
@@ -633,7 +634,7 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
     assert slideshow.pass_size() == 1
     model = slideshow_hud_model("portrait", slideshow)
     assert _lit(model, "portrait_fmode")
-    assert "F-Mode" in model.title
+    assert F_MODE_LABEL in model.title
 
     slideshow.shown.press("portrait_fmode")
     assert slideshow.pass_size() == 3

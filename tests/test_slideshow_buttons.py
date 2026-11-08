@@ -8,7 +8,7 @@ from funestra.hud_controls import (
     TRASH_TOOLTIP,
     lock_tooltip,
 )
-from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.slideshow_buttons import HUD_FACTS, SlideshowFacts, answer, slideshow_rows
 
@@ -79,7 +79,7 @@ class TestTheWords:
         assert row["nudge_next"].tooltip.startswith("Forward 10s")
         assert row["funscript_jump"].tooltip.startswith(
             "Skip ahead to where this slide's scripting starts up again")
-        assert row["fmode"].tooltip == "F-Mode — browse only the favorites on this Funestra"
+        assert row["fmode"].tooltip == f"{F_MODE_LABEL} — browse only the favorites on this Funestra"
         assert row["shuffle"].tooltip == f"{SHUFFLE_LABEL} — reshuffle what plays"
         assert row["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
         assert row["cycle_version"].tooltip == "Another version of this slide"

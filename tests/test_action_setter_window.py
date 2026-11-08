@@ -186,10 +186,11 @@ def test_the_window_says_when_there_is_nothing_left_to_set(window):
 
 class _Asked:
     def __init__(self, answer):
-        self.answer, self.times = answer, 0
+        self.answer, self.times, self.showing = answer, 0, []
 
-    def __call__(self, _parent):
+    def __call__(self, parent):
         self.times += 1
+        self.showing.append(_said(parent, STATUS_LINE))
         return self.answer
 
 
@@ -231,13 +232,31 @@ def test_with_nothing_else_waiting_it_does_not_ask(window):
     assert (asked.times, _said(made, STATUS_LINE)) == (0, ActionSetterWindow.NOTHING_LEFT)
 
 
-def test_skipping_the_first_one_does_not_ask(window):
+def test_it_asks_with_the_first_item_still_showing(window):
     asked = _Asked(True)
-    made, _store, _stage = window("first", "second", keep_going=asked)
+    made, _store, _stage = window(items=[{"prompt_id": "first", "name": "3FA9C0D2 001"},
+                                         {"prompt_id": "second", "name": "3FA9C0D2 002"}],
+                                  keep_going=asked)
 
-    _press(made, SKIP_BUTTON).click()
+    _tile(made, "button one").click()
 
-    assert asked.times == 0
+    assert (asked.showing, _said(made, STATUS_LINE)) == (
+        ["2 left · 3FA9C0D2 001"], "1 left · 3FA9C0D2 002")
+
+
+def test_opened_on_an_item_skip_is_grayed_until_that_item_has_its_actions(window):
+    made, _store, _stage = window("first", "second", keep_going=_Asked(True))
+    before = _press(made, SKIP_BUTTON).isEnabled()
+
+    _tile(made, "button one").click()
+
+    assert (before, _press(made, SKIP_BUTTON).isEnabled()) == (False, True)
+
+
+def test_opened_on_its_own_skip_can_be_pressed_on_the_first_item(window):
+    made, _store, _stage = window("first", "second")
+
+    assert _press(made, SKIP_BUTTON).isEnabled()
 
 
 @pytest.mark.parametrize(("pressed", "going_on"), [(KEEP_GOING, True), (QUIT, False)])

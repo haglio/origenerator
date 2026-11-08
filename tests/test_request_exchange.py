@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QEvent, QPoint, Qt
 from PyQt6.QtGui import QColor, QHelpEvent, QImage, QTextCursor, QTextDocument
 from PyQt6.QtWidgets import QApplication, QToolTip
-from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_PRIMARY
+from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.db_requests import Turn
@@ -336,7 +336,8 @@ def _fragments(block):
         it += 1
 
 
-def test_the_stand_in_for_an_item_not_made_is_gray_with_a_question_mark(qtbot, tmp_path):
+def test_the_stand_in_for_an_item_not_made_is_a_gray_the_hover_box_does_not_wear(
+        qtbot, tmp_path):
     paths = _thumbnails(tmp_path, "start")
     exchange = _exchange(qtbot)
     exchange.set_thumbnail_of(paths.get)
@@ -347,9 +348,10 @@ def test_the_stand_in_for_an_item_not_made_is_gray_with_a_question_mark(qtbot, t
     name = next(part.split('"')[0] for part in entry.tip.split('src="')[1:] if "not made" in part)
     stand_in = QImage(name)
     assert (stand_in.width(), stand_in.height()) == (192, 96)
-    assert stand_in.pixelColor(2, 2) == BG_TERTIARY
+    assert stand_in.pixelColor(2, 2) == TEXT_MUTED
+    assert TEXT_MUTED != BG_TERTIARY
     marked = [(x, y) for x in range(192) for y in range(96)
-              if stand_in.pixelColor(x, y) != BG_TERTIARY]
+              if stand_in.pixelColor(x, y) != TEXT_MUTED]
     assert min(y for _x, y in marked) < 30
     assert max(y for _x, y in marked) > 66
 

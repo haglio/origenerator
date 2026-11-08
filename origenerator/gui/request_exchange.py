@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_PRIMARY, TEXT_SECONDARY
+from shared_ui.colors import BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -48,6 +48,8 @@ _COMPARED = THUMBNAIL_BOX * 2
 _NOT_MADE = "?"
 _THUMBNAIL_LINES = 2
 _MARK_SHARE = 0.7
+_NOT_MADE_FILL = TEXT_MUTED
+_NOT_MADE_INK = TEXT_PRIMARY
 _AUTO_GENERATE = "Auto-generate"
 _AUTO_GENERATE_TIP = "Generate each time the model comes back with its changes"
 
@@ -122,17 +124,18 @@ def _write_comparison(cursor: QTextCursor, *thumbnails: str | None) -> None:
 
 
 def _not_made(size: QSize) -> QTextImageFormat:
-    path = config.STATE_DIR / "not made" / f"not made {size.width()}x{size.height()}.png"
+    drawn = f"{size.width()}x{size.height()} {_NOT_MADE_FILL.name()[1:]} {_NOT_MADE_INK.name()[1:]}"
+    path = config.STATE_DIR / "not made" / f"not made {drawn}.png"
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         stand_in = QImage(size, QImage.Format.Format_RGB32)
-        stand_in.fill(BG_TERTIARY)
+        stand_in.fill(_NOT_MADE_FILL)
         painter = QPainter(stand_in)
         font = QFont()
         font.setPixelSize(round(min(size.width(), size.height()) * _MARK_SHARE))
         font.setWeight(QFont.Weight.Bold)
         painter.setFont(font)
-        painter.setPen(TEXT_SECONDARY)
+        painter.setPen(_NOT_MADE_INK)
         painter.drawText(stand_in.rect(), Qt.AlignmentFlag.AlignCenter, _NOT_MADE)
         painter.end()
         stand_in.save(str(path))

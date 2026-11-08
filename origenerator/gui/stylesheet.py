@@ -30,7 +30,7 @@ from shared_ui.spacing import (
 from origenerator.config import PROJECT_DIR
 from origenerator.gui import drop_style
 from origenerator.gui.eliding_tab_bar import EDGE
-from origenerator.gui.panes import BORDER_NAME, BORDERED_SET
+from origenerator.gui.panes import BORDERED_SET
 from origenerator.spin_arrows import arrow_paths
 
 CHOSEN = "chosen"
@@ -285,7 +285,7 @@ def build_stylesheet() -> str:
     QTabWidget::pane {{
         border: none;
     }}
-    QSplitter::handle, QFrame#{BORDER_NAME} {{
+    QSplitter::handle {{
         background-color: {_h(BG_SECONDARY)};
     }}
     QSplitter::handle:hover {{

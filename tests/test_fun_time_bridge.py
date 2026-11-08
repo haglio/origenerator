@@ -183,6 +183,18 @@ def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch
     assert spoken == [("landscape favorites", None), ("portrait fix teeth", None)]
 
 
+def test_a_spoken_phrase_said_to_no_side_runs_here_as_it_was_said(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    spoken = []
+    monkeypatch.setattr(view, "run_spoken_command",
+                        lambda text, said_at: spoken.append((text, said_at)))
+
+    (tmp_path / "origenerator_cmd.txt").write_text("SAY:populate on" + chr(10), encoding="utf-8")
+    bridge._tick()
+
+    assert spoken == [("populate on", None)]
+
+
 def _five_seconds_ago() -> tuple[float, float]:
     return time.time() - 5.0, time.monotonic() - 5.0
 

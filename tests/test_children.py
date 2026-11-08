@@ -7,7 +7,7 @@ import textwrap
 
 import pytest
 
-from tests.children import run_python
+from tests.children import run_python, run_python_timed_from
 
 _MAKES_A_SOUND_OUTPUT_THEN_ENDS = textwrap.dedent("""
     import sys
@@ -52,8 +52,8 @@ def test_a_child_still_running_at_its_timeout_fails_with_what_it_said_where_it_w
 
 
 def test_a_child_ended_outright_while_qt_still_probes_the_sound_devices_ends_at_once():
-    ran = run_python(["-c", _MAKES_A_SOUND_OUTPUT_THEN_ENDS], timeout=30,
-                     env=os.environ | {"QT_QPA_PLATFORM": "offscreen"})
+    ran = run_python_timed_from("made", ["-c", _MAKES_A_SOUND_OUTPUT_THEN_ENDS], timeout=30,
+                                env=os.environ | {"QT_QPA_PLATFORM": "offscreen"})
 
     assert ran.stdout.splitlines() == ["made"]
 
@@ -87,3 +87,47 @@ def test_a_child_runs_at_normal_priority_so_other_runs_below_normal_cannot_starv
     ran = run_python(["-c", _SAYS_ITS_PRIORITY_CLASS])
 
     assert int(ran.stdout) == subprocess.NORMAL_PRIORITY_CLASS
+
+
+_STARTS_SLOWLY_THEN_ENDS = textwrap.dedent("""
+    import time
+    time.sleep(3)
+    print("ready", flush=True)
+""")
+
+
+def test_a_child_slow_to_start_is_timed_from_the_line_that_says_it_is_ready():
+    ran = run_python_timed_from("ready", ["-c", _STARTS_SLOWLY_THEN_ENDS], timeout=1)
+
+    assert ran.stdout.splitlines() == ["ready"]
+
+
+_SAYS_IT_IS_READY_THEN_HANGS = textwrap.dedent("""
+    import time
+    print("ready", flush=True)
+    while True:
+        time.sleep(1)
+""")
+
+
+def test_a_child_still_running_after_it_said_it_is_ready_fails_with_what_it_said():
+    with pytest.raises(AssertionError) as failure:
+        run_python_timed_from("ready", ["-c", _SAYS_IT_IS_READY_THEN_HANGS], timeout=1)
+
+    assert str(failure.value).splitlines()[:3] == [
+        "the child was still running 1 s after it said 'ready'", "--- its output", "ready"]
+
+
+def test_a_child_that_never_says_it_is_ready_fails_once_its_start_runs_out():
+    with pytest.raises(AssertionError) as failure:
+        run_python_timed_from("ready", ["-c", "import time; time.sleep(60)"], timeout=1,
+                              start_timeout=1)
+
+    assert str(failure.value).splitlines()[0] == (
+        "the child was still running 1 s after it started, without saying 'ready'")
+
+
+def test_a_child_that_ends_without_saying_it_is_ready_is_returned_as_it_ended():
+    ran = run_python_timed_from("ready", ["-c", "raise SystemExit(3)"], timeout=1)
+
+    assert ran.returncode == 3

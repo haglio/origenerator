@@ -20,6 +20,7 @@ from shared_ui.icons import qt_icon
 from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_ICON, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
+from shared_ui.tooltip_shape import shaped
 
 from origenerator.base_models import loras_offered_beside
 from origenerator.box_breaks import unboxed
@@ -55,7 +56,6 @@ from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
 from origenerator.gui.request_exchange import RequestExchange
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
-from origenerator.gui.tooltip_shape import shaped
 from origenerator.gui.training_controls import TrainingRows
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import FilesOnly

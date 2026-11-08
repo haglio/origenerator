@@ -4,11 +4,13 @@ import json
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QSize, Qt
+from PyQt6.QtCore import QPoint, QSize, Qt, QTimer
 from PyQt6.QtGui import QColor, QPalette, QPixmap
 from PyQt6.QtWidgets import (
+    QApplication,
     QGridLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QToolButton,
@@ -24,8 +26,11 @@ from origenerator.action_setter import Locks, SetterSession
 from origenerator.action_vocabulary import Tile, Vocabulary, vocabulary
 from origenerator.content import EXAMPLE_CONTENT
 from origenerator.gui.action_setter_window import (
+    KEEP_GOING,
+    KEEP_GOING_QUESTION,
     LAST_LINE,
     PREVIOUSLY_LINE,
+    QUIT,
     ROOM_FOR_THE_GRID,
     SAME_BUTTON,
     SKIP_BUTTON,
@@ -33,6 +38,7 @@ from origenerator.gui.action_setter_window import (
     UNDO_BUTTON,
     ActionSetterWindow,
     action_button,
+    ask_to_keep_going,
     checkbox,
     lock,
     on_a_white_square,
@@ -98,7 +104,7 @@ def _said(made, name) -> str:
 @pytest.fixture
 def window(qtbot, tmp_path):
     def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
-              side=MediaType.IMAGE, locks=None):
+              side=MediaType.IMAGE, locks=None, keep_going=None):
         store = _Store()
         listed = items or [{"prompt_id": p, "name": "3FA9C0D2 000", "path": None}
                            for p in prompt_ids]
@@ -106,7 +112,8 @@ def window(qtbot, tmp_path):
         made = ActionSetterWindow(
             SetterSession(listed, store, side),
             Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}, {}, {}),
-            drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage)
+            drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage,
+            keep_going=keep_going)
         qtbot.addWidget(made)
         return made, store, stage
 
@@ -175,6 +182,79 @@ def test_the_window_says_when_there_is_nothing_left_to_set(window):
     _tile(made, "button one").click()
 
     assert _said(made, STATUS_LINE) == ActionSetterWindow.NOTHING_LEFT
+
+
+class _Asked:
+    def __init__(self, answer):
+        self.answer, self.times = answer, 0
+
+    def __call__(self, _parent):
+        self.times += 1
+        return self.answer
+
+
+def test_opened_on_an_item_it_asks_after_that_one_whether_to_go_on(window):
+    asked = _Asked(True)
+    made, _store, _stage = window("first", "second", keep_going=asked)
+    made.show()
+
+    _tile(made, "button one").click()
+
+    assert (asked.times, made.isVisible(), _said(made, STATUS_LINE)[:2]) == (1, True, "1 ")
+
+
+def test_quitting_at_the_question_closes_the_tool(window):
+    made, store, _stage = window("first", "second", keep_going=_Asked(False))
+    made.show()
+
+    _tile(made, "button one").click()
+
+    assert (made.isVisible(), store.labels) == (False, {"first": Labels(("alpha",))})
+
+
+def test_it_asks_only_after_the_first_one(window):
+    asked = _Asked(True)
+    made, _store, _stage = window("first", "second", "third", keep_going=asked)
+
+    _tile(made, "button one").click()
+    _press(made, SAME_BUTTON).click()
+
+    assert asked.times == 1
+
+
+def test_with_nothing_else_waiting_it_does_not_ask(window):
+    asked = _Asked(True)
+    made, _store, _stage = window("only", keep_going=asked)
+
+    _tile(made, "button one").click()
+
+    assert (asked.times, _said(made, STATUS_LINE)) == (0, ActionSetterWindow.NOTHING_LEFT)
+
+
+def test_skipping_the_first_one_does_not_ask(window):
+    asked = _Asked(True)
+    made, _store, _stage = window("first", "second", keep_going=asked)
+
+    _press(made, SKIP_BUTTON).click()
+
+    assert asked.times == 0
+
+
+@pytest.mark.parametrize(("pressed", "going_on"), [(KEEP_GOING, True), (QUIT, False)])
+def test_the_question_offers_keeping_on_or_quitting(window, pressed, going_on):
+    made, _store, _stage = window("first")
+    seen = []
+
+    def answer():
+        asked = next(shown for shown in QApplication.topLevelWidgets()
+                     if isinstance(shown, QMessageBox) and shown.isVisible())
+        seen.append((asked.text(), sorted(button.text() for button in asked.buttons())))
+        next(button for button in asked.buttons() if button.text() == pressed).click()
+
+    QTimer.singleShot(0, answer)
+
+    assert (ask_to_keep_going(made), seen) == (
+        going_on, [(KEEP_GOING_QUESTION, sorted((KEEP_GOING, QUIT)))])
 
 
 def test_same_as_last_gives_this_item_the_actions_the_last_one_got(window):

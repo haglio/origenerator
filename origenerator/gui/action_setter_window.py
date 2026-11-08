@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QToolButton,
@@ -45,6 +46,9 @@ PREVIOUSLY = "yellow box was previously selected"
 SKIP_BUTTON = "setter.skip"
 SAME_BUTTON = "setter.same"
 UNDO_BUTTON = "setter.undo"
+KEEP_GOING_QUESTION = "Do you want to keep setting actions for other items, or quit the tool?"
+KEEP_GOING = "Keep setting actions for other items"
+QUIT = "Quit the tool"
 TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
           MediaType.VIDEO: "Origenerator — video action setter tool"}
 
@@ -123,8 +127,9 @@ class ActionSetterWindow(QWidget):
     MISSING = "(this one's file is missing)"
 
     def __init__(self, session, vocabulary, drawings: dict[str, str], locks, *,
-                 stage=None, parent=None):
+                 stage=None, keep_going=None, parent=None):
         super().__init__(parent)
+        self._keep_going = keep_going
         self._session = session
         self._vocabulary = vocabulary
         self._drawings = dict(drawings)
@@ -331,6 +336,7 @@ class ActionSetterWindow(QWidget):
             return
         self._session.set_as(name, Labels(self._vocabulary.buttons[name], self._checked()))
         self._said(f"Last: {name}")
+        self._ask_whether_to_go_on()
 
     def _on_same(self) -> None:
         last = self._session.last
@@ -340,6 +346,11 @@ class ActionSetterWindow(QWidget):
         said, labels = last
         self._session.set_as(said, Labels(labels.actions, self._checked()))
         self._said(f"Last: {said}")
+
+    def _ask_whether_to_go_on(self) -> None:
+        asking, self._keep_going = self._keep_going, None
+        if asking is not None and self._session.current is not None and not asking(self):
+            self.close()
 
     def _on_skip(self) -> None:
         if self._session.current is None:
@@ -411,6 +422,17 @@ def _set(boxes: dict[str, TickControl], held: dict[str, bool], its_own: tuple[st
         box.blockSignals(True)
         box.setChecked(held.get(name, name in its_own))
         box.blockSignals(False)
+
+
+def ask_to_keep_going(parent) -> bool:
+    asked = QMessageBox(QMessageBox.Icon.Question, parent.windowTitle(), KEEP_GOING_QUESTION,
+                        parent=parent)
+    going_on = asked.addButton(KEEP_GOING, QMessageBox.ButtonRole.AcceptRole)
+    asked.addButton(QUIT, QMessageBox.ButtonRole.RejectRole)
+    asked.setDefaultButton(going_on)
+    asked.setEscapeButton(going_on)
+    asked.exec()
+    return asked.clickedButton() is going_on
 
 
 def _lock_tip(locked: bool) -> str:

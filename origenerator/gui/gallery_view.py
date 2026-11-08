@@ -622,7 +622,7 @@ class GalleryView(QWidget):
             self._client, self._db, fun_time=self._fun_time, inbox=self._inbox,
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
                            animated_preview=self.animated_preview,
-                           requests=self._voice.requests))
+                           requests=self._voice.requests, request_aims={}))
         self._find_bar = FindBar("Find in prompts:", "a word you wrote…",
                                  dismiss_key="Esc", reveal=reveal_prompt)
         self.generate_pane.tab_added.connect(self._wire_generate_tab)

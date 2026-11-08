@@ -95,6 +95,14 @@ def test_his_prompts_that_touch_the_request_are_the_model_for_writing_what_he_as
     assert "end" in rule.lower()
 
 
+def test_a_request_that_contradicts_a_prompt_rewrites_the_whole_of_both_prompts():
+    rule = _request_prompt()[_request_prompt().index("Change every term"):].split("\n")[0]
+
+    assert "both prompts" in rule
+    assert "negative prompt" in rule
+    assert "two women" in rule
+
+
 def test_portrait_and_landscape_are_taught_as_width_and_height_never_as_prompt_words():
     prompt = _request_prompt()
     rule = prompt[prompt.index("Portrait, landscape"):].split("\n")[0]

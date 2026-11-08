@@ -183,18 +183,22 @@ def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch
     assert spoken == [("landscape favorites", None), ("portrait fix teeth", None)]
 
 
+def _five_seconds_ago() -> tuple[float, float]:
+    return time.time() - 5.0, time.monotonic() - 5.0
+
+
 def test_a_spoken_phrase_goes_with_when_the_session_heard_it_said(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     commanded = []
     monkeypatch.setattr(view._voice, "on_command",
                         lambda matched, said_at=None: commanded.append(said_at))
-    five_seconds_ago = time.time() - 5.0
+    five_seconds_ago, on_this_clock = _five_seconds_ago()
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         f"PORTRAIT_SAY:fix teeth @{five_seconds_ago:.3f}\n", encoding="utf-8")
     bridge._tick()
 
-    assert commanded == [pytest.approx(time.monotonic() - 5.0, abs=1.0)]
+    assert commanded == [pytest.approx(on_this_clock, abs=0.1)]
 
 
 class _SaidOverShow:
@@ -221,13 +225,13 @@ def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _SaidOverShow()
     monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
-    five_seconds_ago = time.time() - 5.0
+    five_seconds_ago, on_this_clock = _five_seconds_ago()
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         f"portrait_{said} @{five_seconds_ago:.3f}\n", encoding="utf-8")
     bridge._tick()
 
-    assert show.done == [("back to", pytest.approx(time.monotonic() - 5.0, abs=1.0)), (done,)]
+    assert show.done == [("back to", pytest.approx(on_this_clock, abs=0.1)), (done,)]
 
 
 def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, tmp_path,

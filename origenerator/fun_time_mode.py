@@ -110,6 +110,7 @@ def command_lines() -> tuple[str, ...]:
         *SESSION_VERBS,
         f"{HAND_OVER}|{{frames}}|{{input}}",
         f"{GO_TO}|{{file}}",
+        f"{SAY.upper()}:{{words}}",
         *(line for shape in SHAPES for line in _lines_said_to(shape)),
     )
 

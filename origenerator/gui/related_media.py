@@ -14,10 +14,9 @@ from origenerator.gallery import (
     was_made_from,
     was_taken_from,
 )
-from origenerator.gui.animations import Animations
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.source_tile import NO_HEADING, SourceTile
+from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.trash_box import place_tiles
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
@@ -28,18 +27,18 @@ def _is_request(record: dict | None) -> bool:
     return bool(words_of(record))
 
 
-ANIMATIONS = "Animations"
+LINKS = "Links"
+ANIMATED_IN = "Animated in"
 STARTING_FRAME_ANIMATED_IN = "Starting frame animated in"
 
 
-class _Links(CollapsibleSection):
+class _LinkRow(QWidget):
     activated = pyqtSignal(str)
 
-    def __init__(self, title: str):
-        super().__init__(title)
-        host = QWidget()
-        self._flow = FlowLayout(host, spacing=GAP_MEDIUM)
-        self.content_form().addRow(host)
+    def __init__(self, movie_of: Callable[[dict], str | None]):
+        super().__init__()
+        self._movie_of = movie_of
+        self._flow = FlowLayout(self, spacing=GAP_MEDIUM)
         self.hide()
 
     def show_links(self, links: list[tuple[str, dict]], name_of: Callable[[str], str],
@@ -56,7 +55,7 @@ class _Links(CollapsibleSection):
         tile = SourceTile()
         tile.activated.connect(self.activated)
         tile.show_source(row, name_of(row["prompt_id"]), heading=heading,
-                         media_type=media_type_of_row(row))
+                         media_type=media_type_of_row(row), movie=self._movie_of(row))
         return tile
 
 
@@ -85,33 +84,35 @@ class RelatedMedia(QWidget):
         self._requests_about = lookups.requests_about
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(GAP_MEDIUM)
+        self._section = CollapsibleSection(LINKS)
+        layout.addWidget(self._section)
+        rows_host = QWidget()
+        rows = QVBoxLayout(rows_host)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(GAP_MEDIUM)
+        self._section.content_form().addRow(rows_host)
         self._source_tile = SourceTile()
         self._source_video_tile = SourceTile()
         self._source_box = None
-        self._source_section = self._source_section_of(self._source_tile,
-                                                       self._source_video_tile)
-        layout.addWidget(self._source_section)
-        self._requests_section = _Links("Requests")
-        self._modifications_section = _Links("Modifications")
-        self._animations = Animations()
-        self._animations.video_activated.connect(self.link_clicked)
-        self._animations_section = CollapsibleSection(ANIMATIONS)
-        self._animations_section.content_form().addRow(self._animations)
-        self._animations_section.hide()
-        self._combine_section = _Links("Combine")
-        self._trims_section = _Links("Trims")
-        for section in (self._requests_section, self._modifications_section,
-                        self._combine_section, self._trims_section):
-            section.activated.connect(self.link_clicked)
-        for section in self._sections():
-            layout.addWidget(section)
-        self._follow_the_sections()
+        self._sources = self._source_links_of(self._source_tile, self._source_video_tile)
+        self._requests = _LinkRow(self._movie_of)
+        self._modifications = _LinkRow(self._movie_of)
+        self._animations = _LinkRow(self._movie_of)
+        self._combines = _LinkRow(self._movie_of)
+        self._trims = _LinkRow(self._movie_of)
+        for row in self._rows():
+            if isinstance(row, _LinkRow):
+                row.activated.connect(self.link_clicked)
+            rows.addWidget(row)
+        self._follow_the_rows()
 
-    def _follow_the_sections(self) -> None:
-        self.setVisible(any(not section.isHidden() for section in self._sections()))
+    def _movie_of(self, row: dict) -> str | None:
+        return self._animated_preview(row) if media_type_of_row(row) == MediaType.VIDEO else None
 
-    def _source_section_of(self, *tiles: SourceTile) -> CollapsibleSection:
+    def _follow_the_rows(self) -> None:
+        self.setVisible(any(not row.isHidden() for row in self._rows()))
+
+    def _source_links_of(self, *tiles: SourceTile) -> QWidget:
         side_by_side = QWidget()
         self._source_row = QHBoxLayout(side_by_side)
         self._source_row.setContentsMargins(0, 0, 0, 0)
@@ -120,10 +121,8 @@ class RelatedMedia(QWidget):
         for tile in tiles:
             tile.activated.connect(self.link_clicked)
             self._source_row.addWidget(tile)
-        section = CollapsibleSection("Source")
-        section.content_form().addRow(side_by_side)
-        section.hide()
-        return section
+        side_by_side.hide()
+        return side_by_side
 
     def show_row(self, row: dict, image_rows: list[dict]) -> None:
         start_image_of = start_images_among([*image_rows, *self._held_of_kind(MediaType.IMAGE)])
@@ -132,41 +131,38 @@ class RelatedMedia(QWidget):
         self._show_source_tile(row, start_image_of, videos)
         self._show_source_video_tile(row)
         self._place_source_tiles()
-        self._source_section.setVisible(
+        self._sources.setVisible(
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
-        items = self._animated_items(row, start_image_of, videos)
-        self._animations_section.show_title(STARTING_FRAME_ANIMATED_IN
-                                            if media_type_of_row(row) == MediaType.VIDEO
-                                            else ANIMATIONS)
-        self._animations.show_videos(items, in_trash=self._trashed())
-        self._animations_section.setVisible(not self._animations.isHidden())
+        heading = (STARTING_FRAME_ANIMATED_IN if media_type_of_row(row) == MediaType.VIDEO
+                   else ANIMATED_IN)
+        self._animations.show_links(
+            [(heading, video) for video in self._animated_videos(row, start_image_of, videos)],
+            self._name_of, self._trashed())
         self._show_videos_made_from(row.get("prompt_id"), videos)
-        self._follow_the_sections()
+        self._follow_the_rows()
 
     def folds(self) -> dict[str, bool]:
-        return {section.title(): section.is_collapsed() for section in self._sections()}
+        return {LINKS: self._section.is_collapsed()}
 
     def set_folds(self, saved: dict) -> None:
-        for section in self._sections():
-            folded = saved.get(section.title())
-            if isinstance(folded, bool):
-                section.set_collapsed(folded)
+        folded = saved.get(LINKS)
+        if isinstance(folded, bool):
+            self._section.set_collapsed(folded)
 
-    def _sections(self) -> tuple[CollapsibleSection, ...]:
-        return (self._source_section, self._requests_section, self._modifications_section,
-                self._animations_section, self._combine_section, self._trims_section)
+    def _rows(self) -> tuple[QWidget, ...]:
+        return (self._sources, self._requests, self._modifications,
+                self._animations, self._combines, self._trims)
 
     def clear(self) -> None:
         self._source_tile.clear()
         self._source_video_tile.clear()
         self._place_source_tiles()
-        self._source_section.hide()
+        self._sources.hide()
         self.show_requests_and_modifications(None)
-        self._animations.hide()
-        self._animations_section.hide()
+        self._animations.show_links([], self._name_of)
         self._show_videos_made_from(None, [])
-        self._follow_the_sections()
+        self._follow_the_rows()
 
     def _show_source_tile(self, row: dict, start_image_of, videos: list[dict]):
         source_row, heading, media_type = self._built_from(row, start_image_of)
@@ -179,7 +175,7 @@ class RelatedMedia(QWidget):
             source_row, heading, media_type = taken_from, "From starting frame of", MediaType.VIDEO
         self._source_tile.show_source(
             source_row, self._name_of(source_row["prompt_id"]),
-            heading=heading, media_type=media_type,
+            heading=heading, media_type=media_type, movie=self._movie_of(source_row),
         )
 
     def show_requests_and_modifications(self, prompt_id: str | None) -> None:
@@ -188,22 +184,22 @@ class RelatedMedia(QWidget):
         made_into = [(record, made)
                      for record in (self._requests_about(prompt_id) if prompt_id else [])
                      if (made := self._item(record["prompt_id"])) is not None]
-        for section, is_request, from_heading, into_heading in (
-                (self._requests_section, True, "Requested from", "Requested into"),
-                (self._modifications_section, False, "Modified from", "Modified into")):
-            section.show_links(
+        for links, is_request, from_heading, into_heading in (
+                (self._requests, True, "Requested from", "Requested into"),
+                (self._modifications, False, "Modified from", "Modified into")):
+            links.show_links(
                 ([(from_heading, made_from)]
                  if made_from is not None and _is_request(request) == is_request else [])
                 + [(into_heading, made) for record, made in made_into
                    if _is_request(record) == is_request],
                 self._name_of, self._trashed())
-        self._follow_the_sections()
+        self._follow_the_rows()
 
     def _show_videos_made_from(self, prompt_id: str | None, videos: list[dict]) -> None:
-        for section, names_it, heading in (
-                (self._combine_section, "source_video", NO_HEADING),
-                (self._trims_section, "trimmed_from", NO_HEADING)):
-            section.show_links([(heading, video) for video in videos
+        for links, names_it, heading in (
+                (self._combines, "source_video", "Source video for"),
+                (self._trims, "trimmed_from", "Trimmed into")):
+            links.show_links([(heading, video) for video in videos
                                 if prompt_id and video.get(names_it) == prompt_id],
                                self._name_of, self._trashed())
 
@@ -252,14 +248,13 @@ class RelatedMedia(QWidget):
         return self._row_of(prompt_id) or next(
             (held for held in self._held_rows() if held["prompt_id"] == prompt_id), None)
 
-    def _animated_items(self, row: dict, start_image_of, videos: list[dict]) -> list[tuple]:
+    def _animated_videos(self, row: dict, start_image_of, videos: list[dict]) -> list[dict]:
         image = row
         if media_type_of_row(row) != MediaType.IMAGE:
             image = start_image_of(row)
             if image is None or not was_taken_from(image, row):
                 return []
         could_name_it = videos_from_source_image(image, videos)
-        return [(video["prompt_id"], self._animated_preview(video), video.get("thumbnail_path"))
-                for video in could_name_it
+        return [video for video in could_name_it
                 if (self._built_from(video, start_image_of)[0] or {}).get("prompt_id")
                 == image["prompt_id"]]

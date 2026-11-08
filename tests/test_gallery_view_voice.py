@@ -753,7 +753,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    section = view._generate_pane.current_generate_tab()._related._requests_section
+    section = view._generate_pane.current_generate_tab()._related._requests
     assert not section.isHidden()
     assert [(tile._heading.text(), tile._prompt_id) for tile in section.findChildren(SourceTile)] == [
         ("Requested from", "orig")]

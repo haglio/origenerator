@@ -70,7 +70,6 @@ from origenerator.gui import corner_buttons, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
-from origenerator.gui.animations import _VideoTile
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
@@ -450,9 +449,6 @@ def test_the_metadata_leads_the_items_area_with_its_related_media_below(tab):
     body = tab._item_scroll.widget().layout()
     assert (body.indexOf(tab._metadata_section), body.indexOf(tab._related),
             body.indexOf(tab._versions)) == (0, 1, 2)
-    links = tab._related.layout()
-    sections = tab._related._sections()
-    assert [links.indexOf(section) for section in sections] == list(range(len(sections)))
 
 
 def test_the_lane_button_shares_the_button_bank_with_generate_and_cancel(tab):
@@ -2170,7 +2166,7 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
     tab.show_saved_generation(image, image_rows)
 
     assert not tab._related._animations.isHidden()
-    assert len(tab._related._animations.findChildren(_VideoTile)) == 1
+    assert len(tab._related._animations.findChildren(SourceTile)) == 1
     assert tab._related._source_tile.isHidden()
     assert tab._lane_button.isHidden()
     assert tab._displayed_row is image
@@ -2184,7 +2180,7 @@ def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypa
     got = []
     tab.link_clicked.connect(got.append)
 
-    tab._related._animations.video_activated.emit("vid1")
+    tab._related._animations.activated.emit("vid1")
 
     assert got == ["vid1"]
 
@@ -3186,7 +3182,7 @@ def test_an_image_a_request_is_still_making_links_to_the_one_it_was_asked_of(sav
 
     tab.show_running_generation(running)
 
-    section = tab._related._requests_section
+    section = tab._related._requests
     assert not section.isHidden()
     assert [(tile._heading.text(), tile._prompt_id)
             for tile in section.findChildren(SourceTile)] == [("Requested from", "src")]

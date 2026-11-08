@@ -7,7 +7,9 @@ from math import ceil
 from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QFont,
+    QImage,
     QImageReader,
+    QPainter,
     QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
@@ -25,11 +27,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
-from shared_ui.fonts import SIZE_HEADING
+from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_PRIMARY, TEXT_SECONDARY
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
+from origenerator import config
 from origenerator.db_requests import Turn
 from origenerator.gui.diff_text import write_request_change
 from origenerator.gui.generate_button import GenerateButton
@@ -45,6 +47,7 @@ _LINES_AT_MOST = 20
 _COMPARED = THUMBNAIL_BOX * 2
 _NOT_MADE = "?"
 _THUMBNAIL_LINES = 2
+_MARK_SHARE = 0.7
 _AUTO_GENERATE = "Auto-generate"
 _AUTO_GENERATE_TIP = "Generate each time the model comes back with its changes"
 
@@ -108,17 +111,36 @@ def _write_comparison(cursor: QTextCursor, *thumbnails: str | None) -> None:
     shape.setColumnWidthConstraints([QTextLength(QTextLength.Type.FixedLength, _COMPARED.width())]
                                     * len(thumbnails))
     table = cursor.insertTable(1, len(thumbnails), shape)
-    for column, thumbnail in enumerate(thumbnails):
+    pictures = [_fitted(thumbnail, _COMPARED) for thumbnail in thumbnails]
+    made = next((picture for picture in pictures if picture is not None), None)
+    size = (QSize(round(made.width()), round(made.height())) if made is not None
+            else _COMPARED)
+    for column, picture in enumerate(pictures):
         cell = table.cellAt(0, column).firstCursorPosition()
-        picture = _fitted(thumbnail, _COMPARED)
-        if picture is not None:
-            cell.insertImage(picture)
-        else:
-            mark = QTextCharFormat()
-            mark.setFontPointSize(SIZE_HEADING)
-            mark.setFontWeight(QFont.Weight.Bold)
-            cell.insertText(_NOT_MADE, mark)
+        cell.insertImage(picture if picture is not None else _not_made(size))
     cursor.movePosition(QTextCursor.MoveOperation.End)
+
+
+def _not_made(size: QSize) -> QTextImageFormat:
+    path = config.STATE_DIR / "not made" / f"not made {size.width()}x{size.height()}.png"
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stand_in = QImage(size, QImage.Format.Format_RGB32)
+        stand_in.fill(BG_TERTIARY)
+        painter = QPainter(stand_in)
+        font = QFont()
+        font.setPixelSize(round(min(size.width(), size.height()) * _MARK_SHARE))
+        font.setWeight(QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.setPen(TEXT_SECONDARY)
+        painter.drawText(stand_in.rect(), Qt.AlignmentFlag.AlignCenter, _NOT_MADE)
+        painter.end()
+        stand_in.save(str(path))
+    picture = QTextImageFormat()
+    picture.setName(str(path))
+    picture.setWidth(size.width())
+    picture.setHeight(size.height())
+    return picture
 
 
 def _block(cursor: QTextCursor, *, indent: int = 0, above: int = 0) -> None:

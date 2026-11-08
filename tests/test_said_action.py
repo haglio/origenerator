@@ -25,7 +25,7 @@ class _Gallery:
 
 def _places(tmp_path) -> Places:
     library = tmp_path / "videos"
-    return Places(upscaled_dir=library / "videos" / "outbox", records_folder=library / "metadata",
+    return Places(kino=library / "videos" / "kino", records_folder=library / "metadata",
                   frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
                   skip_sources=frozenset(), library_root=library,
                   journal=tmp_path / "journals" / "origenerator.jsonl")
@@ -66,7 +66,7 @@ def _a_video(db, *, image=None, video=None, **params) -> Slide:
 def _a_recorded_video(db, places: Places, filed_under: str, *, video=None,
                       source=GenerationSource.GENERATED) -> tuple[Slide, object]:
     played = places.upscaled_dir / "portrait" / filed_under / "scene one_topaz.mp4"
-    record = (places.records_folder / "outbox" / "portrait" / filed_under
+    record = (places.records_folder / "kino" / "2D" / "AI" / "portrait" / filed_under
               / "scene one_topaz.json")
     record.parent.mkdir(parents=True)
     record.write_text(json.dumps({"video": {"action": "alpha", "prompt": "a made-up prompt"}}),

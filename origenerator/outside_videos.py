@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from app_support import haglio_settings
+from app_support import haglio_settings, kino_folder
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_and_seed
@@ -29,6 +29,7 @@ from origenerator.generation_state import GenerationSource, GenerationStatus, ma
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S, Turn
 from origenerator.outside_journal import actions_in, favorites_in, said_in
+from origenerator.relocate import follow_kinos_upscales_out_of_2_outbox
 from origenerator.thumbnail import (
     first_frame_of,
     generate_animated_thumbnail,
@@ -108,13 +109,17 @@ def _block(record: dict, name: str) -> dict:
 
 @dataclass(frozen=True)
 class Places:
-    upscaled_dir: Path
+    kino: Path
     records_folder: Path
     frames_dir: Path
     thumb_dir: Path
     skip_sources: frozenset[str]
     library_root: Path
     journal: Path | None
+
+    @property
+    def upscaled_dir(self) -> Path:
+        return kino_folder.upscales_in(self.kino)
 
 
 def places_here() -> Places | None:
@@ -123,7 +128,7 @@ def places_here() -> Places | None:
     if records is None:
         return None
     journals = _journals_folder()
-    return Places(upscaled_dir=config.KINO_UPSCALES_DIR, records_folder=records,
+    return Places(kino=config.KINO_DIR, records_folder=records,
                   frames_dir=config.STARTING_FRAMES_DIR, thumb_dir=config.THUMB_DIR,
                   skip_sources=frozenset(source for source in (config.EVOLVER_SOURCE,
                                                                config.GENAU_SOURCE) if source),
@@ -177,6 +182,7 @@ def scan_in_turn(db, places: Places, *, wait_s: float = WAIT_S) -> int:
 
 def scan(db, places: Places, *, grab=first_frame_of,
          videos_per_write: int = VIDEOS_PER_WRITE) -> int:
+    follow_kinos_upscales_out_of_2_outbox(db, places.library_root, places.kino)
     rows = db.list_generations()
     new = [(video, record_of(video.path, places.records_folder))
            for video in outside_videos(places.upscaled_dir, skip_sources=places.skip_sources,

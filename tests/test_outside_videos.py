@@ -95,7 +95,7 @@ _IMAGE_BLOCK = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", "
 
 
 def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
-    video = _filed(tmp_path / "videos" / "videos" / "outbox", "portrait", "a-site", "c1_topaz.mp4")
+    video = _filed(tmp_path / "videos" / "videos" / "kino" / "2D" / "AI", "portrait", "a-site", "c1_topaz.mp4")
     recorded = {"favorite": True, "watch": {"weight": 2.5},
                 "provenance": {"upscale": {"app": "an-upscaler"}},
                 "video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK}
@@ -117,8 +117,8 @@ def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
 
 
 def test_a_video_made_from_words_alone_has_no_image_and_a_missing_record_says_nothing(tmp_path):
-    video = _filed(tmp_path / "videos" / "videos" / "outbox", "portrait", "a-site", "c1_topaz.mp4")
-    unrecorded = _filed(tmp_path / "videos" / "videos" / "outbox", "portrait", "a-site", "c2_topaz.mp4")
+    video = _filed(tmp_path / "videos" / "videos" / "kino" / "2D" / "AI", "portrait", "a-site", "c1_topaz.mp4")
+    unrecorded = _filed(tmp_path / "videos" / "videos" / "kino" / "2D" / "AI", "portrait", "a-site", "c2_topaz.mp4")
     _record(tmp_path, video, {"video": {"model": "Video Model"}})
 
     assert record_of(video, tmp_path / "videos" / "metadata") == Record(
@@ -238,7 +238,7 @@ def test_a_video_whose_first_frame_cannot_be_read_is_left_for_the_next_scan(tmp_
 
 
 def _places(tmp_path) -> Places:
-    return Places(upscaled_dir=tmp_path / "videos" / "videos" / "outbox",
+    return Places(kino=tmp_path / "videos" / "videos" / "kino",
                   records_folder=tmp_path / "videos" / "metadata",
                   frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
                   skip_sources=frozenset({"this-app"}), library_root=tmp_path,
@@ -415,7 +415,7 @@ def test_the_look_reads_this_apps_folders_and_where_evolver_keeps_its_records(
     monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
 
     assert places_here() == Places(
-        upscaled_dir=config.KINO_UPSCALES_DIR,
+        kino=config.KINO_DIR,
         records_folder=config.LIBRARY_ROOT / "videos" / "records",
         frames_dir=config.STARTING_FRAMES_DIR, thumb_dir=config.THUMB_DIR,
         skip_sources=frozenset({config.EVOLVER_SOURCE, config.GENAU_SOURCE}),
@@ -465,7 +465,7 @@ def test_starring_a_video_from_another_source_tells_fun_time_through_the_journal
 
     [line] = places.journal.read_text(encoding="utf-8").splitlines()
     assert json.loads(line) == {"t": 1_700_000_000_500, "event": "favorite",
-                                "path": "videos/videos/outbox/portrait/a-site/c1_topaz.mp4"}
+                                "path": "videos/videos/kino/2D/AI/portrait/a-site/c1_topaz.mp4"}
 
 
 def _two_word_made_videos_one_action_apart(tmp_path) -> tuple[Database, dict]:
@@ -501,7 +501,7 @@ def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(
 def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
     db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     _picked_here_before(tmp_path, picked, "Bow", 1_700_000_100)
-    video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
+    video = tmp_path / "videos" / "videos" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.mp4"
     _record(tmp_path, video, _made_from_words("a slow walk on the shore", "11", action="Kneel"))
 
     scan(db, _places(tmp_path), grab=_still)
@@ -512,10 +512,10 @@ def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
 def test_a_pick_does_not_keep_a_video_from_taking_its_star_from_the_record(tmp_path):
     db, picked = _two_word_made_videos_one_action_apart(tmp_path)
     _picked_here_before(tmp_path, picked, "Bow", 1_700_000_100)
-    video = tmp_path / "videos" / "videos" / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
+    video = tmp_path / "videos" / "videos" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.mp4"
     _record(tmp_path, video, {**_made_from_words("a slow walk on the shore", "11", action="Bow"),
                               "favorite": True})
-    record = tmp_path / "videos" / "metadata" / "outbox" / "portrait" / "a-site" / "c1_topaz.json"
+    record = tmp_path / "videos" / "metadata" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.json"
     os.utime(record, (1_700_000_050, 1_700_000_050))
 
     scan(db, _places(tmp_path), grab=_still)
@@ -538,7 +538,7 @@ def test_a_star_set_here_since_its_record_was_written_stands_until_evolver_carri
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
     _record(tmp_path, video, {"favorite": False})
-    record = tmp_path / "videos" / "metadata" / "outbox" / "portrait" / "a-site" / "c1_topaz.json"
+    record = tmp_path / "videos" / "metadata" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.json"
     os.utime(record, (1_700_000_000, 1_700_000_000))
     scan(db, places, grab=_still)
     [shown] = _videos(db)
@@ -982,3 +982,21 @@ def test_a_source_named_like_one_of_this_apps_workflows_is_still_a_folder_of_its
     [videos] = build_gallery_tree([video, made_here])
 
     assert len(videos.children) == 2
+
+
+def test_a_scan_after_kinos_upscales_left_2_outbox_follows_them_rather_than_bringing_them_in_again(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    now = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+    scan(db, places, grab=_still)
+    old = (tmp_path / "videos" / "videos" / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
+           / "portrait" / "a-site" / "c1_topaz.mp4")
+    for row in db.list_generations():
+        files = json.loads(row.get("output_files") or "[]")
+        for file in files:
+            if file.get("library_path") == str(now):
+                file["library_path"] = str(old)
+        db.update_generation(row["prompt_id"], output_files=json.dumps(files))
+    assert db.library_paths() == {str(old)}
+
+    assert scan(db, places, grab=_still) == 0
+    assert db.library_paths() == {str(now)}

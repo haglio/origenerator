@@ -179,6 +179,9 @@ class Database:
     def trashed_library_paths(self) -> set[str]:
         return self.deletions.trashed_library_paths()
 
+    def follow_trashed(self, followed) -> int:
+        return self.deletions.follow_trashed(followed)
+
     def list_item_numbers(self) -> dict[str, tuple[str, int]]:
         return self.item_numbers.list_item_numbers()
 

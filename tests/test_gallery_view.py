@@ -599,7 +599,7 @@ def test_starring_another_sources_video_tells_fun_time_through_the_journal(qtbot
                                           "library_path": str(tmp_path / "outbox" / "c1_topaz.mp4")}])}
     journal = tmp_path / "journals" / "origenerator.jsonl"
     monkeypatch.setattr(outside_videos, "places_here", lambda: outside_videos.Places(
-        upscaled_dir=tmp_path / "outbox", records_folder=tmp_path / "records",
+        kino=tmp_path / "kino", records_folder=tmp_path / "records",
         frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
         skip_sources=frozenset(), library_root=tmp_path, journal=journal))
     view = GalleryView(FakeDB([video]))

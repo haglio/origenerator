@@ -65,7 +65,6 @@ from origenerator.gui.action_row import ActionRow
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.drop_zone import DropZone, DropZones
-from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import (
     Dating,
     EnhanceOffer,
@@ -82,13 +81,13 @@ from origenerator.gui.generate_button import (
 )
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyDropdown
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
-from origenerator.gui.label_cells import LabelCell, LabelForm
+from origenerator.gui.item_area import ItemArea
 from origenerator.gui.lora_offers import LoraOffers
 from origenerator.gui.message import set_marked_text
 from origenerator.gui.metadata_section import MetadataSection, wrappable
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
-from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowTraits
+from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowRow, WorkflowTraits
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.viewport import Viewport
@@ -290,18 +289,23 @@ class GenerateTab(DropZones):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
         self._build_viewport()
-        body = self._build_body_scroll()
-        header = LabelForm()
-        self._build_saved_generation_block(body, header)
-        self._build_workflow_header(body, header)
-        self._build_related_media(body)
-        body.addStretch(1)
+        self._item_scroll, item_body = _scrolling_column()
+        self._settings_scroll, settings_body = _scrolling_column()
+        self._build_saved_generation_block(item_body)
+        self._build_related_media(item_body)
+        item_body.addStretch(1)
+        self._build_workflow_dropdown(settings_body)
+        settings_body.addStretch(1)
+        ItemArea(self._item_scroll,
+                 (self._metadata_section, self._related, self._versions),
+                 on_shown=self._share_the_settings_pane)
         self._settings_pane = self._build_settings_pane()
         self._media_split.addWidget(self._settings_pane)
         self._media_split.hold_still(self._fun_time is not None)
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
         self._media_border: list[int] | None = None
+        self._settings_border_sizes: list[int] | None = None
         self._on_workflow_changed()
 
     def _build_viewport(self) -> Viewport:
@@ -316,35 +320,19 @@ class GenerateTab(DropZones):
         self._viewport.media_resized.connect(self._reflow_for_the_media)
         return self._viewport
 
-    def _build_body_scroll(self) -> QVBoxLayout:
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        body_host = QWidget()
-        body = QVBoxLayout(body_host)
-        body.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
-                                MARGIN_STANDARD, 0)
-        body.setSpacing(GAP_MEDIUM)
-        self._scroll.setWidget(body_host)
-        return body
-
-    def _build_saved_generation_block(self, body: QVBoxLayout, header: LabelForm) -> None:
+    def _build_saved_generation_block(self, body: QVBoxLayout) -> None:
         self._metadata_section = MetadataSection()
         self._metadata_section.hide()
         body.addWidget(self._metadata_section)
-        self._action = ActionRow(header)
+        self._action = ActionRow(self._metadata_section.form())
         self._action.changed.connect(self._save_actions)
 
     def _save_actions(self, prompt_id: str, side: str, item_actions) -> None:
         set_actions(self._db, prompt_id, side, item_actions)
 
-    def _build_workflow_header(self, body: QVBoxLayout, header: LabelForm) -> None:
+    def _build_workflow_dropdown(self, body: QVBoxLayout) -> None:
         self._form_workflow_key = None
-        header.setContentsMargins(0, 0, 0, 0)
-        header.setSpacing(GAP_MEDIUM)
-        header.setLabelAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
+        self._bare_form: ParamForm | None = None
         self._workflow_dropdown = NoWheelDropdown()
         self._workflow_dropdown.setPlaceholderText("Select a workflow…")
         self._offer_workflows(makes=None, holding=None)
@@ -352,10 +340,6 @@ class GenerateTab(DropZones):
         self._workflow_dropdown.currentIndexChanged.connect(self._note_user_edit)
         self._workflow_warning = WarningMark()
         self._workflow_warning.pressed.connect(self._resolve_every_warning)
-        header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"),
-                                header.label_column),
-                      self._workflow_dropdown)
-        body.addLayout(header)
         self._cannot_remake_note = QLabel()
         self._cannot_remake_note.setObjectName("cannotRemakeNote")
         self._cannot_remake_note.setWordWrap(True)
@@ -397,8 +381,19 @@ class GenerateTab(DropZones):
         column.addLayout(buttons)
         self._settings_border = pane_border()
         column.addWidget(self._settings_border)
-        column.addWidget(self._scroll, 1)
+        self._settings_split = PaneSplitter(Qt.Orientation.Vertical)
+        self._settings_split.addWidget(self._item_scroll)
+        self._settings_split.addWidget(self._settings_scroll)
+        self._settings_split.setStretchFactor(0, 1)
+        self._settings_split.setStretchFactor(1, 2)
+        self._settings_split.hold_still(self._fun_time is not None)
+        column.addWidget(self._settings_split, 1)
         return settings_pane
+
+    def _share_the_settings_pane(self) -> None:
+        if self._settings_split.dragged_sizes() is None:
+            whole = sum(self._settings_split.sizes())
+            self._settings_split.setSizes([whole // 3, whole - whole // 3])
 
     def _build_button_row(self) -> FlowLayout:
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
@@ -446,11 +441,7 @@ class GenerateTab(DropZones):
         return hint
 
     def _contents_floor(self) -> int:
-        body = self._scroll.widget()
-        return (body.minimumSizeHint().width()
-                + self._scroll.verticalScrollBar().sizeHint().width()
-                + 2 * self._scroll.frameWidth()
-                + 2 * MARGIN_STANDARD)
+        return max(_scroll_floor(self._item_scroll), _scroll_floor(self._settings_scroll))
 
     def _can_generate(self) -> bool:
         return (self._client is not None
@@ -558,7 +549,8 @@ class GenerateTab(DropZones):
                                generates_here=wf.generates_here),
                 FormHelpers(heights=self._heights,
                             seed_history=SeedHistory(self._seed_uses, self._looping_preview),
-                            items=self._zone_items())))
+                            items=self._zone_items()),
+                workflow_row=self._workflow_row()))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried_over = {
@@ -640,6 +632,13 @@ class GenerateTab(DropZones):
     def _resolve_every_warning(self):
         self._param_form.resolve_every_warning()
 
+    def _drop_bare_form(self) -> None:
+        if self._bare_form is not None:
+            self._form_host_column.removeWidget(self._bare_form)
+            self._bare_form.setParent(None)
+            self._bare_form.deleteLater()
+            self._bare_form = None
+
     def _detach_form(self):
         """Detached from its parent at once: Qt's deleteLater leaves it on screen until the event loop spins."""
         if self._param_form is None:
@@ -649,8 +648,14 @@ class GenerateTab(DropZones):
         self._param_form.deleteLater()
         self._param_form = None
 
+    def _workflow_row(self) -> WorkflowRow:
+        return WorkflowRow(self._workflow_warning, self._workflow_dropdown)
+
     def _clear_form(self):
         had_form = self._param_form is not None
+        if self._bare_form is None:
+            self._bare_form = ParamForm([], workflow_row=self._workflow_row())
+            self._form_host_column.addWidget(self._bare_form)
         self._detach_form()
         self._form_workflow_key = None
         if had_form:
@@ -658,6 +663,7 @@ class GenerateTab(DropZones):
 
     def _install_form(self, form: ParamForm):
         self._detach_form()
+        self._drop_bare_form()
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
         self._param_form.text_fields_changed.connect(self.prompt_fields_changed)
@@ -1029,11 +1035,14 @@ class GenerateTab(DropZones):
     def saved_layout(self) -> dict:
         if self._fun_time is None:
             self._media_border = self._media_split.dragged_sizes() or self._media_border
+            self._settings_border_sizes = (self._settings_split.dragged_sizes()
+                                           or self._settings_border_sizes)
         return {"folds": self._param_form.folds() if self._param_form else {},
                 "enhancement_levels_folded": self._versions.is_collapsed(),
                 "details_folded": self._metadata_section.is_folded(),
                 "related_folds": self._related.folds(),
-                "media_border": self._media_border}
+                "media_border": self._media_border,
+                "settings_border": self._settings_border_sizes}
 
     def restore_layout(self, saved) -> None:
         if not isinstance(saved, dict):
@@ -1048,8 +1057,10 @@ class GenerateTab(DropZones):
         if isinstance(saved.get("related_folds"), dict):
             self._related.set_folds(saved["related_folds"])
         self._media_border = saved.get("media_border", saved.get("picture_border"))
+        self._settings_border_sizes = saved.get("settings_border")
         if self._fun_time is None:
             self._media_split.take_dragged_sizes(self._media_border)
+            self._settings_split.take_dragged_sizes(self._settings_border_sizes)
 
     def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
                       params: dict, thumbnails: list) -> None:
@@ -1389,10 +1400,10 @@ class GenerateTab(DropZones):
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         self.reread_folder_buttons()
-        self._metadata_section.setVisible(
-            self._metadata_section.show_row(row, self._upscale_of(row), self._item_name()))
+        self._metadata_section.show_row(row, self._upscale_of(row), self._item_name())
         start = start_images_among(image_rows)(row)
         self._action.show_row(row, self._db.get_generation(start["prompt_id"]) if start else None)
+        self._metadata_section.setVisible(self._metadata_section.has_content())
         self._related.show_row(row, image_rows)
         self._refresh_versions()
         self._update_lane_button(preview)
@@ -1578,3 +1589,23 @@ class GenerateTab(DropZones):
 
     def video_on_screen(self) -> str | None:
         return self._viewport.video_on_screen()
+
+
+
+def _scrolling_column() -> tuple[QScrollArea, QVBoxLayout]:
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+    host = QWidget()
+    column = QVBoxLayout(host)
+    column.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD, 0)
+    column.setSpacing(GAP_MEDIUM)
+    scroll.setWidget(host)
+    return scroll, column
+
+
+def _scroll_floor(scroll: QScrollArea) -> int:
+    return (scroll.widget().minimumSizeHint().width()
+            + scroll.verticalScrollBar().sizeHint().width()
+            + 2 * scroll.frameWidth()
+            + 2 * MARGIN_STANDARD)

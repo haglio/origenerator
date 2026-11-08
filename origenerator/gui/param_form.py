@@ -39,6 +39,7 @@ from origenerator.gui.param_fields import (
     NO_TRAITS,
     NOT_KNOWN,
     FormHelpers,
+    WorkflowRow,
     WorkflowTraits,
     field_kind,
     grey_out_of_reach,
@@ -128,8 +129,11 @@ class ParamForm(QWidget):
         traits: WorkflowTraits = NO_TRAITS,
         helpers: FormHelpers = NO_HELPERS,
         parent=None,
+        *,
+        workflow_row: WorkflowRow | None = None,
     ):
         super().__init__(parent)
+        self._workflow_row = workflow_row
         self._lora_keys = tuple(traits.lora_keys)
         self.training = TrainingRows()
         self._heights = helpers.heights
@@ -228,7 +232,8 @@ class ParamForm(QWidget):
         title = param_sections.section_title(key)
         keys = self._present_keys.get(title, [])
         if key in keys:
-            self._sections[title].content_form().setRowVisible(keys.index(key), visible)
+            self._sections[title].content_form().setRowVisible(
+                self._rows_above_keys(title) + keys.index(key), visible)
 
     def _build(self):
         outer = QVBoxLayout(self)
@@ -249,6 +254,11 @@ class ParamForm(QWidget):
                     pd.key == "positive_prompt" for pd in self._param_defs):
                 outer.addWidget(self._build_request_section())
         outer.addStretch(1)
+        if self._workflow_row is not None:
+            form = self._sections[param_sections.WORKFLOW_TITLE].content_form()
+            form.insertRow(0, LabelCell(self._workflow_row.warning, ElidingLabel("Workflow"),
+                                        form.label_column),
+                           self._workflow_row.field)
 
         for pd in sorted(self._param_defs, key=lambda d: param_sections.key_rank(d.key)):
             widget = self._make_widget(pd)
@@ -314,7 +324,8 @@ class ParamForm(QWidget):
         index = self._insert_index(keys, key)
         form = self._sections[title].content_form()
         label_widget = ElidingLabel(label)
-        form.insertRow(index, self._label_cell(key, label_widget, form.label_column),
+        form.insertRow(self._rows_above_keys(title) + index,
+                       self._label_cell(key, label_widget, form.label_column),
                        self._field_cell(field, extras))
         keys.insert(index, key)
         self._labels[key] = label_widget
@@ -364,9 +375,12 @@ class ParamForm(QWidget):
         rank = param_sections.key_rank(key)
         return sum(1 for k in present if param_sections.key_rank(k) < rank)
 
+    def _rows_above_keys(self, title: str) -> int:
+        return int(self._workflow_row is not None and title == param_sections.WORKFLOW_TITLE)
+
     def _refresh_section_visibility(self):
         for title, section in self._sections.items():
-            section.setVisible(bool(self._present_keys[title]))
+            section.setVisible(bool(self._present_keys[title]) or bool(self._rows_above_keys(title)))
         self._position_dimension_controls()
 
     def _field_cell(self, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:

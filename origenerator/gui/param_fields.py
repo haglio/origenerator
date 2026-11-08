@@ -43,6 +43,12 @@ class FormHelpers:
     items: object = None
 
 
+@dataclass(frozen=True)
+class WorkflowRow:
+    warning: QWidget
+    field: QWidget
+
+
 NO_TRAITS = WorkflowTraits()
 NO_HELPERS = FormHelpers()
 

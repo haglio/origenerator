@@ -110,7 +110,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form._sections["Models & LoRAs"].set_collapsed(False)
+    form._sections["Workflow, Models & LoRAs"].set_collapsed(False)
     with qtbot.waitExposed(form):
         form.show()
     form.resize(600, form.height())
@@ -1307,12 +1307,12 @@ def test_empty_sections_are_hidden(qtbot):
     assert form._sections["Video"].isHidden() is True
 
 
-def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
+def test_prompts_seed_and_the_workflow_start_open_the_rest_collapsed(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
     qtbot.addWidget(form)
     assert form._sections["Prompts"].is_collapsed() is False
     assert form._sections["Seed"].is_collapsed() is False
-    assert form._sections["Models & LoRAs"].is_collapsed() is True
+    assert form._sections["Workflow, Models & LoRAs"].is_collapsed() is False
     assert form._sections["Calibration"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
     assert form._sections["Sound"].is_collapsed() is True
@@ -1414,7 +1414,7 @@ def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(
     form.set_values({"unet_high": "example_high.safetensors",
                      "unet_low": "example_low.safetensors"})
 
-    assert form._sections["Models & LoRAs"].isHidden() is True
+    assert form._sections["Workflow, Models & LoRAs"].isHidden() is True
 
 
 def _rate_def(default=24.0):
@@ -2081,7 +2081,7 @@ def test_a_section_warns_with_every_warning_inside_it_one_per_line(qtbot):
         "Steps: 50. Example Model's page recommends 20\u201340 steps. Click to use 40.\n"
         "Sampler: heun. Example Model's page recommends euler_ancestral. "
         "Click to use euler_ancestral.")
-    assert form._sections["Models & LoRAs"].warning.isHidden()
+    assert form._sections["Workflow, Models & LoRAs"].warning.isHidden()
     form.set_warnings({})
     assert calibration.isHidden()
 
@@ -2258,7 +2258,7 @@ def test_a_trigger_word_warning_beside_two_fields_is_one_line_of_each_warning_it
     line = f"LoRA 1: Example Style 1.0. {_TRIGGER_WORD_SAID}"
     assert form.every_warning() == line
     assert [form._sections[title].warning.toolTip()
-            for title in ("Prompts", "Models & LoRAs")] == [line, line]
+            for title in ("Prompts", "Workflow, Models & LoRAs")] == [line, line]
 
 
 def test_one_click_adds_once_a_word_two_loras_both_lack(qtbot):

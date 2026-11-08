@@ -13,18 +13,20 @@ class Section:
     collapsed: bool
 
 
+WORKFLOW_TITLE = "Workflow, Models & LoRAs"
+
 SECTIONS: tuple[Section, ...] = (
     Section("Prompts", ("positive_prompt", "scene_frames", "scene_lines",
                         "negative_prompt", "input_image", "video", "video_start"),
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
-    Section("Models & LoRAs", (
+    Section(WORKFLOW_TITLE, (
         "checkpoint", "unet", *keys_with_strengths(LORA_KEYS), "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
         *keys_with_strengths(FIRST_PASS_LORA_KEYS),
         *keys_with_strengths(SECOND_PASS_LORA_KEYS),
         "upscale_model", "model", "style",
-    ), collapsed=True),
+    ), collapsed=False),
     Section("Calibration", (
         "steps", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",

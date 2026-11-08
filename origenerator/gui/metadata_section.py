@@ -16,6 +16,7 @@ from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_MEDIUM, GAP_SMALL
 
 from origenerator.generation_metadata import (
+    METADATA_TITLE,
     MetadataFacts,
     MetadataItem,
     metadata_facts,
@@ -23,9 +24,11 @@ from origenerator.generation_metadata import (
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
+from origenerator.gui.label_cells import LabelForm
 from origenerator.reveal import show_in_explorer
 
 _SELECTABLE = Qt.TextInteractionFlag.TextSelectableByMouse
+_DIRECT = Qt.FindChildOption.FindDirectChildrenOnly
 
 
 def _h(color) -> str:
@@ -37,15 +40,23 @@ class MetadataSection(QWidget):
         super().__init__(parent)
         self._shown: tuple[dict, Path | None, str] | None = None
         self._section: MetadataFacts | None = None
-        self._outer = QVBoxLayout(self)
-        self._outer.setContentsMargins(0, 0, 0, 0)
-        self._block: CollapsibleSection | None = None
-        self._folded = False
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self._block = CollapsibleSection(METADATA_TITLE)
+        outer.addWidget(self._block)
+        self._facts = QWidget()
+        self._facts_column = QVBoxLayout(self._facts)
+        self._facts_column.setContentsMargins(0, 0, 0, 0)
+        self._facts_column.setSpacing(GAP_SMALL)
+        self.form().addRow(self._facts)
+
+    def form(self) -> LabelForm:
+        return self._block.content_form()
 
     def show_row(self, row: dict, upscale=None, name: str = "") -> bool:
         self._shown = (row, upscale, name)
         self._section = metadata_facts(row, upscale, name=name)
-        self._render(self._section)
+        self._show_facts(self._section.items if self._section is not None else [])
         return self.has_content()
 
     def show_name(self, name: str) -> bool:
@@ -55,43 +66,24 @@ class MetadataSection(QWidget):
         return self.has_content()
 
     def has_content(self) -> bool:
-        return self._section is not None
+        form = self.form()
+        return any(form.isRowVisible(row) for row in range(form.rowCount()))
 
-    def _render(self, section: MetadataFacts | None):
-        if self._block is not None:
+    def _show_facts(self, items: list[MetadataItem]) -> None:
+        for old in self._facts.findChildren(QWidget, options=_DIRECT):
             # Qt: deleteLater alone leaves it among the children until the next loop turn.
-            self._block.setParent(None)
-            self._block.deleteLater()
-            self._block = None
-        if section is not None:
-            self._block = _build_section(section, collapsed=self._folded)
-            self._block.toggled.connect(self._keep_the_fold)
-            self._outer.addWidget(self._block)
-
-    def _keep_the_fold(self) -> None:
-        self._folded = self._block.is_collapsed()
+            old.setParent(None)
+            old.deleteLater()
+        label_width = label_column_width(items)
+        for item in items:
+            self._facts_column.addWidget(metadata_row(item, label_width))
+        self.form().setRowVisible(self._facts, bool(items))
 
     def is_folded(self) -> bool:
-        return self._folded
+        return self._block.is_collapsed()
 
     def set_folded(self, folded: bool) -> None:
-        self._folded = folded
-        if self._block is not None:
-            self._block.set_collapsed(folded)
-
-
-def _build_section(section: MetadataFacts, *, collapsed: bool = False) -> CollapsibleSection:
-    items = section.items
-    block = CollapsibleSection(section.title, collapsed=collapsed)
-    rows = QWidget()
-    layout = QVBoxLayout(rows)
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(GAP_SMALL)
-    label_width = label_column_width(items)
-    for item in items:
-        layout.addWidget(metadata_row(item, label_width))
-    block.content_form().addRow(rows)
-    return block
+        self._block.set_collapsed(folded)
 
 
 def label_column_width(items: list[MetadataItem]) -> int:

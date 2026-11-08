@@ -148,10 +148,10 @@ def test_show_row_replaces_the_previous_render(block):
     assert "first.mp4" not in texts
 
 
-def test_an_image_renders_no_block(block):
-    block.show_row(_row(workflow_name="sdxl_t2i", output_files=json.dumps(
+def test_an_image_renders_no_facts(block):
+    shown = block.show_row(_row(workflow_name="sdxl_t2i", output_files=json.dumps(
         [{"filename": "out.png", "subfolder": "image"}])))
-    assert _texts(block) == []
+    assert (shown, [text for text in _texts(block) if text]) == (False, [])
 
 
 def test_an_image_with_a_recorded_workflow_version_shows_that_line(block):

@@ -9,7 +9,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
-        "Prompts", "Seed", "Models & LoRAs", "Calibration",
+        "Prompts", "Seed", "Workflow, Models & LoRAs", "Calibration",
         "Size", "Video", "Sound",
     ]
 
@@ -25,11 +25,11 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("input_image") == "Prompts"
     assert ps.section_title("seed") == "Seed"
     assert ps.section_title("noise_seed") == "Seed"
-    assert ps.section_title("checkpoint") == "Models & LoRAs"
-    assert ps.section_title("lora_high") == "Models & LoRAs"
+    assert ps.section_title("checkpoint") == "Workflow, Models & LoRAs"
+    assert ps.section_title("lora_high") == "Workflow, Models & LoRAs"
     assert ps.section_title("steps") == "Calibration"
     assert ps.section_title("scheduler") == "Calibration"
-    assert ps.section_title("upscale_model") == "Models & LoRAs"
+    assert ps.section_title("upscale_model") == "Workflow, Models & LoRAs"
     assert ps.section_title("width") == "Size"
     assert ps.section_title("frame_count") == "Video"
     assert ps.section_title("frame_rate") == "Video"
@@ -56,9 +56,9 @@ def test_sorting_a_workflows_keys_by_rank_is_stable_for_unknowns():
     assert ordered == ["positive_prompt", "steps", "zeta_extra", "alpha_extra"]
 
 
-def test_default_collapse_leaves_only_prompts_and_seed_open():
+def test_default_collapse_leaves_only_prompts_seed_and_the_workflow_open():
     open_sections = [s.title for s in ps.SECTIONS if not s.collapsed]
-    assert open_sections == ["Prompts", "Seed"]
+    assert open_sections == ["Prompts", "Seed", ps.WORKFLOW_TITLE]
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))

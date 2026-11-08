@@ -70,7 +70,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons
 from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_tab as generate_tab_module
-from origenerator.gui.action_row import action_checkbox, action_pills
+from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
 from origenerator.gui.animations import _VideoTile
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
@@ -145,7 +145,7 @@ def _is_descendant(widget, ancestor) -> bool:
 
 
 def test_the_panel_is_one_column_with_no_side_pane(tab):
-    assert tab.findChildren(QSplitter) == [tab._media_split]
+    assert tab.findChildren(QSplitter) == [tab._media_split, tab._settings_split]
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
 
@@ -161,7 +161,7 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
     _, preview_foot = span(tab._viewport)
     line_top, line_foot = span(tab._media_split.handle(1))
     generate_top, generate_foot = span(tab._generate_btn.parentWidget())
-    settings_top, _ = span(tab._scroll)
+    settings_top, _ = span(tab._settings_scroll)
     assert preview_foot <= line_top
     assert line_foot <= generate_top
     assert generate_foot <= settings_top
@@ -179,7 +179,7 @@ def test_a_thick_border_held_still_parts_generate_from_the_settings(tab):
     border = tab._settings_border
     _, generate_foot = span(tab._generate_btn.parentWidget())
     border_top, border_foot = span(border)
-    settings_top, _ = span(tab._scroll)
+    settings_top, _ = span(tab._settings_scroll)
     assert generate_foot <= border_top
     assert border_foot <= settings_top
     assert border.height() == tab._media_split.handleWidth()
@@ -228,7 +228,7 @@ def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(tab):
     for width in (600, 420, 300):
         tab.resize(width, 800)
         QApplication.processEvents()
-        assert not tab._scroll.horizontalScrollBar().isVisible(), f"at {width}px"
+        assert not tab._settings_scroll.horizontalScrollBar().isVisible(), f"at {width}px"
 
 
 def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel):
@@ -238,7 +238,7 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
         section.set_collapsed(False)
     tab.show()
 
-    host = tab._scroll.widget()
+    host = tab._settings_scroll.widget()
     for width in (600, 420, 320, 260, 240):
         tab.resize(width, 800)
         QApplication.processEvents()
@@ -329,15 +329,15 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
 
     tab.resize(floor, 800)
     QApplication.processEvents()
-    assert not tab._scroll.horizontalScrollBar().isVisible()
-    assert tab._scroll.viewport().width() >= tab._scroll.widget().minimumSizeHint().width()
+    assert not tab._settings_scroll.horizontalScrollBar().isVisible()
+    assert tab._settings_scroll.viewport().width() >= tab._settings_scroll.widget().minimumSizeHint().width()
 
 
 def test_the_floor_stops_at_the_width_a_monitor_third_can_give_the_pane(app_chrome, blank_panel):
     tab = blank_panel
     wider_than_a_monitor_third = QWidget()
     wider_than_a_monitor_third.setMinimumWidth(3 * generate_tab_module._FLOOR_CAP)
-    tab._scroll.widget().layout().addWidget(wider_than_a_monitor_third)
+    tab._settings_scroll.widget().layout().addWidget(wider_than_a_monitor_third)
 
     assert tab._contents_floor() > generate_tab_module._FLOOR_CAP
     assert tab.minimumSizeHint().width() == generate_tab_module._FLOOR_CAP
@@ -371,7 +371,7 @@ def test_the_pane_keeps_a_margin_round_its_contents(tab):
     assert top_left.y() == 8
     form = tab._form_host
     assert form.mapTo(tab, form.rect().topLeft()).x() == 8
-    viewport = tab._scroll.viewport()
+    viewport = tab._settings_scroll.viewport()
     bar_side = viewport.mapTo(tab, viewport.rect().topRight()).x()
     assert bar_side - form.mapTo(tab, form.rect().topRight()).x() == 8
     generate = tab._generate_btn.parentWidget()
@@ -420,17 +420,34 @@ def _layout_containing(root, widget):
     return None
 
 
-def test_info_and_form_share_one_scroll(tab):
+def test_the_item_scrolls_above_the_settings_with_a_border_between(tab):
     for widget in (tab._metadata_section, tab._related._source_tile,
-                   tab._related._animations, tab._param_form):
-        assert _is_descendant(widget, tab._scroll)
+                   tab._related._animations, tab._versions):
+        assert _is_descendant(widget, tab._item_scroll)
+    assert _is_descendant(tab._param_form, tab._settings_scroll)
+    split = tab._settings_split
+    assert (split.orientation(), split.widget(0), split.widget(1)) == (
+        Qt.Orientation.Vertical, tab._item_scroll, tab._settings_scroll)
 
 
-def test_file_info_above_form_related_media_below(tab):
-    body = tab._scroll.widget().layout()
-    form_at = body.indexOf(tab._form_host)
-    assert body.indexOf(tab._metadata_section) < form_at
-    assert body.indexOf(tab._related) > form_at
+def test_a_shown_item_takes_a_third_of_the_pane_and_leaves_the_settings_two(saved_panel):
+    tab, db = saved_panel
+    tab.resize(480, 1400)
+    tab.show()
+    QApplication.processEvents()
+    assert tab._item_scroll.isHidden()
+
+    image = _image_row(db)
+    tab.show_saved_generation(image, [image])
+
+    item, settings = tab._settings_split.sizes()
+    assert abs(settings - 2 * item) <= 2
+
+
+def test_the_metadata_leads_the_items_area_with_its_related_media_below(tab):
+    body = tab._item_scroll.widget().layout()
+    assert (body.indexOf(tab._metadata_section), body.indexOf(tab._related),
+            body.indexOf(tab._versions)) == (0, 1, 2)
     links = tab._related.layout()
     sections = tab._related._sections()
     assert [links.indexOf(section) for section in sections] == list(range(len(sections)))
@@ -1811,7 +1828,7 @@ def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video(saved_panel, 
     rows = _version_rows(tab)
     assert [row._title.text() for row in rows] == ["Evolved", "Original"]
     assert upscale.name in _row_texts(rows[0])
-    assert tab._metadata_section.isHidden()
+    assert {text for text in _metadata_texts(tab) if text} == set(SIDE_LABELS.values())
 
 
 def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkeypatch,
@@ -2400,28 +2417,8 @@ def test_a_click_puts_up_only_the_image_it_was_on(qtbot, tmp_path, monkeypatch):
     assert tab._viewport.show_media.call_count == 1
 
 
-def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
-    tab, db = saved_panel
-    tab.show_saved_generation(_enhanced_image_row(db), [])
-    tab.resize(480, 900)
-    tab.show()
-
-    def gap():
-        form = tab._form_host
-        return tab._versions.mapTo(tab, tab._versions.rect().topLeft()).y() \
-            - (form.mapTo(tab, form.rect().topLeft()).y() + form.height())
-
-    before = gap()
-    for section in tab._param_form._sections.values():
-        section.set_collapsed(True)
-    tab._param_form.adjustSize()
-    tab.layout().activate()
-
-    assert gap() == before
-
-
-def _gaps_between_sections(tab) -> dict[str, int]:
-    body = tab._scroll.widget()
+def _gaps_between_sections(tab, scroll) -> dict[str, int]:
+    body = scroll.widget()
     tab.layout().activate()
 
     def top(widget):
@@ -2433,37 +2430,18 @@ def _gaps_between_sections(tab) -> dict[str, int]:
             for upper, lower in pairwise(shown)}
 
 
-def test_the_enhancements_sit_one_gap_under_the_settings_as_each_section_does(saved_panel):
+def test_each_area_keeps_one_gap_between_its_sections(saved_panel):
     tab, db = saved_panel
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
     tab.resize(480, 1400)
     tab.show()
 
-    gaps = _gaps_between_sections(tab)
+    gaps = {**_gaps_between_sections(tab, tab._item_scroll),
+            **_gaps_between_sections(tab, tab._settings_scroll)}
 
-    assert "Enhancements" in gaps
+    assert {"Enhancements", "Seed"} <= set(gaps)
     assert gaps == dict.fromkeys(gaps, GAP_MEDIUM)
-
-
-@pytest.mark.parametrize("width", [480, 340])
-def test_the_actions_and_the_workflow_dropdown_line_up_as_a_sections_fields_do(
-        qtbot, saved_panel, width):
-    tab, db = saved_panel
-    image = _image_row(db)
-    tab.show_saved_generation(image, [image])
-    host = QWidget()
-    qtbot.addWidget(host)
-    tab.setParent(host)
-    tab.resize(width, 1400)
-    host.show()
-    tab.layout().activate()
-    body = tab._scroll.widget()
-    action = tab._action.form().parentWidget().findChild(
-        QWidget, action_pills(MediaType.IMAGE)).parentWidget()
-
-    assert tab.width() == width
-    assert action.mapTo(body, QPoint(0, 0)).x() == tab._workflow_dropdown.mapTo(body, QPoint(0, 0)).x()
 
 
 def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(saved_panel):
@@ -2473,7 +2451,7 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     tab.resize(480, 1600)
     tab.show()
     tab.layout().activate()
-    body = tab._scroll.widget()
+    body = tab._item_scroll.widget()
 
     def corner(widget):
         return widget.mapTo(body, QPoint(0, 0))
@@ -2485,11 +2463,13 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     spans = {section.title(): span(section) for section in body.findChildren(CollapsibleSection)
              if section.isVisibleTo(body)}
 
-    assert spans == dict.fromkeys(spans, span(tab._form_host))
+    assert spans == dict.fromkeys(spans, span(name))
     assert corner(name).y() == body.layout().contentsMargins().top()
     actions = tab._action.form().parentWidget().findChild(
         QWidget, action_pills(MediaType.IMAGE)).parentWidget()
-    assert corner(actions).y() - (corner(name).y() + name.height()) == GAP_MEDIUM
+    assert name.content().isAncestorOf(actions)
+    created = next(label for label in name.findChildren(QLabel) if label.text() == "Created")
+    assert corner(actions).y() > corner(created).y()
 
 
 def _message(tab):
@@ -2666,7 +2646,7 @@ def test_an_image_made_with_a_model_that_is_not_installed_says_so_under_the_work
     assert _message(tab) == ""
 
 
-def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
+def test_the_note_heads_the_settings_above_the_typical_time_and_the_sections(
         installed_models, saved_panel):
     tab, db = saved_panel
     image = _image_made_with(db, "retired_checkpoint.safetensors")
@@ -2679,11 +2659,10 @@ def test_the_note_sits_between_the_workflow_dropdown_and_the_settings_under_it(
         top = widget.mapTo(tab, QPoint(0, 0)).y()
         return top, top + widget.height()
 
-    _, dropdown_foot = span(tab._workflow_dropdown)
     note_top, note_foot = span(tab._cannot_remake_note)
-    typical_time_top, _ = span(tab._estimate_label)
-    assert dropdown_foot <= note_top
-    assert note_foot <= typical_time_top
+    typical_time_top, typical_time_foot = span(tab._estimate_label)
+    form_top, _ = span(tab._form_host)
+    assert note_top < note_foot <= typical_time_top < typical_time_foot <= form_top
 
 
 def test_the_note_wears_the_yellow_of_a_warning(app_chrome, installed_models, saved_panel):
@@ -2709,7 +2688,7 @@ def test_a_long_model_name_in_the_note_wraps_rather_than_scrolling_sideways(
     QApplication.processEvents()
 
     assert not tab._cannot_remake_note.isHidden()
-    assert not tab._scroll.horizontalScrollBar().isVisible()
+    assert not tab._settings_scroll.horizontalScrollBar().isVisible()
 
 
 def test_the_missing_models_field_wears_a_warning_that_puts_an_installed_one_in_its_place(
@@ -4471,16 +4450,18 @@ def test_a_shown_image_whose_prompt_left_off_its_loras_trigger_word_wears_the_wa
     assert tab._param_form._warning_marks["positive_prompt"].toolTip() == _STYLE_SAID
 
 
-def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtbot, blank_panel):
+def test_the_workflows_warning_sits_in_the_column_of_its_sections_rows_warnings(
+        qtbot, blank_panel):
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "wan22_i2v"))
     tab = _on_screen(qtbot, blank_panel)
 
     def left(widget):
         return widget.mapTo(tab, QPoint(0, 0)).x()
 
-    shown = [section for section in tab._param_form._sections.values() if not section.isHidden()]
-    assert len(shown) > 4
-    assert {left(section.warning) for section in shown} == {left(tab._workflow_warning)}
+    section = tab._param_form._sections["Workflow, Models & LoRAs"]
+    assert section.content().isAncestorOf(tab._workflow_dropdown)
+    marks = tab._param_form._warning_marks
+    assert left(tab._workflow_warning) == left(marks["unet_high"])
 
 
 def test_a_fresh_images_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):

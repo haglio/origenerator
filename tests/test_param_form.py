@@ -19,6 +19,7 @@ from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.tick_control import TickControl
+from shared_ui.tooltip_shape import shaped
 
 import origenerator.gui.param_form as pf
 from origenerator.box_breaks import BOX_BREAK
@@ -53,7 +54,6 @@ from origenerator.gui.prompt_marks import (
 )
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.gui.tooltip_shape import shaped
 from origenerator.lora_training import TrainingOffer
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
 from origenerator.seed_history import SeedHistory, SeedUse

@@ -31,7 +31,6 @@ from origenerator.config import PROJECT_DIR
 from origenerator.gui import drop_style
 from origenerator.gui.eliding_tab_bar import EDGE
 from origenerator.gui.panes import BORDER_NAME, BORDERED_SET
-from origenerator.gui.tooltip_shape import shape_long_tooltips
 from origenerator.spin_arrows import arrow_paths
 
 CHOSEN = "chosen"
@@ -416,4 +415,3 @@ def dress_application(app, preview: Preview | None) -> None:
     """A QToolTip popup is a top-level widget no window-level sheet reaches, so the sheet and palette go on the QApplication."""
     colors.dress_application(app, build_stylesheet())
     app.setWindowIcon(app_icon(PROJECT_DIR / "icon.ico", preview))
-    shape_long_tooltips(app)

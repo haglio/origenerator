@@ -72,7 +72,7 @@ from origenerator.passes_on_the_files import (
     reconnect_to_running_generations,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from tests.children import run_python
+from tests.children import a_child_no_run_can_starve, run_python
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.hosted_launch import hosted_launch
 from tests.loading_screens import opened_here
@@ -1748,7 +1748,7 @@ def test_reopening_while_the_last_copy_is_still_closing_opens_before_its_process
         return subprocess.Popen([sys.executable, "-c", script], cwd=REPO_ROOT,
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log,
                                 text=True, encoding="utf-8", errors="replace",
-                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                **a_child_no_run_can_starve())
 
     with open(tmp_path / "first.log", "w", encoding="utf-8") as first_log, \
             open(tmp_path / "second.log", "w", encoding="utf-8") as second_log:

@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from origenerator.single_instance import Copies
+from tests.children import a_child_no_run_can_starve
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -183,7 +184,7 @@ def test_a_copy_quitting_says_it_is_closing_until_it_lets_go_while_its_process_l
         """)],
         cwd=REPO_ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
         env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        **a_child_no_run_can_starve())
     try:
         assert copy.stdout.readline() == "tearing down\n"
         assert copies.one_is_closing()

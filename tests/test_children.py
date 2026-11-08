@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ctypes
 import os
+import subprocess
 import textwrap
 
 import pytest
@@ -54,3 +56,34 @@ def test_a_child_ended_outright_while_qt_still_probes_the_sound_devices_ends_at_
                      env=os.environ | {"QT_QPA_PLATFORM": "offscreen"})
 
     assert ran.stdout.splitlines() == ["made"]
+
+
+_SAYS_ITS_PRIORITY_CLASS = textwrap.dedent("""
+    import ctypes
+    kernel32 = ctypes.WinDLL("kernel32")
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.GetPriorityClass.argtypes = [ctypes.c_void_p]
+    print(kernel32.GetPriorityClass(kernel32.GetCurrentProcess()), flush=True)
+""")
+
+
+@pytest.fixture
+def a_run_giving_way_to_what_he_is_using():
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.GetPriorityClass.argtypes = [ctypes.c_void_p]
+    kernel32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    this_run = kernel32.GetCurrentProcess()
+    its_own = kernel32.GetPriorityClass(this_run)
+    kernel32.SetPriorityClass(this_run, subprocess.BELOW_NORMAL_PRIORITY_CLASS)
+    try:
+        yield
+    finally:
+        kernel32.SetPriorityClass(this_run, its_own)
+
+
+def test_a_child_runs_at_normal_priority_so_other_runs_below_normal_cannot_starve_it(
+        a_run_giving_way_to_what_he_is_using):
+    ran = run_python(["-c", _SAYS_ITS_PRIORITY_CLASS])
+
+    assert int(ran.stdout) == subprocess.NORMAL_PRIORITY_CLASS

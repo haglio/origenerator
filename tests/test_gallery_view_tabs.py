@@ -16,9 +16,9 @@ from origenerator import (
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gui import generate_tab as generate_tab_module
-from origenerator.gui.animations import _VideoTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_tab import GenerateTab
+from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.viewport import Viewport
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
@@ -51,9 +51,9 @@ def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
 
     view._on_thumbnail_clicked("img1")
     assert not _animations(view).isHidden()
-    assert len(_animations(view).findChildren(_VideoTile)) == 1
+    assert len(_animations(view).findChildren(SourceTile)) == 1
 
-    _animations(view).video_activated.emit("vid1")
+    _animations(view).activated.emit("vid1")
     assert view._selected["prompt_id"] == "vid1"
 
 
@@ -73,7 +73,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
 
     view._on_thumbnail_clicked("img2")
     assert _animations(view).isHidden()
-    assert _animations(view).findChildren(_VideoTile) == []
+    assert _animations(view).findChildren(SourceTile) == []
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):

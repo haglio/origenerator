@@ -4,7 +4,6 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QImage
 
 from origenerator.gallery.enhance import EnhanceVersion
-from origenerator.gui.animations import Animations
 from origenerator.gui.drop_zone import DropZone, ZoneLookups
 from origenerator.gui.enhance_versions import _VersionRow
 from origenerator.gui.source_tile import SourceTile
@@ -35,17 +34,6 @@ def test_a_source_tile_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_p
     tile.show_source({"prompt_id": "img", "thumbnail_path": path}, "a name")
 
     assert tile._thumb.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)
-
-
-def test_the_animated_in_strip_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):
-    path = _wide_thumbnail(tmp_path)
-    animations = Animations()
-    qtbot.addWidget(animations)
-
-    animations.show_videos([("vid", None, path)])
-
-    tile = animations._host.layout().itemAt(0).widget()
-    assert tile.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)
 
 
 def test_an_enhancement_level_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):

@@ -117,6 +117,11 @@ def _left_out(part: str) -> str:
     return said.group(1) if said else ""
 
 
+def _only_the_form_changed(before: str, after: str) -> bool:
+    return (bool(before and after) and not _naming(after) - _naming(before)
+            and after.count(":") <= before.count(":"))
+
+
 def _same_parts(old: str, new: str) -> bool:
     return [part.lower() for part in _parts(old)] == [part.lower() for part in _parts(new)]
 
@@ -425,7 +430,8 @@ class _Applying:
         pairs = _paired(_parts(old), _parts(new))
         changed = [pair for pair in pairs if pair[0] != pair[1]]
         named = [pair for pair in changed if self._names_what_he_asked(" ".join(pair))]
-        asked_for = named or [pair for pair in changed if pair[1]]
+        asked_for = ([pair for pair in changed if pair in named or _only_the_form_changed(*pair)]
+                     if named else [pair for pair in changed if pair[1]])
         if len(changed) <= 1 or (not named and len(asked_for) == len(changed)):
             return new, []
         kept, made = [], []

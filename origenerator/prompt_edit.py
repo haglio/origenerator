@@ -216,7 +216,7 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
 
 def _his_words(told: WhatIsKnown) -> frozenset:
     notes = told.notes.as_told() if told.notes is not None and told.notes.complete else ""
-    return words_of_his([*told.examples, notes])
+    return words_of_his([positive for positive, _negative in told.examples] + [notes])
 
 
 _SHORTEST_ROOT = 3
@@ -258,18 +258,23 @@ def _touches(asked: list[set[str]], prompt: str) -> int:
 
 
 def prompts_touching(request: str, prompts, *, limit: int = 8,
-                     limit_chars: int = 6000) -> list[str]:
+                     limit_chars: int = 6000) -> list[tuple[str, str]]:
     asked = _asked_about(request)
-    scored = sorted((-_touches(asked, prompt), position, prompt)
-                    for position, prompt in enumerate(prompts))
+    scored = sorted((-_touches(asked, positive), position, (positive, negative))
+                    for position, (positive, negative) in enumerate(prompts))
     chosen, used = [], 0
-    for score, _position, prompt in scored:
+    for score, _position, pair in scored:
         if score == 0 or len(chosen) == limit:
             break
-        if used + len(prompt) <= limit_chars:
-            chosen.append(prompt)
-            used += len(prompt)
+        if used + len(pair[0]) + len(pair[1]) <= limit_chars:
+            chosen.append(pair)
+            used += len(pair[0]) + len(pair[1])
     return chosen
+
+
+def _numbered(examples) -> str:
+    return "\n".join(f"{number}. {positive}" + (f"\n   negative: {negative}" if negative else "")
+                     for number, (positive, negative) in enumerate(examples, 1))
 
 
 
@@ -303,9 +308,9 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
     if known.notes is not None and known.notes.complete:
         parts.append(known.notes.as_told())
     if known.examples:
-        numbered = "\n".join(f"{number}. {prompt}" for number, prompt in enumerate(known.examples, 1))
         parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
-                     f"carry over the details that go with them):\n{numbered}")
+                     "carry over the details that go with them, and what his negative prompts keep "
+                     f"out):\n{_numbered(known.examples)}")
     if known.settings:
         parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
                      + request_settings.as_told(known.settings))

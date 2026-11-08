@@ -12,11 +12,9 @@ from origenerator.workflows.model_arch import describe
 from origenerator.workflows.model_files import is_no_lora
 
 TRAINER = lora_training.TRAINERS / "look_lora_trainer.py"
-HOLDS_THE_LINE = False
 FIRST_STATE = "preparing"
 STEPS = 1500
 SAVE_EVERY = 25
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"}
 
 
 def trainable_loras() -> dict:
@@ -45,14 +43,8 @@ def images_folder(base: str) -> Path:
     return Path(trainable_loras()[base]["pictures"])
 
 
-def image_files(folder: Path) -> list[Path]:
-    if not folder.is_dir():
-        return []
-    return sorted(path for path in folder.iterdir() if path.suffix.lower() in IMAGE_SUFFIXES)
-
-
 def image_stamps(base: str) -> dict[str, list[int]]:
-    return lora_training.image_stamps(image_files(images_folder(base)))
+    return lora_training.image_stamps(lora_training.image_files(images_folder(base)))
 
 
 def work_folder(base: str) -> Path:
@@ -129,8 +121,6 @@ def training_offer(base: str, lora) -> TrainingOffer:
     folder = images_folder(base)
     return lora_training.offer(
         training_state(base),
-        tooltip=(f"Trains the next version of {base} from the images in {folder}. Your own "
-                 "generations come first: the training pauses whenever ComfyUI has work and picks "
-                 "up where it stopped."),
-        images=len(image_files(folder)), folder=folder,
+        tooltip=lora_training.train_tooltip(base, [folder]),
+        images=len(lora_training.image_files(folder)), folder=folder,
         trash_tooltip=trash_tooltip(lora, model_family(base)))

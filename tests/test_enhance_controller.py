@@ -902,6 +902,21 @@ def test_train_with_no_images_makes_the_fixs_folder_and_says_to_put_them_there(
     assert _training_runs == []
 
 
+def test_train_with_no_training_program_says_so_first_as_a_generating_loras_train_does(
+        enhance, images, monkeypatch):
+    monkeypatch.setattr(config, "LORA_TRAINING_PYTHON", None)
+    told = []
+    monkeypatch.setattr(module.QMessageBox, "information",
+                        lambda parent, title, text: told.append(text))
+    controller, _host = enhance()
+
+    controller.pane.fix_training_requested.emit("hands")
+
+    assert told == ["No training program is set up: content.local.json names no "
+                    "lora_training_python and lora_training_scripts."]
+    assert _training_runs == []
+
+
 def test_train_with_images_in_the_shared_folder_alone_trains_that_fix(enhance, images):
     (images / "shared").mkdir()
     (images / "shared" / "everyone.jpg").write_bytes(b"")
@@ -997,7 +1012,7 @@ def _kept_training(images, part="hands", **status) -> dict:
     return job
 
 
-def test_a_training_an_earlier_launch_left_running_is_taken_up_and_holds_the_line(
+def test_a_training_an_earlier_launch_left_running_is_taken_up_and_watched(
         enhance, images, monkeypatch):
     _kept_training(images)
     trainer = _KeptTrainer(alive=True)

@@ -14,22 +14,13 @@ from origenerator.gui.training_run import TrainingRun
 
 
 class _Queue:
-    def __init__(self, busy: bool):
-        self.busy = busy
+    def __init__(self):
         self.held: list = []
         self.ended: list = []
-        self.freed = 0
 
     def watch_training(self, training) -> None:
         self.held.append(training)
         training.ended.connect(self.ended.append)
-
-    def making_something(self) -> bool:
-        return self.busy
-
-    def free_comfyui_memory(self) -> None:
-        self.freed += 1
-
 
 class _Trainer:
     def __init__(self):
@@ -45,7 +36,7 @@ class _Trainer:
         self.alive = False
 
 
-def _run(qtbot, monkeypatch, tmp_path, *, busy=False):
+def _run(qtbot, monkeypatch, tmp_path):
     monkeypatch.setattr(training_run, "POLL_MS", 5)
     monkeypatch.setattr(config, "FIX_TRAINING_DIR", tmp_path / "fix training")
     started: list[_Trainer] = []
@@ -55,7 +46,7 @@ def _run(qtbot, monkeypatch, tmp_path, *, busy=False):
         return started[-1]
 
     monkeypatch.setattr(fix_training, "start", start)
-    queue = _Queue(busy)
+    queue = _Queue()
     job = {"part": "hands", "display_name": "Hands fix 1.0",
            "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
     run = TrainingRun(job, queue, fix_training, reveal=lambda: None)
@@ -66,29 +57,15 @@ def _say(tmp_path, **status) -> None:
     Path(tmp_path / "status.json").write_text(json.dumps(status), encoding="utf-8")
 
 
-def test_a_training_waits_for_what_comfyui_is_making_then_frees_it_and_starts(
+def test_a_fixs_training_starts_the_moment_it_is_asked_for_since_it_gives_way_to_comfyui_itself(
         qtbot, monkeypatch, tmp_path):
-    run, queue, started = _run(qtbot, monkeypatch, tmp_path, busy=True)
+    run, queue, started = _run(qtbot, monkeypatch, tmp_path)
 
     run.begin()
-    qtbot.wait(30)
+
     assert queue.held == [run]
-    assert started == []
-    assert not run.running
-
-    queue.busy = False
-    qtbot.waitUntil(lambda: bool(started))
-    assert queue.freed == 1
+    assert len(started) == 1
     assert run.running
-
-
-def test_a_training_waiting_its_turn_reads_as_queued_with_nothing_to_count(
-        qtbot, monkeypatch, tmp_path):
-    run, _queue, _started = _run(qtbot, monkeypatch, tmp_path, busy=True)
-    run.begin()
-
-    assert run.reading().status == JobState.QUEUED
-    assert run.reading().progress is None
 
 
 def test_a_training_reads_how_far_its_cropping_and_then_its_steps_have_got(
@@ -194,20 +171,6 @@ def test_a_canceled_training_stops_its_program_lets_the_queue_go_and_says_nothin
         qtbot.wait(30)
 
 
-def test_a_training_canceled_while_it_waits_its_turn_starts_nothing(
-        qtbot, monkeypatch, tmp_path):
-    run, queue, started = _run(qtbot, monkeypatch, tmp_path, busy=True)
-    run.begin()
-
-    with qtbot.waitSignal(run.canceled):
-        run.cancel()
-    queue.busy = False
-    qtbot.wait(30)
-
-    assert started == []
-    assert queue.ended == [None]
-
-
 def test_a_training_that_cannot_be_started_says_why_and_lets_the_queue_go(
         qtbot, monkeypatch, tmp_path):
     run, queue, _started = _run(qtbot, monkeypatch, tmp_path)
@@ -225,9 +188,9 @@ def test_a_training_that_cannot_be_started_says_why_and_lets_the_queue_go(
     assert [outcome.ok for outcome in queue.ended] == [False]
 
 
-def test_a_training_left_running_by_an_earlier_launch_holds_the_line_at_once(
+def test_a_training_left_running_by_an_earlier_launch_is_watched_at_once(
         qtbot, monkeypatch, tmp_path):
-    run, queue, started = _run(qtbot, monkeypatch, tmp_path, busy=True)
+    run, queue, started = _run(qtbot, monkeypatch, tmp_path)
     trainer = _Trainer()
 
     run.adopt(trainer)
@@ -235,7 +198,6 @@ def test_a_training_left_running_by_an_earlier_launch_holds_the_line_at_once(
     assert queue.held == [run]
     assert run.running
     assert started == []
-    assert queue.freed == 0
     with qtbot.waitSignal(run.finished):
         _say(tmp_path, state="done", lora=r"fixes\hands 2026-10-21 1500.safetensors")
         trainer.alive = False
@@ -246,14 +208,14 @@ def _yielding_kind(started: list):
         started.append(_Trainer())
         return started[-1]
 
-    return types.SimpleNamespace(HOLDS_THE_LINE=False, FIRST_STATE="preparing", start=start,
+    return types.SimpleNamespace(FIRST_STATE="preparing", start=start,
                                  typical_seconds=lambda: None)
 
 
-def test_a_training_that_yields_the_tile_itself_starts_at_once_whatever_comfyui_is_making(
+def test_a_looks_training_reads_its_own_stages_from_its_first(
         qtbot, monkeypatch, tmp_path):
     monkeypatch.setattr(training_run, "POLL_MS", 5)
-    queue = _Queue(busy=True)
+    queue = _Queue()
     started: list[_Trainer] = []
     job = {"display_name": "Example Look 1.1", "status": str(tmp_path / "status.json"),
            "log": str(tmp_path / "training.log")}
@@ -264,9 +226,7 @@ def test_a_training_that_yields_the_tile_itself_starts_at_once_whatever_comfyui_
     run.begin()
 
     assert queue.held == [run]
-    assert not run.holds_the_line
     assert len(started) == 1
-    assert queue.freed == 0
     assert run.reading().stage == "Copying images"
     assert run.caption == "Example Look 1.1 LoRA"
     _say(tmp_path, state="describing", done=3, total=12)

@@ -103,7 +103,8 @@ def test_train_with_no_training_program_set_up_says_so(look, monkeypatch):
 
     tab.train_requested.emit("lora")
 
-    assert told == [module.NO_PROGRAM]
+    assert told == ["No training program is set up: content.local.json names no "
+                    "krea2_training_python and krea2_training_scripts."]
     assert _runs == []
 
 

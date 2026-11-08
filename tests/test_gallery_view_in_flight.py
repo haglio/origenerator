@@ -117,15 +117,16 @@ def test_reconnect_running_rerolls_rebinds_a_live_job(qtbot, tmp_path):
     client.submit_job.assert_not_called()
 
 
-def test_a_training_left_running_is_taken_up_before_the_line_it_held_is_sent(
-        qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("kind", [fix_training, look_training])
+def test_a_training_left_running_of_either_kind_is_taken_up_without_holding_the_line(
+        qtbot, tmp_path, monkeypatch, kind):
     db = _seeded_db(tmp_path, seed=7)
     _insert_running_reroll(db, "waiting")
     db.update_generation("waiting", status="pending")
     trainer = SimpleNamespace(running=lambda: True, began=0.0)
-    job = {"part": "hands", "display_name": "Hands fix 1.0",
+    job = {"part": "hands", "base": "Example Look", "display_name": "Example 1.0",
            "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
-    monkeypatch.setattr(fix_training, "trainings", lambda: [job])
+    monkeypatch.setattr(kind, "trainings", lambda: [job])
     monkeypatch.setattr(lora_training, "trainer_of", lambda kept: trainer)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -134,27 +135,6 @@ def test_a_training_left_running_is_taken_up_before_the_line_it_held_is_sent(
     view.reconnect_running_jobs()
 
     assert view._jobs.training is not None
-    client.submit_job.assert_not_called()
-
-
-def test_a_look_loras_training_left_running_is_taken_up_without_holding_the_line(
-        qtbot, tmp_path, monkeypatch):
-    db = _seeded_db(tmp_path, seed=7)
-    _insert_running_reroll(db, "waiting")
-    db.update_generation("waiting", status="pending")
-    trainer = SimpleNamespace(running=lambda: True, began=0.0)
-    job = {"base": "Example Look", "display_name": "Example Look 1.1",
-           "status": str(tmp_path / "status.json"), "log": str(tmp_path / "training.log")}
-    monkeypatch.setattr(look_training, "trainings", lambda: [job])
-    monkeypatch.setattr(lora_training, "trainer_of", lambda kept: trainer)
-    client = _reroll_client()
-    view = GalleryView(db, client=client)
-    qtbot.addWidget(view)
-
-    view.reconnect_running_jobs()
-
-    assert view._jobs.training is not None
-    assert not view._jobs.training_holds_the_machine()
     client.submit_job.assert_called_once()
 
 

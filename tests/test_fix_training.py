@@ -17,13 +17,6 @@ def test_each_fix_takes_its_images_from_a_folder_of_fixes_named_for_it_in_lowerc
     assert fix_training.images_folder(_part("hands")).parts[-2:] == ("fixes", "hands")
 
 
-def test_only_images_in_a_fixs_folder_are_trained_on(tmp_path):
-    for name in ("b.jpg", "a.PNG", "notes.txt", "c.webp"):
-        (tmp_path / name).write_bytes(b"")
-
-    assert [path.name for path in fix_training.image_files(tmp_path)] == ["a.PNG", "b.jpg", "c.webp"]
-    assert fix_training.image_files(tmp_path / "not made yet") == []
-
 
 def test_a_fix_trains_on_its_own_images_and_the_shared_folders(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "FIX_IMAGES_DIR", tmp_path)
@@ -83,7 +76,10 @@ def test_a_training_job_names_the_fixs_images_its_detector_and_the_model_to_trai
     assert list(job["image_stamps"]) == ["hands/one.jpg", "shared/two.jpg"]
     assert job["detector"] == str(models / "ultralytics" / "bbox" / "hand_yolov8s.pt")
     assert job["base_model"] == str(models / "checkpoints" / "base.safetensors")
-    assert job["output_dir"] == str(models / "loras" / "fixes")
+    assert job["lora_folder"] == str(models / "loras" / "fixes")
+    assert "output_dir" not in job
+    assert job["save_every"] == fix_training.SAVE_EVERY
+    assert job["comfyui"] == f"http://{config.COMFYUI_HOST}:{config.COMFYUI_PORT}"
     assert job["output_name"] == "hands 1.0"
     assert job["display_name"] == "Hands fix 1.0"
     assert job["lora"] == str(Path("fixes") / "hands 1.0.safetensors")
@@ -185,3 +181,26 @@ def test_a_lora_no_training_names_was_trained_on_no_model_anyone_knows(monkeypat
     _training_of(monkeypatch, tmp_path)
 
     assert fix_training.trained_on(str(Path("fixes") / "hands 1.2.safetensors")) is None
+
+
+def test_a_fixs_train_tooltip_names_its_folders_and_says_his_generations_come_first(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_IMAGES_DIR", tmp_path)
+
+    shared = fix_training.train_tooltip(_part("hands"))
+    alone = fix_training.train_tooltip(types.SimpleNamespace(name="hands", shared_images=False))
+
+    assert shared.startswith(f"Trains the next version of Hands fix from the images in "
+                             f"{tmp_path / 'hands'} and {tmp_path / 'shared'}, each cropped")
+    assert str(tmp_path / "shared") not in alone
+    assert "Your own generations come first" in shared
+    assert "Nothing generates" not in shared
+
+
+def test_the_train_tooltips_of_a_fix_and_of_a_generating_lora_end_alike(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "FIX_IMAGES_DIR", tmp_path)
+
+    fix = fix_training.train_tooltip(_part("hands"))
+    look = lora_training.train_tooltip("Example Look", [tmp_path / "look"])
+
+    assert fix.split(". ", 1)[1] == look.split(". ", 1)[1]

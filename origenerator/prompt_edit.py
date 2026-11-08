@@ -294,12 +294,24 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     return story_of(after)
 
 
+_SAID_BY_THE_RULES = {
+    DROPPED: "Took out {term}.",
+    PUSHED: "Made {term} stronger in the Negative Prompt.",
+    EXCLUDED: "Added {term} to the Negative Prompt.",
+    ALLOWED: "Took {term} out of the Negative Prompt.",
+    RAISED: "Made {term} stronger.",
+    ADDED: "Added {term}.",
+}
+
+
 def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
     polarity, term = parsed
 
     def made(new_positive, new_negative, action) -> PromptRevision:
+        said = (_SAID_BY_THE_RULES[action].format(term=term)
+                if (new_positive, new_negative) != (positive, negative) else "")
         return PromptRevision(positive, negative, new_positive, new_negative,
-                              term, polarity, action)
+                              term, polarity, action, said)
 
     if polarity == REMOVE:
         index = _index_of(positive, term)

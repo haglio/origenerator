@@ -146,7 +146,7 @@ def test_a_comfyui_that_stays_busy_leaves_the_rules_to_answer_without_the_model(
 
     qtbot.waitUntil(lambda: bool(answers), timeout=5000)
     assert answers[0].positive == "a woman, soft light"
-    assert answers[0].answer == ""
+    assert answers[0].answer == "Took out hat."
 
 
 def test_with_no_comfyui_the_card_is_not_waited_for(qtbot, tmp_path):

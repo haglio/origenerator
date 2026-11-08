@@ -306,8 +306,8 @@ _SAVES_A_STATE_THEN_WAITS_UNLESS_RESUMED = """
 import os, sys, time
 args = sys.argv[1:]
 out = args[args.index("--output_dir") + 1]
-os.makedirs(os.path.join(out, "hands 1.1-step00000100-state"), exist_ok=True)
 print("asked for", args[args.index("--max_train_steps") + 1], "steps", flush=True)
+os.makedirs(os.path.join(out, "hands 1.1-step00000100-state"), exist_ok=True)
 if "--resume" not in args:
     time.sleep(120)
 print("resumed from", args[args.index("--resume") + 1], "skipping:", "--skip_until_initial_step" in args, flush=True)

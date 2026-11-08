@@ -358,9 +358,13 @@ def _answered(positive: str, negative: str, parsed: tuple, asking,
     new_positive = _said(positive, _without_nothing_weighted(new_positive))
     new_negative = _said(negative, _without_nothing_weighted(new_negative))
     if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
+        logger.info("prompt_edit: the model's rewrite left part of the prompt out; "
+                    "the rules made the change")
         return None
     changes = request_settings.changes_asked(more[0] if more else None, settings)
     if (new_positive, new_negative) == (positive, negative) and not answer and not changes:
+        logger.info("prompt_edit: the model changed nothing and said nothing; "
+                    "the rules made the change")
         return None
     return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
                           REWRITTEN, answer, tuple(changes.items()),

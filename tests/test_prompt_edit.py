@@ -271,12 +271,15 @@ def test_a_model_that_cannot_be_asked_leaves_the_rules_own_edit_and_nothing_said
     assert caplog.messages == ["prompt_edit: the model could not answer the request (OSError)"]
 
 
-def test_a_model_that_changes_nothing_and_says_nothing_leaves_the_rules_own_edit():
-    revision = work_out("a woman wearing a straw hat, freckles", "", "no hat",
-                        ask=_Model(("a woman wearing a straw hat, freckles", "", "")))
+def test_a_model_that_changes_nothing_and_says_nothing_leaves_the_rules_own_edit(caplog):
+    with caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
+        revision = work_out("a woman wearing a straw hat, freckles", "", "no hat",
+                            ask=_Model(("a woman wearing a straw hat, freckles", "", "")))
 
     assert revision.positive == "freckles"
     assert revision.action == DROPPED
+    assert caplog.messages == [
+        "prompt_edit: the model changed nothing and said nothing; the rules made the change"]
 
 
 def test_a_model_that_changes_nothing_but_answers_is_an_answer_with_nothing_to_make():
@@ -303,12 +306,15 @@ def test_an_answer_that_stands_dots_in_for_a_prompt_leaves_that_prompt_as_it_was
         "A dog with big ears sits on a porch at sunset.", "")
 
 
-def test_an_answer_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer():
-    revision = work_out("A dog sits on a porch at sunset, warm light", "", "bigger ears",
-                        ask=_Model(("A dog with bigger ears ... warm light", "", "Bigger.")))
+def test_an_answer_that_leaves_part_of_the_prompt_out_with_dots_is_no_answer(caplog):
+    with caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
+        revision = work_out("A dog sits on a porch at sunset, warm light", "", "bigger ears",
+                            ask=_Model(("A dog with bigger ears ... warm light", "", "Bigger.")))
 
     assert revision.positive == "A dog sits on a porch at sunset, warm light, bigger ears"
     assert revision.answer == ""
+    assert caplog.messages == [
+        "prompt_edit: the model's rewrite left part of the prompt out; the rules made the change"]
 
 
 def test_an_answer_with_no_words_for_a_prompt_leaves_that_prompt_as_it_was():

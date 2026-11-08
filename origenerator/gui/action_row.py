@@ -20,8 +20,8 @@ from origenerator.own_window import show_or_say
 ACTION_LABEL = "Action"
 ACTIONS_LABEL = "Actions"
 SIDE_LABELS = {MediaType.IMAGE: "Image Actions", MediaType.VIDEO: "Video Actions"}
-ADD = "Add actions with setter tool…"
-EDIT = "Edit actions with setter tool…"
+ADD = "Add with setter tool…"
+EDIT = "Edit with setter tool…"
 
 _TIPS = {MediaType.IMAGE: "Set this image's actions, then every image that has none, one press apiece",
          MediaType.VIDEO: "Set this video's actions, then every video that has none, one press apiece"}

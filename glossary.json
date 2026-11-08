@@ -1079,8 +1079,8 @@
       "id": "action",
       "thing": "what an image or a video shows, saved on it as one or more actions with the action setter tool",
       "screen": [
-        "Add actions with setter tool…",
-        "Edit actions with setter tool…",
+        "Add with setter tool…",
+        "Edit with setter tool…",
         "Actions",
         "Image Actions",
         "Video Actions",

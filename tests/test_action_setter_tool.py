@@ -6,8 +6,9 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.action_labels import Labels, labels_of
-from origenerator.action_setter_tool import AnswersTold, waiting_items
+from origenerator.action_setter_tool import AnswersTold, asks_to_keep_going, waiting_items
 from origenerator.db import Database, NewGeneration
+from origenerator.gui.action_setter_window import ask_to_keep_going
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 
@@ -117,3 +118,7 @@ def test_a_video_made_from_no_image_waits_among_the_images_shown_by_its_first_fr
     [item] = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.IMAGE)
 
     assert (item["prompt_id"], item["path"]) == ("vid", "vid_thumb.jpg")
+
+
+def test_opened_on_an_item_it_asks_whether_to_go_on_and_opened_on_its_own_it_never_does():
+    assert (asks_to_keep_going("first"), asks_to_keep_going("")) == (ask_to_keep_going, None)

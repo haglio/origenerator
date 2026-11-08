@@ -67,6 +67,12 @@ def _nobody_listening(_prompt_id: str, _side: str, _labels) -> None:
     pass
 
 
+def asks_to_keep_going(first: str):
+    from origenerator.gui.action_setter_window import ask_to_keep_going
+
+    return ask_to_keep_going if first else None
+
+
 def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_listening):
     from origenerator.action_drawings import drawing_for
     from origenerator.action_setter import Locks, SetterSession
@@ -83,7 +89,8 @@ def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_
     drawings = {name: str(drawn) for name in named.buttons
                 if (drawn := drawing_for(named.drawing_name(name))) is not None}
     return ActionSetterWindow(SetterSession(waiting, AnswersTold(db, heard), side),
-                              named, drawings, Locks(STATE_DIR / LOCKS_FILE))
+                              named, drawings, Locks(STATE_DIR / LOCKS_FILE),
+                              keep_going=asks_to_keep_going(first))
 
 
 def main() -> int:

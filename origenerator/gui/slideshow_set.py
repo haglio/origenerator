@@ -5,7 +5,7 @@ from dataclasses import fields, replace
 
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL, looping_label
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
-from funestra.satellite_hud import label_is_filtered
+from funestra.satellite_hud import actions_are_filtered
 
 from origenerator.gui.hud_nav_map import (
     NO_NEIGHBORS,
@@ -175,7 +175,7 @@ class SlideshowSet:
             return False
         if filters.enhanced and prompt_id not in self.enhanced_ids:
             return False
-        return not filters.action or label_is_filtered(self._named_for(prompt_id), filters.action)
+        return not filters.action or actions_are_filtered(self._named_for(prompt_id), filters.action)
 
     def _named_for(self, prompt_id) -> str:
         if prompt_id is None or self._actions_of is None:

@@ -4,7 +4,7 @@ from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from funestra.video_families import labels_text
+from funestra.video_families import actions_line
 from funestra.video_groups import normalize_path_key
 
 from origenerator import gallery
@@ -89,7 +89,7 @@ class _Animations:
 
     def actions_line_of(self, row: dict) -> str:
         source = (SOURCE_IMAGE,) if self.videos_of(row) else ()
-        return labels_text((*source, *self.actions_of_row(row)))
+        return actions_line((*source, *self.actions_of_row(row)))
 
     def group_of(self, row: dict) -> list[dict]:
         image = self.image_of(row) or row

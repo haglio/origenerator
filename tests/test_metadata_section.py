@@ -4,6 +4,7 @@ import json
 
 import pytest
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
+from shared_ui.colors import TEXT_MUTED
 
 import origenerator.gui.metadata_section as metadata_section_module
 from origenerator import config
@@ -12,6 +13,8 @@ from origenerator.gui.metadata_section import MetadataSection
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from tests import gestures
+
+_LEAD_VIDEO = {"filename": "lead.mp4", "subfolder": "video"}
 
 
 def _row(**overrides):
@@ -24,6 +27,8 @@ def _row(**overrides):
         "output_files": json.dumps([{"filename": "out.mp4", "subfolder": "video"}]),
     }
     row.update(overrides)
+    if row["workflow_name"] == "wan22_i2v":
+        row["output_files"] = json.dumps([_LEAD_VIDEO, *json.loads(row["output_files"])])
     return row
 
 
@@ -174,3 +179,12 @@ def test_the_reveal_button_does_not_hold_the_pane_open(block):
     whole = btn.fontMetrics().horizontalAdvance("Show in Explorer")
     assert btn.minimumSizeHint().width() < whole
     assert btn.display_text(whole // 3).endswith("…")
+
+
+def test_a_facts_value_is_plain_text_in_the_muted_gray_typical_time_wears(block):
+    block.show_row(_row(), name="AB12CD34 007")
+
+    (value,) = [label for label in block.findChildren(QLabel)
+                if label.text().replace("\u200b", "") == "AB12CD34 007"]
+
+    assert TEXT_MUTED.name() in value.styleSheet()

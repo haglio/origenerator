@@ -140,7 +140,7 @@ def test_a_video_lists_what_its_starting_frame_was_animated_into(make_related):
     related.show_row(video, [_hidden_frame()])
 
     assert _animated(related) == ["vid2"]
-    assert related._animations._heading.text() == "Starting frame animated in"
+    assert related._animations_section._header.text() == "Starting frame animated in"
 
 
 def test_a_video_animated_from_another_videos_starting_frame_points_at_that_video(make_related):
@@ -163,14 +163,15 @@ def test_two_videos_animated_from_one_starting_frame_are_not_listed_on_each_othe
     assert related._animations_section.isHidden()
 
 
-def test_an_image_has_no_heading_after_a_videos_starting_frame_was_shown(make_related):
+def test_an_images_animations_are_titled_animations_after_a_videos_starting_frame_was_shown(
+        make_related):
     video, image = _taken_out_of(), _image_row()
     related = make_related(video, _video_row("vid2", input_image="frame1.jpg"), _video_row("vid3"))
     related.show_row(video, [_hidden_frame(), image])
 
     related.show_row(image, [_hidden_frame(), image])
 
-    assert related._animations._heading.isHidden()
+    assert related._animations_section._header.text() == "Animations"
 
 
 def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combine(make_related):

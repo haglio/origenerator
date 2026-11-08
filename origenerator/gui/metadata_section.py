@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import TEXT_SECONDARY
+from shared_ui.colors import TEXT_MUTED
 from shared_ui.spacing import BUTTON_PAD_H_TIGHT, BUTTON_PAD_V, GAP_MEDIUM
 
 from origenerator.generation_metadata import (
@@ -156,7 +156,7 @@ def _value_widget(item: MetadataItem) -> QLabel:
     value = QLabel(wrappable(item.value))
     value.setTextInteractionFlags(_SELECTABLE)
     value.setWordWrap(True)
-    value.setStyleSheet(f"QLabel {{ color: {_h(TEXT_SECONDARY)}; }}")
+    value.setStyleSheet(f"QLabel {{ color: {_h(TEXT_MUTED)}; }}")
     return value
 
 

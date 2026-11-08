@@ -32,36 +32,38 @@ def _image_row(**overrides):
     })
 
 
-def test_an_items_name_leads_the_block_and_is_what_its_copy_button_copies():
+def _file(**overrides):
+    return {"filename": "clip.mp4", "subfolder": "video", **overrides}
+
+
+def test_an_items_name_is_what_its_copy_button_copies_and_its_video_is_left_to_its_versions():
     items = metadata_facts(_row(), name="AB12CD34 007").items
-    assert [(item.label, item.value, item.copy) for item in items[:2]] == [
-        ("Name", "AB12CD34 007", "AB12CD34 007"), ("File", "video/clip.mp4", "clip.mp4")]
+    assert [(item.label, item.value, item.copy) for item in items] == [
+        ("Name", "AB12CD34 007", "AB12CD34 007")]
 
 
-def test_the_output_file_comes_before_its_date():
-    items = metadata_facts(_row(created_at="2026-07-01")).items
-    assert items[0].label == "File"
-    assert items[0].value == "video/clip.mp4"
-    assert items[1].label == "Created"
-    assert items[1].value == "2026-07-01"
+def test_a_file_no_version_lists_comes_before_its_date():
+    row = _row(created_at="2026-07-01", output_files=json.dumps([
+        {"filename": "a.mp4", "subfolder": "video"}, {"filename": "b.mp4", "subfolder": "video"}]))
+    items = metadata_facts(row).items
+    assert [(item.label, item.value) for item in items] == [
+        ("File", "video/b.mp4"), ("Created", "2026-07-01")]
 
 
 def test_file_shows_the_subfolder_path_but_copies_just_the_filename():
-    row = _row(output_files=json.dumps(
-        [{"filename": "clip_00001.mp4", "subfolder": "video"}]
-    ))
-    file_item = metadata_facts(row).items[0]
-    assert file_item.value == "video/clip_00001.mp4"
-    assert file_item.copy == "clip_00001.mp4"
+    item = file_item(_file(filename="clip_00001.mp4"))
+    assert item.value == "video/clip_00001.mp4"
+    assert item.copy == "clip_00001.mp4"
 
 
-def test_every_output_file_gets_its_own_row():
+def test_every_output_file_past_the_video_gets_its_own_row():
     row = _row(output_files=json.dumps([
         {"filename": "a.mp4", "subfolder": ""}, {"filename": "b.mp4", "subfolder": ""},
+        {"filename": "c.mp4", "subfolder": ""},
     ]))
     files = [i.value for i in metadata_facts(row).items
              if i.label == "File"]
-    assert files == ["a.mp4", "b.mp4"]
+    assert files == ["b.mp4", "c.mp4"]
 
 
 def test_a_video_evolver_upscaled_lists_its_file_with_its_versions_instead(tmp_path):
@@ -69,43 +71,36 @@ def test_a_video_evolver_upscaled_lists_its_file_with_its_versions_instead(tmp_p
 
 
 def test_file_item_reveals_the_absolute_output_path():
-    row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video"}]))
-    file_item = metadata_facts(row).items[0]
-    assert file_item.reveal == str(OUTPUT_PLACES.folder("video") / "clip.mp4")
+    assert file_item(_file()).reveal == str(OUTPUT_PLACES.folder("video") / "clip.mp4")
 
 
 def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
-    row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video",
-                                         "path": r"C:\state\trash\abc\0_clip.mp4"}]))
-    file_item = metadata_facts(row).items[0]
-    assert file_item.reveal == r"C:\state\trash\abc\0_clip.mp4"
+    item = file_item(_file(path=r"C:\state\trash\abc\0_clip.mp4"))
+    assert item.reveal == r"C:\state\trash\abc\0_clip.mp4"
 
 
 def test_a_deleted_items_file_line_leads_with_its_days_in_the_trash():
-    file_item = metadata_facts(_row(days_in_trash=3)).items[0]
-    assert file_item.value == "(3 days in trash) video/clip.mp4", (
+    item = file_item(_file(), held_days=3)
+    assert item.value == "(3 days in trash) video/clip.mp4", (
         "the File line is where the user learns what a file is, and for a deleted one "
         "how long it has sat in the Trash is part of that")
-    assert file_item.copy == "clip.mp4"
+    assert item.copy == "clip.mp4"
 
 
 def test_one_day_in_the_trash_reads_as_one_day():
-    file_item = metadata_facts(_row(days_in_trash=1)).items[0]
-    assert file_item.value.startswith("(1 day in trash)")
+    assert file_item(_file(), held_days=1).value.startswith("(1 day in trash)")
 
 
 def test_an_item_trashed_today_says_so_rather_than_counting_zero():
-    file_item = metadata_facts(_row(days_in_trash=0)).items[0]
-    assert file_item.value == "(deleted today) video/clip.mp4"
+    assert file_item(_file(), held_days=0).value == "(deleted today) video/clip.mp4"
 
 
 def test_a_live_items_file_line_says_nothing_about_the_trash():
-    file_item = metadata_facts(_row()).items[0]
-    assert file_item.value == "video/clip.mp4"
+    assert file_item(_file()).value == "video/clip.mp4"
 
 
 def test_created_row_carries_no_reveal_path():
-    created = metadata_facts(_row()).items[1]
+    created = created_item(_file(), "2026-01-01")
     assert created.label == "Created"
     assert created.reveal is None
 
@@ -159,14 +154,14 @@ def test_a_build_that_carried_uncommitted_edits_says_so():
 def test_an_item_from_a_workflow_the_app_no_longer_has_names_no_workflow_version():
     row = _row(workflow_name="wan21_ati_i2v", provenance=_stamped(workflow="wan21_ati_i2v"))
 
-    assert [item.label for item in metadata_facts(row).items] == ["File", "Created"]
+    assert metadata_facts(row) is None
 
 
 def test_a_passthrough_param_does_not_grow_a_second_block():
     row = _row(params_json=json.dumps({"vae": "x.safetensors"}))
-    section = metadata_facts(row)
+    section = metadata_facts(row, name="AB12CD34 007")
     assert section.title == "Metadata"
-    assert [item.label for item in section.items] == ["File", "Created"], (
+    assert [item.label for item in section.items] == ["Name"], (
         "the settings, shown or carried along unshown, live in the form")
 
 

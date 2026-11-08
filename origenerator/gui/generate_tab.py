@@ -441,10 +441,15 @@ class GenerateTab(DropZones):
 
     def showEvent(self, event):
         super().showEvent(event)
-        split = self._media_split
-        if not self._media_shared and split.dragged_sizes() is None and not self._media_side_by_side:
+        if not self._media_shared:
             self._media_shared = True
-            split.setSizes([split.widget(i).sizeHint().height() for i in range(split.count())])
+            QTimer.singleShot(0, self._give_the_preview_a_third)
+
+    def _give_the_preview_a_third(self) -> None:
+        split = self._media_split
+        whole = sum(split.sizes())
+        if whole and split.dragged_sizes() is None and not self._media_side_by_side:
+            split.setSizes([whole // 3, whole - whole // 3])
 
     def minimumSizeHint(self):
         """Qt takes an explicit setMinimumWidth in place of this hint, not alongside it, so none is set here or on the wrapper."""

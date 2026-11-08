@@ -138,14 +138,13 @@ def upscale_and_original(upscale: dict, original: dict) -> list[EnhanceVersion]:
 
 def displayed_versions(row: dict, upscale: Path | None = None) -> list[EnhanceVersion]:
     files = row_output_files(row)
+    if not files:
+        return []
     if media_type_of_row(row) != MediaType.IMAGE:
-        if upscale is None or not files:
-            return []
+        if upscale is None:
+            return [EnhanceVersion(0, "Original", files[0])]
         return upscale_and_original(file_at(upscale), files[0])
-    versions = enhancement_versions(row)
-    if versions:
-        return versions
-    return [EnhanceVersion(0, "Original", files[0])] if files else []
+    return enhancement_versions(row) or [EnhanceVersion(0, "Original", files[0])]
 
 
 def remove_enhance_versions(row: dict, filenames) -> dict:

@@ -116,6 +116,7 @@ class CollapsibleSection(QWidget):
     def __init__(self, title: str, collapsed: bool = False, parent=None):
         super().__init__(parent)
         self._title = title
+        self._shown_title = title
         self._collapsed = collapsed
 
         outer = QVBoxLayout(self)
@@ -144,6 +145,10 @@ class CollapsibleSection(QWidget):
     def title(self) -> str:
         return self._title
 
+    def show_title(self, text: str) -> None:
+        self._shown_title = text
+        self._header.setText(text)
+
     def is_collapsed(self) -> bool:
         return self._collapsed
 
@@ -159,7 +164,7 @@ class CollapsibleSection(QWidget):
     def _apply_state(self):
         self._content.setVisible(not self._collapsed)
         self._header.set_fold(FOLD[self._collapsed])
-        self._header.setText(self._title)
+        self._header.setText(self._shown_title)
 
     def set_mark(self, mark: QPixmap | None, tip: str) -> None:
         self._header.set_mark(mark, tip)

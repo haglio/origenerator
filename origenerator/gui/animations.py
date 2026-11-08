@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.link_heading import link_heading
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 from origenerator.gui.trash_box import place_tiles
@@ -27,11 +26,6 @@ class _VideoTile(QLabel):
             self.clicked.emit(self._prompt_id)
 
 
-def _show_heading(label, heading: str) -> None:
-    label.setText(heading)
-    label.setVisible(bool(heading))
-
-
 class Animations(QWidget):
     video_activated = pyqtSignal(str)
 
@@ -40,17 +34,11 @@ class Animations(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(GAP_SMALL)
-        self._heading = link_heading("")
-        self.set_heading("")
-        column.addWidget(self._heading)
         self._host = QWidget()
         FlowLayout(self._host, spacing=6)
         column.addWidget(self._host)
         self._column = column
         self.hide()
-
-    def set_heading(self, heading: str) -> None:
-        _show_heading(self._heading, heading)
 
     def show_videos(self, items: list[tuple[str, object, object]],
                     in_trash: frozenset[str] = frozenset()):

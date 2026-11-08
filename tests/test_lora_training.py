@@ -220,3 +220,12 @@ def test_a_training_is_current_while_the_images_it_kept_are_the_ones_in_the_fold
     images[0].write_bytes(b"one, retouched")
     assert lora_training.training_state(
         trained, lora_training.image_stamps(images)) is TrainingState.OUT_OF_DATE
+
+
+def test_only_images_in_a_trainings_folder_are_trained_on_whatever_their_kind(tmp_path):
+    for name in ("b.jpg", "a.PNG", "c.webp", "d.avif", "e.gif", "notes.txt", "f.mp4"):
+        (tmp_path / name).write_bytes(b"")
+
+    assert [path.name for path in lora_training.image_files(tmp_path)] == [
+        "a.PNG", "b.jpg", "c.webp", "d.avif", "e.gif"]
+    assert lora_training.image_files(tmp_path / "not made yet") == []

@@ -12,31 +12,42 @@ from __future__ import annotations
 
 import math
 import os
+import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from origenerator import card_claim
+from origenerator import training_rounds
+from origenerator.training_rounds import IN_THE_BACKGROUND, Stopped, output_folder, said_why, status
 
 _TOTAL_IMAGE_SIGHTINGS = 150
+_EPOCHS = 10
 
 
 def training_environment(base: dict) -> dict:
     return dict(base, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
 
 
+def _repeats(count: int) -> int:
+    return max(1, math.ceil(_TOTAL_IMAGE_SIGHTINGS / count))
+
+
 def dataset_folder(work: str, part: str, count: int) -> str:
-    return f"{work}/{max(1, math.ceil(_TOTAL_IMAGE_SIGHTINGS / count))}_{part}"
+    return f"{work}/{_repeats(count)}_{part}"
 
 
-def train_command(job: dict, dataset: str, python: str = sys.executable) -> list[str]:
+def training_steps(count: int) -> int:
+    return _EPOCHS * _repeats(count) * count
+
+
+def train_command(job: dict, dataset: str, resume: Path | None = None,
+                  python: str = sys.executable) -> list[str]:
     return [
         python, f"{job['sd_scripts']}/sdxl_train_network.py",
         "--pretrained_model_name_or_path", job["base_model"],
         "--train_data_dir", dataset,
-        "--output_dir", job["output_dir"],
+        "--output_dir", str(output_folder(job)),
         "--output_name", job["output_name"],
         "--save_model_as", "safetensors",
         "--resolution", "1024,1024",
@@ -47,7 +58,9 @@ def train_command(job: dict, dataset: str, python: str = sys.executable) -> list
         "--learning_rate", "1e-4",
         "--optimizer_type", "AdamW",
         "--lr_scheduler", "cosine",
-        "--max_train_epochs", "10",
+        "--max_train_steps", str(job["steps"]),
+        "--save_every_n_steps", str(job["save_every"]),
+        "--save_state", "--save_last_n_steps", str(3 * job["save_every"]),
         "--train_batch_size", "1",
         "--mixed_precision", "bf16",
         "--save_precision", "bf16",
@@ -57,6 +70,7 @@ def train_command(job: dict, dataset: str, python: str = sys.executable) -> list
         "--no_half_vae",
         "--caption_extension", ".txt",
         "--seed", "1",
+        *(["--resume", str(resume), "--skip_until_initial_step"] if resume is not None else []),
     ]
 
 
@@ -67,20 +81,6 @@ def square_crop(box, size) -> tuple[int, int, int, int]:
     x = min(max((left + right) / 2 - side / 2, 0), width - side)
     y = min(max((top + bottom) / 2 - side / 2, 0), height - side)
     return round(x), round(y), round(x + side), round(y + side)
-
-
-_IN_THE_BACKGROUND = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                      | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
-
-
-def _status(job: dict, **fields) -> None:
-    import json  # noqa: PLC0415
-
-    Path(job["status"]).write_text(json.dumps(fields), encoding="utf-8")
-
-
-class Stopped(Exception):
-    pass
 
 
 def _finder(job: dict):
@@ -104,21 +104,23 @@ def _finder(job: dict):
     return find
 
 
-def crop(job: dict, find=None) -> int:
-    import shutil  # noqa: PLC0415
+def _dataset(job: dict) -> Path:
+    return Path(job["work"]) / "images"
 
+
+def crop(job: dict, find=None) -> int:
     from PIL import Image  # noqa: PLC0415
 
-    work = Path(job["work"])
-    crops = work / "crops"
-    shutil.rmtree(work / "images", ignore_errors=True)
+    crops = Path(job["work"]) / "crops"
+    shutil.rmtree(_dataset(job), ignore_errors=True)
+    shutil.rmtree(output_folder(job), ignore_errors=True)
     shutil.rmtree(crops, ignore_errors=True)
     crops.mkdir(parents=True)
     find = find or _finder(job)
     images = job["images"]
     kept = 0
     for index, path in enumerate(images, 1):
-        _status(job, state="cropping", done=index, total=len(images))
+        status(job, state="cropping", done=index, total=len(images))
         try:
             with Image.open(path) as opened:
                 image = opened.convert("RGB")
@@ -141,83 +143,39 @@ def crop(job: dict, find=None) -> int:
     return kept
 
 
-def _train(job: dict, images: str) -> tuple[int, bytes]:
-    import os  # noqa: PLC0415
-    import re  # noqa: PLC0415
+def train(job: dict, machine, popen=subprocess.Popen, kill=training_rounds.end_process) -> None:
+    crops = Path(job["work"]) / "crops"
+    dataset = _dataset(job)
+    count = len(list(crops.glob("*.jpg")))
+    dataset.mkdir(parents=True)
+    crops.rename(dataset_folder(str(dataset), job["part"], count))
+    job = dict(job, steps=training_steps(count))
+    environment = training_environment(dict(os.environ))
 
-    process = subprocess.Popen(train_command(job, images), cwd=job["sd_scripts"],
-                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                               creationflags=_IN_THE_BACKGROUND,
-                               env=training_environment(dict(os.environ)))
-    tail = b""
-    while chunk := process.stdout.read1(256):
-        sys.stdout.buffer.write(chunk)
-        sys.stdout.buffer.flush()
-        tail = (tail + chunk)[-4096:]
-        steps = re.findall(rb"steps:\s+\d+%\|[^|]*\|\s*(\d+)/(\d+)", tail)
-        if steps:
-            done, total = steps[-1]
-            _status(job, state="training", done=int(done), total=int(total))
-    return process.wait(), tail
+    def in_sd_scripts(command, **options):
+        return popen(command, cwd=job["sd_scripts"], env=environment, **options)
+
+    training_rounds.train(job, machine, training_rounds.Rounds(
+        lambda _done, resume: train_command(job, str(dataset), resume)),
+        popen=in_sd_scripts, kill=kill)
+    training_rounds.install(job)
 
 
-_MEMORY_RAN_OUT = (b"OutOfMemoryError", b"CUDA out of memory", b"CUDA error: out of memory")
-
-
-def _why_the_training_stopped(tail: bytes, log: str) -> str:
-    if any(sign in tail for sign in _MEMORY_RAN_OUT):
-        return ("The graphics card ran out of memory while training. Close anything else "
-                "using it, then press Train again.")
-    return ("The training program stopped with an error. Nothing about your images caused "
-            f"it; an agent can read why in {log}.")
-
-
-def train(job: dict) -> None:
-    import json  # noqa: PLC0415
-
-    work = Path(job["work"])
-    crops = work / "crops"
-    images = work / "images"
-    images.mkdir(parents=True)
-    crops.rename(dataset_folder(str(images), job["part"], len(list(crops.glob("*.jpg")))))
-    _status(job, state="training", done=0, total=0)
-    code, tail = _train(job, str(images))
-    if code != 0:
-        raise Stopped(_why_the_training_stopped(tail, job["log"]))
-    Path(job["trained"]).write_text(
-        json.dumps({"photo_stamps": job["image_stamps"], "lora": job["lora"]}), encoding="utf-8")
-    _status(job, state="done", lora=job["lora"])
-
-
-def _said_why(job: dict) -> bool:
-    import json  # noqa: PLC0415
-
+def run(job: dict, machine=None) -> None:
+    machine = machine or training_rounds.machine_of(job)
     try:
-        return json.loads(Path(job["status"]).read_text(encoding="utf-8"))["state"] == "failed"
-    except (OSError, ValueError, KeyError):
-        return False
-
-
-def _take_the_graphics_card(job: dict) -> None:
-    while not card_claim.take(f"{job['part'].capitalize()} fix training", os.getpid()):
-        _status(job, state="waiting")
-        time.sleep(20)
-
-
-def run(job: dict) -> None:
-    try:
-        _take_the_graphics_card(job)
+        training_rounds.wait_for_idle(job, machine)
         cropping = subprocess.run([job["comfyui_python"], str(Path(__file__).resolve()), "crop",
-                                   job["job_file"]], creationflags=_IN_THE_BACKGROUND,
+                                   job["job_file"]], creationflags=IN_THE_BACKGROUND,
                                   check=False)
         if cropping.returncode != 0:
-            if _said_why(job):
+            if said_why(job):
                 raise Stopped()
             raise Stopped("The image cropping quit without saying why. An agent can read what "
                           f"it printed in {job['log']}.")
-        train(job)
+        train(job, machine)
     finally:
-        card_claim.release(os.getpid())
+        training_rounds.let_go_of_the_graphics_card()
 
 
 STEPS = {"run": run, "crop": crop}
@@ -225,24 +183,7 @@ _DOING = {"run": "training", "crop": "cropping the images"}
 
 
 def main(argv: list[str]) -> int:
-    import json  # noqa: PLC0415
-    import traceback  # noqa: PLC0415
-
-    step, job_path = argv
-    job = json.loads(Path(job_path).read_text(encoding="utf-8"))
-    try:
-        STEPS[step](job)
-    except Stopped as stopped:
-        if str(stopped):
-            _status(job, state="failed", message=str(stopped))
-        return 1
-    except Exception:
-        traceback.print_exc()
-        _status(job, state="failed", message=f"The training stopped with an error while "
-                                             f"{_DOING[step]}. An agent can read why in "
-                                             f"{job['log']}.")
-        return 1
-    return 0
+    return training_rounds.main(argv, STEPS, _DOING)
 
 
 if __name__ == "__main__":

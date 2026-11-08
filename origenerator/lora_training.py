@@ -12,10 +12,9 @@ from app_support.win32 import process_started
 from origenerator import timing
 from origenerator.gallery import JobKind
 from origenerator.run_toast import RunOutcome
+from origenerator.training_rounds import IMAGE_SUFFIXES, IN_THE_BACKGROUND, NO_WINDOW
 
 TRAINERS = Path(__file__).resolve().parents[1] / "tools"
-_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-_IN_THE_BACKGROUND = _NO_WINDOW | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
 
 
 class TrainingState(Enum):
@@ -44,9 +43,33 @@ class TrainingOffer:
     trash_tooltip: str | None = None
 
 
+def train_tooltip(name: str, folders: list[Path], each: str = "") -> str:
+    return (f"Trains the next version of {name} from the images in "
+            f"{' and '.join(str(folder) for folder in folders)}{each}. Your own generations "
+            "come first: the training pauses whenever ComfyUI has work and picks up where it "
+            "stopped.")
+
+
+def why_it_cannot_train(program: tuple, program_settings: tuple[str, str], subject: str,
+                        folder: Path, has_images: bool) -> str | None:
+    if None in program:
+        return ("No training program is set up: content.local.json names no "
+                f"{program_settings[0]} and {program_settings[1]}.")
+    folder.mkdir(parents=True, exist_ok=True)
+    if not has_images:
+        return f"Put images of {subject} in {folder}, then press Train again."
+    return None
+
+
 def offer(state: TrainingState, **shown) -> TrainingOffer:
     return TrainingOffer("Train" if state is TrainingState.UNTRAINED else "Retrain",
                          state is not TrainingState.CURRENT, **shown)
+
+
+def image_files(folder: Path) -> list[Path]:
+    if not folder.is_dir():
+        return []
+    return sorted(path for path in folder.iterdir() if path.suffix.lower() in IMAGE_SUFFIXES)
 
 
 def image_stamps(images: list[Path]) -> dict[str, list[int]]:
@@ -80,7 +103,7 @@ class Trainer:
     def stop(self) -> None:
         if self.running():
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.pid)],
-                           capture_output=True, creationflags=_NO_WINDOW, check=False)
+                           capture_output=True, creationflags=NO_WINDOW, check=False)
 
 
 def start(job: dict, python: Path, trainer: Path, **for_the_program) -> Trainer:
@@ -91,7 +114,7 @@ def start(job: dict, python: Path, trainer: Path, **for_the_program) -> Trainer:
     with open(job["log"], "ab") as log:
         process = subprocess.Popen([str(python), str(trainer), "run", job["job_file"]],
                                    stdout=log, stderr=subprocess.STDOUT,
-                                   creationflags=_IN_THE_BACKGROUND)
+                                   creationflags=IN_THE_BACKGROUND)
     started = Trainer(process.pid, process_started(process.pid), time.time())
     Path(job["process"]).write_text(json.dumps(asdict(started)), encoding="utf-8")
     return started

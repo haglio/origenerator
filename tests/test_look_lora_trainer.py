@@ -5,14 +5,14 @@ import json
 import os
 import subprocess
 import sys
-import time
 import types
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
-from origenerator import card_claim
+from origenerator import card_claim, training_rounds
+from tests.training_machine import AComfyUIJobComesOnceAStateIsSaved, TrainingMachine
 from tools import look_lora_trainer
 
 
@@ -219,45 +219,13 @@ def test_a_cache_program_that_fails_stops_the_training_and_names_the_log(tmp_pat
     assert job["log"] in str(stopped.value)
 
 
-class _Machine:
-    def __init__(self, waiting=(), memory=(), held=(False,), claims=(True,)):
-        self.waiting = list(waiting)
-        self.memory = list(memory)
-        self.held = list(held)
-        self.claims = list(claims)
-        self.unloaded = self.claimed = self.released = 0
-        self.slept: list[float] = []
-
-    def graphics_card_held_by_another(self):
-        return self.held.pop(0) if len(self.held) > 1 else self.held[0]
-
-    def claim_graphics_card(self):
-        self.claimed += 1
-        return self.claims.pop(0) if len(self.claims) > 1 else self.claims[0]
-
-    def release_graphics_card(self):
-        self.released += 1
-
-    def jobs_waiting(self):
-        return self.waiting.pop(0) if len(self.waiting) > 1 else self.waiting[0]
-
-    def unload_comfyui(self):
-        self.unloaded += 1
-
-    def graphics_card_memory_mib(self):
-        return self.memory.pop(0) if len(self.memory) > 1 else self.memory[0]
-
-    def sleep(self, seconds):
-        self.slept.append(seconds)
-
-
 def test_the_tile_is_idle_once_comfyuis_line_has_been_empty_two_minutes_and_its_memory_is_back(
         tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
-    machine = _Machine(waiting=[1, 0, 0, 0, None, 0, 0, 0, 0, 0, 0], memory=[9000, 800])
+    machine = TrainingMachine(waiting=[1, 0, 0, 0, None, 0, 0, 0, 0, 0, 0], memory=[9000, 800])
 
-    look_lora_trainer.wait_for_idle(job, machine)
+    training_rounds.wait_for_idle(job, machine)
 
     assert machine.slept.count(20) == 7
     assert machine.unloaded == 1
@@ -268,9 +236,9 @@ def test_the_tile_is_idle_once_comfyuis_line_has_been_empty_two_minutes_and_its_
 def test_the_tile_is_not_idle_while_another_trainer_holds_it(tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
-    machine = _Machine(waiting=[0], memory=[100], held=[True, True, False])
+    machine = TrainingMachine(waiting=[0], memory=[100], held=[True, True, False])
 
-    look_lora_trainer.wait_for_idle(job, machine)
+    training_rounds.wait_for_idle(job, machine)
 
     assert machine.slept.count(20) == 8
     assert machine.claimed == 1
@@ -279,9 +247,9 @@ def test_the_tile_is_not_idle_while_another_trainer_holds_it(tmp_path):
 def test_a_tile_another_trainer_took_first_is_waited_for_again(tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
-    machine = _Machine(waiting=[0], memory=[100], claims=[False, True])
+    machine = TrainingMachine(waiting=[0], memory=[100], claims=[False, True])
 
-    look_lora_trainer.wait_for_idle(job, machine)
+    training_rounds.wait_for_idle(job, machine)
 
     assert machine.slept.count(20) == 12
     assert machine.claimed == 2
@@ -319,9 +287,9 @@ def test_the_trainer_runs_its_child_below_normal_priority_so_his_generations_com
         flags.append(options["creationflags"])
         return _popen_the_fake(job)(command, **options)
 
-    look_lora_trainer.train(job, _Machine(waiting=[0], memory=[100]), popen=popen, kill=lambda p: None)
+    look_lora_trainer.train(job, TrainingMachine(waiting=[0], memory=[100]), popen=popen, kill=lambda p: None)
 
-    assert flags == [look_lora_trainer._IN_THE_BACKGROUND]
+    assert flags == [training_rounds.IN_THE_BACKGROUND]
     assert flags[0] & _BELOW_NORMAL
 
 
@@ -338,29 +306,13 @@ print("resumed from", args[args.index("--resume") + 1] if "--resume" in args els
 
 def test_a_training_runs_its_steps_under_accelerate_and_says_how_far_it_has_got(tmp_path):
     job = _training_job(tmp_path, _SAVES_A_STATE + "open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')\n")
-    machine = _Machine(waiting=[0], memory=[100])
+    machine = TrainingMachine(waiting=[0], memory=[100])
 
     look_lora_trainer.train(job, machine, popen=_popen_the_fake(job), kill=lambda process: None)
 
     assert Path(job["work"], "output", "Example Look 1.1.safetensors").is_file()
     assert Path(job["work"], "steps_done.txt").read_text() == "50"
     assert _status(job) == {"state": "training", "done": 25, "total": 50}
-
-
-class _AComfyUIJobComesOnceAStateIsSaved(_Machine):
-    def __init__(self, state: Path):
-        super().__init__(waiting=[0], memory=[100])
-        self._state, self._came = state, False
-
-    def jobs_waiting(self):
-        if self._came or not self._state.is_dir():
-            return 0
-        self._came = True
-        return 2
-
-    def sleep(self, seconds):
-        super().sleep(seconds)
-        time.sleep(0.005)
 
 
 def test_a_training_stopped_for_a_comfyui_job_resumes_from_its_newest_state_for_the_steps_left(
@@ -371,7 +323,7 @@ if "--resume" not in args:
 open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')
 ''')
     state = Path(job["work"], "output", "Example Look 1.1-step00000025-state")
-    machine = _AComfyUIJobComesOnceAStateIsSaved(state)
+    machine = AComfyUIJobComesOnceAStateIsSaved(state)
     killed = []
 
     def kill(process):
@@ -390,14 +342,14 @@ def test_a_training_whose_tile_ran_out_of_memory_says_so(tmp_path):
     job = _training_job(tmp_path, "import sys\nprint('torch.OutOfMemoryError: CUDA out of memory')\nsys.exit(1)\n")
 
     with pytest.raises(look_lora_trainer.Stopped) as stopped:
-        look_lora_trainer.train(job, _Machine(waiting=[0], memory=[100]), popen=_popen_the_fake(job), kill=lambda p: None)
+        look_lora_trainer.train(job, TrainingMachine(waiting=[0], memory=[100]), popen=_popen_the_fake(job), kill=lambda p: None)
 
     assert "graphics card ran out of memory" in str(stopped.value)
 
 
 def test_a_training_that_keeps_breaking_gives_up_after_twelve_tries_and_names_the_log(tmp_path):
     job = _training_job(tmp_path, "import sys\nprint('ValueError: bad option')\nsys.exit(1)\n")
-    machine = _Machine(waiting=[0], memory=[100])
+    machine = TrainingMachine(waiting=[0], memory=[100])
 
     with pytest.raises(look_lora_trainer.Stopped) as stopped:
         look_lora_trainer.train(job, machine, popen=_popen_the_fake(job), kill=lambda p: None)

@@ -34,7 +34,6 @@ class TrainingRun(QObject):
         self._job = job
         self._queue = queue
         self._kind = kind
-        self.holds_the_line = kind.HOLDS_THE_LINE
         self.reveal = reveal
         self._trainer = None
         self._status: dict = {"state": kind.FIRST_STATE}
@@ -66,8 +65,7 @@ class TrainingRun(QObject):
 
     def begin(self) -> None:
         self._watch()
-        self.progress.emit("Waiting")
-        self._look()
+        self._start()
 
     def adopt(self, trainer) -> None:
         self._trainer = trainer
@@ -80,13 +78,6 @@ class TrainingRun(QObject):
         self._timer.start(POLL_MS)
 
     def _look(self) -> None:
-        if self._trainer is None:
-            if self.holds_the_line:
-                if self._queue.making_something():
-                    return
-                self._queue.free_comfyui_memory()
-            self._start()
-            return
         alive = self._trainer.running()
         status = self._status = lora_training.read_status(self._job) or self._status
         if not alive:

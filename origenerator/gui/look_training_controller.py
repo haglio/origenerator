@@ -8,9 +8,6 @@ from origenerator import config, look_training, lora_training
 from origenerator.gui.lora_offers import trashed
 from origenerator.gui.training_run import TrainingRun
 
-NO_PROGRAM = ("No training program is set up: content.local.json names no "
-              "krea2_training_python and krea2_training_scripts.")
-
 
 class LookTrainingController:
     def __init__(self, jobs, *, info_tabs_of: Callable[[], object], parent, trash=trashed):
@@ -36,14 +33,13 @@ class LookTrainingController:
         base = look_training.trainable_base_of(tab.lora_value(key))
         if self._training is not None or base is None:
             return
-        if config.KREA2_TRAINING_PYTHON is None or config.KREA2_TRAINING_SCRIPTS is None:
-            QMessageBox.information(self._parent, "Train", NO_PROGRAM)
-            return
         folder = look_training.images_folder(base)
-        folder.mkdir(parents=True, exist_ok=True)
-        if not look_training.image_files(folder):
-            QMessageBox.information(self._parent, "Train",
-                                    f"Put images of {base} in {folder}, then press Train again.")
+        refusal = lora_training.why_it_cannot_train(
+            (config.KREA2_TRAINING_PYTHON, config.KREA2_TRAINING_SCRIPTS),
+            ("krea2_training_python", "krea2_training_scripts"), base,
+            folder, bool(lora_training.image_files(folder)))
+        if refusal is not None:
+            QMessageBox.information(self._parent, "Train", refusal)
             return
         self._watch(look_training.training_job(base), tab, key).begin()
 

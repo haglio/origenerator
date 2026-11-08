@@ -58,15 +58,6 @@ def test_a_lora_of_another_family_than_the_entrys_base_model_is_no_version_of_it
     assert look_training.training_job("Example Look")["output_name"] == "Example Look 1.1"
 
 
-def test_only_images_in_the_folder_are_trained_on_whatever_their_kind(tmp_path):
-    for name in ("b.jpg", "a.PNG", "c.webp", "d.avif", "e.gif", "notes.txt", "f.mp4"):
-        (tmp_path / name).write_bytes(b"")
-
-    assert [path.name for path in look_training.image_files(tmp_path)] == [
-        "a.PNG", "b.jpg", "c.webp", "d.avif", "e.gif"]
-    assert look_training.image_files(tmp_path / "not made yet") == []
-
-
 def test_a_look_is_out_of_date_until_a_training_keeps_its_images_then_current_until_one_changes(
         monkeypatch, tmp_path, installed_models, titled_models, worded_loras):
     folder = _trainable(monkeypatch, tmp_path)

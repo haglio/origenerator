@@ -11,9 +11,8 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, detector_for_part
 
 TRAINER = lora_training.TRAINERS / "fix_lora_trainer.py"
-HOLDS_THE_LINE = True
 FIRST_STATE = "cropping"
-_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+SAVE_EVERY = 100
 
 
 def images_folder(part) -> Path:
@@ -24,18 +23,12 @@ def shared_images_folder() -> Path:
     return config.FIX_IMAGES_DIR / "shared"
 
 
-def image_files(folder: Path) -> list[Path]:
-    if not folder.is_dir():
-        return []
-    return sorted(path for path in folder.iterdir() if path.suffix.lower() in _IMAGE_SUFFIXES)
-
-
 def training_folders(part) -> list[Path]:
     return [images_folder(part)] + ([shared_images_folder()] if part.shared_images else [])
 
 
 def training_images(part) -> list[Path]:
-    return [image for folder in training_folders(part) for image in image_files(folder)]
+    return [image for folder in training_folders(part) for image in lora_training.image_files(folder)]
 
 
 def image_stamps(part) -> dict[str, list[int]]:
@@ -51,17 +44,14 @@ def training_state(part) -> TrainingState:
 
 
 def train_tooltip(part) -> str:
-    folders = (f"{part.name.lower()}, and in fixes\\shared," if part.shared_images
-               else f"{part.name.lower()},")
-    return ("Trains this fix a LoRA from the images in the library's "
-            f"app_data\\origenerator\\fixes\\{folders} each cropped down to the part by the "
-            "fix's own detector. Nothing generates while it trains.")
+    return lora_training.train_tooltip(fix_title_base(part.name), training_folders(part),
+                                       ", each cropped down to the part by the fix's own detector")
 
 
 def training_offer(part, lora) -> TrainingOffer:
     folder = images_folder(part)
     return lora_training.offer(training_state(part), tooltip=train_tooltip(part),
-                               images=len(image_files(folder)), folder=folder,
+                               images=len(lora_training.image_files(folder)), folder=folder,
                                trash_tooltip=trash_tooltip(lora))
 
 
@@ -89,7 +79,9 @@ def training_job(part, checkpoint: str) -> dict:
         "caption": f"close-up photo of {part.name}",
         "base_model": str(models / "checkpoints" / checkpoint),
         "sd_scripts": str(config.LORA_TRAINING_SCRIPTS),
-        "output_dir": str(models / "loras" / FIX_LORA_FOLDER),
+        "lora_folder": str(models / "loras" / FIX_LORA_FOLDER),
+        "save_every": SAVE_EVERY,
+        "comfyui": f"http://{config.COMFYUI_HOST}:{config.COMFYUI_PORT}",
         "output_name": output_name,
         "lora": str(PureWindowsPath(FIX_LORA_FOLDER) / f"{output_name}.safetensors"),
         "display_name": f"{fix_title_base(part.name)} {version}",

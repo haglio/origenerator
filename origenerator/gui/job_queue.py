@@ -147,17 +147,8 @@ class JobQueue(QObject):
     def training(self):
         return self._training
 
-    def _training_holds_the_line(self) -> bool:
-        return self._training is not None and self._training.holds_the_line
-
-    def training_holds_the_machine(self) -> bool:
-        return self._training_holds_the_line() and self._training.running
-
     def making_something(self) -> bool:
         return bool(self._on_server) or self._in_flight is not None
-
-    def free_comfyui_memory(self) -> None:
-        self._client.free_memory()
 
     @property
     def jobs(self) -> dict:
@@ -346,7 +337,7 @@ class JobQueue(QObject):
 
     def _free_for_the_next_job(self) -> bool:
         return not (self._on_server or self._in_flight is not None
-                    or self._training_holds_the_line() or self.model_hold
+                    or self.model_hold
                     or self._awaiting_comfyui)
 
     def _wait_at_the_front(self) -> float:
@@ -424,10 +415,6 @@ class JobQueue(QObject):
 
     def flush_to_server(self) -> int:
         self.close()
-        if self.training_holds_the_machine():
-            logger.info("Left %d queued job(s) for the next launch: a fix's training holds "
-                        "the graphics card", len(self._waiting))
-            return 0
         handed = 0
         for job in list(self._waiting):
             if queue_line.waits_for_any(job, self.all_jobs):

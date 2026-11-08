@@ -554,25 +554,21 @@ is the two hooks that call the guard, below.
   what pyproject declares, and the voice's torch is not the app's to declare.
   `GenerationJob.start` runs it before a job with lines is submitted.
 - `tools/fix_lora_trainer.py` — trains a fix's LoRA in two steps, each run by
-  path under the Python that can do it. `crop` cuts each photo in that fix's
-  folder under `app_data\origenerator\fix photos` down to the part with the
+  path under the Python that can do it. `crop` cuts each image in that fix's
+  folder under `app_data\origenerator\fixes` down to the part with the
   fix's own detector, under the Python ComfyUI runs on, which ComfyUIApp's
   launcher names (`comfyui_python()`): that is the one environment certain to
   read every detector a fix uses, since a fix's detector is ComfyUI's model,
   and a copy of ultralytics anywhere else falls out of step with it -- the training
   environment's could not read a newer detector on 2026-10-21, and the training
-  died before it touched a photo. `run` is the whole training, started by the
+  died before it touched an image. `run` is the whole training, started by the
   Train button under the `lora_training_python` the overlay names (sd-scripts'
-  pins are not this app's to declare, the same reason as the voice's): it starts
-  `crop`, then runs kohya's sd-scripts on the crops into ComfyUI's `loras\fixes`.
-  Both print into the run's `training.log` and leave their word, a failure's
-  reason included, in its `status.json`; `process.json` names the program, so
-  any launch can tell a training still running from one that ended. A training
-  goes on when the app closes, as a run in ComfyUI does: nothing is handed to
-  ComfyUI while it runs (on 2026-10-21 a close handed ComfyUI the line a training
-  held, the two fought over the graphics card and the training ran out of
-  memory), the next launch holds the line for it again, and the watcher left at
-  closing announces its end.
+  pins are not this app's to declare, the same reason as the voice's): it waits
+  for the card, starts `crop`, then runs kohya's sd-scripts on the crops in
+  rounds, as the look trainer runs musubi, and installs the result in ComfyUI's
+  `loras\fixes`, never over a file. A resumed round passes
+  `--skip_until_initial_step`, so sd-scripts carries on its own step count and
+  its cosine learning rate from the saved state.
 - `tools/look_lora_trainer.py` — trains the next version of a look LoRA on
   Krea 2 with musubi-tuner, under the `krea2_training_python` the overlay
   names (musubi's pins are not this app's either), from the Train button beside
@@ -585,15 +581,24 @@ is the two hooks that call the guard, below.
   training; `dataset` puts the recorded trigger words in front of every
   description, the words the entry's `trigger_words` names (a version's own
   recorded words only when the entry names none); `cache` and `train` run
-  musubi's own programs, the training only while ComfyUI's line has been
-  empty two minutes and the card's memory is back, stopped the moment ComfyUI
-  has a job and resumed from its newest saved state, since his own
-  generations come first (his rule); `install` copies the result beside the
-  newest version as `<base> <version>` and never over a file. It works in
-  `state/lora training/<base>`, outside the library, because pCloud turns a
-  state rewritten every 25 steps into conflicted copies. It prints counts,
-  never a description or an image's name. The queue only watches this
-  training (`TrainingRun.holds_the_line`), where a fix's holds it.
+  musubi's own programs; `install` copies the result beside the newest version
+  as `<base> <version>` and never over a file. It prints counts, never a
+  description or an image's name.
+- `origenerator/training_rounds.py` — what both trainers share, imported by
+  path under their own Pythons, so it uses the standard library alone: a
+  training runs only while ComfyUI's line has been empty two minutes and the
+  card's memory is back, is stopped the moment ComfyUI has a job and resumes
+  from its newest saved state, since his own generations come first (his
+  rule; on 2026-10-21 a fix's training and ComfyUI fought over the card and
+  the training ran out of memory); the result is installed beside its
+  versions, and each step leaves its word, a failure's reason included, in the
+  run's `status.json`, with `process.json` naming the program, so any launch
+  can tell a training still running from one that ended. Both kinds work in
+  `state/` (`fix training/<part>`, `lora training/<base>`), outside the
+  library, because pCloud turns a state rewritten every few minutes into
+  conflicted copies. A training goes on when the app closes, the queue hands
+  ComfyUI its jobs while one runs, and the watcher left at closing announces
+  its end.
 - `tools/card_claim.py` — the command for the one claim on the graphics card (`origenerator/card_claim.py`), the file
   `~/.haglio/graphics_card_claim.json` naming who holds it and its Windows
   pid. Both trainers take it before they use the card and let go when they

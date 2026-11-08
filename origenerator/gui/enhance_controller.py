@@ -123,16 +123,12 @@ class EnhanceController:
         if self._training is not None:
             return
         part = part_named(name)
-        folder = fix_training.images_folder(part)
-        folder.mkdir(parents=True, exist_ok=True)
-        if not fix_training.training_images(part):
-            QMessageBox.information(self.pane, "Train",
-                                    f"Put images of {name} in {folder}, then press Train again.")
-            return
-        if config.LORA_TRAINING_PYTHON is None or config.LORA_TRAINING_SCRIPTS is None:
-            QMessageBox.information(
-                self.pane, "Train", "No training program is set up: content.local.json "
-                "names no lora_training_python and lora_training_scripts.")
+        refusal = lora_training.why_it_cannot_train(
+            (config.LORA_TRAINING_PYTHON, config.LORA_TRAINING_SCRIPTS),
+            ("lora_training_python", "lora_training_scripts"), name,
+            fix_training.images_folder(part), bool(fix_training.training_images(part)))
+        if refusal is not None:
+            QMessageBox.information(self.pane, "Train", refusal)
             return
         job = fix_training.training_job(part,
                                         fix_training.model_to_train_for(self._settings.params))

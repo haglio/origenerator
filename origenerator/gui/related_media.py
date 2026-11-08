@@ -28,6 +28,10 @@ def _is_request(record: dict | None) -> bool:
     return bool(words_of(record))
 
 
+ANIMATIONS = "Animations"
+STARTING_FRAME_ANIMATED_IN = "Starting frame animated in"
+
+
 class _Links(CollapsibleSection):
     activated = pyqtSignal(str)
 
@@ -92,7 +96,7 @@ class RelatedMedia(QWidget):
         self._modifications_section = _Links("Modifications")
         self._animations = Animations()
         self._animations.video_activated.connect(self.link_clicked)
-        self._animations_section = CollapsibleSection("Animations")
+        self._animations_section = CollapsibleSection(ANIMATIONS)
         self._animations_section.content_form().addRow(self._animations)
         self._animations_section.hide()
         self._combine_section = _Links("Combine")
@@ -132,8 +136,9 @@ class RelatedMedia(QWidget):
             not (self._source_tile.isHidden() and self._source_video_tile.isHidden()))
         self.show_requests_and_modifications(row.get("prompt_id"))
         items = self._animated_items(row, start_image_of, videos)
-        self._animations.set_heading("Starting frame animated in"
-                                     if media_type_of_row(row) == MediaType.VIDEO else "")
+        self._animations_section.show_title(STARTING_FRAME_ANIMATED_IN
+                                            if media_type_of_row(row) == MediaType.VIDEO
+                                            else ANIMATIONS)
         self._animations.show_videos(items, in_trash=self._trashed())
         self._animations_section.setVisible(not self._animations.isHidden())
         self._show_videos_made_from(row.get("prompt_id"), videos)

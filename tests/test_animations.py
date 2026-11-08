@@ -46,11 +46,3 @@ def test_the_previews_sit_right_under_the_animations_title_with_no_heading_betwe
     assert [label.text() for label in animations.findChildren(QLabel) if label.text()] == []
 
 
-def test_a_heading_shows_only_while_a_video_names_what_its_starting_frame_became(qtbot):
-    animations = Animations()
-    qtbot.addWidget(animations)
-    animations.show_videos([("v1", None, None)])
-    animations.set_heading("Starting frame animated in")
-    shown = animations._heading.text() if not animations._heading.isHidden() else None
-    animations.set_heading("")
-    assert (shown, animations._heading.isHidden()) == ("Starting frame animated in", True)

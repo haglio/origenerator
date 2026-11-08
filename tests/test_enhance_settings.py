@@ -285,10 +285,11 @@ def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
     assert version.file["filename"] == "sdxl_t2i_src.png"
 
 
-def test_a_video_lists_no_versions():
+def test_a_video_nothing_upscaled_lists_itself_as_its_original():
     video = dict(_source_row(), output_files=json.dumps(
         [{"filename": "wan_00001.mp4", "subfolder": "video", "type": "output"}]))
-    assert displayed_versions(video) == []
+    assert [(version.label, version.file["filename"]) for version in displayed_versions(video)] == [
+        ("Original", "wan_00001.mp4")]
 
 
 def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video_itself(tmp_path):

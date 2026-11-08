@@ -227,8 +227,9 @@ class LibrarySnapshot:
         resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
                     if media_type == MediaType.VIDEO else None)
         upscale = self.upscales.upscale_of(resolved[0]) if resolved is not None else None
-        versions = (gallery.displayed_versions(row, upscale)
-                    or self._beside_its_original(resolved))
+        versions = gallery.displayed_versions(row, upscale)
+        if len(versions) <= 1:
+            versions = self._beside_its_original(resolved)
         if len(versions) <= 1:
             return None
         framed_together = parts_framed_together()

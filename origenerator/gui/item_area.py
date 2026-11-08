@@ -42,6 +42,6 @@ class ItemArea(QObject):
         if whole:
             self._sharing = True
             try:
-                self._splitter.setSizes([whole - whole // 3, whole // 3])
+                self._splitter.setSizes([whole - whole // 2, whole // 2])
             finally:
                 self._sharing = False

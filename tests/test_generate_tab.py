@@ -200,15 +200,20 @@ def test_the_border_under_generate_wears_the_gray_of_the_one_above_it(app_chrome
     assert gray(tab._settings_border) == gray(tab._media_split.handle(1))
 
 
-def test_the_preview_and_the_settings_share_the_column_by_what_each_asks_for(tab):
+def test_a_new_tab_gives_the_preview_a_third_and_the_settings_and_metadata_a_third_each(
+        saved_panel):
+    tab, db = saved_panel
+    tab.resize(700, 1200)
     tab.show()
-    tab.resize(700, 1000)
+    QApplication.processEvents()
+    image = _image_row(db)
+    tab.show_saved_generation(image, [image])
     QApplication.processEvents()
 
-    split = tab._media_split
-    asked = [split.widget(i).sizeHint().height() for i in range(2)]
-    given = split.sizes()
-    assert given[0] / sum(given) == pytest.approx(asked[0] / sum(asked), abs=0.01)
+    preview, rest = tab._media_split.sizes()
+    settings, item = tab._settings_split.sizes()
+    assert abs(rest - 2 * preview) <= 2
+    assert abs(settings - item) <= 2
 
 
 def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(tab):
@@ -474,20 +479,6 @@ def test_every_sections_labels_end_at_one_right_edge(app_chrome, installed_model
     edges = {cell.mapTo(tab, QPoint(cell.width(), 0)).x()
              for cell in tab.findChildren(LabelCell) if cell.isVisibleTo(tab)}
     assert len(edges) == 1
-
-
-def test_a_shown_item_takes_a_third_of_the_pane_and_leaves_the_settings_two(saved_panel):
-    tab, db = saved_panel
-    tab.resize(480, 1400)
-    tab.show()
-    QApplication.processEvents()
-
-    image = _image_row(db)
-    tab.show_saved_generation(image, [image])
-    QApplication.processEvents()
-
-    settings, item = tab._settings_split.sizes()
-    assert abs(settings - 2 * item) <= 2
 
 
 def test_the_metadata_leads_the_items_area_with_its_related_media_below(tab):
@@ -1849,13 +1840,6 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_pan
     assert tab._versions._host.findChildren(_AddRow)
 
 
-def test_a_video_has_no_version_strip(saved_panel):
-    tab, db = saved_panel
-    video = _video_row(db, "vid1")
-    tab.show_saved_generation(video, [])
-    assert tab._versions.isHidden()
-
-
 def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     output = tmp_path / "out"
     video = output / "video" / f"{prompt_id}.mp4"
@@ -2151,19 +2135,6 @@ def test_the_tab_watches_no_run_of_its_own(tab):
     assert tab._generate_btn.text() == "Generate"
     assert not hasattr(tab, "_on_progress")
     assert not hasattr(tab, "_generating_prompt_id")
-
-
-def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
-    tab, db = saved_panel
-    video = _video_row(db, "vid1")
-
-    tab.show_saved_generation(video, [])
-
-    assert not tab._metadata_section.isHidden()
-    texts = _metadata_texts(tab)
-    assert "video/vid1.mp4" in texts
-    assert "completed" not in texts
-    assert "generated" not in texts
 
 
 def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
@@ -2527,8 +2498,6 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     actions = tab._action.form().parentWidget().findChild(
         QWidget, action_pills(MediaType.IMAGE)).parentWidget()
     assert name.content().isAncestorOf(actions)
-    created = next(label for label in name.findChildren(QLabel) if label.text() == "Created")
-    assert corner(actions).y() > corner(created).y()
 
 
 def _message(tab):
@@ -4874,3 +4843,14 @@ def test_generate_is_gray_beside_an_item_whose_settings_were_lost_and_says_why(s
 
     assert not tab._generate_pair.isEnabled()
     assert tab._generate_btn.toolTip() == _LOST
+
+
+def test_a_videos_file_and_created_are_listed_under_enhancements_never_metadata(saved_panel):
+    tab, db = saved_panel
+    video = _video_row(db, input_image="sdxl_img1.png")
+
+    tab.show_saved_generation(video, [_image_row(db)])
+
+    (original,) = _version_rows(tab)
+    assert (original._title.text(), "video/vid1.mp4" in _row_texts(original)) == ("Original", True)
+    assert {"File", "Created"}.isdisjoint(_shown_metadata(tab))

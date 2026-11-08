@@ -10,7 +10,7 @@ from typing import NamedTuple
 from app_support.media_renditions import original_rendition
 
 from origenerator import gallery, points_of_interest, trash_collection
-from origenerator.config import EVOLVER_AI_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR, OUTPUT_PLACES
+from origenerator.config import EVOLVER_AI_DIR, EVOLVER_SOURCE, KINO_UPSCALES_DIR, OUTPUT_PLACES
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
@@ -163,7 +163,7 @@ class LibrarySnapshot:
 
     @cached_property
     def upscales(self) -> EvolverUpscales:
-        return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
+        return EvolverUpscales.scan(KINO_UPSCALES_DIR, EVOLVER_SOURCE)
 
     def slides_of(self, rows) -> list[tuple]:
         with one_look():

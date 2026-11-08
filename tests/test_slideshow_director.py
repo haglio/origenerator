@@ -1297,7 +1297,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
     monkeypatch.setattr(library_views, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
-    monkeypatch.setattr(library_views, "EVOLVER_UPSCALED_DIR", library)
+    monkeypatch.setattr(library_views, "KINO_UPSCALES_DIR", library)
     return _row("g1", files=("clip.mp4",)), video, upscale
 
 

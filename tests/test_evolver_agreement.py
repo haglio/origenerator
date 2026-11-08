@@ -8,35 +8,29 @@ from app_support import haglio_settings
 from origenerator import config, evolver_agreement, evolver_export
 
 AGREED_INBOX = "videos/videos/2D/AI/0_inbox"
-AGREED_UPSCALED = "videos/videos/2D/AI/2_outbox/upscaled_by_orientation"
-AGREED_TRASH = "videos/videos/2D/AI/2_outbox/trash"
 AGREED_MARKER = ".partial."
 
 
-def _evolver(root: Path, *, inbox=AGREED_INBOX, upscaled=AGREED_UPSCALED,
-             marker=AGREED_MARKER, trash=AGREED_TRASH) -> Path:
+def _evolver(root: Path, *, inbox=AGREED_INBOX, marker=AGREED_MARKER) -> Path:
     checkout = root / "evolver"
     checkout.mkdir(parents=True, exist_ok=True)
     (checkout / "evolver_contract.json").write_text(json.dumps({
-        "library_relative": {"inbox_dir": inbox, "upscaled_dir": upscaled, "trash_dir": trash},
+        "library_relative": {"inbox_dir": inbox},
         "partial_marker": marker,
     }), encoding="utf-8")
     return checkout
 
 
-def _ours(*, library=Path("L:/library"), inbox_dir=None, upscaled_dir=None,
-          marker=AGREED_MARKER):
+def _ours(*, library=Path("L:/library"), inbox_dir=None, marker=AGREED_MARKER):
     return evolver_agreement.OurSide(
         library_root=library,
         inbox_dir=inbox_dir if inbox_dir is not None else library / Path(AGREED_INBOX),
-        upscaled_dir=upscaled_dir if upscaled_dir is not None else library / Path(AGREED_UPSCALED),
-        kino_trash=library / Path(AGREED_TRASH),
         partial_marker=marker,
     )
 
 
 class TestWhenEvolverIsBeside:
-    def test_three_values_agreeing_is_nothing_to_say(self, tmp_path: Path):
+    def test_both_values_agreeing_is_nothing_to_say(self, tmp_path: Path):
         checkout = _evolver(tmp_path)
 
         assert evolver_agreement.disagreements(_ours(), checkout) == ()
@@ -50,22 +44,6 @@ class TestWhenEvolverIsBeside:
         assert "0_intake" in said[0]
         assert "0_inbox" in said[0]
 
-    def test_a_renamed_upscale_folder_is_named_too(self, tmp_path: Path):
-        checkout = _evolver(tmp_path, upscaled="videos/videos/2D/AI/2_outbox/by_shape")
-
-        said = evolver_agreement.disagreements(_ours(), checkout)
-
-        assert len(said) == 1
-        assert "by_shape" in said[0]
-
-    def test_a_renamed_trash_folder_is_named_too(self, tmp_path: Path):
-        checkout = _evolver(tmp_path, trash="videos/videos/2D/AI/2_outbox/bin")
-
-        said = evolver_agreement.disagreements(_ours(), checkout)
-
-        assert len(said) == 1
-        assert "bin" in said[0]
-
     def test_a_marker_that_moved_is_a_half_written_clip_ingested(self, tmp_path: Path):
         checkout = _evolver(tmp_path, marker=".writing.")
 
@@ -76,9 +54,9 @@ class TestWhenEvolverIsBeside:
         assert ".partial." in said[0]
 
     def test_every_disagreement_is_reported_at_once(self, tmp_path: Path):
-        checkout = _evolver(tmp_path, inbox="a", upscaled="b", marker="c", trash="d")
+        checkout = _evolver(tmp_path, inbox="a", marker="c")
 
-        assert len(evolver_agreement.disagreements(_ours(), checkout)) == 4
+        assert len(evolver_agreement.disagreements(_ours(), checkout)) == 2
 
 
 class TestWhenThereIsNoEvolver:
@@ -122,8 +100,6 @@ class TestWhatTheAppCompares:
         ours = evolver_agreement.our_side()
 
         assert ours.inbox_dir == config.EVOLVER_INBOX_DIR
-        assert ours.upscaled_dir == config.EVOLVER_UPSCALED_DIR
-        assert ours.kino_trash == config.KINO_TRASH_DIR
         assert ours.library_root == config.LIBRARY_ROOT
 
     def test_the_lane_folder_is_the_one_all_of_haglio_shares(self):

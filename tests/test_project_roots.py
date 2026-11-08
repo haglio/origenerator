@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app_support import haglio_settings
 
 from origenerator import config, osr2
@@ -66,7 +68,7 @@ class TestTheValuesAnotherAppHoldsToo:
             config.LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox")
         assert config.EVOLVER_SOURCE == "origenerator"
 
-    def test_evolver_files_its_upscales_under_this_exact_tree(self):
-        assert config.EVOLVER_UPSCALED_DIR == (
-            config.LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            / "upscaled_by_orientation")
+    def test_evolver_files_its_upscales_in_the_kino_folder_all_of_haglio_shares(self):
+        kino = Path(haglio_settings.value("kino_dir"))
+
+        assert (kino / "2D" / "AI", kino / "trash") == (config.KINO_UPSCALES_DIR, config.KINO_TRASH_DIR)

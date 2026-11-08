@@ -21,9 +21,7 @@ def _promise() -> dict:
 
 def test_the_folders_this_app_sends_to_are_the_ones_evolver_watches():
     relative = _promise()["library_relative"]
-    sent_to = {"inbox_dir": config.EVOLVER_INBOX_DIR,
-               "upscaled_dir": config.EVOLVER_UPSCALED_DIR,
-               "trash_dir": config.KINO_TRASH_DIR}
+    sent_to = {"inbox_dir": config.EVOLVER_INBOX_DIR}
 
     watched = {name: config.LIBRARY_ROOT / Path(relative[name])
                for name in sent_to if name in relative}
@@ -55,8 +53,7 @@ def test_a_star_this_app_journals_is_a_line_evolver_carries_into_fun_times_favor
 
 
 def _another_sources_video(promise: dict) -> tuple[Path, dict]:
-    video = (config.LIBRARY_ROOT / Path(promise["library_relative"]["upscaled_dir"])
-             / "portrait" / "a-site" / "c1_topaz.mp4")
+    video = config.KINO_UPSCALES_DIR / "portrait" / "a-site" / "c1_topaz.mp4"
     row = {"prompt_id": "c1", "source": GenerationSource.OUTSIDE,
            "output_files": json.dumps([{"filename": video.name, "library_path": str(video)}])}
     return video, row

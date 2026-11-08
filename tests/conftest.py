@@ -336,7 +336,7 @@ def _never_name_this_app_to_the_real_windows(monkeypatch, _this_tests_own_folder
 @pytest.fixture(autouse=True)
 def _never_take_a_video_out_of_the_real_kino(monkeypatch, _this_tests_own_folder):
     kino = _this_tests_own_folder / "kino"
-    monkeypatch.setattr(gallery_view, "EVOLVER_UPSCALED_DIR", kino / "upscaled_by_orientation")
+    monkeypatch.setattr(gallery_view, "KINO_UPSCALES_DIR", kino / "2D" / "AI")
     monkeypatch.setattr(gallery_view, "KINO_TRASH_DIR", kino / "trash")
 
 

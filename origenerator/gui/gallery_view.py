@@ -34,8 +34,8 @@ from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
     EVOLVER_SOURCE,
-    EVOLVER_UPSCALED_DIR,
     KINO_TRASH_DIR,
+    KINO_UPSCALES_DIR,
     OUTPUT_PLACES,
     THUMB_DIR,
     TRASH_DIR,
@@ -309,7 +309,7 @@ class GalleryView(QWidget):
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=self._enhance.cancel_for_delete,
-                kino=Kino(EVOLVER_UPSCALED_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE),
+                kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE),
             ),
         )
         self._foreign_queue = ForeignQueue(running=[], pending=[])

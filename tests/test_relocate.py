@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
 
 from app_support.funscript import read_actions
@@ -16,7 +15,7 @@ from origenerator.funscript import (
 from origenerator.gallery import output_file_path, resolve_preview
 from origenerator.importer import import_comfyui_output
 from origenerator.output_places import OutputPlaces
-from origenerator.relocate import follow_kinos_upscales_out_of_2_outbox, relocate_moved_outputs
+from origenerator.relocate import relocate_moved_outputs
 
 
 def _library(tmp_path, rows):
@@ -231,48 +230,3 @@ def test_the_enhance_history_names_files_by_name_alone_so_a_move_leaves_it_as_it
 
     assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
     assert _row(db, "a")["enhance_history"] == history
-
-
-class TestKinosUpscalesLeavingTheRetiredOutbox:
-    LIBRARY = Path("L:/library")
-    KINO = LIBRARY / "videos" / "videos" / "kino"
-    OUTBOX = LIBRARY / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-
-    def _following(self, _monkeypatch):
-        return lambda db: follow_kinos_upscales_out_of_2_outbox(db, self.LIBRARY, self.KINO)
-
-    def test_an_outside_videos_library_path_is_followed_into_kinos_folder(self, tmp_path, monkeypatch):
-        old = self.OUTBOX / "upscaled_by_orientation" / "portrait" / "a-site" / "c1_topaz.mp4"
-        db, _ = _library(tmp_path, {"o1": [{"filename": old.name, "library_path": str(old)}]})
-
-        assert self._following(monkeypatch)(db) == 1
-
-        assert _files(db, "o1") == [{"filename": old.name, "library_path": str(
-            self.KINO / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.mp4")}]
-
-    def test_a_trashed_rows_path_and_the_trash_it_was_sent_to_are_followed_too(self, tmp_path, monkeypatch):
-        old = self.OUTBOX / "upscaled_by_orientation" / "portrait" / "a-site" / "c2_topaz.mp4"
-        held = self.OUTBOX / "trash" / "c2_topaz.mp4"
-        db, _ = _library(tmp_path, {})
-        db.record_trashed("o2", {"prompt_id": "o2", "output_files": json.dumps(
-            [{"filename": old.name, "library_path": str(old)}])},
-            {"moves": [], "subdir": None, "sent_to_kino_trash": [[str(old), str(held)]]})
-
-        self._following(monkeypatch)(db)
-
-        now = self.KINO / "2D" / "AI" / "portrait" / "a-site" / "c2_topaz.mp4"
-        assert db.trashed_library_paths() == {str(now)}
-        [batch] = _raw_batches(tmp_path / "test.db")
-        assert batch["sent_to_kino_trash"] == [[str(now), str(self.KINO / "trash" / "c2_topaz.mp4")]]
-
-    def test_a_path_anywhere_else_is_left_as_it_is(self, tmp_path, monkeypatch):
-        files = [{"filename": "a.png", "subfolder": "image", "type": "output"}]
-        db, _ = _library(tmp_path, {"g1": files})
-
-        assert self._following(monkeypatch)(db) == 0
-        assert _files(db, "g1") == files
-
-
-def _raw_batches(db_file):
-    with sqlite3.connect(db_file) as conn:
-        return [json.loads(batch) for (batch,) in conn.execute("SELECT batch_json FROM deletions")]

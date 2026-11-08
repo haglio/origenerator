@@ -31,8 +31,10 @@ from origenerator.gui.message import (
     set_marked_text,
     time_to_read_ms,
 )
+from origenerator.gui.open_setters import ForTheSetter, OpenSetters
 from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.voice_wiring import VoiceSources, VoiceSwitches
+from origenerator.setter_voice import setter_phrases
 from origenerator.voice.app_commands import (
     AUTO_SWITCH as _AUTO,
 )
@@ -137,11 +139,13 @@ class VoiceRouter(QObject):
         self._slideshows = sources.slideshows
         self._client = sources.client
         self._starting = sources.starting
+        self._setters = sources.setters if sources.setters is not None else OpenSetters()
         self.listener = CommandAndRequestListener(
             command_matcher=match_voice_command,
-            bare_matcher=shaped_app_command,
+            bare_matcher=self._bare_command,
             dictation=RequestDictation(),
-            phrases=Phrases(spoken_phrases(), phrases_heard_only_outright(), said_in),
+            phrases=Phrases(spoken_phrases() | setter_phrases(), phrases_heard_only_outright(),
+                            said_in),
         )
         self.listener.heard.connect(self._on_heard)
         self.listener.error.connect(self._on_error)
@@ -250,11 +254,16 @@ class VoiceRouter(QObject):
         self._show(message, transient=True)
         self._slideshows.note_voice_command(message, kind=kind)
 
+    def _bare_command(self, text: str):
+        return ForTheSetter(text) if self._setters.knows(text) else shaped_app_command(text)
+
     def run_spoken_command(self, text: str, said_at: float | None = None) -> bool:
         shape, rest = split_shape(text)
         spoken = self.listener.push_dictation(rest, spoken_at=said_at)
         if spoken is not None:
             self.on_spoken_request(spoken, shape=shape)
+            return True
+        if self._setters.hear(text):
             return True
         bare = self.listener.bare_command(text)
         if bare is not None:
@@ -269,7 +278,9 @@ class VoiceRouter(QObject):
         return True
 
     def on_command(self, matched, said_at: float | None = None) -> None:
-        if isinstance(matched, CollectionCommand):
+        if isinstance(matched, ForTheSetter):
+            self._setters.hear(matched.text)
+        elif isinstance(matched, CollectionCommand):
             self._slideshows.play_collection(matched)
         elif isinstance(matched, SlideshowControl):
             self._slideshows.run_slideshow_command(matched.command, matched.shape)

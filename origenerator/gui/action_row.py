@@ -111,6 +111,7 @@ class ActionRow(QWidget):
                  actions: dict[str, tuple[str, ...]] | None = None, open_setter=the_setter_tool):
         super().__init__()
         self._open_setter = open_setter
+        self._setter_host = None
         self._windows: dict[str, QWidget] = {}
         sides = (MediaType.IMAGE, MediaType.VIDEO)
         if checkboxes is None or actions is None:
@@ -156,6 +157,9 @@ class ActionRow(QWidget):
         for side in self._sides.values():
             self._form.setRowVisible(side, False)
 
+    def set_setter_host(self, host) -> None:
+        self._setter_host = host
+
     def heard(self, prompt_id: str, side: str, labels: Labels | None) -> None:
         if self._sides[side].shows(prompt_id):
             self._sides[side].relabel(labels or Labels())
@@ -166,6 +170,6 @@ class ActionRow(QWidget):
             open_now.raise_()
             open_now.activateWindow()
             return
-        built = self._open_setter(side, prompt_id, heard=self.heard)
+        built = self._open_setter(side, prompt_id, heard=self.heard, host=self._setter_host)
         if not show_or_say("Action setter tool", built, parent=self):
             self._windows[side] = built

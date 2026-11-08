@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QFontMetrics,
     QIcon,
@@ -34,6 +34,7 @@ from shared_ui.tick_control import TickControl
 from origenerator.action_labels import Labels
 from origenerator.branch_session import titled
 from origenerator.media import MediaType
+from origenerator.setter_voice import PRESS, SAME, SKIP, TRASH, UNDO, setter_words
 
 ROOM_FOR_THE_GRID = 1260
 MARK = 96
@@ -49,6 +50,7 @@ UNDO_BUTTON = "setter.undo"
 KEEP_GOING_QUESTION = "Do you want to keep setting actions for other items, or quit the tool?"
 KEEP_GOING = "Keep setting actions for other items"
 QUIT = "Quit the tool"
+TRASH_BUTTON = "setter.trash"
 TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
           MediaType.VIDEO: "Origenerator — video action setter tool"}
 
@@ -122,6 +124,7 @@ def on_a_white_square(source: QPixmap, side: int, scale: float,
 
 
 class ActionSetterWindow(QWidget):
+    closed = pyqtSignal()
 
     NOTHING_LEFT = "Nothing left to set."
     MISSING = "(this one's file is missing)"
@@ -140,6 +143,7 @@ class ActionSetterWindow(QWidget):
         self._presses: dict[str, QPushButton] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
+        self._words = setter_words(vocabulary)
         self.setWindowTitle(titled(TITLES[session.side]))
 
         self._stage = stage if stage is not None else _a_viewport()
@@ -213,6 +217,8 @@ class ActionSetterWindow(QWidget):
              "Give this one the actions the last one got", self._on_same),
             (UNDO_BUTTON, "Undo",
              "Take the last answer back and put its item up again", self._on_undo),
+            (TRASH_BUTTON, "Trash",
+             "Throw this one into Origenerator's Trash", self._on_trash),
         ):
             button = QPushButton(caption, objectName=name)
             button.setToolTip(tip)
@@ -358,7 +364,7 @@ class ActionSetterWindow(QWidget):
         return False
 
     def _on_skip(self) -> None:
-        if self._session.current is None:
+        if self._session.current is None or not self._presses[SKIP_BUTTON].isEnabled():
             return
         self._session.skip()
         self._said("Last: skipped")
@@ -369,6 +375,31 @@ class ActionSetterWindow(QWidget):
             return
         self._session.undo()
         self._said("Last: undone")
+
+    def _on_trash(self) -> None:
+        if self._session.current is None:
+            return
+        self._stage.clear()
+        self._session.trash()
+        self._said("Last: trashed")
+
+    @property
+    def words(self) -> frozenset[str]:
+        return self._words.phrases
+
+    def knows(self, text: str) -> bool:
+        return self._words.heard(text) is not None
+
+    def hear(self, text: str) -> bool:
+        heard = self._words.heard(text)
+        if heard is None:
+            return False
+        if heard.does == PRESS:
+            self._on_action(heard.button)
+        else:
+            {SKIP: self._on_skip, SAME: self._on_same, UNDO: self._on_undo,
+             TRASH: self._on_trash}[heard.does]()
+        return True
 
     def _on_lock(self, name: str, locked: bool) -> None:
         self.findChild(QToolButton, lock(name)).setToolTip(_lock_tip(locked))
@@ -420,6 +451,7 @@ class ActionSetterWindow(QWidget):
 
     def closeEvent(self, event) -> None:  # noqa: N802 -- Qt override
         self._stage.clear()
+        self.closed.emit()
         super().closeEvent(event)
 
 

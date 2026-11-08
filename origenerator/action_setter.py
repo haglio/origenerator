@@ -40,21 +40,38 @@ def _its_own_image_labels(rows: list[dict]) -> list[Waiting]:
             and not inherits_image_labels(video, start := start_image_of(video))]
 
 
-def waiting(rows: list[dict], side: str) -> list[Waiting]:
+def waiting(rows: list[dict], side: str, *, sent_back: tuple[str, ...] = ()) -> list[Waiting]:
     found = [Waiting(row, row) for row in rows if _finished(row, side)]
     if side == MediaType.IMAGE:
         found += _its_own_image_labels(rows)
-    return sorted((entry for entry in found if not labels_of(entry.holder, side).actions),
-                  reverse=True, key=lambda entry: (bool(entry.shown.get("starred")),
-                                                   entry.shown.get("created_at") or ""))
+    unlabeled = sorted((entry for entry in found if not labels_of(entry.holder, side).actions),
+                       reverse=True, key=lambda entry: (bool(entry.shown.get("starred")),
+                                                        entry.shown.get("created_at") or ""))
+    order = {prompt_id: place for place, prompt_id in enumerate(sent_back)}
+    return sorted(unlabeled, key=lambda entry: order.get(entry.holder["prompt_id"], len(order)))
+
+
+class Answer(NamedTuple):
+    item: dict
+    said: str
+    labels: Labels
+
+
+class Thrown(NamedTuple):
+    item: dict
+
+
+def _shown_id(item: dict) -> str:
+    return item.get("shown_id") or item["prompt_id"]
 
 
 class SetterSession:
-    def __init__(self, items: list[dict], store, side: str):
+    def __init__(self, items: list[dict], store, side: str, rubbish=None):
         self._line = deque(items)
         self._store = store
         self._side = side
-        self._set: list[tuple[dict, str, Labels, bool]] = []
+        self._rubbish = rubbish
+        self._done: list[Answer | Thrown] = []
 
     @property
     def side(self) -> str:
@@ -70,28 +87,39 @@ class SetterSession:
 
     @property
     def last(self) -> tuple[str, Labels] | None:
-        return self._set[-1][1:3] if self._set else None
+        answered = next((done for done in reversed(self._done) if isinstance(done, Answer)), None)
+        return (answered.said, answered.labels) if answered is not None else None
 
     @property
     def can_undo(self) -> bool:
-        return bool(self._set)
+        return bool(self._done)
 
     def set_as(self, said: str, labels: Labels) -> None:
         if not self._line:
             return
         item = self._line.popleft()
         self._store.set_labels(item["prompt_id"], self._side, labels)
-        self._set.append((item, said, labels))
+        self._done.append(Answer(item, said, labels))
 
     def skip(self) -> None:
         self._line.rotate(-1)
 
-    def undo(self) -> None:
-        if not self._set:
+    def trash(self) -> None:
+        if not self._line or self._rubbish is None:
             return
-        item, _said, _labels = self._set.pop()
-        self._store.set_labels(item["prompt_id"], self._side, item.get("labels"))
-        self._line.appendleft(item)
+        item = self._line.popleft()
+        self._rubbish.away(_shown_id(item))
+        self._done.append(Thrown(item))
+
+    def undo(self) -> None:
+        if not self._done:
+            return
+        done = self._done.pop()
+        if isinstance(done, Thrown):
+            self._rubbish.back(_shown_id(done.item))
+        else:
+            self._store.set_labels(done.item["prompt_id"], self._side, done.item.get("labels"))
+        self._line.appendleft(done.item)
 
 
 class Locks:

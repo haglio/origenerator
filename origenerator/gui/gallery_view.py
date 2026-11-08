@@ -28,6 +28,7 @@ from origenerator import (
     timing,
     trash_collection,
 )
+from origenerator.action_setter_tool import SetterHost, ThrownInto
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
@@ -140,6 +141,7 @@ from origenerator.gui.message import ERROR, HEARD_MARK, INFO
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.off_thread import run_off_thread
+from origenerator.gui.open_setters import OpenSetters
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.pane_arrangement import PaneArrangement
@@ -445,9 +447,13 @@ class GalleryView(QWidget):
         self._jobs.enhance_images_with(self._enhance.enhance_a_videos_start_image)
         self._look_training = LookTrainingController(
             self._jobs, info_tabs_of=lambda: self._generate_pane, parent=self)
+        open_setters = OpenSetters()
+        self._setter_host = SetterHost(
+            lambda library: ThrownInto(library, self._delete_rows, self.restore_from_trash),
+            open_setters.hold)
         self._voice = VoiceRouter(
             self, VoiceSources(db=db, slideshows=self._slideshows, client=client,
-                               starting=self._starting, jobs=self._jobs),
+                               starting=self._starting, jobs=self._jobs, setters=open_setters),
             parent=self, motion=self._osr2_motion)
         self._folder_history: list[str] = []
 
@@ -731,6 +737,7 @@ class GalleryView(QWidget):
         tab.versions_delete_requested.connect(self.delete_enhance_versions)
         tab.set_enhance_settings(self._enhance.settings)
         tab.set_fullscreen_factory(self._slideshows.open_on_preview)
+        tab.set_setter_host(self._setter_host)
         tab.cancel_requested.connect(lambda p=tab: self._cancel_tab_reroll(p))
         tab.prompt_fields_changed.connect(self._retarget_find)
         tab.form_edited.connect(self._find_bar.refresh)

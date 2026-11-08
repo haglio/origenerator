@@ -13,9 +13,11 @@ from origenerator.gui.slideshow_set import (
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.outside_videos import places_here
+from origenerator.sent_back import SentBack, the_librarys
 from origenerator.slideshow import Slide
 
 NO_ACTION_TO_REMOVE = "No action to remove"
+SENT_BACK = "Sent back to the action setter tool"
 
 
 class ActionPresses:
@@ -49,16 +51,17 @@ class ActionPresses:
             self._tell((NO_ACTION_TO_REMOVE, False))
             return
         playing.library_moved()
-        self._tell((f"Action removed: {struck}", True))
+        self._tell((SENT_BACK, True))
 
     def _tell(self, how_it_went: tuple[str, bool]) -> None:
         said, done = how_it_went
         self._flash(said, kind=INFO if done else WARNING)
 
 
-def striking(db, gallery, places_here=places_here) -> Callable[[Slide], str]:
+def striking(db, gallery, places_here=places_here,
+             sent_back: Callable[[], SentBack] = the_librarys) -> Callable[[Slide], str]:
     def strike(slide) -> str:
-        struck = said_action.strike(db, slide, places_here)
+        struck = said_action.strike(db, slide, places_here, sent_back())
         if struck:
             gallery.refresh()
         return struck

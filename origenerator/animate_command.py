@@ -5,8 +5,8 @@ from typing import NamedTuple
 
 from origenerator import animation_paths
 from origenerator.action_settings import GENAU, VIDEO
-from origenerator.action_vocabulary import vocabulary
-from origenerator.animation_names import JOINER, Animation
+from origenerator.action_vocabulary import said_as, vocabulary
+from origenerator.animation_names import Animation
 from origenerator.media import MediaType
 from origenerator.voice.text import sounds_like, words
 
@@ -55,32 +55,19 @@ def _lane_of(rest: list[str]) -> tuple[str, list[str]]:
     return VIDEO, rest
 
 
-def _said_as(name: str) -> str:
-    return name.replace(JOINER, " plus ").lower()
-
-
 def spoken_actions(content: dict | None = None) -> dict[str, str]:
     words = vocabulary(MediaType.VIDEO, content)
-    named = {" ".join((_said_as(button), *(box.lower() for box in checked))):
+    named = {" ".join((said_as(button), *(box.lower() for box in checked))):
              Animation(button, checked).name
              for button in words.buttons
              for checked in ((), *((box,) for box in words.checkboxes))}
     named.update({box.lower(): Animation(button, (box,)).name
                   for box, button in words.said_alone.items()})
-    return {form: name for said, name in named.items() for form in _forms(said, words.heard_as)}
-
-
-def _forms(said: str, heard_as: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
-    forms = [said]
-    for name, heard in heard_as.items():
-        own = f" {_said_as(name)} "
-        forms.extend(f" {form} ".replace(own, f" {other.lower()} ").strip()
-                     for form in list(forms) if own in f" {form} " for other in heard)
-    return tuple(dict.fromkeys(forms))
+    return {form: name for said, name in named.items() for form in words.spoken_forms(said)}
 
 
 def _heard_as(actions) -> dict[str, str]:
-    return dict(actions) if isinstance(actions, dict) else {_said_as(a): a for a in actions}
+    return dict(actions) if isinstance(actions, dict) else {said_as(a): a for a in actions}
 
 
 def _action_of(rest: list[str], actions) -> str | None:

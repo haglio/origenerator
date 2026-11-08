@@ -60,11 +60,12 @@ def action(qtbot, opened):
     host = QWidget()
     qtbot.addWidget(host)
 
-    def open_setter(side, first="", heard=None):
+    def open_setter(side, first="", heard=None, host=None):
         opened.append((side, first))
         window = QWidget()
         qtbot.addWidget(window)
         window.heard = heard
+        window.host = host
         return window
 
     return ActionRow(LabelForm(host), checkboxes=_BOXES, actions=_ACTIONS, open_setter=open_setter)
@@ -182,6 +183,16 @@ def test_the_button_opens_the_setter_tool_on_the_item_on_the_tab(action, opened)
     assert opened == [(MediaType.IMAGE, "img-seven")]
 
 
+def test_the_setter_tool_opened_is_given_the_trash_and_the_ears_the_app_handed_the_row(action):
+    host = object()
+    action.set_setter_host(host)
+    action.show_row(_row("img-seven"))
+
+    _setter(action, MediaType.IMAGE).click()
+
+    assert action._windows[MediaType.IMAGE].host is host
+
+
 def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second(action, opened):
     action.show_row(_row("img-seven"))
 
@@ -198,7 +209,7 @@ def test_a_setter_tool_with_nothing_to_set_says_so(qtbot, monkeypatch):
     host = QWidget()
     qtbot.addWidget(host)
     action = ActionRow(LabelForm(host), checkboxes=_BOXES,
-                       open_setter=lambda side, first="", heard=None: "nothing waiting")
+                       open_setter=lambda side, first="", heard=None, host=None: "nothing waiting")
     action.show_row(_row())
 
     _setter(action, MediaType.IMAGE).click()

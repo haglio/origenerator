@@ -15,6 +15,7 @@ from origenerator.gui import voice_router as module
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
+from origenerator.setter_voice import setter_phrases
 from origenerator.voice.app_commands import (
     AppCommand,
     BarSetting,
@@ -24,6 +25,7 @@ from origenerator.voice.commands import (
     CollectionCommand,
     SlideshowControl,
     SurfaceCommand,
+    shaped_app_command,
     spoken_phrases,
 )
 from origenerator.voice.dictation import COMPLETED
@@ -276,7 +278,7 @@ def router(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
     built = []
 
-    def build(host=None, *, slideshows=None, db=None, buttons=None, **parts):
+    def build(host=None, *, slideshows=None, db=None, buttons=None, setters=None, **parts):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
@@ -284,7 +286,8 @@ def router(qtbot, monkeypatch, starting):
         router = VoiceRouter(
             host, VoiceSources(db=db or FakeDB(), slideshows=slideshows,
                                client=parts.get("client", _A_CLIENT), starting=starting,
-                               requests=parts.get("requests") or FakeAnswerer()),
+                               requests=parts.get("requests") or FakeAnswerer(),
+                               setters=setters),
             parent=parent, motion=parts.get("motion"))
         built.append((parent, router))
         buttons = dict(buttons or {})
@@ -313,10 +316,50 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
 
     built_with = voice.listener.built_with
     phrases = built_with["phrases"]
-    assert phrases.heard == spoken_phrases()
+    assert phrases.heard == spoken_phrases() | setter_phrases()
     assert phrases.never_repaired == phrases_heard_only_outright()
     assert phrases.said_in is said_in
     assert "transcribe_bias" not in built_with
+
+
+class FakeSetters:
+    def __init__(self, knows=()):
+        self.known = set(knows)
+        self.heard = []
+
+    def knows(self, text):
+        return text in self.known
+
+    def hear(self, text):
+        if text not in self.known:
+            return False
+        self.heard.append(text)
+        return True
+
+
+def test_a_word_the_setter_tool_in_front_knows_goes_to_it_before_any_command(router):
+    setters = FakeSetters(knows={"trash"})
+    voice, _host, slideshows = router(setters=setters)
+    matched = voice.listener.built_with["bare_matcher"]("trash")
+
+    voice.on_command(matched)
+
+    assert (setters.heard, slideshows.slide_words) == (["trash"], [])
+
+
+def test_a_word_the_setter_tool_does_not_know_is_matched_as_before(router):
+    voice, _host, _slideshows = router(setters=FakeSetters())
+
+    assert voice.listener.built_with["bare_matcher"]("go to recents") == shaped_app_command(
+        "go to recents")
+
+
+def test_words_from_the_session_reach_the_setter_tool_in_front_first(router):
+    setters = FakeSetters(knows={"undo"})
+    voice, _host, slideshows = router(setters=setters)
+
+    assert voice.run_spoken_command("undo") is True
+    assert (setters.heard, slideshows.slide_words) == (["undo"], [])
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):

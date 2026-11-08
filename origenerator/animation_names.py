@@ -3,10 +3,8 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from origenerator.action_labels import Labels, labels_of
-from origenerator.action_vocabulary import Vocabulary, vocabulary
+from origenerator.action_vocabulary import JOINER, Vocabulary, vocabulary
 from origenerator.media import MediaType
-
-JOINER = " + "
 
 
 class Animation(NamedTuple):

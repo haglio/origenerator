@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import json
 
+from app_support import wrong_actions
 from PIL import Image
 
 from origenerator import gallery
 from origenerator.action_labels import Labels, labels_of
-from origenerator.action_setter_tool import AnswersTold, asks_to_keep_going, waiting_items
+from origenerator.action_setter_tool import (
+    AnswersTold,
+    ThrownInto,
+    asks_to_keep_going,
+    waiting_items,
+)
 from origenerator.db import Database, NewGeneration
 from origenerator.gui.action_setter_window import ask_to_keep_going
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
+from origenerator.sent_back import Returned, SentBack
 
 
 def test_each_waiting_image_carries_the_name_its_tile_wears(tmp_path):
@@ -122,3 +129,54 @@ def test_a_video_made_from_no_image_waits_among_the_images_shown_by_its_first_fr
 
 def test_opened_on_an_item_it_asks_whether_to_go_on_and_opened_on_its_own_it_never_does():
     assert (asks_to_keep_going("first"), asks_to_keep_going("")) == (ask_to_keep_going, None)
+
+
+def test_a_video_said_to_have_the_wrong_actions_comes_first_in_the_line(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_video(db, "said")
+    _a_finished_video(db, "favorite")
+    db.set_generation_favorite("favorite", True)
+    db.set_labels("said", MediaType.VIDEO, Labels(("beta",)))
+    wrong_actions.say(tmp_path, tmp_path / "said.mp4")
+
+    waiting = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO,
+                            returned=Returned(SentBack(tmp_path / "sent_back.json"), tmp_path))
+
+    assert [video["prompt_id"] for video in waiting] == ["said", "favorite"]
+
+
+def test_an_item_sent_back_leaves_the_list_once_it_has_its_actions_again(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_video(db, "vid")
+    kept = SentBack(tmp_path / "sent_back.json")
+    kept.add(("vid",))
+    db.set_labels("vid", MediaType.VIDEO, Labels(("beta",)))
+    db.set_labels("vid", MediaType.IMAGE, Labels(("alpha",)))
+
+    waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO,
+                  returned=Returned(kept, tmp_path))
+
+    assert kept.ids() == ()
+
+
+def test_each_item_in_line_says_which_item_is_shown_for_it(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_video(db, "vid")
+
+    [item] = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.VIDEO)
+
+    assert item["shown_id"] == "vid"
+
+
+def test_a_trashed_item_goes_the_way_the_gallery_deletes_and_comes_back_as_it_restores(
+        tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_image(db, "gen-one", 1)
+    deleted, restored = [], []
+    rubbish = ThrownInto(db, deleted.extend, restored.extend)
+
+    rubbish.away("gen-one")
+    rubbish.away("never-made")
+    rubbish.back("gen-one")
+
+    assert ([row["prompt_id"] for row in deleted], restored) == (["gen-one"], ["gen-one"])

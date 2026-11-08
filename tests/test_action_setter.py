@@ -95,6 +95,67 @@ def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone()
         (None, False), (("two", _SET), True), (None, False))
 
 
+class _Bin:
+    def __init__(self):
+        self.thrown = []
+
+    def away(self, prompt_id):
+        self.thrown.append(prompt_id)
+
+    def back(self, prompt_id):
+        self.thrown.remove(prompt_id)
+
+
+def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
+    rubbish = _Bin()
+    session = SetterSession(_items("first", "second"), _Store(), MediaType.IMAGE, rubbish)
+
+    session.trash()
+
+    assert (rubbish.thrown, session.current["prompt_id"], session.remaining) == (
+        ["first"], "second", 1)
+
+
+def test_trash_throws_away_the_item_shown_where_its_labels_live_on_another():
+    rubbish = _Bin()
+    session = SetterSession([{"prompt_id": "frame", "shown_id": "video", "labels": None}],
+                            _Store(), MediaType.IMAGE, rubbish)
+
+    session.trash()
+
+    assert rubbish.thrown == ["video"]
+
+
+def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
+    rubbish = _Bin()
+    store = _Store()
+    session = SetterSession(_items("first", "second"), store, MediaType.IMAGE, rubbish)
+    session.trash()
+
+    session.undo()
+
+    assert (rubbish.thrown, store.labels, session.current["prompt_id"], session.remaining) == (
+        [], {}, "first", 2)
+
+
+def test_same_as_last_goes_by_the_last_press_past_an_item_trashed_since():
+    session = SetterSession(_items("first", "second", "third"), _Store(), MediaType.IMAGE,
+                            _Bin())
+    session.set_as("two", _SET)
+
+    session.trash()
+
+    assert (session.last, session.can_undo) == (("two", _SET), True)
+
+
+def test_with_no_trash_to_throw_into_nothing_is_thrown_away():
+    session = SetterSession(_items("first"), _Store(), MediaType.IMAGE)
+
+    session.trash()
+
+    assert (session.current["prompt_id"], session.can_undo) == ("first", False)
+
+
 def test_locks_hold_each_checkbox_as_it_was_left_until_they_are_let_go(tmp_path):
     path = tmp_path / "locks.json"
     Locks(path).hold(MediaType.IMAGE, "first box", True)
@@ -199,3 +260,14 @@ def test_the_favorites_come_first_and_each_half_runs_newest_backwards():
 
     assert _ids(waiting(rows, MediaType.IMAGE)) == [
         "favorite-new", "favorite-old", "plain-new", "plain-old"]
+
+
+def test_items_sent_back_for_their_actions_come_first_in_the_order_they_were_sent():
+    rows = [
+        _row("plain-old", "a_00001_.png", created="2026-01-01 00:00:00"),
+        _row("favorite", "b_00001_.png", created="2026-01-02 00:00:00", starred=1),
+        _row("plain-new", "c_00001_.png", created="2026-01-03 00:00:00"),
+    ]
+
+    assert _ids(waiting(rows, MediaType.IMAGE, sent_back=("plain-old", "gone", "plain-new"))) == [
+        "plain-old", "plain-new", "favorite"]

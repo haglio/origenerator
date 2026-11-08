@@ -1386,7 +1386,7 @@ def _a_slideshow_whose_actions_can_be_struck(qtbot, tmp_path, said: list) -> Fun
         strike_action=lambda slide: named.pop(slide.prompt_id, "")))
 
 
-def test_wrong_action_takes_the_action_off_the_slide_on_screen_and_says_which(qtbot, tmp_path):
+def test_wrong_action_sends_the_slide_on_screen_back_and_says_so(qtbot, tmp_path):
     said = []
     slideshow = _a_slideshow_whose_actions_can_be_struck(qtbot, tmp_path, said)
     slideshow.action_presses.filter_to_the_one_on_screen()
@@ -1394,7 +1394,7 @@ def test_wrong_action_takes_the_action_off_the_slide_on_screen_and_says_which(qt
     assert answer(slideshow, "wrong_action")
     slideshow.action_presses.filter_to_the_one_on_screen()
 
-    assert said == ["Filter: 'alpha' (1)", "Action removed: alpha", "No action for this one"]
+    assert said == ["Filter: 'alpha' (1)", "Sent back to the action setter tool", "No action for this one"]
 
 
 def test_a_row_naming_two_actions_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):

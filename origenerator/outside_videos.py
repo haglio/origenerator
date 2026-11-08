@@ -123,7 +123,7 @@ def places_here() -> Places | None:
     if records is None:
         return None
     journals = _journals_folder()
-    return Places(upscaled_dir=config.EVOLVER_UPSCALED_DIR, records_folder=records,
+    return Places(upscaled_dir=config.KINO_UPSCALES_DIR, records_folder=records,
                   frames_dir=config.STARTING_FRAMES_DIR, thumb_dir=config.THUMB_DIR,
                   skip_sources=frozenset(source for source in (config.EVOLVER_SOURCE,
                                                                config.GENAU_SOURCE) if source),

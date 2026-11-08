@@ -149,4 +149,4 @@ def test_which_kind_of_output_a_folder_holds_is_worked_out_once_for_that_folder(
 
 
 def test_the_apps_own_places_know_where_kinos_library_is():
-    assert config.OUTPUT_PLACES.kino_library == config.EVOLVER_UPSCALED_DIR
+    assert config.OUTPUT_PLACES.kino_library == config.KINO_UPSCALES_DIR

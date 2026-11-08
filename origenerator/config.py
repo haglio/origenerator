@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app_support import haglio_settings, siblings
+from app_support import haglio_settings, kino_folder, siblings
 from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import THIS_CHECKOUT, is_branch_session
@@ -93,11 +93,12 @@ LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
 EVOLVER_INBOX_DIR = EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
-EVOLVER_UPSCALED_DIR = EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
-KINO_TRASH_DIR = EVOLVER_AI_DIR / "2_outbox" / "trash"
+KINO_DIR = kino_folder.kino_dir()
+KINO_UPSCALES_DIR = kino_folder.upscales_in(KINO_DIR)
+KINO_TRASH_DIR = kino_folder.trash_folder_in(KINO_DIR)
 
 OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR,
-                                           trash=TRASH_DIR, kino_library=EVOLVER_UPSCALED_DIR)
+                                           trash=TRASH_DIR, kino_library=KINO_UPSCALES_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, places=OUTPUT_PLACES, temp=COMFYUI_TEMP_DIR,

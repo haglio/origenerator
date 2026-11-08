@@ -415,7 +415,7 @@ def test_the_look_reads_this_apps_folders_and_where_evolver_keeps_its_records(
     monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
 
     assert places_here() == Places(
-        upscaled_dir=config.EVOLVER_UPSCALED_DIR,
+        upscaled_dir=config.KINO_UPSCALES_DIR,
         records_folder=config.LIBRARY_ROOT / "videos" / "records",
         frames_dir=config.STARTING_FRAMES_DIR, thumb_dir=config.THUMB_DIR,
         skip_sources=frozenset({config.EVOLVER_SOURCE, config.GENAU_SOURCE}),

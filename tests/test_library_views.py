@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from app_support import haglio_settings
+
 from origenerator import gallery, library_views
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import FAVORITES_KEY, LATEST_KEY, TRASH_KEY
@@ -305,9 +307,12 @@ def test_a_reading_scans_evolvers_upscales_once(monkeypatch):
     assert len(scanned) == 1
 
 
-def _another_sites_upscale(evolvers, *, with_its_original: bool = True):
-    upscale = (evolvers / "2_outbox" / "upscaled_by_orientation" / "landscape" / "example_site"
-               / "scene one_topaz.mp4")
+def _another_sites_upscale(evolvers, monkeypatch, *, with_its_original: bool = True):
+    kino = evolvers.parent / "kino"
+    settings = evolvers.parent / "settings.json"
+    settings.write_text(json.dumps({"kino_dir": str(kino)}), encoding="utf-8")
+    monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
+    upscale = kino / "2D" / "AI" / "landscape" / "example_site" / "scene one_topaz.mp4"
     original = evolvers / "1_sorted" / "example_site" / "landscape" / "scene one.mp4"
     for video in (upscale, *((original,) if with_its_original else ())):
         video.parent.mkdir(parents=True)
@@ -318,14 +323,14 @@ def _another_sites_upscale(evolvers, *, with_its_original: bool = True):
     return row, upscale, original
 
 
-def test_another_sites_upscale_steps_to_the_video_it_was_made_from(tmp_path):
-    row, upscale, original = _another_sites_upscale(tmp_path / "AI")
+def test_another_sites_upscale_steps_to_the_video_it_was_made_from(tmp_path, monkeypatch):
+    row, upscale, original = _another_sites_upscale(tmp_path / "AI", monkeypatch)
 
     assert LibrarySnapshot([row], evolvers_folder=tmp_path / "AI").versions_of([row]) == {
         str(upscale): [(upscale, "video", "Evolved", ()), (original, "video", "Original", ())]}
 
 
-def test_another_sites_upscale_whose_original_is_gone_has_no_other_version(tmp_path):
-    row, _upscale, _original = _another_sites_upscale(tmp_path / "AI", with_its_original=False)
+def test_another_sites_upscale_whose_original_is_gone_has_no_other_version(tmp_path, monkeypatch):
+    row, _upscale, _original = _another_sites_upscale(tmp_path / "AI", monkeypatch, with_its_original=False)
 
     assert LibrarySnapshot([row], evolvers_folder=tmp_path / "AI").versions_of([row]) == {}

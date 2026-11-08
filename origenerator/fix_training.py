@@ -8,7 +8,7 @@ from origenerator.lora_training import TrainingOffer, TrainingState
 from origenerator.lora_versions import next_version, trash_tooltip
 from origenerator.model_titles import FIX_LORA_FOLDER, model_stem
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import detector_folder, detector_for_part, part_table
+from origenerator.workflows.detail_parts import detector_folder, detector_for_part
 
 TRAINER = lora_training.TRAINERS / "fix_lora_trainer.py"
 HOLDS_THE_LINE = True
@@ -65,12 +65,6 @@ def training_offer(part, lora) -> TrainingOffer:
                                trash_tooltip=trash_tooltip(lora))
 
 
-def fix_to_train():
-    return next((part for part in part_table()
-                 if detector_for_part(part) and training_photos(part)
-                 and training_state(part) is not TrainingState.CURRENT), None)
-
-
 def model_to_train_for(enhance_params: dict) -> str:
     chosen = enhance_params.get("checkpoint")
     if not chosen or chosen == MATCH_SOURCE_MODEL:
@@ -82,7 +76,7 @@ def fix_title_base(part_name: str) -> str:
     return f"{part_name.capitalize()} fix"
 
 
-def training_job(part, checkpoint: str, *, automatic: bool = False) -> dict:
+def training_job(part, checkpoint: str) -> dict:
     models = config.COMFYUI_DIR / "models"
     version = next_version(fix_title_base(part.name))
     output_name = f"{part.name} {version}"
@@ -100,7 +94,6 @@ def training_job(part, checkpoint: str, *, automatic: bool = False) -> dict:
         "lora": str(PureWindowsPath(FIX_LORA_FOLDER) / f"{output_name}.safetensors"),
         "display_name": f"{fix_title_base(part.name)} {version}",
         **lora_training.work_files(_work_folder(part)),
-        "automatic": automatic,
     }
 
 

@@ -110,9 +110,9 @@ def test_the_model_is_asked_first_with_the_prompts_the_exchange_and_the_notes():
 def test_his_prompts_that_touch_the_request_go_to_the_model_with_the_rest():
     model = _Model(_answer(_add("a dog, wagging tail", for_="a dog", after="a woman")))
 
-    work_out("a woman", "blurry", "add a dog", examples=("a dog, wagging tail",), ask=model)
+    work_out("a woman", "blurry", "add a dog", examples=(("a dog, wagging tail", "blurry"),), ask=model)
 
-    assert model.examples == ("a dog, wagging tail",)
+    assert model.examples == (("a dog, wagging tail", "blurry"),)
 
 
 def test_a_term_the_rules_are_sure_of_still_goes_to_the_model_which_knows_the_collection():
@@ -159,9 +159,9 @@ def test_the_models_stronger_words_are_held_to_his_own_prompts_and_notes():
                                     "for": "bigger hat"}]})
 
     invented = work_out("a woman, a small hat", "", "bigger hat", weights=False,
-                        examples=("a woman in a wide hat",), ask=asking_for("a huge hat"))
+                        examples=(("a woman in a wide hat", ""),), ask=asking_for("a huge hat"))
     from_his_prompts = work_out("a woman, a small hat", "", "bigger hat", weights=False,
-                                examples=("a woman in a wide hat",), ask=asking_for("a wide hat"))
+                                examples=(("a woman in a wide hat", ""),), ask=asking_for("a wide hat"))
     from_his_notes = work_out("a woman, a small hat", "", "bigger hat", weights=False, notes=NOTES,
                               ask=asking_for("a comma-separated hat"))
 
@@ -280,47 +280,34 @@ def test_the_model_reads_a_prompt_with_no_box_marks_in_it():
     assert revision.positive == "a woman, soft light, a hat"
 
 
-HIS_PROMPTS = [
-    "a woman in a yellow raincoat on a pier at noon, photo",
-    "a dog on a park bench, wagging tail, autumn leaves",
-    "two dogs chasing a stick, wagging tails, a park bench in the back",
-    "a cat asleep on a windowsill, soft light",
-]
+RAINCOAT = ("a woman in a yellow raincoat on a pier at noon, photo", "blurry")
+ONE_DOG = ("a dog on a park bench, wagging tail, autumn leaves", "blurry, cats")
+TWO_DOGS = ("two dogs chasing a stick, wagging tails, a park bench in the back", "")
+A_CAT = ("a cat asleep on a windowsill, soft light", "blurry")
+HIS_PROMPTS = [RAINCOAT, ONE_DOG, TWO_DOGS, A_CAT]
 
 
 def test_the_prompts_sharing_the_most_of_the_requests_words_come_first_and_the_rest_not_at_all():
-    assert prompts_touching("add a dog on a bench", HIS_PROMPTS) == [
-        "a dog on a park bench, wagging tail, autumn leaves",
-        "two dogs chasing a stick, wagging tails, a park bench in the back",
-    ]
+    assert prompts_touching("add a dog on a bench", HIS_PROMPTS) == [ONE_DOG, TWO_DOGS]
 
 
 def test_the_words_of_a_request_that_name_nothing_touch_no_prompt():
     assert prompts_touching("make it more", HIS_PROMPTS) == []
-    assert prompts_touching("she gives him the stick", HIS_PROMPTS) == [
-        "two dogs chasing a stick, wagging tails, a park bench in the back"]
+    assert prompts_touching("she gives him the stick", HIS_PROMPTS) == [TWO_DOGS]
 
 
 @pytest.mark.parametrize("request_text", ["a dog chased, tails", "dogs chase, a tail"])
 def test_a_word_touches_its_plural_and_its_verb_forms(request_text):
-    assert prompts_touching(request_text, HIS_PROMPTS) == [
-        "two dogs chasing a stick, wagging tails, a park bench in the back",
-        "a dog on a park bench, wagging tail, autumn leaves",
-    ]
+    assert prompts_touching(request_text, HIS_PROMPTS) == [TWO_DOGS, ONE_DOG]
 
 
 def test_a_word_said_twice_in_a_request_counts_once():
-    assert prompts_touching("a dog, a dog on a bench", HIS_PROMPTS) == [
-        "a dog on a park bench, wagging tail, autumn leaves",
-        "two dogs chasing a stick, wagging tails, a park bench in the back",
-    ]
+    assert prompts_touching("a dog, a dog on a bench", HIS_PROMPTS) == [ONE_DOG, TWO_DOGS]
 
 
 def test_the_prompts_handed_over_stop_at_the_limit_and_at_the_characters_allowed():
-    assert prompts_touching("a dog", HIS_PROMPTS, limit=1) == [
-        "a dog on a park bench, wagging tail, autumn leaves"]
-    assert prompts_touching("a dog", HIS_PROMPTS, limit_chars=60) == [
-        "a dog on a park bench, wagging tail, autumn leaves"]
+    assert prompts_touching("a dog", HIS_PROMPTS, limit=1) == [ONE_DOG]
+    assert prompts_touching("a dog", HIS_PROMPTS, limit_chars=70) == [ONE_DOG]
     assert prompts_touching("a dog", HIS_PROMPTS, limit_chars=10) == []
 
 
@@ -346,13 +333,15 @@ def test_the_request_messages_carry_the_notes_the_exchange_as_turns_the_prompts_
 
 def test_the_messages_show_his_prompts_that_touch_the_request_numbered_before_the_current_pair():
     content = build_request_messages("a woman", "", "add a dog", WhatIsKnown(examples=(
-        "a dog on a park bench, wagging tail", "two dogs, wagging tails")), "S")[-1]["content"]
+        ("a dog on a park bench, wagging tail", ""), ("two dogs, wagging tails", "blurry, cats"))),
+        "S")[-1]["content"]
 
     heading = "PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR"
     assert "carry over the details" in content
+    assert "what his negative prompts keep out" in content
     assert content.index(heading) < content.index(
-        "1. a dog on a park bench, wagging tail\n2. two dogs, wagging tails") < content.index(
-        "CURRENT POSITIVE PROMPT")
+        "1. a dog on a park bench, wagging tail\n2. two dogs, wagging tails\n   negative: blurry, cats"
+    ) < content.index("CURRENT POSITIVE PROMPT")
 
 
 def test_without_notes_or_an_exchange_the_messages_say_neither():
@@ -415,7 +404,7 @@ def test_asking_the_model_shows_it_his_prompts_that_touch_the_request():
         sent["messages"] = messages
         return {"message": {"content": '{"changes": []}'}}
 
-    ask_the_model("a woman", "", "add a dog", WhatIsKnown(examples=("a dog, wagging tail",)), llm=ask)
+    ask_the_model("a woman", "", "add a dog", WhatIsKnown(examples=(("a dog, wagging tail", ""),)), llm=ask)
 
     assert "1. a dog, wagging tail" in sent["messages"][-1]["content"]
 

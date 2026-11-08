@@ -33,8 +33,8 @@ STORES = {
 
 
 ASKED_OF_THE_REQUESTS_STORE = {"record_turns", "turns_of", "exchange_of",
-                               "distinct_positive_prompts", "started_on", "mark_made",
-                               "items_asked_into"}
+                               "distinct_positive_prompts", "distinct_prompts", "started_on",
+                               "mark_made", "items_asked_into"}
 
 
 @pytest.fixture

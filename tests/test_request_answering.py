@@ -111,19 +111,19 @@ def test_his_own_prompts_that_touch_the_request_are_gathered_newest_first_for_th
         return "the revision"
 
     answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
-    for pid, prompt in (("g1", "a dog on a park bench, wagging tail"),
-                        ("g2", "a cat on a windowsill"),
-                        ("g3", "two dogs chasing a stick, wagging tails")):
+    for pid, prompt, negative in (("g1", "a dog on a park bench, wagging tail", "blurry, cats"),
+                                  ("g2", "a cat on a windowsill", ""),
+                                  ("g3", "two dogs chasing a stick, wagging tails", None)):
         db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
-                             positive_prompt=prompt, params_json="{}", workflow_json="{}",
-                             source="generated"))
+                             positive_prompt=prompt, negative_prompt=negative, params_json="{}",
+                             workflow_json="{}", source="generated"))
     answers = []
 
     answerer.ask("fresh", ("a woman", ""), "add a dog", owner=parent, then=answers.append)
 
     qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
-    assert seen["examples"] == ["two dogs chasing a stick, wagging tails",
-                                "a dog on a park bench, wagging tail"]
+    assert seen["examples"] == [("two dogs chasing a stick, wagging tails", ""),
+                                ("a dog on a park bench, wagging tail", "blurry, cats")]
 
 
 def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path):

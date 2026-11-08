@@ -18,8 +18,8 @@ def _exchange_of(db, about: str | None) -> list:
     return db.requests.exchange_of(about) if about else []
 
 
-def _his_prompts(db) -> list[str]:
-    return db.requests.distinct_positive_prompts()
+def _his_prompts(db) -> list[tuple[str, str]]:
+    return db.requests.distinct_prompts()
 
 
 def leave_the_graphics_card(*, unload=local_llm.let_go,

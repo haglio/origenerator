@@ -1044,6 +1044,7 @@ def test_the_distinct_prompts_come_once_each_in_the_order_first_written_without_
                              source=source))
 
     assert db.requests.distinct_positive_prompts() == ["a baker waving", "a baker yawning"]
+    assert db.requests.distinct_prompts() == [("a baker waving", ""), ("a baker yawning", "")]
 
 
 

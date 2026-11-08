@@ -148,6 +148,8 @@ def test_more_of_something_is_taught_as_his_stronger_words_and_its_opposite_with
 
     assert '{"more":' in rule
     assert "The stronger words are his" in rule
+    assert "what his prompts put beside it for more of it" in rule
+    assert "what his prompts keep out for more of it" in rule
     assert "the app keeps the part as it is" in rule
     assert "never words of your own" in rule
     assert "a silver ring stays a silver ring" in rule

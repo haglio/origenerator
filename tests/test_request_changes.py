@@ -251,6 +251,16 @@ def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_without_a_
     assert outcome.line == 'Replaced "two women" with "one woman" in the Positive Prompt.'
 
 
+def test_a_replacement_that_puts_the_whole_prompt_in_the_plural_keeps_every_part_it_changed():
+    one = "one woman in a red dress, she smiles at the camera, her hand on a railing, a city street"
+    two = "two women in red dresses, they smile at the camera, their hands on a railing, a city street"
+
+    outcome = _applied([{"prompt": "positive", "replace": one, "with": two, "for": "two women"}],
+                       pair=(one, "blurry"), asked=("two women",))
+
+    assert outcome.positive == two
+
+
 def test_a_replacement_in_words_that_are_not_his_at_all_is_the_models_to_make_whole():
     outcome = _applied([{"prompt": "positive", "replace": "silver ear studs, a necklace",
                          "with": "bare ears, a bare neck", "for": "no jewelry"}],

@@ -86,6 +86,17 @@ class RequestStore(Store):
             ).fetchall()
             return [row[0] for row in rows]
 
+    def distinct_prompts(self) -> list[tuple[str, str]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT positive_prompt, MIN(COALESCE(negative_prompt, '')) FROM generations
+                   WHERE positive_prompt IS NOT NULL AND TRIM(positive_prompt) != ''
+                     AND {MADE_HERE}
+                   GROUP BY positive_prompt ORDER BY MIN(id)""",
+                MADE_ELSEWHERE,
+            ).fetchall()
+            return [(row[0], row[1]) for row in rows]
+
     def record_turns(self, prompt_id: str, turns) -> None:
         with self._connect() as conn:
             conn.executemany(

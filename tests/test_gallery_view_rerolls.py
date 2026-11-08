@@ -802,7 +802,20 @@ def test_populate_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tm
 
     assert not view._buttons.populate.isHidden()
     assert not view._buttons.populate.isEnabled()
-    assert "open a settings folder" in view._buttons.populate.toolTip()
+    assert view._buttons.populate.toolTip() == (
+        "Populate works in a leaf folder, where every item shares its settings. "
+        "Open one to use it.")
+
+
+def test_populate_greyed_on_a_leaf_with_no_comfyui_says_so(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=None)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert not view._buttons.populate.isEnabled()
+    assert view._buttons.populate.toolTip() == (
+        "Populate needs ComfyUI, and Origenerator is not connected to it.")
 
 
 def test_the_switchs_tip_takes_you_to_whichever_folder_populate_runs_in(qtbot, tmp_path):

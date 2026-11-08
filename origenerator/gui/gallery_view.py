@@ -1518,9 +1518,7 @@ class GalleryView(QWidget):
         self._avg_label.setText(f"Average time: {label}" if label else "")
 
     def _can_reroll(self, group) -> bool:
-        if self._client is None or not group.rows:
-            return False
-        return gallery.rerollable(group.rows[0])
+        return self._why_no_more_can_be_made(group) is None
 
     @property
     def _live_jobs(self) -> dict:
@@ -1837,8 +1835,8 @@ class GalleryView(QWidget):
         redo_label = self._edits.redo_label()
         populate_folder = self._populate.active_key()
         group = self.current_group()
-        can_populate = (isinstance(group, gallery.SettingsGroup)
-                             and self._can_reroll(group))
+        why_not = self._why_populate_cannot(group)
+        can_populate = why_not is None
         elsewhere = (populate_folder is not None
                      and populate_folder != getattr(group, "key", None))
         return ButtonStates(
@@ -1858,22 +1856,34 @@ class GalleryView(QWidget):
                        else Button(visible=self._slideshows.anything_to_play(),
                                    tip=f"Play {self.slideshow_subject()} as a slideshow")),
             populate=Button(enabled=can_populate or populate_folder is not None,
-                        tip="" if elsewhere else self._populate_tip(can_populate,
-                                                                populate_folder),
+                        tip="" if elsewhere else self._populate_tip(why_not, populate_folder),
                         checked=populate_folder is not None),
             populate_tip=POPULATE_ELSEWHERE_TIP if elsewhere else "",
         )
 
     @staticmethod
-    def _populate_tip(can_populate: bool, populate_folder: str | None) -> str:
+    def _populate_tip(why_not: str | None, populate_folder: str | None) -> str:
         if populate_folder is not None:
             return "Populate is running in this folder — click to stop it"
-        return (
-            "Populate: repeatedly generate variations of this folder "
-            "until toggled off"
-            if can_populate else
-            "Populate: open a settings folder to generate variations of it"
-        )
+        return why_not or ("Populate: repeatedly generate variations of this folder "
+                           "until toggled off")
+
+    def _why_populate_cannot(self, group) -> str | None:
+        if not isinstance(group, gallery.SettingsGroup):
+            return ("Populate works in a leaf folder, where every item shares its settings. "
+                    "Open one to use it.")
+        return self._why_no_more_can_be_made(group)
+
+    def _why_no_more_can_be_made(self, group) -> str | None:
+        if self._client is None:
+            return "Populate needs ComfyUI, and Origenerator is not connected to it."
+        if not group.rows:
+            return "Populate has nothing to make more of: this folder is empty."
+        if WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "") is None:
+            return "Populate can't make more of these: they were made outside Origenerator."
+        if not gallery.rerollable(group.rows[0]):
+            return "Populate can't make more of these: what they were made from is gone."
+        return None
 
     def _favorite_offer(self) -> Button:
         pids = self.selected_prompt_ids() if self._gallery_pane.selected_ids else []

@@ -137,6 +137,7 @@ class ActionSetterWindow(QWidget):
         self._tiles: dict[str, QToolButton] = {}
         self._faces: dict[str, QToolButton] = {}
         self._boxes: dict[str, TickControl] = {}
+        self._presses: dict[str, QPushButton] = {}
         self._name_font = make_font(size=SIZE_SMALL)
         self._mark = MARK
         self.setWindowTitle(titled(TITLES[session.side]))
@@ -218,6 +219,7 @@ class ActionSetterWindow(QWidget):
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             button.clicked.connect(press)
             controls.addWidget(button)
+            self._presses[name] = button
         column.addLayout(controls)
         column.addStretch(1)
 
@@ -335,8 +337,9 @@ class ActionSetterWindow(QWidget):
         if self._session.current is None:
             return
         self._session.set_as(name, Labels(self._vocabulary.buttons[name], self._checked()))
-        self._said(f"Last: {name}")
-        self._ask_whether_to_go_on()
+        self._last.setText(f"Last: {name}")
+        if self._asked_whether_to_go_on():
+            self._show_current()
 
     def _on_same(self) -> None:
         last = self._session.last
@@ -347,10 +350,12 @@ class ActionSetterWindow(QWidget):
         self._session.set_as(said, Labels(labels.actions, self._checked()))
         self._said(f"Last: {said}")
 
-    def _ask_whether_to_go_on(self) -> None:
+    def _asked_whether_to_go_on(self) -> bool:
         asking, self._keep_going = self._keep_going, None
-        if asking is not None and self._session.current is not None and not asking(self):
-            self.close()
+        if asking is None or self._session.current is None or asking(self):
+            return True
+        self.close()
+        return False
 
     def _on_skip(self) -> None:
         if self._session.current is None:
@@ -384,6 +389,7 @@ class ActionSetterWindow(QWidget):
         self._show_current()
 
     def _show_current(self) -> None:
+        self._presses[SKIP_BUTTON].setEnabled(self._keep_going is None)
         item = self._session.current
         self._mark_the_button_set_before(item)
         if item is None:

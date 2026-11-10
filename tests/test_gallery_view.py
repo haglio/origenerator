@@ -382,9 +382,12 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     lora = _at(_image_workflow(view._tree), 0, 0)
     view._tree.setCurrentItem(lora)
     a_tile_key = view._gallery_pane._listed_folders[0]
+    (its_tile,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                   if tile._key == a_tile_key]
 
-    view._gallery_pane._drill_into(a_tile_key)
-    assert view.listed_prompt_ids()
+    its_tile.clicked.emit(a_tile_key)
+
+    assert view.listed_prompt_ids(), "a click on a folder's tile is what drills into it"
 
 
 def test_opening_a_folder_lands_on_its_first_item(qtbot):

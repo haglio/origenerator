@@ -110,3 +110,17 @@ def test_a_name_leads_back_to_the_item_wearing_it(db):
 
     assert names.prompt_id_of(f"{_code(second)} 001") == "gen-two"
     assert names.prompt_id_of(f"{_code(second)} 002") is None
+
+
+def test_the_names_are_a_new_version_only_when_one_of_them_changes(db):
+    first, second = _image("gen-one", 1), _image("gen-two", 2)
+    names = ItemNames(db)
+    names.take([first], [], {})
+    before = names.version
+
+    names.take([first], [], {})
+    unchanged = names.version
+    names.take([second, first], [], {})
+
+    assert unchanged == before
+    assert names.version != before

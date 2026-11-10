@@ -14,6 +14,7 @@ class ItemNames:
         self._numbers = numbers
         self._names: dict[str, str] = {}
         self._wearing: dict[str, str] = {}
+        self.version = 0
 
     @classmethod
     def from_library(cls, db) -> ItemNames:
@@ -34,11 +35,13 @@ class ItemNames:
                    if recorded.get(prompt_id) != item}
         if changed:
             self._numbers.record_item_numbers(changed)
-        self._names = {prompt_id: item_name(item)
-                       for prompt_id, item in numbering.items()}
-        self._wearing = {name: prompt_id for prompt_id, name in self._names.items()}
-        self._names.update({frame: self._names[video] for frame, video in video_of_frame.items()
-                            if video in self._names})
+        names = {prompt_id: item_name(item) for prompt_id, item in numbering.items()}
+        self._wearing = {name: prompt_id for prompt_id, name in names.items()}
+        names.update({frame: names[video] for frame, video in video_of_frame.items()
+                      if video in names})
+        if names != self._names:
+            self.version += 1
+        self._names = names
 
     def of(self, prompt_id: str | None) -> str:
         return self._names.get(prompt_id, "")

@@ -314,6 +314,14 @@ class _Tier:
     folder_meta: dict
     image_index: dict
     name_of: Callable[[str], str]
+    kept: KeptFolders
+
+    def kept_folder(self, key, rows: list[dict], make: Callable, *made_from):
+        return self.kept.kept(key, rows, make, *made_from, depends_on=self.depends_on)
+
+    @property
+    def depends_on(self) -> tuple:
+        return (self.image_index,) if made_from_an_image(self.workflow_name) else ()
 
 
 def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]:
@@ -326,9 +334,7 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
     for sig, sig_rows in grouped:
         key = settings_key(tier.media_type, tier.workflow_name, sig)
         label, favorite = _overlay(folder_id(key), key, tier.folder_meta)
-        groups.append(SettingsGroup(
-            key, label, sig_rows, favorite,
-        ))
+        groups.append(tier.kept_folder(key, sig_rows, SettingsGroup, key, label, sig_rows, favorite))
     return groups
 
 
@@ -345,10 +351,14 @@ def _grouped_folders(tier: _Tier, rows, level: _Level):
     groups = []
     for sig, sub_rows in _group_by_creation(rows, level.signature):
         key = level.key_for(sig)
-        params = parse_params(sub_rows[0].get("params_json"))
-        label, favorite = _overlay(level.label_for(params), key, tier.folder_meta)
-        groups.append(level.cls(key, label, level.children_for(sub_rows), favorite))
+        groups.append(tier.kept_folder(key, sub_rows, _folder_at, tier, level, key, sub_rows))
     return groups
+
+
+def _folder_at(tier: _Tier, level: _Level, key, rows: list[dict]):
+    params = parse_params(rows[0].get("params_json"))
+    label, favorite = _overlay(level.label_for(params), key, tier.folder_meta)
+    return level.cls(key, label, level.children_for(rows), favorite)
 
 
 def _build_model_groups(tier: _Tier, rows: list[dict]) -> list[ModelGroup]:
@@ -408,22 +418,47 @@ def start_frame_index(rows: list[dict]) -> dict:
     )
 
 
+class KeptFolders:
+    def __init__(self, before: KeptFolders | None = None, *, drawn_with: tuple = ()):
+        self.drawn_with = drawn_with
+        self._before: dict = before.folders_drawn_with(drawn_with) if before is not None else {}
+        self._now: dict = {}
+
+    def folders_drawn_with(self, drawn_with: tuple) -> dict:
+        return self._now if all_the_same(self.drawn_with, drawn_with) else {}
+
+    def kept(self, key, parts: list, make: Callable, *made_from, depends_on: tuple = ()):
+        made_of = (*parts, *depends_on)
+        before = self._before.get(key)
+        same = before is not None and all_the_same(before[0], made_of)
+        folder = before[1] if same else make(*made_from)
+        self._now[key] = (made_of, folder)
+        return folder
+
+
+def all_the_same(these, those) -> bool:
+    return len(these) == len(those) and all(this is that for this, that in zip(these, those, strict=True))
+
+
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None,
     *, image_index: dict | None = None,
     name_of: Callable[[str], str] | None = None,
+    kept: KeptFolders | None = None,
 ) -> list[MediaGroup]:
     folder_meta = folder_meta or {}
     if image_index is None:
         image_index = start_frame_index(rows)
+    kept = kept or KeptFolders()
     rows = placeable_rows(rows)
     by_kind = dict(_group_by_creation(rows, media_type_of_row))
-    return [_media_folder(media_type, by_kind[media_type], folder_meta, image_index,
-                          name_of or _unnamed)
-            for media_type in MediaType if media_type in by_kind]
+    media = [_media_folder(media_type, by_kind[media_type], folder_meta, image_index,
+                           name_of or _unnamed, kept)
+             for media_type in MediaType if media_type in by_kind]
+    return kept.kept("tree", media, list, media)
 
 
-def _media_folder(media_type, rows, folder_meta, image_index, name_of) -> MediaGroup:
+def _media_folder(media_type, rows, folder_meta, image_index, name_of, kept) -> MediaGroup:
     label, favorite = _overlay(MEDIA_LABELS[media_type], media_type, folder_meta)
     workflows = []
     for wf_name, wf_rows in _group_by_creation(
@@ -431,13 +466,16 @@ def _media_folder(media_type, rows, folder_meta, image_index, name_of) -> MediaG
     ):
         wf_key = f"{media_type}/{wf_name}"
         wf_label, wf_favorite = _overlay(workflow_label(wf_name), wf_key, folder_meta)
-        tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of)
-        workflows.append(WorkflowGroup(
-            wf_key, wf_name, wf_label,
-            _build_model_groups(tier, wf_rows),
-            wf_favorite,
-        ))
-    return MediaGroup(str(media_type), label, workflows, favorite)
+        tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of, kept)
+        workflows.append(tier.kept_folder(wf_key, wf_rows, _workflow_folder,
+                                          tier, wf_key, wf_label, wf_rows, wf_favorite))
+    return kept.kept(str(media_type), workflows, MediaGroup, str(media_type), label, workflows,
+                     favorite)
+
+
+def _workflow_folder(tier: _Tier, key: str, label: str, rows: list[dict],
+                     favorite: bool) -> WorkflowGroup:
+    return WorkflowGroup(key, tier.workflow_name, label, _build_model_groups(tier, rows), favorite)
 
 
 def _unnamed(_prompt_id: str) -> str:

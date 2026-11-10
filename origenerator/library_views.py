@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from types import MappingProxyType
 from typing import NamedTuple
 
 from app_support.media_renditions import original_rendition
@@ -24,6 +23,7 @@ from origenerator.gallery.custom import index_folders
 from origenerator.gallery.enhance import EnhanceVersion, file_at, upscale_and_original
 from origenerator.gallery.placement import Placement
 from origenerator.gallery.shapes import LANDSCAPE, shape_covers
+from origenerator.gallery.tree import KeptFolders, all_the_same
 from origenerator.generation_state import on_the_map
 from origenerator.item_shape import filter_rows, split_key
 from origenerator.media import MediaType
@@ -48,12 +48,15 @@ class LibrarySnapshot:
                  folder_meta: dict | None = None,
                  name_of: Callable[[str], str] | None = None,
                  custom_collections: list[dict] = (),
-                 trees_from: LibrarySnapshot | None = None,
+                 previous: LibrarySnapshot | None = None,
+                 names_version: Callable[[], object] = lambda: None,
                  evolvers_folder: Path = EVOLVER_AI_DIR):
-        self.rows = rows
-        self.held_rows = held_rows
-        self.folder_meta = folder_meta or {}
+        self.rows = _carried_over(rows, previous.rows if previous else ())
+        self.held_rows = _carried_over(held_rows, previous.held_rows if previous else ())
+        self.folder_meta = _carried_over_whole(folder_meta or {},
+                                               previous.folder_meta if previous else None)
         self._name_of = name_of
+        self._names_version = names_version
         self._custom_records = custom_collections
         self._evolvers_folder = evolvers_folder
         self._customs: dict[str, list] = {}
@@ -62,27 +65,39 @@ class LibrarySnapshot:
         self._versions: dict[tuple, tuple | None] = {}
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
         self._on_the_map: dict[str | None, list[dict]] = {}
-        self._trees: dict[str, list] = dict(trees_from.trees) if trees_from else {}
-        self._image_index: dict | None = trees_from.image_index if trees_from else None
+        self._drawn_before = previous.drawn() if previous else {}
+        self._image_index_before = previous.image_index if previous else None
+        self._unmoved = (previous is not None and all_the_same(self.rows, previous.rows)
+                         and self.folder_meta is previous.folder_meta)
+        self._drawn: dict[str, tuple[KeptFolders, list]] = {}
+        self._image_index: dict | None = None
         self._placements: dict[str | None, Placement] = {}
         self._on_shape: dict[tuple[str | None, str | None], list[dict]] = {}
 
     @property
-    def trees(self) -> Mapping[str, list]:
-        return MappingProxyType(self._trees)
-
-    @property
     def image_index(self) -> dict:
         if self._image_index is None:
-            self._image_index = gallery.start_frame_index(self.rows)
+            before = self._image_index_before
+            self._image_index = before if self._unmoved else _carried_over_whole(
+                gallery.start_frame_index(self.rows), before)
         return self._image_index
 
     def tree(self, shape: str) -> list:
-        if shape not in self._trees:
-            self._trees[shape] = gallery.build_gallery_tree(
-                filter_rows(self.rows, shape), self.folder_meta,
-                image_index=self.image_index, name_of=self._name_of)
-        return self._trees[shape]
+        if shape not in self._drawn:
+            before = self._drawn_before.get(shape)
+            drawn_with = (self.folder_meta, self._names_version())
+            if self._unmoved and before is not None and all_the_same(before[0].drawn_with,
+                                                                     drawn_with):
+                self._drawn[shape] = before
+            else:
+                kept = KeptFolders(before[0] if before else None, drawn_with=drawn_with)
+                self._drawn[shape] = (kept, gallery.build_gallery_tree(
+                    filter_rows(self.rows, shape), self.folder_meta,
+                    image_index=self.image_index, name_of=self._name_of, kept=kept))
+        return self._drawn[shape][1]
+
+    def drawn(self) -> dict[str, tuple[KeptFolders, list]]:
+        return {**(self._drawn_before if self._unmoved else {}), **self._drawn}
 
     @cached_property
     def rows_by_id(self) -> dict[str, dict]:
@@ -258,6 +273,18 @@ class Version(NamedTuple):
     media_type: str
     label: str = ""
     points_of_interest: tuple = ()
+
+
+def _carried_over(rows, before) -> list[dict]:
+    if not before:
+        return rows
+    read_before = {row["prompt_id"]: row for row in before}
+    return [kept if (kept := read_before.get(row["prompt_id"])) is not None and kept == row
+            else row for row in rows]
+
+
+def _carried_over_whole(reading, before):
+    return before if before is not None and before == reading else reading
 
 
 def _each_once(rows) -> list[dict]:

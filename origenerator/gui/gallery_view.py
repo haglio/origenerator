@@ -1102,6 +1102,7 @@ class GalleryView(QWidget):
         self._combine.offer_the_actions(rows)
         trash_collection.settle_regenerations(self._db)
         library = self._library = self._reading_of(rows, meta)
+        rows = library.rows
         trees = {shape: library.tree(shape) for shape in self._tree.shapes}
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_collections_by_shape = {shape: library.custom_collections(shape)
@@ -1150,10 +1151,11 @@ class GalleryView(QWidget):
         library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
                                   folder_meta=meta, name_of=self._item_names.of,
                                   custom_collections=self._db.list_custom_collections(),
-                                  trees_from=self._library if unmoved else None)
+                                  previous=self._library,
+                                  names_version=lambda: self._item_names.version)
         if not unmoved:
             self._lists_built_from = state
-            self._item_names.take(rows, library.held_rows, library.image_index)
+            self._item_names.take(library.rows, library.held_rows, library.image_index)
         return library
 
     def _build_sides(self, trees):

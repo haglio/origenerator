@@ -1099,7 +1099,7 @@ def _tab_asked_for_two_cats(qtbot, tmp_path):
     return view
 
 
-def _asking_for_two_cats(qtbot, tmp_path, answer_once=None):
+def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -1111,6 +1111,8 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None):
     def two_cats(positive, negative, words, **_):
         if answer_once is not None:
             answer_once.wait(5)
+        if unanswered:
+            raise TimeoutError("the model gave no answer")
         return work_out(positive, negative, words, ask=lambda p, n, r, known: {"changes": [
             {"prompt": "positive", "replace": "a cat", "with": "two cats", "for": "two cats"}]})
 
@@ -1177,10 +1179,44 @@ def test_a_requests_answer_reaches_its_image_after_the_tab_that_asked_is_closed(
     aims = pane.current_generate_tab()._request_aims
 
     answer_now.set()
-    qtbot.waitUntil(lambda: bool(aims["orig"].turns), timeout=5000)
+    qtbot.waitUntil(lambda: bool(aims.of("orig").turns), timeout=5000)
     view._on_thumbnail_clicked("orig")
 
     assert _request_turns_shown(view) == ([("two cats", _TWO_CATS_SAID)], "two cats")
+
+
+def _reopened_while_asking(qtbot, tmp_path, answer_now, *, unanswered=False):
+    view, _exchange = _asking_for_two_cats(qtbot, tmp_path, answer_once=answer_now,
+                                           unanswered=unanswered)
+    pane = view._generate_pane
+    pane._close_subtab(pane.indexOf(pane.current_generate_tab()))
+    view._on_thumbnail_clicked("orig")
+    exchange = pane.current_generate_tab()._param_form.request_exchange()
+    assert (exchange.turns(), exchange._line.isEnabled()) == ([("two cats", "")], False)
+    return view, exchange
+
+
+def test_a_requests_answer_reaches_the_tab_that_reopened_its_image_while_it_was_asked(
+        qtbot, tmp_path):
+    answer_now = threading.Event()
+    view, exchange = _reopened_while_asking(qtbot, tmp_path, answer_now)
+
+    answer_now.set()
+    qtbot.waitUntil(exchange._line.isEnabled, timeout=5000)
+
+    assert _request_turns_shown(view) == ([("two cats", _TWO_CATS_SAID)], "two cats")
+
+
+def test_a_request_left_unanswered_frees_the_tab_that_reopened_its_image_while_it_was_asked(
+        qtbot, tmp_path):
+    answer_now = threading.Event()
+    view, exchange = _reopened_while_asking(qtbot, tmp_path, answer_now, unanswered=True)
+
+    answer_now.set()
+    qtbot.waitUntil(exchange._line.isEnabled, timeout=5000)
+
+    assert _request_turns_shown(view) == ([], "a cat")
+    assert exchange._status.text() == "couldn't work that into the prompts"
 
 
 def test_the_image_a_request_made_lists_the_request_when_it_lands(qtbot, tmp_path):

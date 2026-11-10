@@ -63,7 +63,7 @@ def test_action_rects_sit_left_of_the_label_star_nearest():
     assert delete.left() >= 0
 
 
-def _tree_with_a_leaf_indented_enough_for_its_icons(qtbot, *, favorite=False):
+def _tree_with_an_indented_leaf(qtbot, *, favorite=False):
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     media = _folder_row("Media", "m")
@@ -82,7 +82,7 @@ def _tree_with_a_leaf_indented_enough_for_its_icons(qtbot, *, favorite=False):
 
 
 def test_clicking_the_delete_icon_on_a_leaf_emits_delete_clicked(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     fired = []
     tree.delete_clicked.connect(fired.append)
 
@@ -93,7 +93,7 @@ def test_clicking_the_delete_icon_on_a_leaf_emits_delete_clicked(qtbot):
 
 
 def test_clicking_the_favorite_icon_on_a_leaf_emits_favorite_clicked(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     fired = []
     tree.favorite_clicked.connect(fired.append)
 
@@ -108,7 +108,7 @@ def _is_red(color) -> bool:
 
 
 def test_a_picked_row_can_be_told_to_offer_no_delete(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     tree.setCurrentItem(leaf)
     fired = []
     tree.delete_clicked.connect(fired.append)
@@ -124,7 +124,7 @@ def test_a_picked_row_can_be_told_to_offer_no_delete(qtbot):
 
 
 def test_a_parent_row_offers_no_actions(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     parent = leaf.parent()
     fired = []
     tree.favorite_clicked.connect(fired.append)
@@ -144,7 +144,7 @@ def _caret_pos(tree, item):
 
 
 def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     parent = leaf.parent()
 
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.RightButton,
@@ -158,7 +158,7 @@ def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
 
 
 def test_left_clicking_the_caret_still_collapses_the_folder(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     parent = leaf.parent()
 
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
@@ -168,7 +168,7 @@ def test_left_clicking_the_caret_still_collapses_the_folder(qtbot):
 
 
 def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
 
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
     assert tree._hover_key == shaped_key("m/w/mo/key", LANDSCAPE)
@@ -179,7 +179,7 @@ def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
 
 
 def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     fired = []
     tree.favorite_clicked.connect(fired.append)
     tree.delete_clicked.connect(fired.append)
@@ -200,14 +200,14 @@ def _shown(item):
 
 
 def test_a_row_leads_with_how_many_items_it_holds(qtbot):
-    _tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
     leaf.setData(0, COUNT_ROLE, 3)
 
     assert _shown(leaf) == "(3) A folder"
 
 
 def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
-    _tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
     leaf.setData(0, COUNT_ROLE, 0)
 
     assert _shown(leaf) == "A folder"
@@ -673,7 +673,7 @@ def _wears_within(tree, item, columns: QRect, ink) -> bool:
 
 
 def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     tree.setStyleSheet(build_stylesheet())
     leaf.setText(0, "")
     tree.setCurrentItem(leaf)
@@ -682,7 +682,7 @@ def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):
 
 
 def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf))
 
     leaf.setData(0, RECENT_ROLE, True)
@@ -694,7 +694,7 @@ def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
 
 
 def test_the_marks_of_folders_at_different_depths_stand_in_one_column(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     outermost = leaf
     while outermost.parent() is not None:
         outermost = outermost.parent()
@@ -715,7 +715,7 @@ def _is_white(color) -> bool:
 
 
 def test_a_picked_folder_lately_worked_in_keeps_its_mark_drawn_white(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
     tree.setStyleSheet(build_stylesheet())
     leaf.setData(0, RECENT_ROLE, True)
     tree.setCurrentItem(leaf)
@@ -730,7 +730,7 @@ def _is_green(color) -> bool:
 
 
 def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot, favorite=True)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot, favorite=True)
     star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
 
     assert _wears_within(tree, leaf, star, _is_green), (
@@ -739,7 +739,7 @@ def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
 
 
 def test_a_picked_favorited_folders_star_is_ringed_in_white(qtbot):
-    tree, leaf = _tree_with_a_leaf_indented_enough_for_its_icons(qtbot, favorite=True)
+    tree, leaf = _tree_with_an_indented_leaf(qtbot, favorite=True)
     tree.setStyleSheet(build_stylesheet())
     star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
     assert not _wears_within(tree, leaf, star, _is_white)

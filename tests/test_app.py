@@ -133,11 +133,11 @@ def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
 
 
 def _opened_and_closed_for_real(child: str, said: Path, state: Path) -> None:
-    never_a_preview_whose_library_is_the_production_apps = {
+    away_from_the_production_library = {
         name: value for name, value in os.environ.items() if name != ENV_FLAG}
     ran = run_python(
         ["-m", child, str(said)],
-        env=never_a_preview_whose_library_is_the_production_apps | {
+        env=away_from_the_production_library | {
             "QT_QPA_PLATFORM": "offscreen", "ORIGENERATOR_STATE_DIR": str(state)},
         logs=[state / "origenerator.log", state / "origenerator_crash.log"])
     assert ran.returncode == 0, ran.stdout + ran.stderr

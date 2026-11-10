@@ -107,7 +107,7 @@ def test_the_animation_settings_are_editable_with_nothing_in_the_drop_zones(qtbo
 
     assert combine._defaults_btn.isEnabled(), (
         "what it opens is about the animations, not about a dropped image, so it is not gated "
-        "on one the way Generate and the other Edit button are")
+        "on one the way Generate and \"Edit individual\u2026\" are")
     assert asked == [True]
 
 

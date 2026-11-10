@@ -1271,8 +1271,7 @@ def test_the_entry_point_hands_the_process_whatever_main_gives_back():
         runpy.run_module("origenerator", run_name="__main__")
 
     assert exit_.value.code == 7, (
-        "the exit is the entry point's, not main's: a main that returns its code can be called and "
-        "read by a test, where one that raises can only be caught")
+        "the exit is the entry point's, not main's")
 
 
 def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):

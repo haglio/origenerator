@@ -29,9 +29,7 @@ def test_find_clips_reads_videos_at_any_depth_in_a_stable_order(tmp_path):
     (tmp_path / "a.mp4").touch()
     (tmp_path / "nested" / "c.webm").touch()
 
-    assert [p.name for p in find_videos(tmp_path)] == ["a.mp4", "b.mp4", "c.webm"], (
-        "sorted, so one set always shuffles out of the same starting list and a test can name what "
-        "it expects")
+    assert [p.name for p in find_videos(tmp_path)] == ["a.mp4", "b.mp4", "c.webm"]
 
 
 def test_find_clips_ignores_files_that_are_not_videos(tmp_path):

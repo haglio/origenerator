@@ -677,10 +677,9 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
-    assert client.canceled == ["exp-1"], (
-        "background experiments belong to the closed app: an open one never has one competing for "
-        "the graphics card")
-    assert client.interrupted == ["exp-1"]
+    assert client.canceled == ["exp-1"]
+    assert client.interrupted == ["exp-1"], (
+        "one may be mid-render, and taking it out of the queue alone would not stop it")
     assert db.get_generation("exp-1") is None
     assert win._gallery_view._live_jobs == {}
 

@@ -432,7 +432,9 @@ def test_the_session_keeps_the_image_each_lanes_videos_the_lane_the_action_and_i
 
     assert controller.selection() == {
         "image": "img", "videos": {action_settings.VIDEO: "clip"},
-        "intent": action_settings.GENAU, "category": "alpha", "checked": ["third box"]}
+        "intent": action_settings.GENAU, "category": "alpha", "checked": ["third box"]}, (
+        "none of them can be recovered from the others: an action says nothing about which lane "
+        "answers it")
 
 
 def test_a_restore_ticks_the_boxes_that_were_ticked(combine):

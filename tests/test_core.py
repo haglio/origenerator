@@ -913,7 +913,9 @@ def test_closing_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
         win.close()
         win.hand_comfyui_what_runs_while_closed()
 
-    flush.assert_called_once_with()
+    assert flush.call_count == 1, (
+        "the queue holds work back for the sake of somebody watching, and closing the app ends "
+        "every one of those reasons: ComfyUI outlives it and works through the rest alone")
 
 
 def test_a_window_closed_without_ever_being_shown_leaves_the_saved_geometry_as_it_was(

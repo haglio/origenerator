@@ -37,8 +37,12 @@ def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
     for shape in ("portrait", "landscape"):
         for button in slideshow_rows(shape)[-1]:
-            assert button.command.startswith(f"{shape}_"), button.command
-            assert button.tooltip, button.command
+            assert button.command.startswith(f"{shape}_"), (
+                "the same spelling a Satellite's button row posts, so the session routes a "
+                "slideshow's press with nothing new to learn: " + button.command)
+            assert button.tooltip, (
+                "every glyph on this HUD is cryptic on purpose, so each one names itself on "
+                "hover: " + button.command)
 
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():

@@ -25,7 +25,9 @@ def test_a_folders_count_and_folder_path_are_each_a_whole_line_of_the_caption(qt
 def test_the_band_holds_two_whole_lines_of_the_caption(qtbot):
     line = QFontMetrics(tile_shape.caption_font()).height()
 
-    assert tile_shape.caption_height() == 2 * line
+    assert tile_shape.caption_height() == 2 * line, (
+        "two lines, so a caption long enough to wrap, a twenty-digit seed or a run in flight "
+        "captioned with its model and its prompt, wraps rather than being clipped")
 
 
 def test_the_tile_is_as_tall_as_its_thumbnail_and_its_caption_need(qtbot):

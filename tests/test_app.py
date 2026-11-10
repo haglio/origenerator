@@ -1059,7 +1059,11 @@ def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library)
     try:
         _boot(library)
 
-        assert qapp.palette().color(QPalette.ColorRole.Highlight) == BLUE
+        assert qapp.palette().color(QPalette.ColorRole.Highlight) == BLUE, (
+            "the sheet dresses the widgets it names; the palette answers for the colors it names "
+            "none of, and left to Qt those are the desktop's, which is how a selected word in "
+            "this dark app came to be highlighted in the accent color the user picked for "
+            "Windows")
     finally:
         qapp.setPalette(prior)
 

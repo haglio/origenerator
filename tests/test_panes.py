@@ -93,6 +93,7 @@ def test_a_held_splitter_is_not_moved_by_dragging_its_handle(qtbot):
     _drag(splitter.handle(1), 120)
 
     assert splitter.sizes() == before
+    # Qt gives a disabled widget no drag, shows no resize pointer over it, and does not light it under the pointer.
     assert not splitter.handle(1).isEnabled()
 
 
@@ -118,7 +119,8 @@ def test_only_a_handle_that_moves_lights_up_under_the_pointer(qtbot):
         resting, lit = _under_the_pointer(free.handle(1))
         assert lit != resting
         resting, lit = _under_the_pointer(held.handle(1))
-        assert lit == resting
+        assert lit == resting, (
+            "lit blue under the pointer, a border says it can be dragged, and a held one cannot")
     finally:
         app.setStyleSheet(prior)
 

@@ -265,6 +265,7 @@ def _drop_in_the_middle_pane(view, mime, source=None) -> bool:
             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     enter, move = QDragEnterEvent(*held), QDragMoveEvent(*held)
     drop = QDropEvent(spot, *held[1:])
+    # A QDropEvent made by hand names no source; Qt's own names where the drag started.
     for event in (enter, move, drop):
         event.source = lambda: source
     QApplication.sendEvent(pane, enter)

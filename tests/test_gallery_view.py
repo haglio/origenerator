@@ -784,6 +784,19 @@ def test_a_tick_hands_the_slideshows_an_item_evolver_just_upscaled(qtbot, monkey
     assert arrived == [["i1"]]
 
 
+def test_a_tick_that_learns_when_an_upscale_was_filed_reorders_latest_by_it(qtbot):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    upscaled = {**view._db._rows[0], "evolver_upscale": "video_one_topaz.mp4"}
+    view._db._rows[0] = upscaled
+    view._poll()
+    view._db._rows[0] = {**upscaled, "evolver_upscaled_at": "2099-01-01T00:00:00+00:00"}
+
+    view._poll()
+
+    assert view._library.recent_rows[0]["prompt_id"] == upscaled["prompt_id"]
+    assert view._library.recent_rows[0]["evolver_upscaled_at"] == "2099-01-01T00:00:00+00:00"
+
+
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,
                                                                             monkeypatch):
     view, _cat, dog = _two_leaf_view(qtbot)

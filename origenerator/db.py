@@ -90,8 +90,8 @@ class Database:
     def set_source(self, prompt_id: str, source: str):
         return self.generations.set_source(prompt_id, source)
 
-    def set_evolver_upscale(self, prompt_id: str, path: str):
-        return self.generations.set_evolver_upscale(prompt_id, path)
+    def set_evolver_upscale(self, prompt_id: str, path: str, upscaled_at: str | None):
+        return self.generations.set_evolver_upscale(prompt_id, path, upscaled_at)
 
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)

@@ -2875,7 +2875,7 @@ def _rows_fingerprint(rows) -> int:
     return hash(tuple(
         (r.get("prompt_id"), r.get("status"), r.get("thumbnail_path"),
          r.get("workflow_name"), r.get("params_json"), r.get("output_files"),
-         r.get("evolver_upscale"))
+         r.get("evolver_upscale"), r.get("evolver_upscaled_at"))
         for r in rows
     ))
 

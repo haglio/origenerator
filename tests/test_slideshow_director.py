@@ -1400,6 +1400,28 @@ def test_a_region_reset_re_points_what_feeds_it(slideshows):
     assert made[0].retuned == ([("g4.png", "image", "g4", None)], set())
 
 
+def test_a_slideshow_counts_as_enhanced_what_the_library_counts_as_enhanced(slideshows):
+    gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g4"), _row("g5")]})
+    director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+    gallery_pane.library.enhanced_ids_of = lambda rows: {"g5"}
+    director.open([("a.png", "image", "g1", None)], location="workflow/a", shape=LANDSCAPE)
+
+    director.reset_region(made[0])
+
+    assert made[0].retuned[1] == {"g5"}
+
+
+def test_an_item_that_lands_is_enhanced_when_the_library_counts_it_so(slideshows):
+    gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g9")]})
+    director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+    gallery_pane.library.enhanced_ids_of = lambda rows: {"g9"}
+    director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
+
+    director.note_finished(_row("g9"))
+
+    assert made[0].added == [("g9", False, True)]
+
+
 def test_a_set_handed_to_a_running_slideshow_brings_its_own_versions_with_it(slideshows):
     gallery_pane = FakeGalleryPane(collections={LATEST_LANDSCAPE: [_row("g9")],
                                        ALL_LANDSCAPE: [_row("g4")]})

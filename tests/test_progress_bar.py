@@ -64,7 +64,8 @@ def test_a_caption_too_long_for_the_bar_scrolls_past_instead_of_being_cut(qtbot)
     narrow.resize(40, 22)
     narrow.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
 
-    assert narrow.scrolling()
+    assert narrow.scrolling(), (
+        "cut short, a caption lost whole readings off its end")
     assert narrow.text() == narrow.caption()
     assert "…" not in narrow.text()
 

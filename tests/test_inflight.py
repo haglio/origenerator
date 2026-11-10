@@ -128,7 +128,8 @@ def test_the_menu_carries_the_act_the_button_has_no_room_for():
 
 
 def test_a_wait_on_the_users_own_jobs_earns_no_line():
-    assert queue_wait_text(None) is None
+    assert queue_wait_text(None) is None, (
+        "a line about a wait on the user's own jobs would send them hunting for jobs that are theirs")
     assert queue_wait_text(0) is None
 
 

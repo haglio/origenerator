@@ -257,7 +257,10 @@ def test_space_after_a_click_in_the_generate_pane_drives_rather_than_pressing_it
 def test_a_slideshow_gets_space_wired_to_the_switch(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
     slideshow = _double_click_slideshow(view, qtbot)
-    assert slideshow._actions.drive_toggle == view.toggle_osr2_drive
+    assert slideshow._actions.drive_toggle == view.toggle_osr2_drive, (
+        "every surface that answers the motion keys sends Space to the one switch rather than "
+        "to the motion it was handed, the slideshow as much as the main window, since a "
+        "slideshow is where the device is usually driven from")
 
 
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):

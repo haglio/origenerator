@@ -101,7 +101,9 @@ def test_with_nothing_listening_the_app_is_started_carrying_the_generation(monke
     command, named = runs[0]
     assert command[0].lower().endswith("wscript.exe")
     assert command[1] == str(tmp_path / "launch_origenerator.vbs")
-    assert named["env"][app_link.CARRIED_IN] == "alpha-1"
+    assert named["env"][app_link.CARRIED_IN] == "alpha-1", (
+        "the generation rides in the environment, which is what a launcher passes on and "
+        "arguments are not")
 
 
 def test_a_running_app_is_handed_the_generation_rather_than_a_second_copy_started(

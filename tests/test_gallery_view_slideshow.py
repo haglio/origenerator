@@ -400,7 +400,9 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    assert view._buttons.slideshow.isHidden()
+    assert view._buttons.slideshow.isHidden(), (
+        "a button offering a slideshow that opens nothing is worse than no button; it comes "
+        "back once the first item lands")
 
 
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
@@ -690,7 +692,10 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
 
 def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
-    assert slideshow.findChildren(Osr2Controls) == []
+    assert slideshow.findChildren(Osr2Controls) == [], (
+        "a slideshow used to float two, the HUD and the OSR2 controls under it: between them "
+        "the status was said twice and disagreed, and previous, next, lock and trash were drawn "
+        "on both")
     posted = [button.command for _rect, button in hud_targets(slideshow.shown).buttons]
     assert "robot_hand_cycle_shape" in posted
     assert any(command.endswith("_clip_seconds_up") for command in posted)

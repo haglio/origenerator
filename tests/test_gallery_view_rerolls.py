@@ -484,7 +484,9 @@ def test_turning_populate_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_
     second = _selected_folder(view)
 
     assert view._populate.is_active(second)
-    assert not view._populate.is_active(first)
+    assert not view._populate.is_active(first), (
+        "one folder at a time: Populate in two would take turns on the machine, each waiting "
+        "out the other's render")
     assert view._buttons.populate.isChecked()
 
 
@@ -863,7 +865,9 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_populate_runs_in(qtbot, t
 
     view._buttons.populate_tip.link_activated.emit("populate")
 
-    assert _selected_folder(view) == key
+    assert _selected_folder(view) == key, (
+        "being taken there is the whole of what the tip is for: naming the folder would be no "
+        "help, since the names are long and alike")
 
 
 
@@ -1115,7 +1119,9 @@ def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp
 
     view._on_generate_requested(config.workflow_name, [config.params])
 
-    assert tab._generate_btn.isEnabled() is False
+    assert tab._generate_btn.isEnabled() is False, (
+        "the user's rule: one item at a time per folder. The press that starts a run takes the "
+        "button with it, so the second half of a double-click lands on nothing")
 
 
 def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tmp_path):

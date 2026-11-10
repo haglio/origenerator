@@ -2052,7 +2052,10 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
                        intent=view._combine.widget.selected_intent()))
 
     row, = view._queue.rows()
-    assert row._note_text == "Starting…"
+    assert row._note_text == "Starting…", (
+        "checking every stored generation for a duplicate, building the settings and posting "
+        "the prompt all run on the window's thread; with nothing on screen for that stretch the "
+        "button reads as one that did nothing")
     assert view._live_jobs == {}
 
     deferred[0]()
@@ -2200,7 +2203,8 @@ def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot, monkeypatch):
 
     view._queue._clear.click()
 
-    assert client.cleared == 1
+    assert client.cleared == 1, (
+        "the user's ask: a way out from under a queue the user did not fill")
 
 
 def test_clearing_can_be_declined_at_the_prompt(qtbot, monkeypatch):
@@ -2290,7 +2294,9 @@ def test_cancel_all_cancels_every_job_from_the_back_of_the_line_forward(qtbot, m
 
     view._queue._cancel_all.click()
 
-    assert cancelled == ["c", "b", "a"]
+    assert cancelled == ["c", "b", "a"], (
+        "from the back of the line forward, so nothing waiting starts only to be stopped a "
+        "moment later")
 
 
 def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
@@ -2321,7 +2327,8 @@ def test_cancel_all_leaves_populate_on_to_start_its_next_seed(
 
     view._queue._cancel_all.click()
 
-    assert view._populate.is_active(key)
+    assert view._populate.is_active(key), (
+        "the user's call: Cancel All does not switch Populate off")
     (next_seed,) = view._jobs.all_jobs
     assert next_seed.prompt_id != job.prompt_id
 

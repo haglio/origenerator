@@ -18,7 +18,9 @@ def test_the_everyday_launcher_is_no_branch_session():
 
 def test_both_library_windows_run_on_the_primary_checkouts_venv():
     assert {launcher.file for launcher in launchers(REPO_ROOT) if launcher.venv == "primary" and not launcher.preview} == {
-        "sort_images.vbs", "check_animations.vbs"}
+        "sort_images.vbs", "check_animations.vbs"}, (
+        "a worktree has no virtual environment of its own, and these two windows read and write "
+        "the production library, so they borrow the production checkout's")
 
 
 @on_windows

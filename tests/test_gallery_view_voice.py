@@ -836,7 +836,8 @@ def test_a_spoken_loop_takes_the_one_action_the_sorted_image_leaves(qtbot, tmp_p
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_action.png [output]"
-    assert view._db.get_generation(job.prompt_id)["genau_requested_at"]
+    assert view._db.get_generation(job.prompt_id)["genau_requested_at"], (
+        "spoken, so it hands itself on: whoever said it is not at the keyboard")
 
 
 def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_path,
@@ -898,7 +899,9 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
-    assert surface.noted[0] == "img_action"
+    assert surface.noted[0] == "img_action", (
+        "answered on the surface that heard it, not in a dialog over it: the speaker is looking "
+        "at the image, not at this pane")
     assert "alpha" in surface.noted[1]
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
@@ -917,7 +920,10 @@ def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, mo
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
-    assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING), (
+        "saying it twice is what one does when the first time appeared to do nothing, and two "
+        "identical runs would spend minutes of the one GPU making a video that is already "
+        "coming")
     assert len(_spoken_genau_rows(view)) == 1
 
 
@@ -1340,7 +1346,9 @@ def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
 
     view._voice.listener.speak("next shape")
 
-    assert surface.said == view._osr2_motion.status_text()
+    assert surface.said == view._osr2_motion.status_text(), (
+        "the driver belongs to the whole app, so its words belong to no surface, but the answer "
+        "goes where the speaker is looking")
 
 
 def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):

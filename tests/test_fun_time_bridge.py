@@ -1090,7 +1090,9 @@ def test_the_moment_this_app_is_up_each_funestra_it_was_handed_is_dealt_its_radi
 
     bridge._tick()
 
-    assert _stations_dealt(tmp_path) == [3, 3]
+    assert _stations_dealt(tmp_path) == [3, 3], (
+        "dealt the moment this app is up: the stations play on out of earshot from then, so an "
+        "image tunes in wherever its station has got to")
 
 
 def test_the_radio_is_dealt_once_however_often_this_app_says_it_is_up(qtbot, tmp_path):

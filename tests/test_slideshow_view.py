@@ -316,7 +316,8 @@ def test_a_locked_video_replays_instead_of_advancing(qtbot):
     _press(view, Qt.Key.Key_Right)
     _press(view, Qt.Key.Key_Down)
     _runs_out(view)
-    assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video")
+    assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video"), (
+        "a lock is repeat-one, as Fun Time's is")
     assert view.slideshow.locked
 
 
@@ -335,7 +336,9 @@ def test_stepping_away_releases_the_lock(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Right)
-    assert not view.slideshow.locked
+    assert not view.slideshow.locked, (
+        "Right off a locked slide is the way out of the lock, with no second Down needed, "
+        "matching Fun Time's next and previous")
     assert view.slideshow._set.playlist.current() == Slide("b.mp4", "video")
 
     _press(view, Qt.Key.Key_Down)
@@ -559,7 +562,9 @@ def test_locking_a_slide_asks_for_it_to_be_enhanced(qtbot):
 
     _press(view, Qt.Key.Key_Down)
 
-    assert asked == ["id-a"]
+    assert asked == ["id-a"], (
+        "stopping on an image is the gesture that says the user wants it, so it is also the one "
+        "that asks for the better version")
     assert view.slideshow.locked
     assert view.slideshow.hud_item_note == "Enhancement queued"
 
@@ -694,7 +699,9 @@ def test_the_forward_step_out_of_a_row_down_to_one_image_ends_the_loop(qtbot):
     view.slideshow.slideshow_step(1)
     _settle(view)
 
-    assert view.slideshow.hud_map().loop == ""
+    assert view.slideshow.hud_map().loop == "", (
+        "the forward step ends the loop and puts up what the set plays next, the way it steps "
+        "out of a lock")
     assert shown == ["id-b"]
 
 
@@ -1122,7 +1129,9 @@ def test_locking_favorites_the_item_on_screen(qtbot):
     _press(view, Qt.Key.Key_Down)
 
     assert view.slideshow.locked
-    assert favorite == ["gen-a"]
+    assert favorite == ["gen-a"], (
+        "locking a slide is how the user says this one is worth keeping; having said it once "
+        "they should not have to say it again in a second way")
 
 
 def test_letting_go_of_the_lock_does_not_unfavorite(qtbot):
@@ -1169,7 +1178,9 @@ def test_a_spoken_lock_favorites_the_slide_like_a_pressed_one(qtbot):
     view.slideshow.set_locked(True)
     _settle(view)
 
-    assert favorite == ["gen-a"]
+    assert favorite == ["gen-a"], (
+        "locking is Down's whole gesture here; a spoken lock must not quietly mean less than a "
+        "pressed one")
 
 
 def test_asking_to_let_go_releases_only_what_was_locked(qtbot):
@@ -1224,7 +1235,9 @@ def test_stepping_off_a_locked_slide_releases_it(qtbot):
     view.slideshow.slideshow_step(1)
     _settle(view)
 
-    assert not view.slideshow.locked
+    assert not view.slideshow.locked, (
+        "the same rule the arrows follow: a lock holds the slide it was set on, not wherever "
+        "the user wanders to")
 
 
 def _on_screen_wearing_its_hud(qtbot, view):
@@ -1259,7 +1272,8 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
     gestures.double_click(view._pane._window, _on_the_slide(view))
 
     qtbot.waitUntil(lambda: not view.isVisible())
-    assert closes == [True]
+    assert closes == [True], (
+        "a double-click is the way out of every other fullscreen view here")
 
 
 def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_lock(qtbot):
@@ -1316,7 +1330,9 @@ def test_closing_announces_itself(qtbot):
     closes = []
     view.slideshow.closed.connect(lambda: closes.append(True))
     view.close()
-    assert closes == [True]
+    assert closes == [True], (
+        "the gallery keeps listening for voice commands tied to a surface being up, so a "
+        "dismissal it did not start must still reach it")
 
 
 
@@ -2053,7 +2069,10 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_p
     view._pane.tick()
     _settle(view)
 
-    assert view.slideshow._set.playlist.current()[2] == "i-1"
+    assert view.slideshow._set.playlist.current()[2] == "i-1", (
+        "a video carries no dwell timer, its own length is its dwell, so a video that never "
+        "reports an end would be a black screen for the rest of the session; it is stepped past "
+        "instead")
 
 
 def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
@@ -2069,7 +2088,9 @@ def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
     view._pane.tick()
     _settle(view)
 
-    assert view.slideshow._set.playlist.current()[2] == "i-1"
+    assert view.slideshow._set.playlist.current()[2] == "i-1", (
+        "a lock replays the video it holds, which would hold a video that cannot play forever, "
+        "so this one step happens regardless")
 
 
 _THREE = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
@@ -2095,7 +2116,9 @@ def test_a_reopened_slideshow_stands_where_the_last_one_was_closed(qtbot):
     reopened = _view(qtbot, _THREE, shuffle=lambda order: order.reverse())
     assert reopened.slideshow.resume(closed.slideshow.state()) is True
 
-    assert reopened.slideshow._set.playlist.current()[2] == "id-c"
+    assert reopened.slideshow._set.playlist.current()[2] == "id-c", (
+        "closing a slideshow is usually a detour, to the folder under the item or a fix in a "
+        "tab, so coming back is coming back to that item")
     assert _media_on_screen(reopened) == "c.png"
 
 

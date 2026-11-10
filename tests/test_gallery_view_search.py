@@ -646,8 +646,13 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
 
     _search_for(view, "cat")
 
-    assert len(view.listed_prompt_ids()) == 200
-    assert "205 results" in view._search._count.text()
+    assert len(view.listed_prompt_ids()) == 200, (
+        "a one-word query over a full library can match most of it, and thousands of tiles in "
+        "one pass locks the window; the cap is written out here rather than read from the "
+        "constant that sets it, or this test would pass at any cap at all")
+    assert "205 results" in view._search._count.text(), (
+        "the cap is stated rather than silent: the count alone would read as that many tiles to "
+        "scroll to")
     assert "add a word" in view._search._count.text()
 
 
@@ -743,7 +748,9 @@ def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
 
     _search_for(view, "cat")
 
-    assert [row["prompt_id"] for row in view.rows_to_play()] == ["i1", "i2"]
+    assert [row["prompt_id"] for row in view.rows_to_play()] == ["i1", "i2"], (
+        "a search's results are gathered exactly as a collection's are, and sitting through "
+        "what one turned up is a good reason to have run it")
     assert "these results" in view._buttons.slideshow.toolTip()
 
 

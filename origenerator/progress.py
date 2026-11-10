@@ -5,7 +5,7 @@ _AUDIO_STEP_SECONDS_PER_SECOND = 0.03
 _IMAGE_STEP_SECONDS = 0.5
 _DETAIL_STEP_SECONDS = 0.15
 
-_LATENT_SIZE_INPUTS = ("length", "width", "height", "batch_size")
+_INPUTS_ONLY_A_VIDEO_LATENT_HAS_ALL_OF = ("length", "width", "height", "batch_size")
 
 
 def _ksampler_steps(inputs: dict) -> int:
@@ -39,7 +39,7 @@ def _video_latent_frames(payload: dict) -> int:
     frames = 0
     for node in payload.values():
         inputs = node.get("inputs", {})
-        if all(key in inputs for key in _LATENT_SIZE_INPUTS):
+        if all(key in inputs for key in _INPUTS_ONLY_A_VIDEO_LATENT_HAS_ALL_OF):
             frames = max(frames, int(_literal(inputs["length"], 0)))
     return frames
 

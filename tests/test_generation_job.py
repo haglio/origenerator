@@ -133,7 +133,8 @@ def test_the_stage_is_named_from_the_first_node_long_before_any_step(qtbot, tmp_
     job.start()
 
     client.node_executing.emit("comfy-A", "4")
-    assert job.last_stage == "Loading models"
+    assert job.last_stage == "Loading models", (
+        "a WAN video spends over a minute loading its models before it reports a step")
     client.node_executing.emit("comfy-A", "12")
     assert job.last_stage == "Loading the image"
     client.node_executing.emit("comfy-A", "8")
@@ -503,7 +504,8 @@ def test_take_backlog_holds_another_apps_count_while_the_job_waits(qtbot, tmp_pa
 
     job.take_backlog(3)
 
-    assert job.foreign_ahead == 3
+    assert job.foreign_ahead == 3, (
+        "ComfyUI serves other apps too, and a wait behind their work, left unexplained, looks like a hang")
 
 
 def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):

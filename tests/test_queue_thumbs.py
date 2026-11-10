@@ -38,7 +38,8 @@ def test_a_cell_shows_the_whole_image_letterboxed(qapp, tmp_path):
     block = source_pixmap(Combination(red), CELL)
 
     assert _color_at(block, CELL // 2, CELL // 2).red() > 200
-    assert _color_at(block, CELL // 2, 0).alpha() == 0
+    assert _color_at(block, CELL // 2, 0).alpha() == 0, (
+        "a crop takes off the edges, and an off-center subject becomes an image of something else")
     assert _color_at(block, CELL // 2, CELL - 1).alpha() == 0
 
 
@@ -52,7 +53,8 @@ def test_a_tall_thumbnail_is_pillarboxed_instead(qapp, tmp_path):
 
 
 def test_a_missing_file_is_no_thumbnail_rather_than_a_blank_one(qapp, tmp_path):
-    assert source_pixmap(Combination(tmp_path / "gone.png"), CELL) is None
+    assert source_pixmap(Combination(tmp_path / "gone.png"), CELL) is None, (
+        "a start frame can have moved and a thumbnail can be half written: neither is a fault")
     assert source_pixmap(Combination(), CELL) is None
 
 
@@ -124,7 +126,8 @@ def test_the_thumbnails_lie_across_the_row_not_stacked(qapp, tmp_path):
 
     block = folder_pixmap(paths, CELL)
 
-    assert (block.width(), block.height()) == (block_width(CELL), CELL)
+    assert (block.width(), block.height()) == (block_width(CELL), CELL), (
+        "stacked two by two, each cell is half a row high and four read as one smudge")
     assert _color_at(block, _middle_of_cell(0), CELL // 2).red() > 200
     assert _color_at(block, _middle_of_cell(1), CELL // 2).green() > 200
     assert _color_at(block, _middle_of_cell(2), CELL // 2).blue() > 200
@@ -139,7 +142,8 @@ def test_a_folder_view_keeps_its_empty_slots(qapp, tmp_path):
     block = folder_pixmap([one], CELL)
 
     assert _color_at(block, _middle_of_cell(0), CELL // 2).red() > 200
-    assert _color_at(block, _middle_of_cell(3), CELL // 2).alpha() > 0
+    assert _color_at(block, _middle_of_cell(3), CELL // 2).alpha() > 0, (
+        "drawn faint, an unfilled cell reads as a folder with room, not a thumbnail that failed to load")
 
 
 def test_a_start_frame_leaves_the_rest_of_the_block_empty(qapp, tmp_path):
@@ -148,7 +152,8 @@ def test_a_start_frame_leaves_the_rest_of_the_block_empty(qapp, tmp_path):
     block = source_pixmap(Combination(frame), CELL)
 
     assert _color_at(block, _middle_of_cell(0), CELL // 2).red() > 200
-    assert _color_at(block, _middle_of_cell(3), CELL // 2).alpha() == 0
+    assert _color_at(block, _middle_of_cell(3), CELL // 2).alpha() == 0, (
+        "a start frame's block has nothing missing from it")
 
 
 def test_one_thumbnail_takes_the_same_width_as_four(qapp, tmp_path):
@@ -179,7 +184,8 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
                         lambda *a: reads.append(a) or None)
     again = source_pixmap(Combination(thumbnail), CELL)
 
-    assert reads == []
+    assert reads == [], (
+        "the queue redraws at every poll, and a start frame is a full-size render")
     assert again is not None
 
 
@@ -197,7 +203,9 @@ def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
     for path in (a, c, b):
         fitted_cell(path, CELL)
 
-    assert len(reads) == 1
+    assert len(reads) == 1, (
+        "the seed dropdown draws a cell for every seed scrolled past, "
+        "which over a session can be the whole library")
 
 
 def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
@@ -221,7 +229,8 @@ def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):
 
     thumbs.show_folder(folder)
 
-    assert thumbs.pixmap() is first or thumbs.pixmap().cacheKey() == first.cacheKey()
+    assert thumbs.pixmap() is first or thumbs.pixmap().cacheKey() == first.cacheKey(), (
+        "the queue hands every row a fresh reading at every poll")
 
 
 def test_a_source_frame_that_is_not_on_disk_yet_leaves_the_block_to_the_folder(
@@ -240,7 +249,7 @@ def test_a_block_with_nothing_to_show_leaves_the_row(qtbot, tmp_path):
 
     thumbs.clear_block()
 
-    assert thumbs.isHidden()
+    assert thumbs.isHidden(), "an empty block would say there was a thumbnail to show"
 
 
 def test_the_block_never_eats_the_rows_click(qtbot):

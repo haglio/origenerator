@@ -217,7 +217,7 @@ class _Tracker(QObject):
             self._paint(spans, self._prompt_caret)
 
     def _on_contents_change(self, position: int, removed: int, added: int) -> None:
-        # Qt: a struck-through line break does not report itself as struck, so no format is read back.
+        # Qt: a struck-through line break does not report itself as struck.
         if self._writing:
             return
         inserted = self._edit.toPlainText()[position:position + added]

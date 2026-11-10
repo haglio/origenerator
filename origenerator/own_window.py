@@ -21,8 +21,8 @@ def taskbar_app(title: str, launcher: str, preview):
     from shared_ui.preview_icon_pil import icon_file
 
     from origenerator.config import PROJECT_DIR, STATE_DIR
-    # Windows: a taskbar button told neither wears the icon of the python that started the window
-    # whenever the window is too busy to answer for itself.
+    # Windows: a taskbar button told neither its icon nor how to reopen the window wears the icon
+    # of the python that started the window whenever the window is too busy to answer for itself.
     return TaskbarApp(name=f"Origenerator — {title}",
                       icon=icon_file(PROJECT_DIR / "icon.ico", preview, STATE_DIR),
                       relaunch=f'wscript.exe "{PROJECT_DIR / launcher}"')

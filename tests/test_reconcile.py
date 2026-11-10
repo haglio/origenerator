@@ -14,7 +14,7 @@ from origenerator.favorite_reconcile import (
     stamp_custom_collection_shapes,
 )
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
-from origenerator.inflight import reconcile_in_flight
+from origenerator.inflight import in_flight_at, reconcile_in_flight
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -142,6 +142,20 @@ def test_server_unreachable_leaves_rows_intact(tmp_path):
         "a server that cannot be read is no evidence the job is gone")
     assert db.get_generation("p1")["status"] == "running"
     assert summary["running"] == 1
+
+
+def test_a_reconcile_among_the_runs_in_flight_at_launch_leaves_a_later_run_alone(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _insert_in_flight(db, "from-before")
+    at_launch = in_flight_at(db)
+    _insert_in_flight(db, "this-session")
+
+    summary = reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"),
+                                  among=at_launch)
+
+    assert db.get_generation("from-before") is None
+    assert db.get_generation("this-session")["status"] == "running"
+    assert summary == {"finalized": 0, "running": 0, "cleared": 1}
 
 
 def test_no_in_flight_rows_is_a_noop(tmp_path):

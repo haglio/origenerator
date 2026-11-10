@@ -1070,10 +1070,9 @@ class GalleryView(QWidget):
             rows, meta, requests, fingerprint = listing
             if fingerprint != self._fingerprint and read_at == self._drawn_version:
                 self._fingerprint = fingerprint
-                listed_before = self._live_ids
+                listed_before = self._library.rows
                 self._rebuild(rows, meta)
-                self._slideshows.note_arrived([row for row in self._library.rows
-                                               if row["prompt_id"] not in listed_before])
+                self._slideshows.note_arrived(_arrived(self._library.rows, listed_before))
             else:
                 self._gallery_pane.refresh_inflight(rows=rows, requests=requests)
             self._update_queue(self._inflight_items(rows=rows, requests=requests))
@@ -2875,9 +2874,16 @@ def _fingerprint(rows, meta) -> tuple[int, int]:
 def _rows_fingerprint(rows) -> int:
     return hash(tuple(
         (r.get("prompt_id"), r.get("status"), r.get("thumbnail_path"),
-         r.get("workflow_name"), r.get("params_json"), r.get("output_files"))
+         r.get("workflow_name"), r.get("params_json"), r.get("output_files"),
+         r.get("evolver_upscale"))
         for r in rows
     ))
+
+
+def _arrived(rows, before) -> list[dict]:
+    upscale_before = {row["prompt_id"]: row.get("evolver_upscale") for row in before}
+    return [row for row in rows if row["prompt_id"] not in upscale_before
+            or upscale_before[row["prompt_id"]] != row.get("evolver_upscale")]
 
 
 def _folder_meta_fingerprint(meta) -> int:

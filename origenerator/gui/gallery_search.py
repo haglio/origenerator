@@ -12,7 +12,7 @@ from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
 
-_PAUSE_BEFORE_THE_MODEL_IS_ASKED_MS = 700
+_ONE_ASK_PER_PAUSE_MS = 700
 _DELAY_MS = 300
 MIN_CHARS = 3
 _SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_MODEL_LORA))
@@ -65,7 +65,7 @@ class GallerySearchController(QObject):
         self._timer.timeout.connect(self._run_pending)
         self._expand_timer = QTimer(self)
         self._expand_timer.setSingleShot(True)
-        self._expand_timer.setInterval(_PAUSE_BEFORE_THE_MODEL_IS_ASKED_MS)
+        self._expand_timer.setInterval(_ONE_ASK_PER_PAUSE_MS)
         self._expand_timer.timeout.connect(self._request_expansion)
 
         self.field = ScopeSearchEdit()

@@ -74,6 +74,13 @@ def test_a_filter_pressed_is_told_of_and_one_taken_up_is_not():
     assert told == [SlideshowFilters()]
 
 
+def test_original_only_keeps_what_is_not_enhanced():
+    slideshow_set, _dealt = _set(hud=HudFacts(enhanced_ids={"id-2"}))
+
+    assert slideshow_set.set_filters(SlideshowFilters(originals=True)) is True
+    assert [item.prompt_id for item in slideshow_set.playlist.items] == ["id-1", "id-3"]
+
+
 def test_a_switch_that_would_leave_nothing_is_refused():
     slideshow_set, dealt = _set()
 

@@ -175,6 +175,8 @@ class SlideshowSet:
             return False
         if filters.enhanced and prompt_id not in self.enhanced_ids:
             return False
+        if filters.originals and prompt_id in self.enhanced_ids:
+            return False
         return not filters.action or actions_are_filtered(self._named_for(prompt_id), filters.action)
 
     def _named_for(self, prompt_id) -> str:

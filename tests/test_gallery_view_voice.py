@@ -1301,7 +1301,8 @@ def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
 
     assert bars.amplitude == amplitude - 10
     assert bars.center == center + 5
-    assert words(view._voice.status) == view._osr2_motion.status_text()
+    assert words(view._voice.status) == view._osr2_motion.status_text(), (
+        "answered with what the device now reads, which is the line the OSR2 controls show")
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):

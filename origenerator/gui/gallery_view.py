@@ -1070,7 +1070,10 @@ class GalleryView(QWidget):
             rows, meta, requests, fingerprint = listing
             if fingerprint != self._fingerprint and read_at == self._drawn_version:
                 self._fingerprint = fingerprint
+                listed_before = self._live_ids
                 self._rebuild(rows, meta)
+                self._slideshows.note_arrived([row for row in self._library.rows
+                                               if row["prompt_id"] not in listed_before])
             else:
                 self._gallery_pane.refresh_inflight(rows=rows, requests=requests)
             self._update_queue(self._inflight_items(rows=rows, requests=requests))

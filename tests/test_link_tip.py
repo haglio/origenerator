@@ -18,6 +18,7 @@ def _watched(qtbot, html="hello <a href=\"go\">there</a>"):
 
 def _enter(widget):
     point = QPointF(1.0, 1.0)
+    # Qt's event filters only see what is dispatched, so the event goes through the application, as the pointer's own do.
     QApplication.sendEvent(widget, QEnterEvent(point, point, widget.mapToGlobal(point)))
 
 

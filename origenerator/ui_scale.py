@@ -37,6 +37,7 @@ def apply_room_scale(*, in_a_headset: bool) -> float:
 
 def draw_at(factor: float) -> None:
     # Both are private API exported by Qt6Gui.dll (checked on Qt 6.11): Qt otherwise reads QT_SCALE_FACTOR only at startup, and setGlobalFactor leaves the application's device pixel ratio, which every QIcon.pixmap draws at, cached at the old factor.
+    # Qt on Windows moves every screen's logical geometry at once, and a window hidden and shown again after it draws at the new ratio.
     try:
         qt_gui = ctypes.WinDLL("Qt6Gui.dll")
         set_global_factor = getattr(qt_gui, "?setGlobalFactor@QHighDpiScaling@@SAXN@Z")

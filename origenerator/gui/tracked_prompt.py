@@ -69,6 +69,7 @@ class UndoHistory(QObject):
             undo = event.matches(QKeySequence.StandardKey.Undo)
             redo = event.matches(QKeySequence.StandardKey.Redo)
             if undo or redo:
+                # Accepted at the ShortcutOverride so Qt gives the key to the field and not to a window-wide Undo shortcut.
                 event.accept()
                 if event.type() == QEvent.Type.KeyPress:
                     self._step(*((self._undone, self._redone) if undo

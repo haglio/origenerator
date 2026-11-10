@@ -572,3 +572,15 @@ def test_the_run_ending_takes_both_overlays_away(qtbot):
     assert tw._status_scrim.isHidden()
     assert tw._enhancing_bar.isHidden()
     assert not tw._enhancing_tick.isActive()
+
+
+def test_a_tile_told_the_selection_it_already_has_is_not_styled_again(qtbot):
+    tw = ItemTile("p1", None, "label")
+    qtbot.addWidget(tw)
+    tw.set_selected(True)
+    styled = []
+    tw._apply_styles = lambda: styled.append("styled")
+
+    tw.set_selected(True)
+
+    assert styled == [], "a click that did not move the selection restyles no thumbnail"

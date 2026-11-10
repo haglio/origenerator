@@ -46,7 +46,8 @@ def test_the_tip_can_be_clicked_into(qtbot):
         "Qt's own tooltip is transparent to the mouse and vanishes as the pointer moves toward it, so "
         "a link inside one can be drawn but never followed")
     flags = tip._popup.label.textInteractionFlags()
-    assert flags & Qt.TextInteractionFlag.LinksAccessibleByMouse
+    assert flags == Qt.TextInteractionFlag.LinksAccessibleByMouse, (
+        "links only: selecting the text would swallow the click that follows one")
 
 
 def test_following_a_link_reports_its_href_and_closes_the_tip(qtbot):

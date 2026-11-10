@@ -217,3 +217,14 @@ def test_the_handler_windows_runs_answers_out_of_its_own_checkout(tmp_path):
 
     assert handler.returncode == 2, handler.stderr
     assert handler.stdout == ""
+
+
+def test_follow_reads_what_the_registered_command_passes(monkeypatch, tmp_path):
+    monkeypatch.setattr(app_link, "hand_over", lambda *a, **k: True)
+    command = app_link.handler_command(checkout=tmp_path, interpreter=Path("python.exe"))
+    _interpreter, _handler, *passed = [
+        part.strip('"') for part in command.replace("%1", app_link.link_to("alpha-1")).split('" "')]
+
+    assert app_link.follow(passed, checkout=tmp_path) == 0, (
+        "what the command registered with Windows passes and what the handler reads are written "
+        "in two places, and have to agree")

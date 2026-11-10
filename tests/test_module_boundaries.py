@@ -267,3 +267,13 @@ def test_the_script_that_speaks_imports_nothing_of_this_app():
 
     assert not [module for module in imported if module.split(".")[0] == "origenerator"], (
         "it is run by path under the speech environment's own Python, which has none of this app installed")
+
+
+@pytest.mark.parametrize("surface", ["inflight_tile", "job_queue_view", "hud_queue"])
+def test_a_surface_showing_work_in_flight_never_reaches_the_job(surface):
+    imported = _modules_imported_by(f"origenerator/gui/{surface}.py")
+
+    assert not {module for module in imported
+                if module.split(".")[-1] in ("generation_job", "job_queue", "db")}, (
+        "each is handed one record per job, what to draw and how to stop it and go to it, so none "
+        "knows where a job came from")

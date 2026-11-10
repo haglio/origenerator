@@ -750,6 +750,16 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
     mock_stamp.assert_not_called()
 
 
+def test_a_taskbar_identity_windows_refuses_still_stamps_the_pin():
+    with patch("origenerator.app.sys.platform", "win32"),          app_id_claimed() as mock_set_id,          pinned_shortcuts_stamped() as mock_stamp:
+        mock_set_id.side_effect = OSError("refused")
+        _init_windows_taskbar_identity(None, None)
+
+    assert mock_stamp.call_count == 1, (
+        "the pin is the standalone launch's own, and goes on activating it whatever became of the "
+        "process's identity")
+
+
 def test_a_preview_is_named_on_its_taskbar_button_by_the_feature_it_demos(tmp_path):
     app = _the_preview_on_the_taskbar(Preview(feature="the new seed row"), tmp_path)
 

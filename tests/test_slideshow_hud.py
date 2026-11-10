@@ -512,7 +512,9 @@ class TestTheQueueOnTheOneHud:
     def test_a_slideshow_over_core_hangs_the_job_queue_at_its_foot(self, qtbot):
         window = _core_as(qtbot, over=True)
 
-        assert [line.key for line in window._hud_model().foot.lines] == ["j1"]
+        assert [line.key for line in window._hud_model().foot.lines] == ["j1"], (
+            "a slideshow covers Core's Job Queue just when the user keeps adding to it, so the HUD the "
+            "slideshow already wears carries the queue")
 
     def test_a_slideshow_beside_a_minimized_core_hangs_the_job_queue_at_its_foot(
             self, qtbot):

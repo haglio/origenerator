@@ -58,7 +58,9 @@ def test_the_job_queue_keeps_one_size_whatever_is_in_flight():
         ([_item(f"j{index}", typical_seconds=30) for index in range(7)], 2),
     )}
 
-    assert len(sizes) == 1
+    assert len(sizes) == 1, (
+        "a HUD that grew a row per queued job would run off the screen the first time a folder's "
+        "Modify filled the line")
 
 
 def test_the_job_queue_fits_the_width_the_hud_already_has():
@@ -110,9 +112,12 @@ def test_a_video_waiting_at_the_head_of_the_line_leads_the_block():
     assert section.idle_note == ""
 
 
+CLEAR_OF_A_ROLLOVER = 0.5
+
+
 def test_a_video_waiting_out_the_minute_after_an_image_says_when_it_starts():
     section = queue_section([_item("waiting-one", job_kind="Video",
-                                   starts_at=time.monotonic() + 42.5)], 0)
+                                   starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)], 0)
 
     assert section.leader.wait == "Starts in 0:43"
 
@@ -135,7 +140,7 @@ def _posted(targets) -> list[str]:
 
 def test_a_video_waiting_out_the_minute_offers_start_now_beside_its_countdown():
     section = queue_section([_item("waiting-one", job_kind="Video",
-                                   starts_at=time.monotonic() + 42.5)], 0)
+                                   starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)], 0)
 
     _image, targets = _painted(section)
 
@@ -487,7 +492,9 @@ class TestThePointerOnTheBlock:
         pointer.drag(x, y + 40)
         pointer.release(x, y + 40)
 
-        assert host.moved == []
+        assert host.moved == [], (
+            "a shielded run being made, or one this window holds no job for, has no move, so its row "
+            "has nowhere to go")
 
     def test_nothing_can_be_let_go_in_front_of_a_job_that_holds_its_place(self):
         pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),

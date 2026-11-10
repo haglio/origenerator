@@ -37,13 +37,16 @@ def _ids(payload, class_type):
 
 
 def test_a_lone_sampler_is_budgeted_at_a_still_step_per_step():
-    assert expected_sampling_seconds(_payload("flux_t2i_upscaled", steps=30)) == 15
+    assert expected_sampling_seconds(_payload("flux_t2i_upscaled", steps=30)) == 15, (
+        "30 steps at a still's flat half second: with nothing to weigh a lone sampler against, "
+        "all that matters is that the total doubles with the steps")
     assert expected_sampling_seconds(_payload("flux_t2i_upscaled", steps=60)) == 30
 
 
 def test_expected_seconds_sums_the_base_and_enhance_passes():
     payload = _payload("sdxl_t2i", steps=50, enhance=True, enhance_steps=20)
-    assert expected_sampling_seconds(payload) == 35
+    assert expected_sampling_seconds(payload) == 35, (
+        "50 base steps and 20 enhance steps, each at a still's half second")
 
 
 def test_the_audio_pass_is_a_sliver_of_a_video_job_not_most_of_it():
@@ -83,7 +86,8 @@ def test_a_detail_fix_costs_less_per_step_than_the_render_it_patches(enhance_pay
     assert all(cost < tail for node, (_, cost) in costs.items() if node != tail_id)
     assert expected_sampling_seconds(enhance_payload(
         enhance_steps=20,
-        enhance_detail_fixes={"faces": 0.45, "hands": 0.5})) == 16
+        enhance_detail_fixes={"faces": 0.45, "hands": 0.5})) == 16, (
+        "the tail's 20 steps come to 10, and each of the two fixes' cheaper 20 to 3")
 
 
 def test_expected_pass_count_is_one_for_a_lone_sampler():
@@ -155,8 +159,10 @@ def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_
 
 
 def test_the_minutes_before_the_first_step_are_named_too():
-    names = stage_names(_payload("wan22_i2v", steps=20))
-    assert names["4"] == "Loading models"
+    payload = _payload("wan22_i2v", steps=20)
+    names = stage_names(payload)
+    the_high_noise_model, *_ = _ids(payload, "UNETLoader")
+    assert names[the_high_noise_model] == "Loading models"
     assert names["10"] == "Reading the prompt"
     assert names["12"] == "Loading the image"
     assert names["14"] == "Preparing the clip"
@@ -167,8 +173,8 @@ def test_the_minutes_before_the_first_step_are_named_too():
 def test_a_node_with_nothing_worth_saying_is_left_unnamed():
     payload = _payload("wan22_i2v", steps=20)
     named = stage_names(payload)
-    assert "8" not in named, "an instant node's name would only flash between two real stages"
-    assert "21" not in named
+    for instant in _ids(payload, "ModelSamplingSD3") + _ids(payload, "GetImageSize"):
+        assert instant not in named, "an instant node's name would only flash between two real stages"
 
 
 def test_current_pass_reads_the_pass_in_hand_on_its_own_count():
@@ -311,6 +317,10 @@ def test_a_detailer_is_budgeted_one_region_of_steps_times_cycles():
     assert sampler_costs(payload)["1"][0] == 20
     payload["1"]["inputs"]["cycle"] = 0
     assert sampler_costs(payload)["1"][0] == 10
+    payload["1"]["inputs"]["denoise"] = 0.4
+    assert sampler_costs(payload)["1"][0] == 10, (
+        "Impact Pack's detailer runs exactly its steps whatever the denoise: it widens the schedule "
+        "to steps/denoise and slices steps back out of its tail")
 
 
 def test_a_foley_duration_derived_in_graph_costs_as_one_second_of_audio():

@@ -628,21 +628,19 @@ def _select_first_leaf(view, shape=LANDSCAPE):
 
 def _seeded_db(tmp_path, seed=7):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(NewGeneration(
-        prompt_id="orig",
-        workflow_name="sdxl_t2i",
-        workflow_version=_SDXL.version,
-        positive_prompt="a cat",
-        negative_prompt="",
-        seed=seed,
-        params_json=json.dumps(dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")),
-        workflow_json="{}",
-    ))
-    db.update_generation(
-        "orig", status="completed",
-        output_files=json.dumps([{"filename": "sdxl_orig.png", "subfolder": ""}]),
-    )
+    _completed_image(db, "orig", "a cat", seed)
     return db
+
+
+def _completed_image(db, prompt_id, positive_prompt, seed):
+    db.insert_generation(NewGeneration(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt=positive_prompt, negative_prompt="", seed=seed,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=seed,
+                                    positive_prompt=positive_prompt)),
+        workflow_json="{}"))
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+        [{"filename": f"sdxl_{prompt_id}.png", "subfolder": ""}]))
 
 
 def _generate_in_current_tab(view, positive_prompt, seed):

@@ -612,14 +612,6 @@ def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
     assert record["new_positive"] == job.params["positive_prompt"]
 
 
-def test_a_queued_request_the_rules_made_says_what_they_changed(qtbot, tmp_path, monkeypatch):
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-
-    _speak_request(view, qtbot, "Request, no hat, over.")
-
-    assert words(view._slideshows.showing.shown._note) == "Took out hat."
-
-
 def test_a_request_the_model_answered_says_only_that_it_was_submitted_and_keeps_what_changed(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)

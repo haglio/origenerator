@@ -4,8 +4,10 @@ import json
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 
+from PyQt6 import sip
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
@@ -1274,10 +1276,7 @@ class GenerateTab(DropZones):
 
     def _aim_carried_onto(self, prompt_id: str, shown: tuple[str, str]) -> _RequestAim | None:
         was = self._request_aim
-        made = self._db.get_request(prompt_id)
-        made_from_this = prompt_id in self._launched_runs or (
-            made is not None and made["source_prompt_id"] == was.prompt_id) if was else False
-        if was is None or not made_from_this or not (was.turns or was.asking):
+        if was is None or prompt_id not in self._launched_runs or not (was.turns or was.asking):
             return None
         self._request_aims.pop(was.prompt_id, None)
         was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id)))
@@ -1351,27 +1350,24 @@ class GenerateTab(DropZones):
             words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             weights=workflow_named(self._form_workflow_key).prompts_take_weights,
-            owner=self,
-            then=lambda revision, asked=(aim, self._param_form.get_values()): self._on_rewritten(
-                *asked, revision))
+            owner=self._requests,
+            then=partial(self._on_rewritten, aim, self._param_form.get_values()))
 
     def _on_rewritten(self, aim: _RequestAim, values: dict, revision) -> None:
         said, aim.asking = aim.asking, None
-        shown = aim is self._request_aim
+        if revision is not None:
+            aim.answered(revision.turn(said), {**values, **dict(revision.settings)})
+        if sip.isdeleted(self) or aim is not self._request_aim:
+            return
         exchange = self._param_form.request_exchange()
         if revision is None:
-            if shown:
-                exchange.failed()
-            return
-        turn = revision.turn(said)
-        aim.answered(turn, {**values, **dict(revision.settings)})
-        if not shown:
+            exchange.failed()
             return
         if revision.settings:
             self._param_form.set_values({**self._param_form.get_values(), **dict(revision.settings)})
         if revision.changed:
             self._param_form.set_prompts(revision.positive, revision.negative, typed=True)
-        exchange.answered(turn)
+        exchange.answered(aim.turns[-1])
 
     def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
         current = self.current_config()

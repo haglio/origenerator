@@ -3290,7 +3290,7 @@ def test_a_request_asked_of_the_image_on_display_shows_that_image_before_it(
     tab.show_saved_generation(db.get_generation("img1"), [image])
 
     exchange = _ask(tab, qtbot, "two women")
-    qtbot.waitUntil(lambda: exchange.turns() == [("two women", "Done.")], timeout=5000)
+    qtbot.waitUntil(lambda: exchange.turns() == [("two women", _TWO_WOMEN_SAID)], timeout=5000)
 
     (entry,) = exchange._entries()
     assert shown in entry.tip
@@ -3522,6 +3522,7 @@ def test_a_request_typed_while_generating_follows_the_result_that_lands_with_its
     _ask(tab, qtbot, "two women")
     qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
     landing = _landed(db, "img2", "two women on a couch", asked=tab.asked())
+    tab.note_launched("img2", made_of={"positive_prompt": "two women on a couch"})
     _ask(tab, qtbot, "on a beach")
     qtbot.waitUntil(lambda: _positive(tab) == "two women on a beach", timeout=5000)
 
@@ -4921,8 +4922,8 @@ def _turn_runs(tab):
 
 def test_generate_under_a_turn_asked_now_runs_that_turns_prompts_asked_of_the_image_shown(
         saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch, answer=[("two women on a couch", "blurry"),
-                                    ("two women on a bed", "blurry")])
+    _rewriting(monkeypatch, answer=[
+        _TWO_WOMEN, _replacing("on a couch", "on a bed", for_="on a bed")])
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
@@ -4944,8 +4945,8 @@ def test_generate_under_a_turn_asked_now_runs_that_turns_prompts_asked_of_the_im
 
 def test_once_a_turn_made_an_item_the_turns_after_it_are_asked_of_that_item(
         saved_panel, qtbot, monkeypatch):
-    _rewriting(monkeypatch, answer=[("two women on a couch", "blurry"),
-                                    ("two women on a bed", "blurry")])
+    _rewriting(monkeypatch, answer=[
+        _TWO_WOMEN, _replacing("on a couch", "on a bed", for_="on a bed")])
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])

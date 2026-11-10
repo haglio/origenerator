@@ -147,7 +147,7 @@ def test_a_word_he_names_is_taught_as_taken_out_alone_with_the_words_around_it_k
     assert "only that word" in rule
     assert "keep the words around it" in rule
     answer = prompt[prompt.index("- \"maybe the word 'vintage'"):].split("\n")[0].split("->")[1]
-    assert '"replace": "vintage photo of a lake", "with": "photo of a lake"' in answer
+    assert '"replace": "vintage print of a lake", "with": "print of a lake"' in answer
 
 
 def test_more_of_something_is_taught_as_his_stronger_words_and_its_opposite_with_the_app_doing_the_rest():

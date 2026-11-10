@@ -253,7 +253,7 @@ def test_copy_name_on_a_tab_showing_no_item_copies_the_folder_name_it_wears(tabs
 
 def test_copy_name_on_a_modify_batch_tab_copies_the_folders_name_alone(tabs):
     tab = tabs.open_modify_batch("image/sdxl_t2i/abcdef123456", "AB12CD34", "sdxl_t2i",
-                                    _sdxl_full(positive_prompt="a wizard"), [])
+                                 _sdxl_full(positive_prompt="a wizard"), [])
     QApplication.clipboard().clear()
 
     _entry(tabs._tab_menu(tabs.indexOf(tab)), "Copy name").trigger()

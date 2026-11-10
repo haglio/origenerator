@@ -3548,7 +3548,7 @@ def _images(tmp_path, count):
 @pytest.fixture
 def modify_batch_tab(blank_panel, tmp_path):
     blank_panel.open_modify_batch(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
-                                    _folder_params(), _images(tmp_path, 3))
+                                  _folder_params(), _images(tmp_path, 3))
     return blank_panel
 
 
@@ -3649,7 +3649,7 @@ def test_a_modify_batch_tab_offers_no_corners_over_its_wall_of_images(
     tab.item_action_requested.connect(lambda pid, action: fired.append(pid))
 
     tab.open_modify_batch(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
-                              _folder_params(), _images(tmp_path, 3))
+                          _folder_params(), _images(tmp_path, 3))
 
     assert tab._viewport._actions_id is None
     tab._viewport._on_control("trash")

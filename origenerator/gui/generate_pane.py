@@ -319,7 +319,7 @@ class GeneratePane(QTabWidget):
         return tab
 
     def open_modify_batch(self, folder_key: str, label: str, workflow_name: str,
-                      params: dict, thumbnails: list) -> GenerateTab | None:
+                          params: dict, thumbnails: list) -> GenerateTab | None:
         if self._client is None:
             return None
         tab = self._landing_tab()

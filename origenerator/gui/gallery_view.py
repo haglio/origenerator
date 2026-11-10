@@ -1652,7 +1652,7 @@ class GalleryView(QWidget):
         thumbnails = [row.get("thumbnail_path") for row in rows]
         self._clear_reroll_selection()
         self._generate_pane.open_modify_batch(group.key, group.label, workflow.name,
-                                      filled_params(rows[0], workflow), thumbnails)
+                                              filled_params(rows[0], workflow), thumbnails)
 
     def _on_modify_batch_requested(self, folder_key: str, workflow_name: str, params: dict):
         wf = WORKFLOW_REGISTRY.get(workflow_name)

@@ -763,7 +763,7 @@ class GenerateTab(DropZones):
                 self._generate_btn.flash_guard(_MODIFY_BATCH_GUARD)
                 return
             self.modify_batch_requested.emit(self._modify_batch.folder_key, key,
-                                       self._param_form.get_values())
+                                             self._param_form.get_values())
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
@@ -1080,7 +1080,7 @@ class GenerateTab(DropZones):
             self._settings_split.take_dragged_sizes(self._settings_border_sizes)
 
     def open_modify_batch(self, folder_key: str, label: str, workflow_name: str,
-                      params: dict, thumbnails: list) -> None:
+                          params: dict, thumbnails: list) -> None:
         self.prefill(workflow_name, params)
         self._modify_batch = ModifyBatch(
             folder_key=folder_key, label=label, count=len(thumbnails),

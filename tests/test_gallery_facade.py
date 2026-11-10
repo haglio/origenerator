@@ -63,7 +63,7 @@ PUBLISHED = {
 def test_the_facade_publishes_exactly_the_names_written_down_here():
     assert set(gallery.__all__) == PUBLISHED, (
         "listed, the names offered outside can be told from a stray import, which a linter "
-        "cannot do among ninety-odd imports that only re-export; a name the package keeps "
+        "cannot do among imports that only re-export; a name the package keeps "
         "for its own use is imported from its submodule and stays off the list")
 
 

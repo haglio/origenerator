@@ -6,7 +6,7 @@ import sqlite3
 from origenerator.db import Database, NewGeneration
 
 PAGE = 4096
-FILLS_A_PAGE_ALONE = "x" * 2500
+ONE_ROW_TO_A_PAGE = "x" * 2500
 
 
 def _fill(path, count):
@@ -16,7 +16,7 @@ def _fill(path, count):
             prompt_id=f"job-{i}",
             workflow_name="sdxl_t2i",
             workflow_version="v002",
-            positive_prompt=f"marker-{i}-{FILLS_A_PAGE_ALONE}",
+            positive_prompt=f"marker-{i}-{ONE_ROW_TO_A_PAGE}",
             params_json="{}",
             workflow_json="{}",
         ))
@@ -38,7 +38,7 @@ def _set_journal_mode(path, mode):
         conn.close()
 
 
-def _copy_out_a_hot_journal_while_it_is_held_open(path, rows):
+def _copy_out_while_held_open(path, rows):
     staged = path.with_name("staged.db")
     _fill(staged, rows)
     _set_journal_mode(staged, "wal")
@@ -53,7 +53,7 @@ def _copy_out_a_hot_journal_while_it_is_held_open(path, rows):
     holding.close()
 
 
-def _stray_write_over_the_page_header_of(path, marker):
+def _stray_write_over_a_page_header(path, marker):
     data = bytearray(path.read_bytes())
     page = data.index(marker.encode()) // PAGE
     data[page * PAGE:page * PAGE + 10] = b"Input #0, "
@@ -70,7 +70,7 @@ def _stray_write_over_the_page_header_of(path, marker):
 def test_a_malformed_database_opens_with_every_row_still_readable(tmp_path):
     path = tmp_path / "origenerator.db"
     _fill(path, 12)
-    _stray_write_over_the_page_header_of(path, "marker-5-")
+    _stray_write_over_a_page_header(path, "marker-5-")
 
     rows = Database(path).list_generations()
 
@@ -83,7 +83,7 @@ def test_a_malformed_database_opens_with_every_row_still_readable(tmp_path):
 def test_the_damaged_file_is_kept_beside_the_rebuilt_one(tmp_path):
     path = tmp_path / "origenerator.db"
     _fill(path, 12)
-    _stray_write_over_the_page_header_of(path, "marker-5-")
+    _stray_write_over_a_page_header(path, "marker-5-")
     damaged = path.read_bytes()
 
     Database(path)
@@ -94,7 +94,7 @@ def test_the_damaged_file_is_kept_beside_the_rebuilt_one(tmp_path):
 def test_damage_to_the_newest_rows_does_not_cost_the_older_ones(tmp_path):
     path = tmp_path / "origenerator.db"
     _fill(path, 12)
-    _stray_write_over_the_page_header_of(path, "marker-11-")
+    _stray_write_over_a_page_header(path, "marker-11-")
 
     rows = Database(path).list_generations()
 
@@ -118,7 +118,7 @@ def test_a_row_the_rebuilt_database_refuses_costs_only_itself(tmp_path):
         conn.commit()
     finally:
         conn.close()
-    _stray_write_over_the_page_header_of(path, "marker-3-")
+    _stray_write_over_a_page_header(path, "marker-3-")
 
     rows = Database(path).list_generations()
 
@@ -131,7 +131,7 @@ def test_the_rebuilt_database_keeps_the_journal_mode_it_replaced(tmp_path):
     path = tmp_path / "origenerator.db"
     _fill(path, 6)
     _set_journal_mode(path, "wal")
-    _stray_write_over_the_page_header_of(path, "marker-3-")
+    _stray_write_over_a_page_header(path, "marker-3-")
 
     Database(path)
 
@@ -142,8 +142,8 @@ def test_the_rebuilt_database_keeps_the_journal_mode_it_replaced(tmp_path):
 
 def test_the_damaged_files_write_ahead_log_goes_aside_with_it(tmp_path):
     path = tmp_path / "origenerator.db"
-    _copy_out_a_hot_journal_while_it_is_held_open(path, rows=6)
-    _stray_write_over_the_page_header_of(path, "marker-3-")
+    _copy_out_while_held_open(path, rows=6)
+    _stray_write_over_a_page_header(path, "marker-3-")
 
     Database(path)
 
@@ -175,10 +175,11 @@ def test_a_database_damaged_before_the_table_rename_keeps_its_folders(tmp_path):
         conn.commit()
     finally:
         conn.close()
-    _stray_write_over_the_page_header_of(path, "marker-2-")
+    _stray_write_over_a_page_header(path, "marker-2-")
 
     folders = Database(path).list_custom_collections()
 
     assert [f["folders"] for f in folders] == [["key-a", "key-b"]], (
         "a table missing under its new name raises nothing to the copy, "
-        "which would report a clean salvage of no rows")
+        "which would report a clean salvage of no rows; and the salvage rebuilds every table "
+        "from the one schema text, which is why no store keeps a schema of its own")

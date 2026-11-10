@@ -142,7 +142,7 @@ SCHEMA = {
     ),
 }
 
-SQLITES_OWN_INDEX_FOR_A_PRIMARY_KEY = "sqlite_autoindex_"
+SQLITES_OWN_INDEXES = "sqlite_autoindex_"
 DECLARED_INDEXES = (
     "idx_generations_created",
     "idx_generations_status",
@@ -180,9 +180,7 @@ def _tables(conn: sqlite3.Connection) -> set[str]:
 
 
 def test_the_database_holds_exactly_these_tables(opened):
-    assert _tables(opened) == set(SCHEMA), (
-        "the schema is one text in one module: the salvage rebuilds a damaged file from it, "
-        "and the migration patches every table at once")
+    assert _tables(opened) == set(SCHEMA)
 
 
 @pytest.mark.parametrize("table", sorted(SCHEMA))
@@ -197,19 +195,19 @@ def test_the_declared_indexes_are_all_still_declared(opened):
     named = {
         row[0] for row in opened.execute(
             "SELECT name FROM sqlite_master WHERE type = 'index'")
-        if not row[0].startswith(SQLITES_OWN_INDEX_FOR_A_PRIMARY_KEY)
+        if not row[0].startswith(SQLITES_OWN_INDEXES)
     }
 
     assert named == set(DECLARED_INDEXES)
 
 
 def test_evolvers_own_select_still_runs_against_this_database(opened):
-    select_in_evolvers_origenerator_metadata = (
+    evolver_select = (
         "SELECT prompt_id, positive_prompt, negative_prompt, seed, "
         "params_json, output_files, created_at FROM generations"
     )
 
-    assert opened.execute(select_in_evolvers_origenerator_metadata).fetchall() == []
+    assert opened.execute(evolver_select).fetchall() == []
 
 
 def test_the_seven_columns_evolver_pins_are_in_the_snapshot():

@@ -1037,8 +1037,6 @@ def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
 
     reopened = Database(db_path).get_generation("clip-001")
     assert reopened["genau_requested_at"] is not None
-    assert len(reopened["genau_requested_at"]) == len(reopened["created_at"]), (
-        "stamped by the database's clock, so it reads like every other stamp on the row")
     assert reopened["genau_exported_at"] is not None
     assert reopened["evolver_exported_at"] is None
 

@@ -1074,7 +1074,9 @@ def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
 
     view._on_reroll_finished("k", "loop")
 
-    assert sent == [(video, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert sent == [(video, EVOLVER_INBOX_DIR / GENAU_SOURCE)], (
+        "Evolver upscales what arrives under this folder's name before delivering it; "
+        "sent straight on, a loop out of the graph is visibly softer than the videos there")
     assert view._db.get_generation("loop")["genau_exported_at"]
 
 

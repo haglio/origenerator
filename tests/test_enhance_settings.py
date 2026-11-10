@@ -264,7 +264,8 @@ def test_describe_names_each_part_the_pass_redrew_at_its_own_denoise():
         "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
     }) == "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6"
     assert describe_enhance_params({
-        "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0}}) == "2x"
+        "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0}}) == "2x", (
+        "a part left at zero is no choice either, so the caption leaves it out")
 
 
 def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_default(

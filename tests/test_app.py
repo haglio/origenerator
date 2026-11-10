@@ -133,11 +133,13 @@ def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
 
 
 def _opened_and_closed_for_real(child: str, said: Path, state: Path) -> None:
-    not_a_preview = {name: value for name, value in os.environ.items() if name != ENV_FLAG}
-    ran = run_python(["-m", child, str(said)],
-                     env=not_a_preview | {"QT_QPA_PLATFORM": "offscreen",
-                                          "ORIGENERATOR_STATE_DIR": str(state)},
-                     logs=[state / "origenerator.log", state / "origenerator_crash.log"])
+    never_a_preview_whose_library_is_the_production_apps = {
+        name: value for name, value in os.environ.items() if name != ENV_FLAG}
+    ran = run_python(
+        ["-m", child, str(said)],
+        env=never_a_preview_whose_library_is_the_production_apps | {
+            "QT_QPA_PLATFORM": "offscreen", "ORIGENERATOR_STATE_DIR": str(state)},
+        logs=[state / "origenerator.log", state / "origenerator_crash.log"])
     assert ran.returncode == 0, ran.stdout + ran.stderr
 
 
@@ -187,7 +189,7 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
 
 
 @pytest.fixture(autouse=True)
-def _no_crash_log_in_the_checkout(monkeypatch):
+def _keep_test_boots_out_of_the_checkouts_crash_log(monkeypatch):
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: None)
 
 

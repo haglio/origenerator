@@ -1328,7 +1328,8 @@ def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at
 
     slideshow.shown.queue_foot.move("w2", "w1")
 
-    assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == ["gen1", "w2", "w1"]
+    assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == ["gen1", "w2", "w1"], (
+        "not a poll later: a row that sits still after the drop reads as one missed")
     assert view._queue.keys() == ["gen1", "w2", "w1"]
     view._slideshows.showing.close()
 
@@ -1377,7 +1378,8 @@ def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
 
     view._inflight_items()[0].reveal()
 
-    assert _selected_folder(view) == folder
+    assert _selected_folder(view) == folder, (
+        "a queue row is a place in the gallery, not a settings form")
     view._select_reroll.assert_called_once_with(folder)
 
 

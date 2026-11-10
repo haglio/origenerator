@@ -1117,7 +1117,9 @@ def test_frames_of_the_item_itself_keep_the_message_they_are_about(make_preview,
 
     w.show_frame(_png_bytes(), enhancing=True)
 
-    assert not w._message.isHidden()
+    assert not w._message.isHidden(), (
+        "frames of an enhancement of the item on screen are the coming state of that item, so "
+        "its message and its corners are as true of them and stay")
 
 
 def test_frames_of_the_item_itself_keep_its_corners(make_preview, tmp_path):

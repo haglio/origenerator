@@ -4,8 +4,7 @@ import logging
 from itertools import pairwise
 from pathlib import Path
 
-from app_support.funscript import document, read_actions, write
-from app_support.mirrored_tree import mirrored_path
+from app_support.funscript import document, read_actions, script_of, write
 from funestra.funscript import Funscript
 from funestra.heatmap import build_heatmap
 
@@ -46,8 +45,7 @@ def library_funscript_of(video_path, *, videos_dir, scripts_dir) -> Path | None:
     if not video_path:
         return None
     video = Path(video_path)
-    filed = mirrored_path(video, roots=[Path(videos_dir)], mirror_root=Path(scripts_dir),
-                          suffix=".funscript")
+    filed = script_of(video, library=Path(videos_dir), scripts_tree=Path(scripts_dir))
     return _first_file([*([filed] if filed is not None else []), _beside(video)])
 
 

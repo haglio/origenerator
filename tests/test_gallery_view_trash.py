@@ -354,10 +354,15 @@ def test_a_purge_that_cannot_finish_says_why_and_keeps_the_item_picked(
 def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     actions = _FailingActions()
     view = _trash_collection_view(qtbot, actions)
+    asked = []
+    view._confirm = lambda text: asked.append(text) or False
 
     view.restore_from_trash([])
     view.purge_from_trash([])
 
+    assert asked == [], (
+        "a prompt to permanently delete 0 items would be the app asking the user to confirm "
+        "nothing")
     assert actions.restored == []
     assert actions.purged == []
 

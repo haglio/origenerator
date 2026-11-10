@@ -1500,6 +1500,9 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
                 "said, not refused: nothing else about this app is wrong, and a launch declined "
                 "over a folder name would cost far more than the one lane it protects")
 
+        assert told.call_args is not None, (
+            "a rename on either side left videos arriving nowhere with both apps silent, so "
+            "the launch says what disagrees")
         said = " ".join(str(arg) for arg in told.call_args.args)
         assert "the inbox a send lands in" in said
         window.show.assert_called_once()

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import pytest
+from PIL import Image
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QLabel
 
+from origenerator.gui.looping_preview import what_plays_in
 from origenerator.gui.source_tile import SourceTile
 
 
@@ -81,5 +83,73 @@ def test_a_relation_named_for_one_showing_does_not_carry_to_the_next(tile):
 
     tile.show_source({"prompt_id": "img1", "thumbnail_path": None}, "start.png")
 
-    assert tile._heading.text() == "From source image"
+    assert tile.heading == "From source image"
     assert tile._item_type_icon.media_type == "image"
+
+
+def test_a_heading_of_more_than_three_words_takes_two_lines_and_a_shorter_one_takes_one(tile):
+    tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "77B2E1A0 012",
+                     heading="Animated using video settings of")
+    long_lines = tile._heading.text().split("\n")
+    tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "77B2E1A0 012",
+                     heading="Animated from")
+
+    assert len(long_lines) == 2
+    assert " ".join(long_lines) == "Animated using video settings of"
+    assert tile.heading == "Animated from"
+
+
+def test_thumbnails_under_one_and_two_line_headings_sit_at_one_height(qtbot):
+    tiles = []
+    for heading in ("Animated from", "Video settings used for animation of"):
+        tile = SourceTile()
+        qtbot.addWidget(tile)
+        tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "77B2E1A0 012",
+                         heading=heading)
+        tile.layout().activate()
+        tiles.append(tile)
+
+    assert tiles[0]._thumb.y() == tiles[1]._thumb.y()
+
+
+def _red_thumb(tmp_path):
+    thumb = tmp_path / "red.png"
+    red = QPixmap(32, 32)
+    red.fill(QColor(220, 20, 20))
+    red.save(str(thumb))
+    return str(thumb)
+
+
+def test_a_thumbnail_shown_only_for_its_settings_is_drained_of_color_and_the_next_is_not(tile, tmp_path):
+    thumb = _red_thumb(tmp_path)
+
+    tile.show_source({"prompt_id": "vid1", "thumbnail_path": thumb}, "source.mp4", gray=True)
+    drained = tile._thumb.pixmap().toImage().pixelColor(16, 16)
+    tile.show_source({"prompt_id": "img1", "thumbnail_path": thumb}, "start.png")
+    kept = tile._thumb.pixmap().toImage().pixelColor(16, 16)
+
+    assert drained.red() == drained.green() == drained.blue()
+    assert kept.red() > kept.green()
+
+
+def _red_movie(path):
+    frames = [Image.new("RGB", (16, 12), (220, 20 + i * 10, 20)) for i in range(2)]
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=80, loop=0)
+    return str(path)
+
+
+def test_a_video_shown_only_for_its_settings_plays_drained_of_color(tile, tmp_path):
+    tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "77B2E1A0 012",
+                     movie=_red_movie(tmp_path / "vid1.gif"), gray=True)
+
+    shown = tile._thumb.pixmap().toImage().pixelColor(8, 6)
+    assert what_plays_in(tile._thumb) is not None
+    assert shown.red() == shown.green() == shown.blue()
+
+
+def test_a_video_stops_playing_when_the_tile_shows_a_still(tile, tmp_path):
+    tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "77B2E1A0 012",
+                     movie=_red_movie(tmp_path / "vid1.gif"), gray=True)
+    tile.show_source({"prompt_id": "img1", "thumbnail_path": _red_thumb(tmp_path)}, "start.png")
+
+    assert what_plays_in(tile._thumb) is None

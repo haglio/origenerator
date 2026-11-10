@@ -2200,7 +2200,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     assert not source_tile(tab._related).isHidden()
     assert source_tile(tab._related)._prompt_id == "img1"
     assert source_tile(tab._related)._name.text() == name
-    assert [tile._heading.text() for tile in tab._related._animations.findChildren(SourceTile)
+    assert [tile.heading for tile in tab._related._animations.findChildren(SourceTile)
             if not tile.isHidden()] == ["Animated from"]
 
 
@@ -3186,7 +3186,7 @@ def test_an_image_a_request_is_still_making_links_to_the_one_it_was_asked_of(sav
 
     section = tab._related._requests
     assert not section.isHidden()
-    assert [(tile._heading.text(), tile._prompt_id)
+    assert [(tile.heading, tile._prompt_id)
             for tile in section.findChildren(SourceTile)] == [("Requested from", "src")]
 
 

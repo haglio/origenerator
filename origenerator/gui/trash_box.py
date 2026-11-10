@@ -6,7 +6,7 @@ from PyQt6.QtCore import QRectF, QSize
 from PyQt6.QtGui import QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_PANEL, TEXT_MUTED
-from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL, MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_RADIUS, GAP_DIALOG, GAP_SMALL, MARGIN_STANDARD
 
 from origenerator.gui import tile_shape
 from origenerator.gui.flow_layout import FlowLayout
@@ -14,6 +14,7 @@ from origenerator.gui.flow_layout import FlowLayout
 _EDGE = 1
 _DASH = 10
 _INSET = _EDGE + MARGIN_STANDARD
+TILE_GAP = GAP_DIALOG
 
 
 class _TileGroup(QWidget):
@@ -25,7 +26,7 @@ class _TileGroup(QWidget):
         self._column.setContentsMargins(side_inset, _INSET, side_inset, _INSET)
         self._column.setSpacing(GAP_SMALL)
         host = QWidget()
-        flow = FlowLayout(host, spacing=GAP_MEDIUM)
+        flow = FlowLayout(host, spacing=TILE_GAP)
         for tile in tiles:
             flow.addWidget(tile)
         self._column.addWidget(host)
@@ -33,7 +34,7 @@ class _TileGroup(QWidget):
 
     def _widest_line(self) -> int:
         return (sum(tile.sizeHint().expandedTo(tile.minimumSize()).width() for tile in self._tiles)
-                + GAP_MEDIUM * (len(self._tiles) - 1))
+                + TILE_GAP * (len(self._tiles) - 1))
 
     def sizeHint(self) -> QSize:
         width = self._widest_line() + 2 * self._side_inset

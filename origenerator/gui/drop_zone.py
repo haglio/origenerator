@@ -15,9 +15,9 @@ from origenerator.gui import tile_shape
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT, light
 from origenerator.gui.generation_drag import dragged_generation
-from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
+from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.item_type_icon import ItemTypeIcon
-from origenerator.gui.looping_preview import looping_movie
+from origenerator.gui.looping_preview import play_gray_in, play_in
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 DROP_AN_IMAGE = "Drop an image"
@@ -176,11 +176,8 @@ class DropZone(DropZones):
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
             self._label.setText("")
-            self._movie = looping_movie(movie_path, THUMBNAIL_BOX, self._label)
-            if self._grayscale:
-                play_grayscale(self._movie, self._label)
-            else:
-                self._label.setMovie(self._movie)
+            play = play_gray_in if self._grayscale else play_in
+            self._movie = play(self._label, movie_path, THUMBNAIL_BOX)
         elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
             self._label.setText("")
             thumbnail = fitted_in_the_box(QPixmap(str(thumb_path)))

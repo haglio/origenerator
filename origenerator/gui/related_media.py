@@ -17,7 +17,7 @@ from origenerator.gallery import (
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.source_tile import SourceTile
-from origenerator.gui.trash_box import place_tiles
+from origenerator.gui.trash_box import TILE_GAP, place_tiles
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
 from origenerator.voice.dictation import words_of
@@ -44,7 +44,7 @@ class _LinkRow(QWidget):
     def __init__(self, movie_of: Callable[[dict], str | None]):
         super().__init__()
         self._movie_of = movie_of
-        self._flow = FlowLayout(self, spacing=GAP_MEDIUM)
+        self._flow = FlowLayout(self, spacing=TILE_GAP)
         self.hide()
 
     def show_links(self, links: list[tuple[str, dict]], name_of: Callable[[str], str],
@@ -64,7 +64,8 @@ class _LinkRow(QWidget):
         tile = SourceTile()
         tile.activated.connect(self.activated)
         tile.show_source(row, name_of(row["prompt_id"]), heading=heading,
-                         media_type=media_type_of_row(row), movie=self._movie_of(row))
+                         media_type=media_type_of_row(row), movie=self._movie_of(row),
+                         gray=heading == ANIMATED_USING_VIDEO_SETTINGS_OF)
         return tile
 
 

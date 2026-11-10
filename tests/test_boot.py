@@ -329,18 +329,24 @@ def test_the_copy_fun_time_opened_closes_with_no_offer_to_withdraw_and_no_claim_
     assert events == ["ComfyUI handed its work", "disconnected from ComfyUI"]
 
 
-MAX_BOOT_COMPLEXITY = 11
+MAX_BOOT_COMPLEXITY = 6
+
+
+def _the_boot_checked_against(ceiling: int):
+    return subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--no-cache", "--isolated", "--select", "C901",
+         "--config", f"lint.mccabe.max-complexity = {ceiling}",
+         "--output-format", "concise", "origenerator/app.py"],
+        cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", check=False)
 
 
 @pytest.mark.repo_check
 def test_no_function_of_the_boot_outgrows_the_ceiling():
-    ruff = subprocess.run(
-        [sys.executable, "-m", "ruff", "check", "--no-cache", "--isolated", "--select", "C901",
-         "--config", f"lint.mccabe.max-complexity = {MAX_BOOT_COMPLEXITY}",
-         "--output-format", "concise", "origenerator/app.py"],
-        cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", check=False)
+    ruff = _the_boot_checked_against(MAX_BOOT_COMPLEXITY)
 
     assert ruff.returncode == 0, (
         "the next thing the launch takes on becomes a step of Boot "
         "with a test of its own, or seams one out, rather than one more branch of the routine\n"
         + ruff.stdout + ruff.stderr)
+    assert _the_boot_checked_against(MAX_BOOT_COMPLEXITY - 1).returncode != 0, (
+        "the ceiling only comes down: lower MAX_BOOT_COMPLEXITY to what the boot needs now")

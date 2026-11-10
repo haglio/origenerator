@@ -83,10 +83,11 @@ def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
     view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
-    assert (view.slideshow.hud_order_label, view.slideshow.hud_map().loop) == ("Shuffle", ""), (
+    as_it_opens = (view.slideshow.hud_order_label, view.slideshow.hud_map().loop,
+                   view.slideshow.hud_is_favorite)
+    assert as_it_opens == ("Shuffle", "", False), (
         "the defaults are a shuffled set with nothing favorited: a slideshow asked for by the "
         "Gallery pane buttons, which is the ordinary case")
-    assert view.slideshow.hud_is_favorite is False
 
 
 def test_retuning_a_slideshow_dresses_it_as_a_base_state(qtbot):

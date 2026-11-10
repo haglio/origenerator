@@ -46,7 +46,9 @@ def test_a_launch_a_click_started_opens_on_what_it_carried(qtbot, tmp_path):
     listener.answer_with(asked.append)
 
     assert asked == ["alpha-1"]
-    assert environment == {}
+    assert environment == {}, (
+        "taken out of the environment, not merely read: every child this app starts would "
+        "otherwise inherit an instruction meant for this launch")
 
 
 def test_asking_whether_the_app_is_listening_hands_it_no_click(qtbot, tmp_path):

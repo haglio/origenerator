@@ -37,7 +37,7 @@ def _write_string_values(key_path: str, values: dict[str, str]) -> None:
 def register_toast_identity(app_id: str, *, name: str, icon: Path,
                                    write=_write_string_values) -> None:
     # Windows heads a toast with what is registered under the id the process claims, draws a generic
-    # glyph where it finds no mark, and needs nothing but this entry to let a toast be raised at all.
+    # glyph where it finds no mark, and needs only this entry, no Start menu shortcut, to raise a toast.
     try:
         write(rf"Software\Classes\AppUserModelId\{app_id}",
               {"DisplayName": name, "IconUri": str(icon)})

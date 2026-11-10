@@ -843,7 +843,6 @@ class GalleryView(QWidget):
             self._buttons.radio.setChecked(bool(enabled))
 
     def mic_enabled(self) -> bool:
-        # PyQt: an AttributeError raised inside closeEvent, where this is asked, takes the process down.
         return self._buttons.mic is not None and self._buttons.mic.isChecked()
 
     def set_mic_enabled(self, enabled):

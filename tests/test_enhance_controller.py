@@ -287,10 +287,10 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
 
     offer = controller.offer()
 
-    assert offer.available is True
-    assert offer.tip == "Enhance 2 items (upscale + light redraw)", (
+    assert offer.available is True, (
         "the Enhance button is aimed the way Delete is: at the picked thumbnails if any are "
         "picked, else at the folder")
+    assert offer.tip == "Enhance 2 items (upscale + light redraw)"
 
 
 def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,

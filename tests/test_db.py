@@ -113,7 +113,7 @@ def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
     db.set_settings_source("dropped", video_prompt_id="vid-9")
     db.set_settings_source("curated", category="dancing")
 
-    assert db.get_generation("dropped")["action"] is None
+    assert db.get_generation("dropped")["action"] is None, "a dropped video names no action"
     assert db.get_generation("dropped")["source_video"] == "vid-9"
     assert db.get_generation("curated")["action"] == "dancing"
     assert db.get_generation("curated")["source_video"] is None, (
@@ -228,8 +228,7 @@ def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
 
     db.update_generation("upd-003")
 
-    assert db.get_generation("upd-003")["status"] == "pending", (
-        "callers build the fields to write conditionally, so none to write is ordinary")
+    assert db.get_generation("upd-003")["status"] == "pending"
 
 
 def test_update_generation_stores_duration_seconds(tmp_path):

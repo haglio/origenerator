@@ -162,9 +162,9 @@ def test_a_request_naming_nothing_yields_no_revision():
 def test_a_revision_carries_the_prompts_it_started_from():
     revision = apply_request("a woman, freckles", "blurry", "no freckles")
 
-    assert revision.old_positive == "a woman, freckles"
-    assert revision.old_negative == "blurry", (
+    assert revision.old_positive == "a woman, freckles", (
         "carrying what it started from, the record of a request can be read on its own")
+    assert revision.old_negative == "blurry"
     assert revision.changed
 
 

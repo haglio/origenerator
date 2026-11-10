@@ -173,12 +173,12 @@ def test_the_launch_reclaims_a_batch_no_record_names(tmp_path):
     orphan = trash.store([_file(tmp_path / "out" / "orphan.png")])
     db.record_trashed("held", {"prompt_id": "held"}, held.record())
 
-    assert trash_collection.reclaim_orphans(db, trash) == 1
-
-    assert held.subdir.exists()
-    assert not orphan.subdir.exists(), (
+    assert trash_collection.reclaim_orphans(db, trash) == 1, (
         "a rejected experiment's batch that fell off the undo stack, or one a crash left "
         "between the move and the record, is reached by nothing else and cleared by nothing else")
+
+    assert held.subdir.exists()
+    assert not orphan.subdir.exists()
 
 
 def test_reclaiming_never_takes_a_trashed_item_however_old(tmp_path):
@@ -200,7 +200,7 @@ def test_reclaiming_with_an_empty_trash_is_a_harmless_noop(tmp_path):
 
 
 def _age(db: Database, prompt_id: str, days: int):
-    stamp = (trash_collection._now_as_sqlite_stamps_it() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    stamp = (trash_collection._now_in_sqlite_time() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with SqliteFile(db.path).connect() as conn:
         conn.execute("UPDATE deletions SET deleted_at = ? WHERE prompt_id = ?",
                      (stamp, prompt_id))

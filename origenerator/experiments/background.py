@@ -8,12 +8,12 @@ from origenerator.inflight import drop_in_flight
 logger = logging.getLogger(__name__)
 
 EXPERIMENTS_QUEUED_PER_ABSENCE = 8
-_MISSES_BEFORE_COMFYUI_IS_REFUSING_EVERYTHING = 3
+_MISSES_MEANING_COMFYUI_REFUSES = 3
 
 
 def queue_experiments(rows, policy, launch) -> int:
     launched = misses = 0
-    while launched < EXPERIMENTS_QUEUED_PER_ABSENCE and misses < _MISSES_BEFORE_COMFYUI_IS_REFUSING_EVERYTHING:
+    while launched < EXPERIMENTS_QUEUED_PER_ABSENCE and misses < _MISSES_MEANING_COMFYUI_REFUSES:
         proposal = policy.propose(rows)
         if proposal is None:
             break

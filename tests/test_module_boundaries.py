@@ -22,7 +22,6 @@ QT_FREE = (
     "origenerator.prompt_edit",
     "origenerator.generation_config",
     "origenerator.action_settings",
-    "origenerator.gallery.signatures",
     "origenerator.gallery",
     "origenerator.experiments.policy",
     "origenerator.gallery.tree",
@@ -126,6 +125,10 @@ def test_every_unstamped_row_is_stamped_in_one_write(tmp_path):
     provenance.stamp_unstamped(db, history=lambda _workflow: [])
 
     assert writes == [1], "a commit for each row took half a minute of the launch that writes them all"
+
+
+def test_the_action_settings_load_no_database():
+    assert _loaded_after_importing("origenerator.action_settings", "origenerator.db") is False
 
 
 def test_the_trash_that_moves_files_knows_no_record_and_no_hold_time():

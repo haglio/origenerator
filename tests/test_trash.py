@@ -147,7 +147,7 @@ def test_ending_one_item_leaves_another_holding_a_file_of_the_same_name(tmp_path
     one.purge()
 
     assert not one.subdir.exists()
-    assert [held.name for _was, held in other.moves if held.exists()], (
+    assert all(held.exists() for _was, held in other.moves), (
         "each item has a folder of its own, so items never tread on one another")
 
 
@@ -156,12 +156,12 @@ def test_purge_orphans_clears_only_the_batches_nothing_names(tmp_path):
     held = trash.store([_file(tmp_path / "out" / "held.png")])
     orphan = trash.store([_file(tmp_path / "out" / "orphan.png")])
 
-    assert trash.purge_orphans([held.subdir]) == 1
-
-    assert held.subdir.exists()
-    assert not orphan.subdir.exists(), (
+    assert trash.purge_orphans([held.subdir]) == 1, (
         "nothing can reach it: an experiment's batch off the undo stack, a batch older than "
         "the Trash, or a folder a crash left between the move and the record")
+
+    assert held.subdir.exists()
+    assert not orphan.subdir.exists()
 
 
 def test_purge_orphans_on_an_untouched_trash_is_a_harmless_noop(tmp_path):
@@ -193,4 +193,4 @@ def test_an_empty_batch_re_makes_into_one_that_moves_nothing(tmp_path):
     batch = TrashedBatch.from_record({"moves": [], "subdir": None})
     batch.restore()
     batch.purge()
-    assert batch.moves == [], "a delete whose files were already gone records no moves"
+    assert batch.moves == []

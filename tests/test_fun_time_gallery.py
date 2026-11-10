@@ -32,7 +32,6 @@ from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
 from tests.gallery_view_support import (
-    MODE_VERBS,
     FakeDB,
     _FakeRadio,
     _image,
@@ -465,8 +464,6 @@ def test_a_presented_slideshow_wears_the_funestras_own_hud(qtbot, tmp_path, monk
     qtbot.addWidget(slideshow.shown)
 
     names = hud_button_names(slideshow.shown)
-    assert [n for n in names if n in MODE_VERBS] == [
-        "satellites_kino_activate", "origenerator_activate"]
     assert {"prev", "next", "lock", "trash"} <= set(names)
     assert "minimize" not in names, (
         "the window a Funestra's minimize parks is not this slideshow's")
@@ -565,8 +562,6 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     assert model.playing == ("corner", 0)
     assert model.active_loop == ""
     assert model.title == "Unlocked · Shuffle"
-    assert [(button.command, button.lit) for button in model.rows[0]] == [
-        ("satellites_kino_activate", False), ("origenerator_activate", True)]
     assert model.locked is False
 
     slideshow.slideshow_toggle_lock()

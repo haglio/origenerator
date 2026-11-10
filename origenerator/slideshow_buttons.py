@@ -26,20 +26,9 @@ from funestra.hud_title import LATEST_LABEL
 from funestra.loop_cycle import ACTION, SEED
 from funestra.main_hud import VALUE_W
 
-from origenerator.osr2_controls_commands import FILTER, spelled_for
+from origenerator.osr2_controls_commands import FILTER
 
 SLIDE = "slide"
-
-ORIGENERATOR_MODE = "origenerator_activate"
-
-
-def origenerator_mode_on(shape: str) -> str:
-    return spelled_for(shape, ORIGENERATOR_MODE)
-
-MODE_BUTTONS = (
-    ("satellites_kino_activate", "Kino", False),
-    (ORIGENERATOR_MODE, "Origenerator", True),
-)
 
 ENHANCED_ICON = shared_icon("enhance_filter")
 
@@ -58,7 +47,6 @@ class SlideshowFacts:
     enhanced: bool = False
     order: str = ""
     hosted: bool = False
-    own_window: bool = True
     has_other_versions: bool = False
     clip_seconds: int | None = None
     longer_than_a_step: bool = False
@@ -71,7 +59,6 @@ class SlideshowFacts:
 def slideshow_rows(shape: str,
                    facts: SlideshowFacts | None = None) -> tuple[tuple[Button, ...], ...]:
     facts = facts or SlideshowFacts()
-    mode_row = facts.hosted and facts.own_window
     row = (
         *transport(shape, noun=SLIDE, longer_than_a_step=facts.longer_than_a_step,
                    image=facts.image),
@@ -90,7 +77,7 @@ def slideshow_rows(shape: str,
     )
     pace = (() if facts.clip_seconds is None
             else (clip_seconds_row(shape, facts.clip_seconds),))
-    return (_mode_row(), row, *pace) if mode_row else (row, *pace)
+    return (row, *pace)
 
 
 def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
@@ -179,9 +166,3 @@ def answer(host, action: str, argument: str = "") -> bool:
         return False
     return True
 
-
-def _mode_row() -> tuple[Button, ...]:
-    return tuple(
-        Button(action, label, "", width=FIT_THE_WORD, lit=lit)
-        for action, label, lit in MODE_BUTTONS
-    )

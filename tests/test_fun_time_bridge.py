@@ -17,6 +17,7 @@ from PIL import Image
 from origenerator import fun_time_mode as contract
 from origenerator import gallery
 from origenerator.fun_time_bridge import (
+    ORIGENERATOR_MODE,
     FunTimeBridge,
     ask_for_origenerator_mode,
     tell_of_a_lock,
@@ -29,7 +30,7 @@ from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
 from origenerator.gui.slideshow_pace import DEFAULT_S
-from origenerator.slideshow_buttons import ORIGENERATOR_MODE, answer
+from origenerator.slideshow_buttons import answer
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeActions,

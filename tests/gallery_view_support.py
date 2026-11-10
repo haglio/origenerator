@@ -51,7 +51,6 @@ from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
 from origenerator.prompt_edit import request_applier
-from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
@@ -663,9 +662,6 @@ def _generate_in_current_tab(view, positive_prompt, seed):
 def _resolve_by_id(monkeypatch):
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: (f"{row['prompt_id']}.png", "image"))
-
-
-MODE_VERBS = frozenset(action for action, _label, _lit in MODE_BUTTONS)
 
 
 def _in_view(view, prompt_id) -> bool:

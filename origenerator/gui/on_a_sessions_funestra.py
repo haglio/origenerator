@@ -31,7 +31,7 @@ class OnASessionsFunestra:
         self._forget_the_foot = published.forget
 
     def hud_changed(self) -> None:
-        model = slideshow_hud_model(self._side, self._slideshow, HudPlacement(own_window=False),
+        model = slideshow_hud_model(self._side, self._slideshow, HudPlacement(),
                                     foot=self._publish_the_foot(self._foots_section()))
         text = hud_text(model) if model is not None else ""
         if text != self._published and publish_whole(self._hud_file, text):

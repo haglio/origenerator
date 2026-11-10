@@ -95,13 +95,12 @@ def metadata_facts(row: dict, upscale: Path | None = None, *,
 
 _LENGTH_KEYS = {"frame_count", "scene_frames"}
 _FPS = f"{NATIVE_FPS:g} frames a second"
-_FRAMES_FROM_MODEL_TIP = (
-    f"The frames WAN 2.2 made itself. It was trained on videos at {_FPS}, so each frame "
-    f"it makes moves the scene 1/{NATIVE_FPS:g} of a second forward: asking it for more "
-    "frames makes the motion last longer, never smoother.")
-_TOTAL_FRAMES_TIP = (
-    f"The frames in the file. Above {_FPS}, the frames between the model's own are "
-    "filled in afterward (interpolated), as many as the Frame Rate setting asks for.")
+_FRAMES_TIP = (
+    f"Frames from model: the frames WAN 2.2 made itself. It was trained on videos at {_FPS}, "
+    f"so each frame it makes moves the scene 1/{NATIVE_FPS:g} of a second forward: asking it "
+    "for more frames would only make the motion last longer, never smoother.\n\n"
+    f"Total frames: the frames in the file. Above {_FPS}, the frames between the model's own "
+    "are filled in afterward (interpolated), as many as the Frame Rate setting asks for.")
 
 
 def _knows_its_frames(workflow, recorded: dict) -> bool:
@@ -116,9 +115,9 @@ def _frame_items(row: dict) -> list[MetadataItem]:
         return []
     params = {**workflow.default_params(), **recorded}
     made = workflow.video_frames(workflow.scene_plan(params))
-    return [MetadataItem("Frames from model", str(made), tooltip=_FRAMES_FROM_MODEL_TIP),
+    return [MetadataItem("Frames from model", str(made), tooltip=_FRAMES_TIP),
             MetadataItem("Total frames", str(frames_filled_in(made, params["frame_rate"])),
-                      tooltip=_TOTAL_FRAMES_TIP)]
+                         tooltip=_FRAMES_TIP)]
 
 
 def _version_line(block: dict) -> MetadataItem:

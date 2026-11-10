@@ -40,5 +40,7 @@ def test_a_control_floated_over_media_keeps_the_mouse_for_itself(qtbot):
 
     float_over_media(control, click_through=False)
 
-    assert not control.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+    assert not control.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents), (
+        "passing the mouse on is what a caption or a still wants and what a control does not, "
+        "so it is asked for per call rather than applied to everything")
     assert control.testAttribute(Qt.WidgetAttribute.WA_NativeWindow)

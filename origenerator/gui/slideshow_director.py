@@ -1184,26 +1184,41 @@ class SlideshowDirector:
         self._host.say("F-mode on" if slideshow.hud_favorites_filter else "F-mode off")
 
     def clear_action_filter(self, shape: str | None = None) -> None:
-        slideshow = self.surface_for(shape)
-        if slideshow is None:
-            self._host.say("the filter needs a slideshow to narrow")
-            return
-        slideshow.action_presses.clear_filter()
+        slideshow = self._slideshow_to_narrow(shape)
+        if slideshow is not None:
+            slideshow.action_presses.clear_filter()
 
-    def filter_enhanced(self, enhanced_only: bool, shape: str | None = None):
-        slideshow = self.surface_for(shape)
+    def filter_enhanced(self, shape: str | None = None) -> None:
+        slideshow = self._slideshow_to_narrow(shape)
         if slideshow is None:
-            self._host.say("the filter needs a slideshow to narrow")
-            return
-        if not enhanced_only:
-            slideshow.clear_modes()
-            slideshow.note_voice_command("showing all of them")
             return
         if slideshow.set_enhanced_mode(True) or slideshow.hud_enhanced_mode:
             slideshow.note_voice_command(
                 f"enhanced only — {slideshow.pass_size()} to play")
         else:
             slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
+
+    def filter_originals(self, shape: str | None = None) -> None:
+        slideshow = self._slideshow_to_narrow(shape)
+        if slideshow is None:
+            return
+        if slideshow.show_originals_only() or slideshow.hud_originals_mode:
+            slideshow.note_voice_command(
+                f"original only — {slideshow.pass_size()} to play")
+        else:
+            slideshow.note_voice_command("everything here is enhanced", kind=WARNING)
+
+    def show_enhanced_and_original(self, shape: str | None = None) -> None:
+        slideshow = self._slideshow_to_narrow(shape)
+        if slideshow is not None:
+            slideshow.show_enhanced_and_original()
+            slideshow.note_voice_command("showing all of them")
+
+    def _slideshow_to_narrow(self, shape: str | None):
+        slideshow = self.surface_for(shape)
+        if slideshow is None:
+            self._host.say("the filter needs a slideshow to narrow")
+        return slideshow
 
     def run_on_slide(self, command: AppCommand, said_at: float | None = None) -> None:
         slideshow = self._slideshow

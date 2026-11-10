@@ -128,6 +128,9 @@ def _slideshow() -> ReferenceSection:
         ReferenceGroup("Filter", (
             _row("show only the enhanced ones", said=_said(AppCommand.FILTER_ENHANCED)),
             _row("drop the filter", said=_said(AppCommand.FILTER_OFF)),
+            _row("show only the original ones", said=_said(AppCommand.FILTER_ORIGINALS)),
+            _row("show the enhanced and the original ones",
+                 said=_said(AppCommand.ENHANCED_AND_ORIGINAL)),
         )),
         ReferenceGroup("HUD", tuple(
             _row(f"HUD {direction}", (f"Ctrl+{arrow}", f"Ctrl+{letter}"))

@@ -17,7 +17,7 @@ _SCROLL_PX = 1.0
 _SCROLL_GAP = GAP_DIALOG
 _HOLD_TICKS = 45
 _SUBSTEP_BAR_PX = 6
-_THE_STYLESHEETS_BORDER_PX = 1
+_BORDER_PX = 1
 _SUBSTEP_BAR_RADIUS = BUTTON_RADIUS
 _SUBSTEP_BAR_TROUGH = BG_PRIMARY
 _SUBSTEP_BAR_FILL = BLUE_LIGHT
@@ -137,8 +137,7 @@ class ProgressBar(QProgressBar):
         done, total = self._pass_progress
         if total <= 0:
             return
-        border = _THE_STYLESHEETS_BORDER_PX
-        inner = self.rect().adjusted(border, border, -border, -border)
+        inner = self.rect().adjusted(_BORDER_PX, _BORDER_PX, -_BORDER_PX, -_BORDER_PX)
         if inner.height() <= _SUBSTEP_BAR_PX or inner.width() <= 0:
             return
         painter.save()

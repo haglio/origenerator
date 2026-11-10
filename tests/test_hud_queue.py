@@ -428,7 +428,7 @@ class TestThePointerOnTheBlock:
 
     def test_start_now_starts_the_video_waiting_out_the_minute(self):
         pointer, host = _pointer_over([_item("v1", job_kind="Video",
-                                             starts_at=time.monotonic() + 42.5)])
+                                             starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)])
 
         pointer.press(*_middle_of(pointer, START_NOW))
 
@@ -436,7 +436,7 @@ class TestThePointerOnTheBlock:
 
     def test_start_now_sits_under_the_bar_and_clear_keeps_the_bars_row(self):
         pointer, _host = _pointer_over([_item("v1", job_kind="Video",
-                                              starts_at=time.monotonic() + 42.5)], 3)
+                                              starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)], 3)
         frame_x, _y, frame_width, _h = pointer.where(f"{FRAME}|v1")
         start_x, start_y, _w, _h = pointer.where(START_NOW)
         _x, clear_y, _w, _h = pointer.where(CLEAR)
@@ -493,8 +493,8 @@ class TestThePointerOnTheBlock:
         pointer.release(x, y + 40)
 
         assert host.moved == [], (
-            "a shielded run being made, or one this window holds no job for, has no move, so its row "
-            "has nowhere to go")
+            "a job with no move, as a shielded run being made or one this window holds no job for, "
+            "leaves its row nowhere to go")
 
     def test_nothing_can_be_let_go_in_front_of_a_job_that_holds_its_place(self):
         pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),

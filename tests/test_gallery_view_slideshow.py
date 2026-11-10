@@ -628,7 +628,8 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (False, False)
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (False, False), (
+        "with two switches on the HUD the phrase means both, as it does on every Satellite")
     assert len(slideshow._set.playlist) == 2
     slideshow.close()
 
@@ -706,7 +707,8 @@ def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
-    assert not view._buttons.slideshow.isHidden()
+    assert not view._buttons.slideshow.isHidden(), (
+        "going through a batch of experiments one at a time, full screen, is what a slideshow is for")
     assert "Experiments" in view._buttons.slideshow.toolTip()
 
     view._slideshows.start()
@@ -764,7 +766,8 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     assert view._slideshows.showing is None
     assert view._tree.currentItem() is _collection(view, LATEST_KEY)
     assert view._gallery_pane.selected_ids == {shown}
-    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == shown
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == shown, (
+        "leaving a slideshow for an item is a decision to work on it")
 
 
 def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
@@ -983,7 +986,8 @@ def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, m
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
-    assert view._slideshows.showing._set.playlist.current()[2] == stopped_on
+    assert view._slideshows.showing._set.playlist.current()[2] == stopped_on, (
+        "closing a slideshow is usually a detour, not being done with it")
     assert view._slideshows.showing._set.playlist.order_ids() == order
     view._slideshows.showing.close()
 
@@ -1193,7 +1197,9 @@ def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
     db.add(_image("i2", "a cat", 50, 2))
     view._on_reroll_finished("some-key", "i2")
 
-    assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i2"}
+    assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i2"}, (
+        "a slideshow in a folder that Populate is filling, replaying only what was there at the "
+        "start, is what sent people to double-click the image being made")
     slideshow.close()
 
 
@@ -1235,7 +1241,9 @@ def test_a_run_that_starts_to_look_like_something_joins_the_open_slideshow(qtbot
 
     view._on_reroll_preview("some-key", "i2", b"a-frame")
 
-    assert slideshow.holds("i2")
+    assert slideshow.holds("i2"), (
+        "the first frames coming in are the best thing in a folder that is filling, and they used "
+        "to reach the slideshow only minutes later, as the finished file")
     assert ahead(slideshow._set.playlist, 1) == (b"a-frame", LIVE, "i2", None)
     slideshow.close()
 
@@ -1361,7 +1369,9 @@ def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path)
     view.refresh()
     _set_enhance(view, params={"enhance_steps": 41})
 
-    assert view.enhance_from_slideshow("g0") is False
+    assert view.enhance_from_slideshow("g0") is False, (
+        "a lock is made with no view of the Enhance pane; enhancing again is the thumbnail menu's "
+        "job, pressed while looking at the settings it uses")
     assert view._live_jobs == {}
 
 
@@ -1474,7 +1484,9 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
 
     slideshow = _double_click_slideshow(view, qtbot, media=("v1.mp4", "video"))
 
-    assert slideshow._set.playlist._items == [("v1.mp4", "video", "v1", None)]
+    assert slideshow._set.playlist._items == [("v1.mp4", "video", "v1", None)], (
+        "most video folders hold a single video, so leaving a lone item out is what made fullscreen "
+        "on a video look like a different mode")
     assert slideshow._set.playlist.index == 0
     slideshow.close()
 

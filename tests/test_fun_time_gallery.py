@@ -96,7 +96,9 @@ def _lit(model, action: str) -> bool:
 
 def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     view = _fun_time_view(qtbot)
-    assert view._buttons.radio is None
+    assert view._buttons.radio is None, (
+        "the room's sound is the Main Funestra's and its microphone Fun Time's: a second switch for "
+        "either would be a switch over something this window does not hold")
     assert view._buttons.mic is None
     view.set_radio_enabled(True)
     assert view.radio_enabled() is False
@@ -415,7 +417,8 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     stub.slideshow = SimpleNamespace(set_paused=lambda paused: None, transport=_NoOsr2Word())
     stub.wear_the_hud = lambda shape, wear: None
     view._slideshows._present_surface(stub, "portrait")
-    assert calls == ["raise", "activate"]
+    assert calls == ["raise", "activate"], (
+        "left unfocused, a slideshow's arrows land in Core and it reads as dead")
 
 
 def test_a_preview_double_click_opens_the_slideshow_on_a_region(qtbot, tmp_path):
@@ -787,7 +790,9 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     library["rows"] = base
     view.refresh()
     slideshow = view.region_slideshow("portrait")
-    assert slideshow is not None
+    assert slideshow is not None, (
+        "the Funestra under a region is blacked for the whole mode, so a region left empty is a "
+        "black rectangle, not a fallback")
     qtbot.addWidget(slideshow.shown)
 
     slideshow.close()

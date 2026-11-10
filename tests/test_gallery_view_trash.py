@@ -449,7 +449,9 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
 
     _click_tile(view, "d1")
 
-    assert view._selected_row["prompt_id"] == "d1"
+    assert view._selected_row["prompt_id"] == "d1", (
+        "the Trash kept it whole, so it fills a Generate tab with the settings that made it: being "
+        "able to look before deciding is the point")
     shown = view._generate_pane.current_generate_tab().displayed_row()
     assert shown["prompt_id"] == "d1"
 
@@ -1243,7 +1245,8 @@ def test_insert_key_also_deletes(qtbot, tmp_path):
 
     qtbot.keyClick(view, Qt.Key.Key_Insert)
 
-    assert db.get_generation("i1") is None
+    assert db.get_generation("i1") is None, (
+        "some keyboards send Insert where Delete is expected")
 
 
 def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):

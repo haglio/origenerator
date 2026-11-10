@@ -49,7 +49,9 @@ def test_a_key_the_cluster_does_not_answer_falls_through_untouched(key):
 
 
 def test_no_driver_means_every_key_falls_through():
-    assert apply_motion_key(None, Qt.Key.Key_Space) is False
+    assert apply_motion_key(None, Qt.Key.Key_Space) is False, (
+        "inside a Fun Time session the OSR2 is the Main Funestra's alone and this app holds no "
+        "driver, so none of these keys may be swallowed here")
 
 
 def test_space_reaches_the_switch_it_is_given_rather_than_the_motions_own():

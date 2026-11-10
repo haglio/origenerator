@@ -330,7 +330,9 @@ def test_each_rewritten_image_is_linked_to_the_one_it_came_from(qtbot, tmp_path)
     _rewritten(view, key)
 
     records = db.list_requests()
-    assert {r["source_prompt_id"] for r in records} == {"pic7", "pic8", "pic9"}
+    assert {r["source_prompt_id"] for r in records} == {"pic7", "pic8", "pic9"}, (
+        "image to image, not folder to folder: the link says which image this one is the rewrite "
+        "of, and it shows on the item itself")
     assert {r["prompt_id"] for r in records} == {job.prompt_id for job in view._jobs.all_jobs}
     one = records[0]
     assert one["old_positive"] == "a cat on a couch"
@@ -393,7 +395,9 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
     made = {job.prompt_id for job in view._jobs.all_jobs}
     now = [row["seed"] for row in db.list_generations() if row["prompt_id"] in made]
     assert was == [9, 8, 7]
-    assert now == was
+    assert now == was, (
+        "the same order, not merely a steady one: laid side by side, the two folders show at a "
+        "glance that it worked")
 
 
 

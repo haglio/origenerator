@@ -390,7 +390,9 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     assert view.listed_prompt_ids()[0] == "i1"
-    assert view.selected_generation() == "i1"
+    assert view.selected_generation() == "i1", (
+        "picking a folder is picking what is in it, so it opens ready to work in rather than beside "
+        "whatever the tab in front happened to hold")
     assert view.selected_prompt_ids() == ["i1"]
     tab = view._generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "i1"
@@ -795,7 +797,9 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     view._on_tree_context_menu(images, caret, LANDSCAPE)
 
     assert db.folder_meta_map()[key]["starred"] is True
-    assert _image_workflow(view._tree).isExpanded()
+    assert _image_workflow(view._tree).isExpanded(), (
+        "the menu covers the TOC, so a right-click that shut the folder on the way in is seen only "
+        "once the menu closes")
 
 
 def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot):
@@ -1337,7 +1341,9 @@ def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monke
 
     view._tree.together_button.click()
 
-    assert [cursor and cursor.shape() for cursor in while_drawing] == [Qt.CursorShape.WaitCursor]
+    assert [cursor and cursor.shape() for cursor in while_drawing] == [Qt.CursorShape.WaitCursor], (
+        "a redraw holds the window's thread, so without the cursor the window reads as dead for as "
+        "long as it takes rather than as working")
     assert QApplication.overrideCursor() is None
 
 

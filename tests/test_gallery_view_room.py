@@ -130,7 +130,9 @@ def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbo
 
     view.osr2_control.set_state(OSR2_PARKED)
 
-    assert driver.stopped == 1
+    assert driver.stopped == 1, (
+        "a script driving through a hold is the device ignoring the hold, which the OSR2 controls "
+        "would then be lying about")
     assert view._osr2_motion.active is True
     assert ("hold", OSR2_PARKED) in view._osr2_motion.calls
 
@@ -172,7 +174,9 @@ def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
 
     view.osr2_control.set_state(OSR2_DRIVING)
 
-    assert log == ["motion lets go", "script takes"]
+    assert log == ["motion lets go", "script takes"], (
+        "each driver puts back what it found when it took the device, so one that takes over before "
+        "the other has let go finds it already taken, and later puts that back")
 
 
 def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
@@ -225,7 +229,9 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     _on_screen(qtbot, view, 1400, 900)
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
-    assert not view._osr2_motion.active
+    assert not view._osr2_motion.active, (
+        "sent to the motion directly, Space would start a second source beside a funscript the "
+        "switch already had streaming")
 
     gestures.press_key(view, Qt.Key.Key_Space)
 
@@ -479,7 +485,8 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     qtbot.addWidget(win.shown)
     assert win is not None
     assert view._slideshows.showing is win
-    assert [slide.prompt_id for slide in win.whole_set()] == ["i1"]
+    assert [slide.prompt_id for slide in win.whole_set()] == ["i1"], (
+        "a double-click means this one, bigger: watching the frames come in is what fullscreen is for")
     win.close()
 
 
@@ -709,7 +716,9 @@ def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscri
 
     slideshow = _double_click_slideshow(view, qtbot)
 
-    assert driver.stopped >= 1
+    assert driver.stopped >= 1, (
+        "the surface in front answers for the device alone, the way a Funestra hands back to the "
+        "motion between scripted videos")
     assert view._osr2_motion.active
     slideshow.close()
 
@@ -726,7 +735,9 @@ def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
     view = _driving_the_device(qtbot)
     view._gallery_owns_keys = lambda **_kw: False
 
-    assert _press_escape(view) is True
+    assert _press_escape(view) is True, (
+        "the driven video usually lives in the focused Generate tab, where the gallery does not own "
+        "the keys")
     assert omnipause.frozen()
     assert view.osr2_control.isChecked()
 
@@ -947,7 +958,8 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     _press_escape_at_the_gallery(view)
 
     assert omnipause.frozen()
-    assert view._buttons.mic.isChecked()
+    assert view._buttons.mic.isChecked(), (
+        "speaking is how anything gets going again without reaching for the keyboard")
     assert view._voice.listener.commands_on
 
 

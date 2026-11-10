@@ -776,7 +776,9 @@ def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
 
     slideshow.step_dwell(1)
 
-    assert _sent(slideshow) == [f"SET_PACE {DEFAULT_S + 1}"]
+    assert _sent(slideshow) == [f"SET_PACE {DEFAULT_S + 1}"], (
+        "the pace is the Funestra's to keep: it holds an image that long and then ends the file, "
+        "which is how a slide moves on at all")
 
 
 def test_a_new_pace_is_the_clip_seconds_the_satellites_hud_shows_at_once(qtbot, tmp_path):

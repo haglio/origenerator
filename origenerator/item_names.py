@@ -5,6 +5,7 @@ from collections import defaultdict
 from origenerator import gallery
 from origenerator.gallery.item_numbers import item_name, number_items
 from origenerator.gallery.tree import rows_with_a_folder
+from origenerator.row_readings import RowReadings
 from origenerator.trash_collection import trash_items
 
 
@@ -23,12 +24,19 @@ class ItemNames:
         names.take(rows, trash_items(db.list_trashed()), gallery.start_frame_index(rows))
         return names
 
-    def take(self, rows: list[dict], held_rows: list[dict], image_index: dict) -> None:
-        video_of_frame = _videos_of_starting_frames(rows, held_rows, image_index)
+    def take(self, rows: list[dict], held_rows: list[dict], image_index: dict,
+             readings: RowReadings | None = None) -> None:
+        readings = readings or RowReadings()
+        video_of_frame = _videos_of_starting_frames(rows, held_rows, readings.of(
+            "source image", lambda row: gallery.source_image_id_in(row, image_index),
+            depends_on=image_index))
+        folder_of = readings.of("settings folder",
+                                lambda row: gallery.settings_folder_key(row, image_index),
+                                depends_on=image_index)
         folders: dict[str, list[str]] = defaultdict(list)
         for row in _items_oldest_first(rows, held_rows):
             if row["prompt_id"] not in video_of_frame:
-                folders[gallery.settings_folder_key(row, image_index)].append(row["prompt_id"])
+                folders[folder_of(row)].append(row["prompt_id"])
         recorded = self._numbers.list_item_numbers()
         numbering = number_items(folders, recorded)
         changed = {prompt_id: item for prompt_id, item in numbering.items()
@@ -51,11 +59,11 @@ class ItemNames:
 
 
 def _videos_of_starting_frames(rows: list[dict], held_rows: list[dict],
-                               image_index: dict) -> dict[str, str]:
+                               source_image_of) -> dict[str, str]:
     row_of = {row["prompt_id"]: row for row in rows}
     videos: dict[str, str] = {}
     for video in [*rows, *held_rows]:
-        frame = row_of.get(gallery.source_image_id_in(video, image_index))
+        frame = row_of.get(source_image_of(video))
         if frame is not None and gallery.was_taken_from(frame, video):
             videos.setdefault(frame["prompt_id"], video["prompt_id"])
     return videos

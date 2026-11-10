@@ -25,9 +25,10 @@ from origenerator.gallery.placement import Placement
 from origenerator.gallery.shapes import LANDSCAPE, shape_covers
 from origenerator.gallery.tree import KeptFolders, all_the_same
 from origenerator.generation_state import on_the_map
-from origenerator.item_shape import filter_rows, split_key
+from origenerator.item_shape import filter_rows, row_shape, split_key
 from origenerator.media import MediaType
 from origenerator.one_look import one_look
+from origenerator.row_readings import RowReadings
 from origenerator.workflows.detail_parts import parts_framed_together
 
 
@@ -65,6 +66,7 @@ class LibrarySnapshot:
         self._versions: dict[tuple, tuple | None] = {}
         self._in_settings: dict[tuple[str, str], list[dict]] = {}
         self._on_the_map: dict[str | None, list[dict]] = {}
+        self.readings = RowReadings(previous.readings if previous else None)
         self._drawn_before = previous.drawn() if previous else {}
         self._image_index_before = previous.image_index if previous else None
         self._unmoved = (previous is not None and all_the_same(self.rows, previous.rows)
@@ -79,7 +81,7 @@ class LibrarySnapshot:
         if self._image_index is None:
             before = self._image_index_before
             self._image_index = before if self._unmoved else _carried_over_whole(
-                gallery.start_frame_index(self.rows), before)
+                self._start_frames(), before)
         return self._image_index
 
     def tree(self, shape: str) -> list:
@@ -92,7 +94,7 @@ class LibrarySnapshot:
             else:
                 kept = KeptFolders(before[0] if before else None, drawn_with=drawn_with)
                 self._drawn[shape] = (kept, gallery.build_gallery_tree(
-                    filter_rows(self.rows, shape), self.folder_meta,
+                    self._on_the_shape(self.rows, shape), self.folder_meta,
                     image_index=self.image_index, name_of=self._name_of, kept=kept))
         return self._drawn[shape][1]
 
@@ -131,15 +133,30 @@ class LibrarySnapshot:
 
     @cached_property
     def enhanced_rows(self) -> list[dict]:
-        return gallery.enhanced_generations(self.rows)
+        return self._each_alone(gallery.enhanced_generations, "enhanced")
 
     @cached_property
     def experiment_rows(self) -> list[dict]:
-        return gallery.unreviewed_experiments(self.rows)
+        return self._each_alone(gallery.unreviewed_experiments, "experiment")
+
+    def _each_alone(self, keep, reading: str) -> list[dict]:
+        kept = self.readings.of(reading, lambda row: bool(keep([row])))
+        return [row for row in self.rows if kept(row)]
+
+    def _on_the_shape(self, rows, shape: str | None) -> list[dict]:
+        return filter_rows(rows, shape, self.readings.of("shape", row_shape))
+
+    def _start_frames(self) -> dict:
+        frames_of = self.readings.of("start frames", lambda row: gallery.start_frame_index([row]))
+        index: dict = {}
+        for row in self.rows:
+            for name, frame in frames_of(row).items():
+                index.setdefault(name, frame)
+        return index
 
     def on_shape(self, shape: str | None, listing: str | None = None) -> list[dict]:
         if (listing, shape) not in self._on_shape:
-            self._on_shape[(listing, shape)] = filter_rows(self._listing(listing), shape)
+            self._on_shape[(listing, shape)] = self._on_the_shape(self._listing(listing), shape)
         return self._on_shape[(listing, shape)]
 
     def _listing(self, which: str | None) -> list[dict]:
@@ -260,7 +277,7 @@ class LibrarySnapshot:
 
     def on_the_map(self, shape: str | None) -> list[dict]:
         if shape not in self._on_the_map:
-            self._on_the_map[shape] = filter_rows(
+            self._on_the_map[shape] = self._on_the_shape(
                 [row for row in self.rows if on_the_map(row)], shape)
         return self._on_the_map[shape]
 

@@ -135,5 +135,5 @@ def requested_shape(params: dict) -> str | None:
     return shape_of_size(width, height)
 
 
-def filter_rows(rows, shape: str | None) -> list[dict]:
-    return on_shape(rows, shape, row_shape)
+def filter_rows(rows, shape: str | None, shape_of=row_shape) -> list[dict]:
+    return on_shape(rows, shape, shape_of)

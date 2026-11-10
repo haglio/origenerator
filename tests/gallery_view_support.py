@@ -155,7 +155,7 @@ class FakeDB:
         self._item_numbers = {}
 
     def list_generations(self):
-        return list(self._rows)
+        return [dict(row) for row in self._rows]
 
     def rows_made_by(self, workflow_name):
         return [row for row in self._rows if row.get("workflow_name") == workflow_name]

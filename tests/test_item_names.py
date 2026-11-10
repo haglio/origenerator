@@ -7,6 +7,7 @@ import pytest
 from origenerator import gallery
 from origenerator.db import Database, NewGeneration
 from origenerator.item_names import ItemNames
+from origenerator.row_readings import RowReadings
 
 
 def _image(prompt_id: str, id_: int, prompt: str = "a red kite", **extra) -> dict:
@@ -124,3 +125,21 @@ def test_the_names_are_a_new_version_only_when_one_of_them_changes(db):
 
     assert unchanged == before
     assert names.version != before
+
+
+def test_names_taken_again_work_out_the_folder_of_only_the_rows_that_changed(db, monkeypatch):
+    first, second = _image("gen-one", 1), _image("gen-two", 2)
+    asked = []
+    real = gallery.settings_folder_key
+    monkeypatch.setattr(gallery, "settings_folder_key",
+                        lambda row, *index: asked.append(row["prompt_id"]) or real(row, *index))
+    names, index = ItemNames(db), {}
+    readings = RowReadings()
+    names.take([second, first], [], index, readings)
+    asked.clear()
+    changed = _image("gen-two", 2, prompt="a blue kite")
+
+    names.take([changed, first], [], index, RowReadings(readings))
+
+    assert asked == ["gen-two"]
+    assert names.of("gen-two").startswith(_code(changed))

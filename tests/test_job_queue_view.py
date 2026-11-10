@@ -396,7 +396,8 @@ def test_the_rule_keeps_to_the_gap_when_the_live_half_widens(dressed, qtbot, tmp
 def test_every_row_carries_a_cancel_including_the_one_being_made(queue):
     queue.set_items([_item(key="a", cancel=lambda: None),
                      _item(key="b", status="queued", cancel=lambda: None)])
-    assert [row._cancel.text() for row in queue.rows()] == ["Cancel", "Cancel"]
+    assert [row._cancel.text() for row in queue.rows()] == ["Cancel", "Cancel"], (
+        "the user's call: every row's button says Cancel")
 
 
 def test_cancel_stops_the_job_on_its_own_row(queue):
@@ -417,14 +418,16 @@ def test_cancel_is_grayed_out_on_a_job_that_cannot_be_stopped_from_here(queue):
     queue.set_items([_item(key="a", cancel=None)])
     QApplication.processEvents()
     cancel = queue.rows()[0]._cancel
-    assert (cancel.isVisible(), cancel.isEnabled()) == (True, False)
+    assert (cancel.isVisible(), cancel.isEnabled()) == (True, False), (
+        "the user's answer: grayed out like the arrows, rather than left off")
     assert cancel.cursor().shape() == Qt.CursorShape.ArrowCursor
 
 
 def test_a_row_from_an_populating_folder_says_cancel_too(queue):
     queue.set_items([_item(key="a", cancel=lambda: None, populating=True),
                      _item(key="b", status="queued", cancel=lambda: None)])
-    assert [row._cancel.text() for row in queue.rows()] == ["Cancel", "Cancel"]
+    assert [row._cancel.text() for row in queue.rows()] == ["Cancel", "Cancel"], (
+        "the user's call: every row's button says Cancel")
     assert queue.rows()[0]._cancel.toolTip() == "Throw away this seed and start the next"
 
 
@@ -556,7 +559,8 @@ def test_the_shield_is_grayed_out_on_a_job_that_cannot_be_shielded_from_here(que
     queue.set_items([_item(key="a")])
     QApplication.processEvents()
     shield = queue.rows()[0]._shield
-    assert (shield.isVisible(), shield.isEnabled()) == (True, False)
+    assert (shield.isVisible(), shield.isEnabled()) == (True, False), (
+        "the user's answer: grayed out like the arrows, rather than left off")
     assert shield.cursor().shape() == Qt.CursorShape.ArrowCursor
 
 
@@ -582,14 +586,16 @@ def test_shield_all_and_cancel_all_stand_stacked_at_the_right_end_of_the_strip(q
     QApplication.processEvents()
 
     shield_all, cancel_all = _box(queue, queue._shield_all), _box(queue, queue._cancel_all)
-    assert queue._scroll.geometry().right() < shield_all.left() == cancel_all.left()
+    assert queue._scroll.geometry().right() < shield_all.left() == cancel_all.left(), (
+        "the user's pick of four mockups: the fourth")
     assert shield_all.bottom() < cancel_all.top()
     above, below = shield_all.top(), queue.height() - 1 - cancel_all.bottom()
     assert abs(above - below) <= 1
 
 
 def test_an_empty_job_queue_leaves_shield_all_and_cancel_all_off(queue):
-    assert not (queue._shield_all.isVisible())
+    assert not (queue._shield_all.isVisible()), (
+        "the user's answer: off, so the empty Job Queue looks as it always did")
     assert not (queue._cancel_all.isVisible())
 
     queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
@@ -625,7 +631,9 @@ def test_shield_all_puts_the_shield_on_every_job_that_has_none(queue):
 def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield(queue):
     queue.set_items([_item(key="a", shield=lambda _on: None, shielded=True),
                      _item(key="b", status="queued")])
-    assert (queue._shield_all.isVisible(), queue._shield_all.isEnabled()) == (True, False)
+    assert (queue._shield_all.isVisible(), queue._shield_all.isEnabled()) == (True, False), (
+        "the user's answer for a line already shielded, which a line of jobs that take no "
+        "shield from here reaches too: either way a press would do nothing")
     assert queue._shield_all.cursor().shape() == Qt.CursorShape.ArrowCursor
 
     queue.set_items([_item(key="a", shield=lambda _on: None, shielded=True),
@@ -639,7 +647,9 @@ def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield(queue):
 
 def test_cancel_all_is_grayed_out_while_no_job_in_the_queue_can_be_canceled(queue):
     queue.set_items([_item(key="a"), _item(key="b", status="queued")])
-    assert (queue._cancel_all.isVisible(), queue._cancel_all.isEnabled()) == (True, False)
+    assert (queue._cancel_all.isVisible(), queue._cancel_all.isEnabled()) == (True, False), (
+        "the user's answer, like Shield All's, for a line of jobs this window has no Cancel "
+        "for, as when a restart has not taken them back yet")
     assert queue._cancel_all.cursor().shape() == Qt.CursorShape.ArrowCursor
 
     queue.set_items([_item(key="a"), _item(key="b", status="queued", cancel=lambda: None)])
@@ -789,7 +799,8 @@ def test_start_now_sits_under_the_bar_just_right_of_the_countdown(queue):
 
     end_of_the_words = place(caption).left() + caption.fontMetrics().horizontalAdvance(
         caption.text())
-    assert place(start_now).top() > place(bar).bottom()
+    assert place(start_now).top() > place(bar).bottom(), (
+        "where the user put it")
     assert end_of_the_words < place(start_now).left() <= end_of_the_words + 16
     assert caption.height() < 2 * caption.fontMetrics().lineSpacing()
 

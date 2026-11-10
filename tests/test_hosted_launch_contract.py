@@ -81,7 +81,9 @@ def test_no_other_window_here_wears_that_caption():
         and wears_it.search(source.read_text(encoding="utf-8"))
     ]
 
-    assert elsewhere == []
+    assert elsewhere == [], (
+        "a host finds Core by its exact caption, so a second window wearing it would be picked up "
+        "in Core's place")
 
 
 def test_the_module_the_document_names_tells_a_session_what_to_hear_said_to_a_side():

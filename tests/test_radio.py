@@ -29,7 +29,9 @@ def test_find_clips_reads_videos_at_any_depth_in_a_stable_order(tmp_path):
     (tmp_path / "a.mp4").touch()
     (tmp_path / "nested" / "c.webm").touch()
 
-    assert [p.name for p in find_videos(tmp_path)] == ["a.mp4", "b.mp4", "c.webm"]
+    assert [p.name for p in find_videos(tmp_path)] == ["a.mp4", "b.mp4", "c.webm"], (
+        "sorted, so one set always shuffles out of the same starting list and a test can name what "
+        "it expects")
 
 
 def test_find_clips_ignores_files_that_are_not_videos(tmp_path):
@@ -64,7 +66,8 @@ def test_each_station_is_dealt_its_own_share_of_the_videos():
     stations = deal_stations(_videos("a", "b", "c", "d", "e", "f", "g"), 3,
                              shuffle=_kept_in_order)
 
-    assert stations == [_videos("a", "d", "g"), _videos("b", "e"), _videos("c", "f")]
+    assert stations == [_videos("a", "d", "g"), _videos("b", "e"), _videos("c", "f")], (
+        "the same sound on two stations at once reads as a glitch rather than as two videos")
 
 
 def test_the_clips_are_shuffled_before_they_are_dealt():

@@ -456,7 +456,9 @@ def test_persists_the_radio_switch_on_close(qtbot, tmp_path):
 
 def test_the_app_opens_listening(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    assert win._gallery_view.mic_enabled() is True
+    assert win._gallery_view.mic_enabled() is True, (
+        "spoken commands are worth nothing unheard, and a switch to remember before speaking is one "
+        "found out about by talking to an app that was not listening")
 
 
 def test_restores_a_closed_mic_from_app_state(qtbot, tmp_path):
@@ -626,7 +628,9 @@ def test_once_the_window_has_gone_comfyui_is_asked_with_nothing_of_the_windows_r
 
     asked_once_closed = client.submitted_on[asked_while_open:]
     assert asked_once_closed
-    assert set(asked_once_closed) == {threading.main_thread()}
+    assert set(asked_once_closed) == {threading.main_thread()}, (
+        "once the window has gone its events are a closed window's: a click on a toast would put it "
+        "back on screen")
 
 
 def test_with_the_switch_off_the_closed_apps_turn_runs_no_experiments(qtbot, tmp_path):
@@ -673,7 +677,9 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
-    assert client.canceled == ["exp-1"]
+    assert client.canceled == ["exp-1"], (
+        "background experiments belong to the closed app: an open one never has one competing for "
+        "the graphics card")
     assert client.interrupted == ["exp-1"]
     assert db.get_generation("exp-1") is None
     assert win._gallery_view._live_jobs == {}
@@ -716,7 +722,9 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is _collection(view, LATEST_KEY)
+    assert view._tree.currentItem() is _collection(view, LATEST_KEY), (
+        "where the user left off is where the app reopens: the count on the collection's row "
+        "already says experiments are waiting")
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):

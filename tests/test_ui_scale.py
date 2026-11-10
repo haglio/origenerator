@@ -24,7 +24,9 @@ def clean_env():
 
 
 def test_the_hosted_scale_makes_this_apps_buttons_the_huds_buttons():
-    assert round(BUTTON_SIZE * ui_scale.HOSTED_SCALE) == BUTTON_SIZE_HUD
+    assert round(BUTTON_SIZE * ui_scale.HOSTED_SCALE) == BUTTON_SIZE_HUD, (
+        "hosted, this app sits inches from the session's Satellite HUDs, which draw at the "
+        "family's smaller size")
 
 
 def test_applying_the_scale_sets_what_qt_reads(monkeypatch):
@@ -42,7 +44,8 @@ def test_a_headset_launch_is_not_shrunk_at_all():
 
 def test_a_scale_already_in_the_environment_wins(monkeypatch):
     monkeypatch.setenv("QT_SCALE_FACTOR", "1.5")
-    assert ui_scale.apply_room_scale(in_a_headset=False) == 1.5
+    assert ui_scale.apply_room_scale(in_a_headset=False) == 1.5, (
+        "someone who set it meant it, and this app is not the only reason a process might be scaled")
     assert ui_scale.active_scale() == 1.5
 
 
@@ -173,4 +176,6 @@ def test_a_point_on_no_screen_gets_the_fallback_origin():
 def test_a_length_is_rounded_to_the_nearest_pixel_not_truncated():
     os.environ["QT_SCALE_FACTOR"] = "0.6"
 
-    assert ui_scale.to_logical_size(1) == 2
+    assert ui_scale.to_logical_size(1) == 2, (
+        "truncating an x and a width walks a rect's right edge inward by up to two pixels, enough "
+        "to show the desktop through the seam between two Satellite regions")

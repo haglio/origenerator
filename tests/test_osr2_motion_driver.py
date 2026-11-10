@@ -153,7 +153,9 @@ def test_the_clock_runs_off_the_gui_thread(qtbot):
         time.sleep(0.01)
     ticker.stop()
     assert seen, "the clock never ticked"
-    assert all(t is not threading.main_thread() for t in seen)
+    assert all(t is not threading.main_thread() for t in seen), (
+        "a slideshow decodes a full-size image on the GUI thread every few seconds, and each such "
+        "stall would starve a clock living there")
 
 
 def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():

@@ -20,7 +20,8 @@ def test_the_launcher_prefers_the_copy_named_for_this_app():
 
 
 def test_the_launcher_runs_the_console_interpreter_its_log_needs():
-    assert LAUNCHER.interpreter == "python.exe"
+    assert LAUNCHER.interpreter == "python.exe", (
+        "the launcher sends the app's output into its log, and a windowed interpreter has none")
 
 
 def test_the_app_prepares_that_copy_for_next_time(tmp_path: Path):

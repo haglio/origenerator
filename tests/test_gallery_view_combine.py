@@ -118,7 +118,9 @@ def test_the_video_lane_takes_the_mined_settings_as_they_stand(qtbot, tmp_path):
     view._combine._generate_combination("img", "loop")
 
     job = next(iter(view._live_jobs.values()))
-    assert job.params["frame_count"] == wf.default_params()["frame_count"]
+    assert job.params["frame_count"] == wf.default_params()["frame_count"], (
+        "a video for a Funestra is watched at its own rate, and wants the settings that made the "
+        "one it was mined from")
     assert job.params["frame_rate"] == wf.default_params()["frame_rate"]
     assert job.params["positive_prompt"] == "alpha"
 

@@ -87,7 +87,9 @@ def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
 def test_a_session_on_the_monitors_asks_for_no_frame():
     args = parse_app_args(hosted_launch())
 
-    assert args.fun_time.frames_file is None
+    assert args.fun_time.frames_file is None, (
+        "on the monitors the window itself is what is seen, so this app must not spend a frame "
+        "drawing one to hand over")
     assert args.fun_time.in_a_headset is False
 
 
@@ -162,7 +164,8 @@ def test_a_takeover_this_window_cannot_take_says_why(tmp_path, caplog, written, 
 def test_a_poll_that_finds_no_takeover_says_nothing(tmp_path, caplog):
     assert take_the_takeover(tmp_path, pid=4321) is None
 
-    assert caplog.text == ""
+    assert caplog.text == "", (
+        "four of these a second, for as long as the window stands its offer")
 
 
 def test_region_for_size_splits_on_aspect():

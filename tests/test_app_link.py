@@ -32,14 +32,18 @@ def test_a_link_names_the_generation_it_opens():
     "origenerator:go-to?generation=" + "a" * 129,
 ])
 def test_a_link_that_asks_for_anything_else_names_nothing(link):
-    assert app_link.generation_in(link) is None
+    assert app_link.generation_in(link) is None, (
+        "the scheme is open to whatever can reach a shell, a page or another app, so a link is "
+        "read as one thing only: a generation this gallery may hold")
 
 
 def test_each_checkout_names_a_channel_of_its_own():
     live = app_link.channel_for(Path(r"C:\workspace\origenerator"))
     preview = app_link.channel_for(Path(r"C:\workspace\origenerator\.claude\worktrees\x"))
 
-    assert live != preview
+    assert live != preview, (
+        "a suite's copy listens on its own checkout's channel, never on the one production's "
+        "clicks arrive on")
     assert live == app_link.channel_for(Path(r"c:\WORKSPACE\origenerator"))
     assert live.isascii()
     assert " " not in live
@@ -143,7 +147,9 @@ def test_an_app_too_busy_to_take_a_click_is_not_started_a_second_time(monkeypatc
     assert app_link.follow([app_link.LIVE_LAUNCHER, app_link.link_to("alpha-1")],
                            checkout=tmp_path) == 0
 
-    assert runs == []
+    assert runs == [], (
+        "a busy pipe is not nobody: a second copy started over a click is worse than the click "
+        "doing nothing")
 
 
 def test_a_click_while_another_click_is_starting_the_app_starts_nothing(monkeypatch, tmp_path):
@@ -162,7 +168,9 @@ def test_a_click_while_another_click_is_starting_the_app_starts_nothing(monkeypa
 
     app_is_up.set()
     first.join(timeout=5)
-    assert _carried(runs) == ["alpha-1"]
+    assert _carried(runs) == ["alpha-1"], (
+        "the copy the first click started is still on its loading screen, and a second started "
+        "over it could only say another copy is running")
 
 
 def test_a_click_whose_app_never_comes_up_leaves_the_next_click_free_to_start_it(
@@ -185,7 +193,9 @@ def test_a_click_leaves_a_line_in_the_log_the_launcher_writes(monkeypatch, tmp_p
                     checkout=tmp_path)
 
     written = (tmp_path / "state" / "origenerator_launcher.log").read_text(encoding="utf-8")
-    assert "alpha-1" in written
+    assert "alpha-1" in written, (
+        "the handler has no console and no window, so a click that did nothing would otherwise "
+        "look like one that never happened")
 
 
 def test_a_log_that_cannot_be_written_costs_the_click_nothing(monkeypatch, tmp_path):

@@ -100,7 +100,9 @@ def test_an_interrupted_job_lands_as_an_error_not_a_completion(qtbot, tmp_path):
     client.job_completed.emit(prompt_id, {"outputs": {}})
 
     row = db.get_generation(prompt_id)
-    assert row["status"] == "error"
+    assert row["status"] == "error", (
+        "ComfyUI ends an interrupted run like a finished one with no files; recorded as finished "
+        "it would hide in the gallery and still block those settings as already made")
     assert not json.loads(row["output_files"] or "[]")
     assert "video/wf/deadbeef" not in queue.jobs
 
@@ -839,7 +841,8 @@ def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
     second = _launch_video(queue, "v2", seed=2)
     third = _launch_video(queue, "v3", seed=3)
 
-    assert queue.flush_to_server() == 2
+    assert queue.flush_to_server() == 2, (
+        "every rule of the line is for someone watching it, and once the app closes nobody is")
     assert [call.args[1] for call in client.submit_job.call_args_list] == [
         being_made.prompt_id, second.prompt_id, third.prompt_id
     ]
@@ -1247,7 +1250,9 @@ def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_pat
 
     first = queue.jobs["video/wf/first"].prompt_id
     second = queue.jobs["video/wf/second"].prompt_id
-    assert seen["submits"] == 1
+    assert seen["submits"] == 1, (
+        "the wait pumps events on the caller's own stack, so every caller keeps its order "
+        "and no second hand-over starts while one is out")
     assert queue.queue_order == [first, second]
     assert client.submit_job.call_count == 1
 
@@ -1407,7 +1412,8 @@ def test_a_video_set_aside_says_no_start_while_the_image_is_being_made(qtbot, tm
     _rendering(client, video)
     _launch_image(queue, "i")
 
-    assert queue.starts_at(video.prompt_id) is None
+    assert queue.starts_at(video.prompt_id) is None, (
+        "the image being made could still break, so no start can be promised")
 
 
 def test_start_now_starts_the_video_waiting_out_the_minute_at_once(qtbot, tmp_path):

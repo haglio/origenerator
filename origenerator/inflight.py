@@ -32,10 +32,19 @@ def drop_in_flight(db, client, source: str, noun: str) -> int:
     return dropped
 
 
-def reconcile_in_flight(db, client, folders: OutputFolders) -> dict:
-    return _reconcile(db, client, [r for r in db.list_generations()
-                                   if r.get("status") == GenerationStatus.RUNNING],
+def in_flight_at(db) -> frozenset[str]:
+    return frozenset(row["prompt_id"] for row in _running(db))
+
+
+def reconcile_in_flight(db, client, folders: OutputFolders, *,
+                        among: frozenset[str] | None = None) -> dict:
+    return _reconcile(db, client, [row for row in _running(db)
+                                   if among is None or row["prompt_id"] in among],
                       folders, "in-flight generations")
+
+
+def _running(db) -> list[dict]:
+    return [row for row in db.list_generations() if row.get("status") == GenerationStatus.RUNNING]
 
 
 def _reconcile(db, client, rows: list[dict], folders: OutputFolders, what: str) -> dict:

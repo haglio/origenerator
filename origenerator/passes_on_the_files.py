@@ -22,7 +22,7 @@ def reconnect_to_running_generations(library: Library):
     from origenerator.inflight import reconcile_in_flight
 
     reconcile_in_flight(library.db, library.client,
-                        OutputFolders(library.places, library.thumb_dir))
+                        OutputFolders(library.places, library.thumb_dir), among=library.in_flight)
 
 
 def file_what_comfyui_left(library: Library):

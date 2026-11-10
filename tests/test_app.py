@@ -65,6 +65,7 @@ from origenerator.export_lane import GENAU
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
+from origenerator.inflight import in_flight_at
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.output_places import OutputPlaces
 from origenerator.passes_on_the_files import (
@@ -1391,6 +1392,25 @@ def test_a_run_comfyui_finished_and_then_forgot_is_written_down_on_its_own_row(t
     assert (row["prompt_id"], row["status"]) == ("run-one", "completed")
     assert json.loads(row["output_files"]) == [
         {"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
+
+
+def test_reconnecting_reconciles_only_the_runs_in_flight_when_the_library_opened(tmp_path):
+    places = OutputPlaces.in_one_folder(tmp_path / "saves")
+    db = Database(tmp_path / "test.db")
+    for prompt_id in ("from-before", "this-session"):
+        db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+                                           workflow_version="v1", params_json="{}",
+                                           workflow_json="{}"))
+    db.update_generation("from-before", status="running")
+    library = Library(db=db, client=_ComfyUIThatRestarted(), places=places,
+                      thumb_dir=tmp_path / "thumbs", log_dir=tmp_path / "logs", inbox=None,
+                      in_flight=in_flight_at(db))
+    db.update_generation("this-session", status="running")
+
+    reconnect_to_running_generations(library)
+
+    assert [(row["prompt_id"], row["status"]) for row in db.list_generations()] == [
+        ("this-session", "running")]
 
 
 _SPLASH_LINES = (

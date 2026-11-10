@@ -25,6 +25,7 @@ class Library:
     thumb_dir: Path
     log_dir: Path
     inbox: object
+    in_flight: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)

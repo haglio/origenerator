@@ -474,7 +474,7 @@ def test_original_only_reads_back_as_it_was_saved():
 
 
 def test_enhanced_only_and_original_only_are_never_both_on():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot both be on"):
         SlideshowFilters(enhanced=True, originals=True)
 
     assert SlideshowFilters.restored({"enhanced": True, "originals": True}) == SlideshowFilters(

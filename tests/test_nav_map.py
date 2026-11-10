@@ -300,7 +300,9 @@ def test_the_column_opens_on_the_same_seed_under_other_configurations():
 
     around = surroundings(current, [current, tweaked, other_model, reroll], image_index={})
 
-    assert _ids(row for row, _label in around.configs) == ["g2"]
+    assert _ids(row for row, _label in around.configs) == ["g2"], (
+        "a seed only means the same image where the same sampler draws from the same latent: one "
+        "that matches across models is a coincidence, and across workflows not even that")
 
 
 def test_a_configuration_sibling_is_not_also_one_of_the_actions_below_it():

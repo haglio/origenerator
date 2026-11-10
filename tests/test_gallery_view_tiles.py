@@ -497,7 +497,8 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
         icons_found = view._gallery_pane._thumb_widgets[pid].findChildren(ItemTypeIcon)
         return icons_found[0].media_type if icons_found else None
 
-    assert icon_type("i1") == "image"
+    assert icon_type("i1") == "image", (
+        "the collection mixes kinds, so each tile says its own at a glance")
     assert icon_type("v1") == "video"
 
 

@@ -163,7 +163,9 @@ def test_the_all_row_searches_the_whole_library(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "cat")
 
-    assert set(view.listed_prompt_ids()) == {"i1", "v1"}
+    assert set(view.listed_prompt_ids()) == {"i1", "v1"}, (
+        "every other folder narrows the answer before the query does, so without All there is "
+        "nowhere to stand that means everything")
 
 
 def test_search_all_searches_the_whole_library_and_keeps_the_folder_highlighted(qtbot):
@@ -332,7 +334,8 @@ def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     placeholder = view._search.field.placeholderText()
     assert placeholder.startswith("Search …")
     tail = placeholder[len("Search …"):]
-    assert scope.endswith(tail)
+    assert scope.endswith(tail), (
+        "the folder itself and its nearest parents are the half that answers: search where?")
     assert len(tail) < len(scope)
     assert placeholder.endswith(leaf.text(0))
 
@@ -411,7 +414,8 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
 
     _search_for(view, "778899")
 
-    assert view.listed_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"], (
+        "a seed names one item and rides on no folder label, so it is findable here or nowhere")
 
 
 def test_a_folder_you_named_is_found_by_that_name(qtbot):
@@ -540,7 +544,9 @@ def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
 
     header.click()
 
-    assert section.isHidden()
+    assert section.isHidden(), (
+        "with a dozen combinations under a broad query, shutting the ones not being asked about is "
+        "what makes the sort usable")
     assert header.fold == "chevron_right"
 
 
@@ -651,7 +657,9 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.listed_prompt_ids() == []
+    assert view.listed_prompt_ids() == [], (
+        "a settings folder's rows share a prompt and differ only by seed, so a prompt match hits all "
+        "of them, and near-copies of one image bury every other place the query reached")
     assert len(view._gallery_pane._listed_folders) == 1
     assert "1 result" in view._search._count.text()
 
@@ -664,7 +672,9 @@ def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.listed_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"], (
+        "a folder that answered once has nothing to collapse, and a folder tile there would hide "
+        "the image under a name")
     assert view._gallery_pane._listed_folders == []
 
 
@@ -691,7 +701,9 @@ def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
 
     view._search.field.setText("cat")
 
-    assert not view._gallery_pane.showing_search()
+    assert not view._gallery_pane.showing_search(), (
+        "a search scores the whole library and rebuilds the pane; one per character churns the "
+        "results under a word still being typed")
     assert view._search._timer.isActive()
 
     view._search._timer.stop()
@@ -708,7 +720,8 @@ def test_a_query_under_three_characters_searches_nothing(qtbot):
 
     view._search.field.setText("ca")
 
-    assert not view._search._timer.isActive()
+    assert not view._search._timer.isActive(), (
+        "one or two letters reach a large part of any library through stemming alone")
     assert not view._gallery_pane.showing_search()
 
     _search_for(view, "cat")
@@ -750,7 +763,8 @@ def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, mon
     _tab_with_prompts(view)
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: False)
 
-    assert _press_ctrl_f(view, monkeypatch) is True
+    assert _press_ctrl_f(view, monkeypatch) is True, (
+        "the field being typed in is exactly where a find is reached for")
 
     assert view._find_bar.isVisible()
 

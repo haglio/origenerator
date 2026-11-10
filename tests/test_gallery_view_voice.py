@@ -119,7 +119,9 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     _select_first_leaf(view)
 
     view._toggle_populate(True)
-    assert not view._voice.listener.commands_on
+    assert not view._voice.listener.commands_on, (
+        "coming on with Populate and again with a slideshow made whether it is listening a thing to "
+        "work out rather than to look at")
     view._toggle_populate(False)
 
     view._buttons.mic.setChecked(True)
@@ -794,7 +796,9 @@ def test_what_the_microphone_heard_reaches_the_slideshow(
 
     view._voice.listener.heard.emit("something off the mic")
 
-    assert "something off the mic" in words(view._slideshows.showing.shown._note)
+    assert "something off the mic" in words(view._slideshows.showing.shown._note), (
+        "from a slideshow this window cannot be seen, so a mic that heard nothing and one that "
+        "heard the wrong words used to look exactly alike")
 
 
 def test_a_voice_failure_reaches_the_slideshow_too(qtbot, tmp_path, monkeypatch):
@@ -991,7 +995,9 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert surface.noted == (None, "this one is enhanced already", WARNING)
+    assert surface.noted == (None, "this one is enhanced already", WARNING), (
+        "said over a slideshow with no view of the Enhance pane, so it says so rather than making "
+        "the image again at whatever the settings read now")
     assert view._live_jobs == {}
 
 
@@ -1023,7 +1029,9 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert surface.noted == (None, "this one has no file to enhance", WARNING)
+    assert surface.noted == (None, "this one has no file to enhance", WARNING), (
+        "a row can hold an output with no name: it reads as a finished image everywhere else, and "
+        "there is nothing to feed the enhancer")
     assert view._live_jobs == {}
 
 
@@ -1048,7 +1056,8 @@ def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert words(view._voice.status) == NOTHING_LEFT_TO_ENHANCE
+    assert words(view._voice.status) == NOTHING_LEFT_TO_ENHANCE, (
+        "answered in the button's own words, which is what a speaker not looking at it needs told back")
     assert view._live_jobs == {}
 
 
@@ -1142,7 +1151,8 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
 
     view._voice.listener.speak("go to favorites")
 
-    assert words(view._voice.status) == "no Favorites collection yet"
+    assert words(view._voice.status) == "no Favorites collection yet", (
+        "a word already taken as a command must not vanish because its row is not there yet")
 
 
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
@@ -1202,7 +1212,9 @@ def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
 
     view._voice.listener.speak("forward")
 
-    assert words(view._voice.status) == "nowhere forward"
+    assert words(view._voice.status) == "nowhere forward", (
+        "Back and Forward wear bare labels, so they carry a refusal of their own rather than "
+        "reading a tooltip back")
 
 
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
@@ -1287,7 +1299,9 @@ def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
     bars = view._osr2_motion.state.state
 
     view._voice.listener.speak("amp fifty")
-    assert bars.amplitude == 50
+    assert bars.amplitude == 50, (
+        "the nudges walk a bar five or ten at a time, which never arrives from the far end; a "
+        "number said outright is what Fun Time answers too")
 
     view._voice.listener.speak("center 30")
     assert bars.intended_center == 30

@@ -891,7 +891,9 @@ def test_up_over_a_favorite_takes_the_star_back_rather_than_the_image(qtbot):
 
     _press(view, Qt.Key.Key_Up)
 
-    assert (unfavorited, deleted) == (["id-a"], [])
+    assert (unfavorited, deleted) == (["id-a"], []), (
+        "the Funestras' own rule for Up: a favorite loses its star and the slideshow moves on; only "
+        "an image wearing no star is condemned")
     assert view.slideshow._set.playlist.current()[2] == "id-b"
     assert len(view.slideshow._set.playlist) == 2
     assert view.slideshow.hud_is_favorite is False
@@ -1041,7 +1043,8 @@ def test_the_message_wears_the_color_of_what_it_says(qtbot):
     message = Message(host)
 
     message.say("a plain line")
-    assert TEXT_PRIMARY.name() in message.styleSheet()
+    assert TEXT_PRIMARY.name() in message.styleSheet(), (
+        "the colors Fun Time's own messages read in, since this is the same kind of line")
     message.say("nothing to do", kind=WARNING)
     assert YELLOW.name() in message.styleSheet()
     message.say("it broke", kind=ERROR)
@@ -1142,7 +1145,9 @@ def test_asking_for_a_lock_locks_and_asking_again_changes_nothing(qtbot):
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
     view = _view(qtbot, items=items, actions=SlideshowActions(favorite=favorite.append))
 
-    assert view.slideshow.set_locked(True) is True
+    assert view.slideshow.set_locked(True) is True, (
+        "someone talking to an image asks for a state, not for the other one, and cannot see the "
+        "padlock to know which a flip would give")
     _settle(view)
     assert view.slideshow.locked
     assert favorite == ["gen-a"]
@@ -1845,7 +1850,8 @@ def test_a_live_slideshow_drives_no_device(qtbot):
 
 def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
     view = _view(qtbot)
-    assert _engine(view).muted is False
+    assert _engine(view).muted is False, (
+        "filling the screen with a video is deliberate, so it is heard")
 
 
 def test_a_scripted_clip_hands_its_motion_to_the_hud(qtbot, tmp_path):
@@ -1914,7 +1920,8 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     assert target is not None
     path, tgt_player, actions = target
     assert path == str(vid)
-    assert tgt_player is view._pane
+    assert tgt_player is view._pane, (
+        "the pane is what the drive follows: it is what knows where the video has got to")
     assert actions
 
 

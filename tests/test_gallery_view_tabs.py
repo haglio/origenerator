@@ -263,7 +263,8 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
 
     assert view.selected_generation() == "i2"
     tab = view._generate_pane.current_generate_tab()
-    assert tab.is_blank()
+    assert tab.is_blank(), (
+        "a tab that holds no generation must not come up as a blank form under someone else's image")
     tab._viewport.show_media.assert_not_called()
 
 

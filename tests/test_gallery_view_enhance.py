@@ -61,7 +61,8 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)
-    assert not view._buttons.enhance.isHidden()
+    assert not view._buttons.enhance.isHidden(), (
+        "a button that vanishes is one the user has to go looking for")
     assert view._buttons.enhance.isEnabled()
     assert "1 not-yet-enhanced image" in view._buttons.enhance.toolTip()
 
@@ -545,7 +546,9 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path)
     view.enhance_items(["g0"])
     view.refresh()
 
-    assert view.listed_prompt_ids() == ["g0", "g2", "g1"]
+    assert view.listed_prompt_ids() == ["g0", "g2", "g1"], (
+        "the run shows only on the tile of the image it improves, which can have been made a "
+        "thousand tiles ago; what is being done to an image is the newest thing about it")
     assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
 
 

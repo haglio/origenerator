@@ -227,7 +227,9 @@ def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
     qtbot.addWidget(tile)
     assert _has_image(tile)
     assert tile._status_scrim.text() == "Generating…"
-    assert tile._bar.caption().startswith("50% · ")
+    assert tile._bar.caption().startswith("50% · "), (
+        "the numbers are read back off the job rather than taken from a signal: the tile's own "
+        "clock re-renders on a tick that carries none, and both paths must draw the same line")
 
 
 def test_right_clicking_the_tile_asks_for_its_menu(qtbot):

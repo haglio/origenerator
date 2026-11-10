@@ -43,7 +43,7 @@ MODE_BUTTONS = (
 
 ENHANCED_ICON = shared_icon("enhance_filter")
 
-ENHANCED_TOOLTIP = "Enhanced only — play just the images that have been enhanced"
+ENHANCED_TOOLTIP = "Enhanced only — play just the items that have been enhanced"
 RESET_TOOLTIPS = {
     True: ("Reset — this shape's whole library back, with both filters off, "
            f"{RESET_PUTS_BACK_THE_SPEED}"),

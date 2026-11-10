@@ -88,6 +88,10 @@ class TestTheWords:
         assert row["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
         assert row["cycle_version"].tooltip == "Another version of this slide"
 
+    def test_enhanced_says_it_plays_every_item_that_has_been_enhanced_videos_included(self):
+        assert _by_name()["enhanced"].tooltip == (
+            "Enhanced only — play just the items that have been enhanced")
+
     def test_the_lock_and_the_trash_read_as_kinos_and_reset_says_what_it_does_here(self):
         row = _by_name()
 

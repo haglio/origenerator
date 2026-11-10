@@ -244,9 +244,15 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     assert actions.purged == [["d1"]]
 
 
+def _with_room_under_the_tiles_for_a_press_on_nothing(view):
+    pane = view._scroll.widget()
+    pane.resize(600, 600)
+    return pane
+
+
 class _FailingActions(FakeActions):
     def restore_deleted(self, prompt_ids):
-        raise OSError("the trash folder is gone")
+        raise OSError("a file the OS will not give back")
 
     def purge_deleted(self, prompt_ids):
         raise OSError("the trash folder is gone")
@@ -333,7 +339,7 @@ def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(
     view.restore_from_trash(["d1"])
 
     assert said == [("Restore failed",
-                     "Could not restore the selected item(s):\n\nthe trash folder is gone")]
+                     "Could not restore the selected item(s):\n\na file the OS will not give back")]
     assert view.selected_prompt_ids() == ["d1"]
 
 
@@ -738,8 +744,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     assert view.selected_prompt_ids() == ["i1"]
 
-    pane = view._scroll.widget()
-    pane.resize(600, 600)
+    pane = _with_room_under_the_tiles_for_a_press_on_nothing(view)
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert view.selected_prompt_ids() == []
@@ -754,8 +759,7 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
 
-    pane = view._scroll.widget()
-    pane.resize(600, 600)
+    pane = _with_room_under_the_tiles_for_a_press_on_nothing(view)
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
@@ -780,8 +784,7 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
 
-    pane = view._scroll.widget()
-    pane.resize(600, 600)
+    pane = _with_room_under_the_tiles_for_a_press_on_nothing(view)
     qtbot.mouseClick(pane, Qt.MouseButton.RightButton, pos=QPoint(560, 560))
 
     assert view.selected_prompt_ids() == ["i1"], (

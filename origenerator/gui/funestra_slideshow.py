@@ -627,9 +627,6 @@ class FunestraSlideshow(QObject):
         return self._set.set_filters(replace(self._set.filters, enhanced=enhanced,
                                              originals=originals))
 
-    def clear_modes(self) -> bool:
-        return self._set.set_filters(SlideshowFilters())
-
     def voice_target(self):
         return self._set.current_prompt_id()
 

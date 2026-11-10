@@ -611,7 +611,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view._slideshows.note_finished(better)
 
     assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i2", "i4"]
-    slideshow.clear_modes()
+    slideshow.show_enhanced_and_original()
     assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i2", "i3", "i4"]
     slideshow.close()
 

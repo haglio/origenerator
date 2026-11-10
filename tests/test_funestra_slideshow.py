@@ -1548,15 +1548,6 @@ def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path)
     assert (_sent(slideshow), said) == ([], ["Filter: no matches for 'gamma'"])
 
 
-def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of))
-    slideshow.action_presses.filter("beta")
-
-    assert slideshow.clear_modes() is True
-
-    assert slideshow.pass_size() == 3
-
-
 def test_no_filter_lifts_the_action_filter_and_leaves_f_mode_on(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),

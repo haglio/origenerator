@@ -69,7 +69,9 @@ def test_a_channel_carrying_anything_but_a_generation_is_ignored(qtbot, tmp_path
     _click(app_link.channel_for(tmp_path), "../../windows/system32")
     qtbot.wait(300)
 
-    assert asked == []
+    assert asked == [], (
+        "whatever arrives is read as strictly as the link it came from: a link is open to "
+        "anything that can reach a shell")
 
 
 def test_a_launch_carrying_anything_but_a_generation_opens_on_nothing(qtbot, tmp_path):

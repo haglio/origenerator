@@ -561,6 +561,7 @@ class GalleryPane(QObject):
         while self._pages.more() and (_drawn_height(drawn, seen.width())
                                       - top - seen.height() < _REACH):
             self._pages.draw(_PAGE)
+            # Qt only queues the show of a tile added to a page on screen; until it runs the page measures as nothing.
             show_the_tiles_qt_queued_to_show(drawn)
         _play_only_what_is_in_sight(drawn, self._thumb_widgets.values(),
                                     top - _REACH, top + seen.height() + _REACH)

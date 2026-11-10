@@ -86,7 +86,9 @@ def test_search_fills_the_gallery_pane_with_the_matching_generations(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.listed_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"], (
+        "a search fills the Gallery pane with the matching generations themselves, because a "
+        "thumbnail is what the user recognizes and a folder's name, a short code, is not")
     assert view._gallery_pane.showing_search()
 
 

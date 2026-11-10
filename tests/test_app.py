@@ -124,7 +124,11 @@ def test_a_close_leaves_pyqts_own_cleanup_nothing_to_delete(tmp_path):
 
     _opened_and_closed_for_real("tests.real_close", said, tmp_path / "state")
 
-    assert json.loads(said.read_text(encoding="utf-8")) == {}
+    assert json.loads(said.read_text(encoding="utf-8")) == {}, (
+        "as the QApplication's own wrapper is freed, PyQt deletes every QObject Python still "
+        "owns while it walks sip's map of wrappers, and a deletion that makes enough new "
+        "wrappers has sip rebuild that map under the walk; whether that faults depends on the "
+        "heap, so what is held here is that nothing is left for the walk")
 
 
 def _opened_and_closed_for_real(child: str, said: Path, state: Path) -> None:
@@ -834,7 +838,9 @@ def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
         assert main(hosted_launch(headset=True, **{
             "--frames-file": str(tmp_path / "frame.bin"),
             "--input-file": str(tmp_path / "input.txt"),
-        })) == 0
+        })) == 0, (
+            "the room shows this window's frame there, and Qt draws nothing for a window "
+            "Windows has unmapped: parked, it would hand over an empty frame")
 
     window.showMinimized.assert_not_called()
 

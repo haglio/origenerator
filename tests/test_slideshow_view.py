@@ -1479,7 +1479,9 @@ def test_a_request_leaves_a_clip_playing_and_only_stops_the_slideshow_moving_on(
     view.slideshow.pause_for_request(True, "listening…")
     _settle(view)
 
-    assert _engine(view).paused is False
+    assert _engine(view).paused is False, (
+        "the request is about what is on screen; a video that stopped in the middle of a "
+        "sentence would be answering a question nobody asked")
     assert not _will_move_on(view)
 
 

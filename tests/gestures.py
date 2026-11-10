@@ -43,6 +43,7 @@ def release(widget: QWidget, at: QPoint) -> None:
 
 def press_key(widget: QWidget, key: Qt.Key,
               modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier) -> None:
+    # Qt hands a key to the active window, which passes it to whatever there has the focus.
     QTest.keyClick(widget.window().windowHandle(), key, modifiers)
 
 

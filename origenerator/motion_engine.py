@@ -130,6 +130,7 @@ def _envelope_fraction(motion: Motion) -> float:
 
 
 def position_ahead(motion: Motion, lead_s: float) -> float:
+    # The OSR2 is told a place and how long to take getting there; aimed at the present it only chases.
     if motion.learned.active:
         return learned_motion.position(motion.learned, motion.state, lead_s)
     return _at(motion, motion.phase + lead_s * motion.state.bpm / 60.0)

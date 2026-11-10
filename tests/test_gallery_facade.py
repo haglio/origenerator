@@ -69,7 +69,9 @@ def test_the_facade_publishes_exactly_the_names_written_down_here():
 
 def test_every_published_name_is_actually_there():
     missing = [name for name in PUBLISHED if not hasattr(gallery, name)]
-    assert missing == []
+    assert missing == [], (
+        "Python does not check __all__: a name listed but never imported raises only when "
+        "someone reaches for it, long after the split that dropped it")
 
 
 THE_DB_MODULE = "enhance_fold.py"

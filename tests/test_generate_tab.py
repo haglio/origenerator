@@ -1867,7 +1867,9 @@ def test_an_upscaled_videos_versions_have_no_trash_can(saved_panel, monkeypatch,
 
     rows = _version_rows(tab)
     assert len(rows) == 2
-    assert [row.findChild(QPushButton, "deleteButton") for row in rows] == [None, None]
+    assert [row.findChild(QPushButton, "deleteButton") for row in rows] == [None, None], (
+        "a video's versions are the video itself and the copy Evolver keeps, so they are not "
+        "this list's to trash")
 
 
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):

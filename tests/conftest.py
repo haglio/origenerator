@@ -414,7 +414,7 @@ def _enhance_presets_of_the_tests_own(monkeypatch, _this_tests_own_folder):
 
 
 def pytest_collection_finish(session):
-    """gc.freeze moves the import graph out of the full gc.collect() each test's reap runs; collection finish is before pytest-qt's QApplication exists, so no widget is frozen alive."""
+    """gc.freeze moves the import graph out of the full gc.collect() each test's reap runs; collection finish is before pytest-qt's QApplication exists, so no widget is frozen alive. CPython still promotes a cycle made after the freeze through the generations and reaps it in a full collect."""
     gc.collect()
     gc.freeze()
 

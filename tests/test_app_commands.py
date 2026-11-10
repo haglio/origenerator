@@ -198,7 +198,9 @@ def test_the_recognizer_is_asked_to_hear_every_way_a_command_is_said_in_words():
 
 def test_taking_an_item_away_and_shutting_the_mic_are_heard_only_when_said_outright():
     assert phrases_heard_only_outright() == {
-        "mic off", "voice off", "trash", "delete", "delete it"}
+        "mic off", "voice off", "trash", "delete", "delete it"}, (
+        "a near miss is never repaired into these two: the switch with no spoken way back, and "
+        "the word that takes an item away")
 
 
 def test_a_number_in_digits_is_how_whisper_writes_it_not_something_to_listen_for():

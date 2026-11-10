@@ -161,10 +161,10 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
     line_top, line_foot = span(tab._media_split.handle(1))
     generate_top, generate_foot = span(tab._generate_btn.parentWidget())
     settings_top, _ = span(tab._settings_scroll)
-    assert tab._viewport_pane.isAncestorOf(tab._generate_btn)
-    assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top, (
+    assert tab._viewport_pane.isAncestorOf(tab._generate_btn), (
         "Generate heads the settings rather than trailing them in the lower right corner, where "
         "Windows pops its messages up over whatever is there")
+    assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top
 
 
 def test_a_new_tab_gives_the_preview_five_eighths_and_the_settings_and_metadata_three_sixteenths_each(
@@ -1595,7 +1595,7 @@ def test_the_mark_falls_back_to_what_the_config_makes(tab):
 
 def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
     assert blank_panel.tab_icon().isNull(), (
-        "nothing is known yet, and a mark guessing at a workflow would be wrong")
+        "nothing is known yet, and a mark guessing at a workflow would be the tab's most confident claim")
 
 
 class SpyDB:
@@ -2107,10 +2107,10 @@ def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, m
 
 def test_the_tab_watches_no_run_of_its_own(tab):
     tab.set_generating(True)
-    assert tab._generate_btn.text() == "Generate", (
+    assert tab._generate_btn.text() == "Generate"
+    assert not hasattr(tab, "_on_progress"), (
         "filled with its run's steps, the button was a third, differently worded telling of one run, "
         "and tied the control that starts work to the state of work already going")
-    assert not hasattr(tab, "_on_progress")
     assert not hasattr(tab, "_generating_prompt_id")
 
 
@@ -3060,8 +3060,8 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     tab.set_pending_enhancement(None)
 
     assert _message(tab) == "(not yet generated with modifications)", (
-        "nothing about the settings moved when the enhancement folded in; taking the mark again "
-        "would read the user's edits as what was generated")
+        "nothing about the settings moved when the enhancement folded in; measured from there "
+        "afresh, the user's edits would read as what was generated")
 
 
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
@@ -4053,8 +4053,7 @@ def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, 
     assert _lane_offers(tab) == [f"✓ Sent to {lane.name}"]
     assert [button.text() for button in tab.findChildren(QPushButton)
             if button.isVisibleTo(tab) and "Unsend" in button.text()] == ["Unsend"], (
-        "a send is a file copied into another app's folders, so the only way back is a delete there, "
-        "and it stays offered however long ago the send was")
+        "a send is a file copied into another app's folders, so the only way back is a delete there")
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)

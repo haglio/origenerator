@@ -270,8 +270,19 @@ class SlideshowPlaylist:
             self._pos = 0
 
     def replace_item(self, prompt_id, path, media_type=None, still=None) -> bool:
-        found = self._made_by(prompt_id)
-        for index in found:
+        return self._upgrade(self._made_by(prompt_id), path, media_type, still)
+
+    def replace_file(self, prompt_id, path, media_type=None, still=None) -> bool:
+        changed = [index for index in self._made_by(prompt_id)
+                   if str(self._items[index].path) != str(path)
+                   and index != self._order[self._pos]]
+        self._upgrade(changed, path, media_type, still)
+        for index in changed:
+            self._line_up(index)
+        return bool(changed)
+
+    def _upgrade(self, indexes, path, media_type, still) -> bool:
+        for index in indexes:
             self._items[index] = self._items[index].upgraded(path, media_type, still)
-        return bool(found)
+        return bool(indexes)
 

@@ -299,6 +299,32 @@ def test_a_frame_for_a_slide_that_already_landed_is_ignored():
     assert playlist.current() == Slide("a.png", "image", "id-a")
 
 
+def test_an_item_whose_file_was_upscaled_plays_as_its_upscale_and_comes_up_next():
+    playlist = _four()
+
+    assert playlist.replace_file("id-c", "c_topaz.mp4", "video") is True
+
+    assert ahead(playlist, 1) == ("c_topaz.mp4", "video", "id-c", None)
+    assert len(playlist) == 4
+
+
+def test_the_item_on_screen_keeps_playing_its_file_when_it_is_upscaled():
+    playlist = _four()
+
+    assert playlist.replace_file("id-a", "a_topaz.mp4", "video") is False
+
+    assert playlist.current() == Slide("a.png", "image", "id-a")
+    assert ahead(playlist, 1)[2] == "id-b"
+
+
+def test_an_item_already_playing_as_its_upscale_is_left_where_it_stands():
+    playlist = _four()
+
+    assert playlist.replace_file("id-c", "c.png", "image") is False
+
+    assert ahead(playlist, 1)[2] == "id-b"
+
+
 def test_a_live_slide_becomes_the_file_it_lands_as():
     playlist = _four()
     playlist.add((b"frame-1", LIVE, "id-new", None))

@@ -205,6 +205,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
 
     view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("give her a much longer caption than the idle one")
+    # Qt lays out around a caption that has grown only on a later turn of the event loop.
     qtbot.wait(1)
 
     caption = QRect(view._voice.status.mapTo(view, QPoint(0, 0)), view._voice.status.size())

@@ -34,7 +34,7 @@ class TabViews:
     animated_preview: Callable[[dict], str | None] | None = None
     library: object = None
     requests: object = None
-    request_aims: dict | None = None
+    request_aims: object = None
 
 
 NO_VIEWS = TabViews()

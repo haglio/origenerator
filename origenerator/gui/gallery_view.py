@@ -164,6 +164,7 @@ from origenerator.gui.panes import (
 )
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
+from origenerator.gui.request_aims import RequestAims
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
 from origenerator.gui.slideshow_director import (
     DirectorSources,
@@ -622,7 +623,7 @@ class GalleryView(QWidget):
             self._client, self._db, fun_time=self._fun_time, inbox=self._inbox,
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
                            animated_preview=self.animated_preview,
-                           requests=self._voice.requests, request_aims={}))
+                           requests=self._voice.requests, request_aims=RequestAims(self)))
         self._find_bar = FindBar("Find in prompts:", "a word you wrote…",
                                  dismiss_key="Esc", reveal=reveal_prompt)
         self.generate_pane.tab_added.connect(self._wire_generate_tab)

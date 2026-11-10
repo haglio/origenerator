@@ -3,12 +3,10 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
-import shiboken6
 from app_support.gallery_rows import made_here
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QAction
@@ -111,6 +109,7 @@ from origenerator.gui.param_form import (
     WorkflowTraits,
 )
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
+from origenerator.gui.request_aims import RequestAim, RequestAims
 from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.viewport import Viewport
 from origenerator.gui.warning_mark import WarningMark
@@ -165,46 +164,6 @@ _WAITING_NOTE = "Waiting for preview…"
 _MODIFY_BATCH_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
-
-@dataclass
-class _RequestAim:
-    prompt_id: str
-    shown: tuple[str, str]
-    earlier: list = field(default_factory=list)
-    asked_into: list = field(default_factory=list)
-    started_on: str | None = None
-    turns: list = field(default_factory=list)
-    values: list = field(default_factory=list)
-    asking: str | None = None
-
-    def every_turn(self) -> list:
-        return self.earlier + self.turns
-
-    def last_made(self, before: int) -> int:
-        made = [index for index, turn in enumerate(self.every_turn()[:before]) if turn.made]
-        return made[-1] if made else -1
-
-    def made_before(self, index: int) -> str | None:
-        last = self.last_made(index)
-        return self.every_turn()[last].made if last >= 0 else self.started_on
-
-    def note_made(self, index: int, prompt_id: str) -> None:
-        if index < len(self.earlier):
-            self.earlier[index] = self.earlier[index]._replace(made=prompt_id)
-        else:
-            at = index - len(self.earlier)
-            self.turns[at] = self.turns[at]._replace(made=prompt_id)
-
-    def answered(self, turn, values: dict) -> None:
-        self.turns.append(turn)
-        self.values.append(values)
-
-    def carried_onto(self, prompt_id: str, shown: tuple[str, str], recorded: int) -> None:
-        self.turns = self.turns[recorded:]
-        self.values = self.values[recorded:]
-        self.prompt_id = prompt_id
-        self.shown = shown
-
 
 class _BeingMade(NamedTuple):
     key: str | None
@@ -308,11 +267,12 @@ class GenerateTab(DropZones):
         self._fresh_form = False
         self._form_checkpoint = None
         self._autoshow_held = False
-        self._request_aim: _RequestAim | None = None
+        self._request_aim: RequestAim | None = None
         self._turn_being_made: int | None = None
         self._request_auto_generate = False
-        self._request_aims: dict[str, _RequestAim] = (
-            views.request_aims if views.request_aims is not None else {})
+        self._request_aims = (views.request_aims if views.request_aims is not None
+                              else RequestAims(parent=self))
+        self._request_aims.answered.connect(self._on_request_answered)
         self._requests = views.requests or RequestAnswerer(db, None, client, parent=self)
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
@@ -1397,12 +1357,12 @@ class GenerateTab(DropZones):
         prompt_id = row["prompt_id"]
         params = self._settings_shown().params
         shown = (params.get("positive_prompt") or "", params.get("negative_prompt") or "")
-        aim = (self._request_aims.get(prompt_id) or self._aim_carried_onto(prompt_id, shown)
-               or _RequestAim(prompt_id, shown))
+        aim = (self._request_aims.of(prompt_id) or self._aim_carried_onto(prompt_id, shown)
+               or RequestAim(prompt_id, shown))
         aim.earlier = list(self._db.requests.exchange_of(prompt_id))
         aim.asked_into = self._db.requests.items_asked_into(prompt_id)
         aim.started_on = self._db.requests.started_on(prompt_id) if aim.earlier else prompt_id
-        self._request_aims[prompt_id] = aim
+        self._request_aims.keep(aim)
         self._request_aim = aim
         self._turn_being_made = None
         exchange.set_thumbnail_of(self._thumbnail_of)
@@ -1411,11 +1371,11 @@ class GenerateTab(DropZones):
             self._param_form.set_prompts(aim.turns[-1].new_positive, aim.turns[-1].new_negative,
                                          typed=True)
 
-    def _aim_carried_onto(self, prompt_id: str, shown: tuple[str, str]) -> _RequestAim | None:
+    def _aim_carried_onto(self, prompt_id: str, shown: tuple[str, str]) -> RequestAim | None:
         was = self._request_aim
         if was is None or prompt_id not in self._launched_runs or not (was.turns or was.asking):
             return None
-        self._request_aims.pop(was.prompt_id, None)
+        self._request_aims.forget(was.prompt_id)
         was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id)))
         return was
 
@@ -1487,14 +1447,11 @@ class GenerateTab(DropZones):
             words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             weights=workflow_named(self._form_workflow_key).prompts_take_weights,
-            owner=self._requests,
-            then=partial(self._on_rewritten, aim, self._param_form.get_values()))
+            owner=self._request_aims,
+            then=partial(self._request_aims.take_answer, aim, self._param_form.get_values()))
 
-    def _on_rewritten(self, aim: _RequestAim, values: dict, revision) -> None:
-        said, aim.asking = aim.asking, None
-        if revision is not None:
-            aim.answered(revision.turn(said), {**values, **dict(revision.settings)})
-        if not shiboken6.isValid(self) or aim is not self._request_aim:
+    def _on_request_answered(self, aim: RequestAim, revision) -> None:
+        if aim is not self._request_aim:
             return
         exchange = self._param_form.request_exchange()
         if revision is None:

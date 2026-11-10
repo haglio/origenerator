@@ -1899,7 +1899,7 @@ def test_the_way_to_the_folder_is_one_button_in_the_row_with_generate(saved_pane
     body = tab._settings_scroll.widget()
 
     assert button.isVisibleTo(tab)
-    assert button.mapTo(tab, QPoint(0, 0)).y() == tab._generate_btn.mapTo(tab, QPoint(0, 0)).y()
+    assert button.mapTo(tab, QPoint(0, 0)).y() == tab._generate_pair.mapTo(tab, QPoint(0, 0)).y()
     assert button.mapTo(tab, QPoint(0, 0)).x() == body.mapTo(tab, QPoint(
         body.layout().contentsMargins().left(), 0)).x()
     for row in _version_rows(tab):

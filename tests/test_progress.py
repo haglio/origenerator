@@ -173,7 +173,9 @@ def test_the_minutes_before_the_first_step_are_named_too():
 def test_a_node_with_nothing_worth_saying_is_left_unnamed():
     payload = _payload("wan22_i2v", steps=20)
     named = stage_names(payload)
-    for instant in _ids(payload, "ModelSamplingSD3") + _ids(payload, "GetImageSize"):
+    instant_nodes = _ids(payload, "ModelSamplingSD3") + _ids(payload, "GetImageSize")
+    assert instant_nodes
+    for instant in instant_nodes:
         assert instant not in named, "an instant node's name would only flash between two real stages"
 
 

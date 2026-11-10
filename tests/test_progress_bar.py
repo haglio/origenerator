@@ -20,16 +20,16 @@ def bar(qtbot):
 
 @pytest.fixture
 def styled_bar(qtbot):
-    parent_styled_as_the_app_styles_it = QWidget()
-    parent_styled_as_the_app_styles_it.setStyleSheet(build_stylesheet())
-    layout = QVBoxLayout(parent_styled_as_the_app_styles_it)
+    app_styled_parent = QWidget()
+    app_styled_parent.setStyleSheet(build_stylesheet())
+    layout = QVBoxLayout(app_styled_parent)
     b = ProgressBar()
     b.setFixedHeight(22)
     layout.addWidget(b)
-    qtbot.addWidget(parent_styled_as_the_app_styles_it)
-    parent_styled_as_the_app_styles_it.resize(240, 60)
-    with qtbot.waitExposed(parent_styled_as_the_app_styles_it):
-        parent_styled_as_the_app_styles_it.show()
+    qtbot.addWidget(app_styled_parent)
+    app_styled_parent.resize(240, 60)
+    with qtbot.waitExposed(app_styled_parent):
+        app_styled_parent.show()
     return b
 
 
@@ -171,8 +171,8 @@ def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
     styled_bar.show_progress("50%", (30, 60), (20, 20))
     image = styled_bar.grab().toImage()
 
-    foot = styled_bar.height() - 1
-    substep = range(foot - progress_bar._SUBSTEP_BAR_PX, foot)
+    border_row = styled_bar.height() - progress_bar._BORDER_PX
+    substep = range(border_row - progress_bar._SUBSTEP_BAR_PX, border_row)
     clear_of_the_rounded_ends = range(styled_bar.width() // 3, styled_bar.width() * 2 // 3)
     written = [(x, y) for y in substep for x in clear_of_the_rounded_ends
                if image.pixelColor(x, y) not in (BLUE_LIGHT, BG_PRIMARY)]

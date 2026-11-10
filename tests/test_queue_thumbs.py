@@ -25,7 +25,7 @@ def _thumbnail(path, color, size=(80, 40)):
 
 
 def _color_at(pixmap, x, y):
-    # Qt: pixel() throws the alpha away, and alpha is all that tells an empty cell from a faint one.
+    # Qt: QColor(image.pixel(x, y)) drops the alpha; pixelColor keeps it.
     return pixmap.toImage().pixelColor(x, y)
 
 

@@ -58,7 +58,9 @@ def test_cancelling_a_variation_keeps_populate_on_and_tries_another_seed(qtbot):
 
     populate.note_canceled("k")
 
-    assert launcher.calls == ["k", "k"]
+    assert launcher.calls == ["k", "k"], (
+        "Cancel means not this one, not stop: having to turn Populate on again after every discard "
+        "made the button fight the user")
     assert populate.is_active("k")
     assert stopped == []
 
@@ -177,7 +179,19 @@ def test_populating_in_a_new_folder_ends_it_in_the_old_one(qtbot):
 
     assert populate.is_active("b")
     assert not populate.is_active("a")
-    assert stopped == ["a"]
+    assert stopped == ["a"], (
+        "reported as a hand-stop is, so the folder left behind has its switch cleared in the one "
+        "handler every ending goes through")
+
+
+def test_populate_names_the_folder_it_runs_in_and_none_once_stopped(qtbot):
+    populate = PopulateController(FakeLauncher())
+    populate.start("a")
+
+    assert populate.active_key() == "a", (
+        "a Populate the user has walked away from is the one they need to be told about")
+    populate.stop("a")
+    assert populate.active_key() is None
 
 
 def test_the_displaced_folder_launches_nothing_more(qtbot):

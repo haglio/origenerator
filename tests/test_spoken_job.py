@@ -173,7 +173,8 @@ def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, 
     done_speaking.set()
     qtbot.waitUntil(lambda: job.state == "queued", timeout=_HANG_MS)
     timer.stop()
-    client.free_memory.assert_called_once()
+    assert client.free_memory.call_count == 1, (
+        "the models ComfyUI keeps loaded would leave the voice no room on the graphics card")
     assert seen["spoke_on"] != gui_thread
     assert seen["sent_on"] == gui_thread
 

@@ -19,6 +19,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.media import MediaType
+from origenerator.queue_line import VIDEOS_WAIT_AFTER_AN_IMAGE_S
 from origenerator.run_toast import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -305,7 +306,9 @@ def test_per_seed_rerolls_preempt_experiments_too(qtbot, tmp_path):
 
     queue.reroll_video_seed("k", _video_row())
 
-    assert not queue.has("exp-key")
+    assert not queue.has("exp-key"), (
+        "every launch of the user's goes through the one admission, which clears the experimenter, so no "
+        "path of theirs can skip it")
     assert queue.has("k")
 
 
@@ -395,7 +398,9 @@ def test_progress_persistence_is_throttled(qtbot, tmp_path, monkeypatch):
     client.progress.emit(pid, "s", 5, 10)
     first = db.get_generation(pid)["progress_json"]
     client.progress.emit(pid, "s", 6, 10)
-    assert db.get_generation(pid)["progress_json"] == first
+    assert db.get_generation(pid)["progress_json"] == first, (
+        "the interval is set here, not waited out: a machine that stalls a second between two emits "
+        "would otherwise write the second one")
 
     monkeypatch.setattr(job_queue_module, "_PROGRESS_PERSIST_INTERVAL_S", 0)
     client.progress.emit(pid, "s", 7, 10)
@@ -1027,7 +1032,8 @@ def test_a_video_moved_to_the_top_starts_at_once_however_lately_an_image_was_ask
 
     queue.move(video.prompt_id, before=image.prompt_id)
 
-    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
+    assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id, (
+        "the minute's wait is for a video nobody moved: one moved to the top took the machine to be made now")
 
 
 def test_a_move_cannot_put_anything_ahead_of_a_job_put_first(qtbot, tmp_path):
@@ -1050,7 +1056,9 @@ def test_a_job_let_go_over_one_the_line_does_not_hold_goes_to_its_end(qtbot, tmp
 
     queue.move(second.prompt_id, before="some-other-apps-prompt")
 
-    assert queue.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
+    assert queue.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id], (
+        "another app's prompts share the server, and a row can outlive its job by a poll; neither is a "
+        "place in this line")
 
 
 def test_moving_a_job_the_line_does_not_hold_changes_nothing(qtbot, tmp_path):
@@ -1212,7 +1220,9 @@ def test_the_window_stays_alive_while_comfyui_takes_its_time_to_answer(qtbot, tm
     QTimer.singleShot(0, while_the_submit_is_out)
     queue.start_prepared("video/wf/deadbeef", _I2V, _params())
 
-    assert seen == {"rows": ["pending"], "in_line": True, "announced": 1}
+    assert seen == {"rows": ["pending"], "in_line": True, "announced": 1}, (
+        "a launch is in the line the moment its row is written, so it is announced then and its tile "
+        "appears at once, not a minute later when ComfyUI answers")
     assert db.list_generations()[0]["status"] == "running"
 
 
@@ -1966,7 +1976,7 @@ def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_an
     queue = JobQueue(Database(tmp_path / "test.db"), client, clock=lambda: now[0])
     enhance = _launch_enhance(queue, "e")
     video = _launch_video(queue, "v", input_image=_IMAGE)
-    now[0] += 120
+    now[0] += 2 * VIDEOS_WAIT_AFTER_AN_IMAGE_S
     sent_by_the_announcement = []
     queue.finished.connect(
         lambda *_: sent_by_the_announcement.append(client.submit_job.call_count))

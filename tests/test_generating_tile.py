@@ -44,7 +44,9 @@ def _has_image(tile):
 def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    assert tile._status_scrim.text() == "Waiting…"
+    assert tile._status_scrim.text() == "Waiting…", (
+        "the stage is read on the scrim over the thumbnail, the way an in-flight tile and an "
+        "enhancing thumbnail say theirs")
     assert not tile._cancel.isHidden()
     assert tile._cancel.text() == "Cancel"
 
@@ -128,7 +130,8 @@ def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
                   started_at=time.time() - 90.5)
     tile = GeneratingTile(job, typical_seconds=725.0)
     qtbot.addWidget(tile)
-    assert tile._bar.caption() == "50% · ~6:02 left"
+    assert tile._bar.caption() == "50% · ~6:02 left", (
+        "the same line the Job Queue writes for the same job, so a run reads alike wherever it is watched")
     assert (tile._bar.value(), tile._bar.maximum()) == (10, 20)
 
 
@@ -138,7 +141,9 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
                   started_at=time.time() - 90.5)
     tile = GeneratingTile(job, typical_seconds=725.0)
     qtbot.addWidget(tile)
-    assert tile._bar.caption().startswith("Second pass · 49% · ")
+    assert tile._bar.caption().startswith("Second pass · 49% · "), (
+        "a video's three passes each restart the bar, and early in a long run the pass is the one "
+        "thing it can report")
 
 
 def test_the_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
@@ -177,7 +182,8 @@ def test_progress_signal_advances_the_bar(qtbot):
 def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    assert tile._bar.caption() == ""
+    assert tile._bar.caption() == "", (
+        "its wait is the Job Queue's to explain; a zero counting up would say the run is stuck")
     assert tile._bar.maximum() == 0
 
 
@@ -206,7 +212,9 @@ def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
     qtbot.addWidget(tile)
     thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
 
-    assert bar.bottomLeft().y() == thumbnail.bottomLeft().y()
+    assert bar.bottomLeft().y() == thumbnail.bottomLeft().y(), (
+        "the bar rides over the thumbnail, taking no row of its own, so the tile is the size and "
+        "shape of every tile beside it")
     assert bar.left() == thumbnail.left()
     assert bar.width() == thumbnail.width()
     assert bar.top() > thumbnail.center().y()

@@ -90,7 +90,9 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
 
     client.progress.emit("comfy-A", "5", 5, 50)
     assert started == [True]
-    assert progress == [(2, 35)]
+    assert progress == [(2, 35)], (
+        "five steps of a 50-step base pass, in a run budgeted for that pass and the 20-step enhance pass "
+        "together; nothing in the app turns that enhance on by hand any more, but a reused old run still builds it")
     assert job.state == "running"
     assert job.last_progress == (2, 35)
 
@@ -109,10 +111,14 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     client.progress.emit("comfy-A", "15", 10, 10)
     client.progress.emit("comfy-A", "16", 1, 10)
 
-    assert seen == [(405, 818), (446, 818)]
+    assert seen == [(405, 818), (446, 818)], (
+        "two video passes of 20 steps, then an audio pass whose 50 steps are budgeted at about a "
+        "hundredth of the video's")
     assert job.last_progress == (446, 818)
     assert job.last_pass_progress == (1, 10)
-    assert job.last_stage == "Second pass"
+    assert job.last_stage == "Second pass", (
+        "no executing word came for this node, as for a job joined mid-node after a restart, so its first "
+        "tick names the stage; unnamed, the pass's own bar says only that something started over")
 
 
 def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
@@ -122,7 +128,8 @@ def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
     job.start()
 
     client.progress.emit("comfy-A", "8", 5, 20)
-    assert job.last_progress == (2, 10)
+    assert job.last_progress == (2, 10), (
+        "a still's 20 steps are budgeted at half a second each, and five of them are done")
     assert job.last_pass_progress is None
 
 
@@ -138,7 +145,8 @@ def test_the_stage_is_named_from_the_first_node_long_before_any_step(qtbot, tmp_
     client.node_executing.emit("comfy-A", "12")
     assert job.last_stage == "Loading the image"
     client.node_executing.emit("comfy-A", "8")
-    assert job.last_stage == "Loading the image"
+    assert job.last_stage == "Loading the image", (
+        "a caption that empties between two named stages reads as a run that lost its way")
     client.node_executing.emit("comfy-A", "17")
     assert job.last_stage == "Decoding frames"
 
@@ -332,7 +340,8 @@ def test_reconcile_is_a_noop_while_the_prompt_is_still_running(qtbot, tmp_path):
     job.reconcile_with({})
     job.reconcile_with(None)
 
-    assert finished == []
+    assert finished == [], (
+        "ComfyUI leaves a prompt out of its history until it has run, so an empty fetch is a run still going")
     assert job.state == "queued"
 
 
@@ -504,7 +513,9 @@ def test_a_waiting_job_comfyui_says_it_is_making_is_being_made(qtbot, tmp_path):
     assert (job.state, started) == ("queued", [])
 
     job.take_executing(True)
-    assert (job.state, started) == ("running", [True])
+    assert (job.state, started) == ("running", [True]), (
+        "a run taken back after it started, with no copy of the app listening, may say nothing more for a "
+        "whole sampler step, so ComfyUI's own word for what it is making counts")
 
 
 def test_take_backlog_holds_another_apps_count_while_the_job_waits(qtbot, tmp_path):
@@ -588,7 +599,8 @@ def test_defer_stops_the_prompt_and_brings_the_job_back_unsent(qtbot, tmp_path):
 
     client.cancel_prompt.assert_called_once_with("comfy-A")
     client.interrupt.assert_called_once_with("comfy-A")
-    assert job.state == "idle"
+    assert job.state == "idle", (
+        "ComfyUI cannot set a run down and pick it up again, so the run is thrown away and starts over")
     assert job.last_progress == (0, 0)
     assert job.last_pass_progress is None
     assert job.last_stage == ""

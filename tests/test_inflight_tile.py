@@ -56,7 +56,8 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
     tile = InFlightTile(_item(status="running", frame=_png_bytes()))
     qtbot.addWidget(tile)
 
-    assert not tile._image.pixmap().isNull()
+    assert not tile._image.pixmap().isNull(), (
+        "a stage written in place of the frame hid the frame the user came to watch")
     assert tile._status_scrim.text() == "Generating…"
     assert tile._status_scrim.geometry().intersects(tile._image.geometry())
 
@@ -171,7 +172,8 @@ def test_a_queued_run_stands_what_it_came_from_behind_the_wait(qtbot, tmp_path):
     tile = InFlightTile(_item(status="queued", source_file=_source_file(tmp_path)))
     qtbot.addWidget(tile)
 
-    assert not tile._image.pixmap().isNull()
+    assert not tile._image.pixmap().isNull(), (
+        "what the run came from stands behind the wait, blurred so it reads as the source and not the result")
 
 
 def test_a_run_that_came_from_nothing_keeps_its_plain_plate(qtbot):

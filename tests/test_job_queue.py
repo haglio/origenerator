@@ -680,7 +680,8 @@ def test_a_storys_row_says_running_only_once_its_voice_is_done_and_comfyui_has_i
     queue = JobQueue(db, _client())
     story = _launch_story(queue, "k1", seed=1)
 
-    assert db.get_generation(story.prompt_id)["status"] == "pending"
+    assert db.get_generation(story.prompt_id)["status"] == "pending", (
+        "a row marked running that ComfyUI never got is cleared at the next launch, which lost a story")
     voices[0].done()
     assert db.get_generation(story.prompt_id)["status"] == "running"
 
@@ -1078,7 +1079,8 @@ def test_a_move_says_the_line_was_reordered_and_one_that_changes_nothing_says_no
     queue.move_up(head.prompt_id)
     queue.move_down(head.prompt_id)
 
-    assert said == [[second.prompt_id, head.prompt_id]]
+    assert said == [[second.prompt_id, head.prompt_id]], (
+        "a row that sits still after a press reads as a press that was missed")
 
 
 def test_up_moves_a_job_ahead_of_the_one_above_it(qtbot, tmp_path):

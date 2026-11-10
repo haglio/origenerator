@@ -294,7 +294,9 @@ def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
 
     client.job_completed.emit("comfy-A", {"outputs": {}})
 
-    assert finished == []
+    assert finished == [], (
+        "taken as finished, it would be an item the app believes in with nothing on disk, "
+        "unseen in the gallery")
     assert len(failed) == 1
     assert "without producing an output file" in failed[0]
     assert job.state == "failed"
@@ -316,7 +318,9 @@ def test_reconcile_finishes_a_job_whose_live_completion_was_missed(qtbot, tmp_pa
 
     job.reconcile_with(SDXL_HISTORY)
 
-    assert finished == [[{"filename": "a.png", "subfolder": ""}]]
+    assert finished == [[{"filename": "a.png", "subfolder": ""}]], (
+        "ComfyUI says a job is complete once, over its websocket, and a dropped frame or a "
+        "reconnect loses it; unread from its history, the job would hang with its output unseen")
     assert job.state == "finished"
 
 
@@ -390,7 +394,8 @@ def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
 def test_a_job_taken_back_with_no_start_recorded_waits_on_the_server(qtbot, tmp_path):
     job = GenerationJob.reconnect(_client(), JobSpec(SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="pid"), folders=JobFolders(places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"))
 
-    assert job.state == "queued"
+    assert job.state == "queued", (
+        "a closing app hands ComfyUI every run still waiting, and most are still queued when it reopens")
 
 
 def test_a_job_taken_back_that_had_started_is_still_being_made(qtbot, tmp_path):
@@ -411,7 +416,9 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
 
 def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):
     job, _client = _started_job(tmp_path)
-    assert job.started_at is None
+    assert job.started_at is None, (
+        "a busy queue can hold a job for minutes, and counting that wait as its run "
+        "would make the estimate of what is left nonsense")
 
 
 def test_the_start_time_is_stamped_at_the_first_sign_of_life(qtbot, tmp_path):
@@ -454,7 +461,8 @@ def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_
     job = GenerationJob.reconnect(_client(), JobSpec(SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="pid"), folders=JobFolders(places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"))
     assert job.started_at is None
     job._on_progress("pid", "5", 5, 50)
-    assert job.started_at is not None
+    assert job.started_at is not None, (
+        "a clock that undercounts is better than no clock")
 
 
 def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):

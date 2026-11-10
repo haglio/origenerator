@@ -60,6 +60,7 @@ from origenerator.gallery import (
     videos_from_source_image,
 )
 from origenerator.gallery import output as gallery_output
+from origenerator.gallery import signatures as signatures_module
 from origenerator.gallery import source_image as source_image_module
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
@@ -824,6 +825,26 @@ def test_output_file_reference_without_subfolder_defaults_to_output():
 def test_output_file_reference_is_none_when_no_usable_file():
     assert output_file_reference([]) is None
     assert output_file_reference([{"subfolder": "image"}]) is None
+
+
+def test_a_workflows_seed_keys_are_read_off_it_once(monkeypatch):
+    asked = []
+
+    class Workflow:
+        def seed_keys(self):
+            asked.append("seed keys")
+            return ["seed"]
+
+    monkeypatch.setattr(signatures_module, "workflow_named", lambda name: Workflow())
+    signatures_module._workflow_instance_keys.cache_clear()
+    try:
+        signatures_module._workflow_instance_keys("a workflow")
+        signatures_module._workflow_instance_keys("a workflow")
+    finally:
+        signatures_module._workflow_instance_keys.cache_clear()
+
+    assert asked == ["seed keys"], (
+        "cached because seed_keys walks param_definitions, which scans the model directories")
 
 
 def test_a_start_frame_many_videos_share_is_looked_for_once(monkeypatch):

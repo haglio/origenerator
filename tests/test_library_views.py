@@ -264,7 +264,8 @@ def test_a_reading_deals_its_rows_to_a_shape_once_however_often_it_is_asked(monk
     dealt = []
     filter_rows = library_views.filter_rows
     monkeypatch.setattr(library_views, "filter_rows",
-                        lambda rows, shape: dealt.append(shape) or filter_rows(rows, shape))
+                        lambda rows, shape, *shape_of: dealt.append(shape)
+                        or filter_rows(rows, shape, *shape_of))
     library = LibrarySnapshot([_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")])
 
     library.on_shape("landscape")
@@ -392,3 +393,52 @@ def test_another_sites_upscale_whose_original_is_gone_has_no_other_version(tmp_p
     row, _upscale, _original = _another_sites_upscale(tmp_path / "AI", monkeypatch, with_its_original=False)
 
     assert LibrarySnapshot([row], evolvers_folder=tmp_path / "AI").versions_of([row]) == {}
+
+
+def test_a_reading_after_another_works_out_only_the_changed_rows_shape(monkeypatch):
+    asked = []
+    real = library_views.row_shape
+    monkeypatch.setattr(library_views, "row_shape", lambda row: asked.append(row["prompt_id"])
+                        or real(row))
+    before = LibrarySnapshot([_listed("tall", shape="portrait"), _listed("wide")])
+    before.tree("portrait")
+    asked.clear()
+
+    after = LibrarySnapshot([_listed("tall", shape="landscape"), _listed("wide")], previous=before)
+
+    assert [row["prompt_id"] for row in gallery.rows_under(after.tree("landscape")[0])] == [
+        "tall", "wide"]
+    assert after.on_shape("portrait") == []
+    assert asked == ["tall"]
+
+
+def test_a_reading_after_another_judges_only_the_changed_rows_enhanced(monkeypatch):
+    asked = []
+    real = gallery.enhanced_generations
+    monkeypatch.setattr(gallery, "enhanced_generations",
+                        lambda rows: asked.extend(row["prompt_id"] for row in rows) or real(rows))
+    before = LibrarySnapshot([_listed("pic-1"), _listed("pic-2")])
+    assert before.enhanced_rows == []
+    asked.clear()
+
+    after = LibrarySnapshot([_listed("pic-1"), _listed("pic-2", starred=True)], previous=before)
+
+    assert after.enhanced_rows == []
+    assert asked == ["pic-2"]
+
+
+def test_a_reading_after_another_indexes_only_the_changed_rows_start_frames(monkeypatch):
+    asked = []
+    real = gallery.start_frame_index
+    monkeypatch.setattr(gallery, "start_frame_index",
+                        lambda rows: asked.extend(row["prompt_id"] for row in rows) or real(rows))
+    rows = [_listed("pic-1"), _listed("pic-2")]
+    before = LibrarySnapshot(rows)
+    assert before.image_index == real(rows)
+    asked.clear()
+    changed = [_listed("pic-1"), _listed("pic-2", seed=9)]
+
+    after = LibrarySnapshot(changed, previous=before)
+
+    assert after.image_index == real(changed)
+    assert asked == ["pic-2"]

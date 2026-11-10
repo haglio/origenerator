@@ -1155,7 +1155,8 @@ class GalleryView(QWidget):
                                   names_version=lambda: self._item_names.version)
         if not unmoved:
             self._lists_built_from = state
-            self._item_names.take(library.rows, library.held_rows, library.image_index)
+            self._item_names.take(library.rows, library.held_rows, library.image_index,
+                                  library.readings)
         return library
 
     def _build_sides(self, trees):

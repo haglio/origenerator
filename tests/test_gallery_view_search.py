@@ -437,9 +437,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
 
-    assert view.listed_prompt_ids() == ["i2"], (
-        "a row also carries the names the user gave the folders it sits in, so a folder named "
-        "to be remembered can be searched for by that name")
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):

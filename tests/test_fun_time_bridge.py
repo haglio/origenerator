@@ -508,7 +508,9 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
         "PORTRAIT_SAY:over\n", encoding="utf-8")
     bridge._tick()
 
-    assert begun == [("no feet", "portrait")]
+    assert begun == [("no feet", "portrait")], (
+        "the words are matched here against this app's own vocabulary: the session cannot know "
+        "which collections this TOC has or which detail parts have detectors installed")
     assert slideshow is view.region_slideshow("portrait")
 
 

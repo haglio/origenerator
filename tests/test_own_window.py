@@ -84,7 +84,9 @@ def test_an_animation_with_no_sample_starts_from_the_actions_own_settings(
 
 def test_each_window_names_itself_to_windows_under_the_apps_own_name():
     assert own_window.taskbar_identity(
-        "Action setter tool", None) == "Origenerator.ActionSetterTool"
+        "Action setter tool", None) == "Origenerator.ActionSetterTool", (
+        "a window that claimed the app's own name would answer the pinned Origenerator button "
+        "in the app's place")
     assert own_window.taskbar_identity(
         "Checking animations", None) == "Origenerator.CheckingAnimations"
 

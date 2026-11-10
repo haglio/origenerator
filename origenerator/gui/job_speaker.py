@@ -44,7 +44,7 @@ class Speaker(QObject):
         self._lines_on_disk = lines_on_disk
 
     def speak(self, params: dict, done, failed) -> None:
-        # Qt keeps a QThread that has a parent until deleteLater; one with no parent can be collected while it still runs.
+        # PyQt lets Python collect a QThread with no Qt parent once nothing names it, even while it runs.
         thread = _Speaking(self._client, params, self._lines_on_disk, self)
         thread.finished.connect(lambda: _answer(thread, done, failed))
         thread.start()

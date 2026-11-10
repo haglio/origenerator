@@ -130,6 +130,7 @@ def test_browse_button_fits_its_caption(qtbot):
     with qtbot.waitExposed(form):
         form.show()
 
+    # Qt sizes a button under a sheet set on an ancestor slightly differently from one under a sheet set on the button itself.
     gauge = QWidget()
     gauge.setStyleSheet(build_stylesheet())
     gauge.setFont(make_font(FONT_UI, SIZE_HEADING))

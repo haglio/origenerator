@@ -139,7 +139,7 @@ def _listening_while_open(window) -> None:
 
     hearing = Hearing(window.words, parent=window)
     hearing.said.connect(lambda said, _spoken_at: window.hear(said))
-    window.closed.connect(hearing.stop)
+    window.closed.connect(hearing.close)
     hearing.start()
 
 

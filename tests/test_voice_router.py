@@ -54,6 +54,7 @@ class FakeListener:
         self.error = FakeSignal()
         self.request = FakeSignal()
         self.commands_on = False
+        self.closed = False
         self.bare = None
         self.dictated = None
         self.dictated_at = []
@@ -65,6 +66,10 @@ class FakeListener:
 
     def stop_commands(self):
         self.commands_on = False
+
+    def close(self):
+        self.stop_commands()
+        self.closed = True
 
     def bare_command(self, text):
         return self.bare
@@ -374,6 +379,17 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
     voice.sync()
     assert voice.listener.commands_on is True
 
+
+
+def test_closing_shuts_the_mic_and_waits_for_the_microphone_to_close(router):
+    voice, _host, _slideshows = router(buttons={"mic": FakeButton(checked=True)})
+    voice.sync()
+
+    voice.close()
+
+    assert voice.listener.commands_on is False
+    assert voice.listener.closed is True
+    assert voice.status.isHidden()
 
 
 def test_a_flashed_line_goes_back_to_the_idle_caption(router):

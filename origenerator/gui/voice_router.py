@@ -215,6 +215,10 @@ class VoiceRouter(QObject):
         self._flash_timer.stop()
         self._set_caption(None)
 
+    def close(self) -> None:
+        self.shut_the_mic()
+        self.listener.close()
+
     def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
         self._show(message, transient=True, mark=mark)
 

@@ -32,12 +32,27 @@ def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
     return slideshow_set, dealt
 
 
+def test_a_filter_over_a_slideshow_played_in_order_keeps_that_order():
+    listed = [(f"{n}.png", "image", f"id-{n}") for n in range(8)]
+    kept = {f"id-{n}" for n in range(1, 8)}
+    slideshow_set, _dealt = _set(listed, hud=HudFacts(favorite_ids=kept))
+
+    slideshow_set.set_filters(SlideshowFilters(favorites=True))
+
+    assert [slide.prompt_id for slide in slideshow_set.playlist.in_play_order()] == [
+        f"id-{n}" for n in range(1, 8)], (
+        "a pass dealt again is laid out the way this slideshow's was: a double-clicked item's "
+        "slideshow reads its folder in order, and a filter over one must not quietly shuffle it")
+
+
 def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
     slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
     slideshow_set.playlist.jump_to(1)
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is True
-    assert dealt == [True]
+    assert dealt == [True], (
+        "a switch is a narrowing of what the user is looking through, not a new slideshow, and "
+        "taking the slide away as well would make the switch impossible to try")
     assert slideshow_set.current_prompt_id() == "id-2"
 
 

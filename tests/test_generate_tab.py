@@ -5201,6 +5201,24 @@ def test_generate_under_a_turn_asked_now_runs_that_turns_prompts_asked_of_the_im
     assert _positive(tab) == "two women on a bed"
 
 
+def test_generate_under_a_turn_keeps_the_seed_of_the_image_asked_of_with_random_left_ticked(
+        saved_panel, qtbot, monkeypatch):
+    _rewriting(monkeypatch)
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch")
+    tab.show_saved_generation(image, [image])
+    tab._param_form._randomize_checks["seed"].click()
+    exchange = _ask(tab, qtbot, "two women")
+    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+    asked_for = _turn_runs(tab)
+
+    exchange.generate_asked.emit(0)
+
+    ((_workflow, params, _asked),) = asked_for
+    assert params["seed"] == 1
+    assert tab._param_form._randomize_checks["seed"].isChecked()
+
+
 def test_once_a_turn_made_an_item_the_turns_after_it_are_asked_of_that_item(
         saved_panel, qtbot, monkeypatch):
     _rewriting(monkeypatch, answer=[

@@ -18,8 +18,7 @@ from origenerator.gui.combination import (
     paren_width,
     plus_width,
 )
-from origenerator.gui.grayscale import play_grayscale
-from origenerator.gui.looping_preview import fit_size, looping_movie
+from origenerator.gui.looping_preview import fit_size, play_gray_in
 from origenerator.gui.queue_thumbs import fitted_cell
 
 _HEIGHT_SHARE = 0.8
@@ -106,9 +105,7 @@ class CombinationView(QWidget):
         self.plus_label.setVisible(self._pixmap is not None and self._has_video)
         self._show_parentheses(combination.prompt_edited)
         if self._has_video:
-            self._movie = looping_movie(self._video_path, self._side_size(),
-                                        self.video_label)
-            play_grayscale(self._movie, self.video_label)
+            self._movie = play_gray_in(self.video_label, self._video_path, self._side_size())
         self._rescale()
 
     def mark_prompt_edited(self, edited: bool) -> None:

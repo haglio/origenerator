@@ -22,7 +22,7 @@ class _NoTile:
 def _tiles(related, headings):
     return [tile for row in (related._animations, related._trims)
             for tile in row.findChildren(SourceTile)
-            if not tile.isHidden() and tile._heading.text() in headings]
+            if not tile.isHidden() and tile.heading in headings]
 
 
 def source_tile(related):
@@ -38,7 +38,7 @@ def no_sources(related) -> bool:
 
 
 def settings_used_for(related) -> list[tuple[str, str]]:
-    return [(tile._heading.text(), tile._prompt_id)
+    return [(tile.heading, tile._prompt_id)
             for tile in _tiles(related, (VIDEO_SETTINGS_USED_FOR_ANIMATION_OF,))]
 
 

@@ -4,6 +4,7 @@ from PyQt6.QtCore import QObject, QSize, Qt
 from PyQt6.QtGui import QImageReader, QMovie
 
 from origenerator.gui import omnipause
+from origenerator.gui.grayscale import play_grayscale
 
 
 def fit_size(path: str, size: QSize) -> QSize | None:
@@ -27,8 +28,19 @@ def play_in(label, path: str, size: QSize) -> QMovie:
     return _running(movie)
 
 
+def play_gray_in(label, path: str, size: QSize) -> QMovie:
+    stop_what_plays_in(label)
+    movie = looping_movie(path, size, label)
+    play_grayscale(movie, label)
+    return movie
+
+
+def what_plays_in(label) -> QMovie | None:
+    return label.movie() or label.findChild(QMovie, options=Qt.FindChildOption.FindDirectChildrenOnly)
+
+
 def set_in_sight(label, in_sight: bool) -> None:
-    movie = label.movie()
+    movie = what_plays_in(label)
     gate = movie.findChild(_Gate) if movie is not None else None
     if gate is not None:
         gate.set_in_sight(in_sight)
@@ -49,7 +61,7 @@ class _Gate(QObject):
 
 
 def stop_what_plays_in(label) -> None:
-    playing = label.movie()
+    playing = what_plays_in(label)
     label.setMovie(None)
     if playing is None:
         return

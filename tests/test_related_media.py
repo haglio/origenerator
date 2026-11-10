@@ -5,8 +5,10 @@ from PIL import Image
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
+from shared_ui.spacing import GAP_DIALOG
 
 from origenerator.generation_state import GenerationSource
+from origenerator.gui.looping_preview import what_plays_in
 from origenerator.gui.related_media import (
     ANIMATED_INTO,
     STARTING_FRAME_ANIMATED_INTO,
@@ -68,7 +70,7 @@ def _request(prompt_id, source_prompt_id, asked=""):
 
 
 def _links(section):
-    return [(tile._heading.text(), tile._prompt_id)
+    return [(tile.heading, tile._prompt_id)
             for tile in section.findChildren(SourceTile) if not tile.isHidden()]
 
 
@@ -163,7 +165,7 @@ def test_a_video_animated_from_another_videos_starting_frame_points_at_that_vide
     related.show_row(made_here, [_hidden_frame()])
 
     tile = source_tile(related)
-    assert (tile._prompt_id, tile._heading.text(), tile._item_type_icon.media_type) == (
+    assert (tile._prompt_id, tile.heading, tile._item_type_icon.media_type) == (
         "vid1", "Animated from starting frame of", "video")
 
 
@@ -203,7 +205,7 @@ def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(mak
     assert source_tile(related)._prompt_id == "img1"
     assert not settings_tile(related).isHidden()
     assert settings_tile(related)._prompt_id == "vid0"
-    assert settings_tile(related)._heading.text() == "Animated using video settings of"
+    assert settings_tile(related).heading == "Animated using video settings of"
     assert settings_tile(related)._item_type_icon.media_type == "video"
     assert settings_tile(related)._name.text() == "77B2E1A0 012"
 
@@ -221,7 +223,7 @@ def test_an_image_lists_the_videos_it_was_animated_into(make_related):
 
 def _animated(related):
     return [tile._prompt_id for tile in related._animations.findChildren(SourceTile)
-            if not tile.isHidden() and tile._heading.text() in (ANIMATED_INTO,
+            if not tile.isHidden() and tile.heading in (ANIMATED_INTO,
                                                                  STARTING_FRAME_ANIMATED_INTO)]
 
 
@@ -535,7 +537,7 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
 
     assert not source_tile(related).isHidden()
     assert source_tile(related)._prompt_id == "vid1"
-    assert source_tile(related)._heading.text() == "Trimmed from"
+    assert source_tile(related).heading == "Trimmed from"
     assert source_tile(related)._item_type_icon.media_type == "video"
 
 
@@ -572,7 +574,7 @@ def test_a_cut_whose_video_is_in_the_trash_still_points_back_at_the_video(make_r
     related.show_row(_trim_row(), [_image_row()])
 
     assert source_tile(related)._prompt_id == "vid1"
-    assert source_tile(related)._heading.text() == "Trimmed from"
+    assert source_tile(related).heading == "Trimmed from"
 
 
 def test_a_video_whose_start_image_is_in_the_trash_still_points_back_at_it(make_related):
@@ -582,7 +584,7 @@ def test_a_video_whose_start_image_is_in_the_trash_still_points_back_at_it(make_
 
     assert not source_tile(related).isHidden()
     assert source_tile(related)._prompt_id == "img1"
-    assert source_tile(related)._heading.text() == "Animated from"
+    assert source_tile(related).heading == "Animated from"
 
 
 def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
@@ -742,9 +744,44 @@ def test_a_linked_video_plays_its_animated_thumbnail(make_related, tmp_path):
     assert tile._thumb.movie() is not None
 
 
-def test_the_video_whose_settings_were_used_plays_like_every_linked_video(make_related, tmp_path):
-    related = make_related(_video_row("vid0"), movies={"vid0": _two_frames(tmp_path / "vid0.gif")})
+def _red_frames(path):
+    frames = [Image.new("RGB", (16, 12), (220, 20 + i * 10, 20)) for i in range(2)]
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=80, loop=0)
+    return str(path)
+
+
+def _color_at_middle(tile):
+    return tile._thumb.pixmap().toImage().pixelColor(8, 6)
+
+
+def test_the_video_whose_settings_were_used_plays_drained_of_color(make_related, tmp_path):
+    related = make_related(_video_row("vid0"), movies={"vid0": _red_frames(tmp_path / "vid0.gif")})
 
     related.show_row(_combined_row(), [_image_row()])
 
-    assert settings_tile(related)._thumb.movie() is not None
+    shown = _color_at_middle(settings_tile(related))
+    assert what_plays_in(settings_tile(related)._thumb) is not None
+    assert shown.red() == shown.green() == shown.blue()
+
+
+def test_a_video_made_with_this_ones_settings_plays_in_color(make_related, tmp_path):
+    related = make_related(_combined_row(), movies={"made1": _red_frames(tmp_path / "made1.gif")})
+
+    related.show_row(_video_row("vid0"), [_image_row()])
+
+    (tile,) = settings_used_for_tiles(related)
+    assert tile._thumb.movie() is not None
+
+
+def test_the_tiles_in_a_row_stand_a_wide_gap_apart(make_related, qtbot):
+    image = _image_row()
+    related = make_related(_video_row("vid1"), _video_row("vid2"))
+    related.resize(800, 400)
+    with qtbot.waitExposed(related):
+        related.show()
+    related.show_row(image, [image])
+    related._animations.layout().activate()
+
+    left, right = sorted((tile.geometry() for tile in related._animations.findChildren(SourceTile)),
+                         key=lambda box: box.x())
+    assert right.x() - (left.x() + left.width()) == GAP_DIALOG

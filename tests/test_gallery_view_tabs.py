@@ -69,7 +69,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
         tab._viewport.show_media = MagicMock()
 
     view._on_thumbnail_clicked("vid1")
-    assert [tile._heading.text() for tile in _animations(view).findChildren(SourceTile)
+    assert [tile.heading for tile in _animations(view).findChildren(SourceTile)
             if not tile.isHidden()] == ["Animated from"]
 
     view._on_thumbnail_clicked("img2")

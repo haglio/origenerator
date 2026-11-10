@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from functools import cache, lru_cache
 
-from origenerator.file_refs import frame_name, reference_basename, unannotated
+from app_support.comfy_file_refs import frame_name
+
 from origenerator.media import MediaType
 from origenerator.output_files import READINGS_KEPT
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY, workflow_named
@@ -151,9 +152,6 @@ def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
     return _keyed_signature(tuple(key for key in keys if key not in unkeyed), named)
 
 
-_basename = reference_basename
-_unannotated = unannotated
-_frame_name = frame_name
 
 
 def _outputs_video(workflow_name: str | None) -> bool:
@@ -163,7 +161,7 @@ def _outputs_video(workflow_name: str | None) -> bool:
 
 def _input_image_config(input_image: str | None, image_index: dict | None,
                         *, identify: bool = False) -> str:
-    name = _frame_name(input_image)
+    name = frame_name(input_image)
     if not name:
         return ""
     entry = (image_index or {}).get(name)

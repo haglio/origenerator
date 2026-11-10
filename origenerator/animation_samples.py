@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from app_support.comfy_file_refs import frame_name
+
 from origenerator import animation_paths, gallery
 from origenerator.action_settings import GENAU, VIDEO, loops
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animation_names import animation_of, image_button_of
 from origenerator.db_generations import was_kept
-from origenerator.file_refs import frame_name
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 

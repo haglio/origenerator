@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from app_support.comfy_file_refs import frame_name
+
 from origenerator.gallery.enhance_graph import graph_version_params
 from origenerator.gallery.enhance_settings import (
     ENHANCE_SETTING_KEYS,
@@ -26,7 +28,7 @@ from origenerator.gallery.output import (
     output_file_reference,
     row_output_files,
 )
-from origenerator.gallery.signatures import _frame_name, parse_params
+from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import source_image_id_for
 from origenerator.generation_state import GenerationSource
 from origenerator.media import MediaType
@@ -103,9 +105,9 @@ def enhancement_versions(row: dict) -> list[EnhanceVersion]:
 
 
 def enhanced_version_of(image_ref: str | None, image: dict) -> str | None:
-    plain = {_frame_name(f.get("filename")) for f in original_files_of(image)}
+    plain = {frame_name(f.get("filename")) for f in original_files_of(image)}
     enhanced = output_file_reference(row_output_files(image))
-    if _frame_name(image_ref) not in plain or _frame_name(enhanced) in plain:
+    if frame_name(image_ref) not in plain or frame_name(enhanced) in plain:
         return None
     return enhanced
 
@@ -195,7 +197,7 @@ def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
         if row.get("enhance_of"):
             ids.add(row["enhance_of"])
             continue
-        name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+        name = frame_name(parse_params(row.get("params_json")).get("input_image"))
         if name:
             names.add(name)
     return ids, names
@@ -266,10 +268,10 @@ def models_matching_a_folders_sources(folder) -> frozenset[str] | None:
 
 
 def enhance_targets_row(input_image: str | None, row: dict) -> bool:
-    name = _frame_name(input_image)
+    name = frame_name(input_image)
     if not name:
         return False
-    return name in {_frame_name(f.get("filename")) for f in row_output_files(row)}
+    return name in {frame_name(f.get("filename")) for f in row_output_files(row)}
 
 
 def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
@@ -297,7 +299,7 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
         if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
             target = row.get("enhance_of")
             if not target:
-                name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+                name = frame_name(parse_params(row.get("params_json")).get("input_image"))
                 target = holders.get(name) if name else None
             if target is not None and target != row.get("prompt_id"):
                 note(target, row.get("completed_at"), row.get("id"))
@@ -316,7 +318,7 @@ def rows_awaiting_enhancement(folder_rows, enhance_rows) -> list[dict]:
             continue
         if row.get("prompt_id") in in_flight_ids:
             continue
-        names = {_frame_name(f.get("filename")) for f in row_output_files(row)}
+        names = {frame_name(f.get("filename")) for f in row_output_files(row)}
         if names & in_flight_names:
             continue
         awaiting.append(row)

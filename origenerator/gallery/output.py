@@ -6,9 +6,9 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from app_support.comfy_file_refs import frame_name
 from app_support.video_names import UPSCALE_SUFFIX
 
-from origenerator.file_refs import frame_name
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type

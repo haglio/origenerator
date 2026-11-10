@@ -5,10 +5,10 @@ import logging
 from collections import namedtuple
 from typing import NamedTuple, Protocol
 
+from app_support.comfy_file_refs import frame_name
 from PyQt6.QtWidgets import QMessageBox
 
 from origenerator import config, enhance_presets, fix_training, gallery, lora_training
-from origenerator.file_refs import frame_name
 from origenerator.gallery.enhance_settings import basic_enhance_settings
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource

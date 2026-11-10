@@ -6,8 +6,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.comfy_file_refs import reference_basename, unannotated
+
 from origenerator import gallery
-from origenerator.file_refs import reference_basename, reference_path, unannotated
+from origenerator.file_refs import reference_path
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces

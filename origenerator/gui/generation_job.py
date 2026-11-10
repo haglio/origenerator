@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from app_support.comfy_file_refs import frame_name
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import comfyui_api, speech
 from origenerator.completion import animate_before_filing, extract_completion
-from origenerator.file_refs import frame_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.job_speaker import Speaker

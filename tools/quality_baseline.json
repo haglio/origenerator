@@ -18,9 +18,8 @@
     "origenerator/workflows/outside.py": 1
   },
   "private_imports": {
-    "origenerator/gallery/enhance.py": 1,
-    "origenerator/gallery/labels.py": 4,
-    "origenerator/gallery/source_image.py": 2,
+    "origenerator/gallery/labels.py": 1,
+    "origenerator/gallery/source_image.py": 1,
     "origenerator/gallery/tree.py": 3
   },
   "private_reaches": {

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
@@ -13,6 +15,7 @@ from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.generation_state import GenerationStatus, made_here
 from origenerator.media import MediaType
+from origenerator.output_files import READINGS_KEPT
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 _SEPARATOR = "::"
@@ -80,18 +83,34 @@ def record_shapes(db) -> int:
     return len(shapes)
 
 
+@lru_cache(maxsize=READINGS_KEPT)
 def _asked_shape(workflow_name: str | None, params_json: str | None) -> str | None:
     return requested_shape(canonical_settings(workflow_name, gallery.parse_params(params_json)))
 
 
 def _measure_any(candidates) -> str | None:
-    for candidate in candidates:
-        try:
-            with Image.open(candidate) as image:
-                return shape_of_size(*image.size)
-        except (OSError, ValueError):
-            continue
-    return None
+    return next((shape for candidate in candidates
+                 if (shape := _measured(str(candidate), _as_it_stands(candidate))) is not None),
+                None)
+
+
+def _as_it_stands(path) -> tuple[int, int] | None:
+    try:
+        stat = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return stat.st_mtime_ns, stat.st_size
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _measured(path: str, as_it_stands: tuple[int, int] | None) -> str | None:
+    if as_it_stands is None:
+        return None
+    try:
+        with Image.open(path) as image:
+            return shape_of_size(*image.size)
+    except (OSError, ValueError):
+        return None
 
 
 def _own_files(row: dict) -> Iterator[Path]:

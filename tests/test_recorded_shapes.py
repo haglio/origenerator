@@ -126,3 +126,26 @@ def test_a_favorite_keeps_the_recorded_shape(db, tall_image):
     db.set_generation_favorite("starred", True)
 
     assert db.get_generation("starred")["shape"] == PORTRAIT
+
+
+def test_an_unrecorded_item_is_measured_once_however_often_the_gallery_asks(tall_image, monkeypatch):
+    opened = []
+    real_open = Image.open
+    monkeypatch.setattr(Image, "open", lambda path, *a, **kw: opened.append(path) or real_open(path, *a, **kw))
+    row = {"prompt_id": "measured", "workflow_name": "made_up", "thumbnail_path": tall_image}
+
+    shapes = [item_shape.row_shape(dict(row)) for _ in range(3)]
+
+    assert shapes == [PORTRAIT] * 3
+    assert len(opened) == 1
+
+
+def test_a_file_made_again_in_another_shape_is_measured_again(tmp_path):
+    path = tmp_path / "made-up.png"
+    Image.new("RGB", (9, 16)).save(path)
+    row = {"prompt_id": "measured", "workflow_name": "made_up", "thumbnail_path": str(path)}
+    assert item_shape.row_shape(dict(row)) == PORTRAIT
+
+    Image.new("RGB", (32, 9)).save(path)
+
+    assert item_shape.row_shape(dict(row)) == LANDSCAPE

@@ -2447,3 +2447,16 @@ def test_the_speaking_model_sits_between_the_expert_models_and_their_loras():
     assert max(models) < first_lora, (
         "the rows come in the order the form shows and the gallery groups by: "
         "the models together, then the LoRAs")
+
+
+
+def test_a_workflow_works_out_once_whether_it_starts_from_an_image(monkeypatch):
+    workflow = Wan22I2vWorkflow()
+    asked = []
+    real = workflow.default_params
+    monkeypatch.setattr(workflow, "default_params", lambda: asked.append(1) or real())
+
+    answers = [workflow.starts_from_an_image() for _ in range(3)]
+
+    assert answers == [True] * 3
+    assert len(asked) == 1

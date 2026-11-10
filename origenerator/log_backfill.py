@@ -11,6 +11,8 @@ _LINE = re.compile(
     r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\] Prompt executed in ([\d.]+) seconds"
 )
 
+# ComfyUI writes a "Prompt executed" line moments after the file lands, stamped in local time
+# with no zone, and names no file in it.
 MATCH_TOLERANCE_SECONDS = 120.0
 
 

@@ -139,6 +139,18 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
     assert batch.moves[0][1].exists()
 
 
+def test_ending_one_item_leaves_another_holding_a_file_of_the_same_name(tmp_path):
+    trash = Trash(tmp_path / "trash")
+    one = trash.store([_file(tmp_path / "out" / "image" / "same.png")])
+    other = trash.store([_file(tmp_path / "out" / "video" / "same.png")])
+
+    one.purge()
+
+    assert not one.subdir.exists()
+    assert [held.name for _was, held in other.moves if held.exists()], (
+        "each item has a folder of its own, so items never tread on one another")
+
+
 def test_purge_orphans_clears_only_the_batches_nothing_names(tmp_path):
     trash = Trash(tmp_path / "trash")
     held = trash.store([_file(tmp_path / "out" / "held.png")])
@@ -147,7 +159,9 @@ def test_purge_orphans_clears_only_the_batches_nothing_names(tmp_path):
     assert trash.purge_orphans([held.subdir]) == 1
 
     assert held.subdir.exists()
-    assert not orphan.subdir.exists()
+    assert not orphan.subdir.exists(), (
+        "nothing can reach it: an experiment's batch off the undo stack, a batch older than "
+        "the Trash, or a folder a crash left between the move and the record")
 
 
 def test_purge_orphans_on_an_untouched_trash_is_a_harmless_noop(tmp_path):
@@ -179,4 +193,4 @@ def test_an_empty_batch_re_makes_into_one_that_moves_nothing(tmp_path):
     batch = TrashedBatch.from_record({"moves": [], "subdir": None})
     batch.restore()
     batch.purge()
-    assert batch.moves == []
+    assert batch.moves == [], "a delete whose files were already gone records no moves"

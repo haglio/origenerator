@@ -93,7 +93,8 @@ def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
     beside = video.with_suffix(".funscript")
     write_funscript(beside, synthesize_actions(2.0, hz=1.0))
 
-    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == beside
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)) == beside, (
+        "hundreds of scripts sit beside their videos from before the scripts folder")
     assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path)))
 
 
@@ -142,7 +143,8 @@ def test_an_upscale_finds_the_script_still_beside_the_video_it_was_made_from(tmp
     upscale = (tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
                / "clip_topaz.mp4")
 
-    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) == beside
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) == beside, (
+        "an upscale's path does not say which folder its video was kept in, so each is tried")
 
 
 def test_a_video_of_this_apps_own_named_like_an_upscale_keeps_its_own_script(tmp_path):
@@ -215,10 +217,10 @@ def test_a_scripted_video_moves_at_the_pace_the_robot_hands_speed_bar_rests_at()
 
 
 def test_every_script_is_back_where_it_began_exactly_as_its_video_ends():
-    duration = 49 / 16
-    actions = synthesize_actions(duration, hz=1.2)
+    not_a_whole_number_of_cycles = 49 / 16
+    actions = synthesize_actions(not_a_whole_number_of_cycles, hz=1.2)
     assert actions[0]["pos"] == actions[-1]["pos"]
-    assert actions[-1]["at"] == round(duration * 1000)
+    assert actions[-1]["at"] == round(not_a_whole_number_of_cycles * 1000)
 
 
 def test_a_video_shorter_than_one_cycle_at_the_rate_still_gets_a_whole_one():

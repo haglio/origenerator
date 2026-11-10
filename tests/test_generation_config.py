@@ -175,7 +175,9 @@ def test_find_duplicate_ignores_a_completed_row_that_produced_nothing():
         _row(params=params, output_files="not json"),
     ]
     snap = _snapshot(params=params)
-    assert find_duplicate_generation(rows, snap) is None
+    assert find_duplicate_generation(rows, snap) is None, (
+        "the gallery shows no row without a file, so refusing a run on its account "
+        "would point at a result the user can find nowhere")
 
 
 def test_find_duplicate_picks_the_matching_row_among_several():
@@ -210,7 +212,8 @@ def test_configs_differ_on_any_changed_param():
 
 def test_configs_differ_on_a_changed_seed():
     assert not configs_match(_snapshot(params={"seed": 5}),
-                             _snapshot(params={"seed": 6}))
+                             _snapshot(params={"seed": 6})), (
+        "a different seed is a different image, though it lands in the same gallery folder")
 
 
 def test_configs_differ_on_a_changed_workflow():
@@ -229,7 +232,8 @@ def test_configs_differ_when_one_carries_a_param_the_other_lacks():
 
 
 def test_configs_match_across_int_and_float_spellings_of_a_number():
-    assert configs_match(_snapshot(params={"cfg": 8}), _snapshot(params={"cfg": 8.0}))
+    assert configs_match(_snapshot(params={"cfg": 8}), _snapshot(params={"cfg": 8.0})), (
+        "a form reads back as a float what a stored row may hold as an int")
 
 
 def test_would_reproduce_fills_defaults_before_comparing():

@@ -85,7 +85,8 @@ def test_settings_source_records_where_a_combine_got_its_settings(tmp_path):
 
     row = db.get_generation("rec-001")
     assert row["action"] == "dancing"
-    assert row["source_video"] == "vid-9"
+    assert row["source_video"] == "vid-9", (
+        "the run's settings hold the values, never which video they came from")
 
 
 def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
@@ -115,7 +116,8 @@ def test_each_half_of_a_settings_source_can_stand_alone(tmp_path):
     assert db.get_generation("dropped")["action"] is None
     assert db.get_generation("dropped")["source_video"] == "vid-9"
     assert db.get_generation("curated")["action"] == "dancing"
-    assert db.get_generation("curated")["source_video"] is None
+    assert db.get_generation("curated")["source_video"] is None, (
+        "settings the overlay pins for an action come from no past video")
 
 
 def test_an_image_keeps_the_state_it_was_sorted_as_until_that_is_taken_back(tmp_path):
@@ -226,7 +228,8 @@ def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
 
     db.update_generation("upd-003")
 
-    assert db.get_generation("upd-003")["status"] == "pending"
+    assert db.get_generation("upd-003")["status"] == "pending", (
+        "callers build the fields to write conditionally, so none to write is ordinary")
 
 
 def test_update_generation_stores_duration_seconds(tmp_path):
@@ -904,7 +907,8 @@ def test_trashed_items_list_newest_first(tmp_path):
     for prompt_id in ("d-1", "d-2", "d-3"):
         db.record_trashed(prompt_id, {"prompt_id": prompt_id}, {})
 
-    assert [r["prompt_id"] for r in db.list_trashed()] == ["d-3", "d-2", "d-1"]
+    assert [r["prompt_id"] for r in db.list_trashed()] == ["d-3", "d-2", "d-1"], (
+        "stamped within one second they tie, and the order they were recorded in settles it")
 
 
 def test_re_deleting_an_item_restarts_its_window(tmp_path):

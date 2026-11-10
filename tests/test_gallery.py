@@ -1158,6 +1158,18 @@ def test_two_folders_of_one_name_in_two_places_have_two_keys():
             assert folder_key_at_level(row, group_level(folder), index) == folder.key
 
 
+def test_the_tree_files_each_row_under_one_folder_only():
+    face = _img("face", "a face", 30, 1)
+    rows = [face, _img_model("i1", "a cat", "alpha.safetensors", 50, 1),
+            _animated("va", "styleA", "sdxl_t2i_face.png")]
+    tree = build_gallery_tree(rows, image_index=build_image_config_index([face]))
+
+    filed = [row["prompt_id"] for media in tree for row in rows_under(media)]
+
+    assert sorted(filed) == ["face", "i1", "va"], (
+        "only a custom collection can hold a row twice, so only its walk drops repeats")
+
+
 def test_a_rows_folder_chain_is_the_path_the_tree_files_it_under():
     face = _img("face", "a face", 30, 1)
     rows = [face, _img_model("i1", "a cat", "alpha.safetensors", 50, 1),

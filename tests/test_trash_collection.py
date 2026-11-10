@@ -74,7 +74,8 @@ def test_a_trash_items_thumbnail_points_at_where_the_file_actually_is():
 def test_a_trash_item_keeps_its_path_when_the_delete_moved_nothing():
     record = _record(row={"prompt_id": "p1", "thumbnail_path": r"C:\thumbs\p1.jpg"})
     (item,) = trash_collection.trash_items([record], _NOW)
-    assert item["thumbnail_path"] == r"C:\thumbs\p1.jpg"
+    assert item["thumbnail_path"] == r"C:\thumbs\p1.jpg", (
+        "a delete whose files were already gone moved nothing, so nothing is re-pointed")
 
 
 def test_a_trash_items_output_files_point_at_where_they_actually_are():
@@ -88,7 +89,9 @@ def test_a_trash_items_output_files_point_at_where_they_actually_are():
     (f,) = json.loads(item["output_files"])
 
     assert f["path"] == trashed
-    assert (f["filename"], f["subfolder"]) == ("clip.mp4", "video")
+    assert (f["filename"], f["subfolder"]) == ("clip.mp4", "video"), (
+        "the name a Generate tab shows and the copy button hands over is the file's own, "
+        "never the trash's")
 
 
 def test_a_trash_items_output_files_stay_put_when_the_delete_moved_nothing():
@@ -157,7 +160,8 @@ def test_purge_takes_the_held_files_and_forgets_the_record(tmp_path):
 
     trash_collection.purge(db, db.get_trashed("p1"))
 
-    assert not batch.subdir.exists()
+    assert not batch.subdir.exists(), (
+        "nothing can undo this: the row went at the delete, and these were the only copies")
     assert db.get_trashed("p1") is None
 
 
@@ -172,7 +176,9 @@ def test_the_launch_reclaims_a_batch_no_record_names(tmp_path):
     assert trash_collection.reclaim_orphans(db, trash) == 1
 
     assert held.subdir.exists()
-    assert not orphan.subdir.exists()
+    assert not orphan.subdir.exists(), (
+        "a rejected experiment's batch that fell off the undo stack, or one a crash left "
+        "between the move and the record, is reached by nothing else and cleared by nothing else")
 
 
 def test_reclaiming_never_takes_a_trashed_item_however_old(tmp_path):
@@ -194,7 +200,7 @@ def test_reclaiming_with_an_empty_trash_is_a_harmless_noop(tmp_path):
 
 
 def _age(db: Database, prompt_id: str, days: int):
-    stamp = (trash_collection._now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    stamp = (trash_collection._now_as_sqlite_stamps_it() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with SqliteFile(db.path).connect() as conn:
         conn.execute("UPDATE deletions SET deleted_at = ? WHERE prompt_id = ?",
                      (stamp, prompt_id))

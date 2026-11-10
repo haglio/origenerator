@@ -72,6 +72,18 @@ def test_a_record_that_still_resolves_is_left_untouched(tmp_path):
     assert _files(db, "a")[0]["subfolder"] == "image"
 
 
+def test_the_output_folders_are_walked_once_however_many_rows_there_are(tmp_path, monkeypatch):
+    db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00007_.mp4")],
+                                         "b": [_file("wan22_i2v_00008_.mp4")]})
+    walks = []
+    files = OutputPlaces.files
+    monkeypatch.setattr(OutputPlaces, "files", lambda places: walks.append(1) or files(places))
+
+    relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir))
+
+    assert walks == [1], "a healthy library pays this at every launch, over thousands of rows"
+
+
 def test_a_name_in_two_places_is_left_alone(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00007_.mp4")]})
     for folder in ("video", "harem"):
@@ -79,7 +91,9 @@ def test_a_name_in_two_places_is_left_alone(tmp_path):
         (output_dir / folder / "wan22_i2v_00007_.mp4").write_bytes(b"mp4")
 
     assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
-    assert _files(db, "a")[0]["subfolder"] == ""
+    assert _files(db, "a")[0]["subfolder"] == "", (
+        "a row that names a missing file shows as broken; "
+        "one pointed at another item's file would look right and be wrong")
 
 
 def test_a_file_that_is_simply_gone_keeps_saying_where_it_was(tmp_path):

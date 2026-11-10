@@ -120,7 +120,9 @@ def test_for_something_being_excluded_stops_excluding_it():
     revision = apply_request("a woman", "blurry, freckles", "more freckles")
 
     assert revision.negative == "blurry"
-    assert revision.positive == "a woman"
+    assert revision.positive == "a woman", (
+        "the smallest change that answers the request: asked again, "
+        "it finds the term in neither prompt and adds it")
     assert revision.action == ALLOWED
 
 
@@ -141,6 +143,8 @@ def test_a_comma_inside_a_weighted_group_does_not_split_a_segment():
     revision = apply_request("(a woman, seated:1.2), freckles", "", "no freckles")
 
     assert revision.positive == "(a woman, seated:1.2)"
+    assert apply_request("(a woman, seated:1.2), freckles", "", "no seated").positive != \
+        "(a woman, freckles"
 
 
 def test_dropping_the_only_term_leaves_an_empty_prompt():
@@ -159,7 +163,8 @@ def test_a_revision_carries_the_prompts_it_started_from():
     revision = apply_request("a woman, freckles", "blurry", "no freckles")
 
     assert revision.old_positive == "a woman, freckles"
-    assert revision.old_negative == "blurry"
+    assert revision.old_negative == "blurry", (
+        "carrying what it started from, the record of a request can be read on its own")
     assert revision.changed
 
 

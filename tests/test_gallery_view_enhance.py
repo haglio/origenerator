@@ -672,8 +672,9 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
     view.trash_generation("g0")
 
     assert job.state == "canceled", (
-        "a rejection keeps the row but takes its files, and an enhancement that landed after would "
-        "bring a rejected experiment back as an enhanced image")
+        "a rejection keeps the row but takes its files, so nothing is left for a landing "
+        "enhance to fold onto, and one that did land would bring a rejected experiment back as "
+        "an enhanced image")
     assert view._jobs.all_jobs == []
 
 

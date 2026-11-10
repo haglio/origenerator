@@ -448,10 +448,12 @@ def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):
 
     bridge._tick()
 
-    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
-    assert text.strip() == FunTimeBridge.READY, (
+    waited_on = (
         "the session waits on this file appearing, and reads nothing else of it, to know the mode "
         "can be opened: a mode opened over an app still booting has nothing under it")
+    assert (tmp_path / "origenerator_status.txt").exists(), waited_on
+    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
+    assert text.strip() == FunTimeBridge.READY, waited_on
 
 
 def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):

@@ -1501,8 +1501,9 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
                 "over a folder name would cost far more than the one lane it protects")
 
         assert told.call_args is not None, (
-            "a rename on either side left videos arriving nowhere with both apps silent, so "
-            "the launch says what disagrees")
+            "a rename on either side left videos arriving nowhere with both apps silent, and "
+            "the test that holds the two together skips wherever no Evolver sits beside the "
+            "checkout, which is every run of this repo's gate, so the launch says what disagrees")
         said = " ".join(str(arg) for arg in told.call_args.args)
         assert "the inbox a send lands in" in said
         window.show.assert_called_once()

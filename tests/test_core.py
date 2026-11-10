@@ -664,7 +664,8 @@ def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
 
     assert client.submitted == [], (
         "a preview's saved state is seeded from production's, the experiments switch included, and it "
-        "still queues none")
+        "still queues none: a preview shares the same ComfyUI, so a batch queued as it closes "
+        "would outlive it as work the production app can neither see nor cancel")
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 

@@ -632,8 +632,9 @@ def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield(queue):
     queue.set_items([_item(key="a", shield=lambda _on: None, shielded=True),
                      _item(key="b", status="queued")])
     assert (queue._shield_all.isVisible(), queue._shield_all.isEnabled()) == (True, False), (
-        "the user's answer for a line already shielded, which a line of jobs that take no "
-        "shield from here reaches too: either way a press would do nothing")
+        "the user's answer for a Job Queue whose jobs are all shielded already, which a Job "
+        "Queue of jobs that take no shield from here reaches too: either way a press would do "
+        "nothing")
     assert queue._shield_all.cursor().shape() == Qt.CursorShape.ArrowCursor
 
     queue.set_items([_item(key="a", shield=lambda _on: None, shielded=True),
@@ -648,8 +649,8 @@ def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield(queue):
 def test_cancel_all_is_grayed_out_while_no_job_in_the_queue_can_be_canceled(queue):
     queue.set_items([_item(key="a"), _item(key="b", status="queued")])
     assert (queue._cancel_all.isVisible(), queue._cancel_all.isEnabled()) == (True, False), (
-        "the user's answer, like Shield All's, for a line of jobs this window has no Cancel "
-        "for, as when a restart has not taken them back yet")
+        "the user's answer, like Shield All's, for a Job Queue of jobs this window has no "
+        "Cancel for, as when a restart has not taken them back yet")
     assert queue._cancel_all.cursor().shape() == Qt.CursorShape.ArrowCursor
 
     queue.set_items([_item(key="a"), _item(key="b", status="queued", cancel=lambda: None)])

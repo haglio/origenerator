@@ -690,11 +690,13 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
 
     view._toggle_favorite(key)
 
-    assert view._tree_item_for(key) is target
+    assert view._tree_item_for(key) is target, (
+        "the gallery used to be read back and redrawn whole for one star, seconds of it on a "
+        "real library")
     assert target.data(0, _GROUP_ROLE).favorite
     assert half.verticalScrollBar().value() == scrolled_to, (
-        "the gallery used to be read back and redrawn whole for one star, seconds of it on a "
-        "real library, and the redraw scrolled the TOC")
+        "the redraw scrolled the TOC to the folder that was open, taking the row just starred "
+        "out from under the mouse")
 
 
 def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
@@ -725,7 +727,8 @@ def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
     view._toggle_favorite(dog)
 
     assert view.group_for_key(dog).favorite, (
-        "the squares a star marks are the ones on screen now")
+        "the squares a star marks are the ones on screen now: every pane drawn since deleted "
+        "the squares of the one before it")
 
 
 def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
@@ -988,9 +991,7 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
 
     view._experiments_cb.setChecked(True)
 
-    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == [], (
-        "a preview shares the same ComfyUI, so a batch queued as it closes would outlive it as "
-        "work the production app can neither see nor cancel")
+    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
@@ -2356,7 +2357,8 @@ def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
     view.refresh()
     first = view.image_config_index()
     assert view.image_config_index() is first, (
-        "the index is kept between rebuilds rather than built again at every site that asks")
+        "the index is kept between uses, since it was built again at every site that asked, "
+        "several of them on a click's path")
 
     db._rows.append(_image("i2", "a dog", 50, 2))
     view.refresh()

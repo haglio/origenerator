@@ -700,10 +700,12 @@ def test_a_slideshow_opening_on_a_sessions_funestra_has_its_whole_hud_out_before
                actions=SlideshowActions(queue_now=lambda: ([_inflight("j1")], 0)))
 
     hud = out_when_the_list_went[0]
-    assert f"{OPEN}|j1" in [button.command for _rect, button in hud.foot.targets], (
+    in_stages = (
         "the session draws whatever HUD is out when its Funestra takes the list, so a HUD that "
         "came after the list, or filled in after it, was a Satellite switching to Origenerator "
         "mode in stages")
+    assert hud is not None, in_stages
+    assert f"{OPEN}|j1" in [button.command for _rect, button in hud.foot.targets], in_stages
     assert not next(button for row in hud.rows for button in row
                     if button.command == "portrait_cycle_version").dim
 

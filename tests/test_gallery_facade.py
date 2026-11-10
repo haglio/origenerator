@@ -66,7 +66,9 @@ def test_the_facade_publishes_exactly_the_names_written_down_here():
         "cannot do among imports that only re-export; a name the package keeps "
         "for its own use is imported from its submodule and stays off the list; held as an "
         "equality rather than a floor, because a name added without a line here is as much a "
-        "failure as one dropped: nothing else records what the package owes its callers")
+        "failure as one dropped: splitting a module under the package is meant to be invisible "
+        "from outside, the window reaches most of these as gallery.X, and nothing else records "
+        "what the package owes its callers")
 
 
 def test_every_published_name_is_actually_there():

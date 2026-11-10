@@ -1020,7 +1020,8 @@ def test_a_request_outlives_the_generation_it_queued(tmp_path):
 
     db.delete_generation("gen-1")
 
-    assert db.get_request("gen-1") is not None
+    assert db.get_request("gen-1") is not None, (
+        "a delete can be undone, and a restored item comes back with the request that made it")
 def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
     db_path = tmp_path / "test.db"
     db = Database(db_path)

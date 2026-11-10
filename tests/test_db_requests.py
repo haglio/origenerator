@@ -7,7 +7,8 @@ def test_recording_a_request_again_for_one_generation_replaces_the_earlier_recor
 
     db.record_request(NewRequest(prompt_id="gen-1", source_prompt_id="src-1", heard="Request, no scarf, over."))
 
-    assert [r["heard"] for r in db.list_requests()] == ["Request, no scarf, over."]
+    assert [r["heard"] for r in db.list_requests()] == ["Request, no scarf, over."], (
+        "only a prompt id used again can record twice, so replacing loses nothing")
 
 
 def test_a_folder_wide_rewrite_is_recorded_with_no_single_term(tmp_path):

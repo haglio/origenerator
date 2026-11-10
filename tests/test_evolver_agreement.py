@@ -40,7 +40,9 @@ class TestWhenEvolverIsBeside:
 
         said = evolver_agreement.disagreements(_ours(), checkout)
 
-        assert len(said) == 1
+        assert len(said) == 1, (
+            "the test that holds these against Evolver's skips wherever no Evolver sits beside "
+            "the checkout, so the app itself asks at startup")
         assert "0_intake" in said[0]
         assert "0_inbox" in said[0]
 
@@ -56,7 +58,8 @@ class TestWhenEvolverIsBeside:
     def test_every_disagreement_is_reported_at_once(self, tmp_path: Path):
         checkout = _evolver(tmp_path, inbox="a", marker="c")
 
-        assert len(evolver_agreement.disagreements(_ours(), checkout)) == 2
+        assert len(evolver_agreement.disagreements(_ours(), checkout)) == 2, (
+            "told one at a time, three renames are three launches")
 
 
 class TestWhenThereIsNoEvolver:
@@ -75,7 +78,9 @@ class TestWhenThereIsNoEvolver:
 
         said = evolver_agreement.disagreements(_ours(), checkout)
 
-        assert len(said) == 1
+        assert len(said) == 1, (
+            "this runs before there is a window, and a broken file in another repo "
+            "must not be how this app declines to open")
         assert "evolver_contract.json" in said[0]
 
 

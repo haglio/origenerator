@@ -139,7 +139,7 @@ def test_a_video_no_other_shares_a_name_with_keeps_the_script_an_older_version_f
     result = backfill(FakeDB([_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
                       OutputPlaces.in_one_folder(tmp_path), steps=Steps(write=_recording_write(seen)))
 
-    assert seen == []
+    assert seen == [], "written again beside the video, it would leave one video two scripts"
     assert result["skipped"] == 1
     assert older.read_text(encoding="utf-8") == "keep me"
 

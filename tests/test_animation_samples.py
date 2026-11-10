@@ -99,7 +99,8 @@ def test_an_animation_the_table_rules_out_gets_no_example_however_it_was_made(sa
     rows = [_image("pic", "state one"), _video("clip", made_from="pic", action="beta",
                                               starred=1)]
 
-    assert samples(rows) == {}
+    assert samples(rows) == {}, (
+        "such a video was made before its image was sorted, or the image was sorted again since")
 
 
 def test_the_newest_kept_clip_leads(samples):

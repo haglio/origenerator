@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 POLL_SECONDS = 15.0
 
-PATIENCE_SECONDS = 4 * 60 * 60
+PATIENCE_FOR_THE_LONGEST_RUN_SECONDS = 4 * 60 * 60
 
 THIS_LIBRARY = OutputFolders(OUTPUT_PLACES, THUMB_DIR)
 
@@ -75,7 +75,7 @@ def _training_ended(job: dict, announce) -> bool:
 class Waiting(NamedTuple):
     sleep: Callable[[float], object] = time.sleep
     folders: OutputFolders = THIS_LIBRARY
-    patience_seconds: float = PATIENCE_SECONDS
+    patience_seconds: float = PATIENCE_FOR_THE_LONGEST_RUN_SECONDS
     trainings: list | None = None
 
 

@@ -19,6 +19,7 @@ from origenerator.db import Database
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 QT_FREE = (
+    "origenerator.prompt_diff",
     "origenerator.prompt_edit",
     "origenerator.generation_config",
     "origenerator.action_settings",
@@ -144,6 +145,23 @@ def test_the_folder_types_and_their_walkers_lean_on_nothing_else_of_this_app():
 
     assert not [module for module in imported if module.startswith(("origenerator", "."))], (
         "the walkers need only the folder types, so they live with them and not with the tree's builder")
+
+
+def test_the_output_files_module_leans_on_nothing_of_the_folder_tree():
+    output = ast.parse((REPO_ROOT / "origenerator" / "gallery" / "output.py").read_text(
+        encoding="utf-8"))
+    imported = {node.module or "" for node in ast.walk(output) if isinstance(node, ast.ImportFrom)}
+
+    assert not [module for module in imported
+                if module.endswith((".tree", ".groups", ".keys"))]
+
+
+def test_one_module_alone_puts_a_question_to_the_language_model():
+    package = REPO_ROOT / "origenerator"
+    asking = {path.relative_to(package).as_posix() for path in package.rglob("*.py")
+              if "/api/chat" in path.read_text(encoding="utf-8")}
+
+    assert asking == {"local_llm.py"}, "a second way to the model would answer the same words two ways"
 
 
 def test_timing_loads_no_database():

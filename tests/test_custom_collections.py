@@ -133,7 +133,8 @@ def test_two_custom_folders_saved_inside_each_other_resolve_without_looping():
     ])
 
     assert [g.key for g in gallery.child_groups(first)] == [b]
-    assert gallery.child_groups(second) == []
+    assert gallery.child_groups(second) == [], (
+        "an undo and a redo can leave two collections each holding the other; the later link is left out")
     assert [r["prompt_id"] for r in gallery.rows_under(first)] == ["i1"]
 
 
@@ -241,7 +242,8 @@ def test_removing_a_custom_folder_takes_what_it_gathered_with_it(tmp_path):
     assert db.folders_in_custom_collections() == []
     db.create_custom_collection("Mine", folder_id)
     (record,) = db.list_custom_collections()
-    assert record["items"] == []
+    assert record["items"] == [], (
+        "brought back at its old id, as an undone removal brings it, it picks up none of its old items")
 
 
 def test_repointing_a_gathered_folder_keeps_its_place(tmp_path):

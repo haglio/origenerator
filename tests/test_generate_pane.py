@@ -365,7 +365,9 @@ def test_tab_text_and_mark_follow_the_item_a_click_shows(tabs):
 
 
 def test_the_resting_tab_is_named_for_what_it_is_and_wears_no_mark(tabs):
-    assert tabs.tabText(0) == "New generation"
+    assert tabs.tabText(0) == "New generation", (
+        "\"unknown\" would read as a workflow the app failed to recognize, "
+        "not as a question nobody has answered yet")
     assert tabs.tabIcon(0).isNull()
 
 

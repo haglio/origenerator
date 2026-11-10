@@ -79,7 +79,8 @@ def test_the_watcher_asks_nothing_once_the_app_is_back(tmp_path):
     said = _watch(db, api, tmp_path, app_is_running=lambda: True)
 
     assert said == []
-    assert api.asked == []
+    assert api.asked == [], (
+        "the app is watching those runs itself now, and two watchers would announce each twice")
     assert db.get_generation("vid")["status"] == "running"
 
 
@@ -192,7 +193,8 @@ def test_what_the_watcher_says_lands_in_the_apps_log(tmp_path):
         cwd=REPO_ROOT, env=env, check=True,
     )
 
-    assert "said by the watcher" in (tmp_path / "origenerator.log").read_text(encoding="utf-8")
+    assert "said by the watcher" in (tmp_path / "origenerator.log").read_text(encoding="utf-8"), (
+        "the watcher has no window and no console, so a line logged anywhere else is read by nobody")
 
 
 def test_the_watcher_asks_whether_a_copy_holds_the_library_it_waits_for(tmp_path, monkeypatch):

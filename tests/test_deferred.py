@@ -52,7 +52,8 @@ def test_the_work_is_dropped_once_it_has_run(qtbot):
     _pump(qtbot)
 
     assert ran == [1]
-    assert timer._work is None
+    assert timer._work is None, (
+        "a widget the work holds is not kept alive by a timer that has already fired")
 
 
 def test_each_deferral_is_its_own_pending_call(qtbot):

@@ -145,7 +145,8 @@ def test_which_kind_of_output_a_folder_holds_is_worked_out_once_for_that_folder(
 
     answers = {places.subfolder_of(videos) for _ in range(3)}
 
-    assert (answers, len(worked)) == ({"video"}, once)
+    assert (answers, len(worked)) == ({"video"}, once), (
+        "worked out again for every video handed to a slideshow, it cost a double-click on Latest a second")
 
 
 def test_the_apps_own_places_know_where_kinos_library_is():

@@ -110,7 +110,8 @@ def test_folder_level_names_the_folder_levels_and_nothing_else():
 
 def test_generate_tab_title_leads_with_model_then_prompt():
     title = generate_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
-    assert title == "SDXL T2I \u203a a cat in a hat"
+    assert title == "SDXL T2I \u203a a cat in a hat", (
+        "the model leads, so tabs of one pipeline sit together")
 
 
 def test_generate_tab_title_is_just_the_model_without_a_prompt():

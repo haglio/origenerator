@@ -751,7 +751,9 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
 
 
 def test_a_taskbar_identity_windows_refuses_still_stamps_the_pin():
-    with patch("origenerator.app.sys.platform", "win32"),          app_id_claimed() as mock_set_id,          pinned_shortcuts_stamped() as mock_stamp:
+    with (patch("origenerator.app.sys.platform", "win32"),
+          app_id_claimed() as mock_set_id,
+          pinned_shortcuts_stamped() as mock_stamp):
         mock_set_id.side_effect = OSError("refused")
         _init_windows_taskbar_identity(None, None)
 

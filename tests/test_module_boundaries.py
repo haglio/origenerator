@@ -271,9 +271,12 @@ def test_the_script_that_speaks_imports_nothing_of_this_app():
 
 @pytest.mark.parametrize("surface", ["inflight_tile", "job_queue_view", "hud_queue"])
 def test_a_surface_showing_work_in_flight_never_reaches_the_job(surface):
-    imported = _modules_imported_by(f"origenerator/gui/{surface}.py")
+    tree = ast.parse((REPO_ROOT / "origenerator" / "gui" / f"{surface}.py").read_text(encoding="utf-8"))
+    reached = _modules_imported_by(f"origenerator/gui/{surface}.py")
+    reached |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+                for alias in node.names}
 
-    assert not {module for module in imported
-                if module.split(".")[-1] in ("generation_job", "job_queue", "db")}, (
+    assert not {name for name in reached
+                if name.split(".")[-1] in ("generation_job", "job_queue") or "db" in name.split(".")[-1].split("_")}, (
         "each is handed one record per job, what to draw and how to stop it and go to it, so none "
         "knows where a job came from")

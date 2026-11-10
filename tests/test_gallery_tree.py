@@ -74,6 +74,18 @@ def _gathered_tree(qtbot, rows, collections_of_your_own, folder_meta=None, recen
     return pane, tree, model
 
 
+def test_no_section_of_the_toc_is_the_main_one(qtbot):
+    pane = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(pane)
+
+    shares = {pane._splitter.widget(n).sizePolicy().verticalStretch()
+              for n in range(pane._splitter.count())}
+
+    assert shares == {1}, (
+        "equal sections, and equal shares of anything the pane gains or loses: no shape is the "
+        "main one, and the sizes are the user's to drag")
+
+
 def _table_of_contents(qtbot, rows, collections_of_your_own=(), folder_meta=None):
     pane, _tree = _gallery_tree(qtbot, rows, collections_of_your_own, folder_meta)
     pane.resize(500, 1600)

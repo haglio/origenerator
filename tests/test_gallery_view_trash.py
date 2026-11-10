@@ -1359,10 +1359,11 @@ def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):
 
     view.trash_generation("d1")
 
-    assert actions.deleted == [], (
+    assert actions.deleted == []
+    assert actions.rejected == []
+    assert actions.purged == [], (
         "the only delete left in the Trash is the permanent one, which is asked for from the tile and "
         "confirmed, never done on a keystroke")
-    assert actions.rejected == []
 
 
 def test_no_gallery_the_suite_builds_reaches_the_libraries_kino(qtbot):

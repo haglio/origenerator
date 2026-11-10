@@ -187,7 +187,9 @@ def test_typing_on_takes_the_strike_back_out_and_keeps_the_prompt_right(pair, qt
     pair.edit.insertPlainText("og")
     _drawn(pair.edit)
 
-    assert pair.edit.toPlainText() == "a frog on a couch"
+    assert pair.edit.toPlainText() == "a frog on a couch", (
+        "the next keystroke takes the strikes out again, so they are never in the way of the typing "
+        "they describe")
     assert diff_text.live_text(pair.edit) == "a frog on a couch"
     _settle(qtbot, pair.edit)
     assert _marked(pair.edit, "struck") == "cat"
@@ -226,7 +228,9 @@ def test_undo_takes_back_the_last_burst_of_typing_and_redo_puts_it_back(pair, qt
     _settle(qtbot, pair.edit)
 
     qtbot.keyClick(pair.edit, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
-    assert diff_text.live_text(pair.edit) == "a cat on a couch"
+    assert diff_text.live_text(pair.edit) == "a cat on a couch", (
+        "the field's own undo is off: rewritten under the typist on every settle, it would step back "
+        "through renders rather than through edits")
     assert _marks(pair.edit) == [("a cat on a couch", "plain")]
 
     qtbot.keyClick(pair.edit, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)

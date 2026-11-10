@@ -427,7 +427,9 @@ def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot):
 
     pane.refresh_inflight()
 
-    assert list(pane._inflight_tiles) == ["j1", "j2"]
+    assert list(pane._inflight_tiles) == ["j1", "j2"], (
+        "a drag in the Job Queue, or a run ComfyUI turns out to be making, moves runs without adding "
+        "or taking any away")
 
 
 def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qtbot):
@@ -602,7 +604,9 @@ def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
     pane.set_model(LibrarySnapshot(latest, held))
     pane.show_collection(LATEST_KEY)
 
-    assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"]
+    assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"], (
+        "a slideshow hosted by Fun Time outlives the selection that opened it, while the Gallery pane "
+        "goes on being used for something else")
 
 
 @pytest.mark.parametrize(("folder", "kind"), [
@@ -877,7 +881,8 @@ def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_head
 def test_a_pane_with_nothing_drawn_marks_no_folder_square(qtbot):
     pane, _scroll = _pane(qtbot)
 
-    assert pane.reveal_folder("image/sdxl_t2i/abc::landscape") is False
+    assert pane.reveal_folder("image/sdxl_t2i/abc::landscape") is False, (
+        "a slideshow closing as the app itself closes hands its slide to a pane with nothing in it")
 
 
 def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):

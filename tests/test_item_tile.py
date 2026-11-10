@@ -181,7 +181,8 @@ def test_right_click_requests_a_context_menu_for_this_thumbnail(qtbot):
 def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     plain = ItemTile("p1", None, "label")
     qtbot.addWidget(plain)
-    assert plain.findChildren(ItemTypeIcon) == []
+    assert plain.findChildren(ItemTypeIcon) == [], (
+        "inside a folder of one kind the icon would only repeat what the folder already says")
     typed = ItemTile("p2", None, "label", TileAppearance(media_type=MediaType.VIDEO))
     qtbot.addWidget(typed)
     assert len(typed.findChildren(ItemTypeIcon)) == 1
@@ -296,7 +297,8 @@ def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
 
     tw.set_enhance(icons.ENHANCE_MORE)
 
-    assert tw.enhance_state() == icons.ENHANCE_MORE
+    assert tw.enhance_state() == icons.ENHANCE_MORE, (
+        "a turn of the Enhance pane's settings does this to every item on screen at once")
     assert plus.isEnabled()
 
 
@@ -396,7 +398,9 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
 
     later = ItemTile("p3", None, "a clip", TileAppearance(movie_path=str(webp)))
     qtbot.addWidget(later)
-    assert later._image_label.movie().state() == QMovie.MovieState.Paused
+    assert later._image_label.movie().state() == QMovie.MovieState.Paused, (
+        "held app-wide, not tile by tile: a paused room with the gallery in it must not be a wall "
+        "of videos still playing, the ones started since included")
 
     omnipause.freeze(False)
     assert movie.state() == QMovie.MovieState.Running
@@ -440,7 +444,9 @@ def test_the_fix_being_applied_gets_the_band_under_the_run_s_own_reading(qtbot):
     qtbot.addWidget(tw)
 
     assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (45, 60)
-    assert tw._enhancing_bar.pass_progress() == (5, 20)
+    assert tw._enhancing_bar.pass_progress() == (5, 20), (
+        "the bar is the whole enhancement; the band along its foot is the fix in hand, the reading "
+        "that starts over with each fix")
 
 
 def test_an_enhance_still_queued_draws_no_band(qtbot):
@@ -489,8 +495,10 @@ def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
     qtbot.addWidget(tw)
 
     assert tw._enhancing_bar.caption() == ""
-    assert tw._enhancing_bar.maximum() == 0
-    assert not tw._enhancing_tick.isActive()
+    assert tw._enhancing_bar.maximum() == 0, (
+        "nothing has begun: a bar parked at nought would say the run had started and was stuck")
+    assert not tw._enhancing_tick.isActive(), (
+        "ticking a queued run would only redraw a line that cannot change")
 
 
 def test_a_fresh_run_updates_the_overlays_in_place(qtbot):

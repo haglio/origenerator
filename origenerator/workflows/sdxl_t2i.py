@@ -11,7 +11,7 @@ from origenerator.workflows.base import (
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_dropdowns import model_dropdown
-from origenerator.workflows.model_files import ANY
+from origenerator.workflows.model_files import WORKS_ON_PIXELS
 from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import CLIP
 
@@ -68,7 +68,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             *sampler_params(defaults),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
             model_dropdown("upscale_model", "Upscaler", defaults["upscale_model"],
-                         "upscale_models", accepts=ANY),
+                         "upscale_models", accepts=WORKS_ON_PIXELS),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),

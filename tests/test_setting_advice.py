@@ -240,7 +240,7 @@ def test_with_no_page_only_the_step_spacing_its_sampler_wants_is_quoted():
 
 
 _DURATION = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161,
-                     step=4, unit="s", rate=16, good=(81, 161))
+                     step=4, unit="s", shown_in_seconds_at=16, good=(81, 161))
 
 
 def test_a_durations_fix_is_shown_in_seconds():

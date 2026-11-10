@@ -157,11 +157,11 @@ class _Scene(QFrame):
 
     def frames(self) -> int:
         seconds = self.length.value()
-        return (frames_for_seconds(seconds, self._pd.rate, self._pd)
+        return (frames_for_seconds(seconds, self._pd.shown_in_seconds_at, self._pd)
                 if seconds is not None else int(self._pd.default[0]))
 
     def set_frames(self, frames: int) -> None:
-        self.length.set_value(seconds_for_frames(int(frames), self._pd.rate, self._pd))
+        self.length.set_value(seconds_for_frames(int(frames), self._pd.shown_in_seconds_at, self._pd))
 
     def _settle(self) -> None:
         self.set_frames(self.frames())

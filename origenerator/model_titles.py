@@ -10,7 +10,8 @@ from origenerator import config
 from origenerator.file_refs import reference_basename
 from origenerator.workflows.model_arch import safetensors_metadata
 
-MODEL_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
+_QUANTIZED_FLUX_SUFFIX = ".gguf"
+MODEL_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".pth", _QUANTIZED_FLUX_SUFFIX, ".sft")
 _TRAINED_AT = ("ss_training_finished_at", "ss_training_started_at")
 FIX_LORA_FOLDER = "fixes"
 _FIX_LORA = re.compile(r"^(?P<part>.+) (?P<when>\d{4}-\d{2}-\d{2} \d{4})$")

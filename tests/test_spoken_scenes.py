@@ -107,12 +107,15 @@ def test_the_writer_hears_her_line_where_she_speaks_and_the_foley_where_she_does
     ambience = payload[earlier["inputs"]["audio2"][0]]
     assert ambience["class_type"] == "TrimAudioDuration"
     assert (ambience["inputs"]["start_index"], ambience["inputs"]["duration"]) == (
-        pytest.approx(160 / 16), pytest.approx(80 / 16))
+        pytest.approx(160 / 16), pytest.approx(80 / 16)), (
+        "each scene but the last is cut to the frames it adds, its seam frame being the next scene's")
     assert payload[ambience["inputs"]["audio"][0]]["class_type"] == "HunyuanFoleySampler"
     first = payload[earlier["inputs"]["audio1"][0]]
     assert (first["class_type"], first["inputs"]["duration"]) == ("TrimAudioDuration", pytest.approx(160 / 16))
     assert payload[first["inputs"]["audio"][0]]["class_type"] == "LoadAudio"
-    assert "AudioMerge" not in {node["class_type"] for node in payload.values()}
+    assert "AudioMerge" not in {node["class_type"] for node in payload.values()}, (
+        "the foley scores what it sees, and shown her talking it lays a garbled voice under hers, "
+        "so her line is never mixed with it")
 
 
 def test_a_story_without_lines_keeps_the_graph_it_always_had():

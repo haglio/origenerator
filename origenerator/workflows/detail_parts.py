@@ -11,7 +11,9 @@ from origenerator.workflows.model_files import (
     list_outline_detector_files,
 )
 
-DEFAULT_FIX_DENOISE = 0.45
+_BOLD_ENOUGH_TO_RE_FORM_A_PART = 0.45
+DEFAULT_FIX_DENOISE = _BOLD_ENOUGH_TO_RE_FORM_A_PART
+_EDGE_MARGIN_PIXELS = 10
 FIX_STEP = 0.1
 FIX_MAX = 1.0
 
@@ -24,13 +26,13 @@ class DetailPart:
     outline: bool = False
     prompt: str = ""
     avoid: str = ""
-    dilation: int = 10
+    dilation: int = _EDGE_MARGIN_PIXELS
     framed_together: bool = False
     shared_images: bool = True
 
 
 # ComfyUI's detector models are named ADetailer-style, and these fragments follow.
-_BUILTIN_PARTS = (
+_ANATOMY_ANY_IMAGE_HAS = (
     DetailPart("faces", ("face", "faces"), ("face",),
                prompt=("natural detailed face, natural proportions of the face, realistic skin "
                        "texture, photographic detail"),
@@ -62,7 +64,7 @@ _BUILTIN_PARTS = (
 )
 
 
-def _overlay_parts(content: dict | None = None) -> tuple:
+def _library_only_parts(content: dict | None = None) -> tuple:
     if content is None:
         content = load_content()
     parts = []
@@ -84,7 +86,7 @@ def _text(value) -> str:
 
 
 def part_table(content: dict | None = None) -> tuple:
-    return _BUILTIN_PARTS + _overlay_parts(content)
+    return _ANATOMY_ANY_IMAGE_HAS + _library_only_parts(content)
 
 
 def part_named(name: str) -> DetailPart:
@@ -100,6 +102,7 @@ _MAX_COMMAND_WORDS = 6
 ALL_PARTS_WORDS = ("all", "everything")
 
 
+# Whisper renders an imperative "fix" off a quiet microphone as "fixed", or one letter off.
 def _lead_is_fix(word: str) -> bool:
     return sounds_like(word, ("fix", "fixed"))
 
@@ -125,7 +128,7 @@ def fix_command_phrases() -> frozenset[str]:
 
 
 def published_fix_phrases() -> tuple[str, ...]:
-    return tuple(f"fix {word}" for part in _BUILTIN_PARTS for word in part.spoken)
+    return tuple(f"fix {word}" for part in _ANATOMY_ANY_IMAGE_HAS for word in part.spoken)
 
 
 def fix_command_spelling(text: str) -> str | None:
@@ -188,13 +191,20 @@ def detail_fixes_of(params: dict) -> dict:
     if isinstance(fixes, dict):
         found = {str(name): _denoise(value) for name, value in fixes.items()}
         return {name: value for name, value in found.items() if value is not None}
+    return _fixes_of_the_old_shape(params)
+
+
+_OLD_PASS_PARTS = ("faces", "hands")
+
+
+def _fixes_of_the_old_shape(params: dict) -> dict:
     if not params.get("enhance_detail_fix"):
         return {}
     denoise = _denoise(params.get("enhance_detail_denoise")) or DEFAULT_FIX_DENOISE
     named = [detector_part_label(params[key])
              for key in ("enhance_face_detector", "enhance_hand_detector")
              if params.get(key)]
-    return dict.fromkeys(named or ["faces", "hands"], denoise)
+    return dict.fromkeys(named or _OLD_PASS_PARTS, denoise)
 
 
 def fix_prompts(params: dict) -> dict:

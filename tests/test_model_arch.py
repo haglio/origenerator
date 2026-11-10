@@ -41,7 +41,7 @@ def _write(path, tensor_names):
     return _write_shaped(path, {name: [1] for name in tensor_names})
 
 
-ARCH_CASES = [
+ARCH_CASES_MADE_UP_IN_REAL_LAYOUTS = [
     (SDXL, ["conditioner.embedders.0.transformer.x", "model.diffusion_model.input_blocks.0.y"]),
     (SDXL, ["model.diffusion_model.label_emb.0.0.weight", "model.diffusion_model.input_blocks.0.y"]),
     (SDXL, ["add_embedding.linear_1.weight", "controlnet_cond_embedding.conv_in.weight"]),
@@ -51,6 +51,9 @@ ARCH_CASES = [
     (SD15, ["lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight",
             "lora_unet_down_blocks_0_attn.lora_down.weight"]),
     (SD15, ["control_model.zero_convs.0.0.weight", "control_model.input_hint_block.0.weight"]),
+    pytest.param(SDXL, ["control_model.label_emb.0.0.weight", "control_model.zero_convs.0.0.weight",
+                        "control_model.input_hint_block.0.weight"],
+                 id="an SDXL ControlNet holds the original ControlNet shape too"),
     (SDXL, ["lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_q.lora_down.weight",
             "lora_unet_output_blocks_2_1_proj_in.lora_down.weight"]),
     (SD15, ["lora_unet_input_blocks_4_1_transformer_blocks_0_attn1_to_q.lora_down.weight",
@@ -74,15 +77,18 @@ ARCH_CASES = [
     (KREA2, ["diffusion_model.blocks.0.attn.wq.lora_A.weight",
              "diffusion_model.blocks.0.mlp.gate.lora_A.weight"]),
     (KREA2, ["lycoris_blocks_0_attn_wq.lora_down.weight"]),
-    (KREA2, ["diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_A.weight"]),
+    pytest.param(KREA2, ["diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lora_A.weight"],
+                 id="a Krea 2 LoRA in use is trained on the text-fusion adapter alone"),
     (WAN_ANIMATE, ["blocks.0.self_attn.q.weight", "face_adapter.fuser_blocks.0.k_norm.weight",
                    "patch_embedding.weight", "pose_patch_embedding.weight"]),
     (WAN_ANIMATE, ["model.diffusion_model.blocks.0.self_attn.q.weight",
                    "model.diffusion_model.pose_patch_embedding.weight"]),
 ]
 
+AN_SDXL_CHECKPOINT = ARCH_CASES_MADE_UP_IN_REAL_LAYOUTS[0][1]
 
-@pytest.mark.parametrize(("expected", "tensor_names"), ARCH_CASES)
+
+@pytest.mark.parametrize(("expected", "tensor_names"), ARCH_CASES_MADE_UP_IN_REAL_LAYOUTS)
 def test_reads_the_architecture_off_the_tensor_names(tmp_path, expected, tensor_names):
     assert model_arch.describe(_write(tmp_path / "m.safetensors", tensor_names)).arch == expected
 
@@ -106,7 +112,7 @@ def test_a_wan_model_with_a_reference_conv_is_steered_by_a_control_video(tmp_pat
 
 
 def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch):
-    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    path = _write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)
     reads = []
     read = model_arch._tensor_shapes
     monkeypatch.setattr(model_arch, "_tensor_shapes", lambda p: reads.append(p) or read(p))
@@ -114,13 +120,15 @@ def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch
     model_arch.describe(path)
     model_arch.describe(path)
 
-    assert len(reads) == 1
+    assert len(reads) == 1, (
+        "every tab restored at a launch lists the same model folders, "
+        "so one launch asks what a file is many times over")
 
 
 def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeypatch):
     monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
     model_arch._remembered.cache_clear()
-    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    path = _write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)
     assert model_arch.describe(path).arch == SDXL
     reads = []
     monkeypatch.setattr(model_arch, "_tensor_shapes", reads.append)
@@ -133,13 +141,15 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
 def test_a_header_remembered_by_an_older_reader_is_read_again(tmp_path, monkeypatch):
     monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
     model_arch._remembered.cache_clear()
-    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    path = _write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)
     stat = path.stat()
     remembered = {"path": str(path), "size": stat.st_size, "mtime_ns": stat.st_mtime_ns,
                   "arch": None, "is_lora": False, "expert": None, "is_shard": False}
     (tmp_path / "headers.json").write_text(json.dumps(
         {"reader": "an older reader", "entries": [remembered]}))
-    assert model_arch.describe(path).arch == SDXL
+    assert model_arch.describe(path).arch == SDXL, (
+        "what a file was taken for is only as good as the reader that took it, "
+        "so a reader that has since learned a shape reads the file again")
 
     model_arch._remembered.cache_clear()
     (tmp_path / "headers.json").write_text(json.dumps([remembered]))
@@ -147,8 +157,17 @@ def test_a_header_remembered_by_an_older_reader_is_read_again(tmp_path, monkeypa
     assert model_arch.describe(path).arch == SDXL
 
 
+def test_a_launch_that_cannot_keep_what_it_read_still_describes_the_model(tmp_path, monkeypatch):
+    in_the_way = tmp_path / "a file where the state folder would be"
+    in_the_way.write_text("")
+    monkeypatch.setattr(model_arch, "_HEADERS_PATH", in_the_way / "headers.json")
+    model_arch._remembered.cache_clear()
+
+    assert model_arch.describe(_write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)).arch == SDXL
+
+
 def test_a_model_file_written_over_is_read_again(tmp_path):
-    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    path = _write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)
     assert model_arch.describe(path).arch == SDXL
 
     _write(path, ["double_blocks.0.img_attn.qkv.weight", "single_blocks.0.linear1.weight"])
@@ -234,6 +253,17 @@ def test_reads_a_gguf_index_past_its_metadata(tmp_path):
         + b"".join(tensor(name) for name in names)
     )
     assert model_arch.describe(path).arch == FLUX
+
+
+def test_a_gguf_holding_a_value_of_a_type_not_known_reads_as_unknown(tmp_path):
+    a_type_gguf_has_not_got = 99
+    key = b"general.architecture"
+    path = tmp_path / "newer.gguf"
+    path.write_bytes(b"GGUF" + struct.pack("<I", 3) + struct.pack("<QQ", 0, 1)
+                     + struct.pack("<Q", len(key)) + key
+                     + struct.pack("<I", a_type_gguf_has_not_got))
+
+    assert model_arch.describe(path).arch is None
 
 
 def test_a_malformed_gguf_reads_as_unknown(tmp_path):

@@ -1052,7 +1052,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     (ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=120.0,
               step=1.0, options=[16, 24, 60], unit="fps"), 60, 60.0),
     (ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=161, step=4,
-              options=[1, 5, 10], unit="s", rate=16.0), 21, 21),
+              options=[1, 5, 10], unit="s", shown_in_seconds_at=16.0), 21, 21),
 ])
 def test_every_kind_of_setting_reads_back_as_the_row_stores_it(qtbot, pd, written, read_back):
     form = ParamForm([pd])
@@ -1458,7 +1458,7 @@ def test_a_typed_number_past_the_range_is_clamped_and_shown_clamped_once_the_edi
 def _video_defs(max_frames=161):
     return [
         ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=max_frames,
-                 step=4, options=[1, 5, 10], unit="s", rate=16.0),
+                 step=4, options=[1, 5, 10], unit="s", shown_in_seconds_at=16.0),
         ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0, max_val=112.0,
                  step=16.0, options=[16, 32, 48], unit="fps"),
     ]
@@ -1563,10 +1563,10 @@ def _scene_defs():
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
         ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
         ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5, max_val=961, step=4,
-                 options=[1, 5, 10, 15, 30, 60], unit="s", rate=16.0),
+                 options=[1, 5, 10, 15, 30, 60], unit="s", shown_in_seconds_at=16.0),
         ParamDef("scene_lines", "Lines", "lines", [""]),
         ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=961, step=4,
-                 options=[1, 5, 10, 15, 30, 60], unit="s", rate=16.0),
+                 options=[1, 5, 10, 15, 30, 60], unit="s", shown_in_seconds_at=16.0),
     ]
 
 

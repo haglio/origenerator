@@ -107,7 +107,9 @@ def test_a_mouth_is_found_by_the_lips_detector_around_it(monkeypatch):
 def test_a_part_with_no_installed_detector_resolves_to_nothing(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["face_yolov8m.pt", "hand_yolov8s.pt"])
-    assert detector_for_part(_part("teeth")) is None
+    assert detector_for_part(_part("teeth")) is None, (
+        "a detector's file name says its part only to a table that knows what to look for, "
+        "so the table is written down and a part stays in it with nothing installed")
 
 
 def test_only_the_parts_something_can_find_are_fixable(monkeypatch):
@@ -139,51 +141,56 @@ def test_a_detector_file_labels_as_the_part_it_finds():
 
 
 def test_an_unrecognized_detector_keeps_its_own_name():
-    assert detector_part_label("wristwatch_yolov8n.pt") == "wristwatch_yolov8n"
+    assert detector_part_label("wristwatch_yolov8n.pt") == "wristwatch_yolov8n", (
+        "better named oddly than labeled as another part")
 
 
 
-def _with_overlay(monkeypatch, entries):
+def _with_made_up_library_parts(monkeypatch, entries):
     monkeypatch.setattr(detail_parts, "load_content",
                         lambda: {"detail_fix_parts": entries})
 
 
 def test_overlay_parts_join_the_vocabulary_whole(monkeypatch):
-    _with_overlay(monkeypatch, [
+    _with_made_up_library_parts(monkeypatch, [
         {"name": "zeta", "spoken": ["zeta", "zetas"], "matches": ["zeta"]},
     ])
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["zeta_yolov8n.pt"])
 
     (part,) = match_fix_command("fix her zetas")
-    assert part.name == "zeta"
+    assert part.name == "zeta", (
+        "past the anatomy any image has, the vocabulary is library content that is never "
+        "published, so it comes from the overlay and the tests make theirs up")
     assert detector_for_part(part) == "zeta_yolov8n.pt"
     assert detector_part_label("zeta_yolov8n.pt") == "zeta"
 
 
 def test_a_bare_overlay_part_answers_to_its_own_name(monkeypatch):
-    _with_overlay(monkeypatch, [{"name": "Zeta"}])
+    _with_made_up_library_parts(monkeypatch, [{"name": "Zeta"}])
     (part,) = match_fix_command("fix zeta")
     assert part.name == "Zeta"
     assert part.matches == ("zeta",)
 
 
 def test_malformed_overlay_entries_are_skipped_not_fatal(monkeypatch):
-    _with_overlay(monkeypatch, ["zeta", {"spoken": ["zeta"]}, {"name": ""}])
-    assert detail_parts.part_table() == detail_parts._BUILTIN_PARTS
+    _with_made_up_library_parts(monkeypatch, ["zeta", {"spoken": ["zeta"]}, {"name": ""}])
+    assert detail_parts.part_table() == detail_parts._ANATOMY_ANY_IMAGE_HAS
 
 
 def test_the_recognizer_is_asked_to_hear_a_fix_of_each_part_of_two_and_of_all(monkeypatch):
-    _with_overlay(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
+    _with_made_up_library_parts(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
     heard = detail_parts.fix_command_phrases()
     for phrase in ("fix teeth", "fix mouth", "fix zetas", "fix all", "fix everything",
                    "fix hands and mouth", "fix zeta and eyes"):
         assert phrase in heard
     assert "fix hand and hands" not in heard
+    assert "fix hands and mouth and eyes" not in heard, (
+        "more than two at once is said rarely enough to be left to the engine that takes sentences down")
 
 
 def test_every_fix_the_recognizer_is_asked_to_hear_is_a_fix(monkeypatch):
-    _with_overlay(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
+    _with_made_up_library_parts(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
     assert [phrase for phrase in detail_parts.fix_command_phrases()
             if not detail_parts.match_fix_command(phrase)] == []
 
@@ -200,7 +207,9 @@ def test_each_part_carries_its_own_denoise():
 
 
 def test_junk_where_a_number_should_be_asks_for_no_pass():
-    assert detail_fixes_of({"enhance_detail_fixes": {"teeth": "lots"}}) == {}
+    assert detail_fixes_of({"enhance_detail_fixes": {"teeth": "lots"}}) == {}, (
+        "saved settings can come back holding anything, and a pass is better left out "
+        "than submitted with a denoise the sampler refuses")
     assert detail_fixes_of({"enhance_detail_fixes": "all of them"}) == {}
 
 
@@ -209,7 +218,9 @@ def test_an_enhancement_recorded_the_old_way_reads_as_the_parts_it_fixed():
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
         "enhance_face_detector": "face_yolov8m.pt",
         "enhance_hand_detector": "hand_yolov8s.pt",
-    }) == {"faces": 0.45, "hands": 0.45}
+    }) == {"faces": 0.45, "hands": 0.45}, (
+        "every enhancement the library already holds was recorded this way, "
+        "and each goes on captioning itself and re-running as what it was")
     assert detail_fixes_of({
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.5,
         "enhance_face_detector": "Teeth_v1.pt", "enhance_hand_detector": "",
@@ -237,13 +248,18 @@ def test_the_passes_come_in_the_tables_order_however_they_were_asked_for(monkeyp
                         lambda: ["Teeth_v1.pt", "face_yolov8m.pt"])
     asked = {"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}}
     backwards = {"enhance_detail_fixes": {"faces": 0.4, "teeth": 0.5}}
-    assert detail_fix_passes(asked) == detail_fix_passes(backwards)
+    assert detail_fix_passes(asked) == detail_fix_passes(backwards), (
+        "the same fixes build the same graph whichever order they were set in, "
+        "or running an enhancement again would make a different one")
 
 
 def test_a_part_with_no_installed_detector_is_dropped_rather_than_submitted(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["face_yolov8m.pt"])
-    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [DetailFixPass(_part("faces"), "face_yolov8m.pt", 0.4)]
+    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}}) == [
+        DetailFixPass(_part("faces"), "face_yolov8m.pt", 0.4)], (
+        "settings outlive the detector file they named, so a part without one is an ordinary state "
+        "that is left out, never an error")
 
 
 def test_a_part_the_vocabulary_no_longer_lists_is_dropped(monkeypatch):
@@ -255,9 +271,10 @@ def test_a_part_the_vocabulary_no_longer_lists_is_dropped(monkeypatch):
 
 def test_skin_and_hair_are_redrawn_inside_their_outlines_toward_their_own_prompts():
     skin, hair = _part("skin"), _part("hair")
-    assert skin.outline
-    assert hair.outline
-    assert "pores" in skin.prompt
+    assert skin.outline, "a box around the skin is most of the image"
+    assert hair.outline, "a box around the hair takes the face with it"
+    assert "pores" in skin.prompt, (
+        "redrawn toward the image's prompt alone, skin comes back as smooth as it started")
     assert "strands" in hair.prompt
     assert skin.avoid
     assert hair.avoid
@@ -269,7 +286,7 @@ def test_every_part_this_app_names_is_redrawn_toward_prompts_of_its_own():
 
 
 def test_an_overlay_part_can_be_an_outline_with_its_own_prompts(monkeypatch):
-    _with_overlay(monkeypatch, [{"name": "zeta", "outline": True,
+    _with_made_up_library_parts(monkeypatch, [{"name": "zeta", "outline": True,
                                  "prompt": "fine zeta texture", "avoid": "smooth zeta"}])
     (part,) = match_fix_command("fix zeta")
     assert part.outline is True
@@ -278,7 +295,7 @@ def test_an_overlay_part_can_be_an_outline_with_its_own_prompts(monkeypatch):
 
 
 def test_an_overlay_part_that_says_nothing_of_the_sort_is_a_box_on_the_images_prompt(monkeypatch):
-    _with_overlay(monkeypatch, [{"name": "zeta", "outline": "yes please", "prompt": 7}])
+    _with_made_up_library_parts(monkeypatch, [{"name": "zeta", "outline": "yes please", "prompt": 7}])
     (part,) = match_fix_command("fix zeta")
     assert part.outline is False
     assert part.prompt == ""

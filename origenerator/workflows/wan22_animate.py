@@ -80,7 +80,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5,
                      max_val=LONGEST_VIDEO_FRAMES, step=4, options=DURATION_OPTIONS, unit="s",
-                     rate=NATIVE_FPS, good=(81, 161)),
+                     shown_in_seconds_at=NATIVE_FPS, good=(81, 161)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(4, 8)),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1,
                      good=(1.0, 1.0)),

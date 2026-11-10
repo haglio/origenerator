@@ -233,7 +233,7 @@ class _Presets(FieldKind):
     def make(self, pd):
         widget = PresetDropdown(pd.options, unit=pd.unit)
         grey_out_of_reach(pd, widget)
-        if not pd.rate:
+        if not pd.shown_in_seconds_at:
             widget.set_value(pd.default)
         return widget
 
@@ -242,13 +242,13 @@ class _Presets(FieldKind):
 
     def read(self, pd, widget):
         shown = widget.value()
-        if shown is None and pd.rate:
+        if shown is None and pd.shown_in_seconds_at:
             return pd.default
         return _stored(pd, shown)
 
     def write(self, pd, widget, value):
         number = clamped_number(pd, value)
-        widget.set_value(seconds_for_frames(number, pd.rate, pd) if pd.rate else number)
+        widget.set_value(seconds_for_frames(number, pd.shown_in_seconds_at, pd) if pd.shown_in_seconds_at else number)
 
 
 class _Choice(FieldKind):
@@ -332,12 +332,12 @@ def grey_out_of_reach(pd: ParamDef, widget: PresetDropdown) -> None:
 
 
 def _stored(pd: ParamDef, shown):
-    return (frames_for_seconds(shown, pd.rate, pd) if pd.rate
+    return (frames_for_seconds(shown, pd.shown_in_seconds_at, pd) if pd.shown_in_seconds_at
             else clamped_number(pd, shown))
 
 
 def _shown(pd: ParamDef, stored):
-    return (seconds_for_frames(stored, pd.rate, pd) if pd.rate
+    return (seconds_for_frames(stored, pd.shown_in_seconds_at, pd) if pd.shown_in_seconds_at
             else clamped_number(pd, stored))
 
 

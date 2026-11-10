@@ -4,12 +4,13 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from app_support.comfy_file_refs import reference_basename
 
-from origenerator import config
-from origenerator.workflows.model_arch import safetensors_metadata
+from origenerator import config, precision
+from origenerator.precision import Precision
+from origenerator.workflows.model_arch import describe, safetensors_metadata
 
 _QUANTIZED_FLUX_SUFFIX = ".gguf"
 MODEL_EXTENSIONS = (".safetensors", ".ckpt", ".pt", ".pth", _QUANTIZED_FLUX_SUFFIX, ".sft")
@@ -17,6 +18,7 @@ _TRAINED_AT = ("ss_training_finished_at", "ss_training_started_at")
 FIX_LORA_FOLDER = "fixes"
 _FIX_LORA = re.compile(r"^(?P<part>.+) (?P<when>\d{4}-\d{2}-\d{2} \d{4})$")
 _VERSIONED = re.compile(r"^(?P<base>.+?) (?P<major>\d+)\.(?P<minor>\d+)$")
+_FOLDERS_SHOWN_BY_TITLE = ("diffusion_models", "checkpoints", "loras")
 _read: dict[str, tuple[tuple[int, int], object]] = {}
 
 
@@ -49,8 +51,40 @@ def option_title(option) -> str:
 
 
 def model_title(value) -> str:
+    title = _kept_title(value)
+    shown = _precision_shown(value, title)
+    return title if shown is None else precision.in_plain_words(title, shown)
+
+
+def precision_help(value) -> str:
+    shown = _precision_shown(value, _kept_title(value))
+    if shown is None:
+        return ""
+    installed = _installed(value)
+    size = "" if installed is None else precision.file_size_sentence(installed.stat().st_size)
+    return " ".join(filter(None, (shown.explained(), size)))
+
+
+def _kept_title(value) -> str:
     stem = model_stem(value)
     return kept_by_stem(config.MODEL_TITLES_PATH).get(stem) or _fix_title(value, stem) or stem
+
+
+def _precision_shown(value, title: str) -> Precision | None:
+    named = precision.named_in(title)
+    if named is None:
+        return None
+    installed = _installed(value)
+    inside = None if installed is None else describe(installed).precision
+    return precision.tagged(inside) or named
+
+
+def _installed(value) -> Path | None:
+    for folder in _FOLDERS_SHOWN_BY_TITLE:
+        path = config.COMFYUI_DIR / "models" / folder / str(value)
+        if path.is_file():
+            return path
+    return None
 
 
 def is_a_fixs_lora(value) -> bool:

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from origenerator.model_titles import (
     Version,
     model_title,
+    precision_help,
     trained_sentence,
     trained_when,
     versioned,
@@ -91,3 +94,47 @@ def test_a_title_written_for_a_new_file_keeps_every_other_title(titled_models):
 
     assert model_title("example_look_1_1.safetensors") == "Example Look 1.1"
     assert model_title("example_model.safetensors") == "Example Model"
+
+
+@pytest.mark.parametrize(("tag", "words"), [
+    ("fp16", "full size"), ("bf16", "full size"), ("fp8", "half size"), ("FP8", "half size"),
+    ("int8", "half size, int8"), ("Q8", "half size, packed"),
+])
+def test_a_titles_precision_is_shown_in_plain_words(titled_models, tag, words):
+    titled_models({"example_model": f"Example Model 2.0 (High, {tag})"})
+
+    assert model_title("example_model.safetensors") == f"Example Model 2.0 (High, {words})"
+
+
+def test_the_precision_shown_is_the_one_inside_the_file_whatever_its_title_says(
+        installed_models, titled_models):
+    installed_models.add("diffusion_models", "example_model.safetensors")
+    titled_models({"example_model": "Example Model (fp8)"})
+
+    assert model_title("example_model.safetensors") == "Example Model (full size)"
+
+
+def test_a_word_that_only_contains_a_precision_tag_is_left_as_it_is(titled_models):
+    titled_models({"example_model": "Example Modelfp8 (bf16x)"})
+
+    assert model_title("example_model.safetensors") == "Example Modelfp8 (bf16x)"
+
+
+def test_a_titles_precision_is_explained_by_what_its_tag_stands_for_and_what_it_means(titled_models):
+    titled_models({"example_model": "Example Model (fp8)"})
+
+    assert precision_help("example_model.safetensors").startswith(
+        "fp8: floating point, 8 bits. Half the file of full size, and the fastest")
+
+
+def test_an_installed_models_explanation_ends_with_its_file_size(installed_models, titled_models):
+    installed_models.add_bytes("diffusion_models", "example_model.gguf", b"\x00" * (3 * 2**30 // 2**20))
+    titled_models({"example_model": "Example Model (Q8)"})
+
+    assert precision_help("example_model.gguf").endswith("This file is 0.0 GB.")
+
+
+def test_a_title_naming_no_precision_has_nothing_to_explain(titled_models):
+    titled_models({"example_model": "Example Model"})
+
+    assert precision_help("example_model.safetensors") == ""

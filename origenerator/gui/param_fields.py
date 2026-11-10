@@ -18,7 +18,7 @@ from origenerator.gui.prompt_boxes import PromptBoxes
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.seed_dropdown import SeedDropdown
 from origenerator.media import MediaType
-from origenerator.model_titles import option_title
+from origenerator.model_titles import option_title, precision_help
 from origenerator.seed_history import SeedHistory
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
@@ -302,7 +302,8 @@ def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = No
 def offer_options(dropdown: QComboBox, options, tip=lambda _option: None) -> None:
     for option in options:
         dropdown.addItem(option_title(option), option)
-        dropdown.setItemData(dropdown.count() - 1, tip(option) or None, Qt.ItemDataRole.ToolTipRole)
+        explained = " ".join(filter(None, (tip(option), precision_help(option))))
+        dropdown.setItemData(dropdown.count() - 1, explained or None, Qt.ItemDataRole.ToolTipRole)
 
 
 def offer_only(pd: ParamDef, dropdown: QComboBox, options: list) -> None:

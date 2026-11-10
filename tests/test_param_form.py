@@ -2447,6 +2447,18 @@ def test_the_recommended_choices_wear_a_thumbs_up_and_the_rest_a_blank_as_wide(q
     assert len(_items_wearing(spacings, icons.unmarked_icon())) == spacings.count()
 
 
+def test_a_model_whose_title_names_its_precision_explains_it_on_hover(qtbot, titled_models):
+    titled_models({"example_model": "Example Model (bf16)", "other_model": "Other Model"})
+    form = ParamForm([ParamDef("unet", "Model", "dropdown", "example_model.safetensors",
+                               options=["example_model.safetensors", "other_model.safetensors"])])
+    qtbot.addWidget(form)
+    dropdown = form._widgets["unet"]
+
+    assert _item_tooltip(dropdown, "Example Model (full size)").startswith(
+        "bf16: brain floating point, 16 bits.")
+    assert _item_tooltip(dropdown, "Other Model") is None
+
+
 def _item_tooltip(dropdown, text):
     return dropdown.itemData(dropdown.findText(text), Qt.ItemDataRole.ToolTipRole)
 

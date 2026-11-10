@@ -380,4 +380,5 @@ def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(
 
 def test_the_stamp_keeps_what_ran_under_the_keys_it_was_first_written_with():
     assert (WORKFLOW, WORKFLOW_VERSION, BASIS) == (
-        "recipe", "recipe_version", "recipe_version_basis")
+        "recipe", "recipe_version", "recipe_version_basis"), (
+        "every row's block, and every library video's sidecar, holds these keys already")

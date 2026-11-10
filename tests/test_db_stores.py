@@ -66,7 +66,10 @@ def test_the_facade_holds_one_of_each(file, attribute):
 def test_the_facade_forwards_exactly_what_the_stores_offer():
     offered = set().union(*(_public_methods(store) for store, _ in STORES.values()))
 
-    assert _public_methods(Database) == offered - ASKED_OF_THE_REQUESTS_STORE
+    assert _public_methods(Database) == offered - ASKED_OF_THE_REQUESTS_STORE, (
+        "fewer, and a query's name went with it when it moved out, breaking its callers; "
+        "more, and a method was written on the facade and not on the table it queries, "
+        "which is how the one big class grew")
 
 
 def test_every_store_is_one(file):
@@ -129,5 +132,7 @@ def test_every_column_written_by_name_is_a_literal_column_of_the_table():
 
     assert written, "the walk found no call at all, so this checks nothing"
     for column in written:
-        assert isinstance(column, ast.Constant), ast.unparse(column)
+        assert isinstance(column, ast.Constant), (
+            f"{ast.unparse(column)}: a column's name goes straight into the statement, "
+            "so it must be a literal written in that file, never a caller's string")
         assert column.value in GENERATION_COLUMNS, column.value

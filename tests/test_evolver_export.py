@@ -144,7 +144,8 @@ class TestTheInbox:
 
         landed = inbox.hand_over(video, "example-loop-clips")
 
-        assert landed == tmp_path / "0_inbox" / "example-loop-clips" / "clip.mp4"
+        assert landed == tmp_path / "0_inbox" / "example-loop-clips" / "clip.mp4", (
+            "the folder is the whole message: Evolver routes by it and by nothing else")
         assert landed.read_bytes() == b"video"
 
     def test_a_clip_handed_over_with_its_funscript_brings_it(self, tmp_path):

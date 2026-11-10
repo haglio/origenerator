@@ -72,7 +72,8 @@ def test_launches_that_keep_failing_give_up_instead_of_retrying_the_batch_out():
     policy = StubPolicy()
     launcher = FakeLauncher(refuse_all=True)
     assert queue_experiments([], policy, launcher) == 0
-    assert 0 < len(launcher.launched) < EXPERIMENTS_QUEUED_PER_ABSENCE
+    assert 0 < len(launcher.launched) < EXPERIMENTS_QUEUED_PER_ABSENCE, (
+        "this runs while the user waits for the app to close, so it cannot spend a timeout on every slot")
 
 
 class FakeClient:
@@ -134,5 +135,7 @@ def test_an_experiment_that_wont_dequeue_keeps_its_row(tmp_path):
     client = FakeClient(refuse=["exp-1"])
 
     assert cancel_experiments(db, client) == 1
-    assert db.get_generation("exp-1") is not None
+    assert db.get_generation("exp-1") is not None, (
+        "with ComfyUI unreachable its run may still go on, and the app takes a row in flight "
+        "up as a live job; without the row the run's result would be lost")
     assert db.get_generation("exp-2") is None

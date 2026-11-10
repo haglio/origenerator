@@ -27,4 +27,5 @@ def test_dropping_a_folder_already_gathered_refreshes_its_identity(tmp_path):
 
 def test_a_collection_is_recreated_at_the_id_it_had(tmp_path):
     db = Database(tmp_path / "t.db")
-    assert db.create_custom_collection("Favorites", folder_id=7) == 7
+    assert db.create_custom_collection("Favorites", folder_id=7) == 7, (
+        "a saved session names the collection by its id, so an undo brings it back at that id")

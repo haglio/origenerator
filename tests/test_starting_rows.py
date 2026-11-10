@@ -35,7 +35,7 @@ def test_a_row_shown_stands_in_the_line_until_it_is_dropped(qtbot):
     rows.drop(key)
     rows.drop(key)
     assert rows.rows() == []
-    assert len(redraws) == 2
+    assert len(redraws) == 2, "dropping a row already dropped raises nothing and redraws nothing"
 
 
 def test_a_row_stands_where_the_line_would_take_its_job(qtbot):

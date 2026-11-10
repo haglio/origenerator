@@ -2850,3 +2850,19 @@ def test_an_item_the_tree_has_nowhere_to_put_has_no_folder_row(qtbot):
     view.refresh()
 
     assert view._folder_row_for("no-such-item") is None
+
+
+def test_a_rebuild_puts_no_stop_on_the_way_back(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    _click_tile(view, "i2")
+    stops = list(view._navigation._history._stack)
+    assert len(stops) > 1
+
+    view.refresh()
+
+    assert view._navigation._history._stack == stops, (
+        "a rebuild puts the view back as it was, which is no move of the user's; a poll would "
+        "otherwise pile up stops")

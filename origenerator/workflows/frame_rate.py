@@ -14,3 +14,6 @@ def rate_multiplier(frame_rate: float) -> int:
 def playback_rate(frame_rate: float) -> float:
     return NATIVE_FPS * rate_multiplier(frame_rate)
 
+
+def frames_filled_in(frames_made: int, frame_rate: float) -> int:
+    return (frames_made - 1) * rate_multiplier(frame_rate) + 1

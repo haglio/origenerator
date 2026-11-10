@@ -216,3 +216,21 @@ def test_a_file_gone_from_disk_is_created_when_the_row_says(tmp_path):
                         places=OutputPlaces.in_one_folder(tmp_path / "nowhere"))
 
     assert item.value == "2026-01-02 03:04:05"
+
+
+def _frames(items):
+    return [(item.label, item.value) for item in items if item.label in ("Frames from model", "Total frames")]
+
+
+def test_a_video_says_how_many_frames_the_model_made_and_how_many_the_file_holds():
+    row = _row(workflow_name="wan22_flf2v_loop",
+               params_json=json.dumps({"frame_count": 17, "frame_rate": 112.0}))
+
+    assert _frames(metadata_facts(row).items) == [
+        ("Frames from model", "17"), ("Total frames", "113")]
+
+
+def test_a_video_whose_settings_never_said_its_length_shows_no_frame_counts():
+    row = _row(workflow_name="wan22_flf2v_loop", params_json=json.dumps({"frame_rate": 112.0}))
+
+    assert metadata_facts(row) is None

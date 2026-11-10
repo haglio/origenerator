@@ -159,7 +159,8 @@ def test_a_switch_that_would_leave_nothing_is_refused(qtbot, tmp_path):
     assert len(view.slideshow._set.playlist) == 2
 
 
-def test_both_switches_together_keep_what_answers_both(qtbot, tmp_path):
+def test_both_switches_together_keep_what_answers_both_and_enhanced_and_original_lifts_one(
+        qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
                  favorite_ids={"a", "b"}, enhanced_ids={"b", "c"})
 
@@ -169,9 +170,9 @@ def test_both_switches_together_keep_what_answers_both(qtbot, tmp_path):
     _settle(view)
 
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b"]
-    assert view.slideshow.clear_modes() is True
-    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_mode) == (False, False)
-    assert len(view.slideshow._set.playlist) == 3
+    assert view.slideshow.show_enhanced_and_original() is True
+    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_mode) == (True, False)
+    assert len(view.slideshow._set.playlist) == 2
 
 
 def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_path):
@@ -185,7 +186,7 @@ def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_
     _settle(view)
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "d"]
-    view.slideshow.clear_modes()
+    view.slideshow.show_enhanced_and_original()
     _settle(view)
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "b", "c", "d"]
 
@@ -202,7 +203,7 @@ def test_an_enhancement_landing_brings_its_item_into_an_enhanced_only_pass(qtbot
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "b"]
     assert next(item for item in view.slideshow._set.playlist._items if item[2] == "b")[0] == better
-    view.slideshow.clear_modes()
+    view.slideshow.show_enhanced_and_original()
     _settle(view)
     assert next(item for item in view.slideshow._set.playlist._items if item[2] == "b")[0] == better
 
@@ -215,7 +216,7 @@ def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
 
     view.slideshow.cull()
     _settle(view)
-    view.slideshow.clear_modes()
+    view.slideshow.show_enhanced_and_original()
     _settle(view)
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["b", "c"]
@@ -797,14 +798,14 @@ def test_filter_said_over_an_item_named_for_no_action_says_so(qtbot):
     assert (view.slideshow.hud_action_filter, words(view._note)) == ("", "No action for this one")
 
 
-def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot):
+def test_enhanced_and_original_leaves_the_action_filter_on(qtbot):
     view = _view(qtbot, _KEYED, actions=SlideshowActions(actions_of=_actions_of))
     view.slideshow.action_presses.filter("beta")
     _settle(view)
 
-    assert view.slideshow.clear_modes() is True
+    assert view.slideshow.show_enhanced_and_original() is False
 
-    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("", 2)
+    assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("beta", 1)
 
 
 def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):

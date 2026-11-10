@@ -1811,7 +1811,9 @@ def test_a_slideshow_closed_while_a_request_holds_its_slide_lets_the_funestra_go
 
     slideshow.close()
 
-    assert _sent(slideshow) == ["LOCK_OFF"]
+    assert _sent(slideshow) == ["LOCK_OFF"], (
+        "the Funestra keeps playing this list until the session hands it its own, which is what "
+        "leaving Origenerator mode does")
 
 
 def test_a_slideshow_closed_while_its_versions_are_compared_sets_the_funestra_going_again(

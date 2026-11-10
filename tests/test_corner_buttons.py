@@ -171,7 +171,10 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
 
     star, trash, plus = (b.geometry() for b in controls.buttons())
     for corner in (star, trash, plus):
-        assert area.contains(corner)
+        assert area.contains(corner), (
+            "the host says where the item currently is, because only the host knows: the item "
+            "in a thumbnail is a fixed rectangle and the one in a preview moves with every "
+            "resize and every change of aspect ratio")
         assert corner.size().width() == CORNER_SIZE
     assert star.left() == plus.left() > area.center().x()
     assert star.top() < area.center().y() < plus.top()

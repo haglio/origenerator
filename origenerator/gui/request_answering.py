@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import shiboken6
 from PySide6.QtCore import QObject
@@ -20,6 +21,14 @@ def _exchange_of(db, about: str | None) -> list:
 
 def _his_prompts(db) -> list[tuple[str, str]]:
     return db.requests.distinct_prompts()
+
+
+def _how_it_ended(by_the_model: bool, revision) -> str:
+    if not by_the_model:
+        return "A Request could not get the graphics card in %.1f s"
+    if revision is None:
+        return "The model gave no answer to a Request in %.1f s"
+    return "A Request was answered by the model in %.1f s"
 
 
 def leave_the_graphics_card(*, unload=local_llm.let_go,
@@ -44,6 +53,7 @@ class RequestAnswerer(QObject):
             "wait_for_the_graphics_card", graphics_card.wait_for_the_graphics_card)
         self._leave_the_graphics_card = stand_ins.get(
             "leave_the_graphics_card", leave_the_graphics_card)
+        self._clock = stand_ins.get("clock", time.monotonic)
 
     def ask(self, about: str | None, pair: tuple[str, str], words: str, *, owner: QObject, then,
             **told) -> None:
@@ -54,14 +64,16 @@ class RequestAnswerer(QObject):
                        owner=self, waits_long=True)
 
     def _answer(self, pair: tuple[str, str], words: str, exchange, told: dict, still_loaded: bool):
-        by_the_model = still_loaded
+        by_the_model, revision, began = still_loaded, None, self._clock()
         try:
             by_the_model = still_loaded or self._takes_the_graphics_card()
-            return self._worked_out(pair, words, exchange, told, by_the_model), by_the_model
+            revision = self._worked_out(pair, words, exchange, told, by_the_model)
+            return revision, by_the_model
         except Exception as exc:  # noqa: BLE001 -- answered with nothing, never raised off-thread
             logger.warning("Could not work out a request (%s)", type(exc).__name__)
             return None, by_the_model
         finally:
+            logger.info(_how_it_ended(by_the_model, revision), self._clock() - began)
             if not by_the_model:
                 graphics_card.let_go_of_the_graphics_card()
             elif self._hold is None:

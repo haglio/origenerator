@@ -42,7 +42,7 @@ def settings_used_for(related) -> list[tuple[str, str]]:
             for tile in _tiles(related, (VIDEO_SETTINGS_USED_FOR_ANIMATION_OF,))]
 
 
-POINTING_BACK = ("Requested from", "Modified from", *_MADE_FROM, ANIMATED_USING_VIDEO_SETTINGS_OF)
+POINTING_BACK = ("Requested from", "Batch-modified from", *_MADE_FROM, ANIMATED_USING_VIDEO_SETTINGS_OF)
 
 
 def settings_used_for_tiles(related) -> list:

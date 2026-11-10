@@ -192,7 +192,7 @@ class RelatedMedia(QWidget):
                      if (made := self._item(record["prompt_id"])) is not None]
         for links, is_request, from_heading, into_heading in (
                 (self._requests, True, "Requested from", "Requested into"),
-                (self._modifications, False, "Modified from", "Modified into")):
+                (self._modifications, False, "Batch-modified from", "Batch-modified into")):
             links.show_links(
                 ([(from_heading, made_from)]
                  if made_from is not None and _is_request(request) == is_request else [])

@@ -565,7 +565,8 @@ def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
     view.refresh()
 
     assert _rows(view._tree, "portrait") == ["All"], \
-        "a shape nothing has been made for yet is still somewhere to start a slideshow from"
+        ("the split is what tells a slideshow which screen it is for, so a shape nothing has "
+         "been made for yet is still somewhere to stand and to start a slideshow from")
     assert _under_all(view._tree, "portrait") == ["Experiments", "Trash"], \
         "the collections a first generation of that shape would land in"
     assert "Favorites" in _under_all(view._tree, "landscape")

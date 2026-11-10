@@ -131,7 +131,10 @@ def test_every_control_in_the_window_comes_back_after_a_restart_or_is_no_setting
     unnamed = [widget for widget in win.findChildren(QWidget)
                if _settable(widget) and _address(widget) not in claimed]
 
-    assert not unnamed, "say how a restart brings back: " + "; ".join(map(_described, unnamed))
+    assert not unnamed, (
+        "a control that neither comes back after a restart nor is named as no setting fails, "
+        "the way a Fun Time setting nobody has said either of does; say how a restart brings "
+        "back: " + "; ".join(map(_described, unnamed)))
 
 
 def test_every_control_on_the_osr2_controls_comes_back_after_a_restart_or_is_no_setting(

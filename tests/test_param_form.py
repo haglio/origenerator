@@ -1730,6 +1730,32 @@ def test_a_story_has_no_length_row_and_still_records_the_scenes_total(qtbot):
     assert form.get_values()["frame_count"] == 241
 
 
+def test_a_prompt_under_a_key_the_form_has_never_heard_of_is_a_text_field_too(qtbot):
+    form = ParamForm([ParamDef("a_prompt_added_later", "A Later Prompt", "str", "",
+                               multiline=True),
+                      ParamDef("name", "Name", "str", "")])
+    qtbot.addWidget(form)
+
+    assert len(form.text_fields()) == 1, (
+        "the form finds its prompts by asking which fields are multiline text, never by naming "
+        "keys, so a workflow that grows another prompt has it searched and marked from the day "
+        "it lands")
+
+
+def test_a_drop_zones_help_goes_on_its_label_and_leaves_the_zones_own_tooltip_alone(qtbot):
+    image = ParamDef("input_image", "Input Image", "image", "")
+    form = ParamForm([image])
+    qtbot.addWidget(form)
+    zone = form._widgets["input_image"]
+    assert isinstance(zone, DropZone)
+
+    said = (_label_beside(form, "input_image").toolTip(), zone.toolTip())
+
+    assert said == (definition_help(image), ""), (
+        "a drop zone's tooltip names what it holds, so the setting's help goes on the label "
+        "alone")
+
+
 def test_scene_prompts_are_text_fields_for_find_and_read_back_as_one_story(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)

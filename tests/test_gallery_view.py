@@ -291,7 +291,8 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
 
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    assert "SDXL T2I" in view._folder_path.display_text()
+    assert "SDXL T2I" in view._folder_path.display_text(), (
+        "the title carries the full folder path, which the narrow TOC cuts short")
     assert "All" in view._folder_path.display_text()
 
 
@@ -752,7 +753,9 @@ def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
 
     view._poll()
 
-    assert ticks == [1]
+    assert ticks == [1], (
+        "at every tick, however the lock came about: an image locked from the map, a slideshow "
+        "put back the way it was left, a Funestra locking itself")
 
 
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,

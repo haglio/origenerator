@@ -25,6 +25,7 @@ from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_section import label_column_width, metadata_cells
+from origenerator.gui.param_fields import NOT_KNOWN
 from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
@@ -203,7 +204,7 @@ class _VersionRow(_Row):
         if not pixmap.isNull():
             self._show_thumbnail(pixmap)
         else:
-            self._thumbnail.setText("—")
+            self._thumbnail.setText(NOT_KNOWN)
             self._thumbnail.setToolTip("This version's file is no longer on disk")
         items = []
         if version.settings:

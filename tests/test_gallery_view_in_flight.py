@@ -1041,7 +1041,10 @@ def test_right_clicking_an_inflight_tile_offers_to_cancel_the_run(
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert labels == [["Cancel"]]
+    assert labels == [["Cancel"]], (
+        "a tile is the whole of what the collection shows of a run being made, and it used to "
+        "answer a right-click with nothing at all: stopping the run meant finding it again "
+        "among the Job Queue's rows")
     assert view._jobs.all_jobs == []
 
 
@@ -1107,7 +1110,9 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
 
     view._generating_tile_menu(key, QPoint(0, 0))
 
-    assert labels == [["Cancel"]]
+    assert labels == [["Cancel"]], (
+        "the same act as the button on the tile's face, on the gesture the rest of the Gallery "
+        "pane answers")
     assert view._jobs.all_jobs == []
 
 

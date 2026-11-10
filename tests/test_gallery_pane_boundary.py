@@ -24,12 +24,12 @@ def test_the_panes_own_tests_build_it_with_no_view_in_sight():
 
 def test_the_pane_holds_no_view():
     tree = ast.parse(PANE.read_text(encoding="utf-8"))
-    named = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} \
+    named_by_the_code_itself = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} \
         | {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} \
         | {a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
            for a in n.names}
-    assert "GalleryView" not in named
-    assert "_v" not in named
+    assert "GalleryView" not in named_by_the_code_itself
+    assert "_v" not in named_by_the_code_itself
     init = next(n for n in _class_def(PANE, "GalleryPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [

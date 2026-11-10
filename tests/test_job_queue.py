@@ -426,7 +426,10 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     queue.reconnect_running()
 
     job = next(j for j in queue.jobs.values() if j.prompt_id == "rr")
-    assert job.last_progress == (30, 50)
+    assert job.last_progress == (30, 50), (
+        "the value last shown is saved beside the tracker, so even a job with no recognized "
+        "sampler, whose raw numbers a node at a time leave the tracker nothing to restore, "
+        "comes back at what it last showed")
 
 
 def _image_params(**over):
@@ -1315,6 +1318,20 @@ def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
 
     assert not ended[0].ok
     assert 190 <= ended[0].seconds <= 210
+
+
+def test_a_run_that_fails_while_still_waiting_in_the_line_is_given_no_time(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.start_prepared("k", _I2V, _params())
+    ended = []
+    queue.run_ended.connect(ended.append)
+
+    queue.job_for("k").failed.emit("ComfyUI turned it away")
+
+    assert ended[0].seconds is None, (
+        "the time a run is given is the run itself, never its wait in the line before it")
 
 
 def test_a_background_experiment_reports_itself_as_one(qtbot, tmp_path):

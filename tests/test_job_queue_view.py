@@ -114,7 +114,8 @@ def test_an_empty_line_says_what_it_is_for(queue):
 
     assert queue._hint.isVisible()
     assert queue._hint.text() == EMPTY_QUEUE_TEXT
-    assert queue._hint.objectName() == "estimateLabel"
+    assert queue._hint.objectName() == "estimateLabel", (
+        "in the muted style, it reads as a note about the space, not as a row in it")
 
 
 def test_the_hint_sits_in_the_middle_of_the_whole_strip(queue):
@@ -195,7 +196,8 @@ def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_cor
     frame = queue._running._frame
     top_left = frame.mapTo(queue, frame.rect().topLeft())
 
-    assert frame.width() == frame.height() == queue.height()
+    assert frame.width() == frame.height() == queue.height(), (
+        "the Job Queue draws no top border of its own: the splitter handle above it is that border")
     assert (top_left.x(), top_left.y()) == (0, 0)
 
 
@@ -277,7 +279,8 @@ def test_progress_is_indeterminate_without_step_counts(queue):
 
 def test_the_whole_queue_is_listed_the_job_being_made_first(queue):
     _four(queue)
-    assert queue.keys() == ["a", "b", "c", "d"]
+    assert queue.keys() == ["a", "b", "c", "d"], (
+        "the job being made has a row too, so the rows alone answer what is queued")
 
 
 def test_the_line_moves_up_when_the_leader_finishes(queue):
@@ -461,7 +464,8 @@ def test_an_arrow_its_job_cannot_go_is_grayed_out(queue):
     QApplication.processEvents()
     row = queue.rows()[0]
 
-    assert (row._up.isVisible(), row._up.isEnabled()) == (True, False)
+    assert (row._up.isVisible(), row._up.isEnabled()) == (True, False), (
+        "grayed and not hidden, so the arrows keep their column down the rows")
     assert row._up.cursor().shape() == Qt.CursorShape.ArrowCursor
     assert row._down.isEnabled()
     assert row._down.cursor().shape() == Qt.CursorShape.PointingHandCursor
@@ -889,7 +893,8 @@ def test_the_dragged_row_lights_up_while_it_is_being_dragged(queue, monkeypatch)
 
     _press_and_drag(row, monkeypatch, watch=lit)
 
-    assert lit == [True]
+    assert lit == [True], (
+        "lit while it moves, the drag reads as something the Job Queue offers, not an accident")
     assert row.property("dragging") is False
 
 
@@ -1191,7 +1196,9 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
     mates = (_image(tmp_path / "mate.png"),)
     queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            folder_thumbnails=mates)])
-    assert queue.rows()[0]._thumbs._showing == ("folder", mates)
+    assert queue.rows()[0]._thumbs._showing == ("folder", mates), (
+        "a video queued behind the image it animates has no frame on disk yet, "
+        "and its folder's thumbnails say more than a blank square")
 
 
 def test_a_combine_row_shows_the_frame_and_the_source_video_it_follows(queue, tmp_path):
@@ -1207,7 +1214,8 @@ def test_a_combine_row_keeps_its_source_video_while_the_frame_is_still_rendering
     queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            source_video_thumbnail=video,
                            folder_thumbnails=(_image(tmp_path / "mate.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, video))
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, video)), (
+        "the source video is about this run; the folder says only where it will land")
 
 
 def test_a_combine_row_whose_prompt_was_edited_draws_its_source_video_in_parentheses(queue,

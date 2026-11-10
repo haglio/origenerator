@@ -752,14 +752,14 @@ def test_a_site_video_kino_put_back_meanwhile_stays_where_kino_put_it(tmp_path):
     assert video.read_bytes() == b"site video"
 
 
-def test_a_site_video_whose_name_kinos_trash_already_holds_stays_in_kino(tmp_path):
+def test_a_site_video_whose_name_kinos_trash_already_holds_leaves_kino_beside_the_one_there(tmp_path):
     actions, db, video, kino_trash = _site_video_actions(tmp_path)
     kino_trash.mkdir()
     (kino_trash / "video one.mp4").write_bytes(b"another video")
 
     actions.delete_rows([db.get_generation("v1")])
 
-    assert video.read_bytes() == b"site video"
+    assert not video.exists()
     assert (kino_trash / "video one.mp4").read_bytes() == b"another video"
 
 

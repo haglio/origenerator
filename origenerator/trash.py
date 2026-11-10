@@ -9,6 +9,7 @@ from pathlib import Path
 
 from app_support.file_channel import retried_while_held
 from app_support.flick_folder import flicks_folder_in, trash_folder_beside
+from app_support.trash_names import spot_in_trash
 
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.file_numbers import NUMBERED, next_number, numbered
@@ -179,9 +180,8 @@ class Genau:
 
 
 def take_out_of_play(place: Kino | Genau, video: Path) -> tuple[Path, Path] | None:
-    held = place.waits_at(video)
-    if held.exists():
-        return None
+    waits = place.waits_at(video)
+    held = spot_in_trash(waits.parent, waits.name)
     try:
         held.parent.mkdir(parents=True, exist_ok=True)
         _move(video, held)

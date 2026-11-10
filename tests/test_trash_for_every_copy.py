@@ -96,6 +96,18 @@ class TestAKinoVideoTheGalleryHasNoEntryFor:
         assert stranger.read_bytes() == b"kino video"
         assert library.db.get_generation("brought") is not None
 
+    def test_restore_brings_one_whose_name_the_kino_trash_held_back_and_leaves_the_other(self, tmp_path):
+        library = Library(tmp_path)
+        library.kino.trash.mkdir(parents=True)
+        (library.kino.trash / "video two.mp4").write_bytes(b"trashed before")
+        stranger = library.in_kino("landscape", "sample site", "video two.mp4")
+
+        library.edits.trash_file(stranger)
+        library.edits.restore_deleted(["brought"])
+
+        assert (library.kino.trash / "video two.mp4").read_bytes() == b"trashed before"
+        assert stranger.read_bytes() == b"kino video"
+
     def test_one_that_cannot_be_given_an_entry_stays_in_kino(self, tmp_path):
         library = Library(tmp_path, gives_entries=False)
         stranger = library.in_kino("landscape", "sample site", "video two.mp4")

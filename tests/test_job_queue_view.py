@@ -33,7 +33,7 @@ def queue(qtbot):
     return q
 
 
-ROOM_FOR_A_ROW_BESIDE_SHIELD_ALL_AND_CANCEL_ALL = 1100
+ROOM_BESIDE_SHIELD_ALL_AND_CANCEL_ALL = 1100
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def dressed(qtbot):
     q = JobQueueView()
     q.setStyleSheet(build_stylesheet())
     qtbot.addWidget(q)
-    q.resize(ROOM_FOR_A_ROW_BESIDE_SHIELD_ALL_AND_CANCEL_ALL, 60)
+    q.resize(ROOM_BESIDE_SHIELD_ALL_AND_CANCEL_ALL, 60)
     with qtbot.waitExposed(q):
         q.show()
     return q
@@ -1239,10 +1239,11 @@ def test_a_combine_row_whose_prompt_was_edited_draws_its_source_video_in_parenth
 def test_a_row_that_is_not_a_job_yet_says_so(queue):
     queue.set_items([_item(status="queued", job_kind="Video", action="dancing",
                            cancel=None, starting=True)])
+    assert len(queue.rows()) == 1, (
+        "the row is there as soon as Generate is pressed, so the button never seems to have done nothing")
     row = queue.rows()[0]
 
-    assert row._note_text == "Starting…", (
-        "the row is there as soon as Generate is pressed, so the button never seems to have done nothing")
+    assert row._note_text == "Starting…"
     assert row._lead.text() == "~? · Video · dancing"
     assert not row._cancel.isEnabled()
     assert "Not sent to ComfyUI yet" in row._lead.toolTip()
@@ -1261,10 +1262,10 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
 
     row.resize(row.width() - row._note.width() + room, row.height())
 
-    assert words(row._note).endswith("…"), (
+    assert words(row._note).endswith("…")
+    assert words(row._note) != "Starting…", (
         "the note asks for no width of its own: holding out for its full text, it would widen the row "
         "past the Job Queue and carry what follows off its end")
-    assert words(row._note) != "Starting…"
     assert row._note.toolTip() == "Starting…"
 
 

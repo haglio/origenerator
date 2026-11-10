@@ -371,7 +371,7 @@ def test_a_queued_run_whose_folder_holds_nothing_yet_shows_no_thumbnails(build):
     items = build(sources=_sources([_row("g1")], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1", state="queued")]})))
 
     assert items[0].folder_thumbnails == (), (
-        "a block of empty squares reads as thumbnails that failed to load")
+        "no block, rather than an empty grid")
 
 
 def test_a_workflows_recent_runs_are_what_the_countdown_reads(build):

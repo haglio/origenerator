@@ -194,8 +194,13 @@ def test_populate_is_run_with_no_gallery_and_no_job():
     assert _loaded_after_importing(
         "origenerator.gui.populate_controller", "origenerator.gui.gallery_view") is False, (
         "it reaches the gallery only through the launch it is handed and the outcomes it is told")
-    assert _loaded_after_importing(
-        "origenerator.gui.populate_controller", "origenerator.gui.job_queue") is False
+    for job_module in ("origenerator.gui.job_queue", "origenerator.gui.generation_job"):
+        assert _loaded_after_importing("origenerator.gui.populate_controller", job_module) is False
+
+
+def test_the_lines_rules_ask_no_server():
+    assert _loaded_after_importing("origenerator.queue_line", "origenerator.comfyui_api") is False, (
+        "pure rules, so they are tested with no ComfyUI running")
 
 
 def test_file_refs_leans_on_neither_the_gallery_nor_the_workflows():

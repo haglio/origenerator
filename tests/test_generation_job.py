@@ -112,7 +112,7 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     client.progress.emit("comfy-A", "16", 1, 10)
 
     assert seen == [(405, 818), (446, 818)], (
-        "two video passes of 20 steps, then an audio pass whose 50 steps are budgeted at about a "
+        "two video passes of ten steps, twenty in all, then an audio pass whose 50 steps are budgeted at about a "
         "hundredth of the video's")
     assert job.last_progress == (446, 818)
     assert job.last_pass_progress == (1, 10)
@@ -597,11 +597,13 @@ def test_defer_stops_the_prompt_and_brings_the_job_back_unsent(qtbot, tmp_path):
 
     assert job.defer() is True
 
+    assert client.cancel_prompt.call_count == 1, (
+        "ComfyUI cannot set a run down and pick it up again, so the run is stopped and thrown away")
     client.cancel_prompt.assert_called_once_with("comfy-A")
     client.interrupt.assert_called_once_with("comfy-A")
-    assert job.state == "idle", (
-        "ComfyUI cannot set a run down and pick it up again, so the run is thrown away and starts over")
-    assert job.last_progress == (0, 0)
+    assert job.state == "idle"
+    assert job.last_progress == (0, 0), (
+        "ComfyUI cannot set a run down and pick it up again, so nothing of the stopped run is kept: it starts over")
     assert job.last_pass_progress is None
     assert job.last_stage == ""
     assert job.started_at is None

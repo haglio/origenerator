@@ -28,7 +28,8 @@ def test_the_scrim_lies_over_the_thumbnail_it_is_about(host):
     scrim.cover(thumbnail, "Generating…")
 
     assert scrim.text() == "Generating…"
-    assert scrim.geometry() == thumbnail.geometry(), (
+    assert scrim.geometry() == thumbnail.geometry()
+    assert not thumbnail.isHidden(), (
         "over the thumbnail, never in its place: what is under it is what the user came to look at")
 
 

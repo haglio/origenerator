@@ -71,7 +71,10 @@ REROLL_IMAGE = "image"
 _TILE_SPACING = GAP_MEDIUM
 _PREVIEW_COUNT = 4
 _PAGE = 50
-_NEIGHBORS_PAST_A_REVEAL = 12
+_ROWS_PAST_A_REVEAL_AT_THE_PANES_WIDEST = 3
+_TILES_ACROSS_AT_THE_PANES_WIDEST = 4
+_NEIGHBORS_PAST_A_REVEAL = (_ROWS_PAST_A_REVEAL_AT_THE_PANES_WIDEST
+                           * _TILES_ACROSS_AT_THE_PANES_WIDEST)
 _REACH = 600
 _ROOM_ABOVE_A_SECTIONS_HEADING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
@@ -348,6 +351,7 @@ class GalleryPane(QObject):
         self.show_widget(container)
         self._pages = pages
         self.follow_the_scroll()
+        # Qt has not laid out a pane drawn this turn, so its tiles have no positions yet: asked again once the layout has run.
         defer(self._scroll, self.follow_the_scroll)
 
     def show_empty(self):

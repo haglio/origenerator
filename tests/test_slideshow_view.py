@@ -466,7 +466,7 @@ def _collection_view(qtbot):
 
 
 def _leave_by_double_clicking_the_slide(qtbot, view):
-    gestures.double_click(view._pane._window, _on_the_slide(view))
+    gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud_and_its_corners(view))
     qtbot.waitUntil(lambda: not view.isVisible())
 
 
@@ -1270,7 +1270,7 @@ def test_a_move_of_its_volume_is_told_to_the_gallery(qtbot):
     assert moved == [VolumeHud(volume=100, muted=True)]
 
 
-def _on_the_slide(view) -> QPoint:
+def _on_the_slide_clear_of_the_hud_and_its_corners(view) -> QPoint:
     window = view._pane._window
     return QPoint(window.width() * 3 // 4, window.height() * 3 // 4)
 
@@ -1280,7 +1280,7 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
     closes = []
     view.slideshow.closed.connect(lambda: closes.append(True))
 
-    gestures.double_click(view._pane._window, _on_the_slide(view))
+    gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud_and_its_corners(view))
 
     qtbot.waitUntil(lambda: not view.isVisible())
     assert closes == [True]

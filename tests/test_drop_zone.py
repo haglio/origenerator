@@ -326,6 +326,7 @@ def test_the_item_type_icon_appears_only_once_filled(qtbot, kind):
     zone = _zone(qtbot, kind=kind)
     icon = zone.findChild(ItemTypeIcon)
     assert icon.media_type == kind
+    # Qt's isHidden answers for a widget whose window was never shown.
     assert icon.isHidden()
 
     _drop(zone, "x1")

@@ -1,6 +1,6 @@
 """Qt sizes a button or a label to its whole text as a floor; these elide to whatever width they are given.
 
-``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its own full-line size hint without clamping it to the row.
+``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its own full-line size hint without clamping it to the row, which is why these elide rather than wrap.
 """
 from __future__ import annotations
 

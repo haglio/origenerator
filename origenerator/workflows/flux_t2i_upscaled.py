@@ -23,6 +23,10 @@ from origenerator.workflows.prompt_readers import T5
 
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
+    """Flux is guidance-distilled: it samples at a cfg of 1 with an empty negative, and FluxGuidance is its prompt strength.
+
+    The ComfyUI graph this follows also carried a VRGDG_LLM_Multi prompt-enhancer node, which fed nothing and needs a custom node and an API key.
+    """
     name = "flux_t2i_upscaled"
     version = "v002"
     display_name = "Flux T2I"

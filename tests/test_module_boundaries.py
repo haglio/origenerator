@@ -4,6 +4,7 @@ Each module is imported in a fresh interpreter, because PyQt6 is already loaded 
 """
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
@@ -38,6 +39,9 @@ QT_FREE = (
     "origenerator.gallery_edits",
     "origenerator.run_toast",
     "origenerator.timing",
+    "origenerator.file_refs",
+    "origenerator.generation_metadata",
+    "origenerator.workflows.derived_size",
     "origenerator.item_shape",
     "origenerator.spin_arrows",
     "origenerator.slideshow_buttons",
@@ -96,3 +100,16 @@ OUTSIDE_THE_WIDGETS = (
 def test_the_app_own_machinery_is_not_in_the_widget_package(module):
     assert (REPO_ROOT / "origenerator" / f"{module}.py").exists()
     assert not (REPO_ROOT / "origenerator" / "gui" / f"{module}.py").exists()
+
+
+def test_file_refs_leans_on_neither_the_gallery_nor_the_workflows():
+    assert _loaded_after_importing("origenerator.file_refs", "origenerator.gallery") is False
+    assert _loaded_after_importing("origenerator.file_refs", "origenerator.workflows") is False
+
+
+def test_derived_size_imports_no_workflow_so_the_form_and_the_workflows_share_it():
+    source = (REPO_ROOT / "origenerator" / "workflows" / "derived_size.py").read_text(encoding="utf-8")
+    imported = [node.module for node in ast.walk(ast.parse(source))
+                if isinstance(node, ast.ImportFrom) and node.module]
+
+    assert not [module for module in imported if module.startswith("origenerator.workflows")]

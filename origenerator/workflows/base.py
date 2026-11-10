@@ -11,7 +11,11 @@ from origenerator import points_of_interest
 from origenerator.box_breaks import BOX_BREAK, prompt_boxes, unboxed
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
-from origenerator.workflows.derived_size import measure_derived_size, override_size
+from origenerator.workflows.derived_size import (
+    TARGET_MEGAPIXELS,
+    measure_derived_size,
+    override_size,
+)
 from origenerator.workflows.detail_parts import detail_fix_passes, fix_prompts
 from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
@@ -366,7 +370,8 @@ class WorkflowTemplate(ABC):
         return nodes, joined, cls.video_frames(plan)
 
     @staticmethod
-    def image_size_nodes(image_ref, params: dict, megapixels: float = 0.4) -> SizedInput:
+    def image_size_nodes(image_ref, params: dict,
+                         megapixels: float = TARGET_MEGAPIXELS) -> SizedInput:
         override = override_size(params)
         if override is not None:
             width, height = override

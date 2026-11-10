@@ -31,6 +31,7 @@ _SEAM_FRAMES = 1
 
 
 class Wan22AnimateWorkflow(WorkflowTemplate):
+    """ComfyUI's own video_wan2_2_14B_animate template, in its animation mode."""
     name = "wan22_animate"
     version = "v001"
     display_name = "WAN 2.2 I2V (Moves from a Library Video)"

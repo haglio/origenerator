@@ -27,6 +27,7 @@ from origenerator.workflows.wan_experts import (
 
 
 class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
+    """mpv restarts a looped file's sound along with its frames, so only the frames loop without a seam."""
 
     name = "wan22_flf2v_loop"
     version = "v009"

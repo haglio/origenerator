@@ -83,7 +83,9 @@ def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
 
 def test_a_deleted_items_file_line_leads_with_its_days_in_the_trash():
     file_item = basic_facts(_row(days_in_trash=3)).items[0]
-    assert file_item.value == "(3 days in trash) video/clip.mp4"
+    assert file_item.value == "(3 days in trash) video/clip.mp4", (
+        "the File line is where the user learns what a file is, and for a deleted one "
+        "how long it has sat in the Trash is part of that")
     assert file_item.copy == "clip.mp4"
 
 
@@ -164,7 +166,8 @@ def test_a_passthrough_param_does_not_grow_a_second_block():
     row = _row(params_json=json.dumps({"vae": "x.safetensors"}))
     section = basic_facts(row)
     assert section.title == "Basic"
-    assert [item.label for item in section.items] == ["File", "Created"]
+    assert [item.label for item in section.items] == ["File", "Created"], (
+        "the settings, shown or carried along unshown, live in the form")
 
 
 def test_an_images_block_leaves_its_file_to_the_version_list():
@@ -187,7 +190,9 @@ def test_a_files_row_can_be_pointed_at_a_different_output_folder(tmp_path):
     item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"},
                      places=OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
 
-    assert item.reveal == str(tmp_path / "elsewhere" / "image" / "alpha_00001_.png")
+    assert item.reveal == str(tmp_path / "elsewhere" / "image" / "alpha_00001_.png"), (
+        "the folder is an argument, as it is for its neighbors, so the signature shows the "
+        "disk is read and no test has to patch a module to point it elsewhere")
 
 
 def test_created_reads_the_file_in_the_folder_it_is_given(tmp_path):
@@ -198,7 +203,9 @@ def test_created_reads_the_file_in_the_folder_it_is_given(tmp_path):
     item = created_item({"filename": "alpha_00001_.png", "subfolder": "image"},
                         "never", places=OutputPlaces.in_one_folder(tmp_path / "elsewhere"))
 
-    assert item.value != "never"
+    assert item.value != "never", (
+        "an image's versions were made at different moments, so each is dated from its own file, "
+        "which one date on the row could not do")
 
 
 def test_the_output_folder_still_defaults_to_the_configured_one(tmp_path, monkeypatch):

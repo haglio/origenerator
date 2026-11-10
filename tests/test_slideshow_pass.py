@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from origenerator.gui.slideshow_pass import rotated_onto
+from origenerator.funscript import synthesize_actions, write_funscript
+from origenerator.gui import slideshow_pass
+from origenerator.gui.slideshow_pass import playlist_item, rotated_onto
+from origenerator.media import MediaType
+from origenerator.output_places import OutputPlaces
 
 
 @dataclass
@@ -28,3 +32,16 @@ def test_a_pass_with_nothing_on_screen_or_without_the_slide_on_screen_is_left_al
     assert rotated_onto(items, None) is items
     assert rotated_onto(items, _Slide("z")) is items
     assert rotated_onto(items, _Slide(None)) is items
+
+
+def test_an_upscale_another_site_made_plays_with_the_script_filed_for_it_in_the_library(
+        tmp_path, monkeypatch):
+    library = tmp_path / "videos" / "videos"
+    upscale = library / "kino" / "2D" / "AI" / "landscape" / "example_site" / "video_one_topaz.mp4"
+    script = tmp_path / "videos" / "scripts" / "scripts" / "kino" / "2D" / "AI" / "landscape" / (
+        "example_site/video_one_topaz.funscript")
+    write_funscript(script, synthesize_actions(2.0, hz=1.0))
+    monkeypatch.setattr(slideshow_pass, "OUTPUT_PLACES",
+                        OutputPlaces.in_one_folder(tmp_path / "output", library=library))
+
+    assert playlist_item(upscale, MediaType.VIDEO).funscript == script

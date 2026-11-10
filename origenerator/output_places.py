@@ -29,29 +29,33 @@ class OutputPlaces:
     audio: Path
     trash: Path | None = None
     kino_library: Path | None = None
+    library: Path | None = None
 
     @classmethod
     def in_one_folder(cls, folder: Path, *, trash: Path | None = None,
-                      kino_library: Path | None = None) -> OutputPlaces:
+                      kino_library: Path | None = None,
+                      library: Path | None = None) -> OutputPlaces:
         folder = Path(folder)
         return cls(comfyui=folder, images=folder / IMAGES, videos=folder,
                    scripts=folder / SCRIPTS, audio=folder / AUDIO, trash=trash,
-                   kino_library=kino_library)
+                   kino_library=kino_library, library=library)
 
     @classmethod
     def from_settings(cls, settings: dict, *, comfyui_dir: Path,
                       trash: Path | None = None,
-                      kino_library: Path | None = None) -> OutputPlaces:
+                      kino_library: Path | None = None,
+                      library: Path | None = None) -> OutputPlaces:
         comfyui = Path(settings.get("comfyui_output_dir") or Path(comfyui_dir) / "output")
         images, videos = (settings.get("origenerator_images_dir"),
                             settings.get("origenerator_videos_dir"))
         if not (images and videos):
-            return cls.in_one_folder(comfyui, trash=trash, kino_library=kino_library)
+            return cls.in_one_folder(comfyui, trash=trash, kino_library=kino_library,
+                                     library=library)
         videos = Path(videos)
         return cls(comfyui=comfyui, images=Path(images), videos=videos,
                    scripts=Path(settings.get("origenerator_scripts_dir") or videos / SCRIPTS),
                    audio=Path(settings.get("origenerator_audio_dir") or videos / AUDIO),
-                   trash=trash, kino_library=kino_library)
+                   trash=trash, kino_library=kino_library, library=library)
 
     def folder(self, subfolder: str) -> Path:
         parts = PurePosixPath(subfolder.replace("\\", "/")).parts

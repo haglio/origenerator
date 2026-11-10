@@ -147,6 +147,54 @@ def test_an_upscale_finds_the_script_still_beside_the_video_it_was_made_from(tmp
         "an upscale's path does not say which folder its video was kept in, so each is tried")
 
 
+def _kino_upscale(library: Path) -> Path:
+    upscale = library / "kino" / "2D" / "AI" / "portrait" / "example_site" / "video_one_topaz.mp4"
+    upscale.parent.mkdir(parents=True)
+    upscale.write_bytes(b"v")
+    return upscale
+
+
+def _mirrored_script_of(upscale: Path, library: Path) -> Path:
+    script = (library.parent / "scripts" / "scripts" / upscale.relative_to(library)).with_suffix(".funscript")
+    write_funscript(script, synthesize_actions(2.0, hz=1.0))
+    return script
+
+
+def test_an_upscale_with_no_script_of_this_apps_has_the_one_filed_for_it_in_the_library(tmp_path):
+    library = tmp_path / "videos" / "videos"
+    upscale = _kino_upscale(library)
+    mirrored = _mirrored_script_of(upscale, library)
+
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output", library=library)) == mirrored
+
+
+def test_an_upscale_keeps_this_apps_own_script_over_the_one_filed_in_the_library(tmp_path):
+    library = tmp_path / "videos" / "videos"
+    upscale = _kino_upscale(library)
+    _mirrored_script_of(upscale, library)
+    own = tmp_path / "output" / "funscript" / "video_one.funscript"
+    write_funscript(own, synthesize_actions(5.0, hz=1.0))
+
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output", library=library)) == own
+
+
+def test_an_upscale_with_no_script_filed_anywhere_has_none(tmp_path):
+    library = tmp_path / "videos" / "videos"
+    upscale = _kino_upscale(library)
+    elsewhere = tmp_path / "elsewhere" / "landscape" / "example_site" / "video_two_topaz.mp4"
+
+    for video in (upscale, elsewhere):
+        assert funscript_of(video, places=OutputPlaces.in_one_folder(tmp_path / "output", library=library)) is None
+
+
+def test_an_upscale_has_no_script_from_a_library_it_was_not_told_of(tmp_path):
+    library = tmp_path / "videos" / "videos"
+    upscale = _kino_upscale(library)
+    _mirrored_script_of(upscale, library)
+
+    assert funscript_of(upscale, places=OutputPlaces.in_one_folder(tmp_path / "output")) is None
+
+
 def test_a_video_of_this_apps_own_named_like_an_upscale_keeps_its_own_script(tmp_path):
     video = tmp_path / "video" / "clip_topaz.mp4"
     video.parent.mkdir()

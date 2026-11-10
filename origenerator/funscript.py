@@ -4,7 +4,7 @@ import logging
 from itertools import pairwise
 from pathlib import Path
 
-from app_support.funscript import document, read_actions, script_of, write
+from app_support.funscript import document, read_actions, script_of, scripts_tree_in, write
 from funestra.funscript import Funscript
 from funestra.heatmap import build_heatmap
 
@@ -35,7 +35,7 @@ def _beside(video_path) -> Path:
 def funscript_of(video_path, *, places: OutputPlaces) -> Path | None:
     original = original_stem(video_path)
     if original is not None:
-        return _script_of_upscaled(original, places)
+        return _script_of_upscaled(original, places) or _filed_in_the_library(video_path, places)
     return _first_file([funscript_path_for(video_path, places=places),
                         _filed_under(Path(video_path).stem, places),
                         _beside(video_path)])
@@ -45,8 +45,19 @@ def library_funscript_of(video_path, *, videos_dir, scripts_dir) -> Path | None:
     if not video_path:
         return None
     video = Path(video_path)
-    filed = script_of(video, library=Path(videos_dir), scripts_tree=Path(scripts_dir))
-    return _first_file([*([filed] if filed is not None else []), _beside(video)])
+    return _first_file([*_filed_in(video, Path(videos_dir), Path(scripts_dir)), _beside(video)])
+
+
+def _filed_in_the_library(video_path, places: OutputPlaces) -> Path | None:
+    if places.library is None:
+        return None
+    return _first_file(_filed_in(Path(video_path), places.library,
+                                 scripts_tree_in(places.library.parent)))
+
+
+def _filed_in(video: Path, library: Path, scripts_tree: Path) -> list[Path]:
+    filed = script_of(video, library=library, scripts_tree=scripts_tree)
+    return [] if filed is None else [filed]
 
 
 def _first_file(paths) -> Path | None:

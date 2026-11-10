@@ -104,7 +104,8 @@ KINO_UPSCALES_DIR = kino_folder.upscales_in(KINO_DIR)
 KINO_TRASH_DIR = kino_folder.trash_folder_in(KINO_DIR)
 
 OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR,
-                                           trash=TRASH_DIR, kino_library=KINO_UPSCALES_DIR)
+                                           trash=TRASH_DIR, kino_library=KINO_UPSCALES_DIR,
+                                           library=LIBRARY_VIDEOS_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 COMFYUI_FOLDERS = ComfyFolders(input=COMFYUI_INPUT_DIR, places=OUTPUT_PLACES, temp=COMFYUI_TEMP_DIR,

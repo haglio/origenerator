@@ -17,6 +17,7 @@ from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import (
+    audio_params,
     clip_prompt_nodes,
     conditioning_node,
     driving_video_params,
@@ -25,7 +26,6 @@ from origenerator.comfy_graph import (
     graph_model_params,
     guidance_params,
     input_image_name,
-    sound_params,
     texts_read,
 )
 from origenerator.db import Database, NewGeneration
@@ -44,7 +44,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.record_fold import file_key, fold_record_into, lanes_owed
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import SOURCE_MODEL_PREFIX, soundless_copies_of
+from origenerator.workflows.base import SOURCE_MODEL_PREFIX, silent_copies_of
 
 logger = logging.getLogger(__name__)
 
@@ -176,13 +176,13 @@ def _sidecar_key(file_entry: dict) -> tuple[str, str]:
     return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
 
 
-def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
+def merge_silent_copy_rows(db: Database, *, send_down) -> int:
     rows = db.list_generations()
     video_by_copy_key: dict[tuple[str, str], dict] = {}
     for row in rows:
         files = row_output_files(row)
         if row.get("source") != GenerationSource.IMPORTED and files:
-            for copy in soundless_copies_of(files[:1]):
+            for copy in silent_copies_of(files[:1]):
                 video_by_copy_key[_sidecar_key(copy)] = row
 
     merged = 0
@@ -201,12 +201,12 @@ def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
                            "the copy waits for the next launch",
                            video["prompt_id"], exc_info=True)
             continue
-        _fold_soundless_copy(db, row, video, rows)
+        _fold_silent_copy(db, row, video, rows)
         merged += 1
     return merged
 
 
-def fold_sound_versions_into_their_videos(db: Database) -> int:
+def fold_audio_versions_into_their_videos(db: Database) -> int:
     rows = db.list_generations()
     with_graph_by_file = {file_key(files[0]): row for row in rows
                           if (files := row_output_files(row)) and graph_of(row)}
@@ -215,7 +215,7 @@ def fold_sound_versions_into_their_videos(db: Database) -> int:
         files = row_output_files(row)
         if source_of(row) != GenerationSource.IMPORTED or len(files) != 1 or graph_of(row):
             continue
-        silent = soundless_copies_of(files)
+        silent = silent_copies_of(files)
         video = with_graph_by_file.get(file_key(silent[0])) if silent else None
         if video is None or len(row_output_files(video)) != 1:
             continue
@@ -226,10 +226,10 @@ def fold_sound_versions_into_their_videos(db: Database) -> int:
     return folded
 
 
-def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]) -> None:
+def _fold_silent_copy(db: Database, copy: dict, video: dict, rows: list[dict]) -> None:
     listed = row_output_files(video)
     listed_names = {f.get("filename") for f in listed}
-    unlisted = [c for c in soundless_copies_of(listed[:1]) if c["filename"] not in listed_names]
+    unlisted = [c for c in silent_copies_of(listed[:1]) if c["filename"] not in listed_names]
     db.update_generation(video["prompt_id"], output_files=json.dumps(listed + unlisted))
     fold_record_into(db, rows, copy, video)
     db.delete_generation(copy["prompt_id"])
@@ -586,6 +586,6 @@ def _graph_params(graph: dict) -> dict:
         **sampler_params,
         **guidance_params(graph),
         **graph_model_params(graph),
-        **sound_params(graph),
+        **audio_params(graph),
         **{key: value for key, value in stated if value is not None},
     }

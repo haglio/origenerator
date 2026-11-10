@@ -36,8 +36,8 @@ SECTIONS: tuple[Section, ...] = (
     Section("Size", ("width", "height", "resolution", "aspect_ratio", "quality"),
             collapsed=True),
     Section("Video", ("frame_count", "frame_rate"), collapsed=True),
-    Section("Sound", (
-        "audio_prompt", "audio_negative_prompt", "audio_seed",
+    Section("Audio", (
+        "enable_audio", "audio_prompt", "audio_negative_prompt", "audio_seed",
         "voice", "voice_sample", "voice_sample_text",
     ), collapsed=True),
 )

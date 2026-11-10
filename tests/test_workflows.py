@@ -14,6 +14,7 @@ from origenerator import config, points_of_interest
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.comfy_graph import dual_sampler_model_files, graph_model_params, texts_read
 from origenerator.gui.param_fields import clamped_number
+from origenerator.gui.param_sections import section_title
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.media import MediaType
 from origenerator.workflows import (
@@ -28,6 +29,7 @@ from origenerator.workflows.base import (
     RIFE_CHECKPOINT,
     SINGLE_WINDOW_FRAMES,
     ParamDef,
+    ParamType,
     WorkflowTemplate,
     chained_to,
 )
@@ -1195,7 +1197,7 @@ def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
 
 def test_wan22_flf2v_payload_generates_synced_foley_audio():
     wf = Wan22Flf2vLoopWorkflow()
-    params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3)
+    params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3, enable_audio=True)
     payload = wf.build_api_payload(params)
 
     sampler_id = _node_id(payload, "HunyuanFoleySampler")
@@ -1215,11 +1217,11 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
 def test_foley_duration_never_undercuts_the_models_one_second_floor():
     # ComfyUI's HunyuanFoley rejects durations under one second.
     wf = Wan22Flf2vLoopWorkflow()
-    params = dict(wf.default_params(), frame_count=5, frame_rate=16.0)
+    params = dict(wf.default_params(), frame_count=5, frame_rate=16.0, enable_audio=True)
     payload = wf.build_api_payload(params)
     assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == 1.0
 
-    params = dict(wf.default_params(), frame_count=21, frame_rate=16.0)
+    params = dict(wf.default_params(), frame_count=21, frame_rate=16.0, enable_audio=True)
     payload = wf.build_api_payload(params)
     sampler = _find_node(payload, "HunyuanFoleySampler")
     assert sampler["inputs"]["duration"] == pytest.approx(21 / 16.0)
@@ -1361,6 +1363,7 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
         audio_negative_prompt="music",
         audio_seed=7,
         foley_model="another_foley_model.safetensors",
+        enable_audio=True,
     )
     payload = wf.build_api_payload(params)
 
@@ -2018,7 +2021,7 @@ def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_
 
 def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
     wf = Wan22I2vWorkflow()
-    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481, enable_audio=True))
     written = payload[wf.output_node_id]["inputs"]["images"]
     joined = payload[written[0]]
     pieces = []
@@ -2117,7 +2120,7 @@ def test_each_scene_runs_for_its_own_frames_and_reads_its_own_prompt(name, condi
     wf = WORKFLOW_REGISTRY[name]
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=401, scene_frames=[161, 81, 161],
-        positive_prompt="she waves\n---\nshe turns\n---\nshe walks off"))
+        positive_prompt="she waves\n---\nshe turns\n---\nshe walks off", enable_audio=True))
     segments = _segments(payload, conditioning)
     assert [seg["inputs"]["length"] for seg in segments] == [161, 81, 161]
     assert _scene_texts(payload, conditioning) == ["she waves", "she turns", "she walks off"]
@@ -2146,7 +2149,7 @@ def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
 def test_the_audio_is_scored_for_the_scenes_as_they_add_up(wf):
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=481, scene_frames=[161, 81],
-        positive_prompt="a\n---\nb"))
+        positive_prompt="a\n---\nb", enable_audio=True))
     assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == pytest.approx(241 / 16)
 
 
@@ -2225,7 +2228,7 @@ def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
 @pytest.mark.parametrize("name", _SCORED_VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
     wf = WORKFLOW_REGISTRY[name]
-    params = dict(wf.default_params(), frame_count=81, frame_rate=MAX_PLAYBACK_FPS)
+    params = dict(wf.default_params(), frame_count=81, frame_rate=MAX_PLAYBACK_FPS, enable_audio=True)
     payload = wf.build_api_payload(params)
 
     sampler = _find_node(payload, "HunyuanFoleySampler")["inputs"]
@@ -2260,7 +2263,7 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
 
 _GRAPH_JARGON = re.compile(
     r"CFG|Denoise|Stage|Guidance|Input Image|ControlNet|Scheduler|Shift"
-    r"|\((High|Low|Speech)\)|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
+    r"|\((High|Low|Speech)\)|Sound|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
 )
 
 _NAMES_EVERYONE_USES = {
@@ -2461,3 +2464,21 @@ def test_a_workflow_works_out_once_whether_it_starts_from_an_image(monkeypatch):
 
     assert answers == [True] * 3
     assert len(asked) == 1
+
+
+@pytest.mark.parametrize("workflow", [Wan22Flf2vLoopWorkflow, Wan22I2vWorkflow])
+def test_a_video_is_made_without_audio_unless_its_audio_is_enabled(workflow):
+    wf = workflow()
+    payload = wf.build_api_payload(wf.default_params())
+
+    assert wf.default_params()["enable_audio"] is False
+    assert _find_node(payload, "HunyuanFoleySampler") is None
+    assert "audio" not in _find_node(payload, "VHS_VideoCombine")["inputs"]
+
+
+@pytest.mark.parametrize("workflow", [Wan22Flf2vLoopWorkflow, Wan22I2vWorkflow])
+def test_enable_audio_is_a_switch_first_under_audio(workflow):
+    switch = next(pd for pd in workflow().param_definitions() if pd.key == "enable_audio")
+
+    assert (switch.label, switch.type, switch.switch) == ("Enable Audio", ParamType.BOOL, True)
+    assert section_title("enable_audio") == "Audio"

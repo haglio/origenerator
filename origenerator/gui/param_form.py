@@ -91,7 +91,7 @@ STRENGTH_ONE_HELP = ("Prompt Strength is 1, so the Negative Prompt is not used. 
                      "Raise Prompt Strength above 1 to use it.")
 BOTH_STRENGTHS_ONE_HELP = ("Both Prompt Strengths are 1, so the Negative Prompt is not used. "
                            "Raise either one above 1 to use it.")
-EVERY_SCENE_SPEAKS_HELP = ("Every scene has a line, so the sound is her speaking and this "
+EVERY_SCENE_SPEAKS_HELP = ("Every scene has a line, so the audio is her speaking and this "
                            "prompt is not used. Clear Her Lines on a scene to use it.")
 
 
@@ -106,11 +106,11 @@ _SHOWN_WHILE = {
     "unet_s2v": _speaks,
 }
 
-_SOUND_IN_USE = (lambda values: not _all_speak(values), lambda values: EVERY_SCENE_SPEAKS_HELP)
+_AUDIO_IN_USE = (lambda values: not _all_speak(values), lambda values: EVERY_SCENE_SPEAKS_HELP)
 _IN_USE_WHILE = {
     "negative_prompt": (_pushes_the_prompt, _strength_one_help),
-    "audio_prompt": _SOUND_IN_USE,
-    "audio_negative_prompt": _SOUND_IN_USE,
+    "audio_prompt": _AUDIO_IN_USE,
+    "audio_negative_prompt": _AUDIO_IN_USE,
 }
 
 _DIMENSION_MAX = 8192

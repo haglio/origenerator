@@ -80,7 +80,7 @@ def _landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
     return length if hosted else round(length * ui_scale.HOSTED_SCALE)
 
 
-class _SoundSwitch(QToolButton):
+class _AudioSwitch(QToolButton):
     def set_frozen(self, frozen: bool) -> None:
         self.setStyleSheet(_LIT_WHILE_THE_ROOM_IS_PAUSED if frozen else _LIT)
         self.setIcon(icons.radio_icon(lit_ink=BG_PRIMARY if frozen else None))
@@ -161,8 +161,8 @@ class GalleryPaneButtons(QWidget):
             self.radio = _tool_button(
                 icons.radio_icon(),
                 f"Origenerator Radio: play {RADIO_STATIONS} library videos at once, "
-                "sound only, shuffling endlessly",
-                handlers.toggle_radio, checkable=True, kind=_SoundSwitch,
+                "audio only, shuffling endlessly",
+                handlers.toggle_radio, checkable=True, kind=_AudioSwitch,
             )
             omnipause.holds(self.radio)
             self.mic = _tool_button(

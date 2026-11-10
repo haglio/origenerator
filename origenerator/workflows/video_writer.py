@@ -12,7 +12,7 @@ def video_writer(frames_ref, audio_ref, params: dict) -> dict:
         "class_type": VIDEO_WRITER,
         "inputs": {
             "images": frames_ref,
-            "audio": audio_ref,
+            **({"audio": audio_ref} if audio_ref is not None else {}),
             "frame_rate": playback_rate(params["frame_rate"]),
             "loop_count": 0,
             "filename_prefix": params["filename_prefix"],

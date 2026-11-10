@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from origenerator.db_connection import Store
 from origenerator.media import MediaType
 
-_SOUND_SEED = "audio_seed"
+_AUDIO_SEED = "audio_seed"
 _A_TABS_PICK_FOR_ITS_NEXT_PRESS = timedelta(seconds=5)
 
 
@@ -17,7 +17,7 @@ def give_old_seed_uses_their_kind(conn) -> None:
         " OR EXISTS (SELECT 1 FROM seed_uses AS sound WHERE sound.seed_key = ?"
         " AND sound.kind = seed_uses.kind AND ABS(strftime('%s', sound.created_at)"
         " - strftime('%s', seed_uses.created_at)) <= 1))",
-        (MediaType.VIDEO, _SOUND_SEED, _SOUND_SEED))
+        (MediaType.VIDEO, _AUDIO_SEED, _AUDIO_SEED))
     conn.execute("UPDATE seed_uses SET media_type = ? WHERE media_type IS NULL",
                  (MediaType.IMAGE,))
 

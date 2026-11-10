@@ -18,7 +18,7 @@ from origenerator.prompt_tokens import (
     prompt_readings,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.prompt_readers import SOUND_PROMPT_KEYS
+from origenerator.workflows.prompt_readers import AUDIO_PROMPT_KEYS
 from tests.text_readers import clap_reader, clip_reader, word_reader
 
 _UMT5_FILE = "example_umt5.safetensors"
@@ -194,7 +194,7 @@ def test_a_form_hears_how_each_of_its_prompts_is_read(comfyui, tmp_path):
 
     assert {key: (reading.reads_well, reading.past_it) for key, reading in readings.items()} == {
         "positive_prompt": (511, READ_WHOLE), "negative_prompt": (511, READ_WHOLE),
-        **dict.fromkeys(SOUND_PROMPT_KEYS, (76, CUT_OFF))}
+        **dict.fromkeys(AUDIO_PROMPT_KEYS, (76, CUT_OFF))}
 
 
 def test_a_prompt_whose_text_reader_is_not_installed_is_of_unknown_length(comfyui):
@@ -220,7 +220,7 @@ def test_every_prompt_comfyui_reads_names_its_text_reader(name):
     workflow = WORKFLOW_REGISTRY[name]
     prompts = {key for key in workflow.default_params() if key.endswith("prompt")}
 
-    assert not workflow.generates_here or prompts - set(SOUND_PROMPT_KEYS) <= {
+    assert not workflow.generates_here or prompts - set(AUDIO_PROMPT_KEYS) <= {
         "positive_prompt", "negative_prompt"}
     assert not workflow.generates_here or workflow.text_reader is not None
 

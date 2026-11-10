@@ -92,6 +92,7 @@ def test_float_noise_past_the_sixth_decimal_moves_no_fingerprint():
 _PINNED = {
     "audio_encoder_name": "an_audio_encoder.safetensors",
     "audio_negative_prompt": "hiss",
+    "enable_audio": True,
     "audio_prompt": "waves on shingle",
     "audio_seed": 103,
     "batch_size": 1,

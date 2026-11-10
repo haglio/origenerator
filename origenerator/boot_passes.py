@@ -54,19 +54,19 @@ def _tidy_video_previews(library: Library):
         library.db.list_generations()))
 
 
-def _merge_soundless_copies(library: Library):
+def _merge_silent_copies(library: Library):
     from origenerator.export_lane import EXPORT_LANES_BY_KEY
     from origenerator.importer import (
-        fold_sound_versions_into_their_videos,
-        merge_soundless_copy_rows,
+        fold_audio_versions_into_their_videos,
+        merge_silent_copy_rows,
     )
 
     def send_down(video: dict, lane_key: str) -> None:
         EXPORT_LANES_BY_KEY[lane_key].send_video_of(
             video, db=library.db, inbox=library.inbox, places=library.places)
 
-    return (merge_soundless_copy_rows(library.db, send_down=send_down)
-            + fold_sound_versions_into_their_videos(library.db))
+    return (merge_silent_copy_rows(library.db, send_down=send_down)
+            + fold_audio_versions_into_their_videos(library.db))
 
 
 def _backfill_workflow_labels(library: Library):
@@ -171,7 +171,7 @@ MAINTENANCE = (
     BootPass("Tidying up video previews...", _tidy_video_previews,
              counted="Consolidated %d video sidecar previews and first frames",
              failure="Sidecar consolidation failed: %s"),
-    BootPass(None, _merge_soundless_copies,
+    BootPass(None, _merge_silent_copies,
              counted="Folded %d soundless copies into the videos they came from",
              failure="Folding soundless copies failed: %s"),
     BootPass("Updating workflow labels...", _backfill_workflow_labels,

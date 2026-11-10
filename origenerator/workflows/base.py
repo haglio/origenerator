@@ -196,6 +196,7 @@ class ParamDef:
     good: tuple[float, float] | None = None
     beside_model: str = ""
     folder: str = ""
+    switch: bool = False
 
     def __post_init__(self):
         self.type = ParamType(self.type)
@@ -224,6 +225,7 @@ class WorkflowTemplate(ABC):
     lora_keys: tuple[str, ...] = ()
     text_reader: str | None = None
     loras_keyed_only_when_named: tuple[str, ...] = ()
+    keyed_only_when_on: tuple[str, ...] = ()
     extra_enhance_keys: tuple[str, ...] = ()
     redraw_model_key: str = ""
     redraw_keys: tuple[str, ...] = ()
@@ -545,6 +547,8 @@ class WorkflowTemplate(ABC):
 
     @staticmethod
     def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):
+        if not params["enable_audio"]:
+            return {}, None
         duration = max(1.0, params["frame_count"] / NATIVE_FPS)
         nodes = {
             model_id: {
@@ -664,7 +668,7 @@ class WorkflowTemplate(ABC):
         places = points_of_interest.reported(outputs, parts_found_by(history_data))
         if files and places is not None:
             files[0] = {**files[0], **points_of_interest.kept(places)}
-        files += soundless_copies_of(files)
+        files += silent_copies_of(files)
         if self.base_output_node_id is None:
             return files
         base = _listed_files(outputs.get(self.base_output_node_id, {}))
@@ -688,7 +692,7 @@ def _listed_files(saved_by_node: dict) -> list[dict]:
     return [*saved_by_node.get("images", []), *saved_by_node.get("gifs", [])]
 
 
-def soundless_copies_of(saved: list[dict]) -> list[dict]:
+def silent_copies_of(saved: list[dict]) -> list[dict]:
     copies = []
     for saved_file in saved:
         stem, dot, ext = (saved_file.get("filename") or "").rpartition(".")

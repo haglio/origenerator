@@ -39,6 +39,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     lora_keys = LORA_KEYS_OF_BOTH_PASSES
     text_reader = UMT5
     loras_keyed_only_when_named = LORAS_KEYED_ONLY_WHEN_NAMED
+    keyed_only_when_on = ("enable_audio",)
     output_node_id = "16"
 
     def default_params(self) -> dict:
@@ -68,6 +69,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "lora_high": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
             "lora_low": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
             **wan_expert_lora_defaults(),
+            "enable_audio": False,
             "audio_prompt": "",
             "audio_negative_prompt": "noisy, harsh",
             "audio_seed": 0,
@@ -85,10 +87,11 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                      unit="s", shown_in_seconds_at=NATIVE_FPS),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
+            ParamDef("enable_audio", "Enable Audio", ParamType.BOOL, defaults["enable_audio"], switch=True),
             ParamDef("audio_prompt", "Positive Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
             ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
-            ParamDef("audio_seed", "Sound Seed", ParamType.SEED, defaults["audio_seed"]),
+            ParamDef("audio_seed", "Audio Seed", ParamType.SEED, defaults["audio_seed"]),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=LONGEST_VIDEO_FRAMES, step=4,
                      options=DURATION_OPTIONS, unit="s", shown_in_seconds_at=NATIVE_FPS, good=(17, 49)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(4, 8)),

@@ -88,7 +88,7 @@ _STAGE_NAMES = {
 
 def _sampler_stage(class_type: str, inputs: dict, title: str = "") -> str:
     if class_type == "HunyuanFoleySampler":
-        return "Sound"
+        return "Audio"
     if class_type == "DetailerForEach":
         return title or "Detail fix"
     if class_type == "KSamplerAdvanced":

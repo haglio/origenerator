@@ -68,7 +68,7 @@ def test_a_video_step_is_costed_by_the_length_of_the_video():
 
 def test_every_video_workflow_costs_its_audio_pass_against_its_video_one():
     for name in ("wan22_i2v", "wan22_flf2v_loop"):
-        payload = _payload(name, steps=4)
+        payload = _payload(name, steps=4, enable_audio=True)
         costs = sampler_costs(payload)
         audio = sum(steps * cost for node, (steps, cost) in costs.items()
                     if payload[node]["class_type"] == "HunyuanFoleySampler")
@@ -146,8 +146,8 @@ def test_a_step_that_names_no_node_belongs_to_the_pass_already_running():
 
 
 def test_each_sampler_pass_is_named_the_way_the_form_names_it():
-    names = stage_names(_payload("wan22_i2v", steps=20))
-    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound")
+    names = stage_names(_payload("wan22_i2v", steps=20, enable_audio=True))
+    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Audio")
 
 
 def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):
@@ -163,7 +163,7 @@ def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_
 
 
 def test_the_minutes_before_the_first_step_are_named_too():
-    payload = _payload("wan22_i2v", steps=20)
+    payload = _payload("wan22_i2v", steps=20, enable_audio=True)
     names = stage_names(payload)
     the_high_noise_model, *_ = _ids(payload, "UNETLoader")
     assert names[the_high_noise_model] == "Loading models"
@@ -276,7 +276,7 @@ def test_tracker_unknown_total_passes_raw_numbers_through():
 
 
 def test_tracker_for_payload_sizes_itself_from_the_workflow():
-    tracker = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
+    tracker = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20, enable_audio=True))
     tracker.update(10, 10, "15")
     assert tracker.update(1, 10, "16") == (446, 818)
     tracker.update(10, 10, "16")
@@ -299,8 +299,8 @@ def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():
 def test_a_snapshot_from_when_the_bar_counted_steps_is_not_resumed():
     resumed = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
     resumed.restore({"total": 70, "banked": 10, "stage_max": 10, "last_value": 3})
-    assert resumed.current() == (0, 818)
-    assert resumed.update(4, 10, "15") == (162, 818)
+    assert resumed.current() == (0, 810)
+    assert resumed.update(4, 10, "15") == (162, 810)
 
 
 def test_snapshot_is_json_serializable():

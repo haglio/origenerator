@@ -64,7 +64,7 @@ PARAM_HELP: dict[str, str] = {
         "before it, so the clip is the scenes end to end."
     ),
     "scene_lines": (
-        "What she says in this scene, spoken in the voice set under Sound. A "
+        "What she says in this scene, spoken in the voice set under Audio. A "
         "scene with lines renders on the speaking model, and her speaking is all "
         "that happens in it — its prompts go unused, so a scene is one or the "
         "other. Words past the scene's end are cut; a scene left blank renders "
@@ -100,7 +100,7 @@ PARAM_HELP: dict[str, str] = {
     "video": (
         "The video of the library whose moves the person in the image performs: "
         "the person's pose is read off every frame and performed, the video's "
-        "sound rides along, and its script becomes the result's. The run is "
+        "audio rides along, and its script becomes the result's. The run is "
         "shaped like this video, with the image fitted into that shape. Drop a "
         "video from the gallery on it, or right-click it to paste an Origenerator "
         "name or browse to one of the library's."
@@ -119,8 +119,8 @@ PARAM_HELP: dict[str, str] = {
         "composition. Random draws a fresh one on every Generate."
     ),
     "audio_seed": (
-        "The starting noise for the generated sound, separate from the video's "
-        "seed — re-roll it to get a different take of the same scene's sound."
+        "The starting noise for the generated audio, separate from the video's "
+        "seed — re-roll it to get a different take of the same scene's audio."
     ),
 
     "checkpoint": (
@@ -253,11 +253,15 @@ PARAM_HELP: dict[str, str] = {
         "settles onto the nearest."
     ),
 
+    "enable_audio": (
+        "On, the video is saved with audio: what the prompts below describe, and "
+        "her speaking on scenes with lines. Off, the video is saved with no audio."
+    ),
     "audio_prompt": (
-        "What the generated soundtrack should be — the sounds themselves, not the "
+        "What the generated audio should be — what is heard, not what is seen in the "
         "video. It watches the finished motion while it scores."
     ),
-    "audio_negative_prompt": "Sounds to keep out of the generated soundtrack.",
+    "audio_negative_prompt": "What to keep out of the generated audio.",
 }
 
 

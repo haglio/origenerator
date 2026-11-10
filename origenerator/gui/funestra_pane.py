@@ -60,23 +60,23 @@ class PaneChannel:
 
 
 @dataclass(frozen=True)
-class PaneSound:
+class PaneAudio:
     radio: object = None
     volume: object = None
     on_volume_moved: object = None
 
 
-NO_SOUND = PaneSound()
+NO_AUDIO = PaneAudio()
 
 
 class FunestraPane(QWidget):
     def __init__(self, *, channel: PaneChannel, user, hud, engine_for=None,
-                 sound: PaneSound = NO_SOUND):
+                 audio: PaneAudio = NO_AUDIO):
         super().__init__()
         self._user = user
         self._hud = hud
-        self._radio, self._volume = sound.radio, sound.volume
-        self._on_volume_moved = sound.on_volume_moved
+        self._radio, self._volume = audio.radio, audio.volume
+        self._on_volume_moved = audio.on_volume_moved
         self._engine_for = engine_for
         self._engine = None
         self._funestra: Funestra | None = None

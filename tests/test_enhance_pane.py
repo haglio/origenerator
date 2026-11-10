@@ -1868,7 +1868,7 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
 
     side_by_side = row._thumbnail.sizeHint().width() + row._facts.minimumSize().width()
     assert row.minimumSizeHint().width() < side_by_side, (
-        "side by side, a thumbnail and its facts want more width than a narrow Generate pane has; "
+        "side by side, a thumbnail and its facts want more width than a narrow Generate tab has; "
         "stacked, the row asks for the wider of the two rather than their sum")
 
     host.resize(side_by_side + 60, 400)

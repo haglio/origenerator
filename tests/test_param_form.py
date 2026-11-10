@@ -1036,7 +1036,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     form.set_values({"cfg": 0.85})
 
     assert form.get_values()["cfg"] == 0.85, (
-        "a LoRA strength of 0.85 rounded to 0.8 is a different render, and it is what goes back "
+        "a strength of 0.85 rounded to 0.8 is a different render, and it is what goes back "
         "into the database as the settings")
 
 
@@ -1291,8 +1291,8 @@ def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
     form.set_values({"input_image": wrapped})
 
     assert form.get_values()["input_image"] == "image/sdxl_t2i_00792_.png", (
-        "a displayed path carries zero-width spaces so long names wrap; pasted back, they would "
-        "reach ComfyUI's LoadImage, which then cannot match the file")
+        "a displayed path carries zero-width spaces so long names wrap; pasted back, they and any "
+        "stray whitespace would reach ComfyUI's LoadImage, which then cannot match the file")
 
 
 def test_fields_are_grouped_into_collapsible_sections(qtbot):
@@ -1405,6 +1405,8 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), WorkflowTraits(hidden_keys=wf.enhance_keys()))
     qtbot.addWidget(form)
+    assert "enhance" in form.get_values(), (
+        "still handed on, so the payload always has a value to build from")
     assert form.get_values()["enhance"] is False
 
     form.set_values(dict(wf.default_params(), enhance=True, enhance_steps=44))
@@ -1412,8 +1414,6 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     values = form.get_values()
     assert values["enhance"] is False
     assert values["enhance_steps"] == wf.default_params()["enhance_steps"]
-    assert "enhance" in values, (
-        "still handed on, so the payload always has a value to build from")
 
 
 def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(qtbot):
@@ -1591,13 +1591,13 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     assert (form._widgets["positive_prompt"] is editor is form._widgets["negative_prompt"]
-            is form._widgets["scene_lines"])
+            is form._widgets["scene_lines"]), (
+        "one row stands for the four: a prompt row of the form's own beside the tiles would read as "
+        "the video's, where the tiles' are the scenes'")
     assert len(editor.fields("positive_prompt")) == 1
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
-    assert form._present_keys["Prompts & Seed"] == ["scene_frames"], (
-        "one row stands for the four: a prompt row of the form's own beside the tiles would read as "
-        "the video's, where the tiles' are the scenes'")
+    assert form._present_keys["Prompts & Seed"] == ["scene_frames"]
 
 
 def test_a_scenes_prompts_mark_unpaired_parentheses_and_its_spoken_line_does_not(qtbot):

@@ -1661,7 +1661,8 @@ def test_each_scene_keeps_out_its_own_and_a_new_one_starts_from_the_last(qtbot):
     editor.fields("negative_prompt")[0].setPlainText("blurry")
     editor.add_scene()
     assert editor.fields("negative_prompt")[1].toPlainText() == "blurry", (
-        "a negative mostly holds across a story, so a new scene starts with the one before it")
+        "a negative mostly holds across a story, so a new scene starts with the one before it "
+        "rather than blank, which would mean typing it again")
     editor.fields("negative_prompt")[1].setPlainText("blurry, hats")
     assert form.get_values()["negative_prompt"] == "blurry\n---\nblurry, hats"
 

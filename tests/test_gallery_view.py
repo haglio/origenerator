@@ -2855,8 +2855,8 @@ def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reope
     view.refresh()
 
     assert _key(view._tree.currentItem()) == saved, (
-        "a session saved before the folder list grew shapes names a folder by its own key, "
-        "and reopening must still land on that folder")
+        "a session saved before the TOC grew shapes names a folder by its own key, and "
+        "reopening must still land on that folder")
 
 
 def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_under_it(qtbot):

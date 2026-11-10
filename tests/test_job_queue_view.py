@@ -33,12 +33,15 @@ def queue(qtbot):
     return q
 
 
+ROOM_FOR_A_ROW_BESIDE_SHIELD_ALL_AND_CANCEL_ALL = 1100
+
+
 @pytest.fixture
 def dressed(qtbot):
     q = JobQueueView()
     q.setStyleSheet(build_stylesheet())
     qtbot.addWidget(q)
-    q.resize(1100, 60)
+    q.resize(ROOM_FOR_A_ROW_BESIDE_SHIELD_ALL_AND_CANCEL_ALL, 60)
     with qtbot.waitExposed(q):
         q.show()
     return q
@@ -103,7 +106,8 @@ def _drawn(image, points, color) -> bool:
 
 def test_keeps_its_slot_when_idle(queue):
     queue.set_items([])
-    assert queue.isVisible()
+    assert queue.isVisible(), (
+        "it holds its room with nothing queued, so the panes above it never move on their own")
     assert queue._running.key is None
     assert queue.rows() == []
 
@@ -112,7 +116,8 @@ def test_an_empty_line_says_what_it_is_for(queue):
     queue.set_items([])
     QApplication.processEvents()
 
-    assert queue._hint.isVisible()
+    assert queue._hint.isVisible(), (
+        "a blank half of a laid-out Job Queue reads as something that failed to draw")
     assert queue._hint.text() == EMPTY_QUEUE_TEXT
     assert queue._hint.objectName() == "estimateLabel", (
         "in the muted style, it reads as a note about the space, not as a row in it")
@@ -1134,7 +1139,9 @@ def test_a_row_leads_with_what_the_job_costs_and_what_it_is(queue):
 def test_a_row_says_when_nobody_typed_its_prompt(queue):
     queue.set_items([_item(typical_seconds=30.0, job_kind="Image",
                            populating=True, requested=True)])
-    assert queue.rows()[0]._lead.text() == "~30 sec · Image · Populate · Request"
+    assert queue.rows()[0]._lead.text() == "~30 sec · Image · Populate · Request", (
+        "the two kinds of job that pile up unnoticed: Populate makes one every few seconds, and a "
+        "spoken request never touched a form")
 
 
 def test_a_hand_launched_job_says_neither(queue):
@@ -1145,7 +1152,9 @@ def test_a_hand_launched_job_says_neither(queue):
 def test_a_row_names_the_action_it_was_asked_for(queue):
     queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
                            action="dancing")])
-    assert queue.rows()[0]._lead.text() == "~2 min · Video · dancing"
+    assert queue.rows()[0]._lead.text() == "~2 min · Video · dancing", (
+        "the kind says a video is being made; the action says which, and is the one thing "
+        "separating two runs on the same image")
 
 
 def test_a_run_nobody_picked_an_action_for_names_none(queue):
@@ -1232,7 +1241,8 @@ def test_a_row_that_is_not_a_job_yet_says_so(queue):
                            cancel=None, starting=True)])
     row = queue.rows()[0]
 
-    assert row._note_text == "Starting…"
+    assert row._note_text == "Starting…", (
+        "the row is there as soon as Generate is pressed, so the button never seems to have done nothing")
     assert row._lead.text() == "~? · Video · dancing"
     assert not row._cancel.isEnabled()
     assert "Not sent to ComfyUI yet" in row._lead.toolTip()
@@ -1251,7 +1261,9 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
 
     row.resize(row.width() - row._note.width() + room, row.height())
 
-    assert words(row._note).endswith("…")
+    assert words(row._note).endswith("…"), (
+        "the note asks for no width of its own: holding out for its full text, it would widen the row "
+        "past the Job Queue and carry what follows off its end")
     assert words(row._note) != "Starting…"
     assert row._note.toolTip() == "Starting…"
 

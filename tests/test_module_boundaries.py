@@ -38,6 +38,7 @@ QT_FREE = (
     "origenerator.comfyui_api",
     "origenerator.completion",
     "origenerator.inflight",
+    "origenerator.queue_line",
     "origenerator.favorite_reconcile",
     "origenerator.base_backfill",
     "origenerator.export_lane",
@@ -187,6 +188,14 @@ OUTSIDE_THE_WIDGETS = (
 def test_the_app_own_machinery_is_not_in_the_widget_package(module):
     assert (REPO_ROOT / "origenerator" / f"{module}.py").exists()
     assert not (REPO_ROOT / "origenerator" / "gui" / f"{module}.py").exists()
+
+
+def test_populate_is_run_with_no_gallery_and_no_job():
+    assert _loaded_after_importing(
+        "origenerator.gui.populate_controller", "origenerator.gui.gallery_view") is False, (
+        "it reaches the gallery only through the launch it is handed and the outcomes it is told")
+    assert _loaded_after_importing(
+        "origenerator.gui.populate_controller", "origenerator.gui.job_queue") is False
 
 
 def test_file_refs_leans_on_neither_the_gallery_nor_the_workflows():

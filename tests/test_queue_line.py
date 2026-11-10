@@ -24,12 +24,14 @@ def _video_frame(name=""):
 
 def test_an_image_joins_the_front():
     line = [_video(), _video()]
-    assert queue_line.insertion_index(line, _image()) == 0
+    assert queue_line.insertion_index(line, _image()) == 0, (
+        "an image is seconds of the graphics card, and usually the thing being waited for")
 
 
 def test_a_video_joins_the_back():
     line = [_image(), _video()]
-    assert queue_line.insertion_index(line, _video()) == 2
+    assert queue_line.insertion_index(line, _video()) == 2, (
+        "a video is minutes of the graphics card, and asking for one means later")
 
 
 def test_a_videos_start_frame_joins_the_back_though_it_draws_a_still():
@@ -42,13 +44,16 @@ def test_images_stack_newest_first():
     line = []
     for job in (older := _image("older"), newer := _image("newer")):
         line.insert(queue_line.insertion_index(line, job), job)
-    assert line == [newer, older]
+    assert line == [newer, older], (
+        "the user asks for a variation while looking at the one before it, so the last asked for is "
+        "the one wanted next")
 
 
 def test_work_nobody_asked_for_never_jumps_the_line():
     line = [_video()]
     for source in ("experiment", "base_render"):
-        assert queue_line.insertion_index(line, _job("image", source)) == 1
+        assert queue_line.insertion_index(line, _job("image", source)) == 1, (
+            "there can be a great many such jobs, and the user asked for none of them")
 
 
 def test_what_is_put_first_leads_the_line_and_each_part_keeps_its_order():
@@ -64,7 +69,8 @@ def test_what_is_put_first_leads_the_line_and_each_part_keeps_its_order():
 
 def test_an_unclassifiable_job_is_treated_as_an_image():
     bare = SimpleNamespace()
-    assert queue_line.is_video(bare) is False
+    assert queue_line.is_video(bare) is False, (
+        "images go first and start sooner, so guessing image is the harmless way to be wrong")
     assert queue_line.insertion_index([_video()], bare) == 0
 
 
@@ -117,7 +123,9 @@ def test_work_nobody_asked_for_set_aside_rejoins_at_the_back():
 
 
 def test_a_video_waits_until_a_minute_after_the_last_image_asked_for():
-    assert queue_line.wait_before_starting(_video(), seconds_since_an_image=10) == 50
+    assert queue_line.wait_before_starting(_video(), seconds_since_an_image=10) == 50, (
+        "started within the minute, a video is set aside by the next image, its render thrown away "
+        "and that image slowed by the switch; or, shielded, it keeps that image waiting")
 
 
 def test_an_image_never_waits():

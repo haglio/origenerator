@@ -160,7 +160,9 @@ def test_only_the_rows_still_being_made_get_a_tile(build):
 def test_a_running_row_no_live_job_holds_is_placed_by_the_gallery_s_own_index(
         build, monkeypatch):
     monkeypatch.setattr(gallery, "build_image_config_index",
-                        lambda rows: pytest.fail("the index was built again"))
+                        lambda rows: pytest.fail(
+                            "the index was built again: at every look at the queue, that cost a "
+                            "double-click a fifth of a second"))
 
     items = build([_row("g1", status="running")], image_index={})
 
@@ -237,7 +239,8 @@ def test_the_queues_own_line_orders_the_tiles(build):
 def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(build):
     items = build(sources=_sources([_row("g1"), _row("unadopted")], jobs=FakeJobQueue(order=["g1"])))
 
-    assert [item.key for item in items] == ["g1", "unadopted"]
+    assert [item.key for item in items] == ["g1", "unadopted"], (
+        "a row a restart has not taken back would otherwise jump the queue on screen")
 
 
 def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_the_rest(build):
@@ -363,11 +366,12 @@ def test_a_run_made_from_a_chosen_action_shows_no_source_video(build):
     assert tile.source_video_thumbnail is None
 
 
-def test_a_queued_run_with_no_thumbnail_shows_what_its_folder_already_holds(build):
+def test_a_queued_run_whose_folder_holds_nothing_yet_shows_no_thumbnails(build):
     key = "image/sdxl_t2i/aaa"
     items = build(sources=_sources([_row("g1")], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1", state="queued")]})))
 
-    assert items[0].folder_thumbnails == ()
+    assert items[0].folder_thumbnails == (), (
+        "a block of empty squares reads as thumbnails that failed to load")
 
 
 def test_a_workflows_recent_runs_are_what_the_countdown_reads(build):

@@ -93,17 +93,22 @@ def test_update_item_refreshes_caption_frame_and_stage_in_place(qtbot):
 def test_tile_names_another_apps_hold_instead_of_a_bare_queued(qtbot):
     tile = InFlightTile(_item(status="queued", foreign_ahead=2))
     qtbot.addWidget(tile)
-    assert tile._status_scrim.text() == "Waiting on 2 jobs from another app"
+    assert tile._status_scrim.text() == "Waiting on 2 jobs from another app", (
+        "a bare Queued is the mystery: queued after what? Another app's jobs are the part nothing "
+        "else in this app explains")
+
+
+CLEAR_OF_A_ROLLOVER = 0.5
 
 
 def test_a_video_waiting_out_the_minute_after_an_image_counts_down_to_its_start(qtbot):
-    tile = InFlightTile(_item(status="queued", starts_at=time.monotonic() + 42.5))
+    tile = InFlightTile(_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER))
     qtbot.addWidget(tile)
     assert tile._status_scrim.text() == "Starts in 0:43"
 
 
 def test_the_countdown_advances_between_polls(qtbot):
-    tile = InFlightTile(_item(status="queued", starts_at=time.monotonic() + 42.5))
+    tile = InFlightTile(_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER))
     qtbot.addWidget(tile)
 
     tile._item.starts_at -= 3
@@ -115,23 +120,29 @@ def test_the_countdown_advances_between_polls(qtbot):
 def test_a_queue_of_the_users_own_jobs_says_nothing_extra(qtbot):
     tile = InFlightTile(_item(status="queued", foreign_ahead=0))
     qtbot.addWidget(tile)
-    assert tile._status_scrim.text() == "Queued…"
+    assert tile._status_scrim.text() == "Queued…", (
+        "a wait on the user's own queue is no mystery")
 
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
     tile = InFlightTile(_item(status="running", progress=(10, 20),
                               started_at=time.time() - 90.5, typical_seconds=725.0))
     qtbot.addWidget(tile)
-    assert tile._bar.caption() == "50% · ~6:02 left"
+    assert tile._bar.caption() == "50% · ~6:02 left", (
+        "a percentage that lived only in the Job Queue left the tile and the queue each telling half "
+        "of one story")
     assert (tile._bar.value(), tile._bar.maximum()) == (10, 20)
 
 
 def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
     tile = InFlightTile(_item(status="queued", started_at=None, typical_seconds=724.0))
     qtbot.addWidget(tile)
-    assert tile._bar.caption() == ""
+    assert tile._bar.caption() == "", (
+        "an unstarted job's wait is the Job Queue's to explain, not a zero counting up over a bar that "
+        "has not moved")
     assert tile._bar.maximum() == 0
-    assert not tile._tick.isActive()
+    assert not tile._tick.isActive(), (
+        "ticking a clock that cannot change would only redraw the same line")
 
 
 def test_the_clock_advances_between_polls(qtbot):
@@ -150,7 +161,9 @@ def test_the_bar_sits_along_the_foot_of_the_frame(qtbot):
     qtbot.addWidget(tile)
     frame, bar = tile._image.geometry(), tile._bar.geometry()
 
-    assert frame.contains(bar)
+    assert frame.contains(bar), (
+        "the bar rides over the frame, taking no row of its own, so the thumbnail keeps the height a "
+        "finished tile's has")
     assert bar.top() > frame.center().y()
 
 
@@ -172,14 +185,17 @@ def test_a_queued_run_stands_what_it_came_from_behind_the_wait(qtbot, tmp_path):
     tile = InFlightTile(_item(status="queued", source_file=_source_file(tmp_path)))
     qtbot.addWidget(tile)
 
-    assert not tile._image.pixmap().isNull()
+    assert not tile._image.pixmap().isNull(), (
+        "a line of queued runs is otherwise a line of identical blank plates")
 
 
 def test_a_run_that_came_from_nothing_keeps_its_plain_plate(qtbot):
     tile = InFlightTile(_item(status="queued", source_file=None))
     qtbot.addWidget(tile)
 
-    assert tile._image.pixmap().isNull()
+    assert tile._image.pixmap().isNull(), (
+        "no stand-in picture would be a true one: a queued image with nothing behind it does look "
+        "like every other")
 
 
 def test_the_run_s_own_frame_replaces_what_it_came_from(qtbot, tmp_path):

@@ -29,9 +29,12 @@ def styled_button(qtbot):
     return b
 
 
+_CLEAR_OF_THE_BORDER = 4
+
+
 def _face(button):
     image = button.grab().toImage()
-    return image.pixelColor(button.width() - 4, button.height() // 2)
+    return image.pixelColor(button.width() - _CLEAR_OF_THE_BORDER, button.height() // 2)
 
 
 def test_idle_reads_generate(button):
@@ -43,7 +46,9 @@ def test_the_button_keeps_the_primary_blue_with_a_run_in_flight(styled_button):
 
 
 def test_the_button_tracks_no_run(button):
-    assert not hasattr(button, "set_progress")
+    assert not hasattr(button, "set_progress"), (
+        "the Job Queue and the run's tile already show a run; a third account here would tie the "
+        "control that starts work to the state of work already going")
     assert not hasattr(button, "start")
     assert not hasattr(button, "finish")
 
